@@ -28,7 +28,7 @@ galactic-empire-reborn/
     ge-source/      ← Original C source. READ ONLY. Never modify.
   backend/          ← NestJS application
   frontend/         ← React/Vite application
-  docs/             ← Architecture decisions and notes
+  docs/             ← Living architecture documentation (always keep current)
   specs/            ← spec-kit feature specs
   docker-compose.yml
   CLAUDE.md         ← This file
@@ -116,6 +116,7 @@ the original C source** in `/reference/ge-source/` before implementation.
 | `GEDROIDS.C` | Droid AI behavior (incl. Murdonian Transport) |
 | `GEPLANET.C` | Planet mechanics |
 | `GEGLOBAL.H` | Global variable declarations |
+| `reference/wiki/` | Human-readable game mechanics from the GE wiki — use alongside C source |
 
 **Preserve balance constants from `GEMAIN.H` exactly** unless there is a
 documented reason to deviate. Key constants include:
@@ -135,6 +136,32 @@ documented reason to deviate. Key constants include:
 #define CYB_BE_EASY 60      // Kills before Cybertrons get really mean
 ```
 
+## Testing Standards (first-class requirement)
+
+Testing is not optional. No feature is complete without tests.
+
+- **Write tests before or alongside implementation** — never after
+- **Unit tests** for all game logic: physics, combat math, command parsing,
+  AI behavior, scoring, midnight job
+- **Integration tests** for WebSocket events, tick engine behavior, DB flush
+- **E2E tests** for critical player flows: login, command input, combat,
+  planet interaction
+- **Balance regression tests** — every constant in `GEMAIN.H` that affects
+  gameplay must have a test that fails if the constant changes
+- **AI behavior tests** must run in isolation without a live game world
+- **Midnight job** must be tested for idempotency — running it twice must
+  produce identical results
+- **Tick engine** must be testable with a fake clock — no real timers in tests
+
+## Code Quality
+
+- TypeScript strict mode — no `any`, no implicit types
+- All public service methods must have JSDoc that references the original C
+  source function where applicable (e.g. `@see GEFUNCS.C:cdistance`)
+- Prisma migrations are never edited after creation — always add new ones
+- Docker Compose must work for both development and production
+- No feature ships without passing CI
+
 ## Spec-Driven Development
 
 This project uses **spec-kit** for all feature development.
@@ -142,11 +169,18 @@ This project uses **spec-kit** for all feature development.
 Before implementing any feature in Claude Code:
 
 ```
-/speckit.constitution   ← run once at project start
-/speckit.specify        ← define the feature (what + why)
-/speckit.plan           ← technical implementation plan
-/speckit.tasks          ← break into actionable tasks
-/speckit.implement      ← execute
+/speckit-constitution   ← run once at project start
+/speckit-specify        ← define the feature (what + why)
+/speckit-plan           ← technical implementation plan
+/speckit-tasks          ← generate actionable tasks
+/speckit-implement      ← execute
+```
+
+Optional enhancement skills (use where valuable):
+```
+/speckit-clarify        ← de-risk ambiguous areas before planning
+/speckit-analyze        ← cross-artifact consistency check before implement
+/speckit-checklist      ← validate requirements completeness after plan
 ```
 
 Specs live in `/specs/` at the repo root, one folder per feature branch.
@@ -162,6 +196,62 @@ Specs live in `/specs/` at the repo root, one folder per feature branch.
 8. `008-droid-ai` — Ephemeral Droid + Murdonian Transport
 9. `009-midnight-job` — Scoring, production reports, mail purge
 10. `010-react-frontend` — Terminal UI, ASCII map, command input, event log
+
+## Living Documentation (always keep current)
+
+These files in `docs/` are the handoff point between Claude Code sessions
+and the Claude Project used for planning. **Update them at the end of every
+implement session — do not skip this step.**
+
+| File | Purpose | Update when |
+|------|---------|-------------|
+| `docs/ARCHITECTURE.md` | Module map, responsibilities, data flow | Any structural change |
+| `docs/DECISIONS.md` | Why things are the way they are | Any architecture decision |
+| `docs/PROGRESS.md` | What's built, what's next, known issues | Every completed feature |
+| `docs/DATA_MODEL.md` | Entities, fields, relationships in plain English | Schema changes |
+| `docs/GAME_MECHANICS.md` | Implemented mechanics with C source references | Each mechanic lands |
+
+### docs/ARCHITECTURE.md format
+
+Plain text module map. Keep it current — no diagrams needed. Example:
+
+```
+GameGateway (gateway/)
+  └── receives player commands via Socket.io
+  └── routes to CommandService
+  └── broadcasts tick events to sector rooms
+
+TickService (game/tick/)
+  └── drives 1s ship update tick
+  └── drives 6s physics tick
+  └── calls ShipService, CombatService, CybertronService, DroidService
+
+ShipService (game/ship/)
+  └── owns in-memory Map<shipId, ShipState>
+  └── flushes to Postgres async every 30s or on significant state change
+  └── source of truth for all active ship state
+```
+
+### docs/DECISIONS.md format
+
+```
+## [date] — Decision title
+**Context:** why this came up
+**Decision:** what was decided
+**Reason:** why
+**Alternatives rejected:** what else was considered and why not
+```
+
+### docs/PROGRESS.md format
+
+```
+## [date] — feature name
+**Completed:** what was built
+**Tests:** what is covered and at what level
+**Decisions made:** any deviations from plan
+**Next:** what comes next
+**Known issues:** anything deferred
+```
 
 ## Fidelity Goals
 
