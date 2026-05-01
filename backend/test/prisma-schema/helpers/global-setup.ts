@@ -1,5 +1,15 @@
 import { execSync } from "child_process";
+import fs from "fs";
 import path from "path";
+
+// Load .env before globalSetup so TEST_DATABASE_URL is available without manual env injection
+const envPath = path.resolve(__dirname, "../../../.env");
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) process.env[match[1].trim()] ??= match[2].trim().replace(/^"|"$/g, "");
+  }
+}
 
 export default async function globalSetup(): Promise<void> {
   const url = process.env.TEST_DATABASE_URL;
