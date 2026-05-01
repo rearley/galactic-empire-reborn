@@ -1,0 +1,471 @@
+// Galactic Empire Reborn — Prisma Schema
+// All models trace to reference/ge-source/GEMAIN.H or reference/wiki/*-ships.md
+// See specs/001-prisma-schema/data-model.md for column-level citations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User (WARUSR) ──────────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:292 — WARUSR struct
+// Excludes waste[40] (GEMAIN.H:295) and filler[...] (GEMAIN.H:308) — FR-003.
+
+model User {
+  /// WARUSR.userid[UIDSIZ=30] — player login name, primary key
+  userid     String  @id
+  /// WARUSR.score — accumulated score; BigInt per FR-036
+  score      BigInt  @default(0)
+  /// WARUSR.noships
+  noships    Int     @default(0)
+  /// WARUSR.topshipno
+  topshipno  Int     @default(0)
+  /// WARUSR.kills
+  kills      Int     @default(0)
+  /// WARUSR.rospos
+  rospos     Int     @default(0)
+  /// WARUSR.planets
+  planets    Int     @default(0)
+  /// WARUSR.cash — BigInt per FR-036
+  cash       BigInt  @default(0)
+  /// WARUSR.debt — BigInt per FR-036
+  debt       BigInt  @default(0)
+  /// WARUSR.plscore — BigInt per FR-036
+  plscore    BigInt  @default(0)
+  /// WARUSR.klscore — BigInt per FR-036
+  klscore    BigInt  @default(0)
+  /// WARUSR.population — BigInt per FR-036
+  population BigInt  @default(0)
+  /// WARUSR.options[30] — player option flags; native array per FR-034
+  options    Int[]
+  /// WARUSR.teamcode — no FK; dangling teamcode tolerated per original game behavior (R-3)
+  teamcode   BigInt?
+
+  ships     Ship[]
+  mails     Mail[]
+  mailStats MailStat[]
+}
+
+// ─── Ship (WARSHP) ──────────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:316 — WARSHP struct
+// Excludes filler[...] (GEMAIN.H:384) — FR-010.
+// Parallel arrays per FR-035: ltorps → channel+distance; lmissl → channel+distance+energy.
+
+model Ship {
+  /// WARSHP.userid[UIDSIZ] — FK to User (R-3: enforced)
+  userid          String
+  /// WARSHP.shipno — ship id number; composite PK with userid (SHPKEY, FR-009)
+  shipno          Int
+  /// WARSHP.shipname[35]
+  shipname        String
+  /// WARSHP.shpclass — resolves to ShipClass.classNumber (FR-027); not an FK
+  shpclass        Int
+  /// WARSHP.heading — double precision per FR-033
+  heading         Float  @default(0)
+  /// WARSHP.head2b
+  head2b          Float  @default(0)
+  /// WARSHP.speed
+  speed           Float  @default(0)
+  /// WARSHP.speed2b
+  speed2b         Float  @default(0)
+  /// WARSHP.coord.xcoord — COORD struct (GEMAIN.H:261); FR-033
+  xcoord          Float  @default(0)
+  /// WARSHP.coord.ycoord
+  ycoord          Float  @default(0)
+  /// WARSHP.damage
+  damage          Float  @default(0)
+  /// WARSHP.energy
+  energy          Float  @default(0)
+  /// WARSHP.phasr
+  phasr           Float  @default(0)
+  /// WARSHP.phasrtype — byte; meaning enforced in code
+  phasrtype       Int    @default(0)
+  /// WARSHP.kills
+  kills           Int    @default(0)
+  /// WARSHP.lastfired
+  lastfired       Int    @default(0)
+  /// WARSHP.shieldtype
+  shieldtype      Int    @default(0)
+  /// WARSHP.shieldstat
+  shieldstat      Int    @default(0)
+  /// WARSHP.shield
+  shield          Int    @default(0)
+  /// WARSHP.cloak
+  cloak           Int    @default(0)
+  /// WARSHP.degrees
+  degrees         Int    @default(0)
+  /// WARSHP.percent
+  percent         Int    @default(0)
+  /// WARSHP.tactical
+  tactical        Int    @default(0)
+  /// WARSHP.helm
+  helm            Int    @default(0)
+  /// WARSHP.train
+  train           Int    @default(0)
+  /// WARSHP.where — hyperspace flag
+  where           Int    @default(0)
+  /// WARSHP.ltorps[MAXTORPS=3].channel — parallel array per FR-035
+  ltorpsChannel   Int[]
+  /// WARSHP.ltorps[MAXTORPS=3].distance
+  ltorpsDistance  Int[]
+  /// WARSHP.lmissl[MAXMISSL=3].channel — parallel array per FR-035
+  lmisslChannel   Int[]
+  /// WARSHP.lmissl[MAXMISSL=3].distance
+  lmisslDistance  Int[]
+  /// WARSHP.lmissl[MAXMISSL=3].energy
+  lmisslEnergy    Int[]
+  /// WARSHP.decout[MAXDECOY=10] — decoys out; native array per FR-034
+  decout          Int[]
+  /// WARSHP.jammer
+  jammer          Int    @default(0)
+  /// WARSHP.freq[3] — subspace/hyperspace/planetary frequencies
+  freq            Int[]
+  /// WARSHP.items[NUMITEMS=14] — cargo quantities; BigInt per FR-037, native array per FR-034
+  items           BigInt[]
+  /// WARSHP.titem
+  titem           Int    @default(0)
+  /// WARSHP.hostile
+  hostile         Int    @default(0)
+  /// WARSHP.cantexit
+  cantexit        Int    @default(0)
+  /// WARSHP.repair
+  repair          Int    @default(0)
+  /// WARSHP.hypha
+  hypha           Int    @default(0)
+  /// WARSHP.firecntl
+  firecntl        Int    @default(0)
+  /// WARSHP.destruct — byte
+  destruct        Int    @default(0)
+  /// WARSHP.status — byte; record status
+  status          Int    @default(0)
+  /// WARSHP.cybmine
+  cybmine         Int    @default(0)
+  /// WARSHP.cybskill
+  cybskill        Int    @default(0)
+  /// WARSHP.cybupdate
+  cybupdate       Int    @default(0)
+  /// WARSHP.tick
+  tick            Int    @default(0)
+  /// WARSHP.emulate
+  emulate         Int    @default(0)
+  /// WARSHP.minesnear
+  minesnear       Int    @default(0)
+  /// WARSHP.lock — locked-on ship number
+  lock            Int    @default(0)
+  /// WARSHP.holdcourse
+  holdcourse      Int    @default(0)
+  /// WARSHP.topspeed
+  topspeed        Int    @default(0)
+  /// WARSHP.warncntr
+  warncntr        Int    @default(0)
+
+  user User @relation(fields: [userid], references: [userid])
+
+  @@id([userid, shipno])
+}
+
+// ─── Sector (GALSECT) ───────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:424 — GALSECT struct
+// Excludes ptab[MAXPLANETS] and filler (FR-013); planet data lives in Planet.
+
+model Sector {
+  /// GALSECT.xsect
+  xsect   Int
+  /// GALSECT.ysect
+  ysect   Int
+  /// GALSECT.plnum — always 0 for sectors
+  plnum   Int @default(0)
+  /// GALSECT.type
+  type    Int @default(0)
+  /// GALSECT.numplan
+  numplan Int @default(0)
+
+  @@id([xsect, ysect])
+}
+
+// ─── Planet (GALPLNT + ITEM) ─────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:438 — GALPLNT struct
+// @see reference/ge-source/GEMAIN.H:394 — ITEM struct
+// Excludes filler[...] (GEMAIN.H:460) — FR-032.
+// ITEM substructure stored as 6 parallel arrays per FR-034/FR-035.
+
+model Planet {
+  /// GALPLNT.xsect
+  xsect       Int
+  /// GALPLNT.ysect
+  ysect       Int
+  /// GALPLNT.plnum — planet number within sector; composite PK (PKEY, FR-015)
+  plnum       Int
+  /// GALPLNT.type
+  type        Int    @default(0)
+  /// GALPLNT.coord.xcoord
+  xcoord      Float  @default(0)
+  /// GALPLNT.coord.ycoord
+  ycoord      Float  @default(0)
+  /// GALPLNT.userid — owner; nullable, no FK (R-3: ownership flips without strict ref-check)
+  userid      String?
+  /// GALPLNT.name[20]
+  name        String @default("")
+  /// GALPLNT.enviorn — environment factor
+  enviorn     Int    @default(0)
+  /// GALPLNT.resource
+  resource    Int    @default(0)
+  /// GALPLNT.cash — BigInt per FR-036
+  cash        BigInt @default(0)
+  /// GALPLNT.debt — BigInt per FR-036
+  debt        BigInt @default(0)
+  /// GALPLNT.tax — BigInt per FR-036
+  tax         BigInt @default(0)
+  /// GALPLNT.taxrate
+  taxrate     Int    @default(0)
+  /// GALPLNT.warnings
+  warnings    Int    @default(0)
+  /// GALPLNT.password[10]
+  password    String @default("")
+  /// GALPLNT.lastattack[UIDSIZ=30] — no FK (R-3: may reference deleted user)
+  lastattack  String @default("")
+  /// GALPLNT.beacon[BEACONMSGSZ=75] — sector announcement message
+  beacon      String @default("")
+  /// GALPLNT.spyowner[UIDSIZ=30] — no FK
+  spyowner    String @default("")
+  /// GALPLNT.technology
+  technology  Int    @default(0)
+  /// GALPLNT.teamcode — no FK (R-3)
+  teamcode    BigInt @default(0)
+
+  // ITEM substructure — parallel arrays, one column per ITEM field, NUMITEMS=14 entries each
+  /// ITEM.qty[NUMITEMS] — BigInt per FR-037
+  itemsQty      BigInt[]
+  /// ITEM.rate[NUMITEMS]
+  itemsRate     Int[]
+  /// ITEM.sell[NUMITEMS] — stored as Int; 0=false, 1=true
+  itemsSell     Int[]
+  /// ITEM.reserve[NUMITEMS]
+  itemsReserve  Int[]
+  /// ITEM.markup2a[NUMITEMS]
+  itemsMarkup2a Int[]
+  /// ITEM.sold2a[NUMITEMS] — BigInt per FR-037
+  itemsSold2a   BigInt[]
+
+  @@id([xsect, ysect, plnum])
+}
+
+// ─── Wormhole (GALWORM) ──────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:467 — GALWORM struct
+
+model Wormhole {
+  /// GALWORM.xsect
+  xsect      Int
+  /// GALWORM.ysect
+  ysect      Int
+  /// GALWORM.plnum
+  plnum      Int
+  /// GALWORM.type
+  type       Int   @default(0)
+  /// GALWORM.coord.xcoord — origin position
+  xcoord     Float @default(0)
+  /// GALWORM.coord.ycoord
+  ycoord     Float @default(0)
+  /// GALWORM.visible — is the wormhole visible flag
+  visible    Int   @default(0)
+  /// GALWORM.destination.xcoord — destination COORD
+  destXcoord Float @default(0)
+  /// GALWORM.destination.ycoord
+  destYcoord Float @default(0)
+  /// GALWORM.name[20]
+  name       String @default("")
+
+  @@id([xsect, ysect, plnum])
+}
+
+// ─── Team (TEAM) ─────────────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:645 — TEAM struct
+
+model Team {
+  /// TEAM.teamcode — long; primary key; BigInt for 32-bit signed range
+  teamcode  BigInt @id
+  /// TEAM.teamname[31]
+  teamname  String @default("")
+  /// TEAM.teamcount
+  teamcount Int    @default(0)
+  /// TEAM.teamscore — BigInt; accumulates across the game lifetime
+  teamscore BigInt @default(0)
+  /// TEAM.password[11]
+  password  String @default("")
+  /// TEAM.secret[11]
+  secret    String @default("")
+  /// TEAM.flag
+  flag      Int    @default(0)
+}
+
+// ─── Mail (MAIL) ─────────────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:511 — MAIL struct
+// Key: (userid, class, msgno) per MAILKEY (GEMAIN.H:501) — FR-022.
+// Excludes filler[...] (GEMAIN.H:526) — FR-032.
+
+model Mail {
+  /// MAIL.userid[UIDSIZ] — FK to User (enforced, R-3)
+  userid  String
+  /// MAILKEY.class — mail class 1..5 (FR-023); plain Int, not enum
+  class   Int
+  /// MAILKEY.msgno — long; BigInt
+  msgno   BigInt
+  /// MAIL.type
+  type    Int    @default(0)
+  /// MAIL.stamp
+  stamp   Int    @default(0)
+  /// MAIL.dtime[20]
+  dtime   String @default("")
+  /// MAIL.topic[30]
+  topic   String @default("")
+  /// MAIL.string1[80]
+  string1 String @default("")
+  /// MAIL.name1[25]
+  name1   String @default("")
+  /// MAIL.name2[25]
+  name2   String @default("")
+  /// MAIL.int1
+  int1    Int    @default(0)
+  /// MAIL.int2
+  int2    Int    @default(0)
+  /// MAIL.int3
+  int3    Int    @default(0)
+  /// MAIL.long1 — widened to BigInt for consistency with open-ended payload
+  long1   BigInt @default(0)
+  /// MAIL.long2
+  long2   BigInt @default(0)
+  /// MAIL.long3
+  long3   BigInt @default(0)
+
+  user User @relation(fields: [userid], references: [userid])
+
+  @@id([userid, class, msgno])
+}
+
+// ─── MailStat (MAILSTAT) ─────────────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:531 — MAILSTAT struct
+// Separate model from Mail; the original game stores both in a shared Btrieve
+// file via union semantics. In Postgres a separate table is cleaner.
+// Excludes filler[...] (GEMAIN.H:545) — FR-032.
+
+model MailStat {
+  /// MAILSTAT.userid[UIDSIZ] — FK to User (enforced)
+  userid  String
+  /// MAILKEY.class
+  class   Int
+  /// MAILKEY.msgno
+  msgno   BigInt
+  /// MAILSTAT.type
+  type    Int    @default(0)
+  /// MAILSTAT.stamp
+  stamp   Int    @default(0)
+  /// MAILSTAT.dtime[20]
+  dtime   String @default("")
+  /// MAILSTAT.topic[30]
+  topic   String @default("")
+  /// MAILSTAT.name1[25]
+  name1   String @default("")
+  /// MAILSTAT.int1
+  int1    Int    @default(0)
+  /// MAILSTAT.int2
+  int2    Int    @default(0)
+  /// MAILSTAT.cash — BigInt per FR-036
+  cash    BigInt @default(0)
+  /// MAILSTAT.debt
+  debt    BigInt @default(0)
+  /// MAILSTAT.tax
+  tax     BigInt @default(0)
+  /// MAILSTAT.itemqty[NUMITEMS=14] — BigInt[] per FR-037, native array per FR-034
+  itemqty BigInt[]
+
+  user User @relation(fields: [userid], references: [userid])
+
+  @@id([userid, class, msgno])
+}
+
+// ─── ShipClass (wiki tables) ─────────────────────────────────────────────────
+// @see reference/wiki/player-ships.md — player classes 1,2,3,4,5,6,7,8,9,34
+// @see reference/wiki/cpu-ships.md — CPU classes 21,22,23,24,25,31,32,33
+// Seeded via backend/prisma/seed/ship-classes.ts (18 rows total).
+
+model ShipClass {
+  /// Wiki "#" column — the class number referenced by WARSHP.shpclass
+  classNumber            Int     @id
+  /// Wiki "Class" / type label (e.g. "Interceptor", "Cybertron Scout")
+  typeName               String
+  /// Wiki "Name" column — ship name template; CPU ships use "###" suffix placeholder
+  shipNameTemplate       String
+  /// Category: "PLAYER", "CPU_COMBATIVE", or "CPU_DROID"
+  category               String
+  /// Wiki Shi — max shield level
+  maxShields             Int
+  /// Wiki Pha — max phaser level
+  maxPhaser              Int
+  /// Wiki Tor
+  hasTorpedo             Boolean
+  /// Wiki Mis
+  hasMissile             Boolean
+  /// Wiki Dec
+  hasDecoy               Boolean
+  /// Wiki Jam
+  hasJammer              Boolean
+  /// Wiki Zip
+  hasZipper              Boolean
+  /// Wiki Mine/Min
+  hasMine                Boolean
+  /// Wiki Atck/Att — can attack planets
+  canAttackPlanet        Boolean
+  /// Wiki Clo — has cloaking device
+  hasCloak               Boolean
+  /// Wiki Acc — max acceleration (normalized integer)
+  maxAcceleration        Int
+  /// Wiki Warp — max warp factor
+  maxWarp                Int
+  /// Wiki Tons — cargo/hull tonnage (normalized integer)
+  maxTons                Int
+  /// Wiki Price — player purchase price; BigInt to accommodate 32m (Death Star); 0 for CPU ships
+  maxPrice               BigInt
+  /// Wiki Scan — scan range (normalized integer)
+  scanRange              Int
+  /// Wiki Pts — score points awarded on kill
+  points                 Int
+  /// Wiki Dmg — damage factor
+  damageFactor           Int
+  /// Wiki Cyb — Cybertrons will attack this ship class (player table); false for CPU ships
+  cybCanAttack           Boolean
+  /// Wiki Cyb# — lowest class Cybertron that will attack (player table); 0 for CPU
+  cybLowestClassAttacks  Int
+  /// Wiki User — CPU "no-claim" count (combat kill attribution threshold); 0 for player ships
+  noClaim                Int
+  /// Wiki Make — max simultaneous instances (CPU only); 0 for player ships
+  make                   Int
+  /// Wiki Tough — AI difficulty level 0/1 (CPU only); 0 for player ships
+  tough                  Int
+}
+
+// ─── Mine (MINE + modernization) ─────────────────────────────────────────────
+// @see reference/ge-source/GEMAIN.H:267 — MINE struct
+// deployedBy and deployedAt are explicit modernization additions (FR-029):
+// the original game tracked mine ownership only in volatile in-memory state;
+// persisting it lets the server restore mines after a restart.
+
+model Mine {
+  /// Synthetic surrogate PK — MINE has no natural key in the original (R-4)
+  id          Int      @id @default(autoincrement())
+  /// MINE.channel — byte
+  channel     Int
+  /// MINE.timer — unsigned countdown
+  timer       Int
+  /// MINE.coord.xcoord
+  xcoord      Float
+  /// MINE.coord.ycoord
+  ycoord      Float
+  /// FR-029: userid of the ship that deployed this mine; no FK (deployer may be deleted)
+  deployedBy  String
+  /// FR-029: timestamp of deployment
+  deployedAt  DateTime @default(now())
+}
