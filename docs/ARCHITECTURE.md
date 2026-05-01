@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 001-prisma-schema.
+Current module map as of feature 002-tick-engine.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -52,11 +52,72 @@ Connection strings are provided via environment variables:
 - `DATABASE_URL` — used by Prisma CLI and (eventually) the NestJS app
 - `TEST_DATABASE_URL` — used by the Jest test harness
 
+## NestJS application (feature 002)
+
+```
+AppModule (app.module.ts)
+  ├── PrismaModule (prisma/) — @Global(), exports PrismaService
+  │     └── PrismaService — extends PrismaClient, connects on init, disconnects on destroy
+  ├── TickModule (game/tick/) — @Global(), exports TickService
+  │     └── TickService — raw setInterval(1000) + setInterval(6000) in onModuleInit;
+  │                        clearInterval in onModuleDestroy; pluggable subscriber registry
+  ├── GatewayModule (gateway/) — exports GameGateway
+  │     └── GameGateway — @WebSocketGateway; handles sector:join, sector:leave;
+  │                        validates X∈[1,30] Y∈[1,15]; manages Socket.io sector rooms
+  └── DebugController (debug/) — GET /debug/tick-stats → {shipUpdate, physics}
+```
+
+### TickService subscriber registry
+
+`tickService.subscribe(kind, handler): Unsubscribe` — hand-rolled `Map<TickKind, Set<TickHandler>>`.
+Handlers are called in registration order every tick. A throwing handler is caught and logged;
+async handlers are fire-and-forget with `.catch` attached. Unsubscribe is idempotent.
+Feature 003+ hooks in via `TickKind.PHYSICS` and `TickKind.SHIP_UPDATE` subscriptions.
+
+### Socket.io sector rooms
+
+Room key format: `sector:{X}:{Y}` (1-indexed integers). Clients join on `sector:join`,
+leave on `sector:leave`; Socket.io clears all memberships on disconnect (FR-008).
+Error events carry `{ event, code, message }` (OUT_OF_BOUNDS, INVALID_PAYLOAD).
+
+### Repository layout (updated)
+
+```
+galactic-empire-reborn/
+  backend/
+    src/
+      main.ts                ← Nest bootstrap with IoAdapter + enableShutdownHooks()
+      app.module.ts          ← Root module: PrismaModule, TickModule, GatewayModule, DebugController
+      prisma/
+        prisma.module.ts     ← @Global PrismaModule
+        prisma.service.ts    ← PrismaService (extends PrismaClient + lifecycle)
+      game/
+        constants.ts         ← MAXX=30, MAXY=15, TICKTIME=6, TICKTIME2=1 (@see GEMAIN.H)
+        tick/
+          tick.module.ts     ← @Global TickModule
+          tick.service.ts    ← setInterval heartbeats + subscriber Map
+          tick.types.ts      ← TickKind, TickContext, TickHandler, Unsubscribe
+      gateway/
+        gateway.module.ts    ← GatewayModule
+        game.gateway.ts      ← @WebSocketGateway sector room management
+      debug/
+        debug.controller.ts  ← GET /debug/tick-stats
+    test/
+      prisma-schema/         ← Existing 250 integration tests (feature 001)
+      unit/
+        tick.service.spec.ts           ← Cadence + lifecycle (fake timers)
+        tick.service.subscribers.spec.ts ← Subscriber registry + error isolation
+        constants.spec.ts              ← TICKTIME/TICKTIME2/MAXX/MAXY regression pins
+      integration/
+        prisma-lifecycle.spec.ts       ← PrismaService connect/disconnect
+        game-gateway.spec.ts           ← sector:join/leave/disconnect with socket.io-client
+      e2e/
+        boot.e2e.spec.ts               ← Full Nest app boot (<5s), client connect, clean shutdown
+```
+
 ## What does not exist yet
 
-- NestJS application (`backend/src/`) — feature 002
-- `PrismaService` — feature 002
-- `GameGateway` (Socket.io) — feature 002
-- `TickService` (1s + 6s intervals) — feature 002
 - Galaxy generator — feature 004
-- Any runtime game logic
+- Ship state in-memory Map — feature 003
+- Command routing — feature 003
+- Any gameplay logic (combat, movement, planets)
