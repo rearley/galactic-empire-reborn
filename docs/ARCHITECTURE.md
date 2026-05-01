@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 002-tick-engine.
+Current module map as of feature 003-ship-commands.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -62,23 +62,57 @@ AppModule (app.module.ts)
   │     └── TickService — raw setInterval(1000) + setInterval(6000) in onModuleInit;
   │                        clearInterval in onModuleDestroy; pluggable subscriber registry
   ├── GatewayModule (gateway/) — exports GameGateway
-  │     └── GameGateway — @WebSocketGateway; handles sector:join, sector:leave;
-  │                        validates X∈[1,30] Y∈[1,15]; manages Socket.io sector rooms
+  │     └── GameGateway — @WebSocketGateway; handshake resolves active ship (lowest shipno);
+  │                        emits welcome command:result; handles sector:join/leave;
+  │                        dispatches `command` events → CommandRouterService → command:result
+  ├── CommandsModule (game/commands/) — exports CommandRouterService
+  │     ├── CommandRouterService — alias-keyed registry; tokenise→lower→dispatch; minArgs guard
+  │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange; projects
+  │     │                         all ships onto 30×15 grid; returns scanGrid payload
+  │     ├── ReportHandlerService — @Injectable report/rep handler; reads ShipClass.typeName/hasCloak;
+  │     │                           builds multi-line nav/sys/cargo/wpns read-out
+  │     └── plain Command objects: rotateCommand, impulseCommand, warpCommand
+  ├── ShipModule (game/ship/) — exports ShipStateService
+  │     └── ShipStateService — owns in-memory Map<"userid:shipno", ShipState>; hydrates from
+  │                             Postgres on init; subscribes SHIP_UPDATE tick → async dirty flush;
+  │                             get/mutate/findByUserid/findAllShips/findByName
   └── DebugController (debug/) — GET /debug/tick-stats → {shipUpdate, physics}
 ```
+
+### Command dispatch path
+
+```
+client  →  [command event]  →  GameGateway.handleCommand()
+            │  resolves active ship from ShipStateService
+            │  calls CommandRouterService.dispatch(input, ship, {client})
+            │    │  tokenise + lowercase input
+            │    │  look up alias-keyed registry
+            │    │  minArgs check → argMissingMessage
+            │    └  call handler(ship, args, ctx) → CommandResult
+            └  emits [command:result] with { lines[], scanGrid? }
+```
+
+Error path: unhandled throw in handler → gateway `catch` → `{ lines: ['Internal error…'] }`.
+Empty input → `{ lines: [] }` (silent drop). Unknown keyword → `{ lines: [UNKNOWN_CMD] }`.
+
+### ShipStateService in-memory Map
+
+`Map<string, ShipState>` keyed by `"userid:shipno"`. On SHIP_UPDATE tick (1s), iterates
+dirty entries, calls `prisma.ship.update()` per dirty ship, clears `dirty` flag.
+Error per-entry is caught and logged; other ships are not affected.
+`mutate(userid, shipno, fn)` calls fn in-place and sets `dirty = true`.
+
+### Socket.io sector rooms and handshake
+
+Handshake: no userid → NO_USER + disconnect. No ships → NO_SHIP + disconnect.
+1 ship → bind; ≥2 ships → bind lowest shipno + log warning.
+Room key format: `sector:{X}:{Y}`. Clients join on `sector:join`, leave on `sector:leave`.
 
 ### TickService subscriber registry
 
 `tickService.subscribe(kind, handler): Unsubscribe` — hand-rolled `Map<TickKind, Set<TickHandler>>`.
 Handlers are called in registration order every tick. A throwing handler is caught and logged;
 async handlers are fire-and-forget with `.catch` attached. Unsubscribe is idempotent.
-Feature 003+ hooks in via `TickKind.PHYSICS` and `TickKind.SHIP_UPDATE` subscriptions.
-
-### Socket.io sector rooms
-
-Room key format: `sector:{X}:{Y}` (1-indexed integers). Clients join on `sector:join`,
-leave on `sector:leave`; Socket.io clears all memberships on disconnect (FR-008).
-Error events carry `{ event, code, message }` (OUT_OF_BOUNDS, INVALID_PAYLOAD).
 
 ### Repository layout (updated)
 
@@ -86,38 +120,70 @@ Error events carry `{ event, code, message }` (OUT_OF_BOUNDS, INVALID_PAYLOAD).
 galactic-empire-reborn/
   backend/
     src/
-      main.ts                ← Nest bootstrap with IoAdapter + enableShutdownHooks()
-      app.module.ts          ← Root module: PrismaModule, TickModule, GatewayModule, DebugController
+      main.ts
+      app.module.ts          ← PrismaModule, TickModule, ShipModule, CommandsModule, GatewayModule
       prisma/
         prisma.module.ts     ← @Global PrismaModule
-        prisma.service.ts    ← PrismaService (extends PrismaClient + lifecycle)
+        prisma.service.ts
       game/
-        constants.ts         ← MAXX=30, MAXY=15, TICKTIME=6, TICKTIME2=1 (@see GEMAIN.H)
-        tick/
-          tick.module.ts     ← @Global TickModule
-          tick.service.ts    ← setInterval heartbeats + subscriber Map
-          tick.types.ts      ← TickKind, TickContext, TickHandler, Unsubscribe
+        constants.ts         ← MAXX=30, MAXY=15, TICKTIME=6, TICKTIME2=1, SCAN_GRID_WIDTH=30,
+        │                       SCAN_GRID_HEIGHT=15, projectRangeCell()
+        tick/tick.{module,service,types}.ts
+        ship/
+          ship-state.types.ts   ← ShipState interface (47 fields + dirty), shipKey()
+          ship-state.mappers.ts ← prismaShipToState(), stateToPrismaUpdate()
+          ship-state.service.ts ← in-memory Map + dirty flush
+          ship.module.ts
+        commands/
+          command.types.ts      ← Command, CommandHandler, CommandResult, CommandContext, ScanCell
+          command-router.service.ts
+          commands.module.ts
+          messages.ts           ← MessageId enum, formatMessage()
+          validators.ts         ← valdegree(-180..180), valpcnt(0..99)
+          handlers/
+            rotate.handler.ts, impulse.handler.ts, warp.handler.ts  ← plain Command objects
+            scan.handler.ts, report.handler.ts                       ← @Injectable() services
       gateway/
-        gateway.module.ts    ← GatewayModule
-        game.gateway.ts      ← @WebSocketGateway sector room management
-      debug/
-        debug.controller.ts  ← GET /debug/tick-stats
+        gateway.module.ts
+        game.gateway.ts
+      debug/debug.controller.ts
     test/
-      prisma-schema/         ← Existing 250 integration tests (feature 001)
+      prisma-schema/         ← 250 integration tests (feature 001)
       unit/
-        tick.service.spec.ts           ← Cadence + lifecycle (fake timers)
-        tick.service.subscribers.spec.ts ← Subscriber registry + error isolation
-        constants.spec.ts              ← TICKTIME/TICKTIME2/MAXX/MAXY regression pins
+        command-router.spec.ts
+        ship-state.service.spec.ts
+        validators.spec.ts
+        constants.spec.ts
+        handlers/rotate.spec.ts, impulse.spec.ts, warp.spec.ts, scan.spec.ts, report.spec.ts
+        tick.service.spec.ts, tick.service.subscribers.spec.ts
       integration/
-        prisma-lifecycle.spec.ts       ← PrismaService connect/disconnect
-        game-gateway.spec.ts           ← sector:join/leave/disconnect with socket.io-client
+        command-roundtrip.spec.ts  ← 11 E2E round-trip tests (US1 + US2 + error path)
+        handshake-resolution.spec.ts
+        game-gateway.spec.ts
+        prisma-lifecycle.spec.ts
       e2e/
-        boot.e2e.spec.ts               ← Full Nest app boot (<5s), client connect, clean shutdown
+        boot.e2e.spec.ts
+  frontend/
+    src/
+      types/contracts.ts     ← EventLogLine, ScanCell, CommandRequest/ResultPayload, grid constants
+      socket/
+        socketClient.ts      ← singleton io() + sendCommand/onCommandResult/onError
+        useSocket.ts         ← useSocket() React hook, ConnectionStatus
+      components/
+        ConnectionIndicator.tsx
+        EventLog.tsx
+        CommandInput.tsx
+        ScanMap.tsx
+      App.tsx                ← 3-region terminal UI
+      main.tsx
+    test/                    ← 33 Vitest tests
 ```
 
 ## What does not exist yet
 
 - Galaxy generator — feature 004
-- Ship state in-memory Map — feature 003
-- Command routing — feature 003
-- Any gameplay logic (combat, movement, planets)
+- Planet mechanics — feature 005
+- Combat (phasors, torpedoes, missiles, mines) — feature 006
+- Cybertron AI — feature 007
+- Droid AI — feature 008
+- Midnight job — feature 009
