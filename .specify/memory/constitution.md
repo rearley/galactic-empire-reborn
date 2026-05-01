@@ -1,26 +1,41 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: [TEMPLATE] → 1.0.0 (initial ratification)
+Version change: 1.0.0 → 1.1.0 (MINOR — refined scheduling clause in Principle III)
 
-Principles added:
-  - I. Fidelity (new)
-  - II. Testing is First Class (new)
-  - III. Architecture (new)
-  - IV. Quality (new)
+Principles modified:
+  - III. Architecture — Scheduling bullet split into two rules:
+      • @nestjs/schedule reserved for calendar-cadence jobs (@Cron)
+      • Sub-second / fixed-interval game ticks MUST use raw setInterval managed
+        in OnModuleInit / OnModuleDestroy
+    Rationale: @Interval decorators are not compatible with Jest fake timers,
+    blocking Principle II (testable tick cadence); raw setInterval gives explicit
+    drift control (each firing on its own schedule, not chained off prior work);
+    single-process deployment makes this safe without distributed locking.
 
-Sections added:
-  - Technology Stack
-  - Development Workflow
+Principles unchanged: I, II, IV
+Sections unchanged: Technology Stack, Development Workflow, Governance
 
-Templates updated:
-  ✅ .specify/memory/constitution.md — this file
-  ✅ .specify/templates/tasks-template.md — removed "Tests are OPTIONAL" language;
-     tests are now mandatory per Principle II
+Bump rationale: MINOR — material refinement of an existing rule with new mandated
+mechanism + rationale. Not MAJOR because the spirit of Principle III (mandated
+cadence and reliability) is preserved and no prior compliant code is invalidated
+(no @Interval-based code exists in the repo). Not PATCH because the mechanism
+itself changed, not just wording.
 
 Templates reviewed (no changes required):
-  ✅ .specify/templates/plan-template.md — Constitution Check section is generic and compatible
-  ✅ .specify/templates/spec-template.md — User Scenarios & Testing section is already mandatory
+  ✅ .specify/templates/plan-template.md — Constitution Check section is generic
+  ✅ .specify/templates/spec-template.md — no scheduling references
+  ✅ .specify/templates/tasks-template.md — no scheduling references
+  ✅ .specify/templates/commands/*.md — no scheduling references
+  ✅ CLAUDE.md — already describes raw setInterval; consistent with amendment
+  ✅ README.md — n/a (no scheduling-specific content)
+
+Follow-ups for feature 002 (002-tick-engine), to be applied via /speckit-tasks
+or manual edits — outside the scope of this constitution change:
+  - tasks.md T015: add bogus-DB-URL fail-fast test (closes /speckit-analyze G3)
+  - tasks.md T016: add boot-time (<5s) and shutdown-latency (<3s) assertions
+    (closes /speckit-analyze G1, G2)
+  - tasks.md T024: add slow-handler and async-handler cases (closes G4, A1)
 
 Deferred TODOs: none
 -->
@@ -77,8 +92,27 @@ documented discussion:
 - **Real-time**: Socket.io via `@nestjs/platform-socket.io`. Players join a Socket.io room
   for their current sector; the physics tick broadcasts sector-scoped events to rooms only;
   global events broadcast to all.
-- **Scheduling**: `@nestjs/schedule` — `@Interval(6000)` for the physics tick,
-  `@Interval(1000)` for the ship update tick, `@Cron('0 0 * * *')` for the midnight job.
+- **Scheduling**: Two distinct mechanisms by cadence kind, both non-negotiable:
+  - **Calendar-cadence jobs MUST use `@nestjs/schedule`** with `@Cron`. The
+    nightly maintenance routine is `@Cron('0 0 * * *')`. Any future scheduled
+    job whose firing time is expressed as a wall-clock cron expression (daily,
+    hourly on the hour, weekly, etc.) MUST use `@nestjs/schedule`.
+  - **Sub-second and fixed-interval game-loop ticks MUST use raw `setInterval`**
+    started in a service's `OnModuleInit` and cleared in `OnModuleDestroy`.
+    Specifically, the 6-second physics tick (`TICKTIME=6`) and the 1-second
+    ship-update tick (`TICKTIME2=1`) MUST be implemented this way. `@Interval`
+    decorators MUST NOT be used for these ticks. Rationale:
+    1. `@Interval` decorators are not compatible with Jest fake timers,
+       blocking unit testing of tick cadence — that violates Principle II.
+    2. `setInterval` schedules each next firing relative to the prior firing's
+       start time, not the prior callback's completion. This gives explicit
+       no-drift behavior; chained `setTimeout` recursion would drift under load.
+    3. Single-process deployment (one container per backend node) makes raw
+       `setInterval` safe today without distributed-lock infrastructure. If
+       deployment ever moves to multi-node, the tick engine MUST be put behind
+       a leader-election mechanism (e.g., Postgres advisory lock) before that
+       topology ships — this is a known constraint, recorded in
+       `docs/DECISIONS.md`.
 - **Spec-Driven Development**: All features MUST follow the spec-kit workflow:
   `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`.
   Specs live in `/specs/`, one folder per feature branch.
@@ -104,7 +138,8 @@ documented discussion:
 | Database | PostgreSQL 16+ |
 | ORM | Prisma |
 | Real-time | Socket.io (`@nestjs/platform-socket.io`) |
-| Scheduling | `@nestjs/schedule` |
+| Calendar scheduling | `@nestjs/schedule` (`@Cron` only — see Principle III) |
+| Game-loop ticks | Raw `setInterval` in `OnModuleInit`/`OnModuleDestroy` |
 | Backend tests | Jest |
 | Frontend tests | Vitest |
 | Deployment | Docker + Docker Compose (Hetzner CPX32) |
@@ -165,4 +200,4 @@ instructions. The constitution governs intent; `CLAUDE.md` governs execution.
 
 ---
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-30 | **Last Amended**: 2026-04-30
+**Version**: 1.1.0 | **Ratified**: 2026-04-30 | **Last Amended**: 2026-05-01
