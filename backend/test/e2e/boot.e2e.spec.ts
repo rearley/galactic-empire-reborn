@@ -1,9 +1,19 @@
 import 'reflect-metadata';
+// Point the real AppModule at the test DB (ge_test), not the dev DB.
+// globalSetup already ran prisma db push on ge_test, so the Ship table exists.
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+}
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { INestApplication } from '@nestjs/common';
 import { io as ioc, Socket } from 'socket.io-client';
+import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../../src/app.module';
+
+const BOOT_TEST_USERID = 'boot-e2e-user';
+const BOOT_TEST_SHIPNO = 1;
+const BOOT_TEST_SHIPNAME = 'Boot Test Ship';
 
 describe('Boot e2e — AppModule boots and accepts Socket.io connections', () => {
   let app: INestApplication;
@@ -11,6 +21,23 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
 
   // G1: boot must complete in < 5000ms
   beforeAll(async () => {
+    // Seed User + Ship before app boots so ShipStateService.onModuleInit hydrates it.
+    const seedPrisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+    try {
+      await seedPrisma.user.upsert({
+        where: { userid: BOOT_TEST_USERID },
+        create: { userid: BOOT_TEST_USERID },
+        update: {},
+      });
+      await seedPrisma.ship.upsert({
+        where: { userid_shipno: { userid: BOOT_TEST_USERID, shipno: BOOT_TEST_SHIPNO } },
+        create: { userid: BOOT_TEST_USERID, shipno: BOOT_TEST_SHIPNO, shipname: BOOT_TEST_SHIPNAME, shpclass: 1 },
+        update: { shipname: BOOT_TEST_SHIPNAME },
+      });
+    } finally {
+      await seedPrisma.$disconnect();
+    }
+
     const start = Date.now();
     app = await NestFactory.create(AppModule, { logger: false });
     app.useWebSocketAdapter(new IoAdapter(app));
@@ -21,7 +48,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
 
     const url = await app.getUrl();
     port = parseInt(new URL(url).port, 10);
-  }, 10000);
+  }, 15000);
 
   // G2: shutdown must complete in < 3000ms
   afterAll(async () => {
@@ -34,6 +61,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
   it('Socket.io client connects within 2s', async () => {
     const socket: Socket = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
+      query: { userid: BOOT_TEST_USERID },
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -41,7 +69,8 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
         socket.disconnect();
         reject(new Error('connect timeout'));
       }, 2000);
-      socket.on('connect', () => {
+      socket.on('command:result', () => {
+        // Welcome message received — handshake succeeded, connection is live
         clearTimeout(timer);
         resolve();
       });
@@ -51,17 +80,17 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
       });
     });
 
-    expect(socket.connected).toBe(true);
     socket.disconnect();
   });
 
   it('no leaked Socket.io connections after disconnect', (done) => {
     const socket: Socket = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
+      query: { userid: BOOT_TEST_USERID },
     });
-    socket.on('connect', () => {
+    socket.on('command:result', () => {
+      // Welcome received; now disconnect and verify no leaked connections
       socket.disconnect();
-      // Give the server a tick to process the disconnect
       setTimeout(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         const count: number = (app.getHttpServer() as any)?.io?.engine?.clientsCount ?? 0;
