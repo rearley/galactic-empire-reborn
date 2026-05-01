@@ -6,9 +6,43 @@ import { io as ioc, Socket } from 'socket.io-client';
 import { Server } from 'socket.io';
 import { GatewayModule } from '../../src/gateway/gateway.module';
 import { GameGateway } from '../../src/gateway/game.gateway';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { CommandRouterService } from '../../src/game/commands/command-router.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipState } from '../../src/game/ship/ship-state.types';
 
-function makeClient(port: number): Socket {
-  return ioc(`http://localhost:${port}`, { transports: ['websocket'] });
+function makeShipState(
+  overrides: { userid: string; shipno: number; shipname: string },
+): ShipState {
+  return {
+    userid: overrides.userid,
+    shipno: overrides.shipno,
+    shipname: overrides.shipname,
+    shpclass: 1,
+    heading: 0, head2b: 0, speed: 0, speed2b: 0,
+    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
+    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
+    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+    where: 0, ltorpsChannel: [], ltorpsDistance: [],
+    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
+    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
+    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
+    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
+    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
+    dirty: false,
+  };
+}
+
+const TEST_USERID = 'u-gateway-test';
+const TEST_SHIP = makeShipState({ userid: TEST_USERID, shipno: 1, shipname: 'Test Ship' });
+
+function makeClient(port: number, userid = TEST_USERID): Socket {
+  return ioc(`http://localhost:${port}`, {
+    transports: ['websocket'],
+    query: { userid },
+  });
 }
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promise<T> {
@@ -27,9 +61,23 @@ describe('GameGateway integration', () => {
   let ioServer: Server;
 
   beforeAll(async () => {
+    const shipServiceMock = {
+      findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
+      get: jest.fn().mockReturnValue(TEST_SHIP),
+      mutate: jest.fn(),
+      size: jest.fn().mockReturnValue(1),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [GatewayModule],
-    }).compile();
+    })
+      .overrideProvider(ShipStateService)
+      .useValue(shipServiceMock)
+      .overrideProvider(CommandRouterService)
+      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .overrideProvider(PrismaService)
+      .useValue({ shipClass: { findMany: jest.fn().mockResolvedValue([]) } })
+      .compile();
 
     app = module.createNestApplication();
     app.useWebSocketAdapter(new IoAdapter(app));
@@ -46,7 +94,7 @@ describe('GameGateway integration', () => {
   describe('sector:join', () => {
     it('join valid (5,5) → receives sector:joined with correct payload', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x: 5, y: 5 });
       const data = await waitForEvent<{ x: number; y: number; room: string }>(socket, 'sector:joined');
@@ -57,7 +105,7 @@ describe('GameGateway integration', () => {
 
     it('join idempotent — joining (5,5) twice yields only one membership', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x: 5, y: 5 });
       await waitForEvent(socket, 'sector:joined');
@@ -70,7 +118,7 @@ describe('GameGateway integration', () => {
 
     it('leave → receives sector:left and room no longer contains socket', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x: 3, y: 7 });
       await waitForEvent(socket, 'sector:joined');
@@ -83,7 +131,7 @@ describe('GameGateway integration', () => {
 
     it('leave never-joined → emits sector:left (no-op, no error)', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:leave', { x: 10, y: 10 });
       const data = await waitForEvent<{ room: string }>(socket, 'sector:left');
@@ -98,7 +146,7 @@ describe('GameGateway integration', () => {
       [5, 16],
     ])('out-of-bounds join (%i,%i) → OUT_OF_BOUNDS error, no room joined', async (x, y) => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x, y });
       const err = await waitForEvent<{ event: string; code: string }>(socket, 'error');
@@ -114,7 +162,7 @@ describe('GameGateway integration', () => {
       [{ x: 1.5, y: 5 }],
     ])('invalid payload %j → INVALID_PAYLOAD error', async (payload) => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', payload);
       const err = await waitForEvent<{ event: string; code: string }>(socket, 'error');
@@ -126,7 +174,7 @@ describe('GameGateway integration', () => {
 
     it('disconnect cleanup — rooms released after disconnect (FR-008)', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'connect');
+      await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x: 1, y: 1 });
       await waitForEvent(socket, 'sector:joined');
@@ -152,7 +200,7 @@ describe('GameGateway integration', () => {
 
       for (let i = 0; i < 100; i++) {
         const socket = makeClient(port);
-        await waitForEvent(socket, 'connect');
+        await waitForEvent(socket, 'command:result'); // welcome message
         socket.emit('sector:join', { x: 5, y: 5 });
         await waitForEvent(socket, 'sector:joined');
         socket.emit('sector:leave', { x: 5, y: 5 });
