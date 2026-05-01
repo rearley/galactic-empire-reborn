@@ -1,0 +1,23 @@
+{
+  "name": "galactic-empire-reborn-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "db:up": "docker compose -f ../docker-compose.yml up -d db && docker compose -f ../docker-compose.yml exec -T db pg_isready -U ge",
+    "db:down": "docker compose -f ../docker-compose.yml down",
+    "db:reset": "docker compose -f ../docker-compose.yml down -v && npm run db:up",
+    "test": "jest",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push --skip-generate"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.17.10",
+    "jest": "^29.7.0",
+    "prisma": "^5.22.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

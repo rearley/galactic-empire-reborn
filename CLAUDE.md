@@ -272,5 +272,6 @@ ShipService (game/ship/)
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+specs/001-prisma-schema/plan.md
 <!-- SPECKIT END -->
