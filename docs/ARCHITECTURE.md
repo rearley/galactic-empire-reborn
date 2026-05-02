@@ -240,6 +240,39 @@ ship-side cargo decrement happening inside the same `runSerialized` call.
 Troop starvation → food consumption → men starvation → gold-to-cash → per-item production
 (qty formula × envFact × taxfact × optional cash-boost) → tax accrual. Revolt deferred to feature 006.
 
+## PhysicsModule (feature 006a)
+
+```
+PhysicsModule (game/physics/)
+  ├── ShipClassCacheService — hydrated once on boot from prisma.shipClass.findMany;
+  │                            Map<classNumber, {maxAcceleration, maxWarp}>; sync getters
+  │                            consumed by PhysicsTickService and WarpHandlerService
+  ├── PhysicsTickService    — subscribes to TickKind.PHYSICS (6s); per ship advanceOne():
+  │                            (1) skip destroyed; (2) if not orbit/docked, run
+  │                            rotate→accel→move→maintenance; (3) unconditionally tick
+  │                            countdowns (hypha, cantexit). Per-ship try/catch logs and
+  │                            increments getFaultCount() on fault; batch continues.
+  │                            Iterates ships in ascending shipKey order (FR-019).
+  │                            Emits typed events on EventEmitter2:
+  │                              physics.sector-transition (on floor(coord) change)
+  │                              physics.hyperspace        (on warp-threshold crossing)
+  └── physics-math.ts       — pure: rotationStep, accelerationStep, positionIntegration,
+                                tryEnergyDebit, sectorOf, normalizeHeading
+```
+
+Tick → physics flow:
+```
+TickService (6s) → PhysicsTickService.advanceAll(ctx)
+   └─ for each ship in shipKey order:
+        ShipStateService.mutate(...)  (sets dirty for the 1s flush)
+        EventEmitter2.emit(physics.sector-transition | physics.hyperspace)
+```
+
+`WarpHandlerService` (replaces the old plain `warpCommand` const) injects
+`ShipClassCacheService` to evaluate the full five-gate sequence:
+WARP01 (class.maxWarp=0) → WARPSPD2 (topspeed=0) → WARP02 (negative) →
+WARP03 (>topspeed+floor(topspeed/2)) → WARP04 (overspeed warning + apply) → normal apply.
+
 ## What does not exist yet
 
 - Combat (phasors, torpedoes, missiles, mines) — feature 006

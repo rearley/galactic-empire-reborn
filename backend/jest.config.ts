@@ -8,6 +8,7 @@ const config: Config = {
     "<rootDir>/test/unit",
     "<rootDir>/test/integration",
     "<rootDir>/test/e2e",
+    "<rootDir>/test/game",
   ],
   testMatch: ["**/*.spec.ts"],
   globalSetup: "<rootDir>/test/prisma-schema/helpers/global-setup.ts",

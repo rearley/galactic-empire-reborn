@@ -5,6 +5,50 @@ Updated at the end of every implement session per CLAUDE.md.
 
 ---
 
+## Movement (feature 006a)
+
+**Source**: GEFUNCS.C:441-460 (`rotship`), 469-573 (`accel`), 617-792 (`moveship`)
+
+Driven by the 6-second `TickKind.PHYSICS` heartbeat. For each non-destroyed
+ship, in ascending `${userid}:${shipno}` order, `PhysicsTickService` runs:
+
+1. **Rotation** (skipped when `where >= 10`, i.e., orbit/docked):
+   step = `shipclass.maxAcceleration / 10` degrees per tick. Snap when the
+   absolute angular gap to `head2b` is within one step (or wraps around the
+   short way). Result normalized to `[0, 360)`. The rotate command pays
+   `ROTENGUSE` up-front; the tick does not debit again.
+
+2. **Acceleration** (same skip condition):
+   up-step = `maxAccel`, down-step = `maxAccel * 2`, snap when within step.
+   Energy debit on the step: `0` if post-step `speed < WARP_THRESHOLD (1000)`,
+   else `ACCENGAMT (120)`. If the per-debit floor refuses, force
+   `speed2b = 0` so the ship coasts down on the next tick.
+   Hyperspace boundary crossings (≥1000 ↔ <1000) emit `physics.hyperspace`.
+
+3. **Position integration** (only when `speed > 0`):
+   `x' = x + speed * sin(deg2rad(heading)) / 65000`
+   `y' = y - speed * cos(deg2rad(heading)) / 65000`
+   Sector is derived from coordinates (`{ x: floor(x), y: floor(y) }`); on a
+   change, `physics.sector-transition` is emitted with the old/new sectors and
+   post-update coords.
+
+4. **Movement maintenance** (only when `speed > 0` AND `status === 1`, i.e.,
+   player ship): debit `MOVENGUSE = 10`; if energy then drops below
+   `MOVENGMIN = 3000`, force `speed2b = 0`. AI ships (status ≠ 1) skip this
+   debit entirely (per the original `moveship`'s `GESTAT_USER` gate).
+
+5. **Countdowns** (unconditional, every non-destroyed ship — orbit/docked too):
+   `hypha = max(0, hypha - 1)` and `cantexit = max(0, cantexit - 1)`.
+
+Per-ship faults are caught: `{ shipId, tickAt, stack }` is logged at error
+level and an in-memory fault counter increments; the batch continues. The
+faulted ship is re-attempted on the next tick (no quarantine).
+
+`max_accel` and `max_warp` are read from `ShipClassCacheService`, which is
+hydrated once on boot from `prisma.shipClass.findMany` and never re-fetched.
+
+---
+
 ## Command dispatch (feature 003)
 
 **Source**: GECMDS.C:111-225 (command table)
