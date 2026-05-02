@@ -87,6 +87,20 @@ wiki tables (`reference/wiki/player-ships.md`, `reference/wiki/cpu-ships.md`).
 Used by combat math, purchase logic, AI, and the scan display. The field
 `WARSHP.shpclass` resolves to exactly one ShipClass row.
 
+## GalaxyMeta
+
+A singleton row (id always 1, enforced by a `CHECK (id=1)` DB constraint) that signals
+a complete, valid galaxy generation. Its presence is the idempotency probe checked by
+`GalaxyService.onModuleInit()` — if a `GalaxyMeta` row exists the generator skips
+regeneration entirely. The fields `seed`, `plodds`, `wormodds`, and `maxplanets` capture
+the exact generation parameters used, providing a complete audit trail of how the current
+galaxy was produced.
+
+The `Sector`, `Planet`, and `Wormhole` tables are populated by `GalaxyService.onModuleInit()`
+on first boot within a single Postgres transaction that also writes the `GalaxyMeta` row.
+They are no longer empty placeholder tables — after first boot all 450 sector rows exist,
+and every planet and wormhole that was generated is present and queryable.
+
 ## Mine
 
 A mine that has been deployed into the galaxy, distinct from mines carried as

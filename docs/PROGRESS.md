@@ -91,3 +91,28 @@
 - `scan ra` / `scan se` return `SCANFMT` — deferred to feature 006
 - Ship topspeed used as proxy for ShipClass.maxWarp in warp handler — WARP01/WARPSPD2 distinction deferred to feature 006
 
+## 2026-05-01 — 004-galaxy-generator
+
+**Completed**:
+- Procedural 30×15 galaxy generator (Mulberry32 PRNG, row-major iteration, `s00` neutral-zone fixture)
+- `GalaxyMeta` singleton written inside a single Postgres transaction on first boot; idempotency probe on `onModuleInit`
+- In-memory read model: `planetsBySector`, `wormholesBySector`, `planetsByName` maps populated from DB after generation
+- `scan lo` planet (`'O'`) and wormhole (`'W'`) projection onto the tactical grid
+- `scan pl <name>` galaxy-wide named planet lookup via `GalaxyService.findPlanetByName`
+- Operator reseed support via `GALAXY_SEED`, `GALAXY_PLODDS`, `GALAXY_WORMODDS`, `GALAXY_MAXPLANETS` env config
+
+**Tests**: 35+ new backend tests:
+- Unit: RNG determinism (5), config validation (38), service read methods (11)
+- Integration: bootstrap (9), determinism (3), idempotency (10), balance (8), config divergence (5)
+- Unit scan handler: 8 new planet/wormhole projection and named lookup tests
+- Integration scan roundtrip: 1 end-to-end roundtrip test
+
+**Decisions made**: Three documented deviations from GEPLANET.C (see DECISIONS.md):
+wormhole destinations bounded to 30×15; `scan pl` resolves by galaxy-wide name not local plnum;
+neutral-zone `s00` table authored in code. G5 rollback test required intercepting `$transaction`
+to patch the tx client.
+
+**Next**: `005-planet-system` — colonization, buy/sell, orbit
+
+**Known issues**: None
+

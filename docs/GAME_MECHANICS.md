@@ -154,6 +154,64 @@ read-only (scan, report) do not set dirty.
 
 ---
 
+## Procedural galaxy generation (feature 004)
+
+**Source**: @see GEPLANET.C:455-650 xgetsector
+
+The 30×15 galaxy is generated once on first boot by `GalaxyService.onModuleInit()`,
+inside a single Postgres transaction that also writes the `GalaxyMeta` singleton row.
+If `GalaxyMeta` already exists the generator is skipped (idempotency probe).
+
+### PRNG
+
+A Mulberry32 generator is seeded from the `GALAXY_SEED` environment variable
+(default `0xC0FFEE`). All random draws during generation consume from this single
+deterministic stream, guaranteeing the same seed always produces the identical galaxy.
+
+### Row-major iteration and the neutral zone
+
+Sectors are visited in row-major order `y=0..14, x=0..29`. The origin sector `(0,0)`
+(neutral zone) is special-cased first: it receives a fixed `s00` fixture authored as
+a TypeScript constant array (the original loaded this from a `.MSG` file not present
+in the reference source). All other sectors are procedurally generated.
+
+### Sector population algorithm
+
+For each non-origin sector:
+1. A slot roll: `rng.intBelow(plodds) === 0` — if true the sector receives planetary objects.
+2. If populated: `slotCount = rng.intBelow(maxplanets)` slots are generated.
+3. Per slot: `rng.intBelow(wormodds) === 0` → wormhole; otherwise → planet.
+
+Default config (matches GEMAIN.H balance intent):
+- `plodds` controls planet density (lower = denser)
+- `wormodds` controls wormhole-to-planet ratio
+- `maxplanets` caps slots per sector
+
+### Planet coordinate placement
+
+Planet floating-point coordinates within a sector are computed as:
+```
+xcoord = xsect + rng.next() * 0.8 + 0.1
+ycoord = ysect + rng.next() * 0.8 + 0.1
+```
+A peer-distance check of ≥ 0.07 is enforced between planets in the same sector;
+slots that fail the check are retried up to a fixed attempt limit.
+
+### Wormhole destinations
+
+Destination coordinates are `(destX + 0.5, destY + 0.5)` where `destX ∈ 0..29` and
+`destY ∈ 0..14`, drawn uniformly at random. Self-loop destinations (landing in the
+same sector as the wormhole origin) are rejected and redrawn. Destinations are bounded
+to the 30×15 grid (deviation from original `[-univmax..+univmax]` — see DECISIONS.md).
+
+### Operator reseed
+
+The generation parameters are configurable via environment variables:
+`GALAXY_SEED`, `GALAXY_PLODDS`, `GALAXY_WORMODDS`, `GALAXY_MAXPLANETS`.
+Changing the seed and running `db:reset` produces a fresh deterministic galaxy.
+
+---
+
 ## Validators (feature 003)
 
 **Source**: GECMDS.C — inline bounds checks in each command handler

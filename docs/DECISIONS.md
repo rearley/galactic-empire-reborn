@@ -181,6 +181,54 @@ are precise; no need for runtime type narrowing or a discriminator column.
 
 ---
 
+## 2026-05-01 — Galaxy generator deviations from GEPLANET.C
+
+**Context**: The procedural galaxy generator (feature 004) reimplements the sector
+population logic from `GEPLANET.C:455-650 (xgetsector)`. Three areas required
+deliberate deviations from the original due to missing assets or web-game constraints.
+
+**Decision 1 — Wormhole destinations bounded to 30×15 grid** (research.md Decision 5):
+Wormhole destination coordinates are clamped to `destX ∈ 0..29`, `destY ∈ 0..14`.
+The original C code allowed destinations in `[-univmax..+univmax]`, which produced
+out-of-bounds sectors unreachable in normal play.
+
+**Reason**: The web port has a fixed 30×15 grid; sectors outside this range cannot
+exist. Destinations pointing off-grid would produce dead wormholes. Bounding to the
+valid grid ensures every wormhole leads somewhere playable.
+
+**Alternatives rejected**: Allow out-of-bounds destinations and clamp at runtime —
+adds a class of degenerate state; easier to fix at generation time.
+
+**Decision 2 — `scan pl <name>` resolves by galaxy-wide planet name** (research.md Decision 8):
+`scan pl <name>` looks up the planet by name across the entire galaxy via
+`GalaxyService.findPlanetByName`. The original `cmd_scan` resolved by numeric `plnum`
+within the current sector only.
+
+**Reason**: Player-typed names are more usable than numeric IDs for a text-command
+interface. Galaxy-wide lookup matches the original intent (players refer to planets
+by name, not slot index). The original's local-sector `plnum` approach was a
+Btrieve file-offset artefact, not a gameplay decision.
+
+**Alternatives rejected**: Keep local-sector numeric lookup — poor UX for a web game
+where players discover planet names from `scan lo` output, not from memory of slot numbers.
+
+**Decision 3 — Neutral-zone `s00` table authored in code** (research.md Decision 4):
+The `(0,0)` sector fixture (neutral zone with fixed planets/wormholes) is hardcoded
+as a TypeScript constant array in `GalaxyService`. The original loaded this data from
+an `.MSG` message file that is not recoverable from the available reference source.
+
+**Reason**: The `.MSG` binary asset is not present in `/reference/ge-source/`. The
+neutral-zone layout is well-documented in the wiki and broadly known from the original
+game; hardcoding it in source is auditable and testable. A future operator could
+override via config if needed.
+
+**Alternatives rejected**: Derive neutral-zone content from procedural seed — would
+produce a different layout each seed, breaking the canonical neutral-zone experience.
+Load from a config file — adds an external asset dependency with no benefit over a
+typed constant.
+
+---
+
 ## 2026-05-01 — CommandsModule explicitly imports PrismaModule
 
 **Context**: `PrismaModule` is `@Global()`, making `PrismaService` available in the full app without explicit imports. However, in integration tests that mount `CommandsModule` or `GatewayModule` in isolation (without `AppModule`), the global registration never happens, so `ScanHandlerService` and `ReportHandlerService` cannot resolve `PrismaService`.

@@ -8,8 +8,10 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandsModule } from '../../src/game/commands/commands.module';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { TickKind } from '../../src/game/tick/tick.types';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { ScanCell } from '../../src/game/commands/command.types';
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -86,6 +88,14 @@ describe('command round-trip integration (US1)', () => {
     );
     await shipServiceFake.onModuleInit();
 
+    const galaxyServiceMock = {
+      onModuleInit: jest.fn(),
+      getSectorPlanets: jest.fn().mockReturnValue([]),
+      getSectorWormholes: jest.fn().mockReturnValue([]),
+      findPlanetByName: jest.fn().mockReturnValue(null),
+      getMeta: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [GatewayModule, CommandsModule],
     })
@@ -93,6 +103,8 @@ describe('command round-trip integration (US1)', () => {
       .useValue(shipServiceFake)
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
+      .overrideProvider(GalaxyService)
+      .useValue(galaxyServiceMock)
       .compile();
 
     app = module.createNestApplication();
@@ -231,6 +243,129 @@ describe('command round-trip integration (US1)', () => {
     await flushTick!();
     expect(prismaMock.ship.update).not.toHaveBeenCalled();
     client.disconnect();
+  });
+
+  // T024: scan lo with GalaxyService mock returns planet and wormhole cells
+  it('scan lo with galaxy returns planet and wormhole cells', async () => {
+    process.env.GALAXY_SEED = '12648430';
+
+    // Mock GalaxyService returning one planet and one wormhole in sector (0,0)
+    const galaxyServiceMock = {
+      getSectorPlanets: jest.fn().mockReturnValue([
+        {
+          xsect: 0, ysect: 0, plnum: 1, type: 2,
+          xcoord: 0.3, ycoord: 0.3,
+          userid: null, name: 'Zygor-3',
+          enviorn: 1, resource: 2,
+          cash: BigInt(0), debt: BigInt(0), tax: BigInt(0),
+          taxrate: 0, warnings: 0, password: 'none',
+          lastattack: '', beacon: '', spyowner: '',
+          technology: 0, teamcode: BigInt(0),
+          itemsQty: [], itemsRate: [], itemsSell: [],
+          itemsReserve: [], itemsMarkup2a: [], itemsSold2a: [],
+        },
+      ]),
+      getSectorWormholes: jest.fn().mockReturnValue([
+        {
+          xsect: 0, ysect: 0, plnum: 6, type: 3,
+          xcoord: 0.6, ycoord: 0.6,
+          visible: 1,
+          destXcoord: 5.5, destYcoord: 5.5,
+          name: '',
+        },
+      ]),
+      findPlanetByName: jest.fn().mockReturnValue(null),
+      getMeta: jest.fn().mockReturnValue({
+        id: 1,
+        seed: BigInt(12648430),
+        plodds: 4,
+        wormodds: 10,
+        maxplanets: 5,
+        generatedAt: new Date(),
+      }),
+      onModuleInit: jest.fn(),
+    };
+
+    const ship = makeShipState({ userid: USERID, shipno: SHIPNO, shipname: SHIPNAME, topspeed: 5 });
+    // Place ship at sector (0,0) — galaxy coords within first sector cell
+    ship.xcoord = 0.0;
+    ship.ycoord = 0.0;
+
+    const localPrismaMock = {
+      ship: {
+        findMany: jest.fn().mockResolvedValue([ship]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      shipClass: {
+        findMany: jest.fn().mockResolvedValue([
+          { classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false },
+        ]),
+      },
+    };
+
+    const localTickMock = {
+      subscribe: jest.fn().mockImplementation(
+        (_kind: TickKind, handler: () => Promise<void>) => {
+          if (_kind === TickKind.SHIP_UPDATE) flushTick = handler;
+          return () => {};
+        },
+      ),
+    };
+
+    const localShipService = new ShipStateService(
+      localPrismaMock as never,
+      localTickMock as never,
+    );
+    await localShipService.onModuleInit();
+
+    const galaxyModule: TestingModule = await Test.createTestingModule({
+      imports: [GatewayModule, CommandsModule],
+    })
+      .overrideProvider(ShipStateService)
+      .useValue(localShipService)
+      .overrideProvider(PrismaService)
+      .useValue(localPrismaMock)
+      .overrideProvider(GalaxyService)
+      .useValue(galaxyServiceMock)
+      .compile();
+
+    const galaxyApp = galaxyModule.createNestApplication();
+    galaxyApp.useWebSocketAdapter(new IoAdapter(galaxyApp));
+    await galaxyApp.listen(0);
+    const galaxyUrl = await galaxyApp.getUrl();
+    const galaxyPort = parseInt(new URL(galaxyUrl).port, 10);
+
+    const client = ioc(`http://localhost:${galaxyPort}`, {
+      transports: ['websocket'],
+      query: { userid: USERID },
+    });
+
+    try {
+      await waitForEvent(client, 'command:result'); // welcome
+
+      client.emit('command', { input: 'scan lo' });
+      const result = await waitForEvent<{ lines: unknown[]; scanGrid?: ScanCell[] }>(
+        client,
+        'command:result',
+      );
+
+      expect(result.scanGrid).toBeDefined();
+      expect(Array.isArray(result.scanGrid)).toBe(true);
+
+      // T024: assert at least one planet cell with char 'O'
+      const planetCells = result.scanGrid!.filter((c) => c.type === 'planet');
+      expect(planetCells.length).toBeGreaterThan(0);
+      expect(planetCells[0].char).toBe('O');
+
+      // T024: assert at least one wormhole cell with char 'W'
+      const wormholeCells = result.scanGrid!.filter((c) => c.type === 'wormhole');
+      expect(wormholeCells.length).toBeGreaterThan(0);
+      expect(wormholeCells[0].char).toBe('W');
+    } finally {
+      client.disconnect();
+      await galaxyApp.close();
+      delete process.env.GALAXY_SEED;
+    }
   });
 
   // T040: gateway try/catch error path
