@@ -6,10 +6,11 @@ import { ShipModule } from './game/ship/ship.module';
 import { CommandsModule } from './game/commands/commands.module';
 import { GalaxyModule } from './game/galaxy/galaxy.module';
 import { PlanetModule } from './game/planet/planet.module';
+import { PhysicsModule } from './game/physics/physics.module';
 import { DebugController } from './debug/debug.controller';
 
 @Module({
-  imports: [PrismaModule, TickModule, ShipModule, GalaxyModule, PlanetModule, CommandsModule, GatewayModule],
+  imports: [PrismaModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CommandsModule, GatewayModule],
   controllers: [DebugController],
 })
 export class AppModule {}

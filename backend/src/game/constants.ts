@@ -18,6 +18,47 @@ export const TICKTIME = 6 as const;
 export const TICKTIME2 = 1 as const;
 
 /**
+ * Energy consumed per acceleration step that keeps speed at or above the warp threshold.
+ * Below the warp threshold the step is free.
+ * @see GEMAIN.H:76 #define ACCENGAMT 120
+ * @see GEFUNCS.C:469-573 accel — `usage = ACCENGAMT` gate
+ */
+export const ACCENGAMT = 120 as const;
+
+/**
+ * Per-tick movement-maintenance debit — paid by player ships only when speed > 0.
+ * @see GEMAIN.H:78 #define MOVENGUSE 10
+ * @see GEFUNCS.C:733-792 moveship — gated on `status == GESTAT_USER`
+ */
+export const MOVENGUSE = 10 as const;
+
+/**
+ * Energy floor below which the post-debit `speed2b = 0` cutoff fires.
+ * @see GEMAIN.H:77 #define MOVENGMIN 3000
+ */
+export const MOVENGMIN = 3000 as const;
+
+/**
+ * Energy debited up-front by the rotate command — pinned defensively here for the
+ * balance-regression test even though the physics tick itself does not debit it.
+ * @see GEMAIN.H:73 #define ROTENGUSE 30
+ */
+export const ROTENGUSE = 30 as const;
+
+/**
+ * Internal-units boundary between impulse and warp. 1 warp factor = 1000 internal units.
+ * @see GEFUNCS.C:482 — `if (ptr->speed < 1000)`
+ * @see GEFUNCS.C:493, 538 — hyperspace boundary tests
+ */
+export const WARP_THRESHOLD = 1000 as const;
+
+/**
+ * Position-integration denominator: `dx = speed * sin(deg) / 65000`.
+ * @see GEFUNCS.C:648-649 moveship
+ */
+export const COORD_SCALE = 65000 as const;
+
+/**
  * Range-scan grid width — canonical value from original source.
  * Mirrors SCAN_GRID_WIDTH in specs/003-ship-commands/contracts/shared-types.ts.
  * @see GEMAIN.H:121 #define MAXX 30
