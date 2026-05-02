@@ -7,6 +7,7 @@ import { GatewayModule } from '../../src/gateway/gateway.module';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 
 function makeClient(port: number, userid?: string): Socket {
   return ioc(`http://localhost:${port}`, {
@@ -91,6 +92,14 @@ describe('GameGateway handshake resolution', () => {
       .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue({ shipClass: { findMany: jest.fn().mockResolvedValue([]) } })
+      .overrideProvider(GalaxyService)
+      .useValue({
+        onModuleInit: jest.fn(),
+        getSectorPlanets: jest.fn().mockReturnValue([]),
+        getSectorWormholes: jest.fn().mockReturnValue([]),
+        findPlanetByName: jest.fn().mockReturnValue(null),
+        getMeta: jest.fn(),
+      })
       .compile();
 
     app = module.createNestApplication();

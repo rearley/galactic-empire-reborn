@@ -9,6 +9,7 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 
 function makeShipState(
@@ -77,6 +78,14 @@ describe('GameGateway integration', () => {
       .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue({ shipClass: { findMany: jest.fn().mockResolvedValue([]) } })
+      .overrideProvider(GalaxyService)
+      .useValue({
+        onModuleInit: jest.fn(),
+        getSectorPlanets: jest.fn().mockReturnValue([]),
+        getSectorWormholes: jest.fn().mockReturnValue([]),
+        findPlanetByName: jest.fn().mockReturnValue(null),
+        getMeta: jest.fn(),
+      })
       .compile();
 
     app = module.createNestApplication();
