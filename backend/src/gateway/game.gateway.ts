@@ -136,8 +136,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const input = typeof body.input === 'string' ? body.input : '';
 
     try {
-      const result = this.commandRouter.dispatch(input, ship, { client });
-      client.emit('command:result', result);
+      const resultOrPromise = this.commandRouter.dispatch(input, ship, { client });
+      if (resultOrPromise instanceof Promise) {
+        resultOrPromise
+          .then((result) => client.emit('command:result', result))
+          .catch((err: unknown) => {
+            this.logger.error('Async command handler threw:', err);
+            client.emit('command:result', {
+              lines: [{ text: 'Internal error processing command.', category: 'system' }],
+            });
+          });
+      } else {
+        client.emit('command:result', resultOrPromise);
+      }
     } catch (err: unknown) {
       this.logger.error('Command handler threw:', err);
       client.emit('command:result', {

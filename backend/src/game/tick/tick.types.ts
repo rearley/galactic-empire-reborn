@@ -1,11 +1,13 @@
 /**
- * The two heartbeat cadences driven by TickService.
+ * The three heartbeat cadences driven by TickService.
  * @see GEMAIN.H TICKTIME=6 (PHYSICS), TICKTIME2=1 (SHIP_UPDATE)
  * @see GEMAIN.C main loop
+ * @see GEMAIN.C:656 plantime = plantock / numrecs (PLANET_UPDATE)
  */
 export enum TickKind {
   SHIP_UPDATE = 'SHIP_UPDATE',
   PHYSICS = 'PHYSICS',
+  PLANET_UPDATE = 'PLANET_UPDATE',
 }
 
 /**

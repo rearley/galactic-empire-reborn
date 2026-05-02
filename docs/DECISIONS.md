@@ -229,6 +229,42 @@ typed constant.
 
 ---
 
+## 2026-05-02 — Planet system decisions (feature 005)
+
+Ten decisions made during the feature 005 research session. Full rationale in `specs/005-planet-system/research.md`.
+
+**Decision 1 — Per-mutation Postgres flush, not the dirty-flag pattern**  
+`PlanetStateService` writes to Postgres synchronously inside the same async critical section that mutates in-memory state. No dirty flag. Reason: planet mutations are sparse (player actions + economy tick); per-mutation I/O is acceptable and crash-safe. The original's `gesdb(GEUPDATE,...)` calls in `cmd_buy`/`cmd_sell`/`cmd_admin`/`multiply()` each executed synchronously. Ships use a dirty flag because the 1 Hz tick batch-flushes many ships; planets do not have that property.
+
+**Decision 2 — Per-planet async mutex via promise chain (`runSerialized`)**  
+Every public write on `PlanetStateService` serializes through a per-planet promise chain. Reason: single-process backend makes in-process serialization sufficient; the pattern is < 20 lines, has no external dep, and directly satisfies SC-005 (no double-spend). Rejected: Postgres advisory lock (round-trip per acquire), `async-mutex` npm dep, per-planet worker queue.
+
+**Decision 3 — Cadence: `max(4, floor(1800 / N))` one-planet-per-firing**  
+`PlanetTickService` processes exactly one planet per `PLANET_UPDATE` firing; interval is derived from the planet count. Reason: matches the original's per-planet cadence intent (`GEMAIN.C:656`), produces a more even cadence than the original's bursty `MAXTIC=20` approach, and is directly unit-testable. Rejected: hardcoded 1 Hz with N planets per firing; recompute cadence after every claim.
+
+**Decision 4 — Sell only at neutral-zone plnum=1**  
+`cmd_sell` refuses unless the pilot is on `plnum=1` at sector `(0,0)`. Reason: strict fidelity — the galactic-market sink is a single fixed planet (`GECMDS.C:4127`). Rejected: allow sell at any owned planet (economic deviation from original).
+
+**Decision 5 — Production-report mail deferred to feature 009**  
+`multiply()` clamps items at `maxpl[i]` but does not emit `MAIL_CLASS_PRODRPT` rows. Reason: the mail service does not yet exist; spec FR-016/SC-006 only require the production formula to match, not the mail side-effect. Deferred cleanly to feature 009.
+
+**Decision 6 — Revolt and `check_spy` deferred to feature 006**  
+`applyEconomyTick` ports `GEPLANET.C:195–340` only (through end of tax accrual). Lines 341+ (revolt, spy check) require combat resolution. Deferred to feature 006.
+
+**Decision 7 — Trade password literal `"team"` preserved as-is**  
+When `planet.password == "team"` and the planet has a non-zero `teamcode`, buy/sell access gates on matching `teamcode`. Reason: strict fidelity to `GECMDS.C:4232-4248`; breaking this breaks team economies.
+
+**Decision 8 — `report cargo` zero-suppresses per-item lines**  
+`report cargo` emits one line per non-zero cargo slot plus a total-tonnage line; zero-quantity slots are omitted. Reason: matches the terse style of the original in-game report display. Full 14-slot table coverage is in `balance-planet.spec.ts`, not the display path.
+
+**Decision 9 — Item canonical arrays hardcoded, not env-configurable**  
+`ITEM_NAMES`, `BASEPRICE`, `MANHOURS`, `MAXPL`, `ITEM_TONS` are frozen constants in source. Reason: balance is a project-level decision; env override would silently defeat the FR-028 balance regression tests. Rebalancing still has a clean path: edit the constant and the regression test in the same commit.
+
+**Decision 10 — Beacon visibility through existing `scan` projection**  
+Non-empty `planet.beacon` surfaces as a `beacon: string` field on the projected `ScanCell`. Reason: cheapest faithful path — `scan` already projects sector contents on demand; no new socket channel needed. Test: `scan.spec.ts` beacon case.
+
+---
+
 ## 2026-05-01 — CommandsModule explicitly imports PrismaModule
 
 **Context**: `PrismaModule` is `@Global()`, making `PrismaService` available in the full app without explicit imports. However, in integration tests that mount `CommandsModule` or `GatewayModule` in isolation (without `AppModule`), the global registration never happens, so `ScanHandlerService` and `ReportHandlerService` cannot resolve `PrismaService`.

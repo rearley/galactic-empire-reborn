@@ -9,6 +9,7 @@ import { CommandsModule } from '../../src/game/commands/commands.module';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
+import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { TickKind } from '../../src/game/tick/tick.types';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ScanCell } from '../../src/game/commands/command.types';
@@ -105,6 +106,13 @@ describe('command round-trip integration (US1)', () => {
       .useValue(prismaMock)
       .overrideProvider(GalaxyService)
       .useValue(galaxyServiceMock)
+      .overrideProvider(PlanetStateService)
+      .useValue({
+        get: jest.fn().mockReturnValue(undefined),
+        all: jest.fn().mockReturnValue([]),
+        size: jest.fn().mockReturnValue(0),
+        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -327,6 +335,13 @@ describe('command round-trip integration (US1)', () => {
       .useValue(localPrismaMock)
       .overrideProvider(GalaxyService)
       .useValue(galaxyServiceMock)
+      .overrideProvider(PlanetStateService)
+      .useValue({
+        get: jest.fn().mockReturnValue(undefined),
+        all: jest.fn().mockReturnValue([]),
+        size: jest.fn().mockReturnValue(0),
+        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+      })
       .compile();
 
     const galaxyApp = galaxyModule.createNestApplication();

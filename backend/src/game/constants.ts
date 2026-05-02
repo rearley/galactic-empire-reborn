@@ -57,6 +57,12 @@ export const PLTYPE_WORM = 3 as const;
  */
 export const MAXPLANETS = 9 as const;
 
+/** Planet lock-time in seconds. @see GEMAIN.C:469 (PLANTOCK; canonical default 30 minutes) */
+export const PLANTOCK_SECONDS = 1800 as const;
+
+/** Minimum planet-update tick interval in seconds. @see GEMAIN.C:658 */
+export const PLANTIME_MIN_SECONDS = 4 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;
