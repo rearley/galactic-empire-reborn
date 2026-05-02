@@ -447,6 +447,25 @@ model ShipClass {
   tough                  Int
 }
 
+// ─── GalaxyMeta (singleton provenance row) ───────────────────────────────────
+// @see specs/004-galaxy-generator/data-model.md — new entity
+// Presence of this row signals that generation completed atomically (FR-002, FR-012).
+
+model GalaxyMeta {
+  /// Always 1; DB CHECK enforces single-row semantics.
+  id          Int      @id @default(1)
+  /// Seed actually used at generation. BigInt to allow operator-supplied wide values.
+  seed        BigInt
+  /// `plodds` tunable in effect at generation. Original `numopt` legal range 1..20.
+  plodds      Int
+  /// `wormodds` tunable in effect at generation. Legal range 1..100.
+  wormodds    Int
+  /// `maxplanets` tunable in effect at generation. Legal range 1..9.
+  maxplanets  Int
+  /// Generation commit time.
+  generatedAt DateTime @default(now())
+}
+
 // ─── Mine (MINE + modernization) ─────────────────────────────────────────────
 // @see reference/ge-source/GEMAIN.H:267 — MINE struct
 // deployedBy and deployedAt are explicit modernization additions (FR-029):
