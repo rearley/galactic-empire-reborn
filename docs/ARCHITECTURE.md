@@ -179,9 +179,25 @@ galactic-empire-reborn/
     test/                    ← 33 Vitest tests
 ```
 
+  └── GalaxyModule (game/galaxy/) — exports GalaxyService
+        └── GalaxyService — generates the full 30×15 galaxy inside a single Postgres transaction
+        │                    on first boot (idempotency probe: checks for GalaxyMeta row in
+        │                    onModuleInit, skips generation if present)
+        │                    owns in-memory read model:
+        │                      Map<"x,y", Planet[]>   (planetsBySector)
+        │                      Map<"x,y", Wormhole[]> (wormholesBySector)
+        │                      Map<string, Planet>    (planetsByName)
+        │                    public read API: getSectorPlanets, getSectorWormholes,
+        │                      findPlanetByName, getMeta
+        │                    consumed by: ScanHandlerService (004), PlanetService (005),
+        │                      CombatService (006), CybertronService (007)
+
+`ScanHandlerService` (feature 004 additions): `scan lo` now projects planets (`'O'`)
+and wormholes (`'W'`) from `GalaxyService` onto the tactical grid alongside ships.
+`scan pl <name>` resolves named planets galaxy-wide via `GalaxyService.findPlanetByName`.
+
 ## What does not exist yet
 
-- Galaxy generator — feature 004
 - Planet mechanics — feature 005
 - Combat (phasors, torpedoes, missiles, mines) — feature 006
 - Cybertron AI — feature 007

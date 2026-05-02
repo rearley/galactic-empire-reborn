@@ -4,10 +4,11 @@ import { TickModule } from './game/tick/tick.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { ShipModule } from './game/ship/ship.module';
 import { CommandsModule } from './game/commands/commands.module';
+import { GalaxyModule } from './game/galaxy/galaxy.module';
 import { DebugController } from './debug/debug.controller';
 
 @Module({
-  imports: [PrismaModule, TickModule, ShipModule, CommandsModule, GatewayModule],
+  imports: [PrismaModule, TickModule, ShipModule, CommandsModule, GalaxyModule, GatewayModule],
   controllers: [DebugController],
 })
 export class AppModule {}

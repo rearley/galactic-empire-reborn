@@ -55,6 +55,21 @@ export enum MessageId {
   TABROKE = 'TABROKE',
   JAMMER4 = 'JAMMER4',
 
+  // scan pl — planet status block (feature 004)
+  // @see specs/004-galaxy-generator/contracts/scan-projection.md §"Message catalogue additions"
+  NO_SUCH_PLANET = 'NO_SUCH_PLANET',
+  SCAN08 = 'SCAN08',
+  SCAN_DASHES = 'SCAN_DASHES',
+  SCAN09 = 'SCAN09',
+  SCAN10 = 'SCAN10',
+  SCAN11 = 'SCAN11',
+  SCAN12 = 'SCAN12',
+  SCAN13 = 'SCAN13',
+  SCAN14 = 'SCAN14',
+  SCAN15 = 'SCAN15',
+  SCAN16 = 'SCAN16',
+  SCAN_LOCATED_IN = 'SCAN_LOCATED_IN',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -114,6 +129,21 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCANFMT]: 'Usage: scan <sh|pl|ra|se|lo>',
   [MessageId.TABROKE]: 'Tactical computer is offline.',
   [MessageId.JAMMER4]: 'Cannot scan while jammer is active.',
+
+  // scan pl — planet status block (feature 004)
+  // @see GECMDS.C:2316 (no-planet path); GECMDS.C:2326-2356 (planet status block)
+  [MessageId.NO_SUCH_PLANET]: 'No planet by that name.',
+  [MessageId.SCAN08]: 'Planet #%d: %s',
+  [MessageId.SCAN_DASHES]: '-----------------',
+  [MessageId.SCAN09]: 'Owned by: %s',
+  [MessageId.SCAN10]: 'Bearing: %d   Distance: %s',
+  [MessageId.SCAN11]: 'Environment: ',
+  [MessageId.SCAN12]: 'Earth-like',
+  [MessageId.SCAN13]: 'Hostile',
+  [MessageId.SCAN14]: 'Toxic',
+  [MessageId.SCAN15]: 'Inferno-like',
+  [MessageId.SCAN16]: 'Resources: ',
+  [MessageId.SCAN_LOCATED_IN]: 'Located in sector (%d,%d).',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',

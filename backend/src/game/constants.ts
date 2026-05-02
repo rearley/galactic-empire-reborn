@@ -33,6 +33,30 @@ export const SCAN_GRID_WIDTH = 30 as const; // GEMAIN.H:121
  */
 export const SCAN_GRID_HEIGHT = 15 as const; // GEMAIN.H:122
 
+/**
+ * Normal (empty) sector type.
+ * @see GEMAIN.H:205
+ */
+export const SECTYPE_NORMAL = 1 as const;
+
+/**
+ * Planet sector type.
+ * @see GEMAIN.H:206
+ */
+export const PLTYPE_PLNT = 2 as const;
+
+/**
+ * Wormhole sector type.
+ * @see GEMAIN.H:207
+ */
+export const PLTYPE_WORM = 3 as const;
+
+/**
+ * Maximum number of planets that can be placed in the galaxy.
+ * @see GEMAIN.H:123
+ */
+export const MAXPLANETS = 9 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;

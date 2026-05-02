@@ -7,9 +7,10 @@ import { ScanHandlerService } from './handlers/scan.handler';
 import { ReportHandlerService } from './handlers/report.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { GalaxyModule } from '../galaxy/galaxy.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule],
   providers: [CommandRouterService, ScanHandlerService, ReportHandlerService],
   exports: [CommandRouterService],
 })
