@@ -101,6 +101,42 @@ on first boot within a single Postgres transaction that also writes the `GalaxyM
 They are no longer empty placeholder tables — after first boot all 450 sector rows exist,
 and every planet and wormhole that was generated is present and queryable.
 
+## Planet (in-memory PlanetState — feature 005)
+
+The `Planet` Prisma row is loaded once on boot by `PlanetStateService.onModuleInit()` and held in a `Map<planetKey, PlanetState>`. `planetKey(xsect, ysect, plnum)` returns `"xsect,ysect,plnum"`.
+
+The parallel `items*` columns in Postgres (`itemsQty BigInt[]`, `itemsRate Int[]`, `itemsSell Int[]`, `itemsReserve BigInt[]`, `itemsMarkup2a Int[]`, `itemsSold2a BigInt[]`) are projected into a `PlanetItem[14]` array inside `PlanetState`. Each element:
+
+```ts
+interface PlanetItem {
+  qty:      bigint;   // items[i].qty    — current stock
+  rate:     number;   // items[i].rate   — per-tick production rate (set by admin)
+  sell:     boolean;  // items[i].sell   — whether pilots can buy this item (0/1 in DB)
+  reserve:  bigint;   // items[i].reserve — qty below which selling is refused
+  markup2a: number;   // items[i].markup2a — non-owner price (set by admin)
+  sold2a:   bigint;   // items[i].sold2a — running total sold (BigInt accumulator)
+}
+```
+
+`prismaPlanetToState(row)` explodes the six parallel arrays into `PlanetItem[14]`. `stateToPrismaUpdate(state)` reassembles them back into `Prisma.PlanetUpdateInput`.
+
+No migration was required for this feature — the `Planet` model already had all columns from feature 001.
+
+### Item constants (`backend/src/game/constants/items.ts`)
+
+`NUMITEMS = 14`. Item indices:
+
+| Const | Value | Name |
+|-------|-------|------|
+| `I_MEN` | 0 | Men |
+| `I_FOOD` | 5 | Food Cases |
+| `I_GOLD` | 12 | Gold |
+| `I_SPY` | 13 | Spy Robots |
+
+Five frozen arrays (length 14, hardcoded from wiki/GEMAIN.H): `ITEM_NAMES`, `BASEPRICE`, `MANHOURS`, `MAXPL`, `ITEM_TONS`. Pinned by `balance-planet.spec.ts` snapshot tests.
+
+---
+
 ## Mine
 
 A mine that has been deployed into the galaxy, distinct from mines carried as

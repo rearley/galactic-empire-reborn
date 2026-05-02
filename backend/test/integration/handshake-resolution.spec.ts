@@ -8,6 +8,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
+import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 
 function makeClient(port: number, userid?: string): Socket {
   return ioc(`http://localhost:${port}`, {
@@ -99,6 +100,13 @@ describe('GameGateway handshake resolution', () => {
         getSectorWormholes: jest.fn().mockReturnValue([]),
         findPlanetByName: jest.fn().mockReturnValue(null),
         getMeta: jest.fn(),
+      })
+      .overrideProvider(PlanetStateService)
+      .useValue({
+        get: jest.fn().mockReturnValue(undefined),
+        all: jest.fn().mockReturnValue([]),
+        size: jest.fn().mockReturnValue(0),
+        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
       })
       .compile();
 

@@ -1,7 +1,9 @@
+import { CommandResult } from '../../../src/game/commands/command.types';
 import { ScanHandlerService } from '../../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { GalaxyService } from '../../../src/game/galaxy/galaxy.service';
+import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../../src/game/constants';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
@@ -45,10 +47,12 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
       findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
     },
   };
+  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
+    planetServiceMock as unknown as PlanetStateService,
   );
   return { service, shipServiceMock, prismaMock, galaxyMock };
 }
@@ -59,7 +63,7 @@ describe('ScanHandlerService', () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       const ship = makeShip();
-      const result = service.command.handler(ship, ['lo'], {});
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
       expect(result.scanGrid).toBeDefined();
       expect(result.scanGrid!.length).toBe(1);
       const selfCell = result.scanGrid![0];
@@ -76,7 +80,7 @@ describe('ScanHandlerService', () => {
       const aiShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 1 });
       const { service } = makeService([playerShip, aiShip]);
       await service.onModuleInit();
-      const result = service.command.handler(playerShip, ['lo'], {});
+      const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       const aiCell = result.scanGrid!.find(c => c.type === 'ship');
       expect(aiCell).toBeDefined();
       expect(aiCell!.char).toBe('+');
@@ -87,7 +91,7 @@ describe('ScanHandlerService', () => {
       const manualShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 0 });
       const { service } = makeService([playerShip, manualShip]);
       await service.onModuleInit();
-      const result = service.command.handler(playerShip, ['lo'], {});
+      const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       const shipCell = result.scanGrid!.find(c => c.type === 'ship');
       expect(shipCell!.char).toBe('=');
     });
@@ -96,7 +100,7 @@ describe('ScanHandlerService', () => {
       const ship = makeShip({ userid: 'u1', shipno: 1 });
       const { service } = makeService([ship]);
       await service.onModuleInit();
-      const result = service.command.handler(ship, ['lo'], {});
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
       const selfCells = result.scanGrid!.filter(c => c.type === 'self');
       expect(selfCells).toHaveLength(1);
       const shipCells = result.scanGrid!.filter(c => c.type === 'ship');
@@ -109,7 +113,7 @@ describe('ScanHandlerService', () => {
       const farShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 9999, ycoord: 9999, status: 0 });
       const { service } = makeService([playerShip, farShip], 100); // tiny scan range
       await service.onModuleInit();
-      const result = service.command.handler(playerShip, ['lo'], {});
+      const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       expect(result.scanGrid!.filter(c => c.type === 'ship')).toHaveLength(0);
     });
   });
@@ -119,8 +123,8 @@ describe('ScanHandlerService', () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       const ship = makeShip();
-      const resultLo = service.command.handler(ship, ['lo'], {});
-      const resultBare = service.command.handler(ship, [], {});
+      const resultLo = service.command.handler(ship, ['lo'], {}) as CommandResult;
+      const resultBare = service.command.handler(ship, [], {}) as CommandResult;
       // Both should return a scanGrid with just the self-cell
       expect(resultBare.scanGrid).toBeDefined();
       expect(resultBare.scanGrid!.length).toBe(resultLo.scanGrid!.length);
@@ -133,7 +137,7 @@ describe('ScanHandlerService', () => {
       await service.onModuleInit();
       const ship = makeShip();
       shipServiceMock.findByName.mockReturnValue(makeShip({ shipname: 'USS Target' }));
-      const result = service.command.handler(ship, ['sh', 'USS', 'Target'], {});
+      const result = service.command.handler(ship, ['sh', 'USS', 'Target'], {}) as CommandResult;
       expect(result.scanGrid).toBeUndefined();
       expect(result.lines.length).toBeGreaterThan(0);
     });
@@ -141,7 +145,7 @@ describe('ScanHandlerService', () => {
     it('missing name arg returns SCANFMT', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
-      const result = service.command.handler(makeShip(), ['sh'], {});
+      const result = service.command.handler(makeShip(), ['sh'], {}) as CommandResult;
       expect(result.lines[0].text).toBe(formatMessage(MessageId.SCANFMT));
       expect(result.scanGrid).toBeUndefined();
     });
@@ -151,7 +155,7 @@ describe('ScanHandlerService', () => {
     it('returns text-only result (no scanGrid field)', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
-      const result = service.command.handler(makeShip(), ['pl', 'Earth'], {});
+      const result = service.command.handler(makeShip(), ['pl', 'Earth'], {}) as CommandResult;
       expect(result.scanGrid).toBeUndefined();
     });
   });
@@ -160,7 +164,7 @@ describe('ScanHandlerService', () => {
     it('returns SCANFMT', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
-      const result = service.command.handler(makeShip(), ['xyz'], {});
+      const result = service.command.handler(makeShip(), ['xyz'], {}) as CommandResult;
       expect(result.lines[0].text).toBe(formatMessage(MessageId.SCANFMT));
     });
   });
@@ -209,13 +213,12 @@ function makeServiceWithGalaxy(
     findPlanetByName: jest.fn().mockReturnValue(null),
     ...galaxyMock,
   };
-  // Constructed with a 3rd arg before T027 updates the signature.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ServiceCtor = ScanHandlerService as unknown as new (...a: any[]) => ScanHandlerService;
-  const service = new ServiceCtor(
+  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
     fullGalaxyMock as unknown as GalaxyService,
+    planetServiceMock as unknown as PlanetStateService,
   );
   return { service, shipServiceMock, prismaMock, galaxyMock: fullGalaxyMock };
 }
@@ -265,7 +268,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       );
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = service.command.handler(ship, ['lo'], {});
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
       const planetCell = result.scanGrid!.find(c => c.type === 'planet');
       expect(planetCell).toBeDefined();
       expect(planetCell!.char).toBe('O');
@@ -281,7 +284,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       );
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = service.command.handler(ship, ['lo'], {});
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
       const wormholeCell = result.scanGrid!.find(c => c.type === 'wormhole');
       expect(wormholeCell).toBeDefined();
       expect(wormholeCell!.char).toBe('W');
@@ -298,7 +301,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
         { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
       );
       await service.onModuleInit();
-      const result = service.command.handler(playerShip, ['lo'], {});
+      const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       expect(result.scanGrid!.some(c => c.type === 'planet')).toBe(true);
       expect(result.scanGrid!.some(c => c.type === 'ship')).toBe(true);
       expect(result.scanGrid!.some(c => c.type === 'self')).toBe(true);
@@ -314,9 +317,60 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       );
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = service.command.handler(ship, ['lo'], {});
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
       expect(result.scanGrid!.some(c => c.type === 'wormhole')).toBe(false);
     });
+  });
+});
+
+// T049 — scan pl: beacon line visibility
+describe('T049 — scan pl: beacon line', () => {
+  function makeServiceWithBeacon(beaconState: { beacon: string } | null) {
+    const planet = makePlanet({ xsect: 0, ysect: 0, plnum: 1, name: 'BeaconWorld' });
+    const shipServiceMock = {
+      findAllShips: jest.fn().mockReturnValue([]),
+      findByName: jest.fn().mockReturnValue(undefined),
+      findByUserid: jest.fn().mockReturnValue([]),
+    };
+    const prismaMock = {
+      shipClass: {
+        findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 5000 }]),
+      },
+    };
+    const galaxyMock = {
+      getSectorPlanets: jest.fn().mockReturnValue([]),
+      getSectorWormholes: jest.fn().mockReturnValue([]),
+      findPlanetByName: jest.fn().mockReturnValue(planet),
+    };
+    const planetServiceMock = { get: jest.fn().mockReturnValue(beaconState) };
+    const service = new ScanHandlerService(
+      shipServiceMock as unknown as ShipStateService,
+      prismaMock as unknown as PrismaService,
+      galaxyMock as unknown as GalaxyService,
+      planetServiceMock as unknown as PlanetStateService,
+    );
+    return { service };
+  }
+
+  it('shows SCAN_BEACON line when beacon is non-empty', async () => {
+    const { service } = makeServiceWithBeacon({ beacon: 'Welcome traders!' });
+    await service.onModuleInit();
+    const result = service.command.handler(makeShip(), ['pl', 'BeaconWorld'], {}) as CommandResult;
+    expect(result.lines.some(l => l.text.includes('Welcome traders!'))).toBe(true);
+  });
+
+  it('omits SCAN_BEACON line when beacon is empty string', async () => {
+    const { service } = makeServiceWithBeacon({ beacon: '' });
+    await service.onModuleInit();
+    const result = service.command.handler(makeShip(), ['pl', 'BeaconWorld'], {}) as CommandResult;
+    expect(result.lines.some(l => l.text.includes('broadcasts'))).toBe(false);
+  });
+
+  it('omits SCAN_BEACON line when planet has no in-memory state', async () => {
+    const { service } = makeServiceWithBeacon(null);
+    await service.onModuleInit();
+    const result = service.command.handler(makeShip(), ['pl', 'BeaconWorld'], {}) as CommandResult;
+    expect(result.lines.some(l => l.text.includes('broadcasts'))).toBe(false);
   });
 });
 
@@ -330,7 +384,7 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
       { findPlanetByName: jest.fn().mockReturnValue(planet) },
     );
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['pl', 'Zygor-3'], {});
+    const result = service.command.handler(makeShip(), ['pl', 'Zygor-3'], {}) as CommandResult;
     const texts = result.lines.map(l => l.text);
     // SCAN08: "Planet #1: Zygor-3"
     expect(texts.some(t => t.includes('Zygor-3'))).toBe(true);
@@ -348,14 +402,14 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
       { findPlanetByName: jest.fn().mockReturnValue(null) },
     );
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['pl', 'NOTAPLANET'], {});
+    const result = service.command.handler(makeShip(), ['pl', 'NOTAPLANET'], {}) as CommandResult;
     expect(result.lines[0].text).toBe('No planet by that name.');
   });
 
   it('scan pl (no args) returns SCANFMT', async () => {
     const { service } = makeServiceWithGalaxy([], {});
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['pl'], {});
+    const result = service.command.handler(makeShip(), ['pl'], {}) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SCANFMT));
   });
 });

@@ -1,3 +1,4 @@
+import { CommandResult } from '../../../src/game/commands/command.types';
 import { rotateCommand } from '../../../src/game/commands/handlers/rotate.handler';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
@@ -28,7 +29,7 @@ const ctx: CommandContext = {};
 describe('rotateCommand', () => {
   it('success path mutates degrees and returns NOWTURN', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['90'], ctx);
+    const result = rotateCommand.handler(ship, ['90'], ctx) as CommandResult;
     expect(ship.degrees).toBe(90);
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, 90));
@@ -43,14 +44,14 @@ describe('rotateCommand', () => {
 
   it('negative degrees mutates correctly (-90)', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['-90'], ctx);
+    const result = rotateCommand.handler(ship, ['-90'], ctx) as CommandResult;
     expect(ship.degrees).toBe(-90);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, -90));
   });
 
   it('out-of-range (181) returns NUMOOR', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['181'], ctx);
+    const result = rotateCommand.handler(ship, ['181'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, -180, 180));
     expect(result.lines[0].category).toBe('system');
     expect(ship.dirty).toBe(false);
@@ -58,14 +59,14 @@ describe('rotateCommand', () => {
 
   it('out-of-range (-181) returns NUMOOR', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['-181'], ctx);
+    const result = rotateCommand.handler(ship, ['-181'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, -180, 180));
     expect(ship.dirty).toBe(false);
   });
 
   it('non-numeric input "abc" returns NUMOOR', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['abc'], ctx);
+    const result = rotateCommand.handler(ship, ['abc'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, -180, 180));
     expect(ship.dirty).toBe(false);
   });
@@ -81,14 +82,14 @@ describe('rotateCommand', () => {
 
   it('boundary: 180 accepted', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['180'], ctx);
+    const result = rotateCommand.handler(ship, ['180'], ctx) as CommandResult;
     expect(ship.degrees).toBe(180);
     expect(result.lines[0].category).toBe('success');
   });
 
   it('boundary: -180 accepted', () => {
     const ship = makeShip();
-    const result = rotateCommand.handler(ship, ['-180'], ctx);
+    const result = rotateCommand.handler(ship, ['-180'], ctx) as CommandResult;
     expect(ship.degrees).toBe(-180);
     expect(result.lines[0].category).toBe('success');
   });
