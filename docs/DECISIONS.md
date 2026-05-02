@@ -4,6 +4,76 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-05-02 — Physics tick uses `max_accel/10` for rotation (not ROTAMT)
+
+**Context**: GEMAIN.H defines `ROTAMT=20` but it is never referenced in any `.C`
+file (verified by grep). `GEFUNCS.C:441 rotship` uses
+`rotamt = (double)(shipclass[ptr->shpclass].max_accel/10.0)`.
+
+**Decision**: 006a's `rotationStep` uses `maxAccel / 10` per tick.
+
+**Reason**: Faithful to the only formula the original actually executes; using
+ROTAMT would erase per-class differentiation.
+
+**Alternatives rejected**: Use ROTAMT (would make heavy and light ships pivot
+identically, breaking class balance).
+
+---
+
+## 2026-05-02 — MOVENGUSE widened to `speed > 0` (with playtest fallback)
+
+**Context**: `GEFUNCS.C:733-792 moveship` only debits MOVENGUSE when
+`speed > 1000.0 && status == GESTAT_USER`. The 006a spec (FR-006) widens this to
+`speed > 0` so impulse ships also pay maintenance.
+
+**Decision**: 006a debits `MOVENGUSE = 10` whenever `speed > 0` and the ship is
+a player (`status === 1`). AI ships skip the debit entirely (matches original).
+
+**Reason**: Every spec reviewer asked "why doesn't impulse cost energy?". The
+deliberate departure answers that with no new constant — same `MOVENGUSE` rate,
+just a wider gate. Tracked here so a future revert is cheap.
+
+**Alternatives rejected**: Match strict `speed > 1000.0` original gate
+(reserved as the playtest fallback if impulse-only ships starve). Debit AI
+ships too (rejected — original does not, spec clarification forbids).
+
+---
+
+## 2026-05-02 — Ascending-shipKey iteration order in physics tick
+
+**Context**: `findAllShips()` returns the in-memory Map's value iterator;
+insertion order under hydration race is implementation-dependent.
+
+**Decision**: `PhysicsTickService` sorts `findAllShips()` lexicographically by
+`${userid}:${shipno}` before iterating. O(n log n) at n≈200 is well under the
+50 ms SC-004 budget.
+
+**Reason**: Tests and bug reproductions need deterministic batch order
+(FR-019); insertion order is brittle.
+
+**Alternatives rejected**: Numeric `shipno` only (collisions across `userid`).
+Insertion order (non-deterministic).
+
+---
+
+## 2026-05-02 — Per-ship try/catch over quarantine
+
+**Context**: Original `RTKICK` does not crash on per-ship exceptions because C
+runtime does not throw; we need an explicit isolation primitive in TS.
+
+**Decision**: `PhysicsTickService.advanceAll` wraps each ship in `try { ... }
+catch`, logs `{ shipId, tickAt, stack }`, increments an instance fault
+counter, and continues. Faulted ship is re-tried next tick (no quarantine).
+
+**Reason**: Mirrors the existing `TickService.dispatch` "one bad subscriber
+must not stop siblings" pattern. Quarantine adds state and hides bugs; metrics
++ log is the correct first response.
+
+**Alternatives rejected**: Quarantine after N consecutive faults (deferred —
+revisit if telemetry shows the same ship faulting repeatedly).
+
+---
+
 ## 2026-05-01 — BigInt for unbounded accumulator columns
 
 **Context**: The original C source uses `unsigned long` (32-bit on DOS/MajorBBS)

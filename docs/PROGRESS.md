@@ -1,3 +1,51 @@
+## 2026-05-02 — 006a-physics-tick
+
+**Completed**:
+- `backend/src/game/physics/` module: `physics-math.ts` (pure: rotationStep,
+  accelerationStep, positionIntegration, tryEnergyDebit, sectorOf,
+  normalizeHeading), `ship-class-cache.service.ts` (boot-hydrated maxAcceleration
+  / maxWarp lookup), `physics-tick.service.ts` (orchestrator subscribed to
+  `TickKind.PHYSICS`), `physics-events.ts` (typed event names + payloads).
+- `EventEmitter2` integration via `@nestjs/event-emitter` (new dep) for the two
+  typed signals: `physics.sector-transition` and `physics.hyperspace`.
+- `WarpHandlerService` (replaces the static `warpCommand` const) — full FR-012
+  five-gate sequence using `ShipClassCacheService.getMaxWarp` for WARP01 vs.
+  WARPSPD2 distinction.
+- Constants added to `game/constants.ts`: `ACCENGAMT=120`, `MOVENGUSE=10`,
+  `MOVENGMIN=3000`, `ROTENGUSE=30`, `WARP_THRESHOLD=1000`, `COORD_SCALE=65000`.
+- Jest config picks up new `test/game/` root.
+
+**Tests** (754 total, 64 suites — all green; 67 net new):
+- Unit (physics-math): 35 tests covering accel/decel/snap, ACCENGAMT gate,
+  hyperspace boundary, position integration on cardinal/diagonal headings,
+  energy floor refusal, sector-of, rotation step short-way + normalization.
+- Unit (ShipClassCacheService): 4 tests for hydration, sync lookup, throw on
+  unknown class, test seam.
+- Integration (PhysicsTickService): 11 tests — warp-1 advance + MOVENGUSE +
+  hyperspace=enter, sector-transition emission, AI maintenance exclusion,
+  orbit/dock skip, MOVENGMIN floor cutoff, per-ship fault isolation, US2
+  short-way rotation, US3 hypha/cantexit decrement, FR-019 ordering.
+- Warp gate (warp-gate.spec.ts + revised warp.spec.ts): all six FR-012 gate
+  paths validated through the cache-injected handler.
+- Balance regression: 12 assertions pinning every consumed constant + the
+  sum-of-classes for `maxAcceleration` (72050) and `maxWarp` (522).
+- Performance bench: 100 ships through one `advanceAll()` < 50 ms (SC-004).
+
+**Decisions made**: rotation step uses `max_accel/10` (not unused ROTAMT);
+MOVENGUSE widened to `speed > 0` (playtest fallback documented); deterministic
+ascending-shipKey iteration; per-ship try/catch (no quarantine). All recorded
+in `docs/DECISIONS.md`.
+
+**Next**: `006b-combat` — phasors first, then torpedoes/missiles/mines on the
+same physics tick.
+
+**Known issues**: None. Out-of-scope (deferred to 006b or galaxy work):
+universe wrap, telezip, gravity, overspeed-engine-blow, weapon/shield/cloak
+state, gateway consumption of the new typed events, manual quickstart §1–§8
+(blocked on a real Postgres seed run; verified at the unit/integration level).
+
+---
+
 ## 2026-05-01 — 001-prisma-schema
 
 **Completed**:

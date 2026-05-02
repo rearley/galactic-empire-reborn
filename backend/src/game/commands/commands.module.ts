@@ -2,7 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { CommandRouterService } from './command-router.service';
 import { rotateCommand } from './handlers/rotate.handler';
 import { impulseCommand } from './handlers/impulse.handler';
-import { warpCommand } from './handlers/warp.handler';
+import { WarpHandlerService } from './handlers/warp.handler';
 import { ScanHandlerService } from './handlers/scan.handler';
 import { ReportHandlerService } from './handlers/report.handler';
 import { OrbitHandlerService } from './handlers/orbit.handler';
@@ -15,9 +15,10 @@ import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { PlanetModule } from '../planet/planet.module';
+import { PhysicsModule } from '../physics/physics.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,
@@ -28,6 +29,7 @@ import { PlanetModule } from '../planet/planet.module';
     SellHandlerService,
     AdminHandlerService,
     WithdrawHandlerService,
+    WarpHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -42,12 +44,13 @@ export class CommandsModule implements OnModuleInit {
     private readonly sellHandler: SellHandlerService,
     private readonly adminHandler: AdminHandlerService,
     private readonly withdrawHandler: WithdrawHandlerService,
+    private readonly warpHandler: WarpHandlerService,
   ) {}
 
   onModuleInit(): void {
     this.commandRouter.register(rotateCommand);
     this.commandRouter.register(impulseCommand);
-    this.commandRouter.register(warpCommand);
+    this.commandRouter.register(this.warpHandler.command);
     this.commandRouter.register(this.scanHandler.command);
     this.commandRouter.register(this.reportHandler.command);
     this.commandRouter.register(this.orbitHandler.command);
