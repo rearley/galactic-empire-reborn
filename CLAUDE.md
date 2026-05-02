@@ -158,7 +158,13 @@ Testing is not optional. No feature is complete without tests.
 - TypeScript strict mode — no `any`, no implicit types
 - All public service methods must have JSDoc that references the original C
   source function where applicable (e.g. `@see GEFUNCS.C:cdistance`)
+- **Prisma migrations are source-controlled artifacts — never add `prisma/migrations/`
+  to `.gitignore`.** They must be committed alongside the schema change that produced
+  them. `prisma migrate deploy` in CI/production depends on this history existing.
 - Prisma migrations are never edited after creation — always add new ones
+- **Never use `prisma db push` or apply schema changes directly to the DB without
+  creating a migration file first.** Always use `prisma migrate dev --name <name>`
+  so the change is captured as a versioned migration.
 - Docker Compose must work for both development and production
 - No feature ships without passing CI
 
