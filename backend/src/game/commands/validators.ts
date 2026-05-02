@@ -4,6 +4,41 @@
  * @see GEFUNCS.C:1906 valpcnt  — validates percentage in [min, max] (default 0..99)
  */
 
+import { ITEM_NAMES } from '../constants/items';
+
+/** Short keyword aliases matching genearas() in the original game. */
+const ITEM_SHORT_KEYWORDS = [
+  'men', 'mis', 'tor', 'ion', 'fla', 'foo', 'fig', 'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy',
+];
+
+/**
+ * Resolve an item keyword (short alias or case-insensitive prefix of full name) to its 0-based index.
+ * Returns -1 if not found.
+ * @see GECMDS.C:genearas
+ */
+export function resolveItemKeyword(keyword: string): number {
+  const lower = keyword.toLowerCase();
+  // Try short keyword exact match first
+  const shortIdx = ITEM_SHORT_KEYWORDS.indexOf(lower);
+  if (shortIdx !== -1) return shortIdx;
+  // Try case-insensitive prefix match against full names
+  for (let i = 0; i < ITEM_NAMES.length; i++) {
+    if (ITEM_NAMES[i].toLowerCase().startsWith(lower)) return i;
+  }
+  return -1;
+}
+
+/**
+ * Parses an unsigned 32-bit integer from a string. Returns undefined on failure.
+ */
+export function parseUint32(input: string): number | undefined {
+  const trimmed = input.trim();
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  const n = parseInt(trimmed, 10);
+  if (n < 0 || n > 0xffff_ffff) return undefined;
+  return n;
+}
+
 export type ValidatorOk<T> = { ok: true; value: T };
 export type ValidatorErr = { ok: false; code: 'NUMOOR' | 'INVALID' };
 export type ValidatorResult<T> = ValidatorOk<T> | ValidatorErr;
