@@ -70,6 +70,59 @@ export enum MessageId {
   SCAN16 = 'SCAN16',
   SCAN_LOCATED_IN = 'SCAN_LOCATED_IN',
 
+  // scan pl beacon (feature 005)
+  SCAN_BEACON = 'SCAN_BEACON',
+
+  // orbit (feature 005) — GECMDS.C:758 cmd_orbit
+  ORBIT01 = 'ORBIT01',
+  ORBITALR = 'ORBITALR',
+  ORBITNO = 'ORBITNO',
+  ORBITPK = 'ORBITPK',
+
+  // land (feature 005)
+  LAND_NOT_ORBIT = 'LAND_NOT_ORBIT',
+  LAND_NAME_PROMPT = 'LAND_NAME_PROMPT',
+  LAND_INVALID_NAME = 'LAND_INVALID_NAME',
+  LAND_CLAIMED = 'LAND_CLAIMED',
+  LAND_OK = 'LAND_OK',
+  LAND_REFUSED = 'LAND_REFUSED',
+  LAND_PASSFAIL = 'LAND_PASSFAIL',
+
+  // buy (feature 005) — GECMDS.C:4201 cmd_buy
+  BUYFMT = 'BUYFMT',
+  BUY1 = 'BUY1',
+  BUY2 = 'BUY2',
+  BUY3 = 'BUY3',
+  BUY4 = 'BUY4',
+  BUY5 = 'BUY5',
+  BUYPAS1 = 'BUYPAS1',
+  BUYPAS3 = 'BUYPAS3',
+  BUYPAS4 = 'BUYPAS4',
+
+  // sell (feature 005) — GECMDS.C:4103 cmd_sell
+  SELLFMT = 'SELLFMT',
+  SELL1 = 'SELL1',
+  SELL2 = 'SELL2',
+  SELL3 = 'SELL3',
+
+  // admin (feature 005) — GECMDS.C:3462 cmd_admin
+  ADM_NOT_LANDED = 'ADM_NOT_LANDED',
+  ADM_NOT_OWNER = 'ADM_NOT_OWNER',
+  ADM_MENU = 'ADM_MENU',
+  ADM_INVALID = 'ADM_INVALID',
+  ADM_OK = 'ADM_OK',
+
+  // withdraw (feature 005)
+  WTHDR_NOT_LANDED = 'WTHDR_NOT_LANDED',
+  WTHDR_NOT_OWNER = 'WTHDR_NOT_OWNER',
+  WTHDR_OK = 'WTHDR_OK',
+  WTHDR_NONE = 'WTHDR_NONE',
+
+  // report cargo (feature 005)
+  REP_CARGO_LINE = 'REP_CARGO_LINE',
+  REP_CARGO_TOTAL = 'REP_CARGO_TOTAL',
+  REP_CARGO_NONE = 'REP_CARGO_NONE',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -145,6 +198,59 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN16]: 'Resources: ',
   [MessageId.SCAN_LOCATED_IN]: 'Located in sector (%d,%d).',
 
+  // scan pl beacon (feature 005)
+  [MessageId.SCAN_BEACON]: '%s broadcasts: "%s"',
+
+  // orbit (feature 005) — GECMDS.C:758 cmd_orbit
+  [MessageId.ORBIT01]: 'Now in orbit around %s.',
+  [MessageId.ORBITALR]: 'You are already in orbit.',
+  [MessageId.ORBITNO]: 'There is nothing to orbit here.',
+  [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
+
+  // land (feature 005)
+  [MessageId.LAND_NOT_ORBIT]: 'You must enter orbit first.',
+  [MessageId.LAND_NAME_PROMPT]: 'What would you like to name this planet? (Up to 19 characters.)',
+  [MessageId.LAND_INVALID_NAME]: 'That is not a valid planet name.',
+  [MessageId.LAND_CLAIMED]: 'You have claimed %s. It is now your planet.',
+  [MessageId.LAND_OK]: 'You have landed on %s.',
+  [MessageId.LAND_REFUSED]: 'Landing refused — this planet is closed.',
+  [MessageId.LAND_PASSFAIL]: 'Landing refused — incorrect password.',
+
+  // buy (feature 005) — GECMDS.C:4201 cmd_buy
+  [MessageId.BUYFMT]: 'Use: buy <quantity> <item>',
+  [MessageId.BUY1]: 'You must be landed on a planet to buy goods.',
+  [MessageId.BUY2]: '%d %s purchased for %d credits.',
+  [MessageId.BUY3]: "That would deplete the planet's reserve.",
+  [MessageId.BUY4]: 'Your cargo holds are full.',
+  [MessageId.BUY5]: 'This planet is not selling that item.',
+  [MessageId.BUYPAS1]: 'Trade password required.',
+  [MessageId.BUYPAS3]: 'This planet trades only with its team.',
+  [MessageId.BUYPAS4]: 'Welcome, fellow team-mate.',
+
+  // sell (feature 005) — GECMDS.C:4103 cmd_sell
+  [MessageId.SELLFMT]: 'Use: sell <quantity> <item>',
+  [MessageId.SELL1]: 'You can only sell at the galactic market on Zygor-3.',
+  [MessageId.SELL2]: 'Sold %d %s for %d credits (fee %d).',
+  [MessageId.SELL3]: "You don't have that many %s.",
+
+  // admin (feature 005) — GECMDS.C:3462 cmd_admin
+  [MessageId.ADM_NOT_LANDED]: 'You must be landed on your planet to administer it.',
+  [MessageId.ADM_NOT_OWNER]: 'You are not the owner of this planet.',
+  [MessageId.ADM_MENU]: 'Admin options: rate, markup, sellflag, reserve, tax, beacon, password',
+  [MessageId.ADM_INVALID]: 'Invalid value.',
+  [MessageId.ADM_OK]: 'Setting saved.',
+
+  // withdraw (feature 005)
+  [MessageId.WTHDR_NOT_LANDED]: 'You must be landed on your planet to withdraw taxes.',
+  [MessageId.WTHDR_NOT_OWNER]: 'You are not the owner of this planet.',
+  [MessageId.WTHDR_OK]: 'Withdrew %d credits from planet tax pool.',
+  [MessageId.WTHDR_NONE]: 'There are no taxes to withdraw.',
+
+  // report cargo (feature 005)
+  [MessageId.REP_CARGO_LINE]: '%6d %s',
+  [MessageId.REP_CARGO_TOTAL]: 'Total: %d tons in cargo (capacity: %d tons).',
+  [MessageId.REP_CARGO_NONE]: '(no items aboard)',
+
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
   [MessageId.NUMOOR]: 'Number out of range (%d-%d).',
@@ -160,7 +266,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 export function formatMessage(id: MessageId, ...args: Array<string | number>): string {
   let result = MESSAGE_STRINGS[id];
   let argIdx = 0;
-  result = result.replace(/%(?:\.\d+)?[suduf]/g, () => {
+  result = result.replace(/%(?:\d+)?(?:\.\d+)?[suduf]/g, () => {
     const val = args[argIdx++];
     return val !== undefined ? String(val) : '';
   });

@@ -196,9 +196,52 @@ galactic-empire-reborn/
 and wormholes (`'W'`) from `GalaxyService` onto the tactical grid alongside ships.
 `scan pl <name>` resolves named planets galaxy-wide via `GalaxyService.findPlanetByName`.
 
+## PlanetModule (feature 005)
+
+```
+PlanetModule (game/planet/)
+  ├── PlanetStateService — in-memory Map<planetKey, PlanetState>; hydrates from Postgres on init;
+  │                         per-planet promise-chain mutex (runSerialized) for all writes;
+  │                         per-mutation Postgres flush on every claim/buy/sell/admin/withdraw/tick;
+  │                         public: get/all/size/claim/buy/sell/applyAdminChange/withdrawTax/runEconomicTickFor
+  └── PlanetTickService  — subscribes to TickKind.PLANET_UPDATE; snapshots all planet keys on init;
+                            round-robins one planet per firing (cursor % keys.length);
+                            calls TickService.startPlanetUpdateTimer(floor(1800/N) clamped ≥ 4s)
+```
+
+`CommandsModule` imports `PlanetModule`, adding:
+- `OrbitHandlerService` (orbit/orb) — resolves sector planets via GalaxyService; auto-orbits single planet; pick-list for multi; sets ship.where = 10+plnum
+- `LandHandlerService` (land/lan) — claims unowned planet (name validation 1–19 printable ASCII); password-checks other-owned planets (none/team/exact)
+- `BuyHandlerService` (buy) — password gate; cargo capacity check; calls planetService.buy(); credits ship cargo + debits user.cash
+- `SellHandlerService` (sell) — neutral-zone plnum=1 gate; calls planetService.sell(); credits user.cash
+- `AdminHandlerService` (admin/adm) — owner-only; dispatches rate/markup/sellflag/reserve/tax/beacon/password changes
+- `WithdrawHandlerService` (withdraw/with) — owner-only; drains planet.tax to user.cash via Prisma increment
+
+### Command dispatch path (updated — async handlers)
+
+```
+client  →  [command event]  →  GameGateway.handleCommand()
+            │  resolves active ship
+            │  calls CommandRouterService.dispatch(input, ship, {})
+            │    └  handler(ship, args, ctx) → CommandResult | Promise<CommandResult>
+            └  if Promise: .then(emit) .catch(emit error); else emit synchronously
+```
+
+### PlanetStateService per-planet mutex
+
+`runSerialized<T>(key, fn)` — per-planet promise chain. Each write acquires the chain,
+runs `fn` atomically (in-memory + Prisma flush), then releases. Different planets do not contend.
+The double-spend prevention in `sell()` relies on both the sufficiency check and the
+ship-side cargo decrement happening inside the same `runSerialized` call.
+
+### Economy tick
+
+`applyEconomyTick(state): PlanetState` (pure, `planet-economy.ts`) ports GEPLANET.C:multiply.
+Troop starvation → food consumption → men starvation → gold-to-cash → per-item production
+(qty formula × envFact × taxfact × optional cash-boost) → tax accrual. Revolt deferred to feature 006.
+
 ## What does not exist yet
 
-- Planet mechanics — feature 005
 - Combat (phasors, torpedoes, missiles, mines) — feature 006
 - Cybertron AI — feature 007
 - Droid AI — feature 008

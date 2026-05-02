@@ -64,7 +64,7 @@ describe('CommandRouterService', () => {
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('ROT 45', ship, ctx);
       // ROT is not an alias — should be unknown
-      const result = router.dispatch('ROT 45', ship, ctx);
+      const result = router.dispatch('ROT 45', ship, ctx) as CommandResult;
       expect(result.lines[0].text).toBe(formatMessage(MessageId.UNKNOWN_CMD));
     });
 
@@ -94,19 +94,19 @@ describe('CommandRouterService', () => {
 
   describe('empty input', () => {
     it('empty string returns no lines (silent drop)', () => {
-      const result = router.dispatch('', ship, ctx);
+      const result = router.dispatch('', ship, ctx) as CommandResult;
       expect(result.lines).toEqual([]);
     });
 
     it('whitespace-only returns no lines', () => {
-      const result = router.dispatch('   ', ship, ctx);
+      const result = router.dispatch('   ', ship, ctx) as CommandResult;
       expect(result.lines).toEqual([]);
     });
   });
 
   describe('unknown keyword', () => {
     it('unknown keyword returns exactly UNKNOWN_CMD system line', () => {
-      const result = router.dispatch('flarp', ship, ctx);
+      const result = router.dispatch('flarp', ship, ctx) as CommandResult;
       expect(result.lines).toHaveLength(1);
       expect(result.lines[0].text).toBe(formatMessage(MessageId.UNKNOWN_CMD));
       expect(result.lines[0].category).toBe('system');
@@ -127,7 +127,7 @@ describe('CommandRouterService', () => {
         minArgs: 1,
         argMissingMessage: formatMessage(MessageId.ROTFMT),
       }));
-      const result = router.dispatch('rotate', ship, ctx);
+      const result = router.dispatch('rotate', ship, ctx) as CommandResult;
       expect(result.lines[0].text).toBe(formatMessage(MessageId.ROTFMT));
     });
 
@@ -178,13 +178,13 @@ describe('CommandRouterService', () => {
         lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }],
       });
       router.register(makeCmd({ keyword: 'rotate', aliases: ['rot'], minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      const result = router.dispatch('rotate abc', ship, ctx);
+      const result = router.dispatch('rotate abc', ship, ctx) as CommandResult;
       expect(handler).toHaveBeenCalledWith(ship, ['abc'], ctx);
       expect(result.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, -180, 180));
     });
 
     it('unknown command produces exactly one system line, zero state mutations', () => {
-      const result = router.dispatch('flarp 99', ship, ctx);
+      const result = router.dispatch('flarp 99', ship, ctx) as CommandResult;
       expect(result.lines).toHaveLength(1);
       expect(result.lines[0].text).toBe(formatMessage(MessageId.UNKNOWN_CMD));
       expect(result.lines[0].category).toBe('system');

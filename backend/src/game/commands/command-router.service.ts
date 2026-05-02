@@ -38,7 +38,7 @@ export class CommandRouterService {
    *
    * @see GECMDS.C dispatch path
    */
-  dispatch(rawInput: string, ship: ShipState, ctx: CommandContext): CommandResult {
+  dispatch(rawInput: string, ship: ShipState, ctx: CommandContext): CommandResult | Promise<CommandResult> {
     const trimmed = rawInput.trim();
     if (trimmed === '') {
       return { lines: [] };

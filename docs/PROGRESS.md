@@ -116,3 +116,39 @@ to patch the tx client.
 
 **Known issues**: None
 
+## 2026-05-02 — 005-planet-system
+
+**Completed**:
+- `NUMITEMS=14` item constants: names, base prices, manhours, max capacities, tonnage weights
+- `PLANTOCK_SECONDS=1800`, `PLANTIME_MIN_SECONDS=4` economy-tick cadence constants
+- `TickKind.PLANET_UPDATE` + `TickService.startPlanetUpdateTimer(intervalMs)` — third heartbeat, idempotent start
+- `PlanetState` interface + `PlanetItem` sub-type; `planetKey(xsect,ysect,plnum)` → string
+- `prismaPlanetToState` / `stateToPrismaUpdate` mappers (parallel-array ↔ `PlanetItem[]`)
+- `PlanetStateService` — in-memory `Map<planetKey, PlanetState>`; hydrates from Postgres; per-planet `runSerialized` async mutex; `get/all/size/claim/buy/sell/applyAdminChange/withdrawTax/runEconomicTickFor`; per-mutation Postgres flush (no dirty-flag)
+- `planet-trade.ts` — pure `computeBuyOutcome` / `computeSellOutcome` (no I/O)
+- `planet-economy.ts` — pure `applyEconomyTick` (ports GEPLANET.C:multiply lines 195–340)
+- `PlanetTickService` — round-robin one-planet-per-PLANET_UPDATE; cadence = floor(1800/N) clamped ≥ 4s
+- `PlanetModule` — imports PrismaModule, GalaxyModule, ShipModule, TickModule; exports PlanetStateService
+- Command handlers: `orbit` (orb), `land` (lan), `buy`, `sell`, `admin` (adm), `withdraw` (with)
+- `report cargo` fully implemented (per-item lines, tonnage total, class capacity)
+- `scan pl <name>` beacon visibility line (research Decision 10)
+- `CommandHandler` type extended to `CommandResult | Promise<CommandResult>`; `GameGateway.handleCommand` awaits async results
+- `formatMessage` regex updated to handle `%6d` width specifiers
+
+**Tests**: 687 backend tests, 58 suites, zero failures. Net new in this feature:
+- Unit: `balance-planet.spec.ts` (7), `tick-planet-update.spec.ts` (5), `planet-state.spec.ts` (22), `planet-economy.spec.ts` (8), `planet-tick-cadence.spec.ts` (7), `planet-trade.spec.ts` (15)
+- Unit handlers: `orbit.spec.ts` (7), `land.spec.ts` (9), `buy.spec.ts` (9), `sell.spec.ts` (6), `admin.spec.ts` (18), `withdraw.spec.ts` (7), `report-cargo.spec.ts` (8), scan.spec.ts beacon extension (3)
+- Integration: `planet-bootstrap.spec.ts` (2), `planet-claim.spec.ts` (6), `planet-trade-persistence.spec.ts` (11), `planet-trade-concurrent.spec.ts` (2), `planet-tick-roundrobin.spec.ts` (4), `planet-tick-zeropop.spec.ts` (3), `command-roundtrip-planet.spec.ts` (4)
+
+**Decisions made**: See research.md Decisions 1–10 now captured in DECISIONS.md. Key:
+- Per-mutation Postgres flush (no dirty flag) for planet state (Decision 1)
+- Per-planet `runSerialized` promise-chain mutex — no external locking (Decision 2)
+- Round-robin PlanetTickService, one planet per PLANET_UPDATE firing (Decision 3)
+- Owner pays baseprice; non-owner pays markup2a (Decision 4)
+- Neutral-zone buy: planet inventory NOT decremented (Decision 5)
+- Revolt deferred to feature 006 (Decision 6)
+
+**Next**: `006-combat` — phasors, torpedoes, missiles, mines
+
+**Known issues**: None
+

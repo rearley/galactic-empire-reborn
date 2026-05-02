@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
 
 const SHIELD_NAMES: Record<number, string> = {
   1: 'standard',
@@ -18,18 +19,19 @@ const SHIELD_NAMES: Record<number, string> = {
 @Injectable()
 export class ReportHandlerService implements OnModuleInit {
   private readonly logger = new Logger(ReportHandlerService.name);
-  private readonly classCache = new Map<number, { typeName: string; hasCloak: boolean }>();
+  private readonly classCache = new Map<number, { typeName: string; hasCloak: boolean; maxTons: number }>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({
-      select: { classNumber: true, typeName: true, hasCloak: true },
+      select: { classNumber: true, typeName: true, hasCloak: true, maxTons: true },
     });
     for (const cls of classes) {
       this.classCache.set(cls.classNumber, {
         typeName: cls.typeName,
         hasCloak: cls.hasCloak,
+        maxTons: cls.maxTons,
       });
     }
     this.logger.log(`Cached ${this.classCache.size} ship class type names`);
@@ -72,10 +74,24 @@ export class ReportHandlerService implements OnModuleInit {
     }
 
     if (sub === 'cargo') {
+      let totalTons = 0;
+      for (let i = 0; i < NUMITEMS; i++) {
+        const qty = Number(ship.items[i] ?? 0n);
+        if (qty <= 0) continue;
+        const tons = qty * ITEM_TONS[i];
+        totalTons += tons;
+        lines.push({
+          text: formatMessage(MessageId.REP_CARGO_LINE, qty, ITEM_NAMES[i]),
+          category: 'info',
+        });
+      }
+      if (totalTons === 0) {
+        lines.push({ text: formatMessage(MessageId.REP_CARGO_NONE), category: 'info' });
+      }
+      const cap = cls?.maxTons ?? 0;
       lines.push({
-        text: 'No items configured.',
+        text: formatMessage(MessageId.REP_CARGO_TOTAL, Math.round(totalTons), cap),
         category: 'info',
-        // TODO(005): expand cargo body when planet/items system is implemented
       });
       return { lines };
     }

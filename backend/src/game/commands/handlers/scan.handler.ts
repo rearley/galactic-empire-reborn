@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
+import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult, ScanCell } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -50,6 +51,7 @@ export class ScanHandlerService implements OnModuleInit {
     private readonly shipService: ShipStateService,
     private readonly prisma: PrismaService,
     private readonly galaxyService: GalaxyService,
+    private readonly planetService: PlanetStateService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -281,6 +283,15 @@ export class ScanHandlerService implements OnModuleInit {
     if (planet.xsect !== shipXsect || planet.ysect !== shipYsect) {
       lines.push({
         text: formatMessage(MessageId.SCAN_LOCATED_IN, planet.xsect, planet.ysect),
+        category: 'info',
+      });
+    }
+
+    // Beacon visibility — research Decision 10
+    const planetState = this.planetService.get(planet.xsect, planet.ysect, planet.plnum);
+    if (planetState?.beacon) {
+      lines.push({
+        text: formatMessage(MessageId.SCAN_BEACON, planet.name || `planet ${planet.plnum}`, planetState.beacon),
         category: 'info',
       });
     }

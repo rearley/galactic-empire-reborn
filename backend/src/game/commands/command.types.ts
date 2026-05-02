@@ -59,4 +59,4 @@ export type CommandHandler = (
   ship: ShipState,
   args: string[],
   ctx: CommandContext,
-) => CommandResult;
+) => CommandResult | Promise<CommandResult>;
