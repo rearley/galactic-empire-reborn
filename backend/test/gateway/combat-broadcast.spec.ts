@@ -3,9 +3,11 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import {
+  COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
+  CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
@@ -61,6 +63,19 @@ describe('GameGateway combat broadcasts', () => {
     gateway.handleCombatHit(event);
     expect(toMock).toHaveBeenCalledWith('sector:12:3');
     expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, event);
+  });
+
+  it('broadcasts COMBAT_DECOY_INTERCEPT to sector room', () => {
+    const event: CombatDecoyInterceptEvent = {
+      defenderId: 'b:2',
+      attackerId: 'a:1',
+      weapon: 'torpedo',
+      sector: { x: 4, y: 9 },
+      tickAt: new Date(),
+    };
+    gateway.handleCombatDecoyIntercept(event);
+    expect(toMock).toHaveBeenCalledWith('sector:4:9');
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_DECOY_INTERCEPT, event);
   });
 
   it('broadcasts COMBAT_MISS to sector room', () => {
