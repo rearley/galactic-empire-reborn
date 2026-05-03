@@ -11,14 +11,16 @@ import { BuyHandlerService } from './handlers/buy.handler';
 import { SellHandlerService } from './handlers/sell.handler';
 import { AdminHandlerService } from './handlers/admin.handler';
 import { WithdrawHandlerService } from './handlers/withdraw.handler';
+import { PhaserHandlerService } from './handlers/phaser.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { PlanetModule } from '../planet/planet.module';
 import { PhysicsModule } from '../physics/physics.module';
+import { CombatModule } from '../combat/combat.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,
@@ -30,6 +32,7 @@ import { PhysicsModule } from '../physics/physics.module';
     AdminHandlerService,
     WithdrawHandlerService,
     WarpHandlerService,
+    PhaserHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -45,6 +48,7 @@ export class CommandsModule implements OnModuleInit {
     private readonly adminHandler: AdminHandlerService,
     private readonly withdrawHandler: WithdrawHandlerService,
     private readonly warpHandler: WarpHandlerService,
+    private readonly phaserHandler: PhaserHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -59,5 +63,6 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.sellHandler.command);
     this.commandRouter.register(this.adminHandler.command);
     this.commandRouter.register(this.withdrawHandler.command);
+    this.commandRouter.register(this.phaserHandler.command);
   }
 }

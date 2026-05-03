@@ -74,7 +74,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
 
     // Stand up PhysicsTickService manually (constructor injection).
     const cache = new ShipClassCacheService({} as unknown as PrismaService);
-    cache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10 });
+    cache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000, scanRange: 100000, maxTons: 5000 });
     const events = new (await import('@nestjs/event-emitter')).EventEmitter2();
     const physics = new PhysicsTickService(
       tickStub as TickService,
@@ -109,6 +109,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
       new Mulberry32Adapter(1),
       events,
       new Logger('combat-test'),
+      cache,
     );
     await combat.onModuleInit();
     void origPhysSub;

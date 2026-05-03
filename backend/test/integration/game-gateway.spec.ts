@@ -78,7 +78,10 @@ describe('GameGateway integration', () => {
       .overrideProvider(CommandRouterService)
       .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
-      .useValue({ shipClass: { findMany: jest.fn().mockResolvedValue([]) } })
+      .useValue({
+        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+        mine: { findMany: jest.fn().mockResolvedValue([]) },
+      })
       .overrideProvider(GalaxyService)
       .useValue({
         onModuleInit: jest.fn(),

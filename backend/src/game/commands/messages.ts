@@ -123,6 +123,11 @@ export enum MessageId {
   REP_CARGO_TOTAL = 'REP_CARGO_TOTAL',
   REP_CARGO_NONE = 'REP_CARGO_NONE',
 
+  // phaser (feature 006b) — GECMDS.C:cmd_phasor
+  PHA_NOPHAS = 'PHA_NOPHAS',
+  PHA_NOPOW = 'PHA_NOPOW',
+  PHA_FMT = 'PHA_FMT',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -250,6 +255,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP_CARGO_LINE]: '%6d %s',
   [MessageId.REP_CARGO_TOTAL]: 'Total: %d tons in cargo (capacity: %d tons).',
   [MessageId.REP_CARGO_NONE]: '(no items aboard)',
+
+  // phaser (feature 006b) — GECMDS.C:cmd_phasor
+  [MessageId.PHA_NOPHAS]: 'No phaser class mounted.',
+  [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
+  [MessageId.PHA_FMT]: 'Format: pha <bearing> <percent>',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
