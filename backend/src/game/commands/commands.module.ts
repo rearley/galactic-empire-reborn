@@ -2,6 +2,9 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { CommandRouterService } from './command-router.service';
 import { rotateCommand } from './handlers/rotate.handler';
 import { impulseCommand } from './handlers/impulse.handler';
+import { shieldCommand } from './handlers/shield.handler';
+import { fluxCommand } from './handlers/flux.handler';
+import { LockHandlerService } from './handlers/lock.handler';
 import { WarpHandlerService } from './handlers/warp.handler';
 import { ScanHandlerService } from './handlers/scan.handler';
 import { ReportHandlerService } from './handlers/report.handler';
@@ -47,6 +50,7 @@ import { CombatModule } from '../combat/combat.module';
     DecoyHandlerService,
     JammerHandlerService,
     SysHandlerService,
+    LockHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -70,6 +74,7 @@ export class CommandsModule implements OnModuleInit {
     private readonly decoyHandler: DecoyHandlerService,
     private readonly jammerHandler: JammerHandlerService,
     private readonly sysHandler: SysHandlerService,
+    private readonly lockHandler: LockHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -92,5 +97,8 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.decoyHandler.command);
     this.commandRouter.register(this.jammerHandler.command);
     this.commandRouter.register(this.sysHandler.command);
+    this.commandRouter.register(this.lockHandler.command);
+    this.commandRouter.register(shieldCommand);
+    this.commandRouter.register(fluxCommand);
   }
 }

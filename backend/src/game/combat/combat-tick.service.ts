@@ -231,24 +231,29 @@ export class CombatTickService implements OnModuleInit {
       }
     }
 
-    // Projectile travel pass (T029) — walk the carrier's own incoming arrays.
-    // Slots represent INCOMING projectiles per GEFUNCS.C:1546.
-    this.processIncomingTorpedoes(ship, ctx);
-    this.processIncomingMissiles(ship, ctx);
-
     // Decoy slot expiry — each active decoy decrements toward 0 each tick.
     // Jammer counter expiry — decrement until 0.
+    // cantexit (FR-028a) — battle-lock counter; decremented BEFORE hit
+    // resolution so a hit during this tick that re-arms cantexit to
+    // FIRETICKS sticks at FIRETICKS rather than FIRETICKS-1.
     // @see GECMDS.C:cmd_decoy, GECMDS.C:cmd_jammer
     const hasDecoy = ship.decout.some((t) => t > 0);
     const hasJammer = ship.jammer > 0;
-    if (hasDecoy || hasJammer) {
+    const hasCantexit = ship.cantexit > 0;
+    if (hasDecoy || hasJammer || hasCantexit) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         for (let i = 0; i < s.decout.length; i++) {
           if (s.decout[i] > 0) s.decout[i] -= 1;
         }
         if (s.jammer > 0) s.jammer -= 1;
+        if (s.cantexit > 0) s.cantexit -= 1;
       });
     }
+
+    // Projectile travel pass (T029) — walk the carrier's own incoming arrays.
+    // Slots represent INCOMING projectiles per GEFUNCS.C:1546.
+    this.processIncomingTorpedoes(ship, ctx);
+    this.processIncomingMissiles(ship, ctx);
   }
 
   /**
