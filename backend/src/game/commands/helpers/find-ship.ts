@@ -46,9 +46,16 @@ export function findShip(
     if (lock === NOLOCK_SENTINEL || lock < 0) {
       return { ok: false, message: 'No target locked.', clearedLock: true };
     }
-    // `lock` is an opaque integer pointer in the original; here we treat it
-    // as an index into the supplied roster (the only stable handle we have).
-    const target = allShips[lock];
+    // In the original C, `lock` is a channel (slot index into warsptr[]).
+    // In this TypeScript port we use `shipno` as the channel — it is a small
+    // stable integer assigned at ship creation. The `loc` handler stores
+    // `target.shipno` into `contextShip.lock`, so the reverse lookup here
+    // matches by `shipno`, excluding self. This convention is project-wide
+    // (ltorpsChannel, lmisslChannel, lastfired, Mine.channel all store shipno values).
+    const selfKey = shipKey(contextShip.userid, contextShip.shipno);
+    const target = allShips.find(
+      (s) => s.shipno === lock && shipKey(s.userid, s.shipno) !== selfKey,
+    );
     if (!isIngame(target)) {
       return { ok: false, message: 'No target locked.', clearedLock: true };
     }
