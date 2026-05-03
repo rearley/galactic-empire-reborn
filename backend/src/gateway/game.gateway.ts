@@ -8,10 +8,19 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
+import {
+  COMBAT_HIT,
+  COMBAT_MISS,
+  COMBAT_PHASER_FIRED,
+  CombatHitEvent,
+  CombatMissEvent,
+  CombatPhaserFiredEvent,
+} from '../game/combat/combat-events';
 
 interface SectorPayload {
   x: unknown;
@@ -195,6 +204,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const room = `sector:${x}:${y}`;
     void client.leave(room);
     client.emit('sector:left', { x, y, room });
+  }
+
+  /**
+   * Broadcast combat events to the firer/victim's sector room.
+   * Sector room name follows the existing convention `sector:${x}:${y}`.
+   * @see specs/006b-combat/contracts/combat-events.md
+   * @see FR-031
+   */
+  @OnEvent(COMBAT_PHASER_FIRED)
+  handleCombatPhaserFired(event: CombatPhaserFiredEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(COMBAT_PHASER_FIRED, event);
+  }
+
+  @OnEvent(COMBAT_HIT)
+  handleCombatHit(event: CombatHitEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(COMBAT_HIT, event);
+  }
+
+  @OnEvent(COMBAT_MISS)
+  handleCombatMiss(event: CombatMissEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(COMBAT_MISS, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

@@ -6,6 +6,14 @@ import { MineRepository } from '../../../src/game/combat/mine.repository';
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
+import { PhaserHandlerService } from '../../../src/game/commands/handlers/phaser.handler';
+import { CommandResult, CommandContext } from '../../../src/game/commands/command.types';
+import {
+  COMBAT_HIT,
+  CombatHitEvent,
+} from '../../../src/game/combat/combat-events';
+import { PRELOAD } from '../../../src/game/constants';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -29,6 +37,9 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 interface Harness {
   service: CombatTickService;
   shipMap: Map<string, ShipState>;
+  events: EventEmitter2;
+  classCache: ShipClassCacheService;
+  shipState: import('../../../src/game/ship/ship-state.service').ShipStateService;
   fire(): Promise<void>;
 }
 
@@ -67,6 +78,15 @@ async function makeHarness(ships: ShipState[] = []): Promise<Harness> {
   // Suppress error noise from fault-isolation case.
   jest.spyOn(logger, 'error').mockImplementation(() => undefined);
 
+  const classCache = new ShipClassCacheService({} as never);
+  classCache.setForTest(1, {
+    maxAcceleration: 1000,
+    maxWarp: 10,
+    maxPhaser: 1000,
+    scanRange: 100000,
+    maxTons: 5000,
+  } as never);
+
   const service = new CombatTickService(
     tickService,
     shipState,
@@ -75,12 +95,16 @@ async function makeHarness(ships: ShipState[] = []): Promise<Harness> {
     new Mulberry32Adapter(1),
     events,
     logger,
+    classCache,
   );
   await service.onModuleInit();
 
   return {
     service,
     shipMap,
+    events,
+    classCache,
+    shipState,
     fire: async () => {
       const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new Date() };
       for (const h of subscribers) h(ctx);
@@ -119,5 +143,45 @@ describe('CombatTickService', () => {
   it('hydrates the mine registry from the repository on init', async () => {
     const h = await makeHarness([]);
     expect(h.service).toBeDefined();
+  });
+});
+
+describe('CombatTickService — phaser interaction (T018)', () => {
+  it('after handler fires and tick runs, victim shield/damage mutate and combat.hit fires; phasr reloads on next tick', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 0, phasr: 100, phasrtype: 1 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, shipname: 'Bob',
+      xcoord: 0, ycoord: 100, shield: 5000, shieldstat: 1, damage: 0, phasr: 100, phasrtype: 1,
+    });
+    const h = await makeHarness([alice, bob]);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    const handler = new PhaserHandlerService(
+      h.shipState,
+      h.classCache,
+      h.events,
+      new Mulberry32Adapter(7),
+    );
+
+    const result = handler.command.handler(alice, ['0', '50'], {} as CommandContext) as CommandResult;
+    expect(result.lines.length).toBeGreaterThan(0);
+
+    // Mutation visible after handler call
+    expect(bob.shield).toBeLessThan(5000);
+    const hit = emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
+    expect((hit!.payload as CombatHitEvent).attackerId).toBe(shipKey('a', 1));
+
+    // Drive a physics tick; phasr should reload by PRELOAD on each ship (capped at maxPhaser=1000)
+    const phasrBefore = alice.phasr;
+    await h.fire();
+    expect(alice.phasr).toBe(Math.min(1000, phasrBefore + PRELOAD));
+    expect(bob.phasr).toBe(Math.min(1000, 100 + PRELOAD));
   });
 });

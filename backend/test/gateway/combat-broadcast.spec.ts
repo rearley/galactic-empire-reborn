@@ -1,0 +1,77 @@
+import 'reflect-metadata';
+import { GameGateway } from '../../src/gateway/game.gateway';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { CommandRouterService } from '../../src/game/commands/command-router.service';
+import {
+  COMBAT_HIT,
+  COMBAT_MISS,
+  COMBAT_PHASER_FIRED,
+  CombatHitEvent,
+  CombatMissEvent,
+  CombatPhaserFiredEvent,
+} from '../../src/game/combat/combat-events';
+
+/**
+ * Verifies that the GameGateway forwards combat events to the firer/victim's
+ * sector room (FR-031). Uses a mock socket.io Server so no network is needed.
+ *
+ * @see specs/006b-combat/contracts/combat-events.md
+ */
+describe('GameGateway combat broadcasts', () => {
+  let gateway: GameGateway;
+  let toMock: jest.Mock;
+  let emitMock: jest.Mock;
+
+  beforeEach(() => {
+    emitMock = jest.fn();
+    toMock = jest.fn().mockReturnValue({ emit: emitMock });
+
+    gateway = new GameGateway(
+      {} as ShipStateService,
+      {} as CommandRouterService,
+    );
+    // Inject the mock io Server.
+    (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+  });
+
+  it('broadcasts COMBAT_PHASER_FIRED to sector room', () => {
+    const event: CombatPhaserFiredEvent = {
+      shipId: 'a:1',
+      bearing: 90,
+      percent: 50,
+      hyper: false,
+      sector: { x: 5, y: 7 },
+      tickAt: new Date(),
+    };
+    gateway.handleCombatPhaserFired(event);
+    expect(toMock).toHaveBeenCalledWith('sector:5:7');
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_PHASER_FIRED, event);
+  });
+
+  it('broadcasts COMBAT_HIT to sector room', () => {
+    const event: CombatHitEvent = {
+      attackerId: 'a:1',
+      victimId: 'b:2',
+      weapon: 'phaser',
+      damageHull: 5,
+      damageShield: 100,
+      sector: { x: 12, y: 3 },
+      tickAt: new Date(),
+    };
+    gateway.handleCombatHit(event);
+    expect(toMock).toHaveBeenCalledWith('sector:12:3');
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, event);
+  });
+
+  it('broadcasts COMBAT_MISS to sector room', () => {
+    const event: CombatMissEvent = {
+      attackerId: 'a:1',
+      weapon: 'phaser',
+      sector: { x: 0, y: 0 },
+      tickAt: new Date(),
+    };
+    gateway.handleCombatMiss(event);
+    expect(toMock).toHaveBeenCalledWith('sector:0:0');
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_MISS, event);
+  });
+});

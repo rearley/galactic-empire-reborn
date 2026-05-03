@@ -163,6 +163,7 @@ describe('command round-trip (planet) integration (T066)', () => {
         ]),
       },
       user: { update: jest.fn().mockResolvedValue({}) },
+      mine: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     // Construct a real ShipStateService and inject the test ship manually.

@@ -4,6 +4,8 @@ import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
+import { ShipClassCacheService } from '../physics/ship-class-cache.service';
+import { PRELOAD } from '../constants';
 import { MineRegistry } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { RANDOM, Random } from './random.port';
@@ -38,6 +40,7 @@ export class CombatTickService implements OnModuleInit {
     @Inject(RANDOM) private readonly random: Random,
     private readonly events: EventEmitter2,
     private readonly logger: Logger,
+    private readonly shipClassCache: ShipClassCacheService,
   ) {}
 
   /**
@@ -85,11 +88,21 @@ export class CombatTickService implements OnModuleInit {
   }
 
   /** Per-ship combat work — filled in by subsequent user-story phases. */
-  private processShipCombat(_ship: ShipState, _ctx: TickContext): void {
-    // Intentionally empty — placeholder for US1+ phaser/weapon/mine logic.
-    // Reading these args avoids unused-parameter complaints from strict mode.
-    void _ship;
+  private processShipCombat(ship: ShipState, _ctx: TickContext): void {
     void _ctx;
+    // Phaser reload (FR-004): phasr += PRELOAD, capped at class maxPhaser.
+    // Only ships with a phaser mounted accumulate charge.
+    // @see GEFUNCS.C — phaser reload pass
+    if (ship.phasrtype > 0) {
+      try {
+        const maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.phasr = Math.min(maxPhaser, s.phasr + PRELOAD);
+        });
+      } catch {
+        // Class not in cache — skip reload silently; logged at hydration time.
+      }
+    }
   }
 
   /** Reference the random port so DI-injected adapter is reachable in subclass tests. */
