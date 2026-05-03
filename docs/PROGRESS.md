@@ -1,3 +1,74 @@
+## 2026-05-03 — 007-cybertron-ai (complete: US1–US6 + Polish)
+
+**Completed**:
+- Full Cybertron AI: spawn-fill, target acquisition, hyperwarp pursuit, engagement (phaser+torp+decoy),
+  breakoff, zipper, damage response (mine+jammer), jammed evasion, gold transfer on kill,
+  persistence (hydrateAll + clampCybertronCash at all boundaries), Sarterns via shared code path
+- `CybertronDebugController` — `GET /debug/cybertron-stats` (dev-only)
+- `CombatShipDestroyedEvent` extended with victimUserid/attackerUserid/victimShipKey/attackerShipKey
+- `ShipClassCacheService` extended with maxShields, hasJammer, hasMine, hasZipper, noClaim, tough, cybLowestClassAttacks, cybCanAttack
+- `GameGateway` extended with @OnEvent handlers for cybertron.taunt + cybertron.broke-off
+
+**Tests**: 1004+ total, 100+ suites, all passing. Net new cybertron test files:
+- `cyb-decisions.spec.ts` — 21 unit tests (pure decision functions)
+- `cybertron-tick.service.spec.ts` — 25+ integration tests (spawn, acquisition, hyperwarp, engagement, Sarterns)
+- `neutral-zone.spec.ts`, `noclaim.spec.ts` — 4 safety-constraint tests
+- `acquisition-rate.spec.ts`, `hyperwarp-arrival.spec.ts`, `spawn-fill-timing.spec.ts` — 7 SC statistical tests
+- `difficulty-curve.spec.ts` — 8 tests (gebemean rate, torpedo volley sizing)
+- `gold-transfer.spec.ts` — 4 tests
+- `persistence.spec.ts` — 4 integration tests (hydrateAll, clampCybertronCash, createSpawn)
+- `balance-regression.spec.ts` — 12 constant-pin tests (T068)
+- `fault-isolation.spec.ts` — 1 test (bad-class ship doesn't block healthy ships)
+- `integration/cybertron-end-to-end.spec.ts` — 8 tests (quickstart recipe as test)
+
+**Decisions made**: See DECISIONS.md R-1 through R-11.
+
+**Next**: `008-droid-ai` — ephemeral Droid + Murdonian Transport behavior
+
+**Known issues / deferred**:
+- T058 (spawn-fill integration: drive ticks until missing Cybertrons are created) — partial
+  coverage in persistence.spec.ts; full recipe in quickstart.md
+- AI scoring (kills → player rank boost) — deferred to 009-midnight-job
+- T077 (manual quickstart verification) — deferred to post-merge
+
+---
+
+## 2026-05-03 — 007-cybertron-ai (Phase 1–3, US1)
+
+**Completed**:
+- `backend/src/game/cybertron/cybertron.module.ts` — CybertronModule (imports CombatModule, PhysicsModule, ShipModule, TickModule)
+- `backend/src/game/cybertron/cybertron.config.ts` — `CybertronClassConfig` interface, `CYBERTRON_CLASS_DEFAULTS` for classes 21-25 (Sarterns 24/25 included), env override support
+- `backend/src/game/cybertron/cybertron-events.ts` — `CYBERTRON_EVENT` const map + payload interfaces
+- `backend/src/game/cybertron/taunt-pool.ts` — 13 in-character taunt strings, `pickTaunt(rand)`
+- `backend/src/game/cybertron/cyb-decisions.ts` — pure AI decision functions: `cybwhoops`, `gebemean`, `rollTorpedoCount`, `pickPursuitBand`, `pickSpawnClass`, `randomInitLoadout`, `randomCybSkill`
+- `backend/src/game/cybertron/cybertron.repository.ts` — `hydrateAll`, `createSpawn`, `flushShipsImmediate`, `flushUsersImmediate`, `clampCybertronCash`
+- `backend/src/game/cybertron/cybertron-tick.service.ts` — US1 complete: `cybLives`, `cybCheckLockon`, `cybCheckDamage`, `cybUpdateDb`, NZ exclusion, `noClaim` cap, hyperwarp/brake/close/combat pursuit bands, shield restore on hyperwarp exit, `cybertron.target-acquired` event emission with immediate flush
+- Extended `CombatShipDestroyedEvent` with `victimShipKey`, `attackerShipKey`, `victimUserid`, `attackerUserid` (T012a/T012b)
+- Extended `ShipClassCacheService` with `maxShields`, `hasJammer`, `hasMine`, `hasZipper`, `noClaim`, `tough`, `cybLowestClassAttacks`; added `get()` method
+- Added `ShipStateService.loadShip()` for boot-time hydration
+- Added 14 Cybertron constants to `constants.ts`
+
+**Tests**: 966 total, 95 suites, all passing. Net new cybertron test files:
+- `cyb-decisions.spec.ts` — 21 unit tests (pickSpawnClass, pickPursuitBand, gebemean, rollTorpedoCount, randomCybSkill, randomInitLoadout)
+- `cybertron-tick.service.spec.ts` — 9 integration tests (spawn cadence, target acquisition, hyperwarp entry/exit, Sartern class 24)
+- `neutral-zone.spec.ts` — 2 tests (NZ exclusion verified)
+- `noclaim.spec.ts` — 2 tests (noClaim cap enforced)
+- `acquisition-rate.spec.ts` — 1 SC-002 statistical test (≥95/100 trials acquire target)
+- `hyperwarp-arrival.spec.ts` — 3 SC-003 travel-time tests (hyperwarp < half baseline ticks)
+- `spawn-fill-timing.spec.ts` — 3 SC-001 tests (all classes fill within 900 ticks)
+
+**Decisions made**:
+- US1 cybLives uses `cybmine === playerShipno` (not user-index like C source — shipno is unique for active players)
+- `isInNeutralZone` = `Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0` (faithful to GEPLANET.C:neutral)
+- Cybertrons at `(0,y)` or `(x,0)` with fractional coordinate may be in NZ — Cybertron must be outside NZ to scan
+- `topSpeed` in cybLives = `ship.topspeed * 1000.0` (matches C source `d_topspeed = topspeed*1000.0`)
+
+**Next**: US2 (engagement: phaser + torpedo + decoy + breakoff) — T040-T047
+
+**Known issues**: US2-US6 stubs in place; T016 test exercises real T029 impl; T020a now enforces ≥95% constraint.
+
+---
+
 ## 2026-05-03 — 006b-combat
 
 **Completed**:
@@ -259,3 +330,92 @@ to patch the tx client.
 
 **Known issues**: None
 
+
+---
+
+## Roadmap to v1 — Planned Features
+
+Features 001–009 are complete or in progress. The following are the remaining work
+items required for a playable v1. All command names reference the `gecmds[]` table
+in `reference/ge-source/GECMDS.C`.
+
+### 010 — Player onboarding (planned)
+
+`cmd_new` — new ship creation: class selection from available `ShipClass` rows,
+initial loadout, userid registration.
+`cmd_rename` — rename ship (1–19 printable ASCII, uniqueness check).
+
+No test coverage yet. No spec exists.
+
+### 011 — Social / information commands (planned)
+
+`cmd_who` — list all active ships (name, class, sector, kills).
+`cmd_data` — full stats on a named ship.
+`cmd_geroster` — alliance / team roster display.
+`cmd_send` — compose and deliver in-game mail (`Mail` + `MailStat` rows, already
+in schema from 001).
+`cmd_team` — set/change team affiliation.
+`cmd_freq` — tune ship communication frequency (used by `freq[]` field on `WARSHP`).
+
+No test coverage yet. No spec exists.
+
+### 012 — Ship management commands (planned)
+
+`cmd_maint` — pay maintenance to repair damage (drains `User.cash`).
+`cmd_transfer` — transfer items/gold between ships in the same sector.
+`cmd_jettison` — drop cargo into space (decrements items, no planet required).
+`cmd_set` — configure ship options (e.g., auto-shield, auto-repair flags).
+`cmd_destruct` — self-destruct the ship (removes ship, penalizes score).
+`cmd_abort` — abort a self-destruct countdown.
+`cmd_abandon` — leave the ship (sets status to abandoned).
+
+**Cross-cutting gap — `cmd_cloak`**: The `cloak` field on `ShipState` is already
+referenced in four places without a command handler to set it:
+- `torpedo.handler.ts:82` — blocks firing while `ship.cloak > 0` (emits `TOR_CLOAK`)
+- `report.handler.ts:189` — hides cloaked ships from the `report` display
+- `CybertronTickService:268,494,513` — `runEngagementScan` and `cybCheckLockon` skip
+  players with `cloak === 10`
+- `messages.ts` — `TOR_CLOAK` message string already exists
+
+The command handler that sets `cloak = 10` (and debits the energy cost) has never
+been implemented. Any ship can be made cloaked by directly setting `ship.cloak = 10`
+in state, but no player command triggers it. This should be the first handler in
+feature 012.
+
+No test coverage yet. No spec exists.
+
+### 013 — Planet attack (planned)
+
+`cmd_attack` — land troops and fighters to capture a planet (interacts with
+`PlanetState.men`, `PlanetState.troops`; uses `GEPLANET.C` combat formulas).
+`cmd_planet` — display full planet status (complement to `report cargo`).
+`cmd_price` — display current buy/sell prices for a planet's inventory.
+
+No test coverage yet. No spec exists.
+
+### 014 — Navigation aids & help (planned)
+
+`cmd_navigate` — compute heading and distance to a named planet or sector.
+`cmd_spy` — deploy a spy to a planet (sets `Planet.spyowner`).
+`cmd_gehelp` — in-game help text (topic-keyed lookup).
+`cmd_clear` — clear the client's event log display.
+
+No test coverage yet. No spec exists.
+
+### 015 — React frontend terminal UI (planned)
+
+Full terminal UI: text command input, scrolling event log, ASCII sector map,
+player list panel. Connects to `GameGateway` via Socket.io. Renders in
+monospace font with an ANSI/ASCII aesthetic. Desktop-first; not mobile-optimized.
+
+Partial scaffolding exists from feature 003 (socketClient, useSocket hook,
+basic components) but is not production-ready.
+
+### Deferred / cross-feature items
+
+- **AI scoring** (Cybertrons/Droids boosting/penalizing player rank) — deferred to 009
+- **Midnight job** (009) — score recalculation, planet production reports, mail purge
+- **Droid AI** (008) — ephemeral Droids + Murdonian Transport (`GEDROIDS.C`)
+- **Universe wrap** — ships crossing galaxy boundary should wrap; currently no boundary enforcement
+- **Gravity / wormhole travel** — wormhole entry (`GEFUNCS.C:moveship` gravity pull) not implemented
+- **Overspeed engine blow** — ship exceeding max warp should take damage; currently warn-and-apply only

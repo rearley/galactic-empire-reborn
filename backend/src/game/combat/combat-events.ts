@@ -64,6 +64,14 @@ export const COMBAT_SHIP_DESTROYED = 'combat.ship-destroyed' as const;
 export interface CombatShipDestroyedEvent {
   victimId: string;
   attackerId: string | null;
+  /** Ship key "userid:shipno" — required by CybertronTickService gold transfer (T012, FR-005a). */
+  victimShipKey: string;
+  /** Ship key "userid:shipno" or null — required by CybertronTickService gold transfer (T012). */
+  attackerShipKey: string | null;
+  /** Plain userid — allows /^Cybrg-/ regex match without parsing the ship key (T012, R-4). */
+  victimUserid: string;
+  /** Plain userid or null — required by gold-transfer attacker lookup (T012). */
+  attackerUserid: string | null;
   attackerChannel: number;
   weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | null;
   sector: { x: number; y: number };

@@ -336,8 +336,76 @@ Added to the economy tick: when `(taxrate/120) × 0.35 × men > troops` AND the 
 hits, troops are reduced, a `MAIL_CLASS_DISTRESS` row is queued, and `ownerUserId` is
 cleared. No combat events emitted. @see GEPLANET.C:341-380.
 
+## CybertronModule (feature 007)
+
+```
+CybertronModule (game/cybertron/)
+  ├── CybertronTickService    — subscribes to TickKind.PHYSICS (after CombatTickService, enforced
+  │                            by CybertronModule importing CombatModule); per-tick passes:
+  │                            (1) modulo-30 spawn slot (runSpawnSlot → repository.createSpawn);
+  │                            (2) per-ship cybLives loop (max CYBMAXPERTICK=2 activations/tick);
+  │                            Fault-isolation: each cybLives is wrapped in try/catch; a throwing
+  │                            ship logs the error and the batch continues (Constitution III).
+  │                            On boot: onApplicationBootstrap → repository.hydrateAll().
+  │                            Listens: combat.ship-destroyed → transferCybertronGold (Cybrg-* only).
+  │                            Emits: cybertron.target-acquired, cybertron.taunt, cybertron.broke-off.
+  ├── CybertronRepository     — Prisma wrapper: hydrateAll (loads all Cybrg-* ships into
+  │                            ShipStateService + clamps cash), createSpawn (inserts User+Ship
+  │                            rows + clamps cash), flushShipsImmediate, flushUsersImmediate,
+  │                            transferGold (atomic tx: zero victim cash, increment attacker),
+  │                            clampCybertronCash (cap to CYB_MAXCASH=2_000_000 at every boundary)
+  ├── CybertronDebugController — GET /debug/cybertron-stats (dev-only, NODE_ENV≠production):
+  │                              per-class population snapshot vs. tot_to_create targets
+  ├── cybertron.config.ts     — CybertronClassConfig interface; CYBERTRON_CLASS_DEFAULTS for
+  │                            classes 21–25 (Cybertron Scout/Cyberquad/Base Star/Sartern);
+  │                            buildCybertronClassConfigs() merges env overrides
+  ├── cybertron-events.ts     — CYBERTRON_EVENT const map + typed payload interfaces
+  ├── cyb-decisions.ts        — pure AI decision functions (all randomness via injected Random):
+  │                            pickSpawnClass, randomInitLoadout, randomCybSkill, pickPursuitBand,
+  │                            cybwhoops, gebemean, rollTorpedoCount
+  ├── taunt-pool.ts           — 13 in-character taunt strings, pickTaunt(rand)
+  └── constants (game/constants.ts additions) — CYBTICKTIME=6, CYBSLO=3, CYB_ALLOW=35,
+                               CYB_MAXCASH=2_000_000, CYB_BE_NICE=30, CYB_BE_EASY=60,
+                               CYB_BREAKOFF=500, CYB_MINDAM=75, CYBMAXPERTICK=2,
+                               CYB_TOUGH_0=0, CYB_TOUGH_1=1, CLASSTYPE_CYBORG=2
+```
+
+### Cybertron AI per-ship state machine (cybLives)
+
+```
+onPhysicsTick (every 6s)
+  └─ for each AUTO (status=2) ship, ship.tick--; if tick===0:
+       cybLives(ship, ctx) [try/catch — fault isolated]
+         ├─ energy += CYB_ALLOW (allowance credit)
+         ├─ cybUpdateDb — decrement cybupdate; randomize direction if idle
+         ├─ if jammer===0: runEngagementScan
+         │     ├─ Zipper branch (hasZipper + minesnear>0 + inventory>0 → retreat)
+         │     ├─ Breakoff (non-quad, 1-in-500 per visible target → disengage)
+         │     ├─ Warp-fire path (both in hyperwarp: gebemean+range gate → cybFirePhaser)
+         │     └─ Normal-space path (point-toward + canAttack gate → cybAttack | cybAnnoy)
+         │           cybAttack: cybwhoops gate → cybFirePhaser + rollTorpedoCount torpedoes
+         │           cybAnnoy: pickTaunt → emit cybertron.taunt
+         │           cybLayDecoys: cybwhoops gate → fill empty decout slot
+         ├─ else (jammed): lay mine + randomize course
+         ├─ cybCheckDamage — damage>75: lay mine + deploy jammer + randomize heading
+         └─ cybCheckLockon — holdcourse countdown; validate/update target; hyperwarp pursuit bands
+```
+
+### Cybertron event bus topology additions
+
+```
+Emitters (cybertron-tick.service.ts):
+  cybertron.target-acquired  → GameGateway: sector-scoped
+  cybertron.taunt            → GameGateway: sector-scoped (target's sector)
+  cybertron.broke-off        → GameGateway: sector-scoped (target's sector)
+  combat.phaser-fired        → (existing COMBAT_PHASER_FIRED path via EventEmitter2)
+  combat.hit                 → (existing COMBAT_HIT path)
+
+Listener (cybertron-tick.service.ts):
+  combat.ship-destroyed (victimUserid starts with 'Cybrg-') → transferCybertronGold
+```
+
 ## What does not exist yet
 
-- Cybertron AI — feature 007
 - Droid AI — feature 008
 - Midnight job — feature 009

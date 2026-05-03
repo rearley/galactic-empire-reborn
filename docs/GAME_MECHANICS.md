@@ -628,3 +628,66 @@ consequence. The `RANDOM` port ensures revolt conditions are deterministic in te
 
 Balance regression tests pin the boundary values. Changing the bounds breaks tests
 (`validators.spec.ts`).
+
+---
+
+## Cybertron AI (feature 007)
+
+**Source**: GECYBS.C — `cyb_lives` (198), `cyb_check_lockon` (649), `cyb_check_damage` (619),
+`cyb_attack` (490), `cyb_annoy` (379), `cyb_lay_decoys` (556), `cyb_init` (88), `db_update` (455)
+
+### Lifecycle
+
+Cybertrons are persistent AI ships stored in Postgres (`userid LIKE 'Cybrg-%'`).
+On boot, `CybertronRepository.hydrateAll` loads all `Cybrg-*` ships into `ShipStateService` and
+clamps any `User.cash > CYB_MAXCASH (2_000_000)`. If population is below configured targets,
+a spawn slot fires every 30 physics ticks (≈3 minutes) via `repository.createSpawn`.
+
+### Per-ship state machine (`cyb_lives`)
+
+Fires when `ship.tick` counts down to 0 (each Cybertron has an independent countdown):
+
+1. **Energy allowance**: `energy += CYB_ALLOW (35)` (capped at 999,999).
+2. **`cybUpdateDb`**: decrement `cybupdate`; when it hits 1, randomize direction/speed.
+3. **Engagement scan** (`runEngagementScan`):
+   - Skipped when inside the neutral zone (sector 0,0).
+   - Skipped when jammed (`ship.jammer !== 0`).
+   - Loops all active players within `scanRange`.
+   - **Zipper branch**: class with `hasZipper`, `minesnear>0`, and inventory → deploy zipper,
+     reverse course, set `holdcourse`, clear target (`cybmine=255`).
+   - **Breakoff**: non-Cyberquad, 1-in-500 per visible target → clear target, escape at top speed,
+     emit `cybertron.broke-off`.
+   - **Warp-fire**: both ships in hyperwarp, `gebemean`, range < 30,000 → fire phasers.
+   - **Normal-space attack** (within `tooclose` or `cantexit > 0`): `cybwhoops` gate → phaser;
+     `rollTorpedoCount` → torpedo volley.
+   - **Normal-space annoy** (in range but out of `tooclose`): `pickTaunt` → emit `cybertron.taunt`.
+   - **Decoy deploy**: after attack/annoy, `cybwhoops` gate → fill one empty `decout` slot.
+4. **Jammed path** (when `jammer !== 0`): lay mine (probabilistic), randomize course.
+5. **`cybCheckDamage`**: if `damage > CYB_MINDAM (75)`: lay mine, deploy jammer, randomize heading;
+   flush ship state immediately.
+6. **`cybCheckLockon`**: honor `holdcourse` countdown; validate or reacquire target; select
+   pursuit band (hyperwarp entry if far > `hyperdist1`, brake if > `hyperdist2`, close if near).
+7. **Tick reset**: random `CYBTICKTIME`-based next countdown; Cyberquad (tough=1) ticks more aggressively.
+
+### Difficulty scaling (`gebemean`)
+
+- `kills < CYB_BE_NICE (30)`: 1-in-`CYBSLO (3)` chance of being mean (ordinary Cybertrons).
+- `kills >= CYB_BE_NICE`: always mean.
+- `kills >= CYB_BE_EASY (60)`: torpedo volley uses `rnd%6` (0–5); otherwise `rnd%2` (0–1).
+- Cyberquad (`tough=1`) is always mean regardless of player kills.
+
+### Gold accumulation and transfer
+
+Each Cybertron earns `CYB_ALLOW (35)` gold per tick (credited to `ship.energy` for the tick
+duration, then zeroed; the actual gold lives in `User.cash`). On spawn, initial gold is
+`rnd % cyb_gold` per class (capped to `CYB_MAXCASH`). When a Cybertron is killed,
+`CybertronRepository.transferGold` atomically zeros the victim's `User.cash` and credits
+the attacker. Cash is clamped to `CYB_MAXCASH` at all four persistence boundaries (spawn,
+hydrate, transfer, createSpawn).
+
+### Sarterns
+
+Sartern Attack Drones (class 24) and Obliterators (class 25) are `CLASSTYPE_CYBORG` ships.
+They use the `Cybrg-` userid prefix per `GECYBS.C:104-105` and run the identical `cyb_lives`
+code path. Their distinct behavior comes from their `ShipClass` row (higher scanRange,
+different `tough` value) and their `CybertronClassConfig` entry (tot_to_create, tooclose, etc.).
