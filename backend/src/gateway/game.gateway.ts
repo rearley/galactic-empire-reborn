@@ -27,6 +27,11 @@ import {
   CombatPhaserFiredEvent,
   CombatShipDestroyedEvent,
 } from '../game/combat/combat-events';
+import {
+  CYBERTRON_EVENT,
+  CybertronTauntPayload,
+  CybertronBrokeOffPayload,
+} from '../game/cybertron/cybertron-events';
 
 interface SectorPayload {
   x: unknown;
@@ -257,6 +262,37 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     this.server.emit(COMBAT_SHIP_DESTROYED, event);
+  }
+
+  /**
+   * Broadcast Cybertron taunt to the Cybertron's sector room so the target
+   * (and all players in that sector) see the taunt message.
+   * @see GECYBS.C:379 cyb_annoy
+   * @see specs/007-cybertron-ai/tasks.md T047
+   */
+  @OnEvent(CYBERTRON_EVENT.TAUNT)
+  handleCybertronTaunt(event: CybertronTauntPayload): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(CYBERTRON_EVENT.TAUNT, event);
+  }
+
+  /**
+   * Deliver "lucky day" broke-off message to the former target's sector room.
+   * @see GECYBS.C:255 CYB_BREAKOFF roll
+   * @see specs/007-cybertron-ai/tasks.md T047
+   */
+  @OnEvent(CYBERTRON_EVENT.BROKE_OFF)
+  handleCybertronBrokeOff(event: CybertronBrokeOffPayload): void {
+    // Find the target's current sector to route the message correctly
+    const parts = event.targetShipKey.split(':');
+    const targetUserid = parts.slice(0, -1).join(':');
+    const targetShipno = Number(parts[parts.length - 1]);
+    const targetShip = this.shipStateService.get(targetUserid, targetShipno);
+    const sector = targetShip
+      ? { x: Math.floor(targetShip.xcoord), y: Math.floor(targetShip.ycoord) }
+      : event.sector;
+    const room = `sector:${sector.x}:${sector.y}`;
+    this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

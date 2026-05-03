@@ -147,6 +147,35 @@ export const ENGYMAX = 50000 as const;
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;
 
+// ── Cybertron AI constants (GEMAIN.H) ────────────────────────────────────────
+
+/** @see GEMAIN.H CYBTICKTIME=6 — physics-tick period for Cybertron AI (seconds) */
+export const CYBTICKTIME = 6 as const;
+/** @see GEMAIN.H CYB_MINCLASS=3 — minimum player class a Cybertron will attack */
+export const CYB_MINCLASS = 3 as const;
+/** @see GEMAIN.H CYBSLO=3 — 1-in-CYBSLO chance gebemean returns true for ordinary AI */
+export const CYBSLO = 3 as const;
+/** @see GEMAIN.H CYB_ALLOW=35 — gold allowance per tick for every Cybertron */
+export const CYB_ALLOW = 35 as const;
+/** @see GEMAIN.H CYB_MAXCASH=2000000 — maximum gold a Cybertron may hold */
+export const CYB_MAXCASH = 2_000_000 as const;
+/** @see GEMAIN.H CYB_BE_NICE=30 — kill threshold at which Cybertrons get tougher */
+export const CYB_BE_NICE = 30 as const;
+/** @see GEMAIN.H CYB_BE_EASY=60 — kill threshold at which Cybertrons get really mean */
+export const CYB_BE_EASY = 60 as const;
+/** @see GEMAIN.H CYB_BREAKOFF=500 — 1-in-CYB_BREAKOFF chance a non-quad breaks off attack */
+export const CYB_BREAKOFF = 500 as const;
+/** @see GEMAIN.H CYB_MINDAM=75 — damage threshold triggering defensive behavior */
+export const CYB_MINDAM = 75 as const;
+/** @see GEMAIN.H CYBMAXPERTICK=2 — max AI ship activations per physics tick */
+export const CYBMAXPERTICK = 2 as const;
+/** @see GEMAIN.H CYB_TOUGH_0=0 — tough_factor value for ordinary Cybertron */
+export const CYB_TOUGH_0 = 0 as const;
+/** @see GEMAIN.H CYB_TOUGH_1=1 — tough_factor value for Cyberquad (smart/mean) */
+export const CYB_TOUGH_1 = 1 as const;
+/** @see GEMAIN.H CLASSTYPE_CYBORG=2 — category constant for all Cybertron/Sartern classes */
+export const CLASSTYPE_CYBORG = 2 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;

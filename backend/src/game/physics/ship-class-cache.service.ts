@@ -13,14 +13,23 @@ import { PrismaService } from '../../prisma/prisma.service';
  * @see GEMAIN.H — shipclass[] table
  * @see specs/006a-physics-tick/research.md R-6
  */
-interface ShipClassEntry {
+export interface ShipClassEntry {
   maxAcceleration: number;
   maxWarp: number;
   maxPhaser: number;
+  maxShields: number;
   scanRange: number;
   maxTons: number;
   hasTorpedo: boolean;
   hasMissile: boolean;
+  hasJammer: boolean;
+  hasMine: boolean;
+  hasZipper: boolean;
+  noClaim: number;
+  tough: number;
+  cybLowestClassAttacks: number;
+  /** True if Cybertrons can attack this class on contact (GECYBS.C cybs_can_att). */
+  cybCanAttack: boolean;
 }
 
 @Injectable()
@@ -37,10 +46,18 @@ export class ShipClassCacheService implements OnModuleInit {
         maxAcceleration: true,
         maxWarp: true,
         maxPhaser: true,
+        maxShields: true,
         scanRange: true,
         maxTons: true,
         hasTorpedo: true,
         hasMissile: true,
+        hasJammer: true,
+        hasMine: true,
+        hasZipper: true,
+        noClaim: true,
+        tough: true,
+        cybLowestClassAttacks: true,
+        cybCanAttack: true,
       },
     });
     for (const row of rows) {
@@ -48,18 +65,40 @@ export class ShipClassCacheService implements OnModuleInit {
         maxAcceleration: row.maxAcceleration,
         maxWarp: row.maxWarp,
         maxPhaser: row.maxPhaser,
+        maxShields: row.maxShields,
         scanRange: row.scanRange,
         maxTons: row.maxTons,
         hasTorpedo: row.hasTorpedo,
         hasMissile: row.hasMissile,
+        hasJammer: row.hasJammer,
+        hasMine: row.hasMine,
+        hasZipper: row.hasZipper,
+        noClaim: row.noClaim,
+        tough: row.tough,
+        cybLowestClassAttacks: row.cybLowestClassAttacks,
+        cybCanAttack: row.cybCanAttack,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
   }
 
+  /**
+   * Returns the full cache entry for a class, or undefined if not cached.
+   * Used by CybertronTickService for AI ship-class resolution.
+   * @see specs/007-cybertron-ai/plan.md — per-class field access
+   */
+  get(classNumber: number): ShipClassEntry | undefined {
+    return this.cache.get(classNumber);
+  }
+
   /** Synchronous lookup. Throws if the class is not in the cache. */
   getMaxAcceleration(classNumber: number): number {
     return this.entry(classNumber).maxAcceleration;
+  }
+
+  /** Synchronous lookup. Throws if the class is not in the cache. */
+  getMaxShields(classNumber: number): number {
+    return this.entry(classNumber).maxShields;
   }
 
   /** Synchronous lookup. Throws if the class is not in the cache. */
@@ -107,10 +146,18 @@ export class ShipClassCacheService implements OnModuleInit {
   setForTest(classNumber: number, entry: Partial<ShipClassEntry> & Pick<ShipClassEntry, 'maxAcceleration' | 'maxWarp'>): void {
     this.cache.set(classNumber, {
       maxPhaser: 1000,
+      maxShields: 3,
       scanRange: 100000,
       maxTons: 5000,
       hasTorpedo: true,
       hasMissile: true,
+      hasJammer: false,
+      hasMine: false,
+      hasZipper: false,
+      noClaim: 3,
+      tough: 0,
+      cybLowestClassAttacks: 0,
+      cybCanAttack: true,
       ...entry,
     });
   }

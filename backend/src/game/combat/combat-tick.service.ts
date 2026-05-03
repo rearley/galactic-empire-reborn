@@ -171,6 +171,10 @@ export class CombatTickService implements OnModuleInit {
         const event: CombatShipDestroyedEvent = {
           victimId: shipKey(victim.userid, victim.shipno),
           attackerId: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+          victimShipKey: shipKey(victim.userid, victim.shipno),
+          attackerShipKey: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+          victimUserid: victim.userid,
+          attackerUserid: attacker ? attacker.userid : null,
           attackerChannel,
           // Weapon type is not separately tracked at kill time; the per-hit
           // events emitted earlier this tick carry the weapon. Leave null.
