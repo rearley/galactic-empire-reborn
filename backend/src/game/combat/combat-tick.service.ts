@@ -32,10 +32,12 @@ import {
   COMBAT_HIT,
   COMBAT_MINE_DETONATION,
   COMBAT_MINE_WARNING,
+  COMBAT_SHIP_DESTROYED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMineDetonationEvent,
   CombatMineWarningEvent,
+  CombatShipDestroyedEvent,
 } from './combat-events';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
@@ -123,6 +125,110 @@ export class CombatTickService implements OnModuleInit {
     // settles first. tickAll() decrements timers; sweepCandidates() returns
     // mines on the timer % 5 === 0 cadence (matches GEFUNCS.C:minesweep).
     this.runMineSweep(ships, ctx);
+
+    // Kill-resolution pass — runs LAST so any damage applied by phaser,
+    // projectile, or mine passes this tick is settled before kills are
+    // attributed and dead ships removed from the in-memory map.
+    this.runKillResolution(ctx);
+  }
+
+  /**
+   * Walk all active ships; any with `damage >= 100` is killed. Attribution
+   * uses the victim's `lastfired` (= attacker's shipno/channel). The attacker's
+   * `kills` is incremented, COMBAT_SHIP_DESTROYED is emitted galaxy-wide, and
+   * the dead ship is removed from the in-memory map. After removal, in-flight
+   * cleanup clears every other ship's incoming projectile slots that reference
+   * the dead firer's shipno (FR-027, GEFUNCS.C:1755-1778).
+   *
+   * @see GEFUNCS.C:killem (line 1103)
+   * @see GEFUNCS.C:acctm  (line 1118)
+   */
+  private runKillResolution(ctx: TickContext): void {
+    const ships = this.shipState
+      .findAllShips()
+      .slice()
+      .sort((a, b) => {
+        const ka = shipKey(a.userid, a.shipno);
+        const kb = shipKey(b.userid, b.shipno);
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+      });
+
+    for (const victim of ships) {
+      try {
+        if (victim.damage < 100) continue;
+        // Skip ships already removed from the active set (defensive).
+        if (victim.status !== 1 && victim.status !== 2) continue;
+
+        const attackerChannel = victim.lastfired;
+        const attacker = this.findActiveAttackerByChannel(attackerChannel, victim);
+
+        if (attacker) {
+          this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
+            a.kills += 1;
+          });
+        }
+
+        const event: CombatShipDestroyedEvent = {
+          victimId: shipKey(victim.userid, victim.shipno),
+          attackerId: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+          attackerChannel,
+          // Weapon type is not separately tracked at kill time; the per-hit
+          // events emitted earlier this tick carry the weapon. Leave null.
+          weapon: null,
+          sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
+          tickAt: ctx.firedAt,
+        };
+        this.events.emit(COMBAT_SHIP_DESTROYED, event);
+
+        // Remove from active state map.
+        this.shipState.removeFromGame(victim);
+
+        // In-flight cleanup — clear any other ship's incoming projectile
+        // slots that reference the dead ship's shipno as the firer (channel).
+        this.clearInFlightFromDeadFirer(victim.shipno);
+      } catch (err) {
+        const id = shipKey(victim.userid, victim.shipno);
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Kill-resolution fault for ship ${id}: ${stack}`);
+      }
+    }
+  }
+
+  /**
+   * After a firer dies, walk every other active ship's incoming torpedo /
+   * missile slots and clear (channel = 255) any whose `.channel` references
+   * the dead firer's `shipno`. Mirrors the firer-dies cleanup in
+   * GEFUNCS.C:1755-1778.
+   */
+  private clearInFlightFromDeadFirer(deadShipno: number): void {
+    for (const carrier of this.shipState.findAllShips()) {
+      for (let i = 0; i < MAXTORPS; i++) {
+        if (carrier.ltorpsChannel[i] === deadShipno) {
+          this.clearTorpSlot(carrier, i);
+        }
+      }
+      for (let i = 0; i < MAXMISSL; i++) {
+        if (carrier.lmisslChannel[i] === deadShipno) {
+          this.clearMisslSlot(carrier, i);
+        }
+      }
+    }
+  }
+
+  /**
+   * Like findShipByChannel but does not require excluding the carrier (used
+   * during kill-resolution where we want to find the attacker for a known
+   * dead victim).
+   */
+  private findActiveAttackerByChannel(channel: number, victim: ShipState): ShipState | undefined {
+    const victimKey = shipKey(victim.userid, victim.shipno);
+    for (const s of this.shipState.findAllShips()) {
+      if (s.shipno !== channel) continue;
+      if (shipKey(s.userid, s.shipno) === victimKey) continue;
+      if (s.status !== 1 && s.status !== 2) continue;
+      return s;
+    }
+    return undefined;
   }
 
   /** @see GEFUNCS.C:minesweep */
