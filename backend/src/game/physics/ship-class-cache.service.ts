@@ -19,6 +19,8 @@ interface ShipClassEntry {
   maxPhaser: number;
   scanRange: number;
   maxTons: number;
+  hasTorpedo: boolean;
+  hasMissile: boolean;
 }
 
 @Injectable()
@@ -37,6 +39,8 @@ export class ShipClassCacheService implements OnModuleInit {
         maxPhaser: true,
         scanRange: true,
         maxTons: true,
+        hasTorpedo: true,
+        hasMissile: true,
       },
     });
     for (const row of rows) {
@@ -46,6 +50,8 @@ export class ShipClassCacheService implements OnModuleInit {
         maxPhaser: row.maxPhaser,
         scanRange: row.scanRange,
         maxTons: row.maxTons,
+        hasTorpedo: row.hasTorpedo,
+        hasMissile: row.hasMissile,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -76,6 +82,16 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).maxTons;
   }
 
+  /** Synchronous lookup. Throws if the class is not in the cache. */
+  getHasTorpedo(classNumber: number): boolean {
+    return this.entry(classNumber).hasTorpedo;
+  }
+
+  /** Synchronous lookup. Throws if the class is not in the cache. */
+  getHasMissile(classNumber: number): boolean {
+    return this.entry(classNumber).hasMissile;
+  }
+
   private entry(classNumber: number): ShipClassEntry {
     const entry = this.cache.get(classNumber);
     if (!entry) throw new Error(`ShipClass ${classNumber} not in cache`);
@@ -93,6 +109,8 @@ export class ShipClassCacheService implements OnModuleInit {
       maxPhaser: 1000,
       scanRange: 100000,
       maxTons: 5000,
+      hasTorpedo: true,
+      hasMissile: true,
       ...entry,
     });
   }

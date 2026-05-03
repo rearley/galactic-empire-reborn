@@ -10,10 +10,18 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
 import { PhaserHandlerService } from '../../../src/game/commands/handlers/phaser.handler';
 import { CommandResult, CommandContext } from '../../../src/game/commands/command.types';
 import {
+  COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
+  CombatDecoyInterceptEvent,
   CombatHitEvent,
 } from '../../../src/game/combat/combat-events';
-import { PRELOAD } from '../../../src/game/constants';
+import {
+  DECOYTIME,
+  FIRETICKS,
+  MISLSPED,
+  PRELOAD,
+  TORPSPED,
+} from '../../../src/game/constants';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -183,5 +191,213 @@ describe('CombatTickService — phaser interaction (T018)', () => {
     await h.fire();
     expect(alice.phasr).toBe(Math.min(1000, phasrBefore + PRELOAD));
     expect(bob.phasr).toBe(Math.min(1000, 100 + PRELOAD));
+  });
+});
+
+describe('CombatTickService — projectile travel pass (T029)', () => {
+  // We need a parameterised harness so we can control the PRNG seed for
+  // deterministic decoy-intercept outcomes.
+  async function makeHarnessSeeded(
+    ships: ShipState[],
+    seed: number,
+  ): Promise<Harness> {
+    const shipMap = new Map<string, ShipState>();
+    for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
+
+    const shipState = {
+      findAllShips: () => Array.from(shipMap.values()),
+      mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
+        const s = shipMap.get(shipKey(userid, shipno));
+        if (!s) return undefined;
+        fn(s);
+        s.dirty = true;
+        return s;
+      },
+    } as unknown as import('../../../src/game/ship/ship-state.service').ShipStateService;
+
+    const subscribers: Array<(c: TickContext) => void> = [];
+    const tickService = {
+      subscribe: (_kind: TickKind, h: (c: TickContext) => void) => {
+        subscribers.push(h);
+        return () => {};
+      },
+    } as unknown as import('../../../src/game/tick/tick.service').TickService;
+
+    const mineRepo = {
+      findAllActive: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      delete: jest.fn(),
+    } as unknown as MineRepository;
+
+    const mineRegistry = new MineRegistry();
+    const events = new EventEmitter2();
+    const logger = new Logger('CombatTickServiceProjectileSpec');
+    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    const classCache = new ShipClassCacheService({} as never);
+    classCache.setForTest(1, {
+      maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000,
+      scanRange: 100000, maxTons: 5000,
+    } as never);
+
+    const service = new CombatTickService(
+      tickService,
+      shipState,
+      mineRepo,
+      mineRegistry,
+      new Mulberry32Adapter(seed),
+      events,
+      logger,
+      classCache,
+    );
+    await service.onModuleInit();
+
+    return {
+      service,
+      shipMap,
+      events,
+      classCache,
+      shipState,
+      fire: async () => {
+        const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new Date() };
+        for (const h of subscribers) h(ctx);
+      },
+    };
+  }
+
+  it('torpedo travel — distance decremented by TORPSPED each tick (no hit, no decoy)', async () => {
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      ltorpsChannel: [7, 255, 255],
+      ltorpsDistance: [TORPSPED * 5, 0, 0],
+    });
+    const h = await makeHarnessSeeded([bob], 1);
+    await h.fire();
+    expect(bob.ltorpsDistance[0]).toBe(TORPSPED * 4);
+    expect(bob.ltorpsChannel[0]).toBe(7);
+  });
+
+  it('missile travel — distance decremented by MISLSPED each tick', async () => {
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      lmisslChannel: [9, 255, 255],
+      lmisslDistance: [MISLSPED * 4, 0, 0],
+      lmisslEnergy: [1500, 0, 0],
+    });
+    const h = await makeHarnessSeeded([bob], 1);
+    await h.fire();
+    expect(bob.lmisslDistance[0]).toBe(MISLSPED * 3);
+    expect(bob.lmisslChannel[0]).toBe(9);
+    expect(bob.lmisslEnergy[0]).toBe(1500);
+  });
+
+  it('torpedo hit at distance ≤ 0 emits COMBAT_HIT { weapon: torpedo }, applies damage, sets cantexit on victim', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      shield: 5000, shieldstat: 1, damage: 0, cantexit: 0,
+      ltorpsChannel: [7, 255, 255],
+      ltorpsDistance: [10, 0, 0], // less than TORPSPED → goes negative → hit
+    });
+    const h = await makeHarnessSeeded([alice, bob], 99);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+
+    const hit = emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect((hit!.payload as CombatHitEvent).weapon).toBe('torpedo');
+    expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
+    expect((hit!.payload as CombatHitEvent).attackerId).toBe(shipKey('a', 7));
+
+    // Slot cleared
+    expect(bob.ltorpsChannel[0]).toBe(255);
+    // cantexit set on victim
+    expect(bob.cantexit).toBe(FIRETICKS);
+    // cantexit set on attacker
+    expect(alice.cantexit).toBe(FIRETICKS);
+  });
+
+  it('missile hit at distance ≤ 0 emits COMBAT_HIT { weapon: missile } using stored energy as dmgMax', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 9, xcoord: 0, ycoord: 0 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      shield: 0, shieldstat: 0, damage: 0,
+      lmisslChannel: [9, 255, 255],
+      lmisslDistance: [10, 0, 0],
+      lmisslEnergy: [2000, 0, 0],
+    });
+    const h = await makeHarnessSeeded([alice, bob], 99);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+    const hit = emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect((hit!.payload as CombatHitEvent).weapon).toBe('missile');
+    // Slot cleared
+    expect(bob.lmisslChannel[0]).toBe(255);
+    expect(bob.lmisslEnergy[0]).toBe(0);
+    // Bob took some hull damage
+    expect(bob.damage).toBeGreaterThan(0);
+  });
+
+  it('decoy intercept — when carrier has active decoy and roll succeeds, emit COMBAT_DECOY_INTERCEPT and clear slot, no COMBAT_HIT', async () => {
+    // Mulberry32(99) first next() ≈ 0.26 < 0.5 (DECODDS=50) → intercept fires.
+    const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      decout: [DECOYTIME, 0, 0], // active decoy
+      ltorpsChannel: [7, 255, 255],
+      // Distance after decrement will be 1000 — below 5000 → decoy roll triggered.
+      ltorpsDistance: [TORPSPED + 1000, 0, 0],
+    });
+    const h = await makeHarnessSeeded([alice, bob], 99);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+    const intercept = emitted.find((e) => e.event === COMBAT_DECOY_INTERCEPT);
+    expect(intercept).toBeDefined();
+    expect((intercept!.payload as CombatDecoyInterceptEvent).weapon).toBe('torpedo');
+    expect((intercept!.payload as CombatDecoyInterceptEvent).defenderId).toBe(shipKey('b', 2));
+    // Slot cleared
+    expect(bob.ltorpsChannel[0]).toBe(255);
+    // No hit emitted
+    expect(emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+  });
+
+  it('FR-027.3 — carrier not ingame mid-flight: slot silently cleared, no hit, no decoy event', async () => {
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      status: 0, // not ingame (neither 1 nor 2)
+      ltorpsChannel: [7, 255, 255],
+      ltorpsDistance: [TORPSPED * 3, 0, 0],
+    });
+    const h = await makeHarnessSeeded([bob], 1);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+    expect(bob.ltorpsChannel[0]).toBe(255);
+    expect(emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+    expect(emitted.find((e) => e.event === COMBAT_DECOY_INTERCEPT)).toBeUndefined();
   });
 });

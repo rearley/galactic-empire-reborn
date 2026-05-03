@@ -12,6 +12,8 @@ import { SellHandlerService } from './handlers/sell.handler';
 import { AdminHandlerService } from './handlers/admin.handler';
 import { WithdrawHandlerService } from './handlers/withdraw.handler';
 import { PhaserHandlerService } from './handlers/phaser.handler';
+import { TorpedoHandlerService } from './handlers/torpedo.handler';
+import { MissileHandlerService } from './handlers/missile.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -33,6 +35,8 @@ import { CombatModule } from '../combat/combat.module';
     WithdrawHandlerService,
     WarpHandlerService,
     PhaserHandlerService,
+    TorpedoHandlerService,
+    MissileHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -49,6 +53,8 @@ export class CommandsModule implements OnModuleInit {
     private readonly withdrawHandler: WithdrawHandlerService,
     private readonly warpHandler: WarpHandlerService,
     private readonly phaserHandler: PhaserHandlerService,
+    private readonly torpedoHandler: TorpedoHandlerService,
+    private readonly missileHandler: MissileHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -64,5 +70,7 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.adminHandler.command);
     this.commandRouter.register(this.withdrawHandler.command);
     this.commandRouter.register(this.phaserHandler.command);
+    this.commandRouter.register(this.torpedoHandler.command);
+    this.commandRouter.register(this.missileHandler.command);
   }
 }

@@ -14,9 +14,11 @@ import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
 import {
+  COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
+  CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
@@ -228,6 +230,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatMiss(event: CombatMissEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_MISS, event);
+  }
+
+  @OnEvent(COMBAT_DECOY_INTERCEPT)
+  handleCombatDecoyIntercept(event: CombatDecoyInterceptEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(COMBAT_DECOY_INTERCEPT, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

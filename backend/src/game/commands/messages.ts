@@ -128,6 +128,20 @@ export enum MessageId {
   PHA_NOPOW = 'PHA_NOPOW',
   PHA_FMT = 'PHA_FMT',
 
+  // torpedo (feature 006b) — GECMDS.C:cmd_torpedo
+  TOR_NOTOR = 'TOR_NOTOR',
+  TOR_WARP = 'TOR_WARP',
+  TOR_CLOAK = 'TOR_CLOAK',
+  TOR_NOAMMO = 'TOR_NOAMMO',
+  TOR_FULL = 'TOR_FULL',
+  TOR_FMT = 'TOR_FMT',
+
+  // missile (feature 006b) — GECMDS.C:cmd_missl
+  MIS_NOMIS = 'MIS_NOMIS',
+  MIS_NOAMMO = 'MIS_NOAMMO',
+  MIS_FULL = 'MIS_FULL',
+  MIS_FMT = 'MIS_FMT',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -260,6 +274,20 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PHA_NOPHAS]: 'No phaser class mounted.',
   [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
   [MessageId.PHA_FMT]: 'Format: pha <bearing> <percent>',
+
+  // torpedo (feature 006b)
+  [MessageId.TOR_NOTOR]: 'No torpedo launcher mounted.',
+  [MessageId.TOR_WARP]: 'Cannot fire torpedoes at warp speed.',
+  [MessageId.TOR_CLOAK]: 'Cannot fire while cloaked.',
+  [MessageId.TOR_NOAMMO]: 'No torpedoes in cargo.',
+  [MessageId.TOR_FULL]: 'Target already has maximum torpedoes incoming.',
+  [MessageId.TOR_FMT]: 'Format: tor <target>',
+
+  // missile (feature 006b)
+  [MessageId.MIS_NOMIS]: 'No missile launcher mounted.',
+  [MessageId.MIS_NOAMMO]: 'No missiles in cargo.',
+  [MessageId.MIS_FULL]: 'Target already has maximum missiles incoming.',
+  [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
