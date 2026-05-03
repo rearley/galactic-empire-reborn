@@ -16,10 +16,12 @@ import { CommandRouterService } from '../game/commands/command-router.service';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
+  COMBAT_MINE_DETONATION,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
+  CombatMineDetonationEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
 } from '../game/combat/combat-events';
@@ -236,6 +238,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatDecoyIntercept(event: CombatDecoyInterceptEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_DECOY_INTERCEPT, event);
+  }
+
+  @OnEvent(COMBAT_MINE_DETONATION)
+  handleCombatMineDetonation(event: CombatMineDetonationEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(COMBAT_MINE_DETONATION, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

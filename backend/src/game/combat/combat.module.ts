@@ -28,6 +28,6 @@ import { MathRandomAdapter, RANDOM } from './random.port';
     { provide: RANDOM, useClass: MathRandomAdapter },
     Logger,
   ],
-  exports: [CombatTickService, RANDOM],
+  exports: [CombatTickService, RANDOM, MineRegistry, MineRepository],
 })
 export class CombatModule {}

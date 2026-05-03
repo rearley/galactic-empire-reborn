@@ -14,6 +14,11 @@ import { WithdrawHandlerService } from './handlers/withdraw.handler';
 import { PhaserHandlerService } from './handlers/phaser.handler';
 import { TorpedoHandlerService } from './handlers/torpedo.handler';
 import { MissileHandlerService } from './handlers/missile.handler';
+import { MineHandlerService } from './handlers/mine.handler';
+import { ZipperHandlerService } from './handlers/zipper.handler';
+import { DecoyHandlerService } from './handlers/decoy.handler';
+import { JammerHandlerService } from './handlers/jammer.handler';
+import { SysHandlerService } from './handlers/sys.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -37,6 +42,11 @@ import { CombatModule } from '../combat/combat.module';
     PhaserHandlerService,
     TorpedoHandlerService,
     MissileHandlerService,
+    MineHandlerService,
+    ZipperHandlerService,
+    DecoyHandlerService,
+    JammerHandlerService,
+    SysHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -55,6 +65,11 @@ export class CommandsModule implements OnModuleInit {
     private readonly phaserHandler: PhaserHandlerService,
     private readonly torpedoHandler: TorpedoHandlerService,
     private readonly missileHandler: MissileHandlerService,
+    private readonly mineHandler: MineHandlerService,
+    private readonly zipperHandler: ZipperHandlerService,
+    private readonly decoyHandler: DecoyHandlerService,
+    private readonly jammerHandler: JammerHandlerService,
+    private readonly sysHandler: SysHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -72,5 +87,10 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.phaserHandler.command);
     this.commandRouter.register(this.torpedoHandler.command);
     this.commandRouter.register(this.missileHandler.command);
+    this.commandRouter.register(this.mineHandler.command);
+    this.commandRouter.register(this.zipperHandler.command);
+    this.commandRouter.register(this.decoyHandler.command);
+    this.commandRouter.register(this.jammerHandler.command);
+    this.commandRouter.register(this.sysHandler.command);
   }
 }

@@ -5,10 +5,12 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
+  COMBAT_MINE_DETONATION,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
+  CombatMineDetonationEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
 } from '../../src/game/combat/combat-events';
@@ -88,5 +90,17 @@ describe('GameGateway combat broadcasts', () => {
     gateway.handleCombatMiss(event);
     expect(toMock).toHaveBeenCalledWith('sector:0:0');
     expect(emitMock).toHaveBeenCalledWith(COMBAT_MISS, event);
+  });
+
+  it('broadcasts COMBAT_MINE_DETONATION to sector room', () => {
+    const event: CombatMineDetonationEvent = {
+      mineId: 42,
+      channel: 99,
+      sector: { x: 8, y: 4 },
+      tickAt: new Date(),
+    };
+    gateway.handleCombatMineDetonation(event);
+    expect(toMock).toHaveBeenCalledWith('sector:8:4');
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_MINE_DETONATION, event);
   });
 });
