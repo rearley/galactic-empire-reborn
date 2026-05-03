@@ -141,6 +141,8 @@ export const MISLSPED = 300 as const;
 export const MISENGFC = 10 as const;
 /** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
 export const JAMTIME = 20 as const;
+/** @see GEGLOBAL.H engymax — canonical default ship energy maximum, restored by `flux`. */
+export const ENGYMAX = 50000 as const;
 
 export interface ProjectTarget {
   xcoord: number;

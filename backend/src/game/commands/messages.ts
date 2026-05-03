@@ -155,6 +155,23 @@ export enum MessageId {
   SYS_UNKNOWN = 'SYS_UNKNOWN',
   SYS_FMT = 'SYS_FMT',
 
+  // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
+  LOC_SELF = 'LOC_SELF',
+  LOC_NOTFOUND = 'LOC_NOTFOUND',
+  LOC_LOCKED = 'LOC_LOCKED',
+  LOC_FMT = 'LOC_FMT',
+  NOLOCK = 'NOLOCK',
+
+  // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
+  SHI_UP = 'SHI_UP',
+  SHI_DN = 'SHI_DN',
+  SHI_FMT = 'SHI_FMT',
+
+  // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
+  FLUX_NOPODS = 'FLUX_NOPODS',
+  FLUX_USED = 'FLUX_USED',
+  FLUX_FMT = 'FLUX_FMT',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -314,6 +331,23 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SYS_UNJAM]: 'Jammer cleared.',
   [MessageId.SYS_UNKNOWN]: 'Unknown system command.',
   [MessageId.SYS_FMT]: 'Format: sys <command>',
+
+  // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
+  [MessageId.LOC_SELF]: 'Cannot lock onto yourself.',
+  [MessageId.LOC_NOTFOUND]: 'No such ship in range.',
+  [MessageId.LOC_LOCKED]: 'Target locked.',
+  [MessageId.LOC_FMT]: 'Format: loc <target>',
+  [MessageId.NOLOCK]: 'No target locked.',
+
+  // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
+  [MessageId.SHI_UP]: 'Shields up.',
+  [MessageId.SHI_DN]: 'Shields down.',
+  [MessageId.SHI_FMT]: 'Format: shi up|dn',
+
+  // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
+  [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
+  [MessageId.FLUX_USED]: 'Flux pod used — energy restored.',
+  [MessageId.FLUX_FMT]: 'Format: flux',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',

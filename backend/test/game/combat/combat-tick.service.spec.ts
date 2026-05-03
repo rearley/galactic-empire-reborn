@@ -612,3 +612,29 @@ describe('CombatTickService — decoy/jammer expiry (T036)', () => {
     expect(ship.jammer).toBe(4);
   });
 });
+
+describe('CombatTickService — battle-lock + shield gating (T052)', () => {
+  it('decrements ship.cantexit by 1 per physics tick (FR-028a)', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, cantexit: 3 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.cantexit).toBe(2);
+    await h.fire();
+    expect(ship.cantexit).toBe(1);
+    await h.fire();
+    expect(ship.cantexit).toBe(0);
+    // Floor at zero — no negative drift.
+    await h.fire();
+    expect(ship.cantexit).toBe(0);
+  });
+
+  it('does NOT auto-raise shields after they have been lowered (e.g., by torpedo fire)', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, shieldstat: 0, shield: 1000 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    // Tick must not flip shields back up — the original game requires `shi up`.
+    expect(ship.shieldstat).toBe(0);
+    await h.fire();
+    expect(ship.shieldstat).toBe(0);
+  });
+});
