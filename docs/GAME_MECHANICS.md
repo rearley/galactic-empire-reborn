@@ -419,6 +419,205 @@ ShipClass `maxTons` is pre-cached at module init alongside `typeName`/`hasCloak`
 
 ---
 
+## Combat (feature 006b)
+
+All combat mechanics are driven by the 6-second `TickKind.PHYSICS` heartbeat via `CombatTickService`,
+which subscribes after `PhysicsTickService` (post-move coordinates guaranteed).
+
+---
+
+### cmd_phasor / pha (feature 006b)
+
+**Source**: GECMDS.C:cmd_phasor, GECMDS.C:954, GEFUNCS.C:firephas
+
+Keywords: `pha <bearing> <percent>`
+
+Gates (in order): `phasrtype` mounted on ship class; `phasr >= PMINFIRE (60)`; bearing `-180..180`;
+percent `1..99`; firer's `jammer == 0` (JAMMER4 reject). Hyper-phaser path selected when
+`speed >= WARP_THRESHOLD (1000)`.
+
+Arc resolution: `lineOfFire(firer, target, bearing, beamWidth)` where `beamWidth = percent`.
+`PHABIAS = 2` widens the effective arc — a target outside `percent` but within `percent + PHABIAS`
+is still a hit (GECMDS.C:954). Friendly fire is allowed (no team filter). Energy and phasr charge
+consumed on the firer. `cantexit = FIRETICKS` set on firer and on each victim hit.
+
+Phaser reload: `CombatTickService` adds `PRELOAD (10)` to `phasr` per tick, clamped to `maxPhaser`.
+
+Events emitted: `COMBAT_PHASER_FIRED`, `COMBAT_HIT` (per hit target), `COMBAT_MISS` (if arc empty).
+All sector-scoped.
+
+---
+
+### Torpedoes / tor (feature 006b)
+
+**Source**: GECMDS.C:cmd_torpedo, GECMDS.C:1178-1206, GEFUNCS.C:firetorp
+
+Keywords: `tor <target>`
+
+Gates: class must have `hasTorpedo`; ship not at warp; ship not cloaked; `items[torpedo] > 0` in
+cargo; target's `ltorps[]` has a free slot (MAXTORPS=3, slots live on the **target**); firer's
+`jammer == 0`.
+
+On fire: allocate lowest free slot on **target's** `ltorps[]` with `.distance = cdistance × 10000 + 20`
+and `.channel = firer.channel`; decrement one torpedo from firer's cargo; set firer's `shieldstat = down`;
+set `cantexit = FIRETICKS` on firer.
+
+Tick travel (`CombatTickService`): decrement `.distance` by `TORPSPED` per tick. If distance drops
+below decoy threshold and target has active decoy, roll `decoyIntercept(random, DECODDS)` — on
+success emit `COMBAT_DECOY_INTERCEPT` and clear slot. At `distance <= 0`, resolve hit via
+`randamage + tonFact + shieldhit`, emit `COMBAT_HIT { weapon: 'torpedo' }`, clear slot. If target
+is no longer `ingegame`, clear slot with no hit (FR-027.3).
+
+---
+
+### Missiles / mis (feature 006b)
+
+**Source**: GECMDS.C:cmd_missl, GEFUNCS.C:firemiss
+
+Keywords: `mis <target> <charge>`
+
+Gates: class must have `hasMissile`; charge `1..50000`; energy debit `charge / MISENGFC`; target's
+`lmissl[]` has a free slot (MAXMISSL=3); firer's `jammer == 0`.
+
+On fire: allocate slot on **target's** `lmissl[]` with `.distance = cdistance × 10000 + 20`,
+`.channel = firer.channel`, `.energy = charge`; set `cantexit = FIRETICKS` on firer. Missiles may
+target ships at warp (no warp gate).
+
+Tick travel: same decoy-intercept and hit resolution as torpedoes, using `MISLSPED` for travel.
+Decoy threshold for missiles: `<3000` (vs `<5000` for torpedoes).
+
+---
+
+### Mines / mine (feature 006b)
+
+**Source**: GECMDS.C:cmd_mine, GEFUNCS.C:minesweep, GEFUNCS.C:1432
+
+Keywords: `mine`
+
+Deploys one mine at the firer's current coordinates. Persisted to the `Mine` table via
+`MineRepository.create()` and added to `MineRegistry`. Decrements `items[mine]` in cargo.
+
+Mine sweep (per tick): `MineRegistry.tickAll()` decrements every mine's `timer` by 1.
+`sweepCandidates()` returns mines where `timer % 5 === 0`. For each candidate, all ships within
+`MINERANGE (10000)` are checked (neutral zone sector 0,0 skipped per GEFUNCS.C:1432).
+- `timer > 0`: emit MINE6 proximity warning only; no damage.
+- `timer === 0`: apply `mineFalloff(distance, tonFact)` cubic-falloff damage; write `victim.lastfired
+  = mine.channel`; emit `COMBAT_HIT { weapon: 'mine' }` + `COMBAT_MINE_DETONATION`; delete mine
+  from repo and registry.
+
+No owner exclusion: the deployer can be hit by their own mine (faithful to GEFUNCS.C:minesweep).
+
+---
+
+### Zipper / zip (feature 006b)
+
+**Source**: GECMDS.C:cmd_zipper
+
+Keywords: `zip`
+
+Sweeps all mines within the firer's scan range. For each in-range mine: `MineRepository.delete()` +
+`MineRegistry.remove()`, emit `COMBAT_MINE_DETONATION` with no victim. Firer is not damaged. Mines
+outside scan range are untouched.
+
+---
+
+### Decoys / decoy (feature 006b)
+
+**Source**: GECMDS.C:cmd_decoy
+
+Keywords: `decoy`
+
+Allocates the lowest zero slot in `ship.decout[]` (max 10 slots, MAXDECOY=10) and sets it to
+`DECOYTIME (15)`. Decrements one decoy from cargo. Decoy counter decremented each tick by
+`CombatTickService`. When a decoy slot is active and an incoming torp/missile enters the decoy
+threshold, `decoyIntercept(random, DECODDS)` is rolled. On intercept: `COMBAT_DECOY_INTERCEPT`
+emitted, slot cleared, projectile neutralized.
+
+---
+
+### Jammer / jam (feature 006b)
+
+**Source**: GECMDS.C:cmd_jammer, GECMDS.C:1593-1651
+
+Keywords: `jam`
+
+Area-effect: iterates all ships within carrier's `scanRange`, including the carrier itself (no
+self-exclusion). Sets each affected ship's `jammer = JAMTIME × (1 − distance/scanRange)` via
+`ShipStateService.mutate`. Decrements one jammer from cargo.
+
+While `jammer > 0`: ship cannot fire phasors, torpedoes, missiles, or use the lock command
+(JAMMER4 reject). `CombatTickService` decrements non-zero `jammer` counters each tick. `sys unjam`
+clears the carrier's own `jammer` to 0 immediately.
+
+---
+
+### Lock / lock (feature 006b)
+
+**Source**: GECMDS.C:cmd_lock, GECMDS.C:1441-1471
+
+Keywords: `lock <name>`
+
+Sets `ship.lock = target.channel` via `ShipStateService.mutate`. Resolves target by case-insensitive
+name prefix within scan range via `findShip`. Self-lock rejected. Out-of-range target rejected (NOLOCK).
+
+Lazy clear via `@` shorthand: when `@` is used in any weapon command, `findShip` re-validates the
+stored lock. If the target is `!ingegame` or `cdistance × 10000 > scanRange`, `lock = -1` is set
+and NOLOCK is returned before the weapon fires.
+
+Firer's `jammer > 0` rejects the lock command (JAMMER4).
+
+---
+
+### Shields / shi (feature 006b)
+
+**Source**: GECMDS.C:cmd_shield
+
+Keywords: `shi up` / `shi dn`
+
+Toggles `ship.shieldstat`. No energy cost. No auto-raise: `CombatTickService` does not reset
+`shieldstat` between ticks. Firing a torpedo lowers shields (`shieldstat = down`) on the firer and
+they remain lowered until the player explicitly raises them (`shi up`).
+
+---
+
+### Flux / flux (feature 006b)
+
+**Source**: GECMDS.C:735-752
+
+Keywords: `flux`
+
+Consumes one flux pod from `items` and sets `ship.energy = ENGYMAX`. Rejected if no flux pods in
+cargo. If energy is already at max, the pod is still consumed (matches original behavior at
+GECMDS.C:751).
+
+---
+
+### Kill resolution (feature 006b)
+
+**Source**: GEFUNCS.C:killem, GEFUNCS.C:acctm, GEFUNCS.C:1103-1118
+
+After each tick's combat passes, `CombatTickService` checks every ship for `damage >= 100`. On death:
+- `attacker = lastfired` channel lookup.
+- `attacker.kills++` via `ShipStateService.mutate`.
+- Emit `COMBAT_SHIP_DESTROYED` (galaxy-wide broadcast — all connected clients).
+- Call `ShipStateService.removeFromGame(victim)`.
+- Walk every other active ship's `ltorps[]`/`lmissl[]`; clear any slot whose `.channel == deadShip.channel`
+  (GEFUNCS.C:1755-1778).
+
+---
+
+### Planet revolt (feature 006b)
+
+**Source**: GEPLANET.C:341-380
+
+Added to `PlanetEconomyService` (runs inside the economy tick for each owned planet): when
+`(taxrate/120) × 0.35 × men > troops` AND `Random.next()` rolls `gernd() % 10 === 0`, troops are
+reduced to `troops / ((rand % 8) + 2)`, a `MAIL_CLASS_DISTRESS` row is queued, and
+`ownerUserId` is set to `null`. No combat events are emitted; this is a pure economic/political
+consequence. The `RANDOM` port ensures revolt conditions are deterministic in tests (SC-007).
+
+---
+
 ## Validators (feature 003)
 
 **Source**: GECMDS.C — inline bounds checks in each command handler
