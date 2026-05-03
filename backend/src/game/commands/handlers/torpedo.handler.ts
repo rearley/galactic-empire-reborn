@@ -1,0 +1,147 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Command, CommandContext, CommandResult } from '../command.types';
+import { formatMessage, MessageId } from '../messages';
+import { ShipState } from '../../ship/ship-state.types';
+import { ShipStateService } from '../../ship/ship-state.service';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
+import { Random, RANDOM } from '../../combat/random.port';
+import { cdistance } from '../../combat/combat-math';
+import { findShip } from '../helpers/find-ship';
+import { FIRETICKS, MAXTORPS, WARP_THRESHOLD } from '../../constants';
+import { I_TORP } from '../../constants/items';
+
+/**
+ * Handles `tor <target>` — locks a torpedo onto a target ship.
+ *
+ * Torpedo slots live on the **target's** `ltorps[]` arrays (per
+ * GECMDS.C:1191–1202): firing allocates the lowest free slot on the
+ * target; the projectile-travel pass in CombatTickService walks each
+ * ship's own incoming arrays and resolves hits or decoy intercepts.
+ *
+ * Validations (mirror GECMDS.C:cmd_torpedo, GECMDS.C:torp 1178–1206):
+ *   1. ShipClass.hasTorpedo === true → else TOR_NOTOR
+ *   2. firer.speed < WARP_THRESHOLD  → else TOR_WARP
+ *   3. firer.cloak === 0             → else TOR_CLOAK
+ *   4. firer.items[I_TORP] > 0n      → else TOR_NOAMMO
+ *   5. firer.jammer === 0            → else JAMMER4 (FR-017)
+ *   6. target found in scan range
+ *   7. target has a free `ltorps` slot → else TOR_FULL
+ *
+ * Side effects on success:
+ *   target.ltorpsChannel[slot]  = firer.shipno
+ *   target.ltorpsDistance[slot] = floor(cdistance × 10000 + 20)
+ *   firer.items[I_TORP]        -= 1n
+ *   firer.shieldstat            = 0   (shields auto-lower)
+ *   firer.cantexit              = FIRETICKS
+ *
+ * @see GECMDS.C:cmd_torpedo
+ * @see GECMDS.C:torp 1178-1206
+ * @see GEFUNCS.C:firetorp
+ */
+@Injectable()
+export class TorpedoHandlerService {
+  constructor(
+    private readonly shipState: ShipStateService,
+    private readonly shipClassCache: ShipClassCacheService,
+    private readonly events: EventEmitter2,
+    @Inject(RANDOM) private readonly random: Random,
+  ) {
+    void this.events;
+    void this.random;
+  }
+
+  readonly command: Command = {
+    keyword: 'tor',
+    aliases: ['torp', 'torpedo'],
+    minArgs: 1,
+    argMissingMessage: formatMessage(MessageId.TOR_FMT),
+    handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
+      return this.handle(ship, args);
+    },
+  };
+
+  private handle(ship: ShipState, args: string[]): CommandResult {
+    // 1. Launcher mounted?
+    let hasTorpedo = false;
+    try {
+      hasTorpedo = this.shipClassCache.getHasTorpedo(ship.shpclass);
+    } catch {
+      hasTorpedo = false;
+    }
+    if (!hasTorpedo) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_NOTOR), category: 'system' }] };
+    }
+
+    // 2. Warp gate
+    if (ship.speed >= WARP_THRESHOLD) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_WARP), category: 'system' }] };
+    }
+
+    // 3. Cloak gate
+    if (ship.cloak > 0) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_CLOAK), category: 'system' }] };
+    }
+
+    // 4. Ammo
+    const ammo = ship.items[I_TORP] ?? 0n;
+    if (ammo <= 0n) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_NOAMMO), category: 'system' }] };
+    }
+
+    // 5. Jammer
+    if (ship.jammer > 0) {
+      return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
+    }
+
+    // 6. Target lookup
+    const allShips = this.shipState.findAllShips();
+    const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
+    const found = findShip(args[0] ?? '', ship, allShips, scanRange);
+    if (!found.ok) {
+      return { lines: [{ text: found.message, category: 'system' }] };
+    }
+    const target = found.ship;
+
+    // 7. Find lowest free slot on target's ltorps
+    let slot = -1;
+    for (let i = 0; i < MAXTORPS; i++) {
+      const ch = target.ltorpsChannel[i];
+      if (ch === undefined || ch === 255) {
+        slot = i;
+        break;
+      }
+    }
+    if (slot < 0) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_FULL), category: 'system' }] };
+    }
+
+    const dist = Math.floor(cdistance(ship, target) * 10000 + 20);
+    const firerShipno = ship.shipno;
+
+    // Mutate target — allocate slot
+    this.shipState.mutate(target.userid, target.shipno, (t) => {
+      // Pad arrays if needed.
+      while (t.ltorpsChannel.length <= slot) t.ltorpsChannel.push(255);
+      while (t.ltorpsDistance.length <= slot) t.ltorpsDistance.push(0);
+      t.ltorpsChannel[slot] = firerShipno;
+      t.ltorpsDistance[slot] = dist;
+    });
+
+    // Mutate firer — decrement ammo, drop shields, set battle-lock
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.items[I_TORP] = (s.items[I_TORP] ?? 0n) - 1n;
+      s.shieldstat = 0;
+      s.cantexit = FIRETICKS;
+    });
+
+    return {
+      lines: [
+        {
+          text: `Torpedo away — locked on ${target.shipname}.`,
+          category: 'combat',
+        },
+      ],
+    };
+  }
+}

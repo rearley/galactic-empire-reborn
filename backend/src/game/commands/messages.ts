@@ -123,6 +123,55 @@ export enum MessageId {
   REP_CARGO_TOTAL = 'REP_CARGO_TOTAL',
   REP_CARGO_NONE = 'REP_CARGO_NONE',
 
+  // phaser (feature 006b) — GECMDS.C:cmd_phasor
+  PHA_NOPHAS = 'PHA_NOPHAS',
+  PHA_NOPOW = 'PHA_NOPOW',
+  PHA_FMT = 'PHA_FMT',
+
+  // torpedo (feature 006b) — GECMDS.C:cmd_torpedo
+  TOR_NOTOR = 'TOR_NOTOR',
+  TOR_WARP = 'TOR_WARP',
+  TOR_CLOAK = 'TOR_CLOAK',
+  TOR_NOAMMO = 'TOR_NOAMMO',
+  TOR_FULL = 'TOR_FULL',
+  TOR_FMT = 'TOR_FMT',
+
+  // missile (feature 006b) — GECMDS.C:cmd_missl
+  MIS_NOMIS = 'MIS_NOMIS',
+  MIS_NOAMMO = 'MIS_NOAMMO',
+  MIS_FULL = 'MIS_FULL',
+  MIS_FMT = 'MIS_FMT',
+
+  // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  MIN_NOAMMO = 'MIN_NOAMMO',
+  MIN_DEPLOYED = 'MIN_DEPLOYED',
+  ZIP_NOAMMO = 'ZIP_NOAMMO',
+  ZIP_SWEPT = 'ZIP_SWEPT',
+  DEC_NOAMMO = 'DEC_NOAMMO',
+  DEC_DEPLOYED = 'DEC_DEPLOYED',
+  JAM_NOAMMO = 'JAM_NOAMMO',
+  JAM_FIRED = 'JAM_FIRED',
+  SYS_UNJAM = 'SYS_UNJAM',
+  SYS_UNKNOWN = 'SYS_UNKNOWN',
+  SYS_FMT = 'SYS_FMT',
+
+  // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
+  LOC_SELF = 'LOC_SELF',
+  LOC_NOTFOUND = 'LOC_NOTFOUND',
+  LOC_LOCKED = 'LOC_LOCKED',
+  LOC_FMT = 'LOC_FMT',
+  NOLOCK = 'NOLOCK',
+
+  // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
+  SHI_UP = 'SHI_UP',
+  SHI_DN = 'SHI_DN',
+  SHI_FMT = 'SHI_FMT',
+
+  // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
+  FLUX_NOPODS = 'FLUX_NOPODS',
+  FLUX_USED = 'FLUX_USED',
+  FLUX_FMT = 'FLUX_FMT',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -250,6 +299,55 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP_CARGO_LINE]: '%6d %s',
   [MessageId.REP_CARGO_TOTAL]: 'Total: %d tons in cargo (capacity: %d tons).',
   [MessageId.REP_CARGO_NONE]: '(no items aboard)',
+
+  // phaser (feature 006b) — GECMDS.C:cmd_phasor
+  [MessageId.PHA_NOPHAS]: 'No phaser class mounted.',
+  [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
+  [MessageId.PHA_FMT]: 'Format: pha <bearing> <percent>',
+
+  // torpedo (feature 006b)
+  [MessageId.TOR_NOTOR]: 'No torpedo launcher mounted.',
+  [MessageId.TOR_WARP]: 'Cannot fire torpedoes at warp speed.',
+  [MessageId.TOR_CLOAK]: 'Cannot fire while cloaked.',
+  [MessageId.TOR_NOAMMO]: 'No torpedoes in cargo.',
+  [MessageId.TOR_FULL]: 'Target already has maximum torpedoes incoming.',
+  [MessageId.TOR_FMT]: 'Format: tor <target>',
+
+  // missile (feature 006b)
+  [MessageId.MIS_NOMIS]: 'No missile launcher mounted.',
+  [MessageId.MIS_NOAMMO]: 'No missiles in cargo.',
+  [MessageId.MIS_FULL]: 'Target already has maximum missiles incoming.',
+  [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
+
+  // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  [MessageId.MIN_NOAMMO]: 'No mines in cargo.',
+  [MessageId.MIN_DEPLOYED]: 'Mine deployed.',
+  [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
+  [MessageId.ZIP_SWEPT]: 'Mines swept.',
+  [MessageId.DEC_NOAMMO]: 'No decoys in cargo.',
+  [MessageId.DEC_DEPLOYED]: 'Decoy deployed.',
+  [MessageId.JAM_NOAMMO]: 'No jammers in cargo.',
+  [MessageId.JAM_FIRED]: 'Jammer deployed.',
+  [MessageId.SYS_UNJAM]: 'Jammer cleared.',
+  [MessageId.SYS_UNKNOWN]: 'Unknown system command.',
+  [MessageId.SYS_FMT]: 'Format: sys <command>',
+
+  // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
+  [MessageId.LOC_SELF]: 'Cannot lock onto yourself.',
+  [MessageId.LOC_NOTFOUND]: 'No such ship in range.',
+  [MessageId.LOC_LOCKED]: 'Target locked.',
+  [MessageId.LOC_FMT]: 'Format: loc <target>',
+  [MessageId.NOLOCK]: 'No target locked.',
+
+  // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
+  [MessageId.SHI_UP]: 'Shields up.',
+  [MessageId.SHI_DN]: 'Shields down.',
+  [MessageId.SHI_FMT]: 'Format: shi up|dn',
+
+  // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
+  [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
+  [MessageId.FLUX_USED]: 'Flux pod used — energy restored.',
+  [MessageId.FLUX_FMT]: 'Format: flux',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
