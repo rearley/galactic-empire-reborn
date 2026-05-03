@@ -104,6 +104,44 @@ export const PLANTOCK_SECONDS = 1800 as const;
 /** Minimum planet-update tick interval in seconds. @see GEMAIN.C:658 */
 export const PLANTIME_MIN_SECONDS = 4 as const;
 
+// ─── Combat constants (006b) ────────────────────────────────────────────────
+/** @see GEMAIN.H:xx #define PMINFIRE 60 — minimum phaser charge to fire */
+export const PMINFIRE = 60 as const;
+/** @see GEMAIN.H:xx #define PRELOAD 10 — phaser reload rate per tick */
+export const PRELOAD = 10 as const;
+/** @see GEMAIN.H:xx #define PHABIAS 2 — phaser arc bias (extra degrees) */
+export const PHABIAS = 2 as const;
+/** @see GEMAIN.H:xx #define SHHITENG 1000 — shield energy drained per phaser hit */
+export const SHHITENG = 1000 as const;
+/** @see GEMAIN.H:xx #define FIRETICKS 10 — battle-lock counter set on fire/hit */
+export const FIRETICKS = 10 as const;
+/** @see GEMAIN.H:xx #define DECOYTIME 15 — decoy slot lifetime in ticks */
+export const DECOYTIME = 15 as const;
+/** @see GEMAIN.H:xx #define HPBEAMW 5 — hyper-phaser beam width in degrees */
+export const HPBEAMW = 5 as const;
+/** @see GEMAIN.H:xx MAXTORPS 3 — max incoming torpedo slots per target */
+export const MAXTORPS = 3 as const;
+/** @see GEMAIN.H:xx MAXMISSL 3 — max incoming missile slots per target */
+export const MAXMISSL = 3 as const;
+/** @see GEMAIN.H:xx #define MINERANGE 10000 — mine damage/warning radius */
+export const MINERANGE = 10000 as const;
+/** @see GEGLOBAL.H tdammax — max torpedo damage roll */
+export const TDAMMAX = 200 as const;
+/** @see GEGLOBAL.H mdammax — max missile damage roll */
+export const MDAMMAX = 300 as const;
+/** @see GEGLOBAL.H minedammax — max mine damage */
+export const MINEDAMMAX = 150 as const;
+/** @see GEGLOBAL.H decodds — decoy intercept probability (0-100 integer) */
+export const DECODDS = 50 as const;
+/** @see GEGLOBAL.H torpsped — torpedo travel distance per tick */
+export const TORPSPED = 500 as const;
+/** @see GEGLOBAL.H mislsped — missile travel distance per tick */
+export const MISLSPED = 300 as const;
+/** @see GEGLOBAL.H misengfc — missile energy divisor for cost: cost = charge / MISENGFC */
+export const MISENGFC = 10 as const;
+/** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
+export const JAMTIME = 20 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;
