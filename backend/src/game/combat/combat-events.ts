@@ -52,6 +52,14 @@ export interface CombatMineDetonationEvent {
   tickAt: Date;
 }
 
+export const COMBAT_MINE_WARNING = 'combat.mine-warning' as const;
+export interface CombatMineWarningEvent {
+  mineId: number;
+  victimId: string;
+  sector: { x: number; y: number };
+  tickAt: Date;
+}
+
 export const COMBAT_SHIP_DESTROYED = 'combat.ship-destroyed' as const;
 export interface CombatShipDestroyedEvent {
   victimId: string;

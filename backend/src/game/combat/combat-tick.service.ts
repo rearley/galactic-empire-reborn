@@ -11,24 +11,31 @@ import {
   MAXMISSL,
   MAXTORPS,
   MDAMMAX,
+  MINERANGE,
   MISLSPED,
   PRELOAD,
   TDAMMAX,
   TORPSPED,
 } from '../constants';
-import { MineRegistry } from './mine.registry';
+import { MineRegistry, MineState } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { RANDOM, Random } from './random.port';
 import {
+  cdistance,
   decoyIntercept,
+  mineFalloff,
   randamage,
   shieldhit,
 } from './combat-math';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
+  COMBAT_MINE_DETONATION,
+  COMBAT_MINE_WARNING,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
+  CombatMineDetonationEvent,
+  CombatMineWarningEvent,
 } from './combat-events';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
@@ -111,6 +118,101 @@ export class CombatTickService implements OnModuleInit {
         this.logger.error(`Combat fault for ship ${id}: ${stack}`);
       }
     }
+
+    // Mine sweep pass — runs AFTER per-ship combat so projectile damage
+    // settles first. tickAll() decrements timers; sweepCandidates() returns
+    // mines on the timer % 5 === 0 cadence (matches GEFUNCS.C:minesweep).
+    this.runMineSweep(ships, ctx);
+  }
+
+  /** @see GEFUNCS.C:minesweep */
+  private runMineSweep(ships: ShipState[], ctx: TickContext): void {
+    this.mineRegistry.tickAll();
+    const sweepMines = this.mineRegistry.sweepCandidates();
+    for (const mine of sweepMines) {
+      try {
+        this.processMineSweep(mine, ships, ctx);
+      } catch (err) {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Mine sweep fault for mine ${mine.id}: ${stack}`);
+      }
+    }
+  }
+
+  private processMineSweep(mine: MineState, ships: ShipState[], ctx: TickContext): void {
+    for (const ship of ships) {
+      // Skip ships not in game.
+      if (ship.status !== 1 && ship.status !== 2) continue;
+      // Neutral zone (0,0) — ships at xcoord ∈ (-0.5, 0.5) and ycoord ∈ (-0.5, 0.5)
+      // are inside sector (0,0) and immune to mines (R-3).
+      if (
+        ship.xcoord > -0.5 && ship.xcoord < 0.5 &&
+        ship.ycoord > -0.5 && ship.ycoord < 0.5
+      ) {
+        continue;
+      }
+
+      const dist = cdistance(ship, mine);
+      if (dist > MINERANGE) continue;
+
+      if (mine.timer === 0) {
+        // Detonate — apply damage, emit hit + detonation.
+        let ton = 5000;
+        try {
+          ton = this.shipClassCache.getMaxTons(ship.shpclass);
+        } catch {
+          // fall back
+        }
+        const damage = mineFalloff(dist, ton);
+        const shieldUp = ship.shieldstat === 1 && ship.shield > 0;
+        const result = shieldhit(ship.shield, damage, shieldUp);
+
+        const channel = mine.channel;
+        this.shipState.mutate(ship.userid, ship.shipno, (v) => {
+          v.shield = result.newShield;
+          v.damage = v.damage + result.hullDamage;
+          v.lastfired = channel;
+        });
+
+        const sector = { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) };
+        const hitEvent: CombatHitEvent = {
+          attackerId: `?:${mine.channel}`,
+          victimId: shipKey(ship.userid, ship.shipno),
+          weapon: 'mine',
+          damageHull: result.hullDamage,
+          damageShield: result.shieldDamage,
+          sector,
+          tickAt: ctx.firedAt,
+        };
+        this.events.emit(COMBAT_HIT, hitEvent);
+
+        const det: CombatMineDetonationEvent = {
+          mineId: mine.id,
+          channel: mine.channel,
+          sector: { x: Math.floor(mine.xcoord), y: Math.floor(mine.ycoord) },
+          tickAt: ctx.firedAt,
+        };
+        this.events.emit(COMBAT_MINE_DETONATION, det);
+      } else {
+        // Proximity warning — mine in range but not yet detonated.
+        const warn: CombatMineWarningEvent = {
+          mineId: mine.id,
+          victimId: shipKey(ship.userid, ship.shipno),
+          sector: { x: Math.floor(mine.xcoord), y: Math.floor(mine.ycoord) },
+          tickAt: ctx.firedAt,
+        };
+        this.events.emit(COMBAT_MINE_WARNING, warn);
+      }
+    }
+
+    // Destroy mine if its time is up.
+    if (mine.timer === 0) {
+      void this.mineRepo.delete(mine.id).catch((err: unknown) => {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Mine repo delete fault for mine ${mine.id}: ${stack}`);
+      });
+      this.mineRegistry.remove(mine.id);
+    }
   }
 
   /** Per-ship combat work — filled in by subsequent user-story phases. */
@@ -133,6 +235,20 @@ export class CombatTickService implements OnModuleInit {
     // Slots represent INCOMING projectiles per GEFUNCS.C:1546.
     this.processIncomingTorpedoes(ship, ctx);
     this.processIncomingMissiles(ship, ctx);
+
+    // Decoy slot expiry — each active decoy decrements toward 0 each tick.
+    // Jammer counter expiry — decrement until 0.
+    // @see GECMDS.C:cmd_decoy, GECMDS.C:cmd_jammer
+    const hasDecoy = ship.decout.some((t) => t > 0);
+    const hasJammer = ship.jammer > 0;
+    if (hasDecoy || hasJammer) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        for (let i = 0; i < s.decout.length; i++) {
+          if (s.decout[i] > 0) s.decout[i] -= 1;
+        }
+        if (s.jammer > 0) s.jammer -= 1;
+      });
+    }
   }
 
   /**

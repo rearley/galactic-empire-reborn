@@ -401,3 +401,214 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(emitted.find((e) => e.event === COMBAT_DECOY_INTERCEPT)).toBeUndefined();
   });
 });
+
+describe('CombatTickService — mine sweep (T036)', () => {
+  async function makeMineHarness(
+    ships: ShipState[],
+    mines: Array<{ id: number; channel: number; timer: number; xcoord: number; ycoord: number; deployedBy: string }>,
+    seed = 1,
+  ): Promise<{
+    fire: () => Promise<void>;
+    events: EventEmitter2;
+    shipMap: Map<string, ShipState>;
+    deleteSpy: jest.Mock;
+    registry: MineRegistry;
+  }> {
+    const shipMap = new Map<string, ShipState>();
+    for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
+    const shipState = {
+      findAllShips: () => Array.from(shipMap.values()),
+      mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
+        const s = shipMap.get(shipKey(userid, shipno));
+        if (!s) return undefined;
+        fn(s);
+        s.dirty = true;
+        return s;
+      },
+    } as unknown as import('../../../src/game/ship/ship-state.service').ShipStateService;
+
+    const subscribers: Array<(c: TickContext) => void> = [];
+    const tickService = {
+      subscribe: (_kind: TickKind, h: (c: TickContext) => void) => {
+        subscribers.push(h);
+        return () => {};
+      },
+    } as unknown as import('../../../src/game/tick/tick.service').TickService;
+
+    const deleteSpy = jest.fn().mockResolvedValue(undefined);
+    const mineRepo = {
+      findAllActive: jest.fn().mockResolvedValue(mines),
+      create: jest.fn(),
+      delete: deleteSpy,
+    } as unknown as MineRepository;
+
+    const registry = new MineRegistry();
+    const events = new EventEmitter2();
+    const logger = new Logger('MineSweepSpec');
+    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    const classCache = new ShipClassCacheService({} as never);
+    classCache.setForTest(1, {
+      maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000,
+      scanRange: 100000, maxTons: 5000,
+    } as never);
+
+    const service = new CombatTickService(
+      tickService,
+      shipState,
+      mineRepo,
+      registry,
+      new Mulberry32Adapter(seed),
+      events,
+      logger,
+      classCache,
+    );
+    await service.onModuleInit();
+
+    return {
+      shipMap,
+      events,
+      deleteSpy,
+      registry,
+      fire: async () => {
+        const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new Date() };
+        for (const h of subscribers) h(ctx);
+      },
+    };
+  }
+
+  it('cadence — timer 11 → 10 (%5===0): triggers sweep tick (no damage); timer 12 → 11 does not', async () => {
+    // First: timer=11 → after tickAll → 10 → 10%5===0 → sweep, but >0 → warning only.
+    const bob1 = makeShip({ userid: 'b', shipno: 2, xcoord: 100, ycoord: 100, damage: 0, status: 1 });
+    const h1 = await makeMineHarness(
+      [bob1],
+      [{ id: 1, channel: 99, timer: 11, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+    );
+    const emitted1: Array<{ event: string }> = [];
+    h1.events.onAny((e: string | string[]) =>
+      emitted1.push({ event: Array.isArray(e) ? e.join('.') : e }));
+    await h1.fire();
+    expect(emitted1.find((e) => e.event === 'combat.mine-warning')).toBeDefined();
+    expect(bob1.damage).toBe(0);
+
+    // Second: timer=12 → after tickAll → 11 → 11%5!==0 → no sweep at all.
+    const bob2 = makeShip({ userid: 'b', shipno: 2, xcoord: 100, ycoord: 100, damage: 0, status: 1 });
+    const h2 = await makeMineHarness(
+      [bob2],
+      [{ id: 2, channel: 99, timer: 12, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+    );
+    const emitted2: Array<{ event: string }> = [];
+    h2.events.onAny((e: string | string[]) =>
+      emitted2.push({ event: Array.isArray(e) ? e.join('.') : e }));
+    await h2.fire();
+    expect(emitted2.find((e) => e.event === 'combat.mine-warning')).toBeUndefined();
+    expect(emitted2.find((e) => e.event === 'combat.mine-detonation')).toBeUndefined();
+  });
+
+  it('neutral zone — ship at (0,0) is skipped by mine sweep damage', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0.1, ycoord: 0.1, damage: 0, shield: 0, shieldstat: 0, status: 1 });
+    const h = await makeMineHarness(
+      [alice],
+      [{ id: 1, channel: 99, timer: 1, xcoord: 0.2, ycoord: 0.2, deployedBy: 'x' }],
+    );
+    await h.fire();
+    expect(alice.damage).toBe(0);
+  });
+
+  it('no owner exclusion — mine deployer ship is damaged if within range', async () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 100, ycoord: 100, damage: 0,
+      shield: 0, shieldstat: 0, status: 1,
+    });
+    const h = await makeMineHarness(
+      [alice],
+      [{ id: 1, channel: 1, timer: 1, xcoord: 100, ycoord: 100, deployedBy: 'a' }],
+      99,
+    );
+    await h.fire();
+    expect(alice.damage).toBeGreaterThan(0);
+  });
+
+  it('detonation — timer===0 emits COMBAT_HIT { weapon:mine } and COMBAT_MINE_DETONATION, mine destroyed', async () => {
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 100, ycoord: 100, damage: 0,
+      shield: 0, shieldstat: 0, lastfired: 0, status: 1,
+    });
+    const h = await makeMineHarness(
+      [bob],
+      [{ id: 42, channel: 99, timer: 1, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+      99,
+    );
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) =>
+      emitted.push({ event: Array.isArray(event) ? event.join('.') : event, payload }));
+
+    await h.fire();
+
+    const hit = emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect((hit!.payload as CombatHitEvent).weapon).toBe('mine');
+    expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
+
+    const det = emitted.find((e) => e.event === 'combat.mine-detonation');
+    expect(det).toBeDefined();
+    expect((det!.payload as { mineId: number; channel: number }).mineId).toBe(42);
+    expect((det!.payload as { mineId: number; channel: number }).channel).toBe(99);
+
+    expect(bob.lastfired).toBe(99);
+    expect(h.deleteSpy).toHaveBeenCalledWith(42);
+    expect(h.registry.getAll().length).toBe(0);
+  });
+
+  it('proximity — timer > 0 on sweep tick: warning only, no damage, mine persists', async () => {
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 100, ycoord: 100, damage: 0, status: 1,
+    });
+    const h = await makeMineHarness(
+      [bob],
+      [{ id: 7, channel: 99, timer: 6, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+    );
+    const emitted: Array<{ event: string }> = [];
+    h.events.onAny((event: string | string[]) =>
+      emitted.push({ event: Array.isArray(event) ? event.join('.') : event }));
+
+    await h.fire();
+    expect(bob.damage).toBe(0);
+    expect(h.registry.getAll().length).toBe(1);
+    expect(h.deleteSpy).not.toHaveBeenCalled();
+    expect(emitted.find((e) => e.event === 'combat.mine-warning')).toBeDefined();
+  });
+
+  it('seeded PRNG — deterministic mine outcomes', async () => {
+    const makeRun = async () => {
+      const bob = makeShip({
+        userid: 'b', shipno: 2, xcoord: 100, ycoord: 100, damage: 0,
+        shield: 0, shieldstat: 0, status: 1,
+      });
+      const h = await makeMineHarness(
+        [bob],
+        [{ id: 1, channel: 99, timer: 1, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+        42,
+      );
+      await h.fire();
+      return bob.damage;
+    };
+    expect(await makeRun()).toBe(await makeRun());
+  });
+});
+
+describe('CombatTickService — decoy/jammer expiry (T036)', () => {
+  it('decoy slots decrement each tick; jammer counter decrements each tick', async () => {
+    const ship = makeShip({
+      userid: 'a', shipno: 1,
+      decout: [3, 1, 0],
+      jammer: 5,
+    });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.decout[0]).toBe(2);
+    expect(ship.decout[1]).toBe(0);
+    expect(ship.decout[2]).toBe(0);
+    expect(ship.jammer).toBe(4);
+  });
+});

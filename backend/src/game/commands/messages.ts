@@ -142,6 +142,19 @@ export enum MessageId {
   MIS_FULL = 'MIS_FULL',
   MIS_FMT = 'MIS_FMT',
 
+  // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  MIN_NOAMMO = 'MIN_NOAMMO',
+  MIN_DEPLOYED = 'MIN_DEPLOYED',
+  ZIP_NOAMMO = 'ZIP_NOAMMO',
+  ZIP_SWEPT = 'ZIP_SWEPT',
+  DEC_NOAMMO = 'DEC_NOAMMO',
+  DEC_DEPLOYED = 'DEC_DEPLOYED',
+  JAM_NOAMMO = 'JAM_NOAMMO',
+  JAM_FIRED = 'JAM_FIRED',
+  SYS_UNJAM = 'SYS_UNJAM',
+  SYS_UNKNOWN = 'SYS_UNKNOWN',
+  SYS_FMT = 'SYS_FMT',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -288,6 +301,19 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MIS_NOAMMO]: 'No missiles in cargo.',
   [MessageId.MIS_FULL]: 'Target already has maximum missiles incoming.',
   [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
+
+  // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  [MessageId.MIN_NOAMMO]: 'No mines in cargo.',
+  [MessageId.MIN_DEPLOYED]: 'Mine deployed.',
+  [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
+  [MessageId.ZIP_SWEPT]: 'Mines swept.',
+  [MessageId.DEC_NOAMMO]: 'No decoys in cargo.',
+  [MessageId.DEC_DEPLOYED]: 'Decoy deployed.',
+  [MessageId.JAM_NOAMMO]: 'No jammers in cargo.',
+  [MessageId.JAM_FIRED]: 'Jammer deployed.',
+  [MessageId.SYS_UNJAM]: 'Jammer cleared.',
+  [MessageId.SYS_UNKNOWN]: 'Unknown system command.',
+  [MessageId.SYS_FMT]: 'Format: sys <command>',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
