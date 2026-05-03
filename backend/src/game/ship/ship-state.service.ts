@@ -100,6 +100,17 @@ export class ShipStateService implements OnModuleInit {
   }
 
   /**
+   * Removes a ship from the in-memory map. Used by the combat kill-resolution
+   * pass when a ship's `damage >= 100` to prevent further processing on the
+   * dead ship in subsequent ticks. Postgres row is left intact so the death
+   * is durable; the ship is simply no longer ingame.
+   * @see GEFUNCS.C:killem
+   */
+  removeFromGame(ship: { userid: string; shipno: number }): void {
+    this.map.delete(shipKey(ship.userid, ship.shipno));
+  }
+
+  /**
    * Flushes all dirty ship states to Postgres. Called on every SHIP_UPDATE tick.
    * Each entry's flush is isolated — one failure does NOT prevent sibling flushes (FR-006).
    * @see GEMAIN.C main loop — tick-driven persistence

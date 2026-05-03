@@ -4,6 +4,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { AdminChange, PlanetState, planetKey } from './planet-state.types';
 import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers';
 import { applyEconomyTick } from './planet-economy';
+import { PlanetEconomyService } from './planet-economy.service';
 import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
 
 /**
@@ -21,6 +22,13 @@ export class PlanetStateService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ships: ShipStateService,
+    /**
+     * Optional — when omitted (legacy unit-test wiring) the pure
+     * `applyEconomyTick` formula is used directly with no revolt branch.
+     * Production wiring via PlanetModule injects PlanetEconomyService so
+     * the revolt branch (FR-028) fires.
+     */
+    private readonly economy?: PlanetEconomyService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -317,7 +325,11 @@ export class PlanetStateService implements OnModuleInit {
         return;
       }
 
-      const newState = applyEconomyTick(state);
+      // Delegate to PlanetEconomyService when wired (production); otherwise
+      // fall back to the pure tick formula (legacy unit-test path).
+      const newState = this.economy
+        ? (await this.economy.applyTick(state)).state
+        : applyEconomyTick(state);
       // Copy mutated fields back
       Object.assign(state, newState);
 

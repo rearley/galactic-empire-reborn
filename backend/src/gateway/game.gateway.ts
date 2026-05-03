@@ -19,11 +19,13 @@ import {
   COMBAT_MINE_DETONATION,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
+  COMBAT_SHIP_DESTROYED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMineDetonationEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
+  CombatShipDestroyedEvent,
 } from '../game/combat/combat-events';
 
 interface SectorPayload {
@@ -244,6 +246,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatMineDetonation(event: CombatMineDetonationEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_MINE_DETONATION, event);
+  }
+
+  /**
+   * Ship destruction is broadcast galaxy-wide (every connected client),
+   * NOT scoped to the sector room — the original game announces kills to
+   * all logged-in players (FR-031, R-7).
+   * @see specs/006b-combat/contracts/combat-events.md
+   */
+  @OnEvent(COMBAT_SHIP_DESTROYED)
+  handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
+    this.server.emit(COMBAT_SHIP_DESTROYED, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

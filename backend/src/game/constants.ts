@@ -144,6 +144,9 @@ export const JAMTIME = 20 as const;
 /** @see GEGLOBAL.H engymax — canonical default ship energy maximum, restored by `flux`. */
 export const ENGYMAX = 50000 as const;
 
+/** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
+export const MAIL_CLASS_DISTRESS = 1 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;
