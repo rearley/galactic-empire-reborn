@@ -52,7 +52,11 @@ describe('command round-trip integration (US1)', () => {
   let app: INestApplication;
   let port: number;
   let shipServiceFake: ShipStateService;
-  let prismaMock: { ship: { findMany: jest.Mock; update: jest.Mock }; shipClass: { findMany: jest.Mock } };
+  let prismaMock: {
+    ship: { findMany: jest.Mock; update: jest.Mock };
+    shipClass: { findMany: jest.Mock };
+    mine: { findMany: jest.Mock };
+  };
   let flushTick: (() => Promise<void>) | undefined;
 
   const USERID = 'roundtrip-user';
@@ -69,6 +73,9 @@ describe('command round-trip integration (US1)', () => {
       },
       shipClass: {
         findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false }]),
+      },
+      mine: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 
@@ -309,6 +316,7 @@ describe('command round-trip integration (US1)', () => {
           { classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false },
         ]),
       },
+      mine: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     const localTickMock = {
