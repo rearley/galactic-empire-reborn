@@ -434,3 +434,147 @@ combatant's sector, breaking the shared game world feel that is core to the orig
 **Alternatives rejected**:
 - Override `PrismaService` in every test: brittle, requires each new test file to know this detail.
 - Remove `@Global()` from PrismaModule: breaks the established pattern for TickModule and would require every module to import PrismaModule explicitly.
+
+---
+
+## 2026-05-03 — 007-cybertron-ai: R-1 through R-11 (Cybertron AI architecture)
+
+### R-1: CybertronModule imports CombatModule — tick ordering guarantee
+
+**Context**: `CybertronTickService` must fire AFTER `CombatTickService` on each PHYSICS tick
+so that kill resolution and shield damage happen before the AI reads victim state.
+
+**Decision**: `CybertronModule` imports `CombatModule` (which in turn imports `PhysicsModule`).
+NestJS runs `onModuleInit` in import-dependency order, guaranteeing subscription registration
+order: Physics → Combat → Cybertron.
+
+**Alternatives rejected**: Manual ordering via injection tokens — fragile and not idiomatic NestJS.
+
+---
+
+### R-2: Spawn cadence — modulo-30 physics-tick counter
+
+**Context**: `GEMAIN.C` outer loop runs the Cybertron spawn slot roughly once every 30 ticks.
+
+**Decision**: `CybertronTickService.spawnTickCounter` increments each PHYSICS tick; `createSpawn`
+is called when `counter % 30 === 0`. Each call picks one under-populated class at random.
+
+**Alternatives rejected**: Separate `@Interval` timer — adds scheduling complexity; using the
+existing PHYSICS tick subscription keeps Cybertron behavior deterministic under the seeded PRNG.
+
+---
+
+### R-3: Per-ship AI tick, not per-class batch
+
+**Context**: The original C loop iterates individual Cybertron records, not ship-class buckets.
+Each ship has its own `tick` countdown field.
+
+**Decision**: `cybLives` is called per-ship when `ship.tick` reaches 0. Max `CYBMAXPERTICK=2`
+activations per physics tick to prevent one slow Cybertron wave from monopolizing the tick budget.
+
+**Alternatives rejected**: Per-class batch activation — diverges from C source and loses
+per-ship `cybskill` variance.
+
+---
+
+### R-4: Gold transfer via `combat.ship-destroyed` event
+
+**Context**: When a Cybertron is killed, its `User.cash` must be transferred to the killer atomically.
+The kill is already signalled by `CombatTickService` via `combat.ship-destroyed`.
+
+**Decision**: `CybertronTickService` listens for `combat.ship-destroyed`. If `victimUserid` starts
+with `Cybrg-` it calls `repository.transferGold(victimUserid, attackerUserid)` which runs a
+Prisma `$transaction` (zero victim cash, increment attacker cash).
+
+**Alternatives rejected**: Poll DB on next tick — non-atomic, adds latency, misses kills during downtime.
+
+---
+
+### R-5: Random port reuse from 006b
+
+**Context**: The same `Random` interface and `RANDOM` injection token introduced in 006b
+for seeded PRNG determinism applies to Cybertron decisions.
+
+**Decision**: `CybertronTickService` injects `@Inject(RANDOM) random: Random`; tests use
+`Mulberry32Adapter` for deterministic replay. No `Math.random()` calls anywhere in the AI.
+
+**Alternatives rejected**: Separate RANDOM token for AI — unnecessary duplication; same token
+lets the whole tick be replayed from a single seed.
+
+---
+
+### R-6: Constants split between `constants.ts` and `cybertron.config.ts`
+
+**Context**: Some Cybertron tuning values (tot_to_create, tooclose, hyperdist) are per-class;
+others (CYB_BE_NICE, CYBSLO) are global balance constants from GEMAIN.H.
+
+**Decision**: Global balance constants go in `game/constants.ts` (balance-tested in
+`balance-regression.spec.ts`). Per-class values go in `cybertron.config.ts` with env override
+support. Balance-regression tests pin all global constants.
+
+**Alternatives rejected**: All in `cybertron.config.ts` — blurs the distinction between
+balance-critical constants and per-deployment tuning knobs.
+
+---
+
+### R-7: Single `Cybrg-` userid prefix for all AI combatives (Cybertrons + Sarterns)
+
+**Context**: `GECYBS.C:104-105` constructs all CPU combative userids as `Cybrg-<N>` regardless
+of ship class. There is no separate Sartern prefix in the original source.
+
+**Decision**: `createSpawn`, `hydrateAll`, and the gold-transfer regex all use the single
+`Cybrg-` prefix. Sarterns (classes 24, 25) share this prefix and ride the same code path.
+
+**Alternatives rejected**: Separate `Sartn-` prefix — diverges from C source; breaks the gold-transfer
+filter and hydrate query.
+
+---
+
+### R-8: Sarterns use the Cybertron code path (no fork)
+
+**Context**: Sarterns are `CLASSTYPE_CYBORG` ships with different class stats but the same AI behavior.
+
+**Decision**: No branching on class number in `cybLives`, `cybCheckLockon`, or `runEngagementScan`.
+Sarterns get `CybertronClassConfig` entries (24, 25) in `CYBERTRON_CLASS_DEFAULTS`; the code
+reads per-class config at runtime.
+
+**Alternatives rejected**: Separate SarternTickService — duplicate state machine, harder to maintain.
+
+---
+
+### R-9: Hyperwarp shield drop faithful to C source
+
+**Context**: `GECYBS.C` sets `shieldstat=0` when a Cybertron enters hyperwarp and restores
+`shieldstat` to `maxShields` on exit. This is a deliberate gameplay vulnerability window.
+
+**Decision**: `cybCheckLockon` sets `shield=0, shieldstat=0` on hyperwarp entry and
+`shield=maxShields, shieldstat=maxShields` on exit per `ShipClassCacheService.get(shpclass).maxShields`.
+
+**Alternatives rejected**: Keep shields up — diverges from original; removes a key tactical counterplay.
+
+---
+
+### R-10: Taunt broadcast via existing `GameGateway` @OnEvent handler
+
+**Context**: `CybertronTickService` must not import Socket.io (architecture constraint). Taunts
+need to reach the target player's sector room.
+
+**Decision**: `CybertronTickService` emits `cybertron.taunt` on the shared `EventEmitter2`.
+`GameGateway` has an `@OnEvent(CYBERTRON_EVENT.TAUNT)` handler that looks up the target's sector
+via `ShipStateService.get` and emits to `sector:${x}:${y}`.
+
+**Alternatives rejected**: Inject Socket.io server into CybertronTickService — violates separation
+of concerns; AI service would depend on transport layer.
+
+---
+
+### R-11: Immediate flush after cybCheckDamage defensive response
+
+**Context**: When a Cybertron deploys a mine or jammer in response to damage, the inventory
+change should be durable before the next tick to avoid double-deploys on crash.
+
+**Decision**: `cybCheckDamage` calls `repository.flushShipsImmediate([shipKey])` when any
+inventory was decremented. This is the same pattern used for target-acquisition persistence.
+
+**Alternatives rejected**: Rely on the 30s dirty flush — acceptable for most state but a
+mine/jammer deploy is a significant action worth persisting immediately.
