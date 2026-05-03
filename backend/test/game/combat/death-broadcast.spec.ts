@@ -35,6 +35,10 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const event: CombatShipDestroyedEvent = {
       victimId: 'b:2',
       attackerId: 'a:7',
+      victimShipKey: 'b:2',
+      attackerShipKey: 'a:7',
+      victimUserid: 'b',
+      attackerUserid: 'a',
       attackerChannel: 7,
       weapon: null,
       sector: { x: 12, y: 3 },
@@ -50,6 +54,10 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const event: CombatShipDestroyedEvent = {
       victimId: 'x:1',
       attackerId: null,
+      victimShipKey: 'x:1',
+      attackerShipKey: null,
+      victimUserid: 'x',
+      attackerUserid: null,
       attackerChannel: 99,
       weapon: null,
       sector: { x: 0, y: 0 },

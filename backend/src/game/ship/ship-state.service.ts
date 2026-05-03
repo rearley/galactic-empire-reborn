@@ -100,6 +100,16 @@ export class ShipStateService implements OnModuleInit {
   }
 
   /**
+   * Inserts or replaces a ShipState in the in-memory map.
+   * Used by CybertronRepository.hydrateAll() to load Cybertron ships after
+   * ShipStateService.onModuleInit() has already run.
+   * @see specs/007-cybertron-ai/plan.md T023 — boot-time hydrate for Cybrg-* rows
+   */
+  loadShip(state: ShipState): void {
+    this.map.set(shipKey(state.userid, state.shipno), state);
+  }
+
+  /**
    * Removes a ship from the in-memory map. Used by the combat kill-resolution
    * pass when a ship's `damage >= 100` to prevent further processing on the
    * dead ship in subsequent ticks. Postgres row is left intact so the death
