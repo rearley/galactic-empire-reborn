@@ -335,6 +335,94 @@ Non-empty `planet.beacon` surfaces as a `beacon: string` field on the projected 
 
 ---
 
+## 2026-05-03 — Combat tick subscribes after physics tick (CombatModule imports PhysicsModule)
+
+**Context**: `CombatTickService` reads ship coordinates during each tick pass. If combat fires before
+physics has moved ships, projectile positions and hit geometry are based on stale coordinates.
+
+**Decision**: `CombatModule` lists `PhysicsModule` in its `imports` array. NestJS resolves module
+dependencies before calling `onModuleInit`, so `PhysicsTickService.onModuleInit` (which subscribes
+to `TickKind.PHYSICS`) runs before `CombatTickService.onModuleInit`. Both subscribe to the same tick
+event but the subscription order enforced by module init order guarantees combat always reads
+post-physics coordinates.
+
+**Reason**: Tick subscriber order is the only ordering guarantee available inside a single Node.js
+process and a shared `TickService` registry. Module import dependency is the least-invasive way to
+enforce it without introducing a separate event or a secondary tick kind.
+
+**Alternatives rejected**: Separate `COMBAT_TICK` event fired by PhysicsTickService after its own
+pass (adds coupling between modules in the opposite direction); explicit subscriber priority field on
+`TickHandler` (overengineered for a two-subscriber case).
+
+---
+
+## 2026-05-03 — Injectable Random port (RANDOM token + Mulberry32Adapter for tests)
+
+**Context**: Several combat math functions require a PRNG. Using `Math.random()` inline makes
+deterministic unit tests impossible — seeded reproducibility is required for SC-004 and SC-007.
+
+**Decision**: Define a `Random` interface (`next(): number`) and a `RANDOM` NestJS injection token.
+Production code binds `MathRandomAdapter` (delegates to `Math.random()`). Tests inject
+`Mulberry32Adapter` (seeded, deterministic, pure 32-bit Mulberry32 PRNG).
+
+**Reason**: Keeps all combat math and tick service code free of direct `Math.random()` calls.
+The token is DI-injected so every test module can supply the seeded adapter without monkey-patching.
+`PlanetModule` binds its own local `{ provide: RANDOM, useClass: MathRandomAdapter }` to avoid a
+circular dependency through `CombatModule → PhysicsModule → ShipModule`.
+
+**Alternatives rejected**: Pass `rng` as a plain function parameter to every combat-math call (no
+DI, awkward for services); global seeded PRNG singleton (not testable in isolation).
+
+---
+
+## 2026-05-03 — Mine damage applied to all ships including deployer (no owner exclusion)
+
+**Context**: The mine-sweep pass applies cubic-falloff damage to every ship within `MINERANGE`.
+A question arose whether the mine deployer should be excluded from their own blast.
+
+**Decision**: No owner exclusion. The deployer can be hit by their own mine.
+
+**Reason**: Faithful reproduction of `GEFUNCS.C:minesweep` — the original C code has no owner
+check; the for-loop iterates all ships unconditionally. Excluding the owner would be a gameplay
+deviation without a fidelity justification.
+
+**Alternatives rejected**: Skip deployer (rejected — not in original); warn deployer but skip
+damage (rejected — original has no such gate).
+
+---
+
+## 2026-05-03 — Friendly fire enabled in phaser lineOfFire
+
+**Context**: `lineOfFire` iterates all ships in scan range when resolving phaser hits.
+
+**Decision**: No team filter applied. Friendly fire is allowed.
+
+**Reason**: `GECMDS.C:cmd_phasor` iterates all ships with no team check. The original game design
+treats weapon arc geometry as the sole inclusion criterion; team membership is irrelevant to phaser
+resolution. A team filter would be a gameplay deviation.
+
+**Alternatives rejected**: Skip teammates (rejected — not in original, changes balance).
+
+---
+
+## 2026-05-03 — COMBAT_SHIP_DESTROYED broadcast galaxy-wide
+
+**Context**: On ship death, connected clients need to see the kill announcement regardless of which
+sector they occupy. Other combat events are sector-scoped.
+
+**Decision**: `GameGateway` handles `COMBAT_SHIP_DESTROYED` via `server.emit(...)` (broadcasts to
+all connected clients). All other combat events use `server.to(sectorRoom).emit(...)`.
+
+**Reason**: Kill announcements are a global game event ("Bob destroyed Alice" scrolls on every
+terminal). Sector-scoping death events would hide kills from players not currently in either
+combatant's sector, breaking the shared game world feel that is core to the original experience.
+@see GECMDS.C:killem broadcast behavior.
+
+**Alternatives rejected**: Sector-scope death event (breaks shared narrative); dedicated
+"galaxy-news" room (extra room management with no benefit over `server.emit` at current scale).
+
+---
+
 ## 2026-05-01 — CommandsModule explicitly imports PrismaModule
 
 **Context**: `PrismaModule` is `@Global()`, making `PrismaService` available in the full app without explicit imports. However, in integration tests that mount `CommandsModule` or `GatewayModule` in isolation (without `AppModule`), the global registration never happens, so `ScanHandlerService` and `ReportHandlerService` cannot resolve `PrismaService`.

@@ -273,9 +273,71 @@ TickService (6s) → PhysicsTickService.advanceAll(ctx)
 WARP01 (class.maxWarp=0) → WARPSPD2 (topspeed=0) → WARP02 (negative) →
 WARP03 (>topspeed+floor(topspeed/2)) → WARP04 (overspeed warning + apply) → normal apply.
 
+## CombatModule (feature 006b)
+
+```
+CombatModule (game/combat/)
+  ├── CombatTickService    — subscribes to TickKind.PHYSICS (after PhysicsTickService, enforced by
+  │                          CombatModule importing PhysicsModule so onModuleInit fires later);
+  │                          per-tick passes: phaser-reload, cantexit decrement, decoy/jammer expiry,
+  │                          torpedo travel, missile travel, mine sweep, kill resolution.
+  │                          Each ship wrapped in try/catch (SC-005); batch continues on per-ship fault.
+  │                          On init: hydrates MineRegistry from MineRepository.findAllActive().
+  ├── MineRegistry         — in-memory Map<mineId, MineState>; hydrate/add/remove/tickAll/sweepCandidates.
+  │                          Pure logic over a Map; no Prisma calls inside.
+  ├── MineRepository       — Prisma wrapper: findAllActive(), create(), delete(). @see GECMDS.C:cmd_mine
+  ├── random.port.ts       — Random interface (next(): number), RANDOM injection token,
+  │                          MathRandomAdapter (production), Mulberry32Adapter (seeded, for tests)
+  └── combat-math.ts       — Pure, side-effect-free functions (all randomness via injected Random):
+                               cdistance, lineOfFire, phaserDamage, tonFact, shieldhit, randamage,
+                               mineFalloff, decoyIntercept, jammerCounter, damstr
+                             @see GEFUNCS.C:cdistance, firephas, shieldhit, killem
+```
+
+### Combat command handlers (game/commands/handlers/)
+
+```
+phaser.handler.ts   — `pha <bearing> <percent>`: validates phasrtype/charge/bearing/percent/jammer;
+                       hyper-phaser at warp; lineOfFire arc + PHABIAS widening; emits COMBAT_PHASER_FIRED;
+                       mutates victim shield/damage; emits COMBAT_HIT / COMBAT_MISS.
+torpedo.handler.ts  — `tor <target>`: validates class-mount, warp/cloak/cargo gates, target ltorps[]
+                       slots (lives on target, GECMDS.C:1191-1202); allocates slot on target.
+missile.handler.ts  — `mis <target> <charge>`: validates class-mount, charge range, energy cost;
+                       allocates slot on target.lmissl[].
+mine.handler.ts     — `mine`: MineRepository.create + MineRegistry.add; decrements cargo.
+zipper.handler.ts   — `zip`: deletes mines in scan range via repo+registry; no self-damage.
+decoy.handler.ts    — `decoy`: allocates lowest zero slot in decout[], set to DECOYTIME.
+jammer.handler.ts   — `jam`: area-effect on all ships within scanrange (including self); sets
+                       jammer = JAMTIME × (1 − distance/scanrange) on each.
+sys.handler.ts      — `sys unjam`: clears carrier's jammer to 0.
+lock.handler.ts     — `lock <name>`: resolves ship by name/prefix; lazy `@` clear on use.
+shield.handler.ts   — `shi up|dn`: toggles shieldstat; no auto-raise after torpedo.
+flux.handler.ts     — `flux`: consumes one flux pod, sets energy = ENGYMAX.
+```
+
+### Event bus topology
+
+```
+Emitters (combat-tick.service.ts, phaser.handler.ts):
+  COMBAT_PHASER_FIRED  → GameGateway: sector-scoped (firer's sector room)
+  COMBAT_HIT           → GameGateway: sector-scoped (victim's sector room)
+  COMBAT_MISS          → GameGateway: sector-scoped (firer's sector room)
+  COMBAT_DECOY_INTERCEPT → GameGateway: sector-scoped (defender's sector room)
+  COMBAT_MINE_DETONATION → GameGateway: sector-scoped (mine's sector room)
+  COMBAT_SHIP_DESTROYED  → GameGateway: galaxy-wide (server.emit — all connected clients)
+
+Listener (game.gateway.ts):
+  @OnEvent(COMBAT_*) → emits to Socket.io room (sector or galaxy-wide)
+```
+
+### Planet revolt (game/planet/planet-economy.service.ts)
+
+Added to the economy tick: when `(taxrate/120) × 0.35 × men > troops` AND the Random roll
+hits, troops are reduced, a `MAIL_CLASS_DISTRESS` row is queued, and `ownerUserId` is
+cleared. No combat events emitted. @see GEPLANET.C:341-380.
+
 ## What does not exist yet
 
-- Combat (phasors, torpedoes, missiles, mines) — feature 006
 - Cybertron AI — feature 007
 - Droid AI — feature 008
 - Midnight job — feature 009

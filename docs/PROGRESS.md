@@ -1,3 +1,62 @@
+## 2026-05-03 — 006b-combat
+
+**Completed**:
+- `backend/src/game/combat/random.port.ts` — `Random` interface, `RANDOM` injection token,
+  `MathRandomAdapter` (production), `Mulberry32Adapter` (seeded, for tests)
+- `backend/src/game/combat/combat-events.ts` — 6 event-name constants + payload interfaces:
+  `COMBAT_PHASER_FIRED`, `COMBAT_HIT`, `COMBAT_MISS`, `COMBAT_DECOY_INTERCEPT`,
+  `COMBAT_MINE_DETONATION`, `COMBAT_SHIP_DESTROYED`
+- `backend/src/game/combat/combat-math.ts` — pure side-effect-free functions (all via injected
+  `Random`): `cdistance`, `lineOfFire`, `phaserDamage`, `tonFact`, `shieldhit`, `randamage`,
+  `mineFalloff`, `decoyIntercept`, `jammerCounter`, `damstr`
+- `backend/src/game/combat/mine.registry.ts` — in-memory `Map<mineId, MineState>` with
+  `hydrate/add/remove/tickAll/sweepCandidates`
+- `backend/src/game/combat/mine.repository.ts` — Prisma wrapper: `findAllActive/create/delete`
+- `backend/src/game/combat/combat-tick.service.ts` — per-physics-tick combat: phaser reload,
+  cantexit decrement, decoy/jammer expiry, torpedo travel, missile travel, mine sweep,
+  kill resolution; per-ship try/catch
+- `backend/src/game/combat/combat.module.ts` — NestJS module (imports PhysicsModule)
+- `backend/src/game/planet/planet-economy.service.ts` — planet revolt logic (taxrate-based
+  per GEPLANET.C:341-380)
+- `backend/src/game/commands/helpers/find-ship.ts` — resolves `@` to lock target, name to shipno
+- Command handlers: `phaser.handler.ts`, `torpedo.handler.ts`, `missile.handler.ts`,
+  `mine.handler.ts`, `zipper.handler.ts`, `decoy.handler.ts`, `jammer.handler.ts`,
+  `sys.handler.ts` (`sys unjam`), `lock.handler.ts`, `shield.handler.ts`, `flux.handler.ts`
+- Modified: `backend/src/game/constants.ts` (+20 combat constants), `ship-class-cache.service.ts`
+  (+maxPhaser/scanRange/maxTons/hasTorpedo/hasMissile), `ship-state.service.ts`
+  (+removeFromGame), `game.gateway.ts` (@OnEvent for all 6 combat events), `app.module.ts`
+  (+CombatModule), `planet.module.ts` (local RANDOM binding), `planet-state.service.ts`
+  (wired PlanetEconomyService)
+
+**Tests**: 918 total, 87 suites, all passing. Net new combat test files:
+- `combat-math.spec.ts`, `mine.registry.spec.ts`, `mine-persistence.spec.ts`,
+  `balance-regression.spec.ts`, `tick-subscription-order.spec.ts`,
+  `combat-tick.service.spec.ts`, `kill-attribution.spec.ts`, `in-flight-cleanup.spec.ts`,
+  `death-broadcast.spec.ts`, `combat-broadcast.spec.ts`
+- Handler specs: `phaser.spec.ts`, `torpedo.spec.ts`, `missile.spec.ts`, `mine.spec.ts`,
+  `zipper.spec.ts`, `decoy.spec.ts`, `jammer.spec.ts`, `sys-unjam.spec.ts`, `lock.spec.ts`,
+  `shield.spec.ts`, `flux.spec.ts`
+- Planet: `revolt.spec.ts`
+
+**Decisions made**:
+- R-1: CombatModule imports PhysicsModule to enforce tick subscription ordering (combat fires
+  post-physics movement)
+- R-2: Injectable `RANDOM` port (Mulberry32Adapter for tests) — no inline `Math.random()`
+- R-3: No mine owner exclusion — faithful to GEFUNCS.C:minesweep (deployer can hit themselves)
+- R-4: `findShip` lazy lock clear — stale lock (`!ingegame` or out-of-range) cleared on use
+- R-5: Jammer area-effect includes carrier itself — no self-exclusion (GECMDS.C:1593)
+- R-6: Friendly fire allowed in `lineOfFire` — no team filter, faithful to GECMDS.C:cmd_phasor
+- R-7: `COMBAT_SHIP_DESTROYED` broadcast galaxy-wide (`server.emit`); all other combat events
+  sector-scoped; `channel = shipno` used as the unique per-player channel identifier
+- PlanetModule binds local RANDOM to avoid circular dep (PlanetModule → CombatModule → PhysicsModule)
+
+**Next**: `007-cybertron-ai` — persistent Cybertron behavior (escalating difficulty, gold
+accumulation, neutral-zone respect, per GECYBS.C)
+
+**Known issues**: None.
+
+---
+
 ## 2026-05-02 — 006a-physics-tick
 
 **Completed**:
