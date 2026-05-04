@@ -137,6 +137,18 @@ export class CybertronRepository {
         },
       });
     });
+
+    // Load the newly created ship into the in-memory map immediately so all
+    // game logic can see it without waiting for server restart.
+    const created = await this.prisma.ship.findUnique({
+      where: { userid_shipno: { userid: slot.userid, shipno: slot.shipno } },
+    });
+    if (created) {
+      const state = prismaShipToState(created as Parameters<typeof prismaShipToState>[0]);
+      state.status = 2; // GESTAT_AUTO
+      state.dirty = false;
+      this.shipState.loadShip(state);
+    }
   }
 
   /**

@@ -70,6 +70,8 @@ describe('T059 — gold transfer on Cybertron kill', () => {
       weapon: 'phaser',
       sector: { x: 5, y: 5 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, event);
@@ -92,6 +94,8 @@ describe('T059 — gold transfer on Cybertron kill', () => {
       weapon: 'phaser',
       sector: { x: 5, y: 5 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, event);
@@ -115,6 +119,8 @@ describe('T059 — gold transfer on Cybertron kill', () => {
       weapon: 'torpedo',
       sector: { x: 10, y: 8 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, event);
@@ -137,6 +143,8 @@ describe('T059 — gold transfer on Cybertron kill', () => {
       weapon: 'mine',
       sector: { x: 5, y: 5 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, event);

@@ -293,6 +293,8 @@ describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transf
       weapon: 'phaser',
       sector: { x: 5, y: 5 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, killEvent);
@@ -315,6 +317,8 @@ describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transf
       weapon: 'phaser',
       sector: { x: 5, y: 5 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, killEvent);

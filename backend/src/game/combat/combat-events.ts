@@ -76,4 +76,8 @@ export interface CombatShipDestroyedEvent {
   weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | null;
   sector: { x: number; y: number };
   tickAt: Date;
+  /** Items looted from victim — GEFUNCS.C:killem (1122-1136). Empty when no attacker or no transfer. */
+  loot: Array<{ itemIndex: number; amount: bigint }>;
+  /** Points awarded on this kill — shipClass.points for victim's class. 0 if class unknown. @see GEFUNCS.C:killem (1145) */
+  scoreAwarded: number;
 }
