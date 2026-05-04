@@ -43,6 +43,8 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       weapon: null,
       sector: { x: 12, y: 3 },
       tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
     };
     gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, event);
@@ -62,6 +64,8 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       weapon: null,
       sector: { x: 0, y: 0 },
       tickAt,
+      loot: [],
+      scoreAwarded: 0,
     };
     gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledTimes(1);

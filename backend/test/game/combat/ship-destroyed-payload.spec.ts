@@ -69,5 +69,7 @@ function makeSampleEvent(): CombatShipDestroyedEvent {
     weapon: 'phaser',
     sector: { x: 0, y: 0 },
     tickAt: new Date(),
+    loot: [],
+    scoreAwarded: 0,
   };
 }

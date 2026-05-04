@@ -594,12 +594,21 @@ GECMDS.C:751).
 
 ### Kill resolution (feature 006b)
 
-**Source**: GEFUNCS.C:killem, GEFUNCS.C:acctm, GEFUNCS.C:1103-1118
+**Source**: GEFUNCS.C:killem, GEFUNCS.C:acctm, GEFUNCS.C:1103-1185
 
 After each tick's combat passes, `CombatTickService` checks every ship for `damage >= 100`. On death:
 - `attacker = lastfired` channel lookup.
 - `attacker.kills++` via `ShipStateService.mutate`.
-- Emit `COMBAT_SHIP_DESTROYED` (galaxy-wide broadcast — all connected clients).
+- **Cargo transfer** (GEFUNCS.C:killem 1122-1136): loop items index 1–13 (skipping `I_MEN=0` by
+  loop bounds, `I_TROOPS=8` explicitly). For each non-zero item: pick a random divisor 1–5
+  (`Math.floor(random.next() * 5) + 1`), transfer `victim.items[i] / divisor` units if the
+  weight fits in the attacker's remaining cargo (`ITEM_TONS[i] × amt ≤ maxTons − usedTons`).
+- **Score transfer** (GEFUNCS.C:killem 1143-1185): `scr = shipClass.points` for victim's class.
+  `attacker.score += scr` and `attacker.klscore += scr` (DB). `victim.score -= scr` and
+  `victim.klscore -= scr` (floored at 0, never negative). AI victims (`Cybrg-*`, `Droid-*`)
+  are never penalised. rospos bonus and chgloser cash penalty deferred to feature 009.
+  Handled by `PlayerScoreService` → `PlayerScoreRepository.transferKillScore`.
+- Emit `COMBAT_SHIP_DESTROYED` (galaxy-wide broadcast) with `loot` and `scoreAwarded` fields.
 - Call `ShipStateService.removeFromGame(victim)`.
 - Walk every other active ship's `ltorps[]`/`lmissl[]`; clear any slot whose `.channel == deadShip.channel`
   (GEFUNCS.C:1755-1778).

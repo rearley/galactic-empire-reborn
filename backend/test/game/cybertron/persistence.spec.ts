@@ -125,6 +125,49 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
     });
   });
 
+  // ─── bugfix: createSpawn loads ship into ShipStateService immediately ────
+
+  describe('createSpawn — ship immediately visible in ShipStateService', () => {
+    it('calls loadShip with the new ship after createSpawn so the ship is visible without restart', async () => {
+      const loadedShips: { userid: string; shipno: number }[] = [];
+      const shipState = {
+        loadShip: jest.fn((s: { userid: string; shipno: number }) => loadedShips.push(s)),
+        findByUserid: jest.fn().mockReturnValue([]),
+        findAllShips: jest.fn().mockReturnValue([]),
+        get: jest.fn().mockImplementation(
+          (userid: string, shipno: number) =>
+            loadedShips.find((s) => s.userid === userid && s.shipno === shipno) ?? undefined,
+        ),
+      } as unknown as ShipStateService;
+
+      const repo = new CybertronRepository(prisma, shipState);
+
+      await repo.createSpawn({
+        userid: 'Cybrg-test-spawn',
+        shipno: 950,
+        classNumber: 21,
+        shipname: 'Cybrg-950950',
+        xcoord: 3.0,
+        ycoord: 7.0,
+        phasrtype: 2,
+        shieldtype: 2,
+        loadout: { fluxpod: 0, decoys: 5, torpedo: 5, mine: 10, jammers: 5, gold: 1000 },
+        cybskill: 10,
+        tick: 6,
+      });
+
+      // loadShip must have been called for the new ship
+      const loaded = loadedShips.find((s) => s.userid === 'Cybrg-test-spawn' && s.shipno === 950);
+      expect(loaded).toBeDefined();
+      expect(loaded!.userid).toBe('Cybrg-test-spawn');
+      expect(loaded!.shipno).toBe(950);
+
+      // The ship must be visible via get() without a restart
+      const visible = (shipState as unknown as { get: (u: string, n: number) => unknown }).get('Cybrg-test-spawn', 950);
+      expect(visible).toBeDefined();
+    });
+  });
+
   // ─── T056: hydrateAll reloads all Cybertrons ─────────────────────────────
 
   describe('T056 — hydrateAll loads all Cybrg-* ships into ShipStateService', () => {

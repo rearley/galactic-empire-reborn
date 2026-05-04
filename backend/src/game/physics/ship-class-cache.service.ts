@@ -30,6 +30,8 @@ export interface ShipClassEntry {
   cybLowestClassAttacks: number;
   /** True if Cybertrons can attack this class on contact (GECYBS.C cybs_can_att). */
   cybCanAttack: boolean;
+  /** Score points awarded to attacker on kill. @see GEMAIN.H shipclass[].max_points */
+  points: number;
 }
 
 @Injectable()
@@ -58,6 +60,7 @@ export class ShipClassCacheService implements OnModuleInit {
         tough: true,
         cybLowestClassAttacks: true,
         cybCanAttack: true,
+        points: true,
       },
     });
     for (const row of rows) {
@@ -77,6 +80,7 @@ export class ShipClassCacheService implements OnModuleInit {
         tough: row.tough,
         cybLowestClassAttacks: row.cybLowestClassAttacks,
         cybCanAttack: row.cybCanAttack,
+        points: row.points,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -131,6 +135,11 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).hasMissile;
   }
 
+  /** Synchronous lookup. Throws if the class is not in the cache. @see GEMAIN.H shipclass[].max_points */
+  getPoints(classNumber: number): number {
+    return this.entry(classNumber).points;
+  }
+
   private entry(classNumber: number): ShipClassEntry {
     const entry = this.cache.get(classNumber);
     if (!entry) throw new Error(`ShipClass ${classNumber} not in cache`);
@@ -158,6 +167,7 @@ export class ShipClassCacheService implements OnModuleInit {
       tough: 0,
       cybLowestClassAttacks: 0,
       cybCanAttack: true,
+      points: 0,
       ...entry,
     });
   }

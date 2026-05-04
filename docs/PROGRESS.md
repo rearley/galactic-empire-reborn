@@ -1,3 +1,51 @@
+## 2026-05-04 — 006b-combat bugfix: score transfer on kill
+
+**Completed**:
+- Added `scoreAwarded: number` to `CombatShipDestroyedEvent`; computed in `runKillResolution`
+  from `ShipClassCacheService.getPoints(victim.shpclass)` (falls back to 0 if class not cached).
+- `ShipClassCacheService`: added `points` field to `ShipClassEntry`, hydrated from Prisma
+  `ShipClass.points`, exposed via `getPoints(classNumber)`.
+- Created `PlayerScoreRepository.transferKillScore` — awards `scr` to attacker score/klscore,
+  deducts from victim score/klscore (floor at 0), skips victim deduction for AI ships
+  (`Cybrg-*` / `Droid-*`). Runs as a single Prisma transaction.
+- Created `PlayerScoreService` — listens to `COMBAT_SHIP_DESTROYED`, skips if `scoreAwarded=0`
+  or no attacker, detects AI victim via `/^(?:Cybrg-|Droid-)/` regex.
+- Updated 5 existing test fixtures to include `scoreAwarded: 0`.
+
+**Tests**: 9 new tests in `score-transfer.spec.ts` — service listener behaviour (5) and
+repository floor logic (4). 1027 tests total, all passing.
+
+---
+
+## 2026-05-04 — 006b-combat bugfix: cargo transfer on kill
+
+**Completed**:
+- Implemented cargo transfer in `CombatTickService.runKillResolution()` per GEFUNCS.C:killem (1122-1136):
+  loop items index 1–13, skip `I_TROOPS`, pick divisor 1–5 via seeded Random port, transfer if
+  the amount fits in the attacker's remaining cargo capacity.
+- Added `loot: Array<{ itemIndex: number; amount: bigint }>` field to `CombatShipDestroyedEvent`
+  so the gateway can broadcast what was looted.
+- Updated 8 existing test fixtures to include `loot: []`.
+
+**Tests**: 6 new tests in `cargo-transfer.spec.ts` — full transfer, near-capacity partial transfer,
+zero transfer when full, men/troops excluded, loot in event, empty loot with no attacker.
+1018 tests total, all passing.
+
+---
+
+## 2026-05-04 — 007-cybertron-ai bugfix: createSpawn in-memory visibility
+
+**Completed**:
+- Fixed `CybertronRepository.createSpawn`: after `prisma.ship.create()` inside the transaction,
+  now fetches the persisted row and calls `ShipStateService.loadShip()` so spawned ships are
+  immediately visible to all game logic without a server restart.
+- Added test to `persistence.spec.ts`: verifies `loadShip` is called and the ship is
+  retrievable via `get(userid, shipno)` immediately after `createSpawn`.
+
+**Tests**: 1 new test in `persistence.spec.ts` (5 total in suite), all passing.
+
+---
+
 ## 2026-05-03 — 007-cybertron-ai (complete: US1–US6 + Polish)
 
 **Completed**:

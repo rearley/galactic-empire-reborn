@@ -17,6 +17,7 @@ import {
   TDAMMAX,
   TORPSPED,
 } from '../constants';
+import { I_TROOPS, ITEM_TONS, NUMITEMS } from '../constants/items';
 import { MineRegistry, MineState } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { RANDOM, Random } from './random.port';
@@ -162,11 +163,46 @@ export class CombatTickService implements OnModuleInit {
         const attackerChannel = victim.lastfired;
         const attacker = this.findActiveAttackerByChannel(attackerChannel, victim);
 
+        const loot: Array<{ itemIndex: number; amount: bigint }> = [];
+
         if (attacker) {
           this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
             a.kills += 1;
           });
+
+          // Cargo transfer — GEFUNCS.C:killem (1122-1136).
+          // Loop starts at 1 (skips I_MEN=0); I_TROOPS=8 skipped explicitly.
+          let maxTons = 5000;
+          try { maxTons = this.shipClassCache.getMaxTons(attacker.shpclass); } catch { /* fallback */ }
+
+          let usedTons = 0;
+          for (let i = 0; i < NUMITEMS; i++) {
+            usedTons += Number(attacker.items[i] ?? 0n) * ITEM_TONS[i];
+          }
+
+          for (let i = 1; i < NUMITEMS; i++) {
+            if (i === I_TROOPS) continue;
+            const victimAmt = victim.items[i] ?? 0n;
+            if (victimAmt <= 0n) continue;
+
+            const divisor = BigInt(Math.floor(this.random.next() * 5) + 1);
+            const amt = victimAmt / divisor;
+            if (amt <= 0n) continue;
+
+            const neededTons = Number(amt) * ITEM_TONS[i];
+            if (neededTons <= maxTons - usedTons) {
+              this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
+                a.items[i] = (a.items[i] ?? 0n) + amt;
+              });
+              usedTons += neededTons;
+              loot.push({ itemIndex: i, amount: amt });
+            }
+          }
         }
+
+        // Score points for this kill — GEFUNCS.C:killem (1145).
+        let scoreAwarded = 0;
+        try { scoreAwarded = this.shipClassCache.getPoints(victim.shpclass); } catch { /* class not cached */ }
 
         const event: CombatShipDestroyedEvent = {
           victimId: shipKey(victim.userid, victim.shipno),
@@ -181,6 +217,8 @@ export class CombatTickService implements OnModuleInit {
           weapon: null,
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,
+          loot,
+          scoreAwarded,
         };
         this.events.emit(COMBAT_SHIP_DESTROYED, event);
 
