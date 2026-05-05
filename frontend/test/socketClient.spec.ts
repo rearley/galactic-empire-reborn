@@ -69,6 +69,7 @@ describe('socketClient', () => {
     const { io } = await import('socket.io-client');
     expect(io).toHaveBeenCalledWith(
       expect.objectContaining({
+        reconnectionDelay: 1000,
         reconnectionDelayMax: 30000,
         randomizationFactor: 0.5,
       }),
