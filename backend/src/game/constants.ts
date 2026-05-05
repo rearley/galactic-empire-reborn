@@ -176,6 +176,31 @@ export const CYB_TOUGH_1 = 1 as const;
 /** @see GEMAIN.H CLASSTYPE_CYBORG=2 — category constant for all Cybertron/Sartern classes */
 export const CLASSTYPE_CYBORG = 2 as const;
 
+// ── Droid AI constants (GEMAIN.H / GEDROIDS.C) ───────────────────────────────
+
+/** @see GEMAIN.H CLASSTYPE_DROID=3 — category constant for all Droid classes */
+export const CLASSTYPE_DROID = 3 as const;
+/** Max live Droids per class (2 × 3 classes = 6 total cap). @see GEDROIDS.C:droid_init */
+export const DROID_MAX_PER_CLASS = 2 as const;
+/** Physics-tick rollover cadence for spawn + per-Droid action evaluation. @see GEMAIN.C:2325 (ticktock2 >= 30) */
+export const DROID_SPAWN_TICK_CADENCE = 30 as const;
+/** Annoy roll denominator: gernd()%4 == 1 → ~25% hit rate. @see GEDROIDS.C:droid_annoy:237 */
+export const DROID_ANNOY_DENOM = 4 as const;
+/** userid prefix for all Droid ships. @see GEDROIDS.C:111 */
+export const DROID_USERID_PREFIX = '@Droid-' as const;
+/** ShipClass.classNumber for the Lydorian Garbage Scow. @see GEDROIDS.C:droid_act_class_10 */
+export const DROID_CLASS_SCOW = 31 as const;
+/** ShipClass.classNumber for the Murdonian Transport. @see GEDROIDS.C:droid_act_class_11 */
+export const DROID_CLASS_TRANSPORT = 32 as const;
+/** ShipClass.classNumber for the Vakory Survey Drone. @see GEDROIDS.C:droid_act_class_12 */
+export const DROID_CLASS_VAKORY = 33 as const;
+/** GESTAT_AVAIL: ship slot is free. @see GEMAIN.H:209 */
+export const GESTAT_AVAIL = 0 as const;
+/** GESTAT_USER: active player ship. @see GEMAIN.H:210 */
+export const GESTAT_USER = 1 as const;
+/** GESTAT_AUTO: AI-controlled ship. @see GEMAIN.H:211 */
+export const GESTAT_AUTO = 2 as const;
+
 export interface ProjectTarget {
   xcoord: number;
   ycoord: number;

@@ -91,6 +91,14 @@ export interface ShipState {
 
   /** In-memory only — true after any mutation; cleared after successful Prisma flush. */
   dirty: boolean;
+
+  /**
+   * In-memory only — when true this ship has no Prisma row and must never be written to DB.
+   * Used exclusively by Droid AI ships (classes 31/32/33).
+   * flush() skips states where isEphemeral === true (FR-002).
+   * @see specs/008-droid-ai/spec.md FR-001..FR-004
+   */
+  isEphemeral?: boolean;
 }
 
 // Ensure ShipState is compatible with Prisma's Ship shape (minus dirty).

@@ -409,3 +409,42 @@ Listener (cybertron-tick.service.ts):
 
 - Droid AI — feature 008
 - Midnight job — feature 009
+
+## DroidModule additions (feature 008)
+
+```
+DroidTickService (game/droid/)
+  └── subscribes to TickKind.PHYSICS after CybertronTickService (onModuleInit order)
+  └── maintains livePopulation: Map<classNumber, Set<userid>> (ephemeral only, not DB)
+  └── spawnTickCounter: every 30th physics tick → runSpawnEvaluation + runDroidActions
+  └── gates spawning on ≥1 GESTAT_USER ship online (same pattern as CybertronTickService)
+  └── dispatches per-class decision trees: droidActClass10 / 11 / 12
+  └── combat.ship-destroyed listener → handleDroidDied (removeFromGame, emit droid.killed)
+                                     → handleDroidWon (winning Droid speed2b = rndm(5000))
+
+DroidSpawner (game/droid/)
+  └── builds ShipState with isEphemeral=true (never written to Prisma)
+  └── allocates @Droid-<n> userids (monotonic counter, wraps at 9999)
+  └── calls ShipStateService.loadShip() — same path as Cybertron createSpawn
+
+Pure decision modules (game/droid/)
+  droid-decisions.ts        ← rollAnnoy, rollConfuseHeading, rollAlterAttackVector,
+                               rollVakoryTorpedoVolley, pickHoldCourseDuration,
+                               missileAttached, randomMurdonianLoadout, randomSparseLoadout
+  droid-act-class-10.ts     ← Lydorian Garbage Scow: scan + shield toggle, no fire
+  droid-act-class-11.ts     ← Murdonian Transport: fight-back, confuse heading, torp
+  droid-act-class-12.ts     ← Vakory Survey Drone: torpedo volley, mine+flee, missile evade
+
+DroidModule event bus topology:
+  Emitters (droid-tick.service.ts):
+    droid.annoy    → GameGateway: target socket + sector room
+    droid.spawned  → (informational; not yet bridged to client)
+    droid.killed   → (informational; not yet bridged to client)
+
+  Listener (droid-tick.service.ts):
+    combat.ship-destroyed (victimUserid starts with '@Droid-') → cleanup + droid.killed
+    combat.ship-destroyed (attackerUserid starts with '@Droid-') → droid_won speed reset
+
+ShipStateService.flush() modification:
+  └── added early-continue when state.isEphemeral === true → zero Prisma calls for Droids
+```
