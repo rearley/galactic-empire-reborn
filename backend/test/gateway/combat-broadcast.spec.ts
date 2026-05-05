@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
+import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -33,6 +34,7 @@ describe('GameGateway combat broadcasts', () => {
     gateway = new GameGateway(
       {} as ShipStateService,
       {} as CommandRouterService,
+      {} as ConnectedShipsRegistry,
     );
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };

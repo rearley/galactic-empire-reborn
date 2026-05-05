@@ -10,8 +10,10 @@ import type { CommandRequest, CommandResultPayload } from '../types/contracts';
  * @see specs/003-ship-commands/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/research.md R3 (reconnection tuning FR-020)
  */
+export const LOCAL_USERID = 'DEV';
+
 const socket: Socket = io({
-  query: { userid: 'DEV' },
+  query: { userid: LOCAL_USERID },
   autoConnect: true,
   reconnection: true,
   reconnectionAttempts: Infinity,

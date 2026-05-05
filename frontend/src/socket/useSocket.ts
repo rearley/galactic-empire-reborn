@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { socket, sendCommand, onCommandResult } from './socketClient';
-import type { CommandResultPayload } from '../types/contracts';
+import { socket, sendCommand, onCommandResult, LOCAL_USERID } from './socketClient';
+import type {
+  CommandResultPayload,
+  PlayerSnapshotPayload,
+  PlayerJoinedPayload,
+  PlayerLeftPayload,
+  PhysicsSectorTransitionPayload,
+} from '../types/contracts';
+import type { UsePlayerListReturn } from '../state/usePlayerList';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
@@ -15,14 +22,20 @@ export interface UseSocketReturn {
 /**
  * Bridges the socket singleton to React component state.
  * Derives connection status from socket.io lifecycle events.
+ * When `playerDispatch` is provided, subscribes to player list events and
+ * dispatches corresponding usePlayerList actions (FR-017, FR-017a).
  *
  * @see specs/003-ship-commands/contracts/websocket-events.md §Connection
+ * @see specs/010-react-frontend/contracts/websocket-events.md §player.snapshot
  */
-export function useSocket(): UseSocketReturn {
+export function useSocket(
+  playerDispatch?: UsePlayerListReturn['dispatch'],
+): UseSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>(
     socket.connected ? 'connected' : 'connecting',
   );
   const [lastResult, setLastResult] = useState<CommandResultPayload | null>(null);
+  const [localShipId, setLocalShipId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleConnect = () => setStatus('connected');
@@ -46,8 +59,43 @@ export function useSocket(): UseSocketReturn {
     };
   }, []);
 
+  useEffect(() => {
+    if (!playerDispatch) return;
+
+    const handleSnapshot = (payload: PlayerSnapshotPayload) => {
+      playerDispatch({ type: 'SNAPSHOT', payload });
+      const local = payload.players.find((p) =>
+        p.shipId.startsWith(LOCAL_USERID + ':'),
+      );
+      if (local) setLocalShipId(local.shipId);
+    };
+
+    const handleJoined = (payload: PlayerJoinedPayload) => {
+      playerDispatch({ type: 'JOIN', payload });
+    };
+
+    const handleLeft = (payload: PlayerLeftPayload) => {
+      playerDispatch({ type: 'LEFT', payload });
+    };
+
+    const handleTransition = (payload: PhysicsSectorTransitionPayload) => {
+      playerDispatch({ type: 'TRANSITION', payload });
+    };
+
+    socket.on('player.snapshot', handleSnapshot);
+    socket.on('player.joined', handleJoined);
+    socket.on('player.left', handleLeft);
+    socket.on('physics.sector-transition', handleTransition);
+
+    return () => {
+      socket.off('player.snapshot', handleSnapshot);
+      socket.off('player.joined', handleJoined);
+      socket.off('player.left', handleLeft);
+      socket.off('physics.sector-transition', handleTransition);
+    };
+  }, [playerDispatch]);
+
   const send = useCallback((input: string) => sendCommand(input), []);
 
-  // localShipId populated in US3 (T032) when player.snapshot arrives
-  return { status, lastResult, send, localShipId: null };
+  return { status, lastResult, send, localShipId };
 }
