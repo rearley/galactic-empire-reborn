@@ -467,3 +467,40 @@ basic components) but is not production-ready.
 - **Universe wrap** — ships crossing galaxy boundary should wrap; currently no boundary enforcement
 - **Gravity / wormhole travel** — wormhole entry (`GEFUNCS.C:moveship` gravity pull) not implemented
 - **Overspeed engine blow** — ship exceeding max warp should take damage; currently warn-and-apply only
+
+---
+
+## 2026-05-05 — 008-droid-ai
+
+**Completed**:
+- `isEphemeral` flag on `ShipState`; `flush()` skips ephemeral states (FR-002)
+- `DroidSpawner` — builds ephemeral `ShipState` with `@Droid-<n>` userid, isEphemeral=true,
+  per-class loadout (heavy Murdonian / sparse Scow+Vakory), class-specific topspeed/phaser/shields
+- `DroidTickService` — subscribes after CybertronTickService; 30-tick cadence; spawn-cap=2/class;
+  player-online gate; per-class dispatch to droidActClass10/11/12; fault isolation per Droid;
+  `combat.ship-destroyed` listener (handleDroidDied + handleDroidWon); emits droid.annoy/spawned/killed
+- Pure decision modules: `droid-decisions.ts`, `droid-act-class-10.ts`, `droid-act-class-11.ts`,
+  `droid-act-class-12.ts` — faithfully porting `GEDROIDS.C:droid_act_class_*` decision trees
+- Message pool `droid-message-pool.ts` — typed catalog for all three classes × passive/help variants
+- `GameGateway` bridge for `droid.annoy` → target socket + sector room
+- Dev-only `POST /debug/droid/spawn?class=31` endpoint
+- `DroidModule` registered in `AppModule`
+
+**Tests**: 1238 total (up from 1027 before this feature); 19 new test files covering spawn-cap,
+spawn-cadence, spawn-placement, loadout, Murdonian cargo-transfer-on-kill, annoy event integration,
+per-class decision matrices (class 10/11/12), decision pure functions, message pool, balance
+regression, annoy rate statistics, fault isolation, cold-boot fill, ephemerality invariants,
+jammed invariants, and Cybertron spawn-visibility regression (T038 backfill).
+
+**Decisions made**:
+- Class numbers 31/32/33 used (not 10/11/12 from spec) — seed already populated; C source
+  dispatches by typename not number (R-14)
+- `isEphemeral` flag approach — no new Prisma model, no migration (R-12)
+- Single 30-tick counter drives both spawn evaluation and per-Droid actions (R-13)
+
+**Next**: 009-midnight-job — nightly score recalculation, planet production reports, mail purge
+
+**Known issues**:
+- Droid kill-score impact (whether kills count toward player score/rank) deferred to 009
+- T043 manual quickstart validation not run (requires live `ge_test` DB)
+- `droid.spawned` and `droid.killed` events not yet bridged to Socket.io client

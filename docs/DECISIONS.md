@@ -578,3 +578,50 @@ inventory was decremented. This is the same pattern used for target-acquisition 
 
 **Alternatives rejected**: Rely on the 30s dirty flush — acceptable for most state but a
 mine/jammer deploy is a significant action worth persisting immediately.
+
+---
+
+### R-12: Ephemerality via in-memory `isEphemeral` flag rather than a separate Prisma model
+
+**Context**: Droid ships (classes 31/32/33) must never be written to the database. They exist
+only for the duration of a server session and must not clutter the `Ship` or `User` tables.
+
+**Decision**: Add an optional `isEphemeral?: boolean` field to the in-memory `ShipState` type.
+`ShipStateService.flush()` skips any state where `isEphemeral === true` (early continue).
+`removeFromGame` likewise skips any Prisma delete for ephemeral states. No new Prisma model,
+no migration, no schema change.
+
+**Alternatives rejected**: Separate `DroidState` type — would require duplicating the entire
+ShipState interface and forking every service that touches ship state. A Prisma `isDroid` column
+was also considered but adds DB rows for something that should never be persisted.
+
+---
+
+### R-13: Single 30-tick counter drives both spawn and per-Droid action evaluation
+
+**Context**: `GEDROIDS.C` uses a per-Droid `tick` countdown for individual action timing, but
+the spawn evaluation fires on a fixed cadence. The implementation needs one coherent clock.
+
+**Decision**: `DroidTickService` maintains a single `spawnTickCounter` incremented on every
+physics tick. On the 30th rollover it runs spawn evaluation (fill population to cap) and
+per-Droid action evaluation for all live Droids. Each Droid's `tick` field is initialized to
+`CYBTICKTIME + rnd % CYBTICKTIME` at spawn for staggered first-action timing per `GEDROIDS.C:170`.
+
+**Alternatives rejected**: Per-Droid separate timers — too fine-grained; the C source evaluates
+Droids in a batch loop per game tick (`GEMAIN.C:2325`), not on individual schedules.
+
+---
+
+### R-14: Droid class numbers 31/32/33 (not 10/11/12 as originally planned)
+
+**Context**: The original spec/tasks.md referenced class numbers 10/11/12 following the
+`droid_act_class_10/11/12` function names in `GEDROIDS.C`. However, the DB seed already
+populated `ShipClass` rows with `classNumber IN (31, 32, 33)` under `CLASSTYPE_DROID` (category 3)
+before this feature was designed, using the MajorBBS typename convention.
+
+**Decision**: Use 31/32/33 throughout the implementation (`DROID_CLASS_SCOW=31`,
+`DROID_CLASS_TRANSPORT=32`, `DROID_CLASS_VAKORY=33`). The C source dispatches by typename string
+comparison (`sameas`), not by class number, so both numbering schemes are valid at the C level.
+
+**Alternatives rejected**: Renumber seed rows to 10/11/12 — would require a migration and would
+diverge from the existing seed without benefit; 31/32/33 is already live in `ge_dev`.
