@@ -700,3 +700,65 @@ Sartern Attack Drones (class 24) and Obliterators (class 25) are `CLASSTYPE_CYBO
 They use the `Cybrg-` userid prefix per `GECYBS.C:104-105` and run the identical `cyb_lives`
 code path. Their distinct behavior comes from their `ShipClass` row (higher scanRange,
 different `tough` value) and their `CybertronClassConfig` entry (tot_to_create, tooclose, etc.).
+
+---
+
+## Droid AI (feature 008)
+
+Three ephemeral ship classes driven by `DroidTickService` on the 6s physics tick. Droids are
+never written to the DB — they exist only in the in-memory `ShipStateService` map. On server
+restart all Droids vanish; on the next spawn cadence rollover (every 30 ticks ≈ 3 minutes) they
+are re-populated up to cap. Max 2 per class, 6 total.
+
+Spawn gated: only fires when ≥1 `GESTAT_USER` (human) ship is online.
+
+### Class 31 — Lydorian Garbage Scow
+
+**`@see GEDROIDS.C:droid_act_class_10`**
+
+- Passive only — never returns fire under any condition.
+- Scan loop: if a live player is within `scanRange (25000)`, toggle shields by speed
+  (up at impulse, down at warp), roll `gernd() % 4 === 1` to emit a passive annoy message.
+- Jammed path: set `speed2b = random sub-warp`, `holdcourse = [10, 59]` ticks.
+- Loadout: sparse (flux 0–49, decoys 0–24, mines 0–9, jammers 0–9; no torps/missiles/gold).
+
+### Class 32 — Murdonian Transport
+
+**`@see GEDROIDS.C:droid_act_class_11`**
+
+- Heavy freighter; primary PvE target for new players.
+- Jammed path: `speed2b = topspeed * 1000`, random heading, hold-course `[10, 59]` ticks.
+- Scan loop: shield toggle, optional sub-warp drift (if `holdcourse == 0`), annoy roll.
+- Fight-back (`cantexit > 0 && lastfired >= 0` — note `>=`, not `>`):
+  - Hyperspace + attacker in same zone + `ddist < 30000`: fire hyper-phaser.
+  - Normal space + attacker non-cloaked: fire phaser; 1-in-10 confuse roll
+    (new `head2b ∈ [0, 359.9)`, `speed2b ∈ [0, 10000)`, `holdcourse [3, 12]`).
+  - Hyperspace + missile attached: exit hyperspace (`speed2b = rndm(999.0)`, hold `[5, 19]`).
+  - Otherwise: raise shields.
+  - Always emits a help-variant annoy message on fight-back entry.
+- Loadout: heavy (flux 0–49, decoys 0–249, torps 0–249, mines 0–99, jammers 0–99,
+  missiles 0–99, ion 0–24, gold 0–249). Gold transfers to killer on death.
+
+### Class 33 — Vakory Survey Drone
+
+**`@see GEDROIDS.C:droid_act_class_12`**
+
+- Jammed path: `speed2b = topspeed * 1000`, `holdcourse = [10, 59]` ticks.
+- Scan loop: shield toggle, annoy roll (passive variant).
+- Fight-back (`cantexit > 0 && lastfired > 0` — note strictly `>`, not `>=`):
+  - Hyperspace + same zone + `ddist < 30000`: fire hyper-phaser.
+  - Normal space + non-cloaked attacker: fire phaser + `rollVakoryTorpedoVolley` (0 or 1 torp).
+    - 1-in-20 alter-attack-vector roll (`head2b`, `speed2b ∈ [0, 5000)`, `holdcourse [3, 12]`).
+  - Missile attached: `speed2b ∈ [5000, 10900)`, `holdcourse [5, 9]`.
+  - `damage > 75%`: lay mine (if `items[I_MINE] > 0`) + deploy jammer (if `items[I_JAMMER] > 0`)
+    + top-warp flee, `holdcourse [20, 49]`.
+  - Help annoy emitted on fight-back entry.
+- Loadout: sparse (no gold, no torps/missiles initially; torp inventory is replenished
+  pre-fire per `GEDROIDS.C:480` so the AI is never gated by inventory).
+
+### Ephemerality invariants
+
+- `ShipState.isEphemeral = true` — `flush()` skips these states; zero Prisma calls.
+- `removeFromGame` skips Prisma delete for ephemeral states.
+- `prisma.ship.findMany({ where: { shpclass: { in: [31,32,33] } } })` always returns `[]`.
+- Zero rows in `User` table with `userid LIKE '@Droid-%'`.
