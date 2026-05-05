@@ -6,11 +6,17 @@ import { CommandInput } from './components/CommandInput';
 import { ConnectionIndicator } from './components/ConnectionIndicator';
 import type { EventLogLine, ScanCell } from './types/contracts';
 
+const MAX_LOG_ENTRIES = 500;
+
 /**
- * Root application component — 3-region terminal UI.
- * Event log (left), scan map (right), command input (pinned bottom).
+ * Root application component — five-region terminal UI (FR-002):
+ *   top: connection-status banner area
+ *   main-left: scrolling event log
+ *   main-right: ASCII sector-map panel
+ *   side: player-list panel (populated by feature 010 US3)
+ *   bottom: command input bar (fixed)
  *
- * @see specs/003-ship-commands/spec.md US4 acceptance scenarios
+ * @see specs/010-react-frontend/spec.md FR-002
  */
 export function App(): React.JSX.Element {
   const { status, lastResult, send } = useSocket();
@@ -20,7 +26,9 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (lastResult) {
       if (lastResult.lines.length > 0) {
-        setLogLines((prev) => [...prev, ...lastResult.lines]);
+        setLogLines((prev) =>
+          [...prev, ...lastResult.lines].slice(-MAX_LOG_ENTRIES),
+        );
       }
       if (lastResult.scanGrid !== undefined) {
         setScanCells(lastResult.scanGrid);
@@ -30,23 +38,29 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
-      {/* Top bar */}
+      {/* Top: connection-status banner area (FR-002) */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-1">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Galactic Empire</span>
         <ConnectionIndicator status={status} />
       </div>
 
-      {/* Main area: log + map */}
+      {/* Main area: log (left), map (right), player-list side-panel slot (FR-002) */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Main-left: scrolling event-log pane */}
         <div className="flex flex-1 flex-col overflow-hidden border-r border-gray-800">
           <EventLog lines={logLines} />
         </div>
-        <div className="w-80 flex-shrink-0">
+
+        {/* Main-right: ASCII sector-map panel */}
+        <div className="w-80 flex-shrink-0 border-r border-gray-800">
           <ScanMap cells={scanCells} />
         </div>
+
+        {/* Side: player-list panel placeholder — populated in US3 (T033) */}
+        <div className="w-48 flex-shrink-0" data-testid="player-list-panel-slot" />
       </div>
 
-      {/* Command input pinned at bottom */}
+      {/* Bottom: command input bar fixed at bottom (FR-002) */}
       <CommandInput onSubmit={send} />
     </div>
   );
