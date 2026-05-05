@@ -152,7 +152,8 @@ type _ConnectedPlayer = ConnectedPlayer extends {
   shipId: string; name: string; sector: Sector; shipClass: number;
 } ? true : never;
 type _PlayerSnapshotPayload = PlayerSnapshotPayload extends { players: ConnectedPlayer[] } ? true : never;
-type _PlayerJoinedPayload = PlayerJoinedPayload extends ConnectedPlayer ? true : never;
+type _PlayerJoinedPayloadFwd = PlayerJoinedPayload extends ConnectedPlayer ? true : never;
+type _PlayerJoinedPayloadBwd = ConnectedPlayer extends PlayerJoinedPayload ? true : never;
 type _PlayerLeftPayload = PlayerLeftPayload extends { shipId: string } ? true : never;
 type _SectorTransition = SectorTransition extends {
   shipId: string; fromSector: Sector; toSector: Sector;
@@ -161,5 +162,5 @@ type _PhysicsSectorTransitionPayload = PhysicsSectorTransitionPayload extends {
   transitions: SectorTransition[];
 } ? true : never;
 
-const _newChecks: [_Sector, _ConnectedPlayer, _PlayerSnapshotPayload, _PlayerJoinedPayload, _PlayerLeftPayload, _SectorTransition, _PhysicsSectorTransitionPayload] = [true, true, true, true, true, true, true];
+const _newChecks: [_Sector, _ConnectedPlayer, _PlayerSnapshotPayload, _PlayerJoinedPayloadFwd, _PlayerJoinedPayloadBwd, _PlayerLeftPayload, _SectorTransition, _PhysicsSectorTransitionPayload] = [true, true, true, true, true, true, true, true];
 void _newChecks;
