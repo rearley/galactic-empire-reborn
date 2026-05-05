@@ -1,3 +1,24 @@
+## 2026-05-05 — 010-react-frontend: React Terminal UI
+
+**Completed**:
+- US1 (P1) — Command input with 20-entry ↑/↓ history (CommandInput.tsx); sticky-bottom EventLog with 500-entry cap and category colour-coding; tailwind `accent` colour token (#4ade80 / green-400)
+- US2 (P1) — ScanMap 30×15 ASCII grid with symbol mapping (`+` self, `@` ship, `O` planet, `W` wormhole, `*` mine, `.` empty); overlap priority `self > ship > planet > wormhole > mine`; clears on `physics.sector-transition` when local shipId appears in transitions
+- US3 (P2) — Player list panel (PlayerListPanel.tsx, usePlayerList hook); alphabetically sorted; incremental sync via `player.snapshot / player.joined / player.left / physics.sector-transition`; backend: ConnectedShipsRegistry, SectorTransitionSubscriber, GameGateway extensions; single-socket-per-ship enforcement with correct event ordering (left → snapshot → joined)
+- US4 (P2) — ConnectionBanner renders for `connecting / disconnected / reconnecting`, hidden for `connected`; Socket.io exponential backoff tuned to max 30 s ±50% jitter (FR-020)
+- Wire contracts in `frontend/src/types/contracts.ts` for all four new Socket.io events; `contracts-parity.spec.ts` verifies backend ↔ frontend type alignment
+
+**Tests**: 83 Vitest (frontend) + 1355 Jest (backend) — all green. New suites: player-snapshot, player-join-leave, single-socket-per-ship, sector-transition (backend); usePlayerList, PlayerListPanel, ConnectionBanner, socketClient extensions (frontend)
+
+**Decisions made**: last-write-wins single-socket (ConnectedShipsRegistry), batched physics.sector-transition (SectorTransitionSubscriber), useReducer over Redux for player list — all in DECISIONS.md
+
+**Next**: 011-onboarding (`cmd_new`, `cmd_rename`)
+
+**Known issues / deferred**:
+- `droid.spawned` / `droid.killed` events not bridged to the client player list (assumed not needed for initial v1 per spec)
+- `LOCAL_USERID` is hardcoded to `'DEV'` in socketClient.ts; auth integration deferred to 011-onboarding
+
+---
+
 ## 2026-05-05 — 009-midnight-job: Midnight Maintenance Job
 
 **Completed**:
@@ -425,7 +446,15 @@ Features 001–009 are complete or in progress. The following are the remaining 
 items required for a playable v1. All command names reference the `gecmds[]` table
 in `reference/ge-source/GECMDS.C`.
 
-### 010 — Player onboarding (planned)
+### 010 — React frontend terminal UI (in progress)
+
+Full terminal UI: text command input with history, scrolling event log, ASCII sector map,
+player list panel, connection banner. Connects to `GameGateway` via Socket.io. Renders in
+monospace font with an ANSI/ASCII aesthetic. Desktop-first; not mobile-optimized.
+
+See feature log entry 2026-05-05 — 010-react-frontend below.
+
+### 011 — Player onboarding (planned)
 
 `cmd_new` — new ship creation: class selection from available `ShipClass` rows,
 initial loadout, userid registration.
@@ -433,7 +462,7 @@ initial loadout, userid registration.
 
 No test coverage yet. No spec exists.
 
-### 011 — Social / information commands (planned)
+### 012 — Social / information commands (planned)
 
 `cmd_who` — list all active ships (name, class, sector, kills).
 `cmd_data` — full stats on a named ship.
@@ -445,7 +474,7 @@ in schema from 001).
 
 No test coverage yet. No spec exists.
 
-### 012 — Ship management commands (planned)
+### 013 — Ship management commands (planned)
 
 `cmd_maint` — pay maintenance to repair damage (drains `User.cash`).
 `cmd_transfer` — transfer items/gold between ships in the same sector.
@@ -466,11 +495,11 @@ referenced in four places without a command handler to set it:
 The command handler that sets `cloak = 10` (and debits the energy cost) has never
 been implemented. Any ship can be made cloaked by directly setting `ship.cloak = 10`
 in state, but no player command triggers it. This should be the first handler in
-feature 012.
+feature 013.
 
 No test coverage yet. No spec exists.
 
-### 013 — Planet attack (planned)
+### 014 — Planet attack (planned)
 
 `cmd_attack` — land troops and fighters to capture a planet (interacts with
 `PlanetState.men`, `PlanetState.troops`; uses `GEPLANET.C` combat formulas).
@@ -479,7 +508,7 @@ No test coverage yet. No spec exists.
 
 No test coverage yet. No spec exists.
 
-### 014 — Navigation aids & help (planned)
+### 015 — Navigation aids & help (planned)
 
 `cmd_navigate` — compute heading and distance to a named planet or sector.
 `cmd_spy` — deploy a spy to a planet (sets `Planet.spyowner`).
@@ -487,15 +516,6 @@ No test coverage yet. No spec exists.
 `cmd_clear` — clear the client's event log display.
 
 No test coverage yet. No spec exists.
-
-### 015 — React frontend terminal UI (planned)
-
-Full terminal UI: text command input, scrolling event log, ASCII sector map,
-player list panel. Connects to `GameGateway` via Socket.io. Renders in
-monospace font with an ANSI/ASCII aesthetic. Desktop-first; not mobile-optimized.
-
-Partial scaffolding exists from feature 003 (socketClient, useSocket hook,
-basic components) but is not production-ready.
 
 ### Deferred / cross-feature items
 

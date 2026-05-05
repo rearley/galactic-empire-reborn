@@ -58,13 +58,22 @@ Connection strings are provided via environment variables:
 AppModule (app.module.ts)
   ├── PrismaModule (prisma/) — @Global(), exports PrismaService
   │     └── PrismaService — extends PrismaClient, connects on init, disconnects on destroy
-  ├── TickModule (game/tick/) — @Global(), exports TickService
-  │     └── TickService — raw setInterval(1000) + setInterval(6000) in onModuleInit;
-  │                        clearInterval in onModuleDestroy; pluggable subscriber registry
+  ├── TickModule (game/tick/) — @Global(), exports TickService + SectorTransitionSubscriber
+  │     ├── TickService — raw setInterval(1000) + setInterval(6000) in onModuleInit;
+  │     │                 clearInterval in onModuleDestroy; pluggable subscriber registry
+  │     └── SectorTransitionSubscriber — subscribes physics tick; holds prev-tick integer-cell
+  │                                       snapshot; emits batched physics.sector-transition via
+  │                                       EventEmitter2 iff ≥1 cell change (all ship types)
   ├── GatewayModule (gateway/) — exports GameGateway
   │     └── GameGateway — @WebSocketGateway; handshake resolves active ship (lowest shipno);
   │                        emits welcome command:result; handles sector:join/leave;
-  │                        dispatches `command` events → CommandRouterService → command:result
+  │                        dispatches `command` events → CommandRouterService → command:result;
+  │                        emits player.snapshot (joining socket), player.joined / player.left (all),
+  │                        physics.sector-transition (all); enforces single-socket-per-ship via registry
+  │     └── ConnectedShipsRegistry — @Injectable singleton; byShipId + bySocketId maps;
+  │                                   upsert(shipId, socketId) returns prior socketId for takeover;
+  │                                   remove(socketId) returns shipId for player.left emission;
+  │                                   list() returns ConnectedPlayer[] for snapshot payload
   ├── CommandsModule (game/commands/) — exports CommandRouterService
   │     ├── CommandRouterService — alias-keyed registry; tokenise→lower→dispatch; minArgs guard
   │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange; projects
@@ -328,6 +337,36 @@ Emitters (combat-tick.service.ts, phaser.handler.ts):
 
 Listener (game.gateway.ts):
   @OnEvent(COMBAT_*) → emits to Socket.io room (sector or galaxy-wide)
+
+Player-presence wire events (feature 010):
+  player.snapshot          → joining socket only (client.emit); full ConnectedPlayer[] snapshot
+  player.joined            → all clients (server.emit); ConnectedPlayer payload
+  player.left              → all clients (server.emit); { shipId } payload
+  physics.sector-transition → all clients (server.emit); batched SectorTransition[] per tick
+    Source: SectorTransitionSubscriber subscribes physics tick via EventEmitter2;
+            GameGateway @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT) forwards to all clients
+```
+
+### Frontend state (feature 010)
+
+```
+usePlayerList (frontend/src/state/usePlayerList.ts)
+  └── useReducer hook; internal Map<shipId, ConnectedPlayer>
+  └── actions: SNAPSHOT (replace-all), JOIN (upsert), LEFT (delete), TRANSITION (update sector)
+  └── output: sorted ConnectedPlayer[] (alphabetical by name, FR-018)
+  └── fed by useSocket player-event subscriptions
+
+useSocket (frontend/src/socket/useSocket.ts)
+  └── wraps socket singleton; maps lifecycle events → ConnectionStatus
+  └── accepts optional playerDispatch → subscribes player.snapshot/joined/left + physics.sector-transition
+  └── derives localShipId from player.snapshot (first entry matching LOCAL_USERID prefix)
+
+Components (frontend/src/components/)
+  ConnectionBanner    ← renders top banner for connecting/disconnected/reconnecting; null when connected
+  PlayerListPanel     ← renders sorted ConnectedPlayer[] rows with name, sector (x,y)
+  ScanMap             ← 30×15 ASCII grid; clears on physics.sector-transition for local ship
+  EventLog            ← sticky-scroll log; capped at 500 entries
+  CommandInput        ← monospace input with 20-entry ↑/↓ history
 ```
 
 ### Planet revolt (game/planet/planet-economy.service.ts)

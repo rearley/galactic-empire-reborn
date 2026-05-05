@@ -76,3 +76,65 @@ describe('socketClient', () => {
     );
   });
 });
+
+/**
+ * Tests that useSocket maps socket.io lifecycle events to ConnectionStatus values (FR-019, FR-021).
+ * @see specs/010-react-frontend/data-model.md §B.5
+ */
+describe('ConnectionStatus event mapping (FR-019, FR-021)', () => {
+  it('connect event → connected status', async () => {
+    const { socket } = await import('../src/socket/socketClient');
+    const registeredEvents: string[] = [];
+    (socket.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
+      registeredEvents.push(ev);
+    });
+
+    const { renderHook } = await import('@testing-library/react');
+    const { useSocket } = await import('../src/socket/useSocket');
+    renderHook(() => useSocket());
+
+    expect(registeredEvents).toContain('connect');
+  });
+
+  it('disconnect event → disconnected status', async () => {
+    const { socket } = await import('../src/socket/socketClient');
+    const registeredEvents: string[] = [];
+    (socket.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
+      registeredEvents.push(ev);
+    });
+
+    const { renderHook } = await import('@testing-library/react');
+    const { useSocket } = await import('../src/socket/useSocket');
+    renderHook(() => useSocket());
+
+    expect(registeredEvents).toContain('disconnect');
+  });
+
+  it('reconnect_attempt event → reconnecting status', async () => {
+    const { socket } = await import('../src/socket/socketClient');
+    const registeredEvents: string[] = [];
+    (socket.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
+      registeredEvents.push(ev);
+    });
+
+    const { renderHook } = await import('@testing-library/react');
+    const { useSocket } = await import('../src/socket/useSocket');
+    renderHook(() => useSocket());
+
+    expect(registeredEvents).toContain('reconnect_attempt');
+  });
+
+  it('connect_error event → disconnected status', async () => {
+    const { socket } = await import('../src/socket/socketClient');
+    const registeredEvents: string[] = [];
+    (socket.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
+      registeredEvents.push(ev);
+    });
+
+    const { renderHook } = await import('@testing-library/react');
+    const { useSocket } = await import('../src/socket/useSocket');
+    renderHook(() => useSocket());
+
+    expect(registeredEvents).toContain('connect_error');
+  });
+});

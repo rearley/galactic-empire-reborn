@@ -92,31 +92,31 @@
 
 **Backend (Jest)**
 
-- [ ] T018 [P] [US3] Create `backend/test/gateway/player-snapshot.spec.ts` asserting `player.snapshot` is emitted via `socket.emit` (joining socket only, NOT broadcast), contains every ship currently in `ConnectedShipsRegistry`, and fires before any `player.joined` for the same shipId (FR-029)
-- [ ] T019 [P] [US3] Create `backend/test/gateway/player-join-leave.spec.ts` asserting `player.joined` broadcasts via `this.server.emit` with `{ shipId, name, sector, shipClass }` after the snapshot, and `player.left` broadcasts via `this.server.emit` with `{ shipId }` from `handleDisconnect` only when the socket had been resolved (FR-024, FR-025)
-- [ ] T020 [P] [US3] Create `backend/test/gateway/single-socket-per-ship.spec.ts` asserting that a second connection for the same shipId disconnects the first; resulting event order is `player.left` (old) → `player.snapshot` (new) → `player.joined` (new) (FR-025a)
-- [ ] T021 [P] [US3] Create `backend/test/game/tick/sector-transition.spec.ts` asserting: batched `physics.sector-transition` emitted iff ≥1 integer-cell change between ticks; not emitted on a quiet tick; AI ships (Cybertrons + Droids) are included; newly-spawned and despawned ships do NOT produce transition entries (FR-026)
+- [X] T018 [P] [US3] Create `backend/test/gateway/player-snapshot.spec.ts` asserting `player.snapshot` is emitted via `socket.emit` (joining socket only, NOT broadcast), contains every ship currently in `ConnectedShipsRegistry`, and fires before any `player.joined` for the same shipId (FR-029)
+- [X] T019 [P] [US3] Create `backend/test/gateway/player-join-leave.spec.ts` asserting `player.joined` broadcasts via `this.server.emit` with `{ shipId, name, sector, shipClass }` after the snapshot, and `player.left` broadcasts via `this.server.emit` with `{ shipId }` from `handleDisconnect` only when the socket had been resolved (FR-024, FR-025)
+- [X] T020 [P] [US3] Create `backend/test/gateway/single-socket-per-ship.spec.ts` asserting that a second connection for the same shipId disconnects the first; resulting event order is `player.left` (old) → `player.snapshot` (new) → `player.joined` (new) (FR-025a)
+- [X] T021 [P] [US3] Create `backend/test/game/tick/sector-transition.spec.ts` asserting: batched `physics.sector-transition` emitted iff ≥1 integer-cell change between ticks; not emitted on a quiet tick; AI ships (Cybertrons + Droids) are included; newly-spawned and despawned ships do NOT produce transition entries (FR-026)
 
 **Frontend (Vitest)**
 
-- [ ] T022 [P] [US3] Create `frontend/test/usePlayerList.spec.ts` asserting reducer handles `SNAPSHOT` (replace), `JOIN` (set / overwrite per FR-025a), `LEFT` (delete), and `TRANSITION` (mutate sector, ignore unknown shipId); output is alphabetically sorted by name (FR-018)
-- [ ] T023 [P] [US3] Create `frontend/test/PlayerListPanel.spec.tsx` asserting the panel renders sorted entries, updates on each event type, and derives sector display from the integer pair `(floor(x), floor(y))` matching FR-026's convention (FR-016, FR-017, FR-017a)
+- [X] T022 [P] [US3] Create `frontend/test/usePlayerList.spec.ts` asserting reducer handles `SNAPSHOT` (replace), `JOIN` (set / overwrite per FR-025a), `LEFT` (delete), and `TRANSITION` (mutate sector, ignore unknown shipId); output is alphabetically sorted by name (FR-018)
+- [X] T023 [P] [US3] Create `frontend/test/PlayerListPanel.spec.tsx` asserting the panel renders sorted entries, updates on each event type, and derives sector display from the integer pair `(floor(x), floor(y))` matching FR-026's convention (FR-016, FR-017, FR-017a)
 
 ### Implementation for User Story 3 — Backend
 
-- [ ] T024 [US3] Create `backend/src/gateway/connected-ships.registry.ts` exporting a `ConnectedShipsRegistry` injectable singleton with `upsert(shipId, socketId): string | undefined`, `remove(socketId): { shipId } | undefined`, `list(): ConnectedPlayer[]` (data-model.md §C.1, research.md R4)
-- [ ] T025 [US3] Register `ConnectedShipsRegistry` as a provider in the gateway module (`backend/src/gateway/gateway.module.ts` or equivalent) so it is injectable into `GameGateway`
-- [ ] T026 [US3] Extend `backend/src/gateway/game.gateway.ts` `handleConnection` to: resolve socket → ship, call `registry.upsert`; if upsert returned a prior socketId, call `server.sockets.sockets.get(oldId)?.disconnect(true)` first; then `socket.emit('player.snapshot', { players: registry.list() })`; then `this.server.emit('player.joined', connectedPlayer)` (FR-024, FR-025a, FR-029, research.md R4)
-- [ ] T027 [US3] Extend `backend/src/gateway/game.gateway.ts` `handleDisconnect` to call `registry.remove(socket.id)`; if a shipId was removed, `this.server.emit('player.left', { shipId })` (FR-025)
-- [ ] T028 [US3] Create `backend/src/game/tick/sector-transition.subscriber.ts` implementing `SectorTransitionSubscriber` per data-model.md §C.2 and research.md R5: holds `Map<shipId, Sector>` previous-tick cells; on each physics tick, builds current `Map` from `ShipStateService` (all ship types incl. AI), diffs, emits batched `physics.sector-transition` via `this.server.emit` iff non-empty, swaps the snapshot (FR-026)
-- [ ] T029 [US3] Wire `SectorTransitionSubscriber` into `backend/src/game/tick/tick.module.ts` and the existing physics-tick lifecycle (no new `setInterval`, per plan.md and Constitution III)
+- [X] T024 [US3] Create `backend/src/gateway/connected-ships.registry.ts` exporting a `ConnectedShipsRegistry` injectable singleton with `upsert(shipId, socketId): string | undefined`, `remove(socketId): { shipId } | undefined`, `list(): ConnectedPlayer[]` (data-model.md §C.1, research.md R4)
+- [X] T025 [US3] Register `ConnectedShipsRegistry` as a provider in the gateway module (`backend/src/gateway/gateway.module.ts` or equivalent) so it is injectable into `GameGateway`
+- [X] T026 [US3] Extend `backend/src/gateway/game.gateway.ts` `handleConnection` to: resolve socket → ship, call `registry.upsert`; if upsert returned a prior socketId, call `server.sockets.sockets.get(oldId)?.disconnect(true)` first; then `socket.emit('player.snapshot', { players: registry.list() })`; then `this.server.emit('player.joined', connectedPlayer)` (FR-024, FR-025a, FR-029, research.md R4)
+- [X] T027 [US3] Extend `backend/src/gateway/game.gateway.ts` `handleDisconnect` to call `registry.remove(socket.id)`; if a shipId was removed, `this.server.emit('player.left', { shipId })` (FR-025)
+- [X] T028 [US3] Create `backend/src/game/tick/sector-transition.subscriber.ts` implementing `SectorTransitionSubscriber` per data-model.md §C.2 and research.md R5: holds `Map<shipId, Sector>` previous-tick cells; on each physics tick, builds current `Map` from `ShipStateService` (all ship types incl. AI), diffs, emits batched `physics.sector-transition` via `this.server.emit` iff non-empty, swaps the snapshot (FR-026)
+- [X] T029 [US3] Wire `SectorTransitionSubscriber` into `backend/src/game/tick/tick.module.ts` and the existing physics-tick lifecycle (no new `setInterval`, per plan.md and Constitution III)
 
 ### Implementation for User Story 3 — Frontend
 
-- [ ] T030 [P] [US3] Create `frontend/src/state/usePlayerList.ts` exporting a `useReducer`-backed hook with actions `SNAPSHOT`, `JOIN`, `LEFT`, `TRANSITION`; internal state is `Map<shipId, ConnectedPlayer>`; selector returns alphabetically-sorted array (data-model.md §B.3, research.md R1)
-- [ ] T031 [P] [US3] Create `frontend/src/components/PlayerListPanel.tsx` rendering name, sector `(x, y)`, class for each connected ship; consumes `usePlayerList`; derives sector from `floor()` (FR-016, FR-017, FR-018)
-- [ ] T032 [US3] In `frontend/src/socket/useSocket.ts` (or a thin adjacent subscriber), wire `player.snapshot` / `player.joined` / `player.left` / `physics.sector-transition` event handlers to dispatch the corresponding `usePlayerList` actions (FR-017, FR-017a)
-- [ ] T033 [US3] Update `frontend/src/App.tsx` to mount `PlayerListPanel.tsx` in the side region (FR-002)
+- [X] T030 [P] [US3] Create `frontend/src/state/usePlayerList.ts` exporting a `useReducer`-backed hook with actions `SNAPSHOT`, `JOIN`, `LEFT`, `TRANSITION`; internal state is `Map<shipId, ConnectedPlayer>`; selector returns alphabetically-sorted array (data-model.md §B.3, research.md R1)
+- [X] T031 [P] [US3] Create `frontend/src/components/PlayerListPanel.tsx` rendering name, sector `(x, y)`, class for each connected ship; consumes `usePlayerList`; derives sector from `floor()` (FR-016, FR-017, FR-018)
+- [X] T032 [US3] In `frontend/src/socket/useSocket.ts` (or a thin adjacent subscriber), wire `player.snapshot` / `player.joined` / `player.left` / `physics.sector-transition` event handlers to dispatch the corresponding `usePlayerList` actions (FR-017, FR-017a)
+- [X] T033 [US3] Update `frontend/src/App.tsx` to mount `PlayerListPanel.tsx` in the side region (FR-002)
 
 **Checkpoint**: User Stories 1, 2 AND 3 all work independently. Multiplayer awareness functional.
 
@@ -130,14 +130,14 @@
 
 ### Tests for User Story 4 (write first, ensure they FAIL before implementation)
 
-- [ ] T034 [P] [US4] Create `frontend/test/ConnectionBanner.spec.tsx` asserting: hidden when status is `'connected'`; visible with appropriate copy when status is `'connecting'`, `'disconnected'`, or `'reconnecting'`; styling distinguishes states (FR-019)
-- [ ] T035 [P] [US4] Extend `frontend/test/socketClient.spec.ts` with assertions that emit/receive `connect`, `disconnect`, `reconnect_attempt`, `reconnect` events translate into the four `ConnectionStatus` values (FR-019, FR-021)
+- [X] T034 [P] [US4] Create `frontend/test/ConnectionBanner.spec.tsx` asserting: hidden when status is `'connected'`; visible with appropriate copy when status is `'connecting'`, `'disconnected'`, or `'reconnecting'`; styling distinguishes states (FR-019)
+- [X] T035 [P] [US4] Extend `frontend/test/socketClient.spec.ts` with assertions that emit/receive `connect`, `disconnect`, `reconnect_attempt`, `reconnect` events translate into the four `ConnectionStatus` values (FR-019, FR-021)
 
 ### Implementation for User Story 4
 
-- [ ] T036 [US4] Create `frontend/src/components/ConnectionBanner.tsx` consuming a `ConnectionStatus` value (`'connecting' | 'connected' | 'disconnected' | 'reconnecting'`); renders nothing when `'connected'`, otherwise a top banner with status-appropriate copy (FR-019, data-model.md §B.5). Keep the existing `ConnectionIndicator.tsx` intact for FR-022 compatibility
-- [ ] T037 [US4] Update `frontend/src/socket/useSocket.ts` (or `socketClient.ts`) to expose a `ConnectionStatus` value derived from socket.io-client lifecycle events (`connect`, `disconnect`, `reconnect_attempt`, `reconnect`) and clear it back to `'connected'` on successful reconnect (FR-019, FR-021)
-- [ ] T038 [US4] Update `frontend/src/App.tsx` to mount `ConnectionBanner.tsx` in the top region (FR-002) and pass the live `ConnectionStatus`; ensure command submission resumes automatically on reconnect — no manual refresh path (FR-021)
+- [X] T036 [US4] Create `frontend/src/components/ConnectionBanner.tsx` consuming a `ConnectionStatus` value (`'connecting' | 'connected' | 'disconnected' | 'reconnecting'`); renders nothing when `'connected'`, otherwise a top banner with status-appropriate copy (FR-019, data-model.md §B.5). Keep the existing `ConnectionIndicator.tsx` intact for FR-022 compatibility
+- [X] T037 [US4] Update `frontend/src/socket/useSocket.ts` (or `socketClient.ts`) to expose a `ConnectionStatus` value derived from socket.io-client lifecycle events (`connect`, `disconnect`, `reconnect_attempt`, `reconnect`) and clear it back to `'connected'` on successful reconnect (FR-019, FR-021)
+- [X] T038 [US4] Update `frontend/src/App.tsx` to mount `ConnectionBanner.tsx` in the top region (FR-002) and pass the live `ConnectionStatus`; ensure command submission resumes automatically on reconnect — no manual refresh path (FR-021)
 
 **Checkpoint**: All user stories independently functional. Feature 010 ready for end-to-end validation.
 
@@ -145,12 +145,12 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T039 [P] Update `docs/PROGRESS.md` roadmap section so the remaining roadmap reads exactly: `010=react-frontend, 011=onboarding, 012=social, 013=ship-mgmt, 014=planet-attack, 015=navigation` (FR-028); do NOT modify existing feature log entries
-- [ ] T040 [P] Update `docs/ARCHITECTURE.md` to add: `ConnectedShipsRegistry` (gateway), `SectorTransitionSubscriber` (tick), `usePlayerList` (frontend state), and the four new wire events
-- [ ] T041 [P] Append a `docs/DECISIONS.md` entry dated 2026-05-05 covering: last-write-wins single-socket-per-ship, batched per-tick `physics.sector-transition`, no Redux/new-state-layer for player list (research.md R1, R4, R5)
-- [ ] T042 [P] Append a `docs/PROGRESS.md` feature-log entry for 010 listing completed user stories, test counts, and any deferred follow-ups (e.g. `droid.spawned` / `droid.killed` bridge still pending per spec assumption)
-- [ ] T043 Run the full Vitest suite (`cd frontend && npm test`) and the full Jest suite (`cd backend && npm test`); confirm all 003-era tests still pass (FR-022) and all new specs are green (FR-023, SC-008)
-- [ ] T044 Execute every step of `specs/010-react-frontend/quickstart.md` against a local backend + frontend; verify each row of the manual acceptance walk passes; record any deviations as issues, not as code changes
+- [X] T039 [P] Update `docs/PROGRESS.md` roadmap section so the remaining roadmap reads exactly: `010=react-frontend, 011=onboarding, 012=social, 013=ship-mgmt, 014=planet-attack, 015=navigation` (FR-028); do NOT modify existing feature log entries
+- [X] T040 [P] Update `docs/ARCHITECTURE.md` to add: `ConnectedShipsRegistry` (gateway), `SectorTransitionSubscriber` (tick), `usePlayerList` (frontend state), and the four new wire events
+- [X] T041 [P] Append a `docs/DECISIONS.md` entry dated 2026-05-05 covering: last-write-wins single-socket-per-ship, batched per-tick `physics.sector-transition`, no Redux/new-state-layer for player list (research.md R1, R4, R5)
+- [X] T042 [P] Append a `docs/PROGRESS.md` feature-log entry for 010 listing completed user stories, test counts, and any deferred follow-ups (e.g. `droid.spawned` / `droid.killed` bridge still pending per spec assumption)
+- [X] T043 Run the full Vitest suite (`cd frontend && npm test`) and the full Jest suite (`cd backend && npm test`); confirm all 003-era tests still pass (FR-022) and all new specs are green (FR-023, SC-008)
+- [ ] T044 Execute every step of `specs/010-react-frontend/quickstart.md` against a local backend + frontend; verify each row of the manual acceptance walk passes; record any deviations as issues, not as code changes [manual — requires running services]
 
 ---
 

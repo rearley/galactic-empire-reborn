@@ -10,6 +10,7 @@ import 'reflect-metadata';
 import { GameGateway } from '../../../src/gateway/game.gateway';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../../src/game/commands/command-router.service';
+import { ConnectedShipsRegistry } from '../../../src/gateway/connected-ships.registry';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
@@ -24,7 +25,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
     serverEmitMock = jest.fn();
 
-    gateway = new GameGateway({} as ShipStateService, {} as CommandRouterService);
+    gateway = new GameGateway({} as ShipStateService, {} as CommandRouterService, {} as ConnectedShipsRegistry);
     (gateway as unknown as { server: { to: jest.Mock; emit: jest.Mock } }).server = {
       to: toMock,
       emit: serverEmitMock,

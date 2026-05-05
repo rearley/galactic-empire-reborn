@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSocket } from './socket/useSocket';
+import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
 import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
 import { ConnectionIndicator } from './components/ConnectionIndicator';
+import { ConnectionBanner } from './components/ConnectionBanner';
+import { PlayerListPanel } from './components/PlayerListPanel';
 import type { EventLogLine, ScanCell } from './types/contracts';
 
 const MAX_LOG_ENTRIES = 500;
@@ -19,7 +22,8 @@ const MAX_LOG_ENTRIES = 500;
  * @see specs/010-react-frontend/spec.md FR-002
  */
 export function App(): React.JSX.Element {
-  const { status, lastResult, send, localShipId } = useSocket();
+  const { players, dispatch: playerDispatch } = usePlayerList();
+  const { status, lastResult, send, localShipId } = useSocket(playerDispatch);
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
 
@@ -38,7 +42,10 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
-      {/* Top: connection-status banner area (FR-002) */}
+      {/* Top: connection status banner (FR-019) — hidden when connected */}
+      <ConnectionBanner status={status} />
+
+      {/* Top bar: title + connection indicator (FR-002, FR-022) */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-1">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Galactic Empire</span>
         <ConnectionIndicator status={status} />
@@ -56,8 +63,10 @@ export function App(): React.JSX.Element {
           <ScanMap cells={scanCells} shipId={localShipId} />
         </div>
 
-        {/* Side: player-list panel placeholder — populated in US3 (T033) */}
-        <div className="w-48 flex-shrink-0" data-testid="player-list-panel-slot" />
+        {/* Side: player-list panel (FR-002, FR-016..FR-018) */}
+        <div className="w-48 flex-shrink-0">
+          <PlayerListPanel players={players} />
+        </div>
       </div>
 
       {/* Bottom: command input bar fixed at bottom (FR-002) */}

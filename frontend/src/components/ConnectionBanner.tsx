@@ -1,0 +1,36 @@
+import type { ConnectionStatus } from '../socket/useSocket';
+
+interface ConnectionBannerProps {
+  status: ConnectionStatus;
+}
+
+const BANNER_COPY: Record<Exclude<ConnectionStatus, 'connected'>, string> = {
+  connecting: 'Connecting to server…',
+  disconnected: 'Disconnected — check your connection',
+  reconnecting: 'Reconnecting…',
+};
+
+const BANNER_CLASS: Record<Exclude<ConnectionStatus, 'connected'>, string> = {
+  connecting: 'bg-yellow-900 text-yellow-200',
+  disconnected: 'bg-red-900 text-red-200',
+  reconnecting: 'bg-orange-900 text-orange-200',
+};
+
+/**
+ * Renders a top-of-screen status banner when the connection is not established.
+ * Renders nothing when status is 'connected' (FR-019).
+ *
+ * @see specs/010-react-frontend/data-model.md §B.5
+ */
+export function ConnectionBanner({ status }: ConnectionBannerProps) {
+  if (status === 'connected') return null;
+
+  return (
+    <div
+      role="status"
+      className={`w-full px-4 py-1 text-center text-xs font-mono ${BANNER_CLASS[status]}`}
+    >
+      {BANNER_COPY[status]}
+    </div>
+  );
+}

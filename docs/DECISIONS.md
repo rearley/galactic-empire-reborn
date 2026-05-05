@@ -685,3 +685,39 @@ diverge from the existing seed without benefit; 31/32/33 is already live in `ge_
 **Reason**: Constant-time comparison is the industry-standard mitigation for secret-comparison timing oracles. The overhead is negligible for a single admin endpoint.
 
 **Alternatives rejected**: Plain `===` comparison (timing-vulnerable), bcrypt (overkill for a static API token).
+
+---
+
+## 2026-05-05 — Last-write-wins single-socket-per-ship enforcement
+
+**Context**: feature 010 (React frontend) needs a multiplayer-aware player list. When a player reconnects or opens a second tab, the server could end up with two sockets for the same ship. (research.md R4)
+
+**Decision**: `ConnectedShipsRegistry.upsert(shipId, socketId)` follows last-write-wins: it returns the prior socketId so `handleConnection` can disconnect the old socket before emitting snapshot/joined. `handleDisconnect` calls `registry.remove(socketId)`; because `upsert` already cleared the prior mapping, `remove` returns `undefined` for the displaced socket, preventing a duplicate `player.left` emission.
+
+**Reason**: Single-socket-per-ship is required so the player list never shows duplicate entries. Last-write-wins is the simplest policy that handles both reconnects and multi-tab scenarios without session state.
+
+**Alternatives rejected**: Per-ship session tokens (extra complexity, no benefit for a single-server game); refusing second connections (worse UX — player would have to manually close the first tab).
+
+---
+
+## 2026-05-05 — Batched per-tick physics.sector-transition event
+
+**Context**: The frontend ScanMap and PlayerListPanel need to know when ships cross sector boundaries, but emitting one event per-ship per-tick at 6 s cadence would flood the client. (research.md R5)
+
+**Decision**: `SectorTransitionSubscriber` accumulates all integer-cell changes within a single physics tick and emits a single batched `physics.sector-transition` event via EventEmitter2, which `GameGateway` forwards to all clients as one Socket.io emission. Newly-spawned and despawned ships are excluded (clients learn of them via `player.joined`/`player.left`).
+
+**Reason**: One batched event per tick is the minimum necessary for the frontend to stay in sync. Individual events per ship would multiply traffic by the number of moving ships with no benefit.
+
+**Alternatives rejected**: Streaming one event per ship (O(n) emissions per tick); polling the player list on a timer (breaks real-time feel).
+
+---
+
+## 2026-05-05 — No Redux / new state layer for player list
+
+**Context**: The player list panel needs reactive state that stays in sync across multiple socket events. (research.md R1)
+
+**Decision**: `usePlayerList` uses `useReducer` with an internal `Map<shipId, ConnectedPlayer>`. The reducer handles `SNAPSHOT`, `JOIN`, `LEFT`, and `TRANSITION` actions. No Redux, Zustand, or other external state library is introduced; the state is local to the component tree that mounts `PlayerListPanel`.
+
+**Reason**: The player list is a single, well-scoped piece of state. A `useReducer` hook is sufficient and avoids adding a new dependency. The list is already hydrated by well-defined socket events with clear semantics for each action type.
+
+**Alternatives rejected**: Redux Toolkit (overkill for a single list); Zustand (unnecessary dependency); Context API with a global store (heavier than needed for one panel).
