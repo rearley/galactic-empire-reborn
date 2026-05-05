@@ -488,3 +488,33 @@ model Mine {
   /// FR-029: timestamp of deployment
   deployedAt  DateTime @default(now())
 }
+
+// ─── MidnightRun ─────────────────────────────────────────────────────────────
+// Ledger of completed midnight passes. One row per server-local calendar date.
+// PK on date guarantees idempotency: a second pass on the same day either
+// updates the row (manual recovery via admin endpoint) or is short-circuited
+// by the cron path's "today already ran" check.
+//
+// @see specs/009-midnight-job/data-model.md — MidnightRun model
+// @see specs/009-midnight-job/research.md D5 (date keying)
+
+model MidnightRun {
+  /// Server-local calendar date — natural primary key; ensures exactly one row per day
+  runDate            DateTime @id @db.Date
+  /// Wall-clock completion timestamp for the pass
+  completedAt        DateTime
+  /// Total wall-clock duration in milliseconds
+  durationMs         Int
+  /// Phase 1: number of user accumulator rows zeroed
+  usersUpdated       Int
+  /// Phase 2: number of owned planets processed
+  planetsProcessed   Int
+  /// Phase 2: number of MailStat production-report rows inserted
+  mailReportsCreated Int
+  /// Phase 3: number of Mail rows deleted
+  mailDeleted        Int
+  /// Phase 4: number of teams with at least one member (reconciled)
+  teamsReconciled    Int
+  /// Phase 4: number of teams marked removed (teamcode = -1)
+  teamsRemoved       Int
+}
