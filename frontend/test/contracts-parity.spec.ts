@@ -6,10 +6,21 @@ import type {
   ScanCell,
   CommandRequest,
   CommandResultPayload,
+  Sector,
+  ConnectedPlayer,
+  PlayerSnapshotPayload,
+  PlayerJoinedPayload,
+  PlayerLeftPayload,
+  SectorTransition,
+  PhysicsSectorTransitionPayload,
 } from '../src/types/contracts';
 import {
   SCAN_GRID_WIDTH,
   SCAN_GRID_HEIGHT,
+  PLAYER_SNAPSHOT,
+  PLAYER_JOINED,
+  PLAYER_LEFT,
+  PHYSICS_SECTOR_TRANSITION,
 } from '../src/types/contracts';
 import type {
   EventLogCategory as CanonicalEventLogCategory,
@@ -77,3 +88,78 @@ type AssertEqualPayload = CommandResultPayload extends CanonicalCommandResultPay
 
 const _checks: [AssertEqualCategory, AssertEqualLine, AssertEqualCellType, AssertEqualCell, AssertEqualReq, AssertEqualPayload] = [true, true, true, true, true, true];
 void _checks;
+
+// ─── T004: New 010 wire types — exported and structurally correct ─────────────
+
+describe('player presence & sector-transition types', () => {
+  it('PLAYER_SNAPSHOT constant equals "player.snapshot"', () => {
+    expect(PLAYER_SNAPSHOT).toBe('player.snapshot');
+  });
+
+  it('PLAYER_JOINED constant equals "player.joined"', () => {
+    expect(PLAYER_JOINED).toBe('player.joined');
+  });
+
+  it('PLAYER_LEFT constant equals "player.left"', () => {
+    expect(PLAYER_LEFT).toBe('player.left');
+  });
+
+  it('PHYSICS_SECTOR_TRANSITION constant equals "physics.sector-transition"', () => {
+    expect(PHYSICS_SECTOR_TRANSITION).toBe('physics.sector-transition');
+  });
+
+  it('PlayerSnapshotPayload accepts a correctly-shaped value', () => {
+    const sector: Sector = { x: 3, y: 7 };
+    const player: ConnectedPlayer = { shipId: 'abc', name: 'Test', sector, shipClass: 2 };
+    const payload: PlayerSnapshotPayload = { players: [player] };
+    expect(payload.players).toHaveLength(1);
+    expect(payload.players[0].shipId).toBe('abc');
+  });
+
+  it('PlayerJoinedPayload accepts a correctly-shaped value', () => {
+    const joined: PlayerJoinedPayload = {
+      shipId: 'xyz',
+      name: 'Pilot',
+      sector: { x: 0, y: 0 },
+      shipClass: 5,
+    };
+    expect(joined.shipId).toBe('xyz');
+    expect(joined.sector.x).toBe(0);
+  });
+
+  it('PlayerLeftPayload accepts a correctly-shaped value', () => {
+    const left: PlayerLeftPayload = { shipId: 'gone' };
+    expect(left.shipId).toBe('gone');
+  });
+
+  it('PhysicsSectorTransitionPayload accepts a correctly-shaped value', () => {
+    const transition: SectorTransition = {
+      shipId: 'ship1',
+      fromSector: { x: 1, y: 2 },
+      toSector: { x: 1, y: 3 },
+    };
+    const payload: PhysicsSectorTransitionPayload = { transitions: [transition] };
+    expect(payload.transitions[0].shipId).toBe('ship1');
+    expect(payload.transitions[0].fromSector.y).toBe(2);
+    expect(payload.transitions[0].toSector.y).toBe(3);
+  });
+});
+
+// TypeScript structural checks for the new 010 types.
+// These are no-op at runtime; the compile-time check is the gate.
+type _Sector = Sector extends { x: number; y: number } ? true : never;
+type _ConnectedPlayer = ConnectedPlayer extends {
+  shipId: string; name: string; sector: Sector; shipClass: number;
+} ? true : never;
+type _PlayerSnapshotPayload = PlayerSnapshotPayload extends { players: ConnectedPlayer[] } ? true : never;
+type _PlayerJoinedPayload = PlayerJoinedPayload extends ConnectedPlayer ? true : never;
+type _PlayerLeftPayload = PlayerLeftPayload extends { shipId: string } ? true : never;
+type _SectorTransition = SectorTransition extends {
+  shipId: string; fromSector: Sector; toSector: Sector;
+} ? true : never;
+type _PhysicsSectorTransitionPayload = PhysicsSectorTransitionPayload extends {
+  transitions: SectorTransition[];
+} ? true : never;
+
+const _newChecks: [_Sector, _ConnectedPlayer, _PlayerSnapshotPayload, _PlayerJoinedPayload, _PlayerLeftPayload, _SectorTransition, _PhysicsSectorTransitionPayload] = [true, true, true, true, true, true, true];
+void _newChecks;
