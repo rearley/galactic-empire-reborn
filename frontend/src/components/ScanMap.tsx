@@ -1,27 +1,78 @@
-import React from 'react';
-import type { ScanCell } from '../types/contracts';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../types/contracts';
+import React, { useEffect, useState } from 'react';
+import type { ScanCell, PhysicsSectorTransitionPayload } from '../types/contracts';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, PHYSICS_SECTOR_TRANSITION } from '../types/contracts';
+import { socket } from '../socket/socketClient';
+
+/**
+ * Overlap priority for cells at the same grid position (FR-015, research.md R7).
+ * Higher value = higher priority.
+ * @see GECMDS.C:2681 scan_lo cell projection
+ */
+const PRIORITY: Record<string, number> = {
+  self: 5,
+  ship: 4,
+  planet: 3,
+  wormhole: 2,
+  mine: 1,
+};
+
+const CELL_CLASS: Record<string, string> = {
+  self: 'text-cyan-400 font-bold',
+  ship: 'text-green-400',
+  planet: 'text-yellow-400',
+  wormhole: 'text-purple-400',
+  mine: 'text-orange-400',
+};
 
 interface ScanMapProps {
   cells: ScanCell[] | null;
+  /** Local ship's ID — used to detect sector transitions that clear the map (FR-013) */
+  shipId?: string | null;
 }
 
 /**
- * Renders the range-scan character grid.
- * Grid dimensions come from the canonical shared-types constants (30×15 per GEMAIN.H:121-122).
- * The self-cell (type:'self') is rendered with a distinct CSS class to differentiate it
- * from wormhole cells (both use '*' as glyph; type discriminates).
+ * Renders the 30×15 range-scan character grid.
+ * Clears on `physics.sector-transition` when the local ship transitions (FR-013).
+ * Resolves overlapping cells by priority: self > ship > planet > wormhole > mine (FR-015).
+ * Empty positions render '.' (FR-014).
  *
- * @see GEMAIN.H:121 MAXX=30, SCAN_GRID_WIDTH=30
- * @see GEMAIN.H:122 MAXY=15, SCAN_GRID_HEIGHT=15
+ * @see GEMAIN.H:121 MAXX=30
+ * @see GEMAIN.H:122 MAXY=15
+ * @see GECMDS.C:2681 xfactor / yfactor projection
  * @see GECMDS.C:2721 player centre at map[MAXY/2][MAXX/2]
+ * @see specs/010-react-frontend/data-model.md §B.4 ScanMapState
  */
-export function ScanMap({ cells }: ScanMapProps): React.JSX.Element {
-  // Build a lookup map from grid cells: "x:y" → ScanCell
+export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Element {
+  // Internal display state — cleared on sector transition, refreshed when cells prop changes
+  const [displayCells, setDisplayCells] = useState<ScanCell[] | null>(cells);
+
+  useEffect(() => {
+    setDisplayCells(cells);
+  }, [cells]);
+
+  useEffect(() => {
+    if (!shipId) return;
+
+    const handleTransition = (payload: PhysicsSectorTransitionPayload) => {
+      const crossed = payload.transitions.some((t) => t.shipId === shipId);
+      if (crossed) setDisplayCells(null);
+    };
+
+    socket.on(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
+    return () => {
+      socket.off(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
+    };
+  }, [shipId]);
+
+  // Build priority-resolved cell lookup: "x:y" → highest-priority ScanCell
   const cellMap = new Map<string, ScanCell>();
-  if (cells) {
-    for (const cell of cells) {
-      cellMap.set(`${cell.x}:${cell.y}`, cell);
+  for (const cell of displayCells ?? []) {
+    const key = `${cell.x}:${cell.y}`;
+    const existing = cellMap.get(key);
+    const cellPrio = PRIORITY[cell.type] ?? 0;
+    const existingPrio = existing != null ? (PRIORITY[existing.type] ?? 0) : -1;
+    if (cellPrio > existingPrio) {
+      cellMap.set(key, cell);
     }
   }
 
@@ -30,17 +81,8 @@ export function ScanMap({ cells }: ScanMapProps): React.JSX.Element {
     const cols: React.JSX.Element[] = [];
     for (let x = 0; x < SCAN_GRID_WIDTH; x++) {
       const cell = cellMap.get(`${x}:${y}`);
-      const char = cell ? cell.char : ' ';
-      const className =
-        cell?.type === 'self'
-          ? 'text-cyan-400 font-bold'
-          : cell?.type === 'wormhole'
-          ? 'text-purple-400'
-          : cell?.type === 'planet'
-          ? 'text-yellow-400'
-          : cell?.type === 'ship'
-          ? 'text-green-400'
-          : 'text-gray-600';
+      const char = cell ? cell.char : '.';
+      const className = cell ? (CELL_CLASS[cell.type] ?? 'text-gray-400') : 'text-gray-600';
       cols.push(
         <span
           key={x}

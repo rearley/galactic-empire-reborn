@@ -70,13 +70,13 @@
 
 ### Tests for User Story 2 (write first, ensure they FAIL before implementation)
 
-- [ ] T014 [P] [US2] Extend `frontend/test/ScanMap.spec.tsx` with tests for: 30×15 empty grid when no scan present (FR-012, edge case), symbol mapping (`+` self, `@` ship, `O` planet, `W` wormhole, `*` mine, `.` empty) (FR-014), overlap priority `self > ship > planet > wormhole > mine` (FR-015), clear on `physics.sector-transition` containing local shipId (FR-013)
+- [X] T014 [P] [US2] Extend `frontend/test/ScanMap.spec.tsx` with tests for: 30×15 empty grid when no scan present (FR-012, edge case), symbol mapping (`+` self, `@` ship, `O` planet, `W` wormhole, `*` mine, `.` empty) (FR-014), overlap priority `self > ship > planet > wormhole > mine` (FR-015), clear on `physics.sector-transition` containing local shipId (FR-013)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Update `frontend/src/components/ScanMap.tsx` to render a 30×15 monospace grid using `MAXX=30 / MAXY=15` constants from `contracts.ts`, project `ScanCell[]` into characters with the priority sort from research.md R7 (FR-012, FR-014, FR-015)
-- [ ] T016 [US2] In `ScanMap.tsx` (or a small `useScanMapState` hook colocated with it), maintain `ScanMapState { cells, selfSector }` per data-model.md §B.4; subscribe to `physics.sector-transition` and clear `cells` when the local shipId appears in the transitions array (FR-013)
-- [ ] T017 [US2] Update `frontend/src/App.tsx` to mount `ScanMap.tsx` in the main right region of the layout (FR-002) and pass the local shipId so transition-clear logic resolves correctly
+- [X] T015 [US2] Update `frontend/src/components/ScanMap.tsx` to render a 30×15 monospace grid using `MAXX=30 / MAXY=15` constants from `contracts.ts`, project `ScanCell[]` into characters with the priority sort from research.md R7 (FR-012, FR-014, FR-015)
+- [X] T016 [US2] In `ScanMap.tsx` (or a small `useScanMapState` hook colocated with it), maintain `ScanMapState { cells, selfSector }` per data-model.md §B.4; subscribe to `physics.sector-transition` and clear `cells` when the local shipId appears in the transitions array (FR-013)
+- [X] T017 [US2] Update `frontend/src/App.tsx` to mount `ScanMap.tsx` in the main right region of the layout (FR-002) and pass the local shipId so transition-clear logic resolves correctly
 
 **Checkpoint**: User Stories 1 AND 2 both work independently — full MVP.
 
