@@ -127,6 +127,7 @@ export class ShipStateService implements OnModuleInit {
    */
   private async flush(): Promise<void> {
     for (const state of this.map.values()) {
+      if (state.isEphemeral) continue; // FR-002: Droid ships have no DB row
       if (!state.dirty) continue;
       try {
         await this.prisma.ship.update({

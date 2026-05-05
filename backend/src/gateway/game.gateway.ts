@@ -32,6 +32,10 @@ import {
   CybertronTauntPayload,
   CybertronBrokeOffPayload,
 } from '../game/cybertron/cybertron-events';
+import {
+  DroidEvents,
+  DroidAnnoyEvent,
+} from '../game/droid/droid-events';
 
 interface SectorPayload {
   x: unknown;
@@ -293,6 +297,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       : event.sector;
     const room = `sector:${sector.x}:${sector.y}`;
     this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
+  }
+
+  /**
+   * Deliver droid annoy message to the target player's socket + sector room broadcast.
+   * @see specs/008-droid-ai/contracts/droid-events.md FR-030, FR-031
+   * @see GEDROIDS.C:237 droid_annoy
+   */
+  @OnEvent(DroidEvents.ANNOY)
+  handleDroidAnnoy(event: DroidAnnoyEvent): void {
+    const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
+    const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {

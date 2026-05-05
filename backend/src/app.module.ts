@@ -9,10 +9,11 @@ import { PlanetModule } from './game/planet/planet.module';
 import { PhysicsModule } from './game/physics/physics.module';
 import { CombatModule } from './game/combat/combat.module';
 import { CybertronModule } from './game/cybertron/cybertron.module';
+import { DroidModule } from './game/droid/droid.module';
 import { DebugController } from './debug/debug.controller';
 
 @Module({
-  imports: [PrismaModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, CommandsModule, GatewayModule],
+  imports: [PrismaModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule],
   controllers: [DebugController],
 })
 export class AppModule {}
