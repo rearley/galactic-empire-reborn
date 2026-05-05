@@ -4,9 +4,11 @@ import type { CommandRequest, CommandResultPayload } from '../types/contracts';
 /**
  * Singleton Socket.io client.
  * Connects with a hard-coded development userid (FR-029).
- * Auto-reconnects with exponential backoff capped at 5s (research.md Decision 6).
+ * Auto-reconnects with exponential backoff: initial delay 1s, max 30s with
+ * 50% jitter so thundering-herd bursts are spread across ±15s (FR-020).
  *
  * @see specs/003-ship-commands/contracts/websocket-events.md §Connection
+ * @see specs/010-react-frontend/research.md R3 (reconnection tuning FR-020)
  */
 const socket: Socket = io({
   query: { userid: 'DEV' },
@@ -14,7 +16,8 @@ const socket: Socket = io({
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
+  reconnectionDelayMax: 30000,
+  randomizationFactor: 0.5,
   transports: ['websocket'],
 });
 

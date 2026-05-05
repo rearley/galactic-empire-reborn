@@ -69,6 +69,56 @@ export interface ScanCell {
   char: string;
 }
 
+// ─── T003: Player presence & sector-transition wire types ────────────────────
+
+/** Integer sector coordinates — 0..MAXX-1 (x), 0..MAXY-1 (y). */
+export interface Sector {
+  x: number;
+  y: number;
+}
+
+/** A connected player visible to other players in the galaxy. */
+export interface ConnectedPlayer {
+  shipId: string;
+  name: string;
+  sector: Sector;
+  shipClass: number;
+}
+
+/** Outbound: server → client `player.snapshot` — full list on join. */
+export interface PlayerSnapshotPayload {
+  players: ConnectedPlayer[];
+}
+
+/** Outbound: server → client `player.joined` — new player connected. */
+export interface PlayerJoinedPayload extends ConnectedPlayer {}
+
+/** Outbound: server → client `player.left` — player disconnected. */
+export interface PlayerLeftPayload {
+  shipId: string;
+}
+
+/** A single ship's sector transition within one physics tick. */
+export interface SectorTransition {
+  shipId: string;
+  fromSector: Sector;
+  toSector: Sector;
+}
+
+/** Outbound: server → client `physics.sector-transition` — tick movement. */
+export interface PhysicsSectorTransitionPayload {
+  transitions: SectorTransition[];
+}
+
+// ─── T005: Typed event-name constants ────────────────────────────────────────
+
+export const PLAYER_SNAPSHOT = 'player.snapshot' as const;
+export const PLAYER_JOINED = 'player.joined' as const;
+export const PLAYER_LEFT = 'player.left' as const;
+export const PHYSICS_SECTOR_TRANSITION = 'physics.sector-transition' as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /** Inbound: client → server `command` */
 export interface CommandRequest {
   input: string;

@@ -63,4 +63,15 @@ describe('socketClient', () => {
     unsub();
     expect(socket.off).toHaveBeenCalledWith('command:result', listener);
   });
+
+  it('socket is constructed with reconnectionDelayMax 30000 and randomizationFactor 0.5 (FR-020)', async () => {
+    await import('../src/socket/socketClient');
+    const { io } = await import('socket.io-client');
+    expect(io).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reconnectionDelayMax: 30000,
+        randomizationFactor: 0.5,
+      }),
+    );
+  });
 });
