@@ -145,3 +145,18 @@ position) plus two modernization additions (`deployedBy` userid, `deployedAt`
 timestamp) that let the server restore mine ownership across restarts. Uses an
 auto-increment integer PK because the original game had no natural mine key.
 Source: `MINE` in `GEMAIN.H`.
+
+---
+
+## MidnightRun
+
+A ledger row written at the end of each successful midnight maintenance pass.
+Primary key is `runDate DateTime @id @db.Date` — one row per calendar day.
+Stores the completion timestamp, wall-clock duration in milliseconds, and the
+six `PhaseCounters` (usersUpdated, planetsProcessed, mailReportsCreated,
+mailDeleted, teamsReconciled, teamsRemoved). Used by `MidnightService` as
+the idempotency probe: if today's row already exists, the pass is skipped.
+The probe is checked both on `onApplicationBootstrap` (self-heal) and on
+every admin-triggered run. `recordRun` uses upsert so same-day re-runs update
+the counters rather than failing on a unique constraint. There is no FK to any
+other table — this is a standalone audit row.

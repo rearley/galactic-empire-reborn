@@ -1,3 +1,41 @@
+## 2026-05-05 — 009-midnight-job: Midnight Maintenance Job
+
+**Completed**:
+- `MidnightRun` Prisma model + migration (runDate @id @db.Date, PhaseCounters, durationMs)
+- `MidnightService` with `@Cron('0 0 * * *')` + `onApplicationBootstrap` self-heal + manual `run()` entry point
+- Postgres advisory lock (`pg_try_advisory_lock`) for concurrent invocation protection; `MidnightLockHeldError` exported for 409 mapping
+- Full 4-phase midnight pass wrapped in a single `prisma.$transaction()`:
+  - Phase 1: `resetUserAccumulators` — planets/score/plscore/population → 0
+  - Phase 2: `processOwnedPlanets` — bulk-load + in-memory accumulation + batch writes (SC-005: 1,656 ms / 2,000 planets)
+  - Phase 3: `purgeMail` — delete by age + delete `*`-prefixed recipients
+  - Phase 4: score = plscore + klscore (raw SQL), team reconciliation, roster ranking (ROW_NUMBER window fn)
+- `valuePlanet()` pure BigInt scorer (GEPLANET.C formula, avoids zero-divisor with rearranged arithmetic)
+- `buildProductionMailStat()` for phase-2 MailStat rows (class=3/MAIL_CLASS_PRODRPT)
+- `rankRoster()` pure fn for rospos assignment
+- `AdminMidnightController` — POST /admin/midnight/run → 202/401/409/503
+- `AdminTokenGuard` — constant-time `timingSafeEqual` comparison; 503 if env unset
+- `PlayerScoreService` + `PlayerScoreRepository` — ChgLoser cash penalty on PvP kill (FR-025/026)
+- `PlayerScoreModule` with `CHGLOSER_PERCENT` DI token factory provider; wired into `CombatModule`
+- `ScheduleModule.forRoot()` and `MidnightModule` added to `AppModule`
+
+**Tests**: 16 new test files, 94 new tests (balance-regression, value-pl, rank-roster, mailstat-builder,
+midnight.service, mail-purge, team-reconciliation, idempotency, advisory-lock, transaction-rollback,
+self-heal, admin-endpoint, perf-budget, seven-day-soak, chgloser-pvp, droid-kill-scoring).
+1332 tests total, all passing.
+
+**Decisions made**:
+- D1: MidnightRun ledger for idempotency (date-keyed upsert)
+- D2: pg_try_advisory_lock for concurrency protection
+- D7: N+1 elimination in processOwnedPlanets (bulk-load + in-memory + batch writes)
+- D8: CHGLOSER_PERCENT injected via NestJS factory provider
+- D9: timingSafeEqual in AdminTokenGuard
+
+**Next**: feature 010-react-frontend — Terminal UI, ASCII map, command input, event log
+
+**Known issues**: None. All 1332 tests green.
+
+---
+
 ## 2026-05-04 — 006b-combat bugfix: score transfer on kill
 
 **Completed**:

@@ -762,3 +762,51 @@ Spawn gated: only fires when ≥1 `GESTAT_USER` (human) ship is online.
 - `removeFromGame` skips Prisma delete for ephemeral states.
 - `prisma.ship.findMany({ where: { shpclass: { in: [31,32,33] } } })` always returns `[]`.
 - Zero rows in `User` table with `userid LIKE '@Droid-%'`.
+
+---
+
+## Midnight Maintenance Pass (feature 009)
+
+**Source**: GEMAIN.C:1084-1335 (`gemidnighta`)
+
+Runs once per calendar day at 00:00 server time (`@Cron('0 0 * * *')`). Also triggered manually via POST /admin/midnight/run. Self-heals on restart: if today's `MidnightRun` row is absent, runs immediately on boot. Protected by a Postgres advisory lock — concurrent invocations throw `MidnightLockHeldError` (mapped to 409 at the API layer). The entire pass runs inside a single `prisma.$transaction()`.
+
+### Phase 1 — Reset user accumulators (GEMAIN.C:1097-1115)
+
+Zero `planets`, `score`, `plscore`, `population` for every non-KEY user. `klscore` is **not** touched — it is the lifetime kill-score accumulator.
+
+### Phase 2 — Planet production reports (GEMAIN.C:1120-1170)
+
+Walk every planet of type `PLTYPE_PLNT` with a non-empty, non-KEY, valid owner:
+
+1. Compute `plScore = valuePlanet(cash, tax, itemsQty, BASEPRICE, PLTVCASH, PLTVDIV)`
+   - Formula: `(cash + tax) × PLTVCASH / 1_000_000 + Σ(BASEPRICE[i] × itemsQty[i] / PLTVDIV)`
+   - Source: GEPLANET.C — `PLTVCASH = PLTVDIV = 201_228_378`
+2. Accumulate `planets`, `population` (= `itemsQty[0] / 10_000`), `plscore` per owner in-memory
+3. Batch-update owners via `Promise.all`
+4. Insert one `MailStat` row (class 3 / `MAIL_CLASS_PRODRPT`) per planet in chunks of 50
+
+Planets with empty `userid`, KEY owner, or unknown owner are silently skipped (FR-011/FR-012).
+
+### Phase 3 — Mail purge (GEMAIN.C:1175-1195)
+
+Delete all `Mail` rows where:
+- `stamp < (now - mailDays × 86400)` (default 7 days, configured via `MIDNIGHT_MAILDAYS`)
+- `userid LIKE '*%'` (system-flagged recipients)
+
+### Phase 4 — Score and roster (GEMAIN.C:1204-1332)
+
+1. **User scores**: `UPDATE User SET score = plscore + klscore WHERE userid != KEY` (raw SQL)
+2. **Team reconciliation**:
+   - Zero all team `teamcount` and `teamscore`
+   - For each user with `teamcode > 0`: increment `teamcount` if team exists, else reset `teamcode = 0` (orphan)
+   - For each user with `teamcode > 0` and `score > 0`: `teamscore += TEAMBONU + (score / teamcount)`
+     - `TEAMBONU = 3_200_000` (GEMAIN.H)
+   - Mark teams with `teamcount = 0` as removed (`teamcode = -1`)
+3. **Roster ranking**: Assign `rospos` via `ROW_NUMBER() OVER (ORDER BY score DESC, userid ASC)` to qualifying users (`score > 0`, not KEY, not `@`-prefixed). Non-qualifiers get `rospos = 0`.
+
+### ChgLoser — PvP cash penalty (FR-025/FR-026)
+
+**Source**: GEMAIN.C — `CHGLOSER` feature, `GEPCNT` percentage
+
+When a player kills another player (both non-AI), `PlayerScoreService` transfers `floor(loser.cash × chgLoserPercent / 100)` from the loser to the killer atomically in a Prisma transaction. Rate configured via `MIDNIGHT_CHGLOSER` env (default 0 = disabled). AI ships (prefix `Cybrg-` or `@Droid-`) never pay the penalty as either attacker or victim.
