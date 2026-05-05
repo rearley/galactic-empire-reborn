@@ -8,6 +8,7 @@ import { CombatTickService } from './combat-tick.service';
 import { MineRegistry } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { MathRandomAdapter, RANDOM } from './random.port';
+import { PlayerScoreModule } from '../player/player-score.module';
 
 /**
  * Combat module — owns ship-to-ship combat: phasers, torpedoes, missiles,
@@ -20,7 +21,7 @@ import { MathRandomAdapter, RANDOM } from './random.port';
  * @see specs/006b-combat/plan.md
  */
 @Module({
-  imports: [PhysicsModule, ShipModule, TickModule, PrismaModule, EventEmitterModule],
+  imports: [PhysicsModule, ShipModule, TickModule, PrismaModule, EventEmitterModule, PlayerScoreModule],
   providers: [
     CombatTickService,
     MineRepository,
