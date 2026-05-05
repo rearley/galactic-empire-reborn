@@ -20,6 +20,7 @@ vi.mock('../src/socket/useSocket', () => ({
     status: 'disconnected' as const,
     lastResult: null,
     send: vi.fn(),
+    localShipId: null,
   })),
 }));
 

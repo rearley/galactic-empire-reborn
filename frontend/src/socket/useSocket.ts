@@ -8,6 +8,8 @@ export interface UseSocketReturn {
   status: ConnectionStatus;
   lastResult: CommandResultPayload | null;
   send: (input: string) => void;
+  /** Local ship's canonical shipId (set from player.snapshot in US3; null until then) */
+  localShipId: string | null;
 }
 
 /**
@@ -46,5 +48,6 @@ export function useSocket(): UseSocketReturn {
 
   const send = useCallback((input: string) => sendCommand(input), []);
 
-  return { status, lastResult, send };
+  // localShipId populated in US3 (T032) when player.snapshot arrives
+  return { status, lastResult, send, localShipId: null };
 }

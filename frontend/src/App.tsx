@@ -19,7 +19,7 @@ const MAX_LOG_ENTRIES = 500;
  * @see specs/010-react-frontend/spec.md FR-002
  */
 export function App(): React.JSX.Element {
-  const { status, lastResult, send } = useSocket();
+  const { status, lastResult, send, localShipId } = useSocket();
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
 
@@ -53,7 +53,7 @@ export function App(): React.JSX.Element {
 
         {/* Main-right: ASCII sector-map panel */}
         <div className="w-80 flex-shrink-0 border-r border-gray-800">
-          <ScanMap cells={scanCells} />
+          <ScanMap cells={scanCells} shipId={localShipId} />
         </div>
 
         {/* Side: player-list panel placeholder — populated in US3 (T033) */}
