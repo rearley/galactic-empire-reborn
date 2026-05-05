@@ -625,3 +625,63 @@ comparison (`sameas`), not by class number, so both numbering schemes are valid 
 
 **Alternatives rejected**: Renumber seed rows to 10/11/12 — would require a migration and would
 diverge from the existing seed without benefit; 31/32/33 is already live in `ge_dev`.
+
+---
+
+## 2026-05-05 — Postgres advisory lock for midnight job concurrency (D2)
+
+**Context**: The midnight job must never run concurrently with itself — double execution would produce double MailStat rows and corrupt team scores. The cron trigger and admin POST endpoint are two independent entry points.
+
+**Decision**: `MidnightService.run()` calls `pg_try_advisory_lock(ADVISORY_LOCK_KEY)` before opening the transaction. If it returns false, throw `MidnightLockHeldError` (code `MIDNIGHT_LOCK_HELD`). The lock is always released in a `finally` block via `pg_advisory_unlock`.
+
+**Reason**: Session-level advisory locks are the lightest Postgres primitive for this pattern — no extra table, no TTL concern. The lock is automatically released if the connection is dropped, so no zombie lock risk.
+
+**Alternatives rejected**: Application-level flag (not crash-safe), a dedicated DB lock table (heavier, requires manual cleanup), Redis-based lock (violates no-Redis principle).
+
+---
+
+## 2026-05-05 — MidnightRun ledger table for idempotency (D1)
+
+**Context**: The cron fires at midnight, but the job may also be triggered manually via the admin endpoint, and must self-heal on restart if midnight was missed. A pure lock does not prevent a same-day re-run from doing duplicate work.
+
+**Decision**: Record each completed run in a `MidnightRun` table with `runDate DateTime @id @db.Date`. On startup (`onApplicationBootstrap`) and at the start of every admin trigger, probe the ledger — skip if today's row already exists. `recordRun` uses upsert so a same-day re-run updates counters without failing.
+
+**Reason**: Date-keyed idempotency is the simplest correct primitive. `@db.Date` stores only the calendar date, so the probe is timezone-independent (server timezone anchors the "today" concept, consistent with the `@Cron('0 0 * * *')` wall-clock trigger).
+
+**Alternatives rejected**: Skip ledger, rely on lock alone (does not prevent same-day re-runs), event-sourcing approach (over-engineered for a once-per-day job).
+
+---
+
+## 2026-05-05 — N+1 elimination in processOwnedPlanets (D7/SC-005)
+
+**Context**: The naive phase-2 implementation issued one User lookup per planet (N+1), producing ~6,000 queries for a 2,000-planet fixture — 7,788 ms, well over the 5,000 ms SC-005 budget.
+
+**Decision**: Load all owned planets in one query. Load all valid user IDs in one batch query. Accumulate per-owner deltas (planets, population, plscore) in-memory. Execute all user updates via `Promise.all` in parallel. Insert MailStat rows in chunks of 50 via `createMany`. Final result: 1,656 ms for 1,000 users / 2,000 planets.
+
+**Reason**: The bulk-load + in-memory accumulation pattern is the canonical fix for N+1 in batch jobs. `Promise.all` parallelizes independent user updates; chunked `createMany` avoids Postgres parameter limits.
+
+**Alternatives rejected**: Prisma `$executeRaw` bulk upsert (complex, brittle), per-planet `upsert` (still N+1), Redis pipeline (violates no-Redis principle).
+
+---
+
+## 2026-05-05 — ChgLoser cash penalty injected via DI token (D8)
+
+**Context**: `PlayerScoreService` needs the `chgLoserPercent` value from `MIDNIGHT_CHGLOSER` env at runtime. Reading `process.env` directly inside a service breaks testability and violates the DI boundary.
+
+**Decision**: `PlayerScoreModule` provides a `CHGLOSER_PERCENT` injection token via a factory provider (`useFactory: () => loadMidnightConfig(process.env).chgLoserPercent`). `PlayerScoreService` injects it as a constructor parameter.
+
+**Reason**: Standard NestJS pattern — factory providers read env at module init time; the value is then stable and mockable in tests.
+
+**Alternatives rejected**: Read `process.env` directly in service (untestable), ConfigService (adds a dep not used elsewhere in this module).
+
+---
+
+## 2026-05-05 — AdminTokenGuard constant-time comparison (D9)
+
+**Context**: Naive string equality (`===`) on a secret token is vulnerable to timing attacks — an attacker can determine correct prefix bytes by measuring response time.
+
+**Decision**: `AdminTokenGuard` uses `crypto.timingSafeEqual` on `Buffer.from` representations of the provided and expected tokens. Returns 503 if env token is unset, 401 otherwise.
+
+**Reason**: Constant-time comparison is the industry-standard mitigation for secret-comparison timing oracles. The overhead is negligible for a single admin endpoint.
+
+**Alternatives rejected**: Plain `===` comparison (timing-vulnerable), bcrypt (overkill for a static API token).

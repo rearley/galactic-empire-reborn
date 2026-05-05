@@ -405,10 +405,73 @@ Listener (cybertron-tick.service.ts):
   combat.ship-destroyed (victimUserid starts with 'Cybrg-') → transferCybertronGold
 ```
 
-## What does not exist yet
+## MidnightModule (feature 009)
 
-- Droid AI — feature 008
-- Midnight job — feature 009
+```
+MidnightModule (game/midnight/)
+  ├── MidnightService     — @Cron('0 0 * * *') scheduledRun() + manual run() entry point.
+  │                         Acquires pg_try_advisory_lock before opening a single
+  │                         prisma.$transaction() that wraps all four phases:
+  │                           Phase 1: reset user accumulators (planets/score/plscore/population → 0)
+  │                           Phase 2: processOwnedPlanets — accumulate per-owner deltas in-memory,
+  │                                    batch-update users, batch-insert MailStat production reports
+  │                           Phase 3: purgeMail — delete mail older than mailDays days
+  │                                    and mail to *-prefixed recipients
+  │                           Phase 4: setUserScores (raw SQL: score = plscore + klscore),
+  │                                    team reconciliation (zeroAllTeams → countTeamMembersAndResetOrphans
+  │                                    → applyPerMemberTeamScore → markEmptyTeamsRemoved),
+  │                                    assignRosterPositions (raw SQL ROW_NUMBER window fn)
+  │                         Advisory lock is always released in `finally`.
+  │                         onApplicationBootstrap: checks MidnightRun ledger; runs if absent.
+  │                         Exports MidnightLockHeldError for 409 mapping in controller.
+  ├── MidnightRepository  — Prisma helpers for all four phases; all methods accept a TxClient.
+  │                         processOwnedPlanets: bulk-loads planets + valid user IDs in two
+  │                         queries, accumulates in-memory, batch-updates via Promise.all,
+  │                         batch-inserts MailStat rows in chunks of 50 (SC-005 budget).
+  ├── AdminMidnightController — POST /admin/midnight/run, guarded by AdminTokenGuard.
+  │                             Returns 202 with PhaseCounters + durationMs on success,
+  │                             409 on MidnightLockHeldError, 401/503 from the guard.
+  ├── AdminTokenGuard     — Returns 503 if MIDNIGHT_ADMIN_TOKEN env unset; 401 on mismatch.
+  │                         Uses timingSafeEqual for constant-time comparison.
+  ├── midnight-run.ledger.ts — hasRunForToday / recordRun helpers; idempotency probe against
+  │                            MidnightRun table (PK: runDate @db.Date).
+  ├── midnight.constants.ts  — TEAMBONU, PLTVCASH, PLTVDIV, ADVISORY_LOCK_KEY, mail class constants.
+  ├── midnight.config.ts     — loadMidnightConfig(env): reads MIDNIGHT_MAILDAYS, MIDNIGHT_CHGLOSER.
+  ├── value-pl.ts            — valuePlanet(): pure BigInt scorer for one planet row.
+  ├── rank-roster.ts         — rankRoster(): pure fn, assigns rospos ranks in-memory.
+  └── mailstat-builder.ts    — buildProductionMailStat(): builds MailStat insert payload.
+```
+
+### Midnight pass phases (GEMAIN.C:1084-1335)
+
+```
+1. resetUserAccumulators    → User.updateMany (planets/score/plscore/population = 0)
+2. processOwnedPlanets      → bulk-load owned planets + valid user IDs →
+                               in-memory delta map → Promise.all(User.update) →
+                               MailStat.createMany (chunks of 50)
+3. purgeMail                → Mail.deleteMany (by age) + Mail.deleteMany (*-prefix)
+4. setUserScores            → raw SQL: UPDATE User SET score = plscore + klscore
+   zeroAllTeams             → Team.updateMany (teamcount=0, teamscore=0)
+   countTeamMembersAndResetOrphans → per-user: increment teamcount or reset orphan
+   applyPerMemberTeamScore  → per-user: teamscore += TEAMBONU + (score / teamcount)
+   markEmptyTeamsRemoved    → Team.update (teamcode=-1 for teamcount=0 teams)
+   assignRosterPositions    → raw SQL: ROW_NUMBER() OVER (ORDER BY score DESC, userid ASC)
+```
+
+### ChgLoser (cash-penalty on PvP kill)
+
+`PlayerScoreService` (game/player/) listens to `COMBAT_SHIP_DESTROYED`. When both
+attacker and victim are non-AI players and `chgLoserPercent > 0`, calls
+`PlayerScoreRepository.applyCashPenalty()` — a Prisma transaction that transfers
+`floor(loser.cash × percent / 100)` from loser to killer. Rate is injected via
+`CHGLOSER_PERCENT` token from `midnight.config.ts`.
+
+```
+PlayerScoreModule (game/player/)
+  ├── PlayerScoreService    — COMBAT_SHIP_DESTROYED listener; AI detection via prefix regex
+  ├── PlayerScoreRepository — transferKillScore (score/klscore); applyCashPenalty (cash tx)
+  └── CHGLOSER_PERCENT      — factory provider reading MIDNIGHT_CHGLOSER env at boot
+```
 
 ## DroidModule additions (feature 008)
 
