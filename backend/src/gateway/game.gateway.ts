@@ -36,6 +36,15 @@ import {
   DroidEvents,
   DroidAnnoyEvent,
 } from '../game/droid/droid-events';
+import {
+  ConnectedShipsRegistry,
+  ConnectedPlayer,
+} from './connected-ships.registry';
+import {
+  PHYSICS_SECTOR_TRANSITION_EVENT,
+  PhysicsSectorTransitionPayload,
+} from '../game/tick/sector-transition.subscriber';
+import { shipKey } from '../game/ship/ship-state.types';
 
 interface SectorPayload {
   x: unknown;
@@ -70,6 +79,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly shipStateService: ShipStateService,
     private readonly commandRouter: CommandRouterService,
+    private readonly registry: ConnectedShipsRegistry,
   ) {}
 
   /**
@@ -115,6 +125,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
+    const shipId = shipKey(userid, activeShip.shipno);
+    const priorSocketId = this.registry.upsert(shipId, client.id);
+    if (priorSocketId) {
+      // Emit player.left for the displaced socket BEFORE snapshot so listeners
+      // see the correct sequence: left → snapshot → joined (FR-025a event ordering).
+      // handleDisconnect will fire for priorSocket via disconnect(true), but registry.remove
+      // returns undefined at that point (upsert already cleared the mapping), preventing
+      // a duplicate player.left emission.
+      this.server.emit('player.left', { shipId });
+      this.server.sockets.sockets.get(priorSocketId)?.disconnect(true);
+    }
+
     client.emit('command:result', {
       lines: [
         {
@@ -123,10 +145,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
       ],
     });
+
+    client.emit('player.snapshot', { players: this.registry.list() });
+
+    const connectedPlayer: ConnectedPlayer = {
+      shipId,
+      name: activeShip.shipname,
+      sector: { x: Math.floor(activeShip.xcoord), y: Math.floor(activeShip.ycoord) },
+      shipClass: activeShip.shpclass,
+    };
+    this.server.emit('player.joined', connectedPlayer);
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`disconnect ${client.id}`);
+    const removed = this.registry.remove(client.id);
+    if (removed) {
+      this.server.emit('player.left', { shipId: removed.shipId });
+    }
   }
 
   /**
@@ -297,6 +333,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       : event.sector;
     const room = `sector:${sector.x}:${sector.y}`;
     this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
+  }
+
+  /**
+   * Forward sector-transition batch to all connected clients so the frontend
+   * can update ScanMap cells and PlayerList positions.
+   * @see specs/010-react-frontend/data-model.md §C.2
+   */
+  @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT)
+  handleSectorTransition(event: PhysicsSectorTransitionPayload): void {
+    this.server.emit('physics.sector-transition', event);
   }
 
   /**
