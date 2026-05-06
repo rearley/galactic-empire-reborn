@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
+// Provide a stored token so App skips AuthScreen and renders the terminal
+vi.mock('../src/auth/tokenStore', () => ({
+  getToken: vi.fn(() => 'test-jwt-token'),
+  setToken: vi.fn(),
+  clearToken: vi.fn(),
+}));
+
 // Mock the socket client BEFORE importing App
 vi.mock('../src/socket/socketClient', () => ({
   socket: {
@@ -9,6 +16,7 @@ vi.mock('../src/socket/socketClient', () => ({
     off: vi.fn(),
     emit: vi.fn(),
   },
+  connectSocket: vi.fn(),
   sendCommand: vi.fn(),
   onCommandResult: vi.fn(() => () => {}),
   onError: vi.fn(() => () => {}),
@@ -21,6 +29,8 @@ vi.mock('../src/socket/useSocket', () => ({
     lastResult: null,
     send: vi.fn(),
     localShipId: null,
+    onboardingPrompt: null,
+    emitPromptReply: vi.fn(),
   })),
 }));
 

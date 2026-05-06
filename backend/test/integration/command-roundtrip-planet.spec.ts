@@ -251,9 +251,8 @@ describe('command round-trip (planet) integration (T066)', () => {
 
     const result = commandRouter.dispatch('land Aurora', shipInOrbit, {}) as CommandResult;
 
-    // The router lowercases all tokens before passing them to the handler,
-    // so the claimed name will be 'aurora' (lower-cased), not 'Aurora'.
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'aurora'));
+    // Args are now passed with original casing preserved (keyword is lowercased, args are not).
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'Aurora'));
     expect(result.lines[0].category).toBe('success');
 
     void ship; // referenced to keep lint happy

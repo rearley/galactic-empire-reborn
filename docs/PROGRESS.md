@@ -1,3 +1,45 @@
+## 2026-05-06 — 011-onboarding: JWT Auth + New-Player Flow + Ship Rename
+
+**Completed**:
+
+- **US1 — JWT authentication**: HTTP endpoints `POST /auth/register` (bcrypt cost-12 + JWT) and
+  `POST /auth/login`; `WsAuthGuard` validates `socket.handshake.auth.token` on every WebSocket
+  connection; `SESSION_REPLACED` error on duplicate connection (same userid); `AUTH_REQUIRED` on
+  invalid/absent token; `clearToken()` on SESSION_REPLACED/AUTH_REQUIRED client-side.
+
+- **US2 — New-player onboarding (cmd_new)**: `OnboardingService` multi-step state machine
+  (`AWAITING_CLASS → AWAITING_NAME → finalized`); emits `prompt:class-list` (18 ship classes)
+  and `prompt:ship-name`; creates `User` + `Ship` rows on completion; returning players get a
+  welcome `command:result` instead of prompts; `loadIfAbsent()` added to `ShipStateService`.
+
+- **US3 — Ship rename (cmd_rename)**: `RenameService` validates format (1-19 printable,
+  no spaces), case-insensitive uniqueness check, DB + memory atomic update; case-identical
+  = no-op; `RenameHandlerService` uses `broadcasts` in `CommandResult` to emit `ship.renamed`
+  to sector room + global `player.snapshot` refresh; arg casing preserved in `CommandRouterService`.
+
+- **Frontend**: `AuthScreen` (register form), `ClassPickerPrompt`, `ShipNamePrompt` with
+  name-taken error; `tokenStore` (localStorage JWT); `socketClient` updated to JWT auth callback
+  (`autoConnect: false`, `auth: (cb) => cb({ token: getToken() })`); `useSocket` subscribes to
+  `prompt:class-list`, `prompt:ship-name`, `ship.renamed`; `usePlayerList` gains `RENAMED` action.
+
+- **DB migration**: `011_onboarding_auth` adds `username NOT NULL`, `passwordHash` nullable,
+  `createdAt`; backfills `username = userid`; adds LOWER() unique indexes on both `User.username`
+  and `Ship.shipname`.
+
+**Tests**: 16 frontend Vitest (109 tests) + backend Jest — all passing.
+New backend suites: handshake-auth, returning-player, session-replaced, rename.service (11 unit),
+rename.handler (unit), cmd-rename (6 integration), loadIfAbsent (3 unit).
+New frontend suites: AuthScreen.returning, tokenStore, ClassPickerPrompt, ShipNamePrompt, ship-renamed (5 unit).
+
+**Decisions made**: bcrypt cost 12, JWT 30-day expiry, NULL-passwordHash backfill policy,
+`broadcasts` decoupling in CommandResult, arg casing fix in CommandRouterService — all in DECISIONS.md.
+
+**Next**: 012 (TBD) per the planned feature sequence.
+
+**Known issues / deferred**: None.
+
+---
+
 ## 2026-05-06 — 010-react-frontend: React Terminal UI
 <!-- Note: implemented on branch 010-react-frontend; logically this feature is
      014 in the planned feature sequence (onboarding, social, ship-mgmt come first),

@@ -44,8 +44,8 @@ export class CommandRouterService {
       return { lines: [] };
     }
 
-    const tokens = trimmed.toLowerCase().split(/\s+/);
-    const keyword = tokens[0];
+    const tokens = trimmed.split(/\s+/);
+    const keyword = tokens[0].toLowerCase();
     const args = tokens.slice(1);
 
     const cmd = this.registry.get(keyword);

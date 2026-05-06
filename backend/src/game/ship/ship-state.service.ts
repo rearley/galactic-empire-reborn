@@ -110,6 +110,19 @@ export class ShipStateService implements OnModuleInit {
   }
 
   /**
+   * Loads a ship into the in-memory map only if not already present.
+   * Idempotent — calling multiple times with the same ship has no effect after
+   * the first call, and never overwrites existing in-flight state.
+   * @see game.gateway.ts handleConnection (US2 returning-player path)
+   */
+  loadIfAbsent(state: ShipState): void {
+    const key = shipKey(state.userid, state.shipno);
+    if (!this.map.has(key)) {
+      this.map.set(key, state);
+    }
+  }
+
+  /**
    * Removes a ship from the in-memory map. Used by the combat kill-resolution
    * pass when a ship's `damage >= 100` to prevent further processing on the
    * dead ship in subsequent ticks. Postgres row is left intact so the death

@@ -54,6 +54,7 @@ beforeAll(async () => {
   // Seed 1,000 users
   const users = Array.from({ length: USER_COUNT }, (_, i) => ({
     userid: `perfuser${i}`,
+    username: `perfuser${i}`,
     klscore: BigInt(i * 100),
   }));
   await prisma.user.createMany({ data: users });

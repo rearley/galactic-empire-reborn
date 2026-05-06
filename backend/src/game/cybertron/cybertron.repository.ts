@@ -94,7 +94,7 @@ export class CybertronRepository {
       // Upsert User row (may already exist from a previous spawn cycle)
       await tx.user.upsert({
         where: { userid: slot.userid },
-        create: { userid: slot.userid, cash },
+        create: { userid: slot.userid, username: slot.userid, cash },
         update: { cash },
       });
 

@@ -121,6 +121,13 @@ export const PLAYER_JOINED = 'player.joined' as const;
 export const PLAYER_LEFT = 'player.left' as const;
 export const PHYSICS_SECTOR_TRANSITION = 'physics.sector-transition' as const;
 
+/** Outbound: server → client `ship.renamed` — a player renamed their ship. */
+export interface ShipRenamedPayload {
+  shipId: string;
+  oldName: string;
+  newName: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Inbound: client → server `command` */
