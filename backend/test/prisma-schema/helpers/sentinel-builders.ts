@@ -18,6 +18,7 @@ const str = (len: number, char = "x") => char.repeat(len);
 export function buildUserSentinel(userid = str(UIDSIZ)) {
   return {
     userid,
+    username: userid,
     score: bigVal,
     noships: 3,
     topshipno: 7,

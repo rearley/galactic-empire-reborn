@@ -7,23 +7,44 @@ import { CommandInput } from './components/CommandInput';
 import { ConnectionIndicator } from './components/ConnectionIndicator';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
+import { AuthScreen } from './auth/AuthScreen';
+import { ClassPickerPrompt } from './onboarding/ClassPickerPrompt';
+import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
+import { getToken, setToken } from './auth/tokenStore';
+import { connectSocket } from './socket/socketClient';
 import type { EventLogLine, ScanCell } from './types/contracts';
 
 const MAX_LOG_ENTRIES = 500;
 
 /**
- * Root application component — five-region terminal UI (FR-002):
- *   top: connection-status banner area
- *   main-left: scrolling event log
- *   main-right: ASCII sector-map panel
- *   side: player-list panel (populated by feature 010 US3)
- *   bottom: command input bar (fixed)
+ * Root application component — five-region terminal UI (FR-002).
+ * Gates on JWT token: renders AuthScreen when absent, terminal otherwise.
+ * During onboarding (prompt:class-list / prompt:ship-name active), renders
+ * the appropriate onboarding component instead of normal command input.
  *
+ * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/spec.md FR-002
  */
 export function App(): React.JSX.Element {
+  const [token, setTokenState] = useState<string | null>(getToken());
+
+  function handleAuthenticated(newToken: string): void {
+    setToken(newToken);
+    setTokenState(newToken);
+    connectSocket();
+  }
+
+  if (!token) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />;
+  }
+
+  return <Terminal />;
+}
+
+function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
-  const { status, lastResult, send, localShipId } = useSocket(playerDispatch);
+  const { status, lastResult, send, localShipId, onboardingPrompt, emitPromptReply } =
+    useSocket(playerDispatch);
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
 
@@ -39,6 +60,32 @@ export function App(): React.JSX.Element {
       }
     }
   }, [lastResult]);
+
+  const shipNameError =
+    onboardingPrompt?.type === 'ship-name'
+      ? ((onboardingPrompt.payload as { error?: string }).error ?? null)
+      : null;
+
+  const renderBottomInput = (): React.JSX.Element => {
+    if (onboardingPrompt?.type === 'class-list') {
+      const classes = (onboardingPrompt.payload as { classes: Parameters<typeof ClassPickerPrompt>[0]['classes'] }).classes;
+      return (
+        <ClassPickerPrompt
+          classes={classes}
+          onSelect={(classNumber) => emitPromptReply(classNumber)}
+        />
+      );
+    }
+    if (onboardingPrompt?.type === 'ship-name') {
+      return (
+        <ShipNamePrompt
+          onSubmit={(name) => emitPromptReply(name)}
+          error={shipNameError}
+        />
+      );
+    }
+    return <CommandInput onSubmit={send} />;
+  };
 
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
@@ -69,8 +116,8 @@ export function App(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Bottom: command input bar fixed at bottom (FR-002) */}
-      <CommandInput onSubmit={send} />
+      {/* Bottom: command input or onboarding prompt (FR-002) */}
+      {renderBottomInput()}
     </div>
   );
 }

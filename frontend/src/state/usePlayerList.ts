@@ -5,13 +5,15 @@ import type {
   PlayerJoinedPayload,
   PlayerLeftPayload,
   PhysicsSectorTransitionPayload,
+  ShipRenamedPayload,
 } from '../types/contracts';
 
 type Action =
   | { type: 'SNAPSHOT'; payload: PlayerSnapshotPayload }
   | { type: 'JOIN'; payload: PlayerJoinedPayload }
   | { type: 'LEFT'; payload: PlayerLeftPayload }
-  | { type: 'TRANSITION'; payload: PhysicsSectorTransitionPayload };
+  | { type: 'TRANSITION'; payload: PhysicsSectorTransitionPayload }
+  | { type: 'RENAMED'; payload: ShipRenamedPayload };
 
 type State = Map<string, ConnectedPlayer>;
 
@@ -42,6 +44,12 @@ function reducer(state: State, action: Action): State {
         const existing = next.get(t.shipId);
         if (existing) next.set(t.shipId, { ...existing, sector: t.toSector });
       }
+      return next;
+    }
+    case 'RENAMED': {
+      const next = new Map(state);
+      const existing = next.get(action.payload.shipId);
+      if (existing) next.set(action.payload.shipId, { ...existing, name: action.payload.newName });
       return next;
     }
   }

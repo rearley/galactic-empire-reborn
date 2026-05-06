@@ -712,6 +712,98 @@ diverge from the existing seed without benefit; 31/32/33 is already live in `ge_
 
 ---
 
+## 2026-05-06 — bcrypt cost 12 for password hashing (011-onboarding)
+
+**Context**: `AuthService.register()` must hash the player password before storage.
+bcrypt cost is the primary tuneable controlling hash time vs. CPU cost on the server.
+
+**Decision**: Use bcrypt cost factor 12.
+
+**Reason**: Cost 12 produces ~200-400 ms per hash on a modern server — acceptable for a
+login endpoint (not in a hot path) and well above the 2026-era brute-force threshold on
+commodity hardware. Cost 10 (the library default) is widely considered too low for new
+projects; cost 14 would be ~4× slower with no meaningful security gain at current scale.
+
+**Alternatives rejected**: Cost 10 (too weak for 2026 baseline), cost 14 (unnecessary
+latency), Argon2 (no existing dep, bcrypt is sufficient for this threat model).
+
+---
+
+## 2026-05-06 — JWT 30-day expiry and no refresh tokens (011-onboarding)
+
+**Context**: After successful register/login, the server issues a JWT. The client stores it
+in localStorage and sends it via `socket.handshake.auth.token`. Token lifetime must be chosen.
+
+**Decision**: Sign with `expiresIn: '30d'`. No refresh-token flow.
+
+**Reason**: This is a persistent 24/7 game where players reconnect daily. A 30-day
+window means they re-authenticate roughly monthly — low friction. The original MajorBBS
+game had no login timeout concept. A refresh-token infrastructure would add significant
+complexity for negligible security benefit at current scale (single-server, non-financial).
+
+**Alternatives rejected**: 24h (too frequent re-auth for a casual game), 90d+ (tokens
+stay alive too long after account deletion), refresh tokens (complexity not justified).
+
+---
+
+## 2026-05-06 — Dev-DB password-hash backfill policy (NULL passwordHash)
+
+**Context**: Migration `011_onboarding_auth` adds `username` and `passwordHash` columns.
+Existing `User` rows (from test/dev seeds) have no `passwordHash`. The migration backfills
+`username = userid` but leaves `passwordHash = NULL` — there is no source for real hashes.
+
+**Decision**: `AuthService.login()` rejects users with `NULL passwordHash` as
+`INVALID_CREDENTIALS`. No attempt is made to auto-migrate these accounts.
+
+**Reason**: No production data exists yet. Dev databases are wiped freely.
+Pre-existing rows are Cybertron/Droid AI accounts (`Cybrg-*`, `@Droid-*`) that
+never log in via the HTTP auth endpoint. Human-readable policy: "old rows can't log in
+until they register through the new auth flow". This is acceptable and documented here.
+
+**Alternatives rejected**: Backfill a random passwordHash (creates accounts players can't
+log into), prompt on first login (adds runtime complexity), block old rows at the DB level
+(would require a separate user type flag).
+
+---
+
+## 2026-05-06 — `broadcasts` field in CommandResult decouples handlers from Socket.io (011-onboarding)
+
+**Context**: `RenameHandlerService` needs to emit `ship.renamed` to the sector room and
+trigger a global `player.snapshot` after a successful rename. Handlers must not import
+Socket.io server directly (separation of concerns).
+
+**Decision**: Add `broadcasts?: { room: string; event: string; payload: unknown }[]` to
+`CommandResult`. `GameGateway.processBroadcasts()` iterates the array after emitting
+`command:result`. The sentinel room `'__player_snapshot__'` triggers
+`server.emit('player.snapshot', registry.list())` (global refresh).
+
+**Reason**: Keeps handlers independent of transport. Any handler can now queue broadcast
+side-effects without knowledge of Socket.io room topology. The sentinel avoids injecting
+`ConnectedShipsRegistry` into every handler.
+
+**Alternatives rejected**: Inject Socket.io server into RenameHandlerService (violates
+separation); EventEmitter2 event per rename (indirection with no benefit over direct
+return); add a `postCommand` hook (overengineered for the one handler that needs it).
+
+---
+
+## 2026-05-06 — Arg casing preserved in CommandRouterService (011-onboarding)
+
+**Context**: Ship rename requires mixed-case names. The old `CommandRouterService` lowercased
+all tokens in the input, which would force rename targets to lowercase regardless of intent.
+
+**Decision**: Only the first token (the keyword) is lowercased. `args = tokens.slice(1)` are
+returned verbatim, preserving original casing.
+
+**Reason**: Ship names are case-sensitive in the original game. Forcing args to lowercase
+would break rename and any future command that accepts mixed-case input (planet names, etc.).
+The keyword must still be lowercased for alias matching.
+
+**Alternatives rejected**: Case-insensitive arg matching (would require caller to re-upcase,
+awkward), separate lowercase/original versions of each arg (unnecessary complexity).
+
+---
+
 ## 2026-05-05 — No Redux / new state layer for player list
 
 **Context**: The player list panel needs reactive state that stays in sync across multiple socket events. (research.md R1)

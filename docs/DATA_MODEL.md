@@ -13,6 +13,20 @@ kills, planet count, ship count, cash on hand, debt, team membership, and a
 Team but the foreign key is intentionally relaxed — the original game tolerates
 a teamcode referencing a deleted team. Source: `WARUSR` in `GEMAIN.H`.
 
+**Feature 011 additions**:
+- `username String @unique` — human-readable display name used for login. Backfilled from
+  `userid` for pre-existing rows. A `LOWER(username)` expression index enforces case-insensitive
+  uniqueness across all login attempts. Cannot be NULL after migration.
+- `passwordHash String?` — bcrypt cost-12 hash of the password. Nullable at the DB level;
+  rows with NULL hash cannot authenticate (pre-existing AI/seed accounts).
+- `createdAt DateTime @default(now())` — timestamp of account creation.
+
+**Unique indexes**:
+- `User_username_lower_idx` — `UNIQUE ON "User" (LOWER("username"))` (raw SQL; Prisma cannot
+  express expression indexes natively). Enforces case-insensitive username uniqueness.
+- `Ship_shipname_lower_idx` — `UNIQUE ON "Ship" (LOWER("shipname"))` (same pattern). Enforces
+  case-insensitive ship name uniqueness for `cmd_rename`.
+
 **Relations**: owns many Ships, has many Mail messages and MailStat messages.
 
 ## Ship

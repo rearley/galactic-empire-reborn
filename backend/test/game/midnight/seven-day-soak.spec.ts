@@ -48,9 +48,9 @@ beforeAll(async () => {
   // Seed messy fixture
   await prisma.user.createMany({
     data: [
-      { userid: 'active1', klscore: 1000n },
-      { userid: 'active2', teamcode: 5n, klscore: 500n },
-      { userid: 'orphan1', teamcode: 99n, klscore: 200n }, // orphan teamcode
+      { userid: 'active1', username: 'active1', klscore: 1000n },
+      { userid: 'active2', username: 'active2', teamcode: 5n, klscore: 500n },
+      { userid: 'orphan1', username: 'orphan1', teamcode: 99n, klscore: 200n }, // orphan teamcode
     ],
   });
 

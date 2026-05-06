@@ -3,6 +3,9 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
+import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 
 /**
  * Verifies player.joined broadcasts after snapshot and player.left fires on disconnect.
@@ -44,16 +47,39 @@ describe('GameGateway player.joined / player.left', () => {
     serverEmitMock = jest.fn();
     const svc = mockShipStateService();
     registry = new ConnectedShipsRegistry(svc as ShipStateService);
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry);
+
+    const mockWsGuard = {
+      validate: jest.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
+        const userid = socket.handshake.query?.userid ?? 'test-user';
+        socket.data.userid = userid;
+        return { sub: userid, username: userid };
+      }),
+    } as unknown as WsAuthGuard;
+    const mockPrisma = {
+      ship: {
+        findFirst: jest.fn().mockResolvedValue({
+          userid: 'user1',
+          shipno: 1,
+          shipname: 'Defiant',
+          shpclass: 3,
+          xcoord: 5.7,
+          ycoord: 3.2,
+          items: Array(16).fill(0n),
+        }),
+      },
+    } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };
   });
 
-  it('broadcasts player.joined via server.emit after handleConnection (FR-024)', () => {
+  it('broadcasts player.joined via server.emit after handleConnection (FR-024)', async () => {
     const socket = makeSocket('sock-1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
     expect(serverEmitMock).toHaveBeenCalledWith(
       'player.joined',
       expect.objectContaining({
@@ -64,9 +90,9 @@ describe('GameGateway player.joined / player.left', () => {
     );
   });
 
-  it('player.joined payload contains sector derived from floor(xcoord), floor(ycoord)', () => {
+  it('player.joined payload contains sector derived from floor(xcoord), floor(ycoord)', async () => {
     const socket = makeSocket('sock-1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
     const joinedCall = (serverEmitMock.mock.calls as [string, unknown][]).find(
       ([ev]) => ev === 'player.joined',
     );
@@ -75,9 +101,9 @@ describe('GameGateway player.joined / player.left', () => {
     expect(payload.sector).toEqual({ x: 5, y: 3 }); // floor(5.7)=5, floor(3.2)=3
   });
 
-  it('broadcasts player.left via server.emit on handleDisconnect (FR-025)', () => {
+  it('broadcasts player.left via server.emit on handleDisconnect (FR-025)', async () => {
     const socket = makeSocket('sock-1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
     serverEmitMock.mockClear();
 
     gateway.handleDisconnect(socket as never);

@@ -100,7 +100,7 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
       // Seed a Cybertron with cash above cap
       await prisma.user.upsert({
         where: { userid: 'Cybrg-test-2' },
-        create: { userid: 'Cybrg-test-2', cash: BigInt(CYB_MAXCASH) + 500_000n },
+        create: { userid: 'Cybrg-test-2', username: 'Cybrg-test-2', cash: BigInt(CYB_MAXCASH) + 500_000n },
         update: { cash: BigInt(CYB_MAXCASH) + 500_000n },
       });
       await prisma.ship.create({
@@ -176,7 +176,7 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
       for (const [suffix, cls] of [['3', 21], ['4', 22], ['5', 24]] as const) {
         await prisma.user.upsert({
           where: { userid: `Cybrg-test-${suffix}` },
-          create: { userid: `Cybrg-test-${suffix}`, cash: 1000n },
+          create: { userid: `Cybrg-test-${suffix}`, username: `Cybrg-test-${suffix}`, cash: 1000n },
           update: { cash: 1000n },
         });
         await prisma.ship.create({

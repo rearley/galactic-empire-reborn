@@ -56,6 +56,14 @@ export class ConnectedShipsRegistry {
   }
 
   /**
+   * Returns true if the given socketId is registered as a bound player.
+   * Onboarding sockets are not registered and return false.
+   */
+  isBound(socketId: string): boolean {
+    return this.bySocketId.has(socketId);
+  }
+
+  /**
    * Returns current data for all connected ships.
    * Ships missing from the in-memory store (race condition) are skipped.
    */

@@ -4,6 +4,9 @@ import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.regist
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import type { ConnectedPlayer } from '../../src/gateway/connected-ships.registry';
+import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 
 /**
  * Verifies player.snapshot is emitted to the joining socket only (not broadcast),
@@ -53,10 +56,35 @@ describe('GameGateway player.snapshot', () => {
 
     registry = new ConnectedShipsRegistry(shipStateService as ShipStateService);
 
+    const mockWsGuard = {
+      validate: jest.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
+        const userid = socket.handshake.query?.userid ?? 'test-user';
+        socket.data.userid = userid;
+        return { sub: userid, username: userid };
+      }),
+    } as unknown as WsAuthGuard;
+    const mockPrisma = {
+      ship: {
+        findFirst: jest.fn().mockResolvedValue({
+          userid: 'user1',
+          shipno: 1,
+          shipname: 'Defiant',
+          shpclass: 3,
+          xcoord: 5.7,
+          ycoord: 3.2,
+          items: Array(16).fill(0n),
+        }),
+      },
+    } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+
     gateway = new GameGateway(
       shipStateService as ShipStateService,
       {} as CommandRouterService,
       registry,
+      mockWsGuard,
+      mockPrisma,
+      mockOnboarding,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
@@ -64,24 +92,24 @@ describe('GameGateway player.snapshot', () => {
     };
   });
 
-  it('emits player.snapshot via socket.emit (not server.emit)', () => {
+  it('emits player.snapshot via socket.emit (not server.emit)', async () => {
     const socket = makeSocket('sock-1', 'user1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
     expect(socket.emit).toHaveBeenCalledWith(
       'player.snapshot',
       expect.objectContaining({ players: expect.any(Array) }),
     );
   });
 
-  it('player.snapshot is NOT broadcast to all clients', () => {
+  it('player.snapshot is NOT broadcast to all clients', async () => {
     const socket = makeSocket('sock-1', 'user1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
     const serverEmitCalls = (serverEmitMock.mock.calls as [string, ...unknown[]][]);
     const snapshotBroadcasts = serverEmitCalls.filter(([ev]) => ev === 'player.snapshot');
     expect(snapshotBroadcasts).toHaveLength(0);
   });
 
-  it('player.snapshot contains every ship currently in the registry', () => {
+  it('player.snapshot contains every ship currently in the registry', async () => {
     // Pre-load another ship into the registry
     const existing: ConnectedPlayer = {
       shipId: 'user2:1',
@@ -92,7 +120,7 @@ describe('GameGateway player.snapshot', () => {
     (registry as unknown as { stored: Map<string, ConnectedPlayer> }).stored?.set('user2:1', existing);
 
     const socket = makeSocket('sock-1', 'user1');
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
 
     const snapshotCall = (socket.emit.mock.calls as [string, unknown][]).find(
       ([ev]) => ev === 'player.snapshot',
@@ -104,7 +132,7 @@ describe('GameGateway player.snapshot', () => {
     expect(ids).toContain('user1:1');
   });
 
-  it('player.snapshot fires before player.joined for the same shipId', () => {
+  it('player.snapshot fires before player.joined for the same shipId', async () => {
     const socket = makeSocket('sock-1', 'user1');
     const emitOrder: string[] = [];
 
@@ -115,7 +143,7 @@ describe('GameGateway player.snapshot', () => {
       emitOrder.push(`server:${ev}`);
     });
 
-    gateway.handleConnection(socket as never);
+    await gateway.handleConnection(socket as never);
 
     const snapshotIdx = emitOrder.indexOf('socket:player.snapshot');
     const joinedIdx = emitOrder.indexOf('server:player.joined');

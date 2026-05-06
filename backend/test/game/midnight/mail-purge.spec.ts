@@ -46,7 +46,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await truncateAll();
   // Create a user to satisfy Mail FK
-  await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+  await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
 });
 
 function daysAgoStamp(days: number): number {
@@ -101,7 +101,7 @@ describe('US3 — mail purge (T024)', () => {
     // Need a *ghost user — but FK requires user. Use alice but with * prefix... no, FK.
     // The *-prefix deletion uses userid LIKE '*%', but Mail has a FK to User.
     // We need a User with * prefix.
-    await prisma.user.create({ data: { userid: '*ghost' } });
+    await prisma.user.create({ data: { userid: '*ghost', username: '*ghost' } });
     await prisma.mail.create({
       data: mailRow(1, '*ghost', 1, 20), // 1 day old but *-prefixed recipient
     });

@@ -31,4 +31,17 @@ export default async function globalSetup(): Promise<void> {
       stdio: "inherit",
     }
   );
+
+  // prisma db push applies the Prisma schema but not raw SQL from migration files.
+  // Manually create case-insensitive unique indexes that require LOWER() expressions,
+  // which Prisma cannot express natively in schema.prisma.
+  const psqlOpts = { env: { ...process.env }, stdio: "inherit" as const };
+  execSync(
+    `psql "${url}" -c 'CREATE UNIQUE INDEX IF NOT EXISTS "User_username_lower_idx" ON "User" (LOWER("username"))'`,
+    psqlOpts
+  );
+  execSync(
+    `psql "${url}" -c 'CREATE UNIQUE INDEX IF NOT EXISTS "Ship_shipname_lower_idx" ON "Ship" (LOWER("shipname"))'`,
+    psqlOpts
+  );
 }

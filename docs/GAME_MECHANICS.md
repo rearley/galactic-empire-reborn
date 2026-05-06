@@ -54,10 +54,11 @@ hydrated once on boot from `prisma.shipClass.findMany` and never re-fetched.
 **Source**: GECMDS.C:111-225 (command table)
 
 Player text input is received over Socket.io as `{ input: string }`.
-The `CommandRouterService` tokenises (trim + collapse whitespace), lowercases the
-first token, and looks it up in an alias-keyed registry. If the keyword is
-unknown it returns `UNKNOWN_CMD`. If `args.length < minArgs` it returns the
-command's `argMissingMessage`. Otherwise it calls `handler(ship, args, ctx)`.
+The `CommandRouterService` tokenises (trim + collapse whitespace), lowercases **only the
+first token** (keyword), and looks it up in an alias-keyed registry. Subsequent tokens
+(args) preserve original casing — required for ship-name commands. If the keyword is
+unknown it returns `UNKNOWN_CMD`. If `args.length < minArgs` it returns the command's
+`argMissingMessage`. Otherwise it calls `handler(ship, args, ctx)`.
 
 The `Command` type is synchronous: `handler` returns `CommandResult`, not a Promise.
 Gateway wraps dispatch in a try/catch and emits `'Internal error processing command.'`
@@ -810,3 +811,52 @@ Delete all `Mail` rows where:
 **Source**: GEMAIN.C — `CHGLOSER` feature, `GEPCNT` percentage
 
 When a player kills another player (both non-AI), `PlayerScoreService` transfers `floor(loser.cash × chgLoserPercent / 100)` from the loser to the killer atomically in a Prisma transaction. Rate configured via `MIDNIGHT_CHGLOSER` env (default 0 = disabled). AI ships (prefix `Cybrg-` or `@Droid-`) never pay the penalty as either attacker or victim.
+
+---
+
+## cmd_new — new-player onboarding (feature 011)
+
+**Source**: GECMDS.C:4534 `cmd_new`
+
+Not a typed command — triggered automatically by `GameGateway.handleConnection()` when
+a connected socket has no existing `Ship` row. `OnboardingService` runs a multi-step
+state machine per `socketId`:
+
+1. **AWAITING_CLASS**: server emits `prompt:class-list` with all 18 `ShipClass` rows
+   (classNumber, typeName, description). Client renders `ClassPickerPrompt`.
+2. **AWAITING_NAME**: after client replies `prompt:reply { value: classNumber }`, server
+   emits `prompt:ship-name`. Client renders `ShipNamePrompt`.
+3. **Finalized**: after client replies `prompt:reply { value: shipName }`, server
+   validates name (1-19 printable chars, no spaces, case-insensitive unique across all ships),
+   creates `User` (if absent) + `Ship` rows in a Prisma transaction, loads ship into
+   `ShipStateService` via `loadIfAbsent()`, then emits `player.snapshot` to all connected
+   clients. `onboardingPrompt` is cleared on the client when `player.snapshot` arrives.
+
+Returning players bypass the state machine: `OnboardingService.handleReturningPlayer()`
+emits a welcome `command:result` directly.
+
+**Validation**: ship name must match `/^[!-~]{1,19}$/` (printable ASCII, no space, max 19
+chars). Name-taken uses the `Ship_shipname_lower_idx` LOWER() expression index.
+
+---
+
+## cmd_rename — ship rename (feature 011)
+
+**Source**: GECMDS.C:5002 `cmd_rename`
+
+**Syntax**: `rename <new-name>`
+
+`RenameService.rename(userid, shipno, newName)` validates:
+1. Format: 1-19 printable ASCII, no spaces (`/^[!-~]{1,19}$/`).
+2. Case-insensitive uniqueness: if any other ship already has the same `LOWER(shipname)`,
+   returns `reason: 'NAME_TAKEN'`.
+3. Byte-identical: if the name is exactly equal (same bytes), it is a no-op — DB write is
+   skipped; the handler returns a "Ship name unchanged" `system` message.
+
+On success, the service atomically updates `Ship.shipname` in Postgres **and** in the
+in-memory `ShipStateService` map. The handler then queues two broadcasts via `CommandResult.broadcasts`:
+- `ship.renamed` to the current sector room with `{ shipId, oldName, newName }`
+- `player.snapshot` sentinel → global `server.emit('player.snapshot', registry.list())`
+
+Frontend: `useSocket` dispatches `RENAMED` action to `usePlayerList`; the reducer updates
+`name` for the matching `shipId` without a full list replacement.

@@ -1,27 +1,32 @@
 import { io, Socket } from 'socket.io-client';
+import { getToken, clearToken } from '../auth/tokenStore';
 import type { CommandRequest, CommandResultPayload } from '../types/contracts';
 
 /**
  * Singleton Socket.io client.
- * Connects with a hard-coded development userid (FR-029).
+ * Authenticates via JWT sent in socket.handshake.auth.token (FR-029).
+ * Does not connect until a token is present — call connect() after auth.
  * Auto-reconnects with exponential backoff: initial delay 1s, max 30s with
  * 50% jitter so thundering-herd bursts are spread across ±15s (FR-020).
  *
- * @see specs/003-ship-commands/contracts/websocket-events.md §Connection
+ * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/research.md R3 (reconnection tuning FR-020)
  */
-export const LOCAL_USERID = 'DEV';
-
 const socket: Socket = io({
-  query: { userid: LOCAL_USERID },
-  autoConnect: true,
+  autoConnect: false,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 30000,
   randomizationFactor: 0.5,
   transports: ['websocket'],
+  auth: (cb) => cb({ token: getToken() }),
 });
+
+/** Connect using the current token in tokenStore. */
+export function connectSocket(): void {
+  socket.connect();
+}
 
 /** Sends a text command to the server. */
 export function sendCommand(input: string): void {
@@ -39,10 +44,18 @@ export function onCommandResult(
 
 /** Registers a listener for server errors. Returns an unsubscribe function. */
 export function onError(
-  listener: (err: { code: string; message: string }) => void,
+  listener: (err: { code: string; message?: string }) => void,
 ): () => void {
   socket.on('error', listener);
   return () => socket.off('error', listener);
 }
+
+// Handle session-replaced and auth-required by clearing the local token.
+socket.on('error', (err: { code?: string }) => {
+  if (err.code === 'SESSION_REPLACED' || err.code === 'AUTH_REQUIRED') {
+    clearToken();
+    socket.disconnect();
+  }
+});
 
 export { socket };

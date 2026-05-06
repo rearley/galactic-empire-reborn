@@ -45,6 +45,9 @@ import {
   PhysicsSectorTransitionPayload,
 } from '../game/tick/sector-transition.subscriber';
 import { shipKey } from '../game/ship/ship-state.types';
+import { WsAuthGuard } from '../auth/ws-auth.guard';
+import { PrismaService } from '../prisma/prisma.service';
+import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
 
 interface SectorPayload {
   x: unknown;
@@ -53,6 +56,10 @@ interface SectorPayload {
 
 interface CommandPayload {
   input: unknown;
+}
+
+interface PromptReplyPayload {
+  value: unknown;
 }
 
 interface GatewayError {
@@ -64,10 +71,15 @@ interface GatewayError {
 type ValidCoord = { ok: true; x: number; y: number };
 type InvalidCoord = { ok: false; code: string; message: string };
 
+type OnboardingState =
+  | { step: 'AWAITING_CLASS' }
+  | { step: 'AWAITING_NAME'; selectedClass: number };
+
 /**
- * Handles Socket.io connections, handshake ship resolution, and command dispatch.
+ * Handles Socket.io connections, handshake JWT auth, and command dispatch.
  * @see GECMDS.C:111-225 command table
  * @see specs/003-ship-commands/contracts/websocket-events.md
+ * @see specs/011-onboarding/contracts/websocket-events.md
  */
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -80,72 +92,75 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly shipStateService: ShipStateService,
     private readonly commandRouter: CommandRouterService,
     private readonly registry: ConnectedShipsRegistry,
+    private readonly wsAuthGuard: WsAuthGuard,
+    private readonly prisma: PrismaService,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   /**
-   * On connection: validate userid, resolve active ship, emit welcome.
-   * @see specs/003-ship-commands/contracts/websocket-events.md §Connection
-   * @see FR-030 — active ship resolved on handshake, not via in-game command
+   * On connection: validate JWT, resolve ship, emit welcome or onboarding prompt.
+   * @see specs/011-onboarding/contracts/websocket-events.md §Connection
    */
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     this.logger.log(`connection ${client.id}`);
 
-    const rawUserid = client.handshake.query['userid'];
-    if (typeof rawUserid !== 'string' || !rawUserid) {
-      client.emit('error', {
-        code: 'NO_USER',
-        message: 'No userid in handshake.',
-      } satisfies GatewayError);
-      client.disconnect(true);
-      return;
-    }
+    // Step 1: Validate JWT
+    const payload = await this.wsAuthGuard.validate(client);
+    if (!payload) return; // already disconnected by guard
 
-    const userid = rawUserid;
+    const userid = payload.sub;
     client.data.userid = userid;
+    client.data.username = payload.username;
 
-    const ships = this.shipStateService.findByUserid(userid);
+    // Step 2: Look up existing Ship in DB
+    let ship = await this.prisma.ship.findFirst({
+      where: { userid },
+    });
 
-    if (ships.length === 0) {
-      client.emit('error', {
-        code: 'NO_SHIP',
-        message: 'No ship found for user.',
-      } satisfies GatewayError);
-      client.disconnect(true);
+    if (!ship) {
+      // US1: New player — start onboarding flow
+      const onboardingState: OnboardingState = { step: 'AWAITING_CLASS' };
+      client.data.onboarding = onboardingState;
+
+      const classes = await this.onboardingService.buildClassListPayload();
+      client.emit('prompt:class-list', { step: 'CLASS', classes });
       return;
     }
 
-    // Pick lowest shipno (deterministic; no BOARD command in original GECMDS.C table)
-    const activeShip = ships[0];
-    client.data.activeShipNo = activeShip.shipno;
+    // US2: Returning player — hydrate and bind
+    const shipId = shipKey(userid, ship.shipno);
 
-    if (ships.length >= 2) {
-      // Log exactly this string — handshake-resolution.spec.ts asserts it verbatim
-      this.logger.warn(
-        `[ShipStateService] WARN multiple ships for userid=${userid}, picked lowest shipno=${activeShip.shipno}`,
-      );
+    // Hydrate into memory if not already loaded
+    if (!this.shipStateService.get(userid, ship.shipno)) {
+      const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
+      const state = prismaShipToState(ship);
+      this.shipStateService.loadShip(state);
     }
 
-    const shipId = shipKey(userid, activeShip.shipno);
+    client.data.activeShipNo = ship.shipno;
+
+    // Latest-wins: displace prior socket if any
     const priorSocketId = this.registry.upsert(shipId, client.id);
     if (priorSocketId) {
-      // Emit player.left for the displaced socket BEFORE snapshot so listeners
-      // see the correct sequence: left → snapshot → joined (FR-025a event ordering).
-      // handleDisconnect will fire for priorSocket via disconnect(true), but registry.remove
-      // returns undefined at that point (upsert already cleared the mapping), preventing
-      // a duplicate player.left emission.
       this.server.emit('player.left', { shipId });
+      this.server.sockets.sockets.get(priorSocketId)?.emit('error', {
+        code: 'SESSION_REPLACED',
+        message: 'Another session connected with your credentials.',
+      });
       this.server.sockets.sockets.get(priorSocketId)?.disconnect(true);
     }
 
-    client.emit('command:result', {
-      lines: [
-        {
-          text: `Welcome aboard, ${activeShip.shipname}.`,
-          category: 'system',
-        },
-      ],
-    });
+    // Welcome sequence
+    const activeShip = this.shipStateService.get(userid, ship.shipno);
+    if (!activeShip) {
+      client.emit('error', { code: 'NO_SHIP', message: 'Failed to load ship.' } satisfies GatewayError);
+      client.disconnect(true);
+      return;
+    }
 
+    client.emit('command:result', {
+      lines: [{ text: `Welcome aboard, ${activeShip.shipname}.`, category: 'system' }],
+    });
     client.emit('player.snapshot', { players: this.registry.list() });
 
     const connectedPlayer: ConnectedPlayer = {
@@ -168,7 +183,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Handles player text commands routed through CommandRouterService.
    * @see GECMDS.C dispatch loop
-   * @see specs/003-ship-commands/contracts/websocket-events.md §command
    */
   @SubscribeMessage('command')
   handleCommand(
@@ -199,7 +213,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const resultOrPromise = this.commandRouter.dispatch(input, ship, { client });
       if (resultOrPromise instanceof Promise) {
         resultOrPromise
-          .then((result) => client.emit('command:result', result))
+          .then((result) => {
+            client.emit('command:result', result);
+            this.processBroadcasts(result);
+          })
           .catch((err: unknown) => {
             this.logger.error('Async command handler threw:', err);
             client.emit('command:result', {
@@ -208,6 +225,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
       } else {
         client.emit('command:result', resultOrPromise);
+        this.processBroadcasts(resultOrPromise);
       }
     } catch (err: unknown) {
       this.logger.error('Command handler threw:', err);
@@ -217,11 +235,129 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Handles onboarding prompt replies (class selection + ship name).
+   * @see specs/011-onboarding/contracts/websocket-events.md §prompt:reply
+   */
+  @SubscribeMessage('prompt:reply')
+  async handlePromptReply(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: PromptReplyPayload,
+  ): Promise<void> {
+    const onboarding = client.data.onboarding as OnboardingState | undefined;
+    const userid = client.data.userid as string | undefined;
+
+    if (!onboarding || !userid) {
+      client.emit('error', { code: 'NOT_IN_ONBOARDING', message: 'Not in onboarding.' } satisfies GatewayError);
+      return;
+    }
+
+    if (onboarding.step === 'AWAITING_CLASS') {
+      const classNumber = typeof body.value === 'number' ? body.value : parseInt(String(body.value), 10);
+      if (isNaN(classNumber) || !(await this.onboardingService.validateClassReply(classNumber))) {
+        const classes = await this.onboardingService.buildClassListPayload();
+        client.emit('prompt:class-list', { step: 'CLASS', classes, error: 'Invalid class selection.' });
+        return;
+      }
+      client.data.onboarding = { step: 'AWAITING_NAME', selectedClass: classNumber } satisfies OnboardingState;
+      client.emit('prompt:ship-name', {
+        step: 'NAME',
+        selectedClass: classNumber,
+        rule: '1-19 printable ASCII',
+      });
+      return;
+    }
+
+    if (onboarding.step === 'AWAITING_NAME') {
+      const name = typeof body.value === 'string' ? body.value.trim() : '';
+      if (!this.onboardingService.validateNameReply(name)) {
+        client.emit('prompt:ship-name', {
+          step: 'NAME',
+          selectedClass: onboarding.selectedClass,
+          rule: '1-19 printable ASCII',
+          error: 'invalid-format',
+        });
+        return;
+      }
+
+      try {
+        const state = await this.onboardingService.finalize(userid, onboarding.selectedClass, name);
+        const shipId = shipKey(userid, state.shipno);
+
+        const priorSocketId = this.registry.upsert(shipId, client.id);
+        if (priorSocketId) {
+          this.server.emit('player.left', { shipId });
+          this.server.sockets.sockets.get(priorSocketId)?.disconnect(true);
+        }
+
+        client.data.activeShipNo = state.shipno;
+        client.data.onboarding = undefined;
+
+        client.emit('command:result', {
+          lines: [{ text: `Welcome aboard, ${state.shipname}.`, category: 'system' }],
+        });
+        client.emit('player.snapshot', { players: this.registry.list() });
+
+        const connectedPlayer: ConnectedPlayer = {
+          shipId,
+          name: state.shipname,
+          sector: { x: Math.floor(state.xcoord), y: Math.floor(state.ycoord) },
+          shipClass: state.shpclass,
+        };
+        this.server.emit('player.joined', connectedPlayer);
+
+      } catch (err: unknown) {
+        if (err instanceof SpawnSectorMissingError) {
+          client.emit('error', { code: 'SPAWN_MISSING', message: err.message } satisfies GatewayError);
+          return;
+        }
+        // Distinguish Prisma unique constraint violations by constraint name
+        if (
+          typeof err === 'object' && err !== null &&
+          'code' in err && (err as { code: string }).code === 'P2002'
+        ) {
+          const meta = (err as { meta?: { target?: string | string[] } }).meta;
+          const target = Array.isArray(meta?.target) ? meta.target.join(',') : String(meta?.target ?? '');
+          if (target.includes('userid') || target.includes('Ship_userid_key')) {
+            // Race: this user won another concurrent finalize → treat as returning player
+            const ship = await this.prisma.ship.findFirst({ where: { userid } });
+            if (ship) {
+              const shipId = shipKey(userid, ship.shipno);
+              this.registry.upsert(shipId, client.id);
+              client.data.activeShipNo = ship.shipno;
+              client.data.onboarding = undefined;
+              client.emit('command:result', {
+                lines: [{ text: `Welcome aboard, ${ship.shipname}.`, category: 'system' }],
+              });
+            }
+            return;
+          }
+          // Name collision
+          client.emit('prompt:ship-name', {
+            step: 'NAME',
+            selectedClass: onboarding.selectedClass,
+            rule: '1-19 printable ASCII',
+            error: 'name-taken',
+          });
+          return;
+        }
+        this.logger.error('Onboarding finalize error:', err);
+        client.emit('error', { code: 'INTERNAL', message: 'Failed to create ship.' } satisfies GatewayError);
+      }
+    }
+  }
+
   @SubscribeMessage('sector:join')
   handleSectorJoin(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: SectorPayload,
   ): void {
+    if (!client.data.userid || !this.registry.isBound(client.id)) {
+      client.emit('command:result', {
+        lines: [{ text: 'Not authenticated or not in play.', category: 'system' }],
+      });
+      return;
+    }
     const result = this.validateCoord(payload, 'sector:join');
     if (!result.ok) {
       client.emit('error', {
@@ -242,6 +378,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: SectorPayload,
   ): void {
+    if (!client.data.userid || !this.registry.isBound(client.id)) {
+      client.emit('command:result', {
+        lines: [{ text: 'Not authenticated or not in play.', category: 'system' }],
+      });
+      return;
+    }
     const result = this.validateCoord(payload, 'sector:leave');
     if (!result.ok) {
       client.emit('error', {
@@ -257,12 +399,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('sector:left', { x, y, room });
   }
 
-  /**
-   * Broadcast combat events to the firer/victim's sector room.
-   * Sector room name follows the existing convention `sector:${x}:${y}`.
-   * @see specs/006b-combat/contracts/combat-events.md
-   * @see FR-031
-   */
+  /** @see specs/006b-combat/contracts/combat-events.md */
   @OnEvent(COMBAT_PHASER_FIRED)
   handleCombatPhaserFired(event: CombatPhaserFiredEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
@@ -294,9 +431,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Ship destruction is broadcast galaxy-wide (every connected client),
-   * NOT scoped to the sector room — the original game announces kills to
-   * all logged-in players (FR-031, R-7).
+   * Ship destruction is broadcast galaxy-wide.
    * @see specs/006b-combat/contracts/combat-events.md
    */
   @OnEvent(COMBAT_SHIP_DESTROYED)
@@ -305,10 +440,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Broadcast Cybertron taunt to the Cybertron's sector room so the target
-   * (and all players in that sector) see the taunt message.
    * @see GECYBS.C:379 cyb_annoy
-   * @see specs/007-cybertron-ai/tasks.md T047
    */
   @OnEvent(CYBERTRON_EVENT.TAUNT)
   handleCybertronTaunt(event: CybertronTauntPayload): void {
@@ -316,14 +448,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(room).emit(CYBERTRON_EVENT.TAUNT, event);
   }
 
-  /**
-   * Deliver "lucky day" broke-off message to the former target's sector room.
-   * @see GECYBS.C:255 CYB_BREAKOFF roll
-   * @see specs/007-cybertron-ai/tasks.md T047
-   */
+  /** @see GECYBS.C:255 CYB_BREAKOFF roll */
   @OnEvent(CYBERTRON_EVENT.BROKE_OFF)
   handleCybertronBrokeOff(event: CybertronBrokeOffPayload): void {
-    // Find the target's current sector to route the message correctly
     const parts = event.targetShipKey.split(':');
     const targetUserid = parts.slice(0, -1).join(':');
     const targetShipno = Number(parts[parts.length - 1]);
@@ -335,19 +462,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
   }
 
-  /**
-   * Forward sector-transition batch to all connected clients so the frontend
-   * can update ScanMap cells and PlayerList positions.
-   * @see specs/010-react-frontend/data-model.md §C.2
-   */
+  /** @see specs/010-react-frontend/data-model.md §C.2 */
   @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT)
   handleSectorTransition(event: PhysicsSectorTransitionPayload): void {
     this.server.emit('physics.sector-transition', event);
   }
 
   /**
-   * Deliver droid annoy message to the target player's socket + sector room broadcast.
-   * @see specs/008-droid-ai/contracts/droid-events.md FR-030, FR-031
    * @see GEDROIDS.C:237 droid_annoy
    */
   @OnEvent(DroidEvents.ANNOY)
@@ -355,6 +476,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
     const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
+  }
+
+  /**
+   * Processes the optional `broadcasts` array from a CommandResult.
+   * The sentinel room `__player_snapshot__` triggers a global player.snapshot
+   * emit using the current registry state; all other rooms are forwarded as-is.
+   * @see specs/011-onboarding/plan.md §rename-broadcasts
+   */
+  private processBroadcasts(result: import('../game/commands/command.types').CommandResult): void {
+    if (!result.broadcasts) return;
+    for (const broadcast of result.broadcasts) {
+      if (broadcast.event === 'player.snapshot') {
+        this.server.emit('player.snapshot', { players: this.registry.list() });
+      } else {
+        this.server.to(broadcast.room).emit(broadcast.event, broadcast.payload);
+      }
+    }
   }
 
   private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {
