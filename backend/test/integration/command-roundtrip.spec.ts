@@ -1,3 +1,5 @@
+process.env['JWT_SECRET'] = 'test-secret-roundtrip';
+
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
@@ -13,6 +15,8 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { TickKind } from '../../src/game/tick/tick.types';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ScanCell } from '../../src/game/commands/command.types';
+import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
+import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -53,7 +57,7 @@ describe('command round-trip integration (US1)', () => {
   let port: number;
   let shipServiceFake: ShipStateService;
   let prismaMock: {
-    ship: { findMany: jest.Mock; update: jest.Mock };
+    ship: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
     shipClass: { findMany: jest.Mock };
     mine: { findMany: jest.Mock };
   };
@@ -69,6 +73,7 @@ describe('command round-trip integration (US1)', () => {
     prismaMock = {
       ship: {
         findMany: jest.fn().mockResolvedValue([ship]),
+        findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
         update: jest.fn().mockResolvedValue({}),
       },
       shipClass: {
@@ -120,6 +125,16 @@ describe('command round-trip integration (US1)', () => {
         size: jest.fn().mockReturnValue(0),
         claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
       })
+      .overrideProvider(WsAuthGuard)
+      .useValue({
+        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+          client.data.userid = USERID;
+          client.data.username = SHIPNAME;
+          return { sub: USERID, username: SHIPNAME };
+        }),
+      })
+      .overrideProvider(OnboardingService)
+      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
       .compile();
 
     app = module.createNestApplication();
@@ -137,7 +152,7 @@ describe('command round-trip integration (US1)', () => {
   function makeClient(): Socket {
     return ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
-      query: { userid: USERID },
+      auth: { token: 'mock-valid-token' },
     });
   }
 
@@ -309,6 +324,7 @@ describe('command round-trip integration (US1)', () => {
     const localPrismaMock = {
       ship: {
         findMany: jest.fn().mockResolvedValue([ship]),
+        findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
         update: jest.fn().mockResolvedValue({}),
       },
       shipClass: {
@@ -350,6 +366,16 @@ describe('command round-trip integration (US1)', () => {
         size: jest.fn().mockReturnValue(0),
         claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
       })
+      .overrideProvider(WsAuthGuard)
+      .useValue({
+        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+          client.data.userid = USERID;
+          client.data.username = SHIPNAME;
+          return { sub: USERID, username: SHIPNAME };
+        }),
+      })
+      .overrideProvider(OnboardingService)
+      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
       .compile();
 
     const galaxyApp = galaxyModule.createNestApplication();
@@ -360,7 +386,7 @@ describe('command round-trip integration (US1)', () => {
 
     const client = ioc(`http://localhost:${galaxyPort}`, {
       transports: ['websocket'],
-      query: { userid: USERID },
+      auth: { token: 'mock-valid-token' },
     });
 
     try {

@@ -56,9 +56,9 @@ describe('US4 — team reconciliation (T027)', () => {
     // 3 users on team 5 with equal klscore (so equal score after phase)
     await prisma.user.createMany({
       data: [
-        { userid: 'alice', teamcode: 5n, klscore: 300n },
-        { userid: 'bob', teamcode: 5n, klscore: 600n },
-        { userid: 'carol', teamcode: 5n, klscore: 900n },
+        { userid: 'alice', username: 'alice', teamcode: 5n, klscore: 300n },
+        { userid: 'bob', username: 'bob', teamcode: 5n, klscore: 600n },
+        { userid: 'carol', username: 'carol', teamcode: 5n, klscore: 900n },
       ],
     });
 
@@ -79,8 +79,8 @@ describe('US4 — team reconciliation (T027)', () => {
     // 2 users on team 9
     await prisma.user.createMany({
       data: [
-        { userid: 'dave', teamcode: 9n, klscore: 1000n },
-        { userid: 'eve', teamcode: 9n, klscore: 2000n },
+        { userid: 'dave', username: 'dave', teamcode: 9n, klscore: 1000n },
+        { userid: 'eve', username: 'eve', teamcode: 9n, klscore: 2000n },
       ],
     });
 
@@ -93,7 +93,7 @@ describe('US4 — team reconciliation (T027)', () => {
   });
 
   it('resets orphan teamcode to 0 when team does not exist', async () => {
-    await prisma.user.create({ data: { userid: 'orphan', teamcode: 99n, klscore: 500n } });
+    await prisma.user.create({ data: { userid: 'orphan', username: 'orphan', teamcode: 99n, klscore: 500n } });
     // Note: team 99 does NOT exist
 
     await service.run();
@@ -114,7 +114,7 @@ describe('US4 — team reconciliation (T027)', () => {
 
   it('non-empty teams keep positive teamcode', async () => {
     await prisma.team.create({ data: { teamcode: 3n, teamname: 'Active' } });
-    await prisma.user.create({ data: { userid: 'member', teamcode: 3n, klscore: 100n } });
+    await prisma.user.create({ data: { userid: 'member', username: 'member', teamcode: 3n, klscore: 100n } });
 
     await service.run();
 
@@ -129,12 +129,12 @@ describe('US4 — team reconciliation (T027)', () => {
 
     await prisma.user.createMany({
       data: [
-        { userid: 'a1', teamcode: 5n, klscore: 100n },
-        { userid: 'a2', teamcode: 5n, klscore: 200n },
-        { userid: 'a3', teamcode: 5n, klscore: 300n },
-        { userid: 'b1', teamcode: 9n, klscore: 500n },
-        { userid: 'b2', teamcode: 9n, klscore: 500n },
-        { userid: 'orphan', teamcode: 99n, klscore: 1000n },
+        { userid: 'a1', username: 'a1', teamcode: 5n, klscore: 100n },
+        { userid: 'a2', username: 'a2', teamcode: 5n, klscore: 200n },
+        { userid: 'a3', username: 'a3', teamcode: 5n, klscore: 300n },
+        { userid: 'b1', username: 'b1', teamcode: 9n, klscore: 500n },
+        { userid: 'b2', username: 'b2', teamcode: 9n, klscore: 500n },
+        { userid: 'orphan', username: 'orphan', teamcode: 99n, klscore: 1000n },
       ],
     });
 

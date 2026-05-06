@@ -1,3 +1,6 @@
+// Must be set before module instantiation
+process.env['JWT_SECRET'] = 'test-secret-gateway';
+
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
@@ -12,6 +15,8 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
+import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 
 function makeShipState(
   overrides: { userid: string; shipno: number; shipname: string },
@@ -40,10 +45,10 @@ function makeShipState(
 const TEST_USERID = 'u-gateway-test';
 const TEST_SHIP = makeShipState({ userid: TEST_USERID, shipno: 1, shipname: 'Test Ship' });
 
-function makeClient(port: number, userid = TEST_USERID): Socket {
+function makeClient(port: number, _userid = TEST_USERID): Socket {
   return ioc(`http://localhost:${port}`, {
     transports: ['websocket'],
-    query: { userid },
+    auth: { token: 'mock-valid-token' },
   });
 }
 
@@ -66,6 +71,7 @@ describe('GameGateway integration', () => {
     const shipServiceMock = {
       findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
       get: jest.fn().mockReturnValue(TEST_SHIP),
+      loadShip: jest.fn(),
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
     };
@@ -81,7 +87,18 @@ describe('GameGateway integration', () => {
       .useValue({
         shipClass: { findMany: jest.fn().mockResolvedValue([]) },
         mine: { findMany: jest.fn().mockResolvedValue([]) },
+        ship: { findFirst: jest.fn().mockResolvedValue({ userid: TEST_USERID, shipno: 1 }) },
       })
+      .overrideProvider(WsAuthGuard)
+      .useValue({
+        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+          client.data.userid = TEST_USERID;
+          client.data.username = 'TestPilot';
+          return { sub: TEST_USERID, username: 'TestPilot' };
+        }),
+      })
+      .overrideProvider(OnboardingService)
+      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
       .overrideProvider(GalaxyService)
       .useValue({
         onModuleInit: jest.fn(),

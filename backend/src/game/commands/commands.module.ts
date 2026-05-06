@@ -22,15 +22,17 @@ import { ZipperHandlerService } from './handlers/zipper.handler';
 import { DecoyHandlerService } from './handlers/decoy.handler';
 import { JammerHandlerService } from './handlers/jammer.handler';
 import { SysHandlerService } from './handlers/sys.handler';
+import { RenameHandlerService } from './handlers/rename.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { PlanetModule } from '../planet/planet.module';
 import { PhysicsModule } from '../physics/physics.module';
 import { CombatModule } from '../combat/combat.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,
@@ -51,6 +53,7 @@ import { CombatModule } from '../combat/combat.module';
     JammerHandlerService,
     SysHandlerService,
     LockHandlerService,
+    RenameHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -75,6 +78,7 @@ export class CommandsModule implements OnModuleInit {
     private readonly jammerHandler: JammerHandlerService,
     private readonly sysHandler: SysHandlerService,
     private readonly lockHandler: LockHandlerService,
+    private readonly renameHandler: RenameHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -98,6 +102,7 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.jammerHandler.command);
     this.commandRouter.register(this.sysHandler.command);
     this.commandRouter.register(this.lockHandler.command);
+    this.commandRouter.register(this.renameHandler.command);
     this.commandRouter.register(shieldCommand);
     this.commandRouter.register(fluxCommand);
   }

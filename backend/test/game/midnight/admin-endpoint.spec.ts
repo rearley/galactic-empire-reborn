@@ -128,7 +128,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
   });
 
   it('202 again on same-day re-run — MailStat row count doubles', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
 
     await request(app.getHttpServer())
       .post('/admin/midnight/run')

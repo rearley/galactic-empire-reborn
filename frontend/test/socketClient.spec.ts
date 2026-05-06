@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Mock tokenStore so socketClient can import it without localStorage
+vi.mock('../src/auth/tokenStore', () => ({
+  getToken: vi.fn(() => null),
+  setToken: vi.fn(),
+  clearToken: vi.fn(),
+}));
+
 // Mock socket.io-client BEFORE importing the module under test
 vi.mock('socket.io-client', () => {
   const mockSocket = {
@@ -7,7 +14,6 @@ vi.mock('socket.io-client', () => {
     emit: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
-    query: { userid: 'DEV' },
   };
   return {
     io: vi.fn(() => mockSocket),
@@ -29,14 +35,17 @@ describe('socketClient', () => {
     vi.clearAllMocks();
   });
 
-  it('socket is constructed with userid query param', async () => {
+  it('socket is constructed with auth callback for JWT (not legacy userid query)', async () => {
     await import('../src/socket/socketClient');
     const { io } = await import('socket.io-client');
-    expect(io).toHaveBeenCalledWith(
-      expect.objectContaining({
-        query: expect.objectContaining({ userid: 'DEV' }),
-      }),
-    );
+    // Find the call that has config args (beforeEach also calls io() with no args)
+    const allCalls = (io as ReturnType<typeof vi.fn>).mock.calls;
+    const configCall = allCalls.find((c) => c.length > 0);
+    const callArgs = configCall?.[0] as Record<string, unknown> | undefined;
+    // auth must be a function (dynamic callback that reads tokenStore at connect time)
+    expect(typeof callArgs?.auth).toBe('function');
+    // legacy query.userid must not be present
+    expect(callArgs?.query).toBeUndefined();
   });
 
   it('sendCommand emits "command" event with the input', async () => {

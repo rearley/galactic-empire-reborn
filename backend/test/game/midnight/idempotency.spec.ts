@@ -61,8 +61,8 @@ describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {
   it('produces identical User state on second run', async () => {
     await prisma.user.createMany({
       data: [
-        { userid: 'alice', klscore: 500n },
-        { userid: 'bob', klscore: 1000n },
+        { userid: 'alice', username: 'alice', klscore: 500n },
+        { userid: 'bob', username: 'bob', klscore: 1000n },
       ],
     });
     await prisma.planet.createMany({
@@ -102,7 +102,7 @@ describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {
   });
 
   it('MailStat row count exactly doubles on second run (FR-003)', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.create({
       data: {
         xsect: 1, ysect: 1, plnum: 1, type: PLTYPE_PLNT,
@@ -132,8 +132,8 @@ describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {
     await prisma.team.create({ data: { teamcode: 5n, teamname: 'Alpha' } });
     await prisma.user.createMany({
       data: [
-        { userid: 'alice', teamcode: 5n, klscore: 100n },
-        { userid: 'bob', teamcode: 5n, klscore: 200n },
+        { userid: 'alice', username: 'alice', teamcode: 5n, klscore: 100n },
+        { userid: 'bob', username: 'bob', teamcode: 5n, klscore: 200n },
       ],
     });
 

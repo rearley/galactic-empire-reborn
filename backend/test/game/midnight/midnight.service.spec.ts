@@ -97,7 +97,7 @@ beforeEach(async () => {
 
 describe('US1 — score recalculation and rospos ranking', () => {
   it('computes plscore = sum of owned-planet net-worths', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 10_000n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 10_000n } });
     await prisma.planet.create({ data: makePlanetRow({ userid: 'alice' }) });
 
     await service.run();
@@ -109,7 +109,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
   });
 
   it('sets score = plscore + klscore', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 5_000n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 5_000n } });
     await prisma.planet.create({ data: makePlanetRow({ userid: 'alice', cash: 1_000_000n, tax: 0n }) });
 
     await service.run();
@@ -121,7 +121,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
 
   it('klscore is unchanged after pass', async () => {
     const originalKlscore = 42_000n;
-    await prisma.user.create({ data: { userid: 'alice', klscore: originalKlscore } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: originalKlscore } });
 
     await service.run();
 
@@ -130,7 +130,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
   });
 
   it('accumulates population = men / 10000', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     const itemsQty = makeItemsQty(100_000n); // 100k men → 10 population
     await prisma.planet.create({ data: makePlanetRow({ userid: 'alice', itemsQty }) });
 
@@ -143,8 +143,8 @@ describe('US1 — score recalculation and rospos ranking', () => {
   it('skips AI users (@-prefix) in rospos ranking', async () => {
     await prisma.user.createMany({
       data: [
-        { userid: 'alice', score: 500n, klscore: 500n },
-        { userid: '@bot1', score: 1000n, klscore: 1000n },
+        { userid: 'alice', username: 'alice', score: 500n, klscore: 500n },
+        { userid: '@bot1', username: '@bot1', score: 1000n, klscore: 1000n },
       ],
     });
 
@@ -161,8 +161,8 @@ describe('US1 — score recalculation and rospos ranking', () => {
   it('skips KEY in rospos ranking', async () => {
     await prisma.user.createMany({
       data: [
-        { userid: 'KEY', score: 999_999n, klscore: 999_999n },
-        { userid: 'alice', score: 1000n, klscore: 1000n },
+        { userid: 'KEY', username: 'KEY', score: 999_999n, klscore: 999_999n },
+        { userid: 'alice', username: 'alice', score: 1000n, klscore: 1000n },
       ],
     });
 
@@ -175,7 +175,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
   });
 
   it('users with score=0 get rospos=0', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
 
     await service.run();
 
@@ -193,7 +193,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
 
   it('silently skips planets with no matching User row', async () => {
     // Planet references 'ghost' user who has no User row
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.create({ data: makePlanetRow({ userid: 'ghost', xsect: 2, ysect: 2 }) });
 
     await expect(service.run()).resolves.not.toThrow();
@@ -207,12 +207,12 @@ describe('US1 — score recalculation and rospos ranking', () => {
   it('handles 5 users + 1 AI + assorted planets + klscores correctly', async () => {
     await prisma.user.createMany({
       data: [
-        { userid: 'alice', klscore: 1_000n },
-        { userid: 'bob', klscore: 2_000n },
-        { userid: 'carol', klscore: 500n },
-        { userid: 'dave', klscore: 0n },
-        { userid: 'eve', klscore: 3_000n },
-        { userid: '@aibot', klscore: 99_000n },
+        { userid: 'alice', username: 'alice', klscore: 1_000n },
+        { userid: 'bob', username: 'bob', klscore: 2_000n },
+        { userid: 'carol', username: 'carol', klscore: 500n },
+        { userid: 'dave', username: 'dave', klscore: 0n },
+        { userid: 'eve', username: 'eve', klscore: 3_000n },
+        { userid: '@aibot', username: '@aibot', klscore: 99_000n },
       ],
     });
 
@@ -254,7 +254,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
 
 describe('US2 — planet production report MailStat rows', () => {
   it('inserts one MailStat row per owned planet', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.createMany({
       data: [
         makePlanetRow({ userid: 'alice', xsect: 1, ysect: 1, plnum: 1 }),
@@ -269,7 +269,7 @@ describe('US2 — planet production report MailStat rows', () => {
   });
 
   it('inserts no MailStat for unowned planets', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.create({ data: makePlanetRow({ userid: null, xsect: 3, ysect: 3 }) });
 
     await service.run();
@@ -288,7 +288,7 @@ describe('US2 — planet production report MailStat rows', () => {
   });
 
   it('sets class = MAIL_CLASS_PRODRPT on each row', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.create({ data: makePlanetRow({ userid: 'alice' }) });
 
     await service.run();
@@ -298,7 +298,7 @@ describe('US2 — planet production report MailStat rows', () => {
   });
 
   it('10 players × multiple planets produces correct per-player row counts', async () => {
-    const users = Array.from({ length: 10 }, (_, i) => ({ userid: `user${i}`, klscore: 0n }));
+    const users = Array.from({ length: 10 }, (_, i) => ({ userid: `user${i}`, username: `user${i}`, klscore: 0n }));
     await prisma.user.createMany({ data: users });
 
     const planets = [];

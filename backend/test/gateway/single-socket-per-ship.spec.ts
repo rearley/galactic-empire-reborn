@@ -3,6 +3,9 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
+import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 
 /**
  * Verifies the single-socket-per-ship invariant (FR-025a).
@@ -59,7 +62,30 @@ describe('GameGateway single-socket-per-ship invariant', () => {
 
     const svc = mockShipStateService();
     registry = new ConnectedShipsRegistry(svc as ShipStateService);
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry);
+
+    const mockWsGuard = {
+      validate: jest.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
+        const userid = socket.handshake.query?.userid ?? 'test-user';
+        socket.data.userid = userid;
+        return { sub: userid, username: userid };
+      }),
+    } as unknown as WsAuthGuard;
+    const mockPrisma = {
+      ship: {
+        findFirst: jest.fn().mockResolvedValue({
+          userid: 'user1',
+          shipno: 1,
+          shipname: 'Defiant',
+          shpclass: 3,
+          xcoord: 5.7,
+          ycoord: 3.2,
+          items: Array(16).fill(0n),
+        }),
+      },
+    } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: {
@@ -75,28 +101,28 @@ describe('GameGateway single-socket-per-ship invariant', () => {
 
   let sock1: ReturnType<typeof makeSocket>;
 
-  it('second connection disconnects the first socket', () => {
+  it('second connection disconnects the first socket', async () => {
     sock1 = makeSocket('sock-1');
     const sock2 = makeSocket('sock-2');
 
-    gateway.handleConnection(sock1 as never);
-    gateway.handleConnection(sock2 as never);
+    await gateway.handleConnection(sock1 as never);
+    await gateway.handleConnection(sock2 as never);
 
     expect(sock1.disconnect).toHaveBeenCalledWith(true);
   });
 
-  it('event order: player.left (old) → player.snapshot (new) → player.joined (new)', () => {
+  it('event order: player.left (old) → player.snapshot (new) → player.joined (new)', async () => {
     sock1 = makeSocket('sock-1');
     const sock2 = makeSocket('sock-2');
 
-    gateway.handleConnection(sock1 as never);
+    await gateway.handleConnection(sock1 as never);
     emitOrder = []; // reset after first connection setup
     serverEmitMock.mockClear();
     serverEmitMock.mockImplementation((ev: string) => {
       emitOrder.push(`server:${ev}`);
     });
 
-    gateway.handleConnection(sock2 as never);
+    await gateway.handleConnection(sock2 as never);
 
     const leftIdx = emitOrder.indexOf('server:player.left');
     const snapshotIdx = emitOrder.findIndex((e) => e.includes('player.snapshot'));
@@ -109,12 +135,12 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     expect(snapshotIdx).toBeLessThan(joinedIdx);
   });
 
-  it('player-list never holds two entries for the same shipId after takeover', () => {
+  it('player-list never holds two entries for the same shipId after takeover', async () => {
     sock1 = makeSocket('sock-1');
     const sock2 = makeSocket('sock-2');
 
-    gateway.handleConnection(sock1 as never);
-    gateway.handleConnection(sock2 as never);
+    await gateway.handleConnection(sock1 as never);
+    await gateway.handleConnection(sock2 as never);
 
     const players = registry.list();
     const ids = players.map((p) => p.shipId);
