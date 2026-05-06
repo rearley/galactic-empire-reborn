@@ -134,6 +134,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!this.shipStateService.get(userid, ship.shipno)) {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
       const state = prismaShipToState(ship);
+      try {
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true } });
+        if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
+      } catch {
+        // Non-fatal: teamcode will be undefined; re-derived on next full hydration
+      }
       this.shipStateService.loadShip(state);
     }
 
@@ -480,8 +486,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Processes the optional `broadcasts` array from a CommandResult.
-   * The sentinel room `__player_snapshot__` triggers a global player.snapshot
-   * emit using the current registry state; all other rooms are forwarded as-is.
+   *
+   * Special rooms handled here:
+   *   `__player_snapshot__` — triggers global player.snapshot emit.
+   *   `galaxy`              — broadcasts to all connected sockets unfiltered.
+   *   `hail`                — broadcasts to all connected sockets, filtering cloaked ships.
+   *   `sector:{x}:{y}`      — forwarded to the named Socket.io room as-is.
+   *
+   * @see GECMDS.C:1825 cmd_send — outwar FILTER (hail) / outsect / outwar ALWAYS (galaxy)
+   * @see specs/012-social-commands/contracts/commands.md §sen
    * @see specs/011-onboarding/plan.md §rename-broadcasts
    */
   private processBroadcasts(result: import('../game/commands/command.types').CommandResult): void {
@@ -489,6 +502,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const broadcast of result.broadcasts) {
       if (broadcast.event === 'player.snapshot') {
         this.server.emit('player.snapshot', { players: this.registry.list() });
+      } else if (broadcast.room === 'galaxy') {
+        // Galaxy-wide: all connected sockets, no filtering
+        this.server.emit(broadcast.event, broadcast.payload);
+      } else if (broadcast.room === 'hail') {
+        // Hail: all connected sockets, exclude cloaked recipients
+        for (const [socketId] of this.server.sockets.sockets) {
+          const sock = this.server.sockets.sockets.get(socketId);
+          if (!sock) continue;
+          const uid = sock.data.userid as string | undefined;
+          const shipno = sock.data.activeShipNo as number | undefined;
+          if (uid == null || shipno == null) continue;
+          const ship = this.shipStateService.get(uid, shipno);
+          if (ship?.cloak) continue;
+          sock.emit(broadcast.event, broadcast.payload);
+        }
       } else {
         this.server.to(broadcast.room).emit(broadcast.event, broadcast.payload);
       }

@@ -65,10 +65,10 @@ describe('PlayerScoreService — COMBAT_SHIP_DESTROYED score transfer', () => {
     const { events, transferKillScore } = buildHarness();
     events.emit(
       COMBAT_SHIP_DESTROYED,
-      makeEvent({ victimUserid: 'Droid-3', victimShipKey: 'Droid-3:1', victimId: 'Droid-3:1' }),
+      makeEvent({ victimUserid: '@Droid-3', victimShipKey: '@Droid-3:1', victimId: '@Droid-3:1' }),
     );
     await new Promise((r) => setImmediate(r));
-    expect(transferKillScore).toHaveBeenCalledWith('attacker', 'Droid-3', 50, true);
+    expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-3', 50, true);
   });
 
   it('skips transferKillScore when scoreAwarded is 0', async () => {

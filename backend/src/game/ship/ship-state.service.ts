@@ -23,12 +23,15 @@ export class ShipStateService implements OnModuleInit {
 
   /**
    * Hydrates the in-memory map from Postgres and registers the SHIP_UPDATE flush subscriber.
+   * Joins User.teamcode so ShipState.teamcode is populated from boot.
    * @see GEMAIN.C boot sequence — ships loaded before game loop starts
+   * @see specs/012-social-commands/data-model.md §ShipState.teamcode
    */
   async onModuleInit(): Promise<void> {
-    const rows = await this.prisma.ship.findMany();
+    const rows = await this.prisma.ship.findMany({ include: { user: { select: { teamcode: true } } } });
     for (const row of rows) {
       const state = prismaShipToState(row);
+      if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
       this.map.set(shipKey(state.userid, state.shipno), state);
     }
     this.logger.log(`Hydrated ${this.map.size} ships from Postgres`);
