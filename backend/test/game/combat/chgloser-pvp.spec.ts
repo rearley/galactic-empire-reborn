@@ -74,7 +74,7 @@ describe('US5 — CHGLOSER PvP cash penalty (GEFUNCS.C:killem)', () => {
 
   it('does NOT call applyCashPenalty when attacker is AI (Droid-*)', async () => {
     events.emit(COMBAT_SHIP_DESTROYED, makeEvent({
-      attackerUserid: 'Droid-3',
+      attackerUserid: '@Droid-3',
       victimUserid: 'alice',
     }));
     await new Promise((r) => setImmediate(r));

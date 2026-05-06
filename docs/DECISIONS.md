@@ -804,6 +804,59 @@ awkward), separate lowercase/original versions of each arg (unnecessary complexi
 
 ---
 
+## 2026-05-06 — `who` and `dat` reinterpreted as in-world player-facing commands (D1)
+
+**Context**: `GECMDS.C:5162 cmd_who` prints the caller's BBS session info; `GECMDS.C:5829
+cmd_data` is gated behind a hard-coded `qazwsx` password and dumps raw wire-format ship
+state for the BBS renderer. Neither is a player-facing galaxy listing.
+
+**Decision**: `who` lists all active non-cloaked ships; `dat <fragment>` returns a full
+stat block on the named ship. These are the in-world semantics documented in the GE wiki and
+expected by every player.
+
+**Reason**: The literal C-source forms are unreachable through the modern command pipeline.
+Feature 010 already exposes the underlying data. Implementing the literal forms would deliver
+zero player value.
+
+**Alternatives rejected**: Implement literal C forms — rejected (no consumer); implement
+both under different keywords — rejected (YAGNI).
+
+---
+
+## 2026-05-06 — `tea` implements join/leave/show subset of `cmd_team` only (D2)
+
+**Context**: `GECMDS.C:5277 cmd_team` supports nine sub-verbs: `join`, `start`, `score`,
+`unjoin`, `members`, `kick`, `newpass`, `newname`. Most are administrative.
+
+**Decision**: Feature 012 implements only `tea` (show), `tea <name>` (join by exact
+case-insensitive name), and `tea leave` (clear). Uses name-based join rather than the
+original five-digit teamcode + password flow. Team creation deferred to a future feature.
+
+**Reason**: Spec is explicit about the three behaviours. The existing `Team` Prisma model
+from feature 001 is sufficient. Name-based join is a deliberate modernisation already
+accepted by the wiki-era community.
+
+**Alternatives rejected**: Port all nine sub-verbs — out of scope; teamcode-based join —
+spec mandates name-based (clarification accepted).
+
+---
+
+## 2026-05-06 — RosHandlerService reads `process.env` directly instead of ConfigService
+
+**Context**: Integration tests import `CommandsModule` without `ConfigModule`, which causes
+NestJS DI to fail to resolve `ConfigService` and leaves the test `app` as `undefined`.
+
+**Decision**: `RosHandlerService` reads `process.env['ROSTER_MAX']` directly in `execute()`,
+defaulting to 20 if absent.
+
+**Reason**: Avoids DI complexity for a single env value; integration tests do not need
+`ConfigModule`; the value is only read at command time, not injected at construction.
+
+**Alternatives rejected**: Add `ConfigModule.forRoot()` to the test harness — adds
+unnecessary boilerplate and couples test setup to module composition.
+
+---
+
 ## 2026-05-05 — No Redux / new state layer for player list
 
 **Context**: The player list panel needs reactive state that stays in sync across multiple socket events. (research.md R1)

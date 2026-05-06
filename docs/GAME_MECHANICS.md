@@ -860,3 +860,91 @@ in-memory `ShipStateService` map. The handler then queues two broadcasts via `Co
 
 Frontend: `useSocket` dispatches `RENAMED` action to `usePlayerList`; the reducer updates
 `name` for the matching `shipId` without a full list replacement.
+
+---
+
+## cmd_who — list active ships (feature 012)
+
+**Source**: GECMDS.C:5162 `cmd_who` (original = BBS debug echo; see D1 in DECISIONS.md for deviation)
+
+**Syntax**: `who`
+
+`WhoHandlerService` reads all ships from `ShipStateService.findAllShips()`, filters out
+any ship with `cloak === 1`, and sorts the remainder by `shipname` case-insensitively.
+Returns one header `system` line followed by one `info` line per ship: class number,
+sector `(x,y)`, kills, shipname. Includes the calling ship.
+
+---
+
+## cmd_dat — ship stat block (feature 012)
+
+**Source**: GECMDS.C:5829 `cmd_data` (original = password-gated wire-format dump; see D1 in DECISIONS.md for deviation)
+
+**Syntax**: `dat <ship-name-fragment>`
+
+`DatHandlerService` iterates `ShipStateService.findAllShips()` for the first ship whose
+`shipname` contains the arg as a case-insensitive substring. If found and not cloaked,
+renders a full stat block: class, sector, heading, speed, energy, damage, kills, 14 cargo
+slots (items[0..13] rendered as numbers), and team name resolved via `Prisma.team.findFirst`
+using the ship's `ShipState.teamcode`. Returns `Ship not found.` for no-match or cloaked.
+
+---
+
+## cmd_ros — leaderboard (feature 012)
+
+**Source**: GECMDS.C (no direct equivalent; see GEMAIN.H for score/kills fields)
+
+**Syntax**: `ros` / `ros all`
+
+`RosHandlerService` queries `Prisma.user.findMany` excluding any userid with prefix `Cybrg-`
+or `@Droid-`, ordered by `score DESC, kills DESC, userid ASC`. Default cap is
+`ROSTER_MAX` (env var, default 20); `ros all` raises cap to 200. Returns header + one row
+per user: rank, userid, score, kills, planets, population.
+
+---
+
+## cmd_fre — channel frequency (feature 012)
+
+**Source**: GECMDS.C — frequency management; thresholds defined in research.md
+
+**Syntax**: `fre <A|B|C> <number|hail>`
+
+`FreHandlerService` maps channel letter to `ship.freq` index (a→0, b→1, c→2). Accepts
+the keyword `hail` (sets 0) or a positive integer ≥1. Rejects: 0, negatives, non-integers,
+invalid channels. On success sets `ship.dirty = true` so the 1s flush persists the value.
+
+Thresholds in `_freq-thresholds.ts`: `FREQ_HAIL=0`, `FREQ_SECTOR_MAX=19999`,
+`FREQ_GALAXY_MIN=20000`. Balance-regression tested in `test/unit/commands/freq-thresholds.spec.ts`.
+
+---
+
+## cmd_sen — send message (feature 012)
+
+**Source**: GECMDS.C — in-game messaging; see contracts/websocket-events.md for payload shape
+
+**Syntax**: `sen <A|B|C> <message>`
+
+`SenHandlerService` reads `ship.freq[channelIndex]` and resolves the broadcast room:
+- `freq === FREQ_HAIL (0)` → `room: 'hail'` (gateway delivers to all non-cloaked sockets)
+- `1 ≤ freq ≤ FREQ_SECTOR_MAX (19999)` → `room: 'sector:{x}:{y}'` (current sector)
+- `freq ≥ FREQ_GALAXY_MIN (20000)` → `room: 'galaxy'` (all connected clients)
+
+Messages are capped at 200 characters; longer messages return a usage error with zero
+broadcasts. Event name: `message.send`. Not persisted.
+
+---
+
+## cmd_tea — team affiliation (feature 012)
+
+**Source**: GECMDS.C:5277 `cmd_team` (subset; see D2 in DECISIONS.md for deviation)
+
+**Syntax**: `tea` / `tea <team-name>` / `tea leave`
+
+`TeaHandlerService`:
+- No arg: returns current team (via `ShipState.teamcode` → name lookup) or "not on a team".
+- `tea <name>`: `Prisma.team.findFirst({ where: { teamname: { equals: name, mode: 'insensitive' } } })`;
+  exact case-insensitive match only (prefix/substring rejected). On match: updates
+  `User.teamcode` in Postgres, updates `ShipState.teamcode` in memory, sets `dirty = true`,
+  emits `player.snapshot` sentinel broadcast.
+- `tea leave`: clears both `User.teamcode` (null) and `ShipState.teamcode` (undefined),
+  sets `dirty = true`, emits `player.snapshot` sentinel broadcast.

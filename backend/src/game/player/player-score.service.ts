@@ -5,22 +5,21 @@ import {
   CombatShipDestroyedEvent,
 } from '../combat/combat-events';
 import { PlayerScoreRepository } from './player-score.repository';
-
-const AI_USERID_RE = /^(?:Cybrg-|Droid-)/;
+import { isAiUserid } from '../commands/helpers/ai-userid';
 
 /**
  * Named constant for AI victim userid prefixes — documents which prefixes
  * participate in the AI-victim contract (isAiVictim=true path).
  *
  * - 'Cybrg-' prefix: Cybertron ships — no victim deduction, cash penalty skipped.
- * - 'Droid-' prefix: Droid ships — same AI path, tolerates absent User row.
+ * - '@Droid-' prefix: Droid ships — same AI path, tolerates absent User row.
  *   FR-025/026: Droid victims already award score via the existing transferKillScore
  *   path (isAiVictim=true). A future refactor MUST NOT regress this.
  *
  * @see backend/src/game/player/player-score.repository.ts:24-55
  * @see GEFUNCS.C:killem (1143-1218) — AI victim branching
  */
-export const AI_VICTIM_PREFIXES = ['Cybrg-', 'Droid-'] as const;
+export const AI_VICTIM_PREFIXES = ['Cybrg-', '@Droid-'] as const;
 
 /**
  * Listens to COMBAT_SHIP_DESTROYED and forwards score updates to
@@ -48,12 +47,12 @@ export class PlayerScoreService implements OnModuleInit {
     const { attackerUserid, victimUserid, scoreAwarded } = event;
     if (!attackerUserid || scoreAwarded <= 0) return;
 
-    const isAiVictim = AI_USERID_RE.test(victimUserid);
+    const isAiVictim = isAiUserid(victimUserid);
     await this.repo.transferKillScore(attackerUserid, victimUserid, scoreAwarded, isAiVictim);
 
     // CHGLOSER cash penalty: only when both sides are non-AI human players
     // @see GEFUNCS.C:killem (1087-1218 chgloser block)
-    if (!isAiVictim && this.chgLoserPercent > 0 && !AI_USERID_RE.test(attackerUserid)) {
+    if (!isAiVictim && this.chgLoserPercent > 0 && !isAiUserid(attackerUserid)) {
       await this.repo.applyCashPenalty(attackerUserid, victimUserid, this.chgLoserPercent);
     }
   }
