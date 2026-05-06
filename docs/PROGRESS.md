@@ -1,3 +1,57 @@
+## 2026-05-06 — 012-social-commands: who / dat / ros / sen / fre / tea
+
+**Completed**:
+
+- **US1 `who`**: `WhoHandlerService` lists all active non-cloaked ships sorted by
+  shipname case-insensitive; class, sector, kills per row; AI ships (Cybrg-/\@Droid-)
+  appear if present.
+
+- **US2 `dat`**: `DatHandlerService` case-insensitive substring match → full stat block
+  (class, sector, heading, speed, energy, damage, 14-slot cargo, kills, team name);
+  cloaked ships return `Ship not found.`; team name resolved via `Prisma.team.findFirst`.
+
+- **US3 `ros`**: `RosHandlerService` — top-N human players ordered by score DESC/kills
+  DESC/userid ASC; Cybrg-* and \@Droid-* excluded; default cap `ROSTER_MAX` (env, def 20);
+  `ros all` cap 200; reads `process.env['ROSTER_MAX']` directly (no ConfigService).
+
+- **US4 `sen`**: `SenHandlerService` — `sen <A|B|C> <msg>` reads `ship.freq[channelIndex]`;
+  FREQ_HAIL=0 → `room:'hail'` (cloaked excluded), 1–19999 → `room:'sector:{x}:{y}'`,
+  ≥20000 → `room:'galaxy'`; 200-char cap; returns single `system` confirmation line.
+
+- **US5 `fre`**: `FreHandlerService` — `fre <A|B|C> <number|hail>`; validates channel (a/b/c),
+  rejects ≤0/negative/non-integer; `hail` keyword sets 0; sets `ship.dirty = true`.
+
+- **US6 `tea`**: `TeaHandlerService` — `tea` (show current team), `tea <name>` (exact
+  case-insensitive join: writes `User.teamcode` via Prisma + `ShipState.teamcode` in memory,
+  sets dirty, emits `player.snapshot` broadcast), `tea leave` (clears both).
+
+- **Foundational**:
+  - `ShipState.teamcode?: bigint` field added; hydrated from `User.teamcode` on boot/connect.
+  - `isAiUserid(userid)` helper extracted to `commands/helpers/ai-userid.ts`; callers updated.
+  - `_freq-thresholds.ts` balance-regression-tested constants.
+  - Gateway `processBroadcasts()` extended for `hail` and `galaxy` sentinel rooms.
+
+**Tests**: 171 suites / 1551 tests passing. New suites: ai-userid (9), freq-thresholds (4),
+who.handler (7), dat.handler (9), ros.handler (10), sen.handler (12), fre.handler (14),
+tea.handler (15) — unit; who.dispatch (3), dat.dispatch (4), ros.dispatch (3), fre.dispatch (6)
+— integration; social-commands E2E (11) — end-to-end through `GameGateway`.
+Combat test suite updated to use canonical `@Droid-` userid prefix.
+
+**Decisions made**:
+- `who`/`dat` reinterpreted as in-world player-facing commands (not BBS debug echoes) — see D1.
+- `tea` ships only join/leave/show subset of `cmd_team`; creation deferred — see D2.
+- `RosHandlerService` reads `process.env['ROSTER_MAX']` directly to avoid ConfigService DI
+  complexity in integration tests.
+- Gateway try-catch wraps teamcode hydration on connect so failure is non-fatal.
+
+**Next**: 013 (ship management commands) per planned feature sequence.
+
+**Known issues / deferred**:
+- T007 gateway broadcast unit test (`test/unit/gateway/game.gateway.broadcast.spec.ts`) was
+  not created; the gateway behaviour is covered by the E2E suite instead.
+
+---
+
 ## 2026-05-06 — 011-onboarding: JWT Auth + New-Player Flow + Ship Rename
 
 **Completed**:

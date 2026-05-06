@@ -124,10 +124,12 @@ Socket connect  →  WsAuthGuard validates JWT  →  GameGateway.handleConnectio
 `CommandResult.broadcasts` decouples handlers from Socket.io. After dispatching a command,
 `GameGateway.processBroadcasts()` iterates the array:
 - `room === '__player_snapshot__'` sentinel → `server.emit('player.snapshot', registry.list())`
-- Any other room → `server.to(room).emit(event, payload)`
+- `room === 'galaxy'` → `server.emit(event, payload)` (all connected clients)
+- `room === 'hail'` → iterate all sockets; skip if ShipState has `cloak === 1`
+- Any other room → `server.to(room).emit(event, payload)` (sector-scoped)
 
-This allows `RenameHandlerService` to trigger a `ship.renamed` sector broadcast and a global
-`player.snapshot` refresh without importing the Socket.io server.
+This allows `RenameHandlerService`, `SenHandlerService`, and `TeaHandlerService` to
+trigger sector, galaxy, hail, and snapshot broadcasts without importing the Socket.io server.
 ```
 
 ### Command dispatch path
@@ -194,6 +196,15 @@ galactic-empire-reborn/
           handlers/
             rotate.handler.ts, impulse.handler.ts, warp.handler.ts  ← plain Command objects
             scan.handler.ts, report.handler.ts                       ← @Injectable() services
+            who.handler.ts    ← lists all active non-cloaked ships sorted by name (US1)
+            dat.handler.ts    ← full stat block for a named ship; team name via Prisma (US2)
+            ros.handler.ts    ← leaderboard top-N human players, AI excluded (US3)
+            fre.handler.ts    ← sets channel A/B/C frequency; validates range; sets dirty (US5)
+            sen.handler.ts    ← sends message to hail/sector/galaxy room (US4)
+            tea.handler.ts    ← join/leave/show team; updates User+ShipState; snapshot (US6)
+            _freq-thresholds.ts ← FREQ_HAIL=0, FREQ_SECTOR_MAX=19999, FREQ_GALAXY_MIN=20000
+          helpers/
+            ai-userid.ts      ← isAiUserid(userid): Cybrg-* | @Droid-* detection
       gateway/
         gateway.module.ts
         game.gateway.ts
