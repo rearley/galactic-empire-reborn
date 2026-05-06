@@ -58,7 +58,7 @@ beforeEach(async () => {
 
 describe('transaction rollback on fault (FR-012a)', () => {
   it('rolls back all mutations when processOwnedPlanets throws', async () => {
-    await prisma.user.create({ data: { userid: 'alice', klscore: 100n } });
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 100n } });
     await prisma.planet.createMany({
       data: Array.from({ length: 3 }, (_, i) => ({
         xsect: i + 1, ysect: 1, plnum: 1, type: PLTYPE_PLNT,

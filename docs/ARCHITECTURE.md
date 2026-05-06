@@ -74,8 +74,25 @@ AppModule (app.module.ts)
   │                                   upsert(shipId, socketId) returns prior socketId for takeover;
   │                                   remove(socketId) returns shipId for player.left emission;
   │                                   list() returns ConnectedPlayer[] for snapshot payload
+  ├── AuthModule (auth/) — HTTP REST auth endpoints (register/login)
+  │     ├── AuthService — register(username, password): bcrypt cost-12 hash + User insert;
+  │     │                  login(username, password): case-insensitive lookup + bcrypt compare;
+  │     │                  both throw typed errors (USERNAME_TAKEN, INVALID_CREDENTIALS)
+  │     ├── AuthController — POST /auth/register → 201 {token}, POST /auth/login → 200 {token};
+  │     │                     400/401/409 on failures; JWT signed with JWT_SECRET (30-day expiry)
+  │     └── WsAuthGuard — validates `socket.handshake.auth.token` JWT before handleConnection runs;
+  │                        disconnects with AUTH_REQUIRED error if token is absent or invalid
+  ├── OnboardingModule (game/onboarding/) — new-player and rename flows
+  │     ├── OnboardingService — multi-step state machine per socketId:
+  │     │                        AWAITING_CLASS → AWAITING_NAME → finalized.
+  │     │                        handleNewPlayer(): emits prompt:class-list; handleReply(): advances
+  │     │                        state; on completion, creates User+Ship rows and emits player.snapshot.
+  │     │                        handleReturningPlayer(): emits welcome command:result for existing ship.
+  │     ├── RenameService — rename(userid, shipno, newName): validates format (1-19 printable, no spaces),
+  │     │                    checks case-insensitive uniqueness, updates DB + in-memory; case-identical = no-op
+  │     └── OnboardingState type — { step, classNumber?, shipId? }
   ├── CommandsModule (game/commands/) — exports CommandRouterService
-  │     ├── CommandRouterService — alias-keyed registry; tokenise→lower→dispatch; minArgs guard
+  │     ├── CommandRouterService — alias-keyed registry; keyword lowercased, args preserve casing; minArgs guard
   │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange; projects
   │     │                         all ships onto 30×15 grid; returns scanGrid payload
   │     ├── ReportHandlerService — @Injectable report/rep handler; reads ShipClass.typeName/hasCloak;
@@ -86,6 +103,31 @@ AppModule (app.module.ts)
   │                             Postgres on init; subscribes SHIP_UPDATE tick → async dirty flush;
   │                             get/mutate/findByUserid/findAllShips/findByName
   └── DebugController (debug/) — GET /debug/tick-stats → {shipUpdate, physics}
+
+### Auth & onboarding flow
+
+```
+POST /auth/register  →  AuthService.register()  →  bcrypt hash + DB insert  →  JWT
+POST /auth/login     →  AuthService.login()     →  bcrypt compare           →  JWT
+
+Socket connect  →  WsAuthGuard validates JWT  →  GameGateway.handleConnection()
+  ├─ ship found  →  OnboardingService.handleReturningPlayer()  →  welcome command:result
+  └─ no ship     →  OnboardingService.handleNewPlayer()        →  prompt:class-list
+       client replies: prompt:reply {value: classNumber}
+         →  OnboardingService.handleReply()  →  prompt:ship-name
+       client replies: prompt:reply {value: shipName}
+         →  OnboardingService.handleReply()  →  create Ship  →  player.snapshot
+```
+
+### GameGateway broadcast resolution
+
+`CommandResult.broadcasts` decouples handlers from Socket.io. After dispatching a command,
+`GameGateway.processBroadcasts()` iterates the array:
+- `room === '__player_snapshot__'` sentinel → `server.emit('player.snapshot', registry.list())`
+- Any other room → `server.to(room).emit(event, payload)`
+
+This allows `RenameHandlerService` to trigger a `ship.renamed` sector broadcast and a global
+`player.snapshot` refresh without importing the Socket.io server.
 ```
 
 ### Command dispatch path
@@ -358,8 +400,15 @@ usePlayerList (frontend/src/state/usePlayerList.ts)
 
 useSocket (frontend/src/socket/useSocket.ts)
   └── wraps socket singleton; maps lifecycle events → ConnectionStatus
-  └── accepts optional playerDispatch → subscribes player.snapshot/joined/left + physics.sector-transition
-  └── derives localShipId from player.snapshot (first entry matching LOCAL_USERID prefix)
+  └── accepts optional playerDispatch → subscribes player.snapshot/joined/left + physics.sector-transition + ship.renamed
+  └── derives localShipId from player.snapshot (first entry with non-null shipId)
+  └── onboardingPrompt state: null (normal play) or { type: 'class-list' | 'ship-name', payload }
+  └── emitPromptReply(value): emits prompt:reply to server
+  └── clears onboardingPrompt on player.snapshot (onboarding complete)
+
+usePlayerList (frontend/src/state/usePlayerList.ts)
+  └── actions: SNAPSHOT, JOIN, LEFT, TRANSITION, RENAMED
+  └── RENAMED: updates name for matching shipId without full refresh
 
 Components (frontend/src/components/)
   ConnectionBanner    ← renders top banner for connecting/disconnected/reconnecting; null when connected
@@ -367,6 +416,17 @@ Components (frontend/src/components/)
   ScanMap             ← 30×15 ASCII grid; clears on physics.sector-transition for local ship
   EventLog            ← sticky-scroll log; capped at 500 entries
   CommandInput        ← monospace input with 20-entry ↑/↓ history
+
+Auth / onboarding components (frontend/src/auth/, frontend/src/onboarding/)
+  AuthScreen          ← register/login form; calls /auth/register; stores JWT via tokenStore.setToken
+  ClassPickerPrompt   ← rendered when onboardingPrompt.type === 'class-list'; emits prompt:reply
+  ShipNamePrompt      ← rendered when onboardingPrompt.type === 'ship-name'; emits prompt:reply; shows
+                         role="alert" on error="name-taken"
+  tokenStore          ← localStorage wrapper: getToken / setToken / clearToken (key: 'ge_jwt')
+
+App.tsx flow:
+  getToken() present → connectSocket() + render Terminal (with ClassPickerPrompt or ShipNamePrompt overlay)
+  getToken() absent  → render AuthScreen → onAuthenticated → setToken + connectSocket + re-render Terminal
 ```
 
 ### Planet revolt (game/planet/planet-economy.service.ts)

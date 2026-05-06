@@ -9,15 +9,28 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { INestApplication } from '@nestjs/common';
 import { io as ioc, Socket } from 'socket.io-client';
 import { PrismaClient } from '@prisma/client';
+import { sign } from 'jsonwebtoken';
 import { AppModule } from '../../src/app.module';
 
 const BOOT_TEST_USERID = 'boot-e2e-user';
 const BOOT_TEST_SHIPNO = 1;
 const BOOT_TEST_SHIPNAME = 'Boot Test Ship';
+const BOOT_TEST_USERNAME = 'BootPilot';
+
+/** Issue a minimal JWT for the test user using the same secret as .env */
+function makeTestToken(): string {
+  const secret = process.env['JWT_SECRET'] ?? 'dev-secret-change-in-prod';
+  return sign(
+    { sub: BOOT_TEST_USERID, username: BOOT_TEST_USERNAME },
+    secret,
+    { expiresIn: '1h' },
+  );
+}
 
 describe('Boot e2e — AppModule boots and accepts Socket.io connections', () => {
   let app: INestApplication;
   let port: number;
+  let testToken: string;
 
   // G1: boot must complete in < 5000ms
   beforeAll(async () => {
@@ -26,7 +39,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
     try {
       await seedPrisma.user.upsert({
         where: { userid: BOOT_TEST_USERID },
-        create: { userid: BOOT_TEST_USERID },
+        create: { userid: BOOT_TEST_USERID, username: BOOT_TEST_USERNAME },
         update: {},
       });
       await seedPrisma.ship.upsert({
@@ -48,6 +61,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
 
     const url = await app.getUrl();
     port = parseInt(new URL(url).port, 10);
+    testToken = makeTestToken();
   }, 15000);
 
   // G2: shutdown must complete in < 3000ms
@@ -61,7 +75,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
   it('Socket.io client connects within 2s', async () => {
     const socket: Socket = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
-      query: { userid: BOOT_TEST_USERID },
+      auth: { token: testToken },
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -86,7 +100,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
   it('no leaked Socket.io connections after disconnect', (done) => {
     const socket: Socket = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
-      query: { userid: BOOT_TEST_USERID },
+      auth: { token: testToken },
     });
     socket.on('command:result', () => {
       // Welcome received; now disconnect and verify no leaked connections
