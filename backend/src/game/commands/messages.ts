@@ -172,6 +172,36 @@ export enum MessageId {
   FLUX_USED = 'FLUX_USED',
   FLUX_FMT = 'FLUX_FMT',
 
+  // who (feature 012) — GECMDS.C:5162 cmd_who reinterpreted
+  WHO_HEADER = 'WHO_HEADER',
+  WHO_ROW = 'WHO_ROW',
+
+  // dat (feature 012) — GECMDS.C:5829 cmd_data reinterpreted
+  DAT_HEADER = 'DAT_HEADER',
+  DAT_LINE = 'DAT_LINE',
+  DAT_NOT_FOUND = 'DAT_NOT_FOUND',
+
+  // ros (feature 012) — GECMDS.C:5276 cmd_geroster
+  ROS_HEADER = 'ROS_HEADER',
+  ROS_ROW = 'ROS_ROW',
+
+  // sen (feature 012) — GECMDS.C:1825 cmd_send
+  MSG_USAGE_SEN = 'MSG_USAGE_SEN',
+  MSG_SENT = 'MSG_SENT',
+  FRE_HAIL = 'FRE_HAIL',
+  FRE_SECTOR = 'FRE_SECTOR',
+  FRE_GALAXY = 'FRE_GALAXY',
+
+  // fre (feature 012) — GECMDS.C:1885 cmd_freq
+  MSG_USAGE_FRE = 'MSG_USAGE_FRE',
+
+  // tea (feature 012) — GECMDS.C:5277 cmd_team (subset)
+  TEAM_NONE = 'TEAM_NONE',
+  TEAM_CURRENT = 'TEAM_CURRENT',
+  TEAM_LEFT = 'TEAM_LEFT',
+  TEAM_JOINED = 'TEAM_JOINED',
+  TEAM_NOT_FOUND = 'TEAM_NOT_FOUND',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -348,6 +378,36 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
   [MessageId.FLUX_USED]: 'Flux pod used — energy restored.',
   [MessageId.FLUX_FMT]: 'Format: flux',
+
+  // who (feature 012) — GECMDS.C:5162 cmd_who reinterpreted
+  [MessageId.WHO_HEADER]: '  Shipname               Class                Sector  Kills',
+  [MessageId.WHO_ROW]: ' %s %s (%2s,%2s)  %5s',
+
+  // dat (feature 012) — GECMDS.C:5829 cmd_data reinterpreted
+  [MessageId.DAT_HEADER]: 'Ship: %s (#%d)',
+  [MessageId.DAT_LINE]: '%s',
+  [MessageId.DAT_NOT_FOUND]: 'Ship not found.',
+
+  // ros (feature 012) — GECMDS.C:5276 cmd_geroster
+  [MessageId.ROS_HEADER]: '  Rank  UserID                Score      Kills  Planets  Population',
+  [MessageId.ROS_ROW]: ' %4s  %s %10s  %5s  %5s  %10s',
+
+  // sen (feature 012) — GECMDS.C:1825 cmd_send
+  [MessageId.MSG_USAGE_SEN]: 'Usage: sen <A|B|C> <message>',
+  [MessageId.MSG_SENT]: 'Message sent on channel %s.',
+  [MessageId.FRE_HAIL]: 'Channel %s set to hail.',
+  [MessageId.FRE_SECTOR]: 'Channel %s set to %d (sector-scoped).',
+  [MessageId.FRE_GALAXY]: 'Channel %s set to %d (galaxy-wide).',
+
+  // fre (feature 012) — GECMDS.C:1885 cmd_freq
+  [MessageId.MSG_USAGE_FRE]: 'Usage: fre <A|B|C> <number|hail>',
+
+  // tea (feature 012) — GECMDS.C:5277 cmd_team (subset)
+  [MessageId.TEAM_NONE]: 'You are not on a team.',
+  [MessageId.TEAM_CURRENT]: 'You are on team %s.',
+  [MessageId.TEAM_LEFT]: 'You have left your team.',
+  [MessageId.TEAM_JOINED]: 'You have joined team %s.',
+  [MessageId.TEAM_NOT_FOUND]: 'No such team: %s',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',

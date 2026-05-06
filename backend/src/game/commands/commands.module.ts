@@ -23,6 +23,12 @@ import { DecoyHandlerService } from './handlers/decoy.handler';
 import { JammerHandlerService } from './handlers/jammer.handler';
 import { SysHandlerService } from './handlers/sys.handler';
 import { RenameHandlerService } from './handlers/rename.handler';
+import { WhoHandlerService } from './handlers/who.handler';
+import { DatHandlerService } from './handlers/dat.handler';
+import { RosHandlerService } from './handlers/ros.handler';
+import { SenHandlerService } from './handlers/sen.handler';
+import { FreHandlerService } from './handlers/fre.handler';
+import { TeaHandlerService } from './handlers/tea.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -54,6 +60,12 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     SysHandlerService,
     LockHandlerService,
     RenameHandlerService,
+    WhoHandlerService,
+    DatHandlerService,
+    RosHandlerService,
+    SenHandlerService,
+    FreHandlerService,
+    TeaHandlerService,
   ],
   exports: [CommandRouterService],
 })
@@ -79,6 +91,12 @@ export class CommandsModule implements OnModuleInit {
     private readonly sysHandler: SysHandlerService,
     private readonly lockHandler: LockHandlerService,
     private readonly renameHandler: RenameHandlerService,
+    private readonly whoHandler: WhoHandlerService,
+    private readonly datHandler: DatHandlerService,
+    private readonly rosHandler: RosHandlerService,
+    private readonly senHandler: SenHandlerService,
+    private readonly freHandler: FreHandlerService,
+    private readonly teaHandler: TeaHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -105,5 +123,11 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.renameHandler.command);
     this.commandRouter.register(shieldCommand);
     this.commandRouter.register(fluxCommand);
+    this.commandRouter.register(this.whoHandler.command);
+    this.commandRouter.register(this.datHandler.command);
+    this.commandRouter.register(this.rosHandler.command);
+    this.commandRouter.register(this.senHandler.command);
+    this.commandRouter.register(this.freHandler.command);
+    this.commandRouter.register(this.teaHandler.command);
   }
 }

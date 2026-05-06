@@ -279,5 +279,5 @@ ShipService (game/ship/)
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/011-onboarding/plan.md
+specs/012-social-commands/plan.md
 <!-- SPECKIT END -->

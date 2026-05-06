@@ -99,6 +99,15 @@ export interface ShipState {
    * @see specs/008-droid-ai/spec.md FR-001..FR-004
    */
   isEphemeral?: boolean;
+
+  /**
+   * Denormalised team affiliation cached from User.teamcode.
+   * Hydrated at boot from User.teamcode; rewritten synchronously by the `tea`
+   * command alongside the User row.
+   * NOT persisted on Ship — re-derived from User.teamcode on every hydrate.
+   * @see specs/012-social-commands/research.md D6
+   */
+  teamcode?: bigint;
 }
 
 // Ensure ShipState is compatible with Prisma's Ship shape (minus dirty).
