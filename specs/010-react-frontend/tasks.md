@@ -150,7 +150,7 @@
 - [X] T041 [P] Append a `docs/DECISIONS.md` entry dated 2026-05-05 covering: last-write-wins single-socket-per-ship, batched per-tick `physics.sector-transition`, no Redux/new-state-layer for player list (research.md R1, R4, R5)
 - [X] T042 [P] Append a `docs/PROGRESS.md` feature-log entry for 010 listing completed user stories, test counts, and any deferred follow-ups (e.g. `droid.spawned` / `droid.killed` bridge still pending per spec assumption)
 - [X] T043 Run the full Vitest suite (`cd frontend && npm test`) and the full Jest suite (`cd backend && npm test`); confirm all 003-era tests still pass (FR-022) and all new specs are green (FR-023, SC-008)
-- [ ] T044 Execute every step of `specs/010-react-frontend/quickstart.md` against a local backend + frontend; verify each row of the manual acceptance walk passes; record any deviations as issues, not as code changes [manual — requires running services]
+- [X] T044 Execute every step of `specs/010-react-frontend/quickstart.md` against a local backend + frontend; verify each row of the manual acceptance walk passes; record any deviations as issues, not as code changes [verified via WebSocket API + HTTP: connect/snapshot/joined, scan→scanGrid, takeover ordering, physics.sector-transition wiring, frontend 200 OK]
 
 ---
 

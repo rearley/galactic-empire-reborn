@@ -1,4 +1,8 @@
-## 2026-05-05 — 010-react-frontend: React Terminal UI
+## 2026-05-06 — 010-react-frontend: React Terminal UI
+<!-- Note: implemented on branch 010-react-frontend; logically this feature is
+     014 in the planned feature sequence (onboarding, social, ship-mgmt come first),
+     but was prioritised and built first. The roadmap section below reflects the
+     correct intended sequence: 010=react-frontend, 011=onboarding … 015=navigation. -->
 
 **Completed**:
 - US1 (P1) — Command input with 20-entry ↑/↓ history (CommandInput.tsx); sticky-bottom EventLog with 500-entry cap and category colour-coding; tailwind `accent` colour token (#4ade80 / green-400)
@@ -11,7 +15,7 @@
 
 **Decisions made**: last-write-wins single-socket (ConnectedShipsRegistry), batched physics.sector-transition (SectorTransitionSubscriber), useReducer over Redux for player list — all in DECISIONS.md
 
-**Next**: 011-onboarding (`cmd_new`, `cmd_rename`)
+**Next**: 011-onboarding (`cmd_new`, `cmd_rename`) — note: react-frontend was built as 010 but is logically 014 in the planned sequence; onboarding, social, and ship-mgmt features will precede it in the backend delivery order
 
 **Known issues / deferred**:
 - `droid.spawned` / `droid.killed` events not bridged to the client player list (assumed not needed for initial v1 per spec)
@@ -442,17 +446,20 @@ to patch the tx client.
 
 ## Roadmap to v1 — Planned Features
 
-Features 001–009 are complete or in progress. The following are the remaining work
-items required for a playable v1. All command names reference the `gecmds[]` table
-in `reference/ge-source/GECMDS.C`.
+Features 001–009 are complete. Feature 010 (react-frontend) was implemented out
+of order — the backend-first sequence would have put it at position 014, but it
+was prioritised to unblock end-to-end testing. The numbering below reflects the
+intended delivery sequence for the remaining work.
 
-### 010 — React frontend terminal UI (in progress)
+All command names reference the `gecmds[]` table in `reference/ge-source/GECMDS.C`.
+
+### 010 — React frontend terminal UI ✓ DONE (implemented out of order; logically 014)
 
 Full terminal UI: text command input with history, scrolling event log, ASCII sector map,
 player list panel, connection banner. Connects to `GameGateway` via Socket.io. Renders in
 monospace font with an ANSI/ASCII aesthetic. Desktop-first; not mobile-optimized.
 
-See feature log entry 2026-05-05 — 010-react-frontend below.
+See feature log entry 2026-05-06 — 010-react-frontend above.
 
 ### 011 — Player onboarding (planned)
 
