@@ -140,4 +140,7 @@ export interface CommandResultPayload {
   lines: EventLogLine[];
   /** present only when the command was `scan` (or an alias) */
   scanGrid?: ScanCell[];
+  /** When true, the frontend should clear the event log. Used by the `cls` command.
+   * @see specs/016-navigation-spy/research.md D4 */
+  clearLog?: boolean;
 }
