@@ -101,6 +101,45 @@ export class PhysicsTickService implements OnModuleInit {
     // Destroyed/removed ships are skipped entirely (FR-001).
     // (No `destroyed` flag exists on ShipState today; reserved for future combat work.)
 
+    // Autopilot bearing update — runs before rotation step, even for in-orbit ships
+    // (handler auto-breaks orbit, but guard here for safety).
+    if (ship.holdcourse > 0 && ship.navTargetX !== null && ship.navTargetY !== null) {
+      // Store coords before mutation clears them
+      const targetX = ship.navTargetX;
+      const targetY = ship.navTargetY;
+
+      // Arrival check: floor-based sector match
+      if (Math.floor(ship.xcoord) === targetX && Math.floor(ship.ycoord) === targetY) {
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.holdcourse = 0;
+          s.navTargetX = null;
+          s.navTargetY = null;
+          s.dirty = true;
+        });
+        this.events.emit('physics.nav-arrived', {
+          userid: ship.userid,
+          shipno: ship.shipno,
+          x: targetX,
+          y: targetY,
+        });
+        // Skip remaining physics for this tick on arrival
+        return;
+      }
+
+      // Steer: update head2b to point toward target cell center
+      const tx = targetX + 0.5;
+      const ty = targetY + 0.5;
+      const dx = tx - ship.xcoord;
+      const dy = ty - ship.ycoord;
+      // Use atan2(dx, -dy) to correctly map to the position-integration coordinate
+      // system where heading=0 is north (y-decreasing). Positive dy (target south)
+      // must produce a bearing >90° so that cos(bearing)<0 and y increases (southward).
+      const newHead2b = Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360);
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.head2b = newHead2b;
+      });
+    }
+
     const inOrbitOrDocked = ship.where >= 10;
 
     if (!inOrbitOrDocked) {

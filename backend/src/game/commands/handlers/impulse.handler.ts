@@ -15,6 +15,12 @@ export const impulseCommand: Command = {
   minArgs: 1,
   argMissingMessage: formatMessage(MessageId.IMPFMT),
   handler(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
+    if (ship.holdcourse > 0) {
+      ship.holdcourse = 0;
+      ship.navTargetX = null;
+      ship.navTargetY = null;
+    }
+
     const arg = args[0] ?? '';
     const result = valpcnt(arg, 0, 99);
 
