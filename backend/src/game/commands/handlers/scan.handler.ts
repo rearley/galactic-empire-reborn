@@ -3,11 +3,25 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } from '../command.types';
+import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
+
+/**
+ * Convert raw speed units to a display string for the side panel.
+ * - speed === 0            → 'Stopped'
+ * - speed > 0 && < 1000   → 'Impulse'
+ * - speed >= 1000          → 'Warp X.Y'  (e.g. 4500 → 'Warp 4.5')
+ *
+ * @see GECMDS.C:3019 printmapfull — speed formatting
+ */
+function showarpDisplay(speed: number): string {
+  if (speed === 0) return 'Stopped';
+  if (speed < 1000) return 'Impulse';
+  return `Warp ${(speed / 1000).toFixed(1)}`;
+}
 
 /** Environment string table indexed by `enviorn` (0..3). @see GECMDS.C:2338-2349 */
 const ENV_STRINGS = [
@@ -107,6 +121,9 @@ export class ScanHandlerService implements OnModuleInit {
     const sub = args[0]?.toLowerCase() ?? 'lo';
 
     if (sub === 'lo') {
+      if (args[1]?.toLowerCase() === 'full') {
+        return this.scanLoFull(ship);
+      }
       return this.scanLo(ship);
     }
 
@@ -139,24 +156,41 @@ export class ScanHandlerService implements OnModuleInit {
    *   3. All visible wormholes in player's current sector
    *   4. Self-cell
    *
+   * Deviation D1: ship cells use scantab letters (A..Z) instead of the original
+   * '+' (AI) and '=' (manual) glyphs. This aligns `sca lo` with `sca ra`/`sca se`
+   * for consistent letter-based identification.
+   *
    * @see GECMDS.C:2640 scan_lo
    */
   private scanLo(ship: ShipState): CommandResult {
+    // Not-in-flight guard — orbit, docked, or dead (mirrors sca ra / sca se)
+    if (ship.where >= 10) {
+      return {
+        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+      };
+    }
+
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
+    // Build / update the scantab (D1: letters used for ship cells)
+    const prevScantab = this.getScantab(ship.userid, ship.shipno);
+    const allShips = this.shipService.findAllShips();
+    const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
+    this.setScantab(ship.userid, ship.shipno, newScantab);
+
     const grid: ScanCell[] = [];
 
-    // 1. Project all in-memory ships — GECMDS.C:2700-2720
-    for (const other of this.shipService.findAllShips()) {
-      if (other.userid === ship.userid && other.shipno === ship.shipno) continue;
+    // 1. Project all in-range ships via scantab — GECMDS.C:2700-2720
+    // Deviation D1: char = entry.letter ('A'..'Z') not '+' / '='
+    for (const entry of newScantab) {
+      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
+      if (!other) continue;
 
       const cell = projectRangeCell(ship, other, scanRange);
       if (!cell) continue;
 
-      // GECMDS.C:2710-2715: status==GESTAT_AUTO → '+', else '='
-      const char = other.status === 1 ? '+' : '=';
-      grid.push({ x: cell.x, y: cell.y, type: 'ship', char });
+      grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
     // 2. Project planets in the player's current sector — GECMDS.C:2640 (004 wire-up)
@@ -194,6 +228,101 @@ export class ScanHandlerService implements OnModuleInit {
     return {
       lines: [{ text: header, category: 'info' }],
       scanRender: { kind: 'lo', mode, cells: grid, header },
+    };
+  }
+
+  /**
+   * Full-detail tactical scan — same grid as `sca lo` but with a side-panel legend.
+   * Each visible ship gets a SidePanelRow: letter, distance (integer parsecs),
+   * bearing (0..359), heading (0..359), speedDisplay, and optionally name.
+   *
+   * The name field is only included when `ship.scanNames === true` (SCANNAMES).
+   *
+   * Rows are ordered by ascending distance (same order as the scantab).
+   *
+   * @see GECMDS.C:3019 printmapfull
+   * @see specs/015-scan-modes/plan.md §T032
+   */
+  private scanLoFull(ship: ShipState): CommandResult {
+    // Not-in-flight guard — orbit, docked, or dead
+    if (ship.where >= 10) {
+      return {
+        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+      };
+    }
+
+    const classInfo = this.classCache.get(ship.shpclass);
+    const scanRange = classInfo?.scanRange ?? 0;
+
+    // Build / update the scantab
+    const prevScantab = this.getScantab(ship.userid, ship.shipno);
+    const allShips = this.shipService.findAllShips();
+    const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
+    this.setScantab(ship.userid, ship.shipno, newScantab);
+
+    const grid: ScanCell[] = [];
+
+    // 1. Project in-range ships with scantab letters (same as sca lo)
+    for (const entry of newScantab) {
+      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
+      if (!other) continue;
+
+      const cell = projectRangeCell(ship, other, scanRange);
+      if (!cell) continue;
+
+      grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
+    }
+
+    // 2. Planets in the player's current sector
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
+
+    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
+    for (const planet of planets) {
+      const cell = projectRangeCell(ship, planet, scanRange);
+      if (!cell) continue;
+      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'O' });
+    }
+
+    // 3. Visible wormholes
+    const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
+    for (const wormhole of wormholes) {
+      if (wormhole.visible !== 1) continue;
+      const cell = projectRangeCell(ship, wormhole, scanRange);
+      if (!cell) continue;
+      grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
+    }
+
+    // 4. Self-cell
+    grid.push({
+      x: Math.floor(SCAN_GRID_WIDTH / 2),
+      y: Math.floor(SCAN_GRID_HEIGHT / 2),
+      type: 'self',
+      char: '*',
+    });
+
+    // Build side-panel rows (sorted by ascending distance — scantab is already sorted)
+    const sidePanel: SidePanelRow[] = newScantab.map(entry => {
+      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
+      const row: SidePanelRow = {
+        letter: entry.letter,
+        distance: Math.round(entry.dist / 10000),
+        bearing: entry.bearing,
+        heading: entry.heading,
+        speedDisplay: showarpDisplay(entry.speed),
+      };
+      if (ship.scanNames && other) {
+        row.name = other.shipname;
+      }
+      return row;
+    });
+
+    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
+    const header = `Range: ${scanRange * 10} — Sector ${xsect},${ysect}`;
+
+    return {
+      lines: [{ text: header, category: 'info' }],
+      scanRender: { kind: 'lo-full', mode, cells: grid, header, sidePanel },
     };
   }
 

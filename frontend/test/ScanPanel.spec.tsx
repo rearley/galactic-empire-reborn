@@ -258,6 +258,64 @@ describe('ScanPanel', () => {
     expect(screen.queryByTestId('scan-card-side-panel')).toBeNull();
   });
 
+  // T034: sca lo full renders kind:'lo-full' with side panel — including name field
+  it('lo-full kind: renders side panel with name field when present', () => {
+    render(<ScanPanel />);
+
+    act(() => {
+      triggerScanRender({
+        kind: 'lo-full',
+        mode: 'overwrite',
+        cells: [{ x: 15, y: 7, type: 'self', char: '*', colour: 'self' }],
+        header: 'Range: 1000 — Sector 5,5',
+        sidePanel: [
+          { letter: 'A', distance: 42, bearing: 90, heading: 0, speedDisplay: 'Warp 2.0', name: 'Avenger' },
+          { letter: 'B', distance: 88, bearing: 270, heading: 180, speedDisplay: 'Stopped' },
+        ],
+      });
+    });
+
+    const card = screen.getByTestId('scan-card');
+    expect((card as HTMLElement).dataset['kind']).toBe('lo-full');
+
+    expect(screen.getByTestId('scan-card-side-panel')).toBeDefined();
+
+    const rowA = screen.getByTestId('side-panel-row-A');
+    expect(rowA.textContent).toContain('42pc');
+    expect(rowA.textContent).toContain('Brg:90');
+    expect(rowA.textContent).toContain('Hdg:0');
+    expect(rowA.textContent).toContain('Warp 2.0');
+    expect(rowA.textContent).toContain('Avenger');
+
+    const rowB = screen.getByTestId('side-panel-row-B');
+    expect(rowB.textContent).toContain('88pc');
+    expect(rowB.textContent).toContain('Stopped');
+    // No name field on rowB
+    expect(rowB.textContent).not.toContain('Avenger');
+  });
+
+  // T034: lo-full with no name field (SCANNAMES off) does not show name text
+  it('lo-full kind: name field absent when undefined', () => {
+    render(<ScanPanel />);
+
+    act(() => {
+      triggerScanRender({
+        kind: 'lo-full',
+        mode: 'overwrite',
+        cells: [{ x: 15, y: 7, type: 'self', char: '*', colour: 'self' }],
+        header: 'Range: 1000 — Sector 5,5',
+        sidePanel: [
+          { letter: 'C', distance: 10, bearing: 45, heading: 90, speedDisplay: 'Impulse' },
+        ],
+      });
+    });
+
+    const rowC = screen.getByTestId('side-panel-row-C');
+    expect(rowC.textContent).toContain('Impulse');
+    // name is undefined → only trailing space rendered (no ship name text)
+    expect(rowC.textContent?.trim()).not.toMatch(/\b[A-Za-z]{4,}\b.*\b[A-Za-z]{4,}\b/);
+  });
+
   // T012: kind and mode metadata available on the card element
   it('card element exposes kind and mode as data attributes', () => {
     render(<ScanPanel />);
