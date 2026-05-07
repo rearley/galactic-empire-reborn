@@ -45,6 +45,8 @@ import { AttackHandlerService } from './handlers/attack.handler';
 import { PlnHandlerService } from './handlers/pln.handler';
 import { PriceHandlerService } from './handlers/price.handler';
 import { FIRETICKS, loadFireticks } from './attack.config';
+// Navigation handlers (016)
+import { NavHandlerService } from './handlers/nav.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -98,6 +100,8 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     PlnHandlerService,
     PriceHandlerService,
     { provide: FIRETICKS, useFactory: () => loadFireticks() },
+    // Navigation handlers (016)
+    NavHandlerService,
   ],
   exports: [CommandRouterService, ScanHandlerService],
 })
@@ -141,6 +145,8 @@ export class CommandsModule implements OnModuleInit {
     private readonly attackHandler: AttackHandlerService,
     private readonly plnHandler: PlnHandlerService,
     private readonly priceHandler: PriceHandlerService,
+    // Navigation handlers (016)
+    private readonly navHandler: NavHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -186,5 +192,7 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.attackHandler.command);
     this.commandRouter.register(this.plnHandler.command);
     this.commandRouter.register(this.priceHandler.command);
+    // Navigation commands (016)
+    this.commandRouter.register(this.navHandler.command);
   }
 }
