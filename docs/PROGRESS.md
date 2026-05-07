@@ -1,3 +1,17 @@
+## 2026-05-07 — 016-navigation-spy
+
+**Completed:** Four player commands — `nav <x> <y>` (autopilot), `spy` (plant spy on planet), `hel`/`?` (in-game help), `cls` (clear screen). Two new Ship DB columns (`navTargetX`, `navTargetY`) + Prisma migration. Autopilot tick branch in `PhysicsTickService`. Spy-owner reveal in `scan pl`. `clearLog` directive added to `CommandResult` and honoured in frontend `command-result-handlers.ts`.
+
+**Tests:** Unit tests for all four handlers; integration tests for autopilot tick (fake-clock arrival), cancel preambles, scan spy-reveal. Balance regression for `UNIVMAX=15` and `I_SPY=13`. Frontend Vitest for `clearLog` directive. Help snapshot tests pin topic wording.
+
+**Decisions made:** Autopilot uses `holdcourse` boolean semantics (existing field, see research D1). `cls` uses a frontend-only `clearLog` directive rather than a separate socket event (D4). Spy reveal added at scan render time — no new event (D3).
+
+**Known issues:** A1 — FR-013 spy removal mechanic not implemented; `spyowner` cleared only by overwrite or ownership change. Needs explicit resolution before feature 014 (planet attack) ships.
+
+**Next:** Feature 017 or endgame commands (planet attack follow-up, mail, teams).
+
+---
+
 ## 2026-05-07 — 015-scan-modes: range radar / sector scan / lo-full / display options
 
 **Completed**:

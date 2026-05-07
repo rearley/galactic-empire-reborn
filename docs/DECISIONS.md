@@ -1067,3 +1067,39 @@ column widths are well-tested and familiar.
 
 **Alternatives rejected**: Arbitrary new column widths (non-fidelity); JSON-only side panel with
 no formatting (pushes all formatting to frontend, harder to keep in sync with original).
+
+---
+
+## 2026-05-07 — D1: holdcourse boolean reuse for player autopilot (feature 016)
+
+**Context**: `cmd_navigate` in the original GE was a one-shot bearing-report command. We needed a way to persist autopilot state between physics ticks without adding a new DB column.
+
+**Decision**: Reuse the existing `holdcourse Int` field as a boolean flag for player ships (0 = off, >0 = on). AI ships already use `holdcourse` as a per-tick countdown — this secondary semantic coexists without conflict since AI ships are never issued `nav` commands.
+
+**Reason**: No new DB column needed; the existing semantics on the AI side are unchanged.
+
+**Alternatives rejected**: Adding a separate `autopilotActive Bool` column was rejected — more migration surface, `holdcourse` is already present and zero-initialized for all ships.
+
+---
+
+## 2026-05-07 — D3: spy intel revealed at scan render time (feature 016)
+
+**Context**: When a player has planted a spy on a planet, they should see the planet's item inventory on `scan pl`.
+
+**Decision**: The reveal is computed at scan-render time in `scanPl` by comparing `planet.spyowner` to the viewer's `ship.userid` (case-insensitive). No separate event or cache.
+
+**Reason**: Simple, stateless, and consistent with how planet-owner intel is revealed elsewhere.
+
+**Alternatives rejected**: A separate `spy:intel` socket event was rejected — more complexity, no benefit.
+
+---
+
+## 2026-05-07 — D4: cls uses clearLog directive on CommandResult (feature 016)
+
+**Context**: The `cls` command should clear the player's event log without affecting other players.
+
+**Decision**: Return `{ lines: [], clearLog: true }` from the handler. The frontend `command-result-handlers.ts` checks this field and calls `clearLines()`. The backend emits no special event; the `clearLog` field travels over the existing `command:result` unicast channel.
+
+**Reason**: Zero new backend events, zero new frontend listeners, fully testable in isolation.
+
+**Alternatives rejected**: A separate `log:clear` socket event was rejected — more coupling, more test surface.
