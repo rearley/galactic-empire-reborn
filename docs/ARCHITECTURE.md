@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 003-ship-commands.
+Current module map as of feature 013-ship-management.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -9,37 +9,37 @@ Updated at the end of every implement session per CLAUDE.md.
 galactic-empire-reborn/
   backend/
     prisma/
-      schema.prisma          ← Prisma schema (10 models, all C structs mapped)
+      schema.prisma          ← Prisma schema (10 models + MidnightRun, all C structs mapped)
+      migrations/            ← Versioned migration files (never edit after creation)
       seed/
         ship-classes.ts      ← 18 ShipClass seed rows (static reference data)
-    test/
-      prisma-schema/         ← Integration test suite (250 tests, 14 suites)
+    src/                     ← NestJS application (see module map below)
+    test/                    ← Jest test suite (192 suites / 1712 tests)
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
+  frontend/
+    src/                     ← React + Vite + Tailwind terminal UI
+    test/                    ← Vitest test suite
   docker/
     postgres/
       init.sql               ← Creates ge_test alongside ge on first container start
-  docker-compose.yml         ← postgres:16-alpine service (db only; backend container deferred to 002)
-  .env.example               ← DATABASE_URL and TEST_DATABASE_URL templates
+  docker-compose.yml         ← postgres:16-alpine service
+  .env.example               ← DATABASE_URL, TEST_DATABASE_URL, JWT_SECRET templates
   reference/
     ge-source/               ← Original C source (READ ONLY)
     wiki/                    ← Game wiki (READ ONLY)
   specs/
-    001-prisma-schema/       ← Spec, plan, research, data-model, contracts, tasks
+    001-prisma-schema/ … 013-ship-management/  ← spec-kit feature specs
   docs/                      ← Living architecture docs (this file)
 ```
 
 ## Prisma layer
 
-`backend/prisma/schema.prisma` is the single source of truth for the database
-schema. There are no migration files yet — `prisma db push` is used during
-feature 001 because the schema is still in flux and migrations are deferred.
-Migration files will be introduced in a future feature.
-
-`PrismaService` (NestJS injectable wrapping `PrismaClient`) does not exist yet —
-that is the first task of feature 002. For now, test code instantiates
-`PrismaClient` directly.
+`backend/prisma/schema.prisma` is the single source of truth for the database schema.
+All schema changes go through `prisma migrate dev --name <name>` — migration files are
+committed alongside the schema change and deployed via `prisma migrate deploy` in CI.
+`PrismaService` extends `PrismaClient` and is provided globally via `@Global() PrismaModule`.
 
 ## Database
 

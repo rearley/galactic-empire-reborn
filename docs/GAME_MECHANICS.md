@@ -968,6 +968,64 @@ broadcasts. Event name: `message.send`. Not persisted.
 
 **Cloaked-at-10 effects**: invisible to Cybertron target acquisition; excluded from `who` listing; `cmd_tor` locked out for firer; `cmd_report sys` shows "Cloak: active."
 
+## cmd_transfer — ship-to-ship cargo transfer (feature 013)
+
+**Source**: GECMDS.C:3271 `cmd_transfer`
+
+**Syntax**: `transfer <item> <amount> <target-ship-name>` (alias: `tra`)
+
+`TransferHandlerService` resolves the named target ship from `ShipStateService`. Gates: target
+not found, target is self, ships in different sectors (co-location required). Amount validated:
+`ALL` keyword transfers entire stack; numeric amount must be ≥1 and ≤ source's actual holding.
+Gold (`I_GOLD`) and any of the 14 cargo items can be transferred.
+
+Atomicity: both `ship.items[i]` decrement and `target.items[i]` increment happen inside the
+same `ShipStateService.mutate` call sequence; if the gate fails neither ship is mutated.
+Conservation invariant: `sourceQty + targetQty` before and after is identical (tested via 100
+randomized transfers in `transfer.conservation.spec.ts`).
+
+On success: a `user:${target.userid}` room broadcast notifies the receiving captain.
+
+---
+
+## cmd_jettison — discard cargo (feature 013)
+
+**Source**: GECMDS.C:6102 `cmd_jettison`
+
+**Syntax**: `jettison <item> <amount|ALL>` (alias: `jet`)
+
+`JettisonHandlerService` decrements `ship.items[i]` by the requested amount. Items discarded
+into space are permanently lost — no sector object is created, no recovery path exists (FR-403).
+
+Gates: item keyword must resolve to a valid index; amount must be ≥1 (`ALL` on an empty slot
+resolves to 0, which fails the guard); ship must actually hold the requested amount.
+
+`ALL` resolves to the ship's entire current holding for that item index.
+
+---
+
+## cmd_set — ship option flags (feature 013)
+
+**Source**: GECMDS.C:5190 `cmd_set`; GEMAIN.H `options[]`
+
+**Syntax**: `set auto-shield on|off` / `set auto-repair on|off` / `set ?` (alias: `set`)
+
+`SetHandlerService` manages two boolean flags persisted on the `Ship` DB row:
+- `auto-shield` → `Ship.autoShield` — when on, the ship management tick should auto-raise
+  shields (tick consumer wiring deferred to feature 019).
+- `auto-repair` → `Ship.autoRepair` — when on, the ship management tick should queue repair
+  automatically (tick consumer wiring deferred to feature 019).
+
+`set ?` returns the current state of both flags.
+
+**Deviation from original** (Decision D4): the original `cmd_set` manages `User.options[]`
+display preferences (SCANNAMES, SCANHOME). This port implements only the auto-shield/auto-repair
+flags; the display options are deferred to feature 015 (scan modes).
+
+Flags are persisted immediately via `ShipStateService.mutate` + the 1s dirty flush.
+
+---
+
 ## cmd_maint — maintenance (feature 013)
 
 **Source**: GECMDS.C:4452 `cmd_maint`
