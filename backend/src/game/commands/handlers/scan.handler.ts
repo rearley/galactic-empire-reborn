@@ -122,11 +122,8 @@ export class ScanHandlerService implements OnModuleInit {
       return this.handleRangeScan(ship, args.slice(1));
     }
 
-    // scan se — out of scope for feature 015
     if (sub === 'se') {
-      return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
-      };
+      return this.handleSectorScan(ship);
     }
 
     return {
@@ -289,6 +286,105 @@ export class ScanHandlerService implements OnModuleInit {
     return {
       lines: [{ text: header, category: 'info' }],
       scanRender: { kind: 'ra', mode, cells, header },
+    };
+  }
+
+  /**
+   * Sector scan — projects all objects in the player's current 1×1 sector onto a
+   * 30×15 grid at high resolution. The grid covers only the current sector
+   * (sector-relative coords 0.0..1.0 mapped to 0..29 × 0..14).
+   *
+   * Rendering precedence (last-writer wins): mine → planet → ship → self.
+   *
+   * Colour categories: self → 'self', human (status≠1) → 'human',
+   * AI (status===1) → 'ai', planet → 'planet'.
+   *
+   * Letter assignment is shared with `sca ra` via the same scantab slot so
+   * letters are sticky across mode switches.
+   *
+   * @see GECMDS.C:2562 scan_se
+   */
+  private handleSectorScan(ship: ShipState): CommandResult {
+    // Not-in-flight guard — orbit, docked, or dead
+    if (ship.where >= 10) {
+      return {
+        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+      };
+    }
+
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
+
+    const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+
+    // Build / update the shared scantab (same slot as sca ra)
+    const prevScantab = this.getScantab(ship.userid, ship.shipno);
+    const allShips = this.shipService.findAllShips();
+    const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
+    this.setScantab(ship.userid, ship.shipno, newScantab);
+
+    /**
+     * Project a galaxy-space coordinate into the sector grid.
+     * Sector-relative coords (0.0..1.0) map to grid (0..SCAN_GRID_WIDTH-1).
+     * @see specs/015-scan-modes/plan.md §"Projection for sector scan"
+     */
+    const project = (xcoord: number, ycoord: number): { x: number; y: number } => {
+      const relX = xcoord - xsect;  // 0.0..1.0
+      const relY = ycoord - ysect;  // 0.0..1.0
+      const x = Math.max(0, Math.min(SCAN_GRID_WIDTH - 1, Math.floor(relX * SCAN_GRID_WIDTH)));
+      const y = Math.max(0, Math.min(SCAN_GRID_HEIGHT - 1, Math.floor(relY * SCAN_GRID_HEIGHT)));
+      return { x, y };
+    };
+
+    // Use a Map keyed by "${x},${y}" so later writes overwrite earlier ones.
+    // Build order: wormholes first, mines, then planets, ships, self — giving
+    // self the highest precedence.
+    const cellMap = new Map<string, ScanCell>();
+
+    const put = (cell: ScanCell) => {
+      cellMap.set(`${cell.x},${cell.y}`, cell);
+    };
+
+    // 1. Visible wormholes in this sector — lowest precedence
+    const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
+    for (const wh of wormholes) {
+      if (wh.visible !== 1) continue;
+      const { x, y } = project(wh.xcoord, wh.ycoord);
+      put({ x, y, type: 'wormhole', char: 'W' });
+    }
+
+    // 2. Planets in this sector
+    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
+    for (const planet of planets) {
+      const { x, y } = project(planet.xcoord, planet.ycoord);
+      const char = String(planet.plnum % 10);
+      put({ x, y, type: 'planet', char, colour: 'planet' });
+    }
+
+    // 3. Other ships in this sector (from scantab for letter assignment)
+    for (const entry of newScantab) {
+      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
+      if (!other) continue;
+      // Sector filter — only include ships in the same sector
+      if (Math.floor(other.xcoord) !== xsect || Math.floor(other.ycoord) !== ysect) continue;
+
+      const { x, y } = project(other.xcoord, other.ycoord);
+      const colour: ScanCell['colour'] = other.status === 1 ? 'ai' : 'human';
+      put({ x, y, type: 'ship', char: entry.letter, colour });
+    }
+
+    // 4. Self — highest precedence, always at its projected position
+    const selfPos = project(ship.xcoord, ship.ycoord);
+    put({ x: selfPos.x, y: selfPos.y, type: 'self', char: '*', colour: 'self' });
+
+    const cells: ScanCell[] = Array.from(cellMap.values());
+
+    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
+    const header = `Sector ${xsect},${ysect}`;
+
+    return {
+      lines: [{ text: header, category: 'info' }],
+      scanRender: { kind: 'se', mode, cells, header },
     };
   }
 
