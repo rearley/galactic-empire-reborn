@@ -3,7 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { Command, CommandContext, CommandResult, ScanCell } from '../command.types';
+import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
@@ -162,9 +162,12 @@ export class ScanHandlerService implements OnModuleInit {
       char: '*',
     });
 
+    const mode: ScanRenderEvent['mode'] =
+      (ship as ShipState & { scanHome?: boolean }).scanHome ? 'overwrite' : 'append';
+
     return {
       lines: [{ text: `Scanning sector...`, category: 'info' }],
-      scanGrid: grid,
+      scanRender: { kind: 'lo', mode, cells: grid, header: 'Scanning sector...' },
     };
   }
 

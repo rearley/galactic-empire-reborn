@@ -15,8 +15,14 @@ export interface CommandContext {
  */
 export interface CommandResult {
   lines: CommandResultLine[];
-  /** Present only on scan lo / bare scan. @see GECMDS.C:2640 scan_lo */
-  scanGrid?: ScanCell[];
+  /**
+   * Present on scan lo / bare scan, scan ra, scan se, scan lo full.
+   * Replaces the old `scanGrid` field.
+   * @see GECMDS.C:2640 scan_lo
+   * @see specs/015-scan-modes/data-model.md §3
+   * @see specs/015-scan-modes/contracts/scan-render.md §1
+   */
+  scanRender?: ScanRenderEvent;
   /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
   broadcasts?: Array<{ room: string; event: string; payload: unknown }>;
 }
@@ -26,11 +32,42 @@ export interface CommandResultLine {
   category: 'system' | 'info' | 'success' | 'combat';
 }
 
+/**
+ * A single cell on the scan grid.
+ * @see specs/015-scan-modes/data-model.md §3
+ */
 export interface ScanCell {
-  x: number;
-  y: number;
-  type: 'ship' | 'planet' | 'wormhole' | 'self';
-  char: string;
+  x: number;                                              // 0..29
+  y: number;                                              // 0..14
+  type: 'ship' | 'planet' | 'mine' | 'self' | 'wormhole';
+  char: string;                                           // 'A'..'Z' | '1'..'9' | '.' | '*' | 'W'
+  colour?: 'self' | 'human' | 'ai' | 'planet';           // omitted for mines / empty
+}
+
+/**
+ * A single row in the side panel (ship/object legend) of the scan display.
+ * @see specs/015-scan-modes/data-model.md §3
+ */
+export interface SidePanelRow {
+  letter: string;       // 'A'..'Z'
+  distance: number;     // integer parsecs
+  bearing: number;      // 0..359
+  heading: number;      // 0..359
+  speedDisplay: string; // 'Warp 4.5' | 'Impulse' | 'Stopped'
+  name?: string;        // present iff SCANNAMES on
+}
+
+/**
+ * Structured scan render event emitted by scan command handlers.
+ * @see specs/015-scan-modes/data-model.md §3
+ * @see specs/015-scan-modes/contracts/scan-render.md §1
+ */
+export interface ScanRenderEvent {
+  kind: 'ra' | 'se' | 'lo' | 'lo-full';
+  mode: 'overwrite' | 'append';
+  cells: ScanCell[];
+  header: string;
+  sidePanel?: SidePanelRow[];
 }
 
 /**
