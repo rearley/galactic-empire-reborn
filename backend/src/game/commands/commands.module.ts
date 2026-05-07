@@ -40,6 +40,11 @@ import { AbortHandlerService } from './handlers/abort.handler';
 import { AbandonHandlerService } from './handlers/abandon.handler';
 import { ShipManagementTickService } from './ship-management-tick.service';
 import { CLOAK_ENERGY_USE, loadCloakEnergyUse } from './cloak.config';
+// Planet attack handlers (014)
+import { AttackHandlerService } from './handlers/attack.handler';
+import { PlnHandlerService } from './handlers/pln.handler';
+import { PriceHandlerService } from './handlers/price.handler';
+import { FIRETICKS, loadFireticks } from './attack.config';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -88,6 +93,11 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     AbandonHandlerService,
     ShipManagementTickService,
     { provide: CLOAK_ENERGY_USE, useFactory: () => loadCloakEnergyUse() },
+    // Planet attack handlers (014)
+    AttackHandlerService,
+    PlnHandlerService,
+    PriceHandlerService,
+    { provide: FIRETICKS, useFactory: () => loadFireticks() },
   ],
   exports: [CommandRouterService],
 })
@@ -127,6 +137,10 @@ export class CommandsModule implements OnModuleInit {
     private readonly destructHandler: DestructHandlerService,
     private readonly abortHandler: AbortHandlerService,
     private readonly abandonHandler: AbandonHandlerService,
+    // Planet attack handlers (014)
+    private readonly attackHandler: AttackHandlerService,
+    private readonly plnHandler: PlnHandlerService,
+    private readonly priceHandler: PriceHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -168,5 +182,9 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.destructHandler.command);
     this.commandRouter.register(this.abortHandler.command);
     this.commandRouter.register(this.abandonHandler.command);
+    // Planet attack commands (014)
+    this.commandRouter.register(this.attackHandler.command);
+    this.commandRouter.register(this.plnHandler.command);
+    this.commandRouter.register(this.priceHandler.command);
   }
 }

@@ -32,6 +32,8 @@ export interface ShipClassEntry {
   cybCanAttack: boolean;
   /** Score points awarded to attacker on kill. @see GEMAIN.H shipclass[].max_points */
   points: number;
+  /** True if this ship class can attack planets (GEMAIN.H shipclass[].max_attk != 0). @see GECMDS.C:3520 */
+  canAttackPlanet: boolean;
 }
 
 @Injectable()
@@ -61,6 +63,7 @@ export class ShipClassCacheService implements OnModuleInit {
         cybLowestClassAttacks: true,
         cybCanAttack: true,
         points: true,
+        canAttackPlanet: true,
       },
     });
     for (const row of rows) {
@@ -81,6 +84,7 @@ export class ShipClassCacheService implements OnModuleInit {
         cybLowestClassAttacks: row.cybLowestClassAttacks,
         cybCanAttack: row.cybCanAttack,
         points: row.points,
+        canAttackPlanet: row.canAttackPlanet,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -168,6 +172,7 @@ export class ShipClassCacheService implements OnModuleInit {
       cybLowestClassAttacks: 0,
       cybCanAttack: true,
       points: 0,
+      canAttackPlanet: true,
       ...entry,
     });
   }

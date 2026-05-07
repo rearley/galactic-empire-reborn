@@ -9,6 +9,25 @@ export interface Random {
   next(): number;
 }
 
+/**
+ * Simulates gernd() from the original game — returns an integer in [0, 65535].
+ * Used for modulo-based probability gates (e.g. gernd() % 35).
+ * @see GEMAIN.H — gernd() macro / PRNG
+ */
+export function gernd(random: Random): number {
+  return Math.floor(random.next() * 65536);
+}
+
+/**
+ * rndm(n) — returns a uniform float in [0, n).
+ * Used for proportional damage calculations (e.g. rndm(plattrt1) + 0.25).
+ * @see research.md D5
+ * @see GECMDS.C:3605 (troop ground kill)
+ */
+export function rndm(random: Random, n: number): number {
+  return random.next() * n;
+}
+
 /** DI token for the Random port. */
 export const RANDOM = 'RANDOM';
 

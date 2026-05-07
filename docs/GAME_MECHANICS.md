@@ -1062,3 +1062,84 @@ Effect: sets `ship.repair = floor(damage/3) + 1` (consumed by the repair sub-sys
 Sets `ship.status = SHIP_STATUS_ABANDONED (3)`; clears any active destruct countdown; detaches `ctx.client.data.activeShipNo` so next command goes through onboarding (FR-704). Sector broadcast of abandonment.
 
 FR-803: `CommandRouterService` checks `ship.status === 3` before routing any command — returns `SHIP_ABANDONED` message immediately.
+
+---
+
+## cmd_att — planet attack (feature 014)
+
+**Source**: GECMDS.C:3515 `cmd_attack`; GECMDS.C:3580–3750 troop branch; GECMDS.C:3788–3950 fighter branch
+
+**Syntax**: `att <amount> <troops|fighters>` (`tro` / `fig` accepted as keywords)
+
+**Preconditions** (canonical source order):
+1. FR-014-001: in orbit (ship.where >= 10)
+2. FR-014-002: ship class can attack planets (ShipClassEntry.canAttackPlanet)
+3. FR-014-003: planet type != PLTYPE_WORM
+4. FR-014-004: not own planet (planet.userid != ship.userid)
+5. FR-014-005: neutral zone zaphim (handled by combat tick)
+6. FR-014-006: valid arg shape (amount + troops|fighters keyword)
+7. FR-014-007: sufficient cargo
+
+**Per-planet mutex** (`PlanetStateService.withPlanetLock`): serializes concurrent attackers on the same planet. Inside the lock: re-validate self-attack and cargo, then set `ship.hostile = ship.where`, `ship.cantexit = FIRETICKS`, deduct cargo.
+
+**Troop attack** (`attackTroop`, steps 1–10):
+1. Defender fighters fire: `kill1 += (gernd()%35+9) * fighters` (if fighters > 1)
+2. Ground troops fire: `kill1 += floor(left2 * (rndm(PLATTRT1) + 0.25))`
+3. Ratio counter-kill: `ratio = floor(left1/left2)`; if ratio > 2: `kill2 += floor(left1 * (rndm(PLATTRT2) + 0.1))`
+4. Cap and apply
+5. Outcome: dominance win if `left2 < left1/4`; retreat if `left1 < left2/4`; full-wipe win if `left2==0 && fighters==0`
+6. Item destruction if `ratio > 2 && left1 > left2/2`: `gernd()%15` items per slot
+7. Persist (planet troops updated, ship returns survivors)
+8. Call-for-help: alert owner via EventEmitter2 + spy-mail roll if `ratio > 1`
+9. Mail: MESG02 (lost) or MESG03 (won) if `ratio > 1`; class=MAIL_CLASS_DISTRESS
+10. Ownership transfer: `WarUser.planets += 1` if won
+
+**Fighter attack** (`attackFighter`, steps 1–11):
+- Ratio is **floating-point**: `ratio = left2 > 0 ? (left1/left2)*100 : 0`
+- **INTENTIONAL BUG PRESERVED** (FR-014-019, SC-008): when `left2 == 0`, `ratio = 0` — skipping ground AA, return-fire, counter-kill, item destruction. This matches the C source exactly.
+- Ground anti-air: fires if troops > 500 AND `(gernd()%5-1) > 0`
+- Defender return-fire if `left2 > 0`
+- Counter-kill gated by `ratio > 1`
+- Item destruction if `ratio > 5`
+- Win if `left2 == 0 && troops < 5`
+- Mail: MESG04 (lost) or MESG05 (won) if `ratio > 2 || won == 1`
+- Call-for-help triggered if `ratio > 1 || won == 1`
+
+**Balance coefficients** (all DI-injectable, env-var overrides): PLATTRT1=0.05, PLATTRT2=0.05, PLATTRF1=0.05, PLATTRF2=0.05, PLATTRF3=0.05, FIRETICKS=10
+
+---
+
+## cmd_pln — list owned planets (feature 014)
+
+**Source**: GECMDS.C `cmd_pln`
+
+**Syntax**: `pln`
+
+Read-only. Queries `Planet` by `userid`, ordered by `plnum` ASC. Formats as `%-20s  (xx,yy)  #zzz`. Returns PLN_NONE if no planets owned.
+
+---
+
+## cmd_pri — price quote (feature 014)
+
+**Source**: GECMDS.C:4284 `cmd_price`
+
+**Syntax**: `pri` (bare listing) / `pri <amount> <item>` (quoted form)
+
+Bare `pri`: lists all items with `sell=true` (or all items for the planet owner), one PRICE1 line each.
+
+Quoted `pri <amount> <item>`: precondition ladder: BUY1 (orbit) → PRICEFMT (bad args) → BUY7 (no owner) → BUY5 (zero qty) → BUY4 (not for sale) → BUY8 (cargo full) → BUY3 (insufficient stock) → PRICE_NO_CASH (can't afford) → PRICE1 (quote).
+
+Owner pricing uses BASEPRICE; foreign buyer uses item.markup2a. Read-only — no DB writes.
+
+---
+
+## cmd_maint — planet password gate (feature 014, deferred from 013)
+
+**Source**: GECMDS.C:4471 MAINT2, :4479 MAINT3
+
+Inserted between FR-209 (NZ non-Zygor) and FR-204 (no damage) in canonical source order.
+
+- FR-014-060: planet has password and no arg provided → MAINT2 (password prompt)
+- FR-014-061: wrong password → MAINT3 (incorrect password)
+- FR-014-062: password == "none" (case-insensitive) → gate bypassed
+- FR-014-063: correct password (case-insensitive `sameas`) → proceed to FR-204
