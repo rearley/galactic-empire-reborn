@@ -12,7 +12,7 @@ import { formatMessage, MessageId } from '../../../../src/game/commands/messages
 import { HELP_TOPIC_IDS } from '../../../../src/game/commands/help/help-topics';
 
 /** Synchronous helper — HelpHandler never returns a Promise. */
-function invoke(h: HelpHandlerService, ship: ShipState, args: string[], _ctx?: CommandContext): CommandResult {
+function invoke(h: HelpHandlerService, ship: ShipState, args: string[], ctx: CommandContext): CommandResult {
   return h.command.handler(ship, args, ctx) as CommandResult;
 }
 
