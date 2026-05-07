@@ -43,6 +43,9 @@ export interface PlanetState {
   teamcode: bigint;
 
   items: PlanetItem[];        // length === NUMITEMS (14)
+
+  /** Marks planet state as needing a flush to Postgres. */
+  dirty?: boolean;
 }
 
 /** Composite key for the in-memory planet state Map. */

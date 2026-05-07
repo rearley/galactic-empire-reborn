@@ -49,6 +49,7 @@ import { FIRETICKS, loadFireticks } from './attack.config';
 import { NavHandlerService } from './handlers/nav.handler';
 import { HelpHandlerService } from './handlers/help.handler';
 import { ClsHandlerService } from './handlers/cls.handler';
+import { SpyHandlerService } from './handlers/spy.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -106,6 +107,7 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     NavHandlerService,
     HelpHandlerService,
     ClsHandlerService,
+    SpyHandlerService,
   ],
   exports: [CommandRouterService, ScanHandlerService],
 })
@@ -153,6 +155,7 @@ export class CommandsModule implements OnModuleInit {
     private readonly navHandler: NavHandlerService,
     private readonly helpHandler: HelpHandlerService,
     private readonly clsHandler: ClsHandlerService,
+    private readonly spyHandler: SpyHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -202,5 +205,6 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.navHandler.command);
     this.commandRouter.register(this.helpHandler.command);
     this.commandRouter.register(this.clsHandler.command);
+    this.commandRouter.register(this.spyHandler.command);
   }
 }

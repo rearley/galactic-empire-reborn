@@ -8,6 +8,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
+import { ITEM_NAMES } from '../../constants/items';
 
 /**
  * Convert raw speed units to a display string for the side panel.
@@ -643,6 +644,23 @@ export class ScanHandlerService implements OnModuleInit {
         text: formatMessage(MessageId.SCAN_BEACON, planet.name || `planet ${planet.plnum}`, planetState.beacon),
         category: 'info',
       });
+    }
+
+    // Spy-owner reveal — per-item inventory (D3)
+    // @see GECMDS.C:2367-2375
+    if (planetState && planetState.spyowner !== ''
+        && planetState.spyowner.toLowerCase() === ship.userid.toLowerCase()) {
+      lines.push({ text: 'Spy intel — Planet Inventory:', category: 'info' });
+      for (let i = 0; i < planetState.items.length; i++) {
+        const it = planetState.items[i];
+        if (it && it.qty > 0n) {
+          const selling = it.sell ? ' (selling)' : '';
+          lines.push({
+            text: `  ${ITEM_NAMES[i]}:  ${it.qty}${selling}`,
+            category: 'info',
+          });
+        }
+      }
     }
 
     return { lines };
