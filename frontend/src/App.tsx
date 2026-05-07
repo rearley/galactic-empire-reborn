@@ -13,6 +13,7 @@ import { ClassPickerPrompt } from './onboarding/ClassPickerPrompt';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { getToken, setToken } from './auth/tokenStore';
 import { connectSocket } from './socket/socketClient';
+import { handleCommandResult } from './socket/command-result-handlers';
 import type { EventLogLine, ScanCell } from './types/contracts';
 
 const MAX_LOG_ENTRIES = 500;
@@ -51,11 +52,11 @@ function Terminal(): React.JSX.Element {
 
   useEffect(() => {
     if (lastResult) {
-      if (lastResult.lines.length > 0) {
-        setLogLines((prev) =>
-          [...prev, ...lastResult.lines].slice(-MAX_LOG_ENTRIES),
-        );
-      }
+      handleCommandResult(
+        lastResult,
+        (lines) => setLogLines((prev) => [...prev, ...lines].slice(-MAX_LOG_ENTRIES)),
+        () => setLogLines([]),
+      );
       if (lastResult.scanGrid !== undefined) {
         setScanCells(lastResult.scanGrid);
       }
