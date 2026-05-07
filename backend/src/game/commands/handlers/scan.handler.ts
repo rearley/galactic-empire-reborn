@@ -648,7 +648,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     // Spy-owner reveal — per-item inventory (D3)
     // @see GECMDS.C:2367-2375
-    if (planetState && planetState.spyowner !== ''
+    if (planetState && planetState.spyowner
         && planetState.spyowner.toLowerCase() === ship.userid.toLowerCase()) {
       lines.push({ text: 'Spy intel — Planet Inventory:', category: 'info' });
       for (let i = 0; i < planetState.items.length; i++) {
