@@ -202,10 +202,76 @@ export enum MessageId {
   TEAM_JOINED = 'TEAM_JOINED',
   TEAM_NOT_FOUND = 'TEAM_NOT_FOUND',
 
+  // cloak (feature 013) — GECMDS.C:3188 cmd_cloak
+  CLOAK_ENGAGED = 'CLOAK_ENGAGED',
+  CLOAK_ALREADY_ON = 'CLOAK_ALREADY_ON',
+  CLOAK_NO_ENERGY = 'CLOAK_NO_ENERGY',
+  CLOAK_DAMAGED = 'CLOAK_DAMAGED',
+  CLOAK_HYPERSPACE = 'CLOAK_HYPERSPACE',
+  CLOAK_DISENGAGED = 'CLOAK_DISENGAGED',
+  CLOAK_ALREADY_OFF = 'CLOAK_ALREADY_OFF',
+  CLOAK_FMT = 'CLOAK_FMT',
+  CLOAK_SECTOR_DECLOAKED = 'CLOAK_SECTOR_DECLOAKED',
+  CLOAK_COLLAPSED = 'CLOAK_COLLAPSED',
+
+  // maint (feature 013) — GECMDS.C:4452 cmd_maint
+  MAINT_NOT_ORBIT = 'MAINT_NOT_ORBIT',
+  MAINT_NO_FACILITY = 'MAINT_NO_FACILITY',
+  MAINT_COMBAT = 'MAINT_COMBAT',
+  MAINT_NZ = 'MAINT_NZ',
+  MAINT_NO_DAMAGE = 'MAINT_NO_DAMAGE',
+  MAINT_NO_CASH = 'MAINT_NO_CASH',
+  MAINT_OK = 'MAINT_OK',
+
+  // transfer (feature 013) — GECMDS.C:3271 cmd_transfer reinterpreted
+  TRAN_SELF = 'TRAN_SELF',
+  TRAN_OFFLINE = 'TRAN_OFFLINE',
+  TRAN_SECTOR = 'TRAN_SECTOR',
+  TRAN_NO_CARGO = 'TRAN_NO_CARGO',
+  TRAN_NO_GOLD = 'TRAN_NO_GOLD',
+  TRAN_UNKNOWN_ITEM = 'TRAN_UNKNOWN_ITEM',
+  TRAN_OK = 'TRAN_OK',
+  TRAN_RECEIVED = 'TRAN_RECEIVED',
+  TRAN_FMT = 'TRAN_FMT',
+
+  // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
+  JET_NO_CARGO = 'JET_NO_CARGO',
+  JET_OK = 'JET_OK',
+  JET_FMT = 'JET_FMT',
+
+  // set (feature 013) — GECMDS.C:5190 cmd_set reinterpreted
+  SET_OK_ON = 'SET_OK_ON',
+  SET_OK_OFF = 'SET_OK_OFF',
+  SET_UNKNOWN = 'SET_UNKNOWN',
+  SET_STATUS = 'SET_STATUS',
+  SET_FMT = 'SET_FMT',
+
+  // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
+  DESTRUCT_NZ = 'DESTRUCT_NZ',
+  DESTRUCT_ACTIVE = 'DESTRUCT_ACTIVE',
+  DESTRUCT_START = 'DESTRUCT_START',
+  DESTRUCT_SECTOR_START = 'DESTRUCT_SECTOR_START',
+  DESTRUCT_TICK = 'DESTRUCT_TICK',
+  DESTRUCT_TICK_10 = 'DESTRUCT_TICK_10',
+  DESTRUCT_TICK_5 = 'DESTRUCT_TICK_5',
+  DESTRUCT_TICK_2 = 'DESTRUCT_TICK_2',
+  DESTRUCT_BOOM = 'DESTRUCT_BOOM',
+
+  // abort (feature 013) — GECMDS.C:5044 cmd_abort
+  ABORT_OK = 'ABORT_OK',
+  ABORT_NONE = 'ABORT_NONE',
+  ABORT_SECTOR = 'ABORT_SECTOR',
+
+  // abandon (feature 013) — GECMDS.C:3420 cmd_abandon reinterpreted
+  ABANDON_OK = 'ABANDON_OK',
+  ABANDON_SECTOR = 'ABANDON_SECTOR',
+  ABANDON_NO_SHIP = 'ABANDON_NO_SHIP',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
   UNKNOWN_CMD = 'UNKNOWN_CMD',
+  SHIP_ABANDONED = 'SHIP_ABANDONED',
 }
 
 /**
@@ -409,10 +475,76 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TEAM_JOINED]: 'You have joined team %s.',
   [MessageId.TEAM_NOT_FOUND]: 'No such team: %s',
 
+  // cloak (feature 013) — GECMDS.C:3188 cmd_cloak
+  [MessageId.CLOAK_ENGAGED]: 'Cloaking device engaged.',
+  [MessageId.CLOAK_ALREADY_ON]: 'Cloaking device already engaged.',
+  [MessageId.CLOAK_NO_ENERGY]: 'Insufficient energy to engage cloak.',
+  [MessageId.CLOAK_DAMAGED]: 'Cloaking device damaged.',
+  [MessageId.CLOAK_HYPERSPACE]: 'Cannot cloak while in hyperspace.',
+  [MessageId.CLOAK_DISENGAGED]: 'Cloaking device disengaged.',
+  [MessageId.CLOAK_ALREADY_OFF]: 'Cloaking device already down.',
+  [MessageId.CLOAK_FMT]: 'Usage: cloak <on|off>',
+  [MessageId.CLOAK_SECTOR_DECLOAKED]: '%s has decloaked.',
+  [MessageId.CLOAK_COLLAPSED]: 'Emergency decloak — insufficient energy to maintain cloak.',
+
+  // maint (feature 013) — GECMDS.C:4452 cmd_maint
+  [MessageId.MAINT_NOT_ORBIT]: 'You must be orbiting a planet to perform maintenance.',
+  [MessageId.MAINT_NO_FACILITY]: 'This planet has no maintenance facility.',
+  [MessageId.MAINT_COMBAT]: 'Cannot perform maintenance — ship is locked into combat.',
+  [MessageId.MAINT_NZ]: 'No maintenance available in the neutral zone except at Zygor.',
+  [MessageId.MAINT_NO_DAMAGE]: 'No maintenance is needed.',
+  [MessageId.MAINT_NO_CASH]: 'Insufficient funds for maintenance.',
+  [MessageId.MAINT_OK]: 'Maintenance complete. Repair queue: %d units.',
+
+  // transfer (feature 013) — GECMDS.C:3271 cmd_transfer reinterpreted
+  [MessageId.TRAN_SELF]: 'Cannot transfer to your own ship.',
+  [MessageId.TRAN_OFFLINE]: 'Target ship not online.',
+  [MessageId.TRAN_SECTOR]: 'Target ship not in this sector.',
+  [MessageId.TRAN_NO_CARGO]: 'Insufficient cargo.',
+  [MessageId.TRAN_NO_GOLD]: 'Insufficient gold.',
+  [MessageId.TRAN_UNKNOWN_ITEM]: 'Usage: transfer <amt> <item|gold> <target-shipno>',
+  [MessageId.TRAN_OK]: 'Transferred %d %s to %s.',
+  [MessageId.TRAN_RECEIVED]: '%s transferred %d %s to you.',
+  [MessageId.TRAN_FMT]: 'Usage: transfer <amt> <item|gold> <target-shipno>',
+
+  // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
+  [MessageId.JET_NO_CARGO]: 'Insufficient cargo to jettison.',
+  [MessageId.JET_OK]: 'Jettisoned %d %s.',
+  [MessageId.JET_FMT]: 'Usage: jettison <amt|ALL> <item>',
+
+  // set (feature 013) — GECMDS.C:5190 cmd_set reinterpreted
+  [MessageId.SET_OK_ON]: 'Option %s set ON.',
+  [MessageId.SET_OK_OFF]: 'Option %s set OFF.',
+  [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <auto-shield|auto-repair> <on|off>',
+  [MessageId.SET_STATUS]: 'auto-shield: %s   auto-repair: %s',
+  [MessageId.SET_FMT]: 'Usage: set <auto-shield|auto-repair> <on|off>',
+
+  // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
+  [MessageId.DESTRUCT_NZ]: 'Cannot self-destruct in the neutral zone.',
+  [MessageId.DESTRUCT_ACTIVE]: 'Self-destruct already in progress.',
+  [MessageId.DESTRUCT_START]: 'Self-destruct sequence initiated.',
+  [MessageId.DESTRUCT_SECTOR_START]: '%s has initiated self-destruct sequence.',
+  [MessageId.DESTRUCT_TICK]: '%s: %d ticks until self-destruct.',
+  [MessageId.DESTRUCT_TICK_10]: '%s has 10 ticks until self-destruct!',
+  [MessageId.DESTRUCT_TICK_5]: '%s has 5 ticks until self-destruct!!',
+  [MessageId.DESTRUCT_TICK_2]: '%s has 2 ticks until self-destruct!!!',
+  [MessageId.DESTRUCT_BOOM]: '%s has self-destructed!',
+
+  // abort (feature 013) — GECMDS.C:5044 cmd_abort
+  [MessageId.ABORT_OK]: 'Self-destruct sequence aborted.',
+  [MessageId.ABORT_NONE]: 'No active self-destruct sequence.',
+  [MessageId.ABORT_SECTOR]: '%s has aborted self-destruct.',
+
+  // abandon (feature 013) — GECMDS.C:3420 cmd_abandon reinterpreted
+  [MessageId.ABANDON_OK]: 'You have abandoned ship %s.',
+  [MessageId.ABANDON_SECTOR]: '%s has been abandoned by its captain.',
+  [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
+
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
   [MessageId.NUMOOR]: 'Number out of range (%d-%d).',
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
+  [MessageId.SHIP_ABANDONED]: 'Your ship has been abandoned. Please create a new ship.',
 };
 
 /**

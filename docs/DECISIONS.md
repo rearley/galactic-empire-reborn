@@ -866,3 +866,45 @@ unnecessary boilerplate and couples test setup to module composition.
 **Reason**: The player list is a single, well-scoped piece of state. A `useReducer` hook is sufficient and avoids adding a new dependency. The list is already hydrated by well-defined socket events with clear semantics for each action type.
 
 **Alternatives rejected**: Redux Toolkit (overkill for a single list); Zustand (unnecessary dependency); Context API with a global store (heavier than needed for one panel).
+
+## 2026-05-07 — 013-ship-management: four deviations from canonical C source
+
+**Context**: Eight commands ported from GECMDS.C have semantics that cannot be mapped 1:1 to the web architecture.
+
+**D1 — `transfer` moves cargo between ships (not ship→planet)**
+
+Original `cmd_transfer` (GECMDS.C:3271) moves items from ship hold to an orbiting planet. This port moves items between two online ships in the same sector.
+
+**Reason**: Planet-based cargo transfer is already handled by `buy`/`sell` (feature 005). A ship-to-ship transfer is more useful for cooperative multiplayer.
+
+---
+
+**D2 — `abandon` marks ship status=3 (not planet-colony abandon)**
+
+Original `cmd_abandon` (GECMDS.C:3420) abandons a planet colony. This port detaches the captain from their ship and routes them to the feature-011 onboarding flow (FR-704).
+
+**Reason**: The web game needs a way for players to switch ships or recover from a stuck state. Planet-colony abandon belongs in feature 005.
+
+---
+
+**D3 — maint password gate (FR-210) deferred**
+
+Original `cmd_maint` (GECMDS.C:4452) checks planet password. This port omits FR-210.
+
+**Reason**: Planet passwords are not yet implemented (feature 005). Deferred.
+
+---
+
+**D4 — `set` manages auto-shield/auto-repair (not scannames/filter)**
+
+Original `cmd_set` (GECMDS.C:5190) manages `User.options[]` flags for scan display. This port manages `autoShield`/`autoRepair` flags on `ShipState`.
+
+**Reason**: Scan display customization is low priority; auto-shield/auto-repair are immediately useful for the physics tick. The `options[]` array can be used later when needed.
+
+---
+
+**CLOAK_ENERGY_USE as sysop-tunable env var (not GEMAIN.H constant)**
+
+`CLOAK_ENERGY_USE` is injected via DI token and loaded from `process.env.CLOAK_ENERGY_USE` at startup (default 50, min 1, max 32000). Pattern follows `midnight.config.ts`.
+
+**Reason**: Energy drain rate is an operational balance knob, not a protocol constant. Sysop should be able to tune it without recompiling.

@@ -1,3 +1,68 @@
+## 2026-05-07 — 013-ship-management: cloak / maint / transfer / jettison / set / destruct / abort / abandon
+
+**Completed**:
+
+- **US1 `cloak`**: `CloakHandlerService` (on/off sub-forms); cloak ramp 1→2→10 across two PHYSICS ticks; energy drain (`CLOAK_ENERGY_USE_DEFAULT=50`, sysop-configurable via env); auto-decloak on energy starvation; `cloak-collapsed` event to per-captain socket; `CLOAK_ENERGY_USE` DI token following midnight.config.ts pattern.
+
+- **US2 `maint`**: `MaintHandlerService`; cost 200 cr (normal) / 2500 cr (Zygor NZ); repair formula `floor(damage/3)+1` queued via `ship.repair`; FR-206–FR-210 gates.
+
+- **US3 `transfer`**: `TransferHandlerService`; ship-to-ship atomic transfer (cargo + gold); sector co-location gate; target broadcast via `user:${target.userid}` Socket.io room; conservation invariant: zero items created/destroyed across 100 randomized transfers.
+
+- **US4 `jettison`**: `JettisonHandlerService`; numeric amount + ALL keyword; items permanently discarded (no recovery path FR-403).
+
+- **US5 `set`**: `SetHandlerService`; `auto-shield`/`auto-repair` flags; `set ?` listing; flags persisted via Prisma round-trip (`autoShield`/`autoRepair` columns, migration `ship_auto_flags`).
+
+- **US6 `destruct`/`abort`**: `DestructHandlerService` sets `ship.destruct=COUNTDOWN(20)`; `ShipManagementTickService.destructTick` decrements each PHYSICS tick, emits sector warnings (special at 10/5/2), `COMBAT_SHIP_DESTROYED` + `removeFromGame` at 0; `AbortHandlerService` clears countdown, sector broadcast only if `destruct<10` (SELFD4A).
+
+- **US7 `abandon`**: `AbandonHandlerService` sets `status=SHIP_STATUS_ABANDONED(3)`, clears destruct, detaches `ctx.client.data.activeShipNo`; FR-803 gate in `CommandRouterService` blocks all subsequent commands with `SHIP_ABANDONED` message.
+
+- **Tick service**: `ShipManagementTickService` subscribes to `TickKind.PHYSICS`; drives both `cloakTick` and `destructTick`; fault-isolated per ship; gateway listens on `ship-management.cloak-collapsed`, `ship-management.destruct-tick`, `ship-management.destruct-boom`.
+
+- **Schema**: added `autoShield Boolean @default(false)` and `autoRepair Boolean @default(false)` to Ship model; migration `20260506235607_ship_auto_flags` committed.
+
+- **Gateway**: clients join `user:${userid}` room on connect for per-captain broadcasts.
+
+**Tests**: ~220 new tests in 17 new spec files across handlers, tick integration, balance regression, and router dispatch. All 171 pre-existing suites continue to pass.
+
+**Test files added**:
+- `test/game/commands/handlers/cloak.handler.spec.ts` (T011)
+- `test/game/tick/cloak-ramp.integration.spec.ts` (T012)
+- `test/game/tick/cloak-drain.integration.spec.ts` (T013)
+- `test/game/commands/handlers/cloak-reachability.spec.ts` (T014)
+- `test/balance/cloak.balance.spec.ts` (T015)
+- `test/game/commands/handlers/maint.handler.spec.ts` (T019)
+- `test/balance/maint.balance.spec.ts` (T020)
+- `test/game/commands/handlers/transfer.handler.spec.ts` (T023)
+- `test/game/commands/handlers/transfer.conservation.spec.ts` (T024)
+- `test/game/commands/handlers/jettison.handler.spec.ts` (T028)
+- `test/game/commands/handlers/set.handler.spec.ts` (T031)
+- `test/integration/commands/set-persistence.spec.ts` (T032)
+- `test/game/commands/handlers/destruct.handler.spec.ts` (T035)
+- `test/game/commands/handlers/abort.handler.spec.ts` (T036)
+- `test/game/tick/destruct-countdown.integration.spec.ts` (T037)
+- `test/game/tick/destruct-abort.integration.spec.ts` (T038)
+- `test/balance/destruct.balance.spec.ts` (T039)
+- `test/game/commands/handlers/abandon.handler.spec.ts` (T044)
+- `test/game/commands/handlers/abandon.onboarding.integration.spec.ts` (T045)
+- `test/game/commands/handlers/abandon.destruct-precedence.spec.ts` (T046)
+- `test/game/commands/command-router.dispatch.spec.ts` (T050)
+
+**Decisions made**:
+- D1: `transfer` moves cargo between ships (not ship→planet) — see research.md D1
+- D2: `abandon` marks ship status=3, routes captain to onboarding — see research.md D2
+- D3: maint password gate (FR-210) deferred to feature 005
+- D4: `set` manages auto-shield/auto-repair (not scannames/scanhome) — see research.md D4
+- autoShield/autoRepair declared optional in ShipState to avoid breaking 72 existing makeShip() factories
+- Per-captain cloak-collapsed broadcast implemented via `user:${userid}` Socket.io room (clients join on connect)
+
+**Next**: 009-midnight-job (if not yet done) or T053 quickstart validation
+
+**Known issues**:
+- T053 manual quickstart validation not run
+- `set auto-repair` flag consumed by repair sub-system is deferred (flag persists, repair-tick integration pending)
+
+---
+
 ## 2026-05-06 — 012-social-commands: who / dat / ros / sen / fre / tea
 
 **Completed**:

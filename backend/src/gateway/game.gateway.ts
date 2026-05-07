@@ -48,6 +48,11 @@ import { shipKey } from '../game/ship/ship-state.types';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
+import {
+  CloakCollapsedPayload,
+  DestructTickPayload,
+  DestructBoomPayload,
+} from '../game/commands/ship-management-tick.service';
 
 interface SectorPayload {
   x: unknown;
@@ -144,6 +149,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     client.data.activeShipNo = ship.shipno;
+
+    // Join per-user room so handlers can broadcast directly to this captain.
+    void client.join(`user:${userid}`);
 
     // Latest-wins: displace prior socket if any
     const priorSocketId = this.registry.upsert(shipId, client.id);
@@ -443,6 +451,33 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     this.server.emit(COMBAT_SHIP_DESTROYED, event);
+  }
+
+  /** Per-captain cloak-collapsed notification (energy starvation). @see GEFUNCS.C:1374 */
+  @OnEvent('ship-management.cloak-collapsed')
+  handleCloakCollapsed(event: CloakCollapsedPayload): void {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
+      category: 'system',
+      text: event.message,
+    });
+  }
+
+  /** Per-sector self-destruct countdown tick warning. @see GEFUNCS.C:1833-1851 */
+  @OnEvent('ship-management.destruct-tick')
+  handleDestructTick(event: DestructTickPayload): void {
+    this.server.to(event.room).emit('event.log', {
+      category: 'system',
+      text: event.message,
+    });
+  }
+
+  /** Sector broadcast when self-destruct expires. @see GEFUNCS.C:1863 */
+  @OnEvent('ship-management.destruct-boom')
+  handleDestructBoom(event: DestructBoomPayload): void {
+    this.server.to(event.room).emit('event.log', {
+      category: 'combat',
+      text: event.message,
+    });
   }
 
   /**

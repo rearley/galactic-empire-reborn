@@ -61,17 +61,19 @@ export function prismaShipToState(row: Ship): ShipState {
     holdcourse: row.holdcourse,
     topspeed: row.topspeed,
     warncntr: row.warncntr,
+    autoShield: row.autoShield,
+    autoRepair: row.autoRepair,
     dirty: false,
   };
 }
 
 /**
  * Converts a live ShipState back to a Prisma update payload.
- * Strips the dirty flag — it is in-memory only and has no Prisma column.
+ * Strips the dirty flag and in-memory-only fields that have no DB column.
  * @see ShipState.dirty
  */
 export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { dirty, ...rest } = state;
+  const { dirty, isEphemeral, teamcode, ...rest } = state;
   return rest;
 }
