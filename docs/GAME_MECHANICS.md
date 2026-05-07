@@ -948,3 +948,59 @@ broadcasts. Event name: `message.send`. Not persisted.
   emits `player.snapshot` sentinel broadcast.
 - `tea leave`: clears both `User.teamcode` (null) and `ShipState.teamcode` (undefined),
   sets `dirty = true`, emits `player.snapshot` sentinel broadcast.
+
+---
+
+## cmd_cloak — cloaking device (feature 013)
+
+**Source**: GECMDS.C:3188 `cmd_cloak`; GEFUNCS.C:1366 `cloakstat`
+
+**Syntax**: `cloak on` / `cloak off` (alias: `clo`)
+
+`CloakHandlerService`:
+- `on`: gates — cloak already active (>0), damaged cloak (<0), in hyperspace (where==1), energy ≤ CLOAK_ENERGY_USE. On success: debits energy, sets `ship.cloak = CLOAK_RAMP_INIT (1)`.
+- `off`: sets `ship.cloak = 0`; broadcasts `event.log` to sector room.
+
+`ShipManagementTickService.cloakTick()` — runs every PHYSICS tick (6s):
+- Damaged cloak (<0): increments +1 each tick until 0.
+- Energy starvation (`energy < CLOAK_ENERGY_USE`): sets cloak=0, emits `ship-management.cloak-collapsed` → gateway pushes to `user:${userid}` socket.
+- Active cloak: drains `CLOAK_ENERGY_USE` (default=50, sysop-configurable via env); ramp: 1→2→10 over two ticks. `cloak===10` = fully cloaked.
+
+**Cloaked-at-10 effects**: invisible to Cybertron target acquisition; excluded from `who` listing; `cmd_tor` locked out for firer; `cmd_report sys` shows "Cloak: active."
+
+## cmd_maint — maintenance (feature 013)
+
+**Source**: GECMDS.C:4452 `cmd_maint`
+
+**Syntax**: `maint` (alias: `mai`)
+
+Gates (canonical order): FR-206 not in orbit, FR-207 uninhabited/pop<25000, FR-208 combat-locked, FR-209 NZ non-Zygor, FR-204 no damage, FR-205 insufficient cash.
+
+Cost: `MAINT_COST_NORMAL=200 cr` (normal planet) / `MAINT_COST_NEUTRAL=2500 cr` (Zygor planets 0 or 1 at sector 0,0).
+
+Effect: sets `ship.repair = floor(damage/3) + 1` (consumed by the repair sub-system).
+
+## cmd_destruct/abort — self-destruct countdown (feature 013)
+
+**Source**: GECMDS.C:5025 `cmd_destruct`, GECMDS.C:5044 `cmd_abort`; GEFUNCS.C:1820 `destruct`
+
+**Syntax**: `destruct` / `des`; `abort` / `abo`
+
+`destruct`: sets `ship.destruct = COUNTDOWN (20)`. Gates: NZ rejection, already-active rejection. Sector broadcast on initiation.
+
+`ShipManagementTickService.destructTick()` — every PHYSICS tick:
+- Decrements destruct by 1.
+- If >0: emits `ship-management.destruct-tick` (special messages at 10/5/2).
+- If ==0: emits `ship-management.destruct-boom` + `COMBAT_SHIP_DESTROYED` (null attacker, scoreAwarded=0) + `removeFromGame`.
+
+`abort`: clears `ship.destruct=0`. Returns ABORT_OK. Sector broadcast only if `destruct<10` at abort time (SELFD4A — countdown was far enough that sector was already warned).
+
+## cmd_abandon — ship abandonment (feature 013)
+
+**Source**: GECMDS.C:3420 `cmd_abandon` (semantics reinterpreted — see DECISIONS.md D2)
+
+**Syntax**: `abandon` / `aba`
+
+Sets `ship.status = SHIP_STATUS_ABANDONED (3)`; clears any active destruct countdown; detaches `ctx.client.data.activeShipNo` so next command goes through onboarding (FR-704). Sector broadcast of abandonment.
+
+FR-803: `CommandRouterService` checks `ship.status === 3` before routing any command — returns `SHIP_ABANDONED` message immediately.

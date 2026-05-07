@@ -89,6 +89,11 @@ export interface ShipState {
   topspeed: number;
   warncntr: number;
 
+  /** Auto-shield flag — toggled by `set auto-shield on/off`. @see GECMDS.C:5190 cmd_set */
+  autoShield?: boolean;
+  /** Auto-repair flag — toggled by `set auto-repair on/off`. @see GECMDS.C:5190 cmd_set */
+  autoRepair?: boolean;
+
   /** In-memory only — true after any mutation; cleared after successful Prisma flush. */
   dirty: boolean;
 

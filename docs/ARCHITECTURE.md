@@ -203,6 +203,18 @@ galactic-empire-reborn/
             sen.handler.ts    ← sends message to hail/sector/galaxy room (US4)
             tea.handler.ts    ← join/leave/show team; updates User+ShipState; snapshot (US6)
             _freq-thresholds.ts ← FREQ_HAIL=0, FREQ_SECTOR_MAX=19999, FREQ_GALAXY_MIN=20000
+            cloak.handler.ts  ← on/off; energy gate; ramp init to CLOAK_RAMP_INIT=1 (013)
+            maint.handler.ts  ← orbit+pop+cash gates; 200 cr or 2500 cr Zygor; repair queue (013)
+            transfer.handler.ts ← ship-to-ship atomic cargo/gold; user:${uid} broadcast (013)
+            jettison.handler.ts ← numeric|ALL amount; items permanently lost (013)
+            set.handler.ts    ← auto-shield/auto-repair flags; set ? listing (013)
+            destruct.handler.ts ← sets ship.destruct=20; NZ+already-active gates (013)
+            abort.handler.ts  ← clears destruct; sector broadcast if destruct<10 (013)
+            abandon.handler.ts ← status=3; clears destruct; detaches activeShipNo (013)
+            _item-keywords.ts ← resolveItemKeywordByName(); gold synonym for I_GOLD
+          cloak.config.ts     ← CLOAK_ENERGY_USE DI token + loadCloakEnergyUse() factory
+          _ship-management-constants.ts ← COUNTDOWN=20, CLOAK_RAMP_*, MAINT_COST_*, SHIP_STATUS_ABANDONED=3
+          ship-management-tick.service.ts ← PHYSICS tick; cloakTick (ramp+drain); destructTick (countdown→boom)
           helpers/
             ai-userid.ts      ← isAiUserid(userid): Cybrg-* | @Droid-* detection
       gateway/

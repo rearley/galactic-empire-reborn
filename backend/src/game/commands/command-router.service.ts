@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from './command.types';
 import { formatMessage, MessageId } from './messages';
 import { ShipState } from '../ship/ship-state.types';
+import { SHIP_STATUS_ABANDONED } from './_ship-management-constants';
 
 /**
  * Routes player text input to registered command handlers.
@@ -47,6 +48,13 @@ export class CommandRouterService {
     const tokens = trimmed.split(/\s+/);
     const keyword = tokens[0].toLowerCase();
     const args = tokens.slice(1);
+
+    // FR-803: reject all commands when the ship has been abandoned.
+    if (ship.status === SHIP_STATUS_ABANDONED) {
+      return {
+        lines: [{ text: formatMessage(MessageId.SHIP_ABANDONED), category: 'system' }],
+      };
+    }
 
     const cmd = this.registry.get(keyword);
     if (!cmd) {

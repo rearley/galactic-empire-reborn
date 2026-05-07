@@ -29,6 +29,17 @@ import { RosHandlerService } from './handlers/ros.handler';
 import { SenHandlerService } from './handlers/sen.handler';
 import { FreHandlerService } from './handlers/fre.handler';
 import { TeaHandlerService } from './handlers/tea.handler';
+// Ship management handlers (013)
+import { CloakHandlerService } from './handlers/cloak.handler';
+import { MaintHandlerService } from './handlers/maint.handler';
+import { TransferHandlerService } from './handlers/transfer.handler';
+import { JettisonHandlerService } from './handlers/jettison.handler';
+import { SetHandlerService } from './handlers/set.handler';
+import { DestructHandlerService } from './handlers/destruct.handler';
+import { AbortHandlerService } from './handlers/abort.handler';
+import { AbandonHandlerService } from './handlers/abandon.handler';
+import { ShipManagementTickService } from './ship-management-tick.service';
+import { CLOAK_ENERGY_USE, loadCloakEnergyUse } from './cloak.config';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -66,6 +77,17 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     SenHandlerService,
     FreHandlerService,
     TeaHandlerService,
+    // Ship management handlers (013)
+    CloakHandlerService,
+    MaintHandlerService,
+    TransferHandlerService,
+    JettisonHandlerService,
+    SetHandlerService,
+    DestructHandlerService,
+    AbortHandlerService,
+    AbandonHandlerService,
+    ShipManagementTickService,
+    { provide: CLOAK_ENERGY_USE, useFactory: () => loadCloakEnergyUse() },
   ],
   exports: [CommandRouterService],
 })
@@ -97,6 +119,14 @@ export class CommandsModule implements OnModuleInit {
     private readonly senHandler: SenHandlerService,
     private readonly freHandler: FreHandlerService,
     private readonly teaHandler: TeaHandlerService,
+    private readonly cloakHandler: CloakHandlerService,
+    private readonly maintHandler: MaintHandlerService,
+    private readonly transferHandler: TransferHandlerService,
+    private readonly jettisonHandler: JettisonHandlerService,
+    private readonly setHandler: SetHandlerService,
+    private readonly destructHandler: DestructHandlerService,
+    private readonly abortHandler: AbortHandlerService,
+    private readonly abandonHandler: AbandonHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -129,5 +159,14 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.senHandler.command);
     this.commandRouter.register(this.freHandler.command);
     this.commandRouter.register(this.teaHandler.command);
+    // Ship management commands (013)
+    this.commandRouter.register(this.cloakHandler.command);
+    this.commandRouter.register(this.maintHandler.command);
+    this.commandRouter.register(this.transferHandler.command);
+    this.commandRouter.register(this.jettisonHandler.command);
+    this.commandRouter.register(this.setHandler.command);
+    this.commandRouter.register(this.destructHandler.command);
+    this.commandRouter.register(this.abortHandler.command);
+    this.commandRouter.register(this.abandonHandler.command);
   }
 }
