@@ -652,78 +652,147 @@ depends on attacker vs defender population math — the primary endgame loop.
 `pln` — list all planets the player owns (name, sector, population, cash, defense).
 `pri` — display current buy/sell prices for every item at the orbited planet.
 
+Also closes: maint password gate (`FR-210`, `GECMDS.C:4463`) — `mai [password]` verifies
+`Planet.password` before charging; currently deferred from feature 013.
+
 No test coverage yet. No spec exists.
 
-### 015 — Navigation autopilot & utility (planned)
+### 015 — Scan modes & display options (planned)
 
-`nav [x] [y]` — set an automatic course; ship navigates autonomously each physics tick
-until it arrives at the target sector or the command is cancelled. More than a heading
-calculator — requires per-tick waypoint logic in `PhysicsTickService`.
-`spy` — deploy a spy item to a planet (sets `Planet.spyowner`; returns intel on planet
-contents and defenses).
+`scan ra` and `scan se` currently return a placeholder error. These are core tactical
+tools needed for situational awareness in combat.
+
+- `sca ra [1-9]` — range radar: 30x15 ASCII grid showing all ships (lettered A-Z by
+  distance), mines (`.`), and self (`*`) within scan range; zoom level 1-9 adjusts the
+  range window (non-linear: `range = scanrange / ((10-x)^2)`). Source: `GECMDS.C:scan_ra`.
+- `sca se` — sector radar: same grid limited to the current sector; ships, mines, and
+  planets (`1-9`) with color coding by type (player vs AI). Source: `GECMDS.C:scan_se`.
+- `sca lo full` — extended local scan with a right-side panel: letter, distance, bearing,
+  heading, speed per detected ship; layout affected by `SCANNAMES` option. Source: `GECMDS.C:scan_lo`.
+- `set` display options — `SCANNAMES` (show ship name on separate line) and `SCANHOME`
+  (home-cursor positioning) stored in `User.options[]`; currently `set` only manages
+  `autoShield`/`autoRepair`. Source: `GECMDS.C:cmd_set`, `GEMAIN.H:options[]`.
+
+No test coverage yet. No spec exists.
+
+### 016 — Navigation autopilot & spy (planned)
+
+`nav [x] [y]` — set an automatic course; `ship.holdcourse` is already a `ShipState`
+field (mapped but unused). Needs per-tick waypoint logic in `PhysicsTickService`:
+compute bearing to target sector, set `head2b`, clear on arrival or when player issues
+`rot`/`imp`/`war`. Source: `GECMDS.C:cmd_navigate`, `GEFUNCS.C:moveship`.
+`spy` — consume one spy item from cargo, attach to target planet (`Planet.spyowner`);
+returns intel (population, items, defenses) on the next scan. Source: `GECMDS.C:cmd_spy`.
 `hel` / `?` — in-game help text (topic-keyed lookup).
-`cls` — clear the client's event log (client-side frontend command, no backend handler).
+`cls` — clear the client's event log (frontend-only; no backend handler needed).
 
 No test coverage yet. No spec exists.
 
-### 016 — Mail system (planned)
+### 017 — Mail inbox (planned)
 
-Players currently have no way to read their mail even though `MailStat` rows are written
-by the midnight job (production reports) and combat (distress signals on PvP kill).
-Needs a command handler to list and read messages.
-`sen` is already implemented (012) for real-time broadcasts; this feature adds the
-persistent inbox: read, delete, list commands.
+`MailStat` rows are already written by the midnight job (production reports) and by PvP
+kill (distress signals) but players have no way to read them. `sen` (012) handles
+real-time broadcasts. This feature adds the persistent inbox:
+- list unread mail (count + sender)
+- read a message by index
+- delete a message
 
 No test coverage yet. No spec exists.
 
-### 017 — Team management (planned)
+### 018 — Team management (planned)
 
-`tea join/leave` is implemented (012) but teams must be manually seeded in the DB —
+`tea join/leave` is implemented (012) but teams must be manually seeded in the DB --
 no player can create one. Needs:
-- `tea create <name>` — create a new team (writes `Team` row)
-- `tea list` — list all teams with member counts
-- Team score display on `ros` roster
+- `tea create <name>` — creates a `Team` row; creator becomes implicit leader
+- `tea list` — all teams with member counts and scores
+- Team score column on `ros` roster output
 
 No test coverage yet. No spec exists.
 
-### 018 — Physics & mechanics polish (planned)
+### 019 — Physics & mechanics polish (planned)
 
-Deferred gaps from features 006a–013:
+Consolidates all deferred mechanical gaps from features 006a-013:
+
+**Physics (GEFUNCS.C)**
 - **Universe boundary wrap** — ships crossing `MAXX=30` / `MAXY=15` should wrap;
-  currently no enforcement.
-- **Overspeed engine damage** — ships exceeding 150% of rated warp take damage
-  per `GEFUNCS.C`; currently warn-and-apply only.
-- **Wormhole gravity** — `GEFUNCS.C:moveship` gravity pull toward wormhole entry;
-  currently wormholes are instant-teleport only.
-- **AI kill scoring** — Cybertron/Droid kills don't affect player `klscore`/rank;
-  deferred from feature 007/008; midnight job (009) exists but the hook wasn't wired.
-- **`set auto-repair` integration** — flag persists (013) but the repair tick doesn't
-  consume it yet; needs wiring into the SHIP_UPDATE tick.
+  `moveship()` does this in C but `PhysicsTickService` has no boundary enforcement.
+- **Overspeed engine damage** — ships exceeding 150% rated warp take hull damage
+  (`GEFUNCS.C:736`); `warncntr` field exists but damage logic is warn-only.
+- **Wormhole gravity** — `gravity()` (`GEFUNCS.C:836`) pulls ships within 250 parsecs
+  of a wormhole toward its mouth; currently wormholes are instant-teleport via `zip` only.
+
+**Tick wiring**
+- **`set auto-repair` tick consumer** — `ship.autoRepair` persists (013) but the
+  SHIP_UPDATE tick doesn't act on it; needs wiring in the repair sub-tick.
+- **`set auto-shield` tick consumer** — same: `autoShield` persists but shields aren't
+  auto-raised on warp exit or after torpedo fire per `GEFUNCS.C:shieldstat`.
+- **AI kill scoring hookup** — Cybertron/Droid kills don't affect player `klscore`/rank;
+  `PlayerScoreService` (009) exists but the event path from AI kills was never wired.
+
+**Frontend events**
+- **`droid.spawned` / `droid.killed`** — emitted by `DroidTickService` (008) but never
+  bridged to the client player list (deferred from 008/010).
+
+No test coverage yet. No spec exists.
+
+### 020 — Source fidelity audit (planned)
+
+A systematic pass through every C source file comparing each function against the
+TypeScript implementation. Goal: close any remaining behavioral differences a player
+would notice. Reference: `GECMDS.C` (all cmd_* bodies), `GEFUNCS.C` (helpers),
+`GEPLANET.C` (planet combat/economy), `GEMAIN.C` (tick loop), `GEMAIN.H` (constants
+and struct fields).
+
+Known specific items to verify and close:
+- `randamage()` logic differences (`GEFUNCS.C` vs `combat-math.ts`)
+- Phaser reload preload bonus for Interceptor class (`GEFUNCS.C:checkdam`)
+- `GALWORM.visible` flag — wormhole visibility per-sector (not yet mapped in ShipState)
+- `scan lo full` side-panel ordering matches original C terminal output
+- Beacon display on movement (`GEFUNCS.C:808`) — not yet emitted as an event
+- `User.options[]` 30-byte array full mapping vs TS `set` command coverage
+- All `GEMAIN.H` balance constants have a pinning balance regression test
+- Live end-to-end validation on real DB: manual quickstart recipes T053, T043, T077
 
 No test coverage yet. No spec exists.
 
 ---
 
-### ★ PLAYTEST MILESTONE — after 014
+### PLAYTEST MILESTONE — after 015
 
-The core gameplay loop is complete when feature 014 ships:
-- Create ship → fight ships → colonize planet → attack enemy planets → midnight scoring
-- All 44 original commands from `gecmds[]` will be implemented
+The game is ready for playtesting when feature 015 ships:
+- Create ship → navigate → fight ships → colonize planet → attack planets → midnight scoring
+- All 44 `gecmds[]` commands implemented; all scan modes working
 - Cybertrons and Murdonian Transport provide PvE targets
-- Real-time multiplayer via Socket.io with sector event log
-- ASCII scan map, ship roster, frequency-based comms
+- Real-time multiplayer via Socket.io with sector event log and tactical radar
+- ASCII scan map, range/sector radar, ship roster, frequency-based comms
 
-Features 015–018 are quality-of-life and depth additions; they can follow in post-playtest
-iterations based on feedback.
+Features 016-020 add depth (mail, teams, autopilot, fidelity polish); they follow based
+on playtest feedback.
 
 ---
 
-### Deferred / cross-feature items
+### Open deferred items — accounted for above
 
-- **Universe wrap** — ships crossing galaxy boundary should wrap; currently no boundary enforcement
-- **Gravity / wormhole travel** — wormhole entry (`GEFUNCS.C:moveship` gravity pull) not implemented
-- **Overspeed engine blow** — ship exceeding max warp should take damage; currently warn-and-apply only
-- **AI kill scoring** — Cybertron/Droid kills not counted against player rank (deferred from 007/008)
+All items from feature "Known issues / deferred" sections map to a planned feature:
+
+| Deferred item | Source feature | Closes in |
+|---|---|---|
+| `scan ra` / `scan se` placeholder | 003 | 015 |
+| `scan lo full` panel | 003 | 015 |
+| `set` display options (SCANNAMES/SCANHOME) | 003/013 | 015 |
+| Maint password gate (FR-210) | 013 | 014 |
+| `set auto-repair` / `auto-shield` tick wiring | 013 | 019 |
+| AI kill scoring hookup | 007/008 | 019 |
+| Universe boundary wrap | 006a | 019 |
+| Overspeed engine damage | 006a | 019 |
+| Wormhole gravity pull | 006a | 019 |
+| `droid.spawned`/`droid.killed` on client | 008/010 | 019 |
+| Nav autopilot (`holdcourse`) | 003 | 016 |
+| Spy deployment | -- | 016 |
+| Mail inbox | 009 | 017 |
+| Team creation | 012 | 018 |
+| Source fidelity gaps (randamage, preload, etc.) | multiple | 020 |
+| Manual quickstart validations (T053/T043/T077) | 007/008/013 | 020 |
 
 ---
 
