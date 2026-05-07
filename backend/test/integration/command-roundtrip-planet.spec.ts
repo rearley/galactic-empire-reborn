@@ -83,6 +83,7 @@ function makeShipState(overrides: Partial<ShipState> = {}): ShipState {
     holdcourse: 0,
     topspeed: 5,
     warncntr: 0,
+    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false,
     dirty: false,
     ...overrides,
