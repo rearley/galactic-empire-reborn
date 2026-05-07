@@ -1208,3 +1208,39 @@ Inserted between FR-209 (NZ non-Zygor) and FR-204 (no damage) in canonical sourc
 - FR-014-061: wrong password → MAINT3 (incorrect password)
 - FR-014-062: password == "none" (case-insensitive) → gate bypassed
 - FR-014-063: correct password (case-insensitive `sameas`) → proceed to FR-204
+
+---
+
+## Autopilot (nav \<x\> \<y\>) (feature 016)
+
+**Source**: GECMDS.C:5109 `cmd_navigate` (deviation: original was a one-shot bearing-report command; this port uses `holdcourse` for persistent steering — see DECISIONS.md D1 2026-05-07)
+
+Player issues `nav <x> <y>` to set an autopilot destination. The command validates coordinates against `UNIVMAX=15`, sets `holdcourse=1`, `navTargetX`, `navTargetY` on the ship. On each 6-second physics tick, `PhysicsTickService` recomputes `head2b` toward the target cell center (`+0.5` offset), using the existing rotation step to steer. Arrival is detected when `Math.floor(xcoord) === navTargetX && Math.floor(ycoord) === navTargetY`; on arrival, `holdcourse`/`navTargetX`/`navTargetY` are cleared and `NAV_ARRIVED` is emitted to the player's socket room.
+
+Manual `rot`, `imp`, or `war` silently disengages autopilot (`holdcourse=0`, targets cleared, no event).
+
+---
+
+## Spy (spy) (feature 016)
+
+**Source**: GECMDS.C:6040 `cmd_spy`
+
+Player in orbit of an enemy planet (`where >= 10`, not self-owned, not neutral zone, not wormhole) with one `I_SPY` item (index 13) plants a spy. Sets `planet.spyowner = ship.userid`, decrements `items[I_SPY]` by 1. A subsequent `scan pl <name>` by the spy owner reveals the planet's full item inventory (spy intel block). Prior spy is silently overwritten by a new spy.
+
+**Known issue (A1)**: explicit spy removal mechanic (`FR-013`) is not implemented; `spyowner` is cleared only by overwrite or ownership change.
+
+---
+
+## Help (hel / ?) (feature 016)
+
+**Source**: GECMDS.C `cmd_help`
+
+`hel` with no args returns a topic catalog (five groups: navigation, combat, trade, planet, ship). `hel <topic>` returns the topic body. Unknown topic returns `HEL_UNKNOWN` listing valid topics. `?` is an alias bound to the same handler. Topic content is a frozen TypeScript catalog in `help-topics.ts`.
+
+---
+
+## Clear Screen (cls) (feature 016)
+
+**Source**: GECMDS.C:117 `cmd_cls`
+
+`cls` returns an empty `CommandResult` with `clearLog: true`. The frontend `command-result-handlers.ts` honours this by calling the `clearLines` callback after appending any lines (zero lines in this case), wiping the event log. No backend state is mutated. Other players' logs are unaffected (unicast via `command:result`).

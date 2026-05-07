@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 015-scan-modes.
+Current module map as of feature 016-navigation-spy.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -14,7 +14,7 @@ galactic-empire-reborn/
       seed/
         ship-classes.ts      ← 18 ShipClass seed rows (static reference data)
     src/                     ← NestJS application (see module map below)
-    test/                    ← Jest test suite (203 suites / 1836 tests as of feature 014; ~200 more tests added in 015)
+    test/                    ← Jest test suite (203 suites / 1836 tests as of feature 014; ~200 more added in 015; additional suites added in 016)
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
@@ -30,7 +30,7 @@ galactic-empire-reborn/
     ge-source/               ← Original C source (READ ONLY)
     wiki/                    ← Game wiki (READ ONLY)
   specs/
-    001-prisma-schema/ … 015-scan-modes/  ← spec-kit feature specs
+    001-prisma-schema/ … 016-navigation-spy/  ← spec-kit feature specs
   docs/                      ← Living architecture docs (this file)
 ```
 
@@ -334,9 +334,14 @@ PhysicsModule (game/physics/)
   │                            countdowns (hypha, cantexit). Per-ship try/catch logs and
   │                            increments getFaultCount() on fault; batch continues.
   │                            Iterates ships in ascending shipKey order (FR-019).
+  │                            Autopilot branch (feature 016): per ship with holdcourse>0,
+  │                            updates head2b toward navTargetX+0.5/navTargetY+0.5 each
+  │                            physics tick; clears holdcourse/navTargetX/navTargetY and
+  │                            emits physics.nav-arrived on sector arrival.
   │                            Emits typed events on EventEmitter2:
   │                              physics.sector-transition (on floor(coord) change)
   │                              physics.hyperspace        (on warp-threshold crossing)
+  │                              physics.nav-arrived       (on autopilot arrival, feature 016)
   └── physics-math.ts       — pure: rotationStep, accelerationStep, positionIntegration,
                                 tryEnergyDebit, sectorOf, normalizeHeading
 ```
