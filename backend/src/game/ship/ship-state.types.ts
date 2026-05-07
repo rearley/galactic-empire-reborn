@@ -94,6 +94,17 @@ export interface ShipState {
   /** Auto-repair flag — toggled by `set auto-repair on/off`. @see GECMDS.C:5190 cmd_set */
   autoRepair?: boolean;
 
+  /**
+   * Show ship names on scan lo overlay. Derived from User.options[0].
+   * @see GEMAIN.H:233 SCANNAMES
+   */
+  scanNames: boolean;
+  /**
+   * Overwrite (home) mode for scan lo render. Derived from User.options[1].
+   * @see GEMAIN.H:234 SCANHOME
+   */
+  scanHome: boolean;
+
   /** In-memory only — true after any mutation; cleared after successful Prisma flush. */
   dirty: boolean;
 

@@ -23,6 +23,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 0, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
     ...overrides,
   };
@@ -58,6 +59,24 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
 }
 
 describe('ScanHandlerService', () => {
+  describe('scan lo — scanHome mode', () => {
+    it('scanLo returns mode overwrite when scanHome=true', async () => {
+      const { service } = makeService([]);
+      await service.onModuleInit();
+      const ship = makeShip({ scanHome: true });
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+      expect(result.scanRender!.mode).toBe('overwrite');
+    });
+
+    it('scanLo returns mode append when scanHome=false', async () => {
+      const { service } = makeService([]);
+      await service.onModuleInit();
+      const ship = makeShip({ scanHome: false });
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+      expect(result.scanRender!.mode).toBe('append');
+    });
+  });
+
   describe('scan lo — empty range', () => {
     it('returns scanRender with only the self-cell when no ships in range', async () => {
       const { service } = makeService([]);

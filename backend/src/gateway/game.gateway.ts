@@ -144,10 +144,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
       const state = prismaShipToState(ship);
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true } });
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
+        state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
+        state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
       } catch {
-        // Non-fatal: teamcode will be undefined; re-derived on next full hydration
+        // Non-fatal: teamcode/scanNames/scanHome will be defaults; re-derived on next full hydration
       }
       this.shipStateService.loadShip(state);
     }
