@@ -6,6 +6,7 @@ import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.regist
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -37,6 +38,7 @@ describe('GameGateway combat broadcasts', () => {
     const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
     const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     gateway = new GameGateway(
       {} as ShipStateService,
       {} as CommandRouterService,
@@ -44,6 +46,7 @@ describe('GameGateway combat broadcasts', () => {
       mockWsGuard,
       mockPrisma,
       mockOnboarding,
+      mockScanHandler,
     );
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
