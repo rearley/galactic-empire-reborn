@@ -24,6 +24,7 @@ import {
   CYB_BE_NICE,
   CYB_BE_EASY,
   CYBSLO,
+  UNIVMAX,
 } from '../constants';
 import {
   CYBERTRON_EVENT,
@@ -671,9 +672,8 @@ export class CybertronTickService implements OnModuleInit {
       const loadout = randomInitLoadout(config.cyb_gold, this.random);
       const cybskill = randomCybSkill(this.random);
       const tick = 6 + Math.floor(this.random.next() * 6);
-      const univmax = 15.0;
-      const xcoord = this.random.next() * univmax * 2.0 - univmax;
-      const ycoord = this.random.next() * univmax * 2.0 - univmax;
+      const xcoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
+      const ycoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
 
       await this.repository.createSpawn({
         userid,
