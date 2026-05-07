@@ -7,7 +7,7 @@ import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } fro
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
-import { Scantab } from './helpers/scantab';
+import { buildScantab, Scantab } from './helpers/scantab';
 
 /** Environment string table indexed by `enviorn` (0..3). @see GECMDS.C:2338-2349 */
 const ENV_STRINGS = [
@@ -118,8 +118,12 @@ export class ScanHandlerService implements OnModuleInit {
       return this.scanPl(ship, args.slice(1));
     }
 
-    // scan ra, scan se — out of scope for feature 003/004
-    if (sub === 'ra' || sub === 'se') {
+    if (sub === 'ra') {
+      return this.handleRangeScan(ship, args.slice(1));
+    }
+
+    // scan se — out of scope for feature 015
+    if (sub === 'se') {
       return {
         lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
       };
@@ -193,6 +197,98 @@ export class ScanHandlerService implements OnModuleInit {
     return {
       lines: [{ text: header, category: 'info' }],
       scanRender: { kind: 'lo', mode, cells: grid, header },
+    };
+  }
+
+  /**
+   * Range-radar scan — projects all in-range ships onto a 30×15 grid at the
+   * requested zoom level. Level is coerced to 1 when out-of-range or non-numeric.
+   *
+   * Formula (GECMDS.C:2510):
+   *   effective_range = scanrange / pow(10.0 - level, 2.0)
+   *
+   * Grid projection (GECMDS.C:2515-2540):
+   *   range_doubled = 2 * effective_range
+   *   xfactor = range_doubled / (MAXX - 1)
+   *   yfactor = range_doubled / (MAXY - 1)
+   *   xf = (other.xcoord - self.xcoord) / xfactor + MAXX / 2.0
+   *   yf = (other.ycoord - self.ycoord) / yfactor + MAXY / 2.0
+   *
+   * @see GECMDS.C:2484 scan_ra
+   * @see GECMDS.C:2510 range = scanrange / pow(10.0 - scan_level, 2.0)
+   */
+  private handleRangeScan(ship: ShipState, args: string[]): CommandResult {
+    // Not-in-flight guard — orbit, docked, or dead
+    if (ship.where >= 10) {
+      return {
+        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+      };
+    }
+
+    // Parse and coerce level: 0 | >9 | non-numeric | missing → 1
+    let level = parseInt(args[0] ?? '', 10);
+    if (isNaN(level) || level < 1 || level > 9) {
+      level = 1;
+    }
+
+    const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+
+    // GECMDS.C:2510 — effective range for projection (zoom)
+    const effectiveRange = scanRange / Math.pow(10 - level, 2);
+
+    // Build/update the scantab using the full scanRange for in-range detection
+    const prevScantab = this.getScantab(ship.userid, ship.shipno);
+    const allShips = this.shipService.findAllShips();
+    const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
+    this.setScantab(ship.userid, ship.shipno, newScantab);
+
+    const cells: ScanCell[] = [];
+
+    // Project each scantab entry onto the grid
+    const rangeDbl = 2 * effectiveRange;
+    const xfactor = rangeDbl / (SCAN_GRID_WIDTH - 1);
+    const yfactor = rangeDbl / (SCAN_GRID_HEIGHT - 1);
+
+    for (const entry of newScantab) {
+      // Find the ship state for this scantab entry
+      const other = allShips.find(
+        s => `${s.userid}#${s.shipno}` === entry.shipKey,
+      );
+      if (!other) continue;
+
+      const xf = (other.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
+      const yf = (other.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
+
+      if (xf >= 0 && xf < SCAN_GRID_WIDTH && yf >= 0 && yf < SCAN_GRID_HEIGHT) {
+        const colour: ScanCell['colour'] = other.status === 1 ? 'ai' : 'human';
+        cells.push({
+          x: Math.floor(xf),
+          y: Math.floor(yf),
+          type: 'ship',
+          char: entry.letter,
+          colour,
+        });
+      }
+    }
+
+    // Self-cell at grid centre — GECMDS.C:2550 map[MAXY/2][MAXX/2] = '*'
+    cells.push({
+      x: Math.floor(SCAN_GRID_WIDTH / 2),
+      y: Math.floor(SCAN_GRID_HEIGHT / 2),
+      type: 'self',
+      char: '*',
+      colour: 'self',
+    });
+
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
+    const header = `Range: ${effectiveRange} — Sector ${xsect},${ysect}`;
+
+    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
+
+    return {
+      lines: [{ text: header, category: 'info' }],
+      scanRender: { kind: 'ra', mode, cells, header },
     };
   }
 
