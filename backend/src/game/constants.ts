@@ -147,6 +147,12 @@ export const ENGYMAX = 50000 as const;
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;
 
+/**
+ * Universe half-extent — coordinates valid in [-UNIVMAX, +UNIVMAX].
+ * @see GEGLOBAL.H:134 univmax
+ */
+export const UNIVMAX = 15 as const;
+
 // ── Cybertron AI constants (GEMAIN.H) ────────────────────────────────────────
 
 /** @see GEMAIN.H CYBTICKTIME=6 — physics-tick period for Cybertron AI (seconds) */
