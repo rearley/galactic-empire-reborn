@@ -218,9 +218,9 @@ describe('SpyHandlerService — success path', () => {
 // ---------------------------------------------------------------------------
 
 describe('SpyHandlerService — command metadata', () => {
-  it('keyword is "spy" with alias "sp"', () => {
+  it('keyword is "spy" with no aliases', () => {
     const { handler } = makeHandler();
     expect(handler.command.keyword).toBe('spy');
-    expect(handler.command.aliases).toContain('sp');
+    expect(handler.command.aliases).toEqual([]);
   });
 });
