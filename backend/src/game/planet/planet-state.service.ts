@@ -56,6 +56,32 @@ export class PlanetStateService implements OnModuleInit {
   }
 
   /**
+   * Public per-planet mutex for use by the attack handler.
+   * The caller acquires the lock, re-validates preconditions, mutates state,
+   * and flushes to Postgres — all inside a single serialized section.
+   * Serializes all att invocations against the same planet (research.md D1).
+   * @see GECMDS.C:3515 cmd_attack — per-planet serialization point
+   */
+  async withPlanetLock<T>(xsect: number, ysect: number, plnum: number, fn: () => Promise<T>): Promise<T> {
+    const key = planetKey(xsect, ysect, plnum);
+    return this.runSerialized(key, fn);
+  }
+
+  /**
+   * Flush a specific planet's in-memory state to Postgres.
+   * Called from within the attack lock after combat resolution.
+   * @see planet-state.service.ts runSerialized — flush is always called inside the lock
+   */
+  async flushPlanet(xsect: number, ysect: number, plnum: number): Promise<void> {
+    const state = this.map.get(planetKey(xsect, ysect, plnum));
+    if (!state) return;
+    await this.prisma.planet.update({
+      where: { xsect_ysect_plnum: { xsect, ysect, plnum } },
+      data: stateToPrismaUpdate(state),
+    });
+  }
+
+  /**
    * Per-planet promise-chain mutex. All write methods acquire this before
    * touching in-memory state or Postgres. Mutations against different planets
    * do not contend (research Decision 2).

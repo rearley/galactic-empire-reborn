@@ -45,6 +45,7 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
   cybLowestClassAttacks: 0,
   cybCanAttack: false,
   points: 50,
+  canAttackPlanet: false,
 };
 
 // Murdonian overrides
