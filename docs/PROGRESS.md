@@ -622,50 +622,27 @@ monospace font with an ANSI/ASCII aesthetic. Desktop-first; not mobile-optimized
 
 See feature log entry 2026-05-06 — 010-react-frontend above.
 
-### 011 — Player onboarding (planned)
+### 011 — Player onboarding ✓ DONE
 
-`cmd_new` — new ship creation: class selection from available `ShipClass` rows,
-initial loadout, userid registration.
-`cmd_rename` — rename ship (1–19 printable ASCII, uniqueness check).
+`cmd_new` — multi-step onboarding state machine (class selection → ship name → finalize);
+`cmd_rename` — rename ship (uniqueness check, DB + memory atomic update). JWT auth added.
 
-No test coverage yet. No spec exists.
+See feature log entry 2026-05-06 — 011-onboarding above.
 
-### 012 — Social / information commands (planned)
+### 012 — Social / information commands ✓ DONE
 
-`cmd_who` — list all active ships (name, class, sector, kills).
-`cmd_data` — full stats on a named ship.
-`cmd_geroster` — alliance / team roster display.
-`cmd_send` — compose and deliver in-game mail (`Mail` + `MailStat` rows, already
-in schema from 001).
-`cmd_team` — set/change team affiliation.
-`cmd_freq` — tune ship communication frequency (used by `freq[]` field on `WARSHP`).
+`who`, `dat`, `ros`, `sen`, `fre`, `tea` — ship listing, full stats, roster, send on
+frequency, set frequency, team join/leave. Per-captain `user:${userid}` socket room added.
 
-No test coverage yet. No spec exists.
+See feature log entry 2026-05-06 — 012-social-commands above.
 
-### 013 — Ship management commands (planned)
+### 013 — Ship management commands ✓ DONE
 
-`cmd_maint` — pay maintenance to repair damage (drains `User.cash`).
-`cmd_transfer` — transfer items/gold between ships in the same sector.
-`cmd_jettison` — drop cargo into space (decrements items, no planet required).
-`cmd_set` — configure ship options (e.g., auto-shield, auto-repair flags).
-`cmd_destruct` — self-destruct the ship (removes ship, penalizes score).
-`cmd_abort` — abort a self-destruct countdown.
-`cmd_abandon` — leave the ship (sets status to abandoned).
+`cloak`, `maint`, `transfer`, `jettison`, `set`, `destruct`, `abort`, `abandon` — full
+implementations with tick integration (cloak ramp, self-destruct countdown), energy drain,
+sysop-configurable `CLOAK_ENERGY_USE` DI token, `autoShield`/`autoRepair` DB columns.
 
-**Cross-cutting gap — `cmd_cloak`**: The `cloak` field on `ShipState` is already
-referenced in four places without a command handler to set it:
-- `torpedo.handler.ts:82` — blocks firing while `ship.cloak > 0` (emits `TOR_CLOAK`)
-- `report.handler.ts:189` — hides cloaked ships from the `report` display
-- `CybertronTickService:268,494,513` — `runEngagementScan` and `cybCheckLockon` skip
-  players with `cloak === 10`
-- `messages.ts` — `TOR_CLOAK` message string already exists
-
-The command handler that sets `cloak = 10` (and debits the energy cost) has never
-been implemented. Any ship can be made cloaked by directly setting `ship.cloak = 10`
-in state, but no player command triggers it. This should be the first handler in
-feature 013.
-
-No test coverage yet. No spec exists.
+See feature log entry 2026-05-07 — 013-ship-management above.
 
 ### 014 — Planet attack (planned)
 
