@@ -133,14 +133,17 @@ Error messages: `WARP01`–`WARP04`, `ENGFIRE` (success)
 
 ---
 
-## cmd_scan (feature 003)
+## cmd_scan (features 003 + 004 + 015)
 
-**Source**: GECMDS.C:2138 (`cmd_scan`), GECMDS.C:2640 (`scan_lo`), GECMDS.C:2190 (`scan_sh`), GECMDS.C:2295 (`scan_pl`)
+**Source**: GECMDS.C:2138 (`cmd_scan`), GECMDS.C:2640 (`scan_lo`), GECMDS.C:2190 (`scan_sh`),
+GECMDS.C:2295 (`scan_pl`), GECMDS.C (`scan_ra`), GECMDS.C (`scan_se`)
 
 Keywords: `scan`, `sc`  
-Subcommands: `lo` (default), `sh <name>`, `pl <name>`
+Subcommands: `lo` (default), `lo full`, `ra <1-9>`, `se`, `sh <name>`, `pl <name>`
 
-`scan lo` — range-centred tactical projection onto a 30×15 grid.
+### scan lo (updated feature 015 — D1 deviation)
+
+Range-centred tactical projection onto a 30×15 grid.
 
 Grid formula (GECMDS.C:2675-2718):
 ```
@@ -151,16 +154,70 @@ cell.x       = floor((target.x - ship.x) / xfactor + MAXX / 2)
 cell.y       = floor((target.y - ship.y) / yfactor + MAXY / 2)
 ```
 
-Returns `{ lines, scanGrid: ScanCell[] }`. Self-cell always at (15, 7) = `*`.
-Other ships: `=` (normal) or `+` (auto-pilot, status==1).
+Self-cell always at (15, 7) = `*`. Other ships assigned scantab letters A-Z (nearest-first
+ordering). Planet cells: `O`. Wormhole cells: `W`. Mine cells: `*` (when no ship overlaps).
+**D1 deviation**: original C used `+` (auto-pilot) / `=` (normal) glyphs; this port uses A-Z
+scantab letters to enable consistent cross-scan targeting.
+
+### scan ra (feature 015)
+
+**Source**: GECMDS.C (`scan_ra`)
+
+Range radar with zoom levels 1–9.
+
+Zoom formula: `effectiveRange = scanRange / (10 - level)^2`
+
+- Level 1: effective range = `scanRange / 81` (very narrow — near vicinity only)
+- Level 5: effective range = `scanRange / 25`
+- Level 9: effective range = `scanRange / 1` (full scan range)
+
+Grid: same 30×15 projection as `scan lo`, but using `effectiveRange` instead of the default
+`scanRange / 500 × 2`. Colour channel: self (`*`), human (A-Z), ai (A-Z). Shares scantab with
+`scan lo` — letter assignments are stable across both subcommands within the same session.
+
+### scan se (feature 015)
+
+**Source**: GECMDS.C (`scan_se`)
+
+Sector close-up scan bounded to the player's current 1×1 sector (no projection outside
+`floor(xcoord)..floor(xcoord)+1`, `floor(ycoord)..floor(ycoord)+1`). Fills the full 30×15
+display grid with the sector contents. 4-colour channel: self (`*`), human (A-Z), ai (A-Z),
+planet (digit 1-9 from plnum). Shares scantab with `scan lo` / `scan ra`.
+
+### scan lo full (feature 015)
+
+**Source**: GECMDS.C (`scan_lo` side-panel path); column layout matches `scan_sh` style
+
+`scan lo full` produces the standard `scan lo` grid plus a right-side panel. Each row in
+the panel corresponds to one scantab entry (A-Z) and contains:
+
+| Col | Field |
+|-----|-------|
+| Letter | scantab letter |
+| Distance | `cdistance × 10000` parsecs |
+| Bearing | degrees to target |
+| Heading | target ship's current heading |
+| Speed | target ship's current speed |
+| Name | target ship name (only if `User.options[0]` SCANNAMES = on) |
+
+Result is emitted as `scan:render` with `mode: 'lo-full'` and a `sidePanel: SidePanelRow[]`
+field alongside the grid.
+
+### Scantab lifecycle (feature 015)
+
+`ScanHandlerService` maintains a per-socket `Map<letter, shipKey>` scantab (letters A-Z,
+up to 26 entries). Assignment is nearest-first by `cdistance`.
+
+- **Lazy init**: populated on first `scan lo` / `scan ra` / `scan se` / `scan lo full` call.
+- **Cleared** on: socket disconnect, ship death (`COMBAT_SHIP_DESTROYED` for that ship's owner),
+  ship dock (where >= 10).
+- **D2 deviation**: NOSCANTAB constant widened from 15 to 26 (full alphabet). The original C
+  capped letter assignment at 15 ships; this port uses the full A-Z set.
+
+### scan sh / scan pl
 
 `scan sh <name>` — text-only bearing/range to a named ship. No scanGrid.
-`scan pl <name>` — text-only planet scan. No scanGrid. Deferred to feature 004.
-
-Deferred gates (TODO markers):
-- Tactical computer check (GECMDS.C:2143) — feature 006
-- Jammer check (GECMDS.C:2150) — feature 006
-- Planet/wormhole projection — feature 004
+`scan pl <name>` — text-only planet scan. Resolves by galaxy-wide name (feature 004 D2).
 
 ---
 
@@ -1004,25 +1061,33 @@ resolves to 0, which fails the guard); ship must actually hold the requested amo
 
 ---
 
-## cmd_set — ship option flags (feature 013)
+## cmd_set — ship option flags (features 013 + 015)
 
 **Source**: GECMDS.C:5190 `cmd_set`; GEMAIN.H `options[]`
 
-**Syntax**: `set auto-shield on|off` / `set auto-repair on|off` / `set ?` (alias: `set`)
+**Syntax**: `set auto-shield on|off` / `set auto-repair on|off` / `set scannames on|off` /
+`set scanhome on|off` / `set ?` (alias: `set`)
 
-`SetHandlerService` manages two boolean flags persisted on the `Ship` DB row:
+`SetHandlerService` manages four flags across two storage locations:
+
+**Ship-level flags** (persisted on the `Ship` DB row via `autoShield`/`autoRepair` columns):
 - `auto-shield` → `Ship.autoShield` — when on, the ship management tick should auto-raise
   shields (tick consumer wiring deferred to feature 019).
 - `auto-repair` → `Ship.autoRepair` — when on, the ship management tick should queue repair
   automatically (tick consumer wiring deferred to feature 019).
 
-`set ?` returns the current state of both flags.
+**User-level display options** (persisted in `User.options Int[]` at fixed indices, feature 015):
+- `scannames` → `User.options[0]` — when on, ship names appear in the `sca lo full` side panel.
+  Source: GEMAIN.H `options[]` SCANNAMES flag.
+- `scanhome` → `User.options[1]` — when on, `scan:render` is delivered with `overwrite: true`
+  (the frontend ScanPanel replaces the previous card rather than appending). When off, scans
+  append. Source: GEMAIN.H `options[]` SCANHOME flag. **D3 deviation**: the original used ANSI
+  cursor-home escape codes; this port uses a typed boolean field on the wire event.
 
-**Deviation from original** (Decision D4): the original `cmd_set` manages `User.options[]`
-display preferences (SCANNAMES, SCANHOME). This port implements only the auto-shield/auto-repair
-flags; the display options are deferred to feature 015 (scan modes).
+`set ?` returns the current state of all four flags.
 
-Flags are persisted immediately via `ShipStateService.mutate` + the 1s dirty flush.
+Flags are persisted immediately via `ShipStateService.mutate` (ship flags) or a direct Prisma
+`User.update` (display options) + the 1s dirty flush (ship flags only).
 
 ---
 

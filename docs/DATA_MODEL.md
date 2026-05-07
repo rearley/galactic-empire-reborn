@@ -53,6 +53,79 @@ control fields. Source: `WARSHP` in `GEMAIN.H`.
 
 **Relations**: belongs to one User (FK enforced).
 
+---
+
+## User.options index map (feature 015)
+
+`User.options Int[]` is a 30-element array mapping directly to `GEMAIN.H WARUSR.options[30]`.
+The first two indices are assigned display-option flags by feature 015:
+
+| Index | Flag | Values | Source |
+|-------|------|--------|--------|
+| 0 | SCANNAMES | 0 = off (default), 1 = on | GEMAIN.H options[] SCANNAMES |
+| 1 | SCANHOME | 0 = off (default), 1 = on | GEMAIN.H options[] SCANHOME |
+
+Indices 2–29 are unassigned and default to 0. The array is initialized to all-zeros for new
+users (no migration required — the existing column already has a default in the Prisma schema).
+
+`SetHandlerService` updates these values via `prisma.user.update({ where: { userid }, data: { options: updatedArray } })` and also updates the in-memory `ShipState` so subsequent scan commands read the correct setting without a DB round-trip.
+
+---
+
+## Scantab (in-memory, feature 015)
+
+`ScanHandlerService` owns a per-socket `Map<letter: string, shipKey: string>` called the scantab.
+It is not persisted to the database — it exists only for the lifetime of a socket connection.
+
+```
+scantab key:   one of 'A'..'Z' (up to 26 entries)
+scantab value: shipKey string — "userid:shipno" format, matching ShipStateService Map keys
+```
+
+The scantab is rebuilt on every `scan lo`, `scan ra`, `scan se`, or `scan lo full` invocation:
+1. Collect all in-range ships except self.
+2. Sort by `cdistance` ascending (nearest first).
+3. Assign letters A, B, C, … in order (up to Z = 26th).
+
+**Cleared** on: socket disconnect, ship death (own ship destroyed), dock event (where >= 10).
+**Lazy init**: no Map entry exists until the first scan command is issued on a socket.
+
+---
+
+## ScanRenderEvent wire payload (feature 015)
+
+The `scan:render` Socket.io event carries a `ScanRenderEvent` object emitted as a unicast
+to the issuing socket only (never broadcast):
+
+```ts
+interface ScanRenderEvent {
+  mode:       'lo' | 'ra' | 'se' | 'lo-full';
+  grid:       ScanCell[];         // length = MAXX × MAXY = 30 × 15 = 450 cells
+  sidePanel?: SidePanelRow[];     // present only when mode === 'lo-full'
+  overwrite:  boolean;            // true when User.options[1] (SCANHOME) is on
+}
+
+interface ScanCell {
+  x:      number;   // 0-29
+  y:      number;   // 0-14
+  char:   string;   // display character: '*', 'A'-'Z', 'O', 'W', '1'-'9', '.'
+  colour: 'self' | 'human' | 'ai' | 'planet' | 'empty';
+}
+
+interface SidePanelRow {
+  letter:   string;   // 'A'-'Z'
+  distance: number;   // parsecs (cdistance × 10000)
+  bearing:  number;   // degrees 0-359
+  heading:  number;   // target ship heading degrees
+  speed:    number;   // target ship speed
+  name?:    string;   // only present when SCANNAMES = on (User.options[0] === 1)
+}
+```
+
+The frontend `useScanRender` hook subscribes to `scan:render` and maintains a `ScanCard[]`.
+When `overwrite === true`, the hook replaces the last card (SCANHOME mode). When `false`,
+it appends a new card (capped at a display limit). `ScanPanel` renders the most-recent card.
+
 ## Sector
 
 One cell of the 30×15 galaxy grid (`MAXX=30`, `MAXY=15`), identified by

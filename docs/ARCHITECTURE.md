@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 014-planet-attack.
+Current module map as of feature 015-scan-modes.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -14,7 +14,7 @@ galactic-empire-reborn/
       seed/
         ship-classes.ts      ← 18 ShipClass seed rows (static reference data)
     src/                     ← NestJS application (see module map below)
-    test/                    ← Jest test suite (192 suites / 1712 tests)
+    test/                    ← Jest test suite (203 suites / 1836 tests as of feature 014; ~200 more tests added in 015)
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
@@ -30,7 +30,7 @@ galactic-empire-reborn/
     ge-source/               ← Original C source (READ ONLY)
     wiki/                    ← Game wiki (READ ONLY)
   specs/
-    001-prisma-schema/ … 013-ship-management/  ← spec-kit feature specs
+    001-prisma-schema/ … 015-scan-modes/  ← spec-kit feature specs
   docs/                      ← Living architecture docs (this file)
 ```
 
@@ -68,6 +68,8 @@ AppModule (app.module.ts)
   │     └── GameGateway — @WebSocketGateway; handshake resolves active ship (lowest shipno);
   │                        emits welcome command:result; handles sector:join/leave;
   │                        dispatches `command` events → CommandRouterService → command:result;
+  │                        emitCommandResult() splits scan results: header-only → command:result (unicast),
+  │                        full grid payload → scan:render (unicast, feature 015);
   │                        emits player.snapshot (joining socket), player.joined / player.left (all),
   │                        physics.sector-transition (all); enforces single-socket-per-ship via registry
   │     └── ConnectedShipsRegistry — @Injectable singleton; byShipId + bySocketId maps;
@@ -93,8 +95,11 @@ AppModule (app.module.ts)
   │     └── OnboardingState type — { step, classNumber?, shipId? }
   ├── CommandsModule (game/commands/) — exports CommandRouterService
   │     ├── CommandRouterService — alias-keyed registry; keyword lowercased, args preserve casing; minArgs guard
-  │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange; projects
-  │     │                         all ships onto 30×15 grid; returns scanGrid payload
+  │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange;
+  │     │                         subcommand dispatch: lo / ra <1-9> / se / sh / pl / lo full;
+  │     │                         owns per-socket scantab Map<letter, shipKey> (lazy init, cleared on
+  │     │                         disconnect/death/dock); builds scantab from nearest-first ship ordering;
+  │     │                         emits scan:render (unicast) for grid payload; command:result for headers
   │     ├── ReportHandlerService — @Injectable report/rep handler; reads ShipClass.typeName/hasCloak;
   │     │                           builds multi-line nav/sys/cargo/wpns read-out
   │     └── plain Command objects: rotateCommand, impulseCommand, warpCommand
@@ -207,7 +212,7 @@ galactic-empire-reborn/
             maint.handler.ts  ← orbit+pop+cash gates; 200 cr or 2500 cr Zygor; repair queue (013)
             transfer.handler.ts ← ship-to-ship atomic cargo/gold; user:${uid} broadcast (013)
             jettison.handler.ts ← numeric|ALL amount; items permanently lost (013)
-            set.handler.ts    ← auto-shield/auto-repair flags; set ? listing (013)
+            set.handler.ts    ← auto-shield/auto-repair/scannames/scanhome flags; set ? listing (013/015)
             destruct.handler.ts ← sets ship.destruct=20; NZ+already-active gates (013)
             abort.handler.ts  ← clears destruct; sector broadcast if destruct<10 (013)
             abandon.handler.ts ← status=3; clears destruct; detaches activeShipNo (013)
@@ -239,18 +244,20 @@ galactic-empire-reborn/
         boot.e2e.spec.ts
   frontend/
     src/
-      types/contracts.ts     ← EventLogLine, ScanCell, CommandRequest/ResultPayload, grid constants
+      types/contracts.ts     ← EventLogLine, ScanCell, ScanRenderEvent, CommandRequest/ResultPayload, grid constants
       socket/
         socketClient.ts      ← singleton io() + sendCommand/onCommandResult/onError
         useSocket.ts         ← useSocket() React hook, ConnectionStatus
+        useScanRender.ts     ← subscribes to scan:render; maintains scan cards with overwrite/append mode
       components/
         ConnectionIndicator.tsx
         EventLog.tsx
         CommandInput.tsx
         ScanMap.tsx
-      App.tsx                ← 3-region terminal UI
+        ScanPanel.tsx        ← renders 30×15 monospace grid with colour; optional side panel (sca lo full)
+      App.tsx                ← 3-region terminal UI; ScanPanel mounted adjacent to ScanMap
       main.tsx
-    test/                    ← 33 Vitest tests
+    test/                    ← Vitest tests (feature 015 added ~10 new frontend suites)
 ```
 
   └── GalaxyModule (game/galaxy/) — exports GalaxyService
@@ -410,6 +417,14 @@ Player-presence wire events (feature 010):
   physics.sector-transition → all clients (server.emit); batched SectorTransition[] per tick
     Source: SectorTransitionSubscriber subscribes physics tick via EventEmitter2;
             GameGateway @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT) forwards to all clients
+
+Scan wire events (feature 015):
+  command:result           → issuing socket only; header lines for scan subcommands
+  scan:render              → issuing socket only; ScanRenderEvent: { mode, grid, sidePanel?, overwrite }
+    mode: 'lo' | 'ra' | 'se' | 'lo-full'
+    grid: ScanCell[] (30×15); colour field: 'self' | 'human' | 'ai' | 'planet'
+    sidePanel: SidePanelRow[] (letter, distance, bearing, heading, speed, name) — only for 'lo-full'
+    overwrite: boolean — driven by SCANHOME User.options[1]; true = home cursor, false = append
 ```
 
 ### Frontend state (feature 010)
@@ -668,4 +683,34 @@ Planet attack handlers (game/commands/handlers/)
 
 GameGateway additions (feature 014):
   └── @OnEvent(ATTACK_OWNER_ALERT_EVENT) → emits to user:${ownerUserid} Socket.io room
+```
+
+## ScanModes additions (feature 015)
+
+```
+ScanHandlerService (game/commands/handlers/scan.handler.ts) — extended
+  ├── scanLo()       — range-centred tactical grid; ship symbols now scantab letters (A-Z)
+  ├── scanRa(level)  — range radar; effectiveRange = scanRange / (10-level)^2; zoom 1-9;
+  │                     3-colour channel: self (*), human (A-Z), ai (A-Z); shared scantab
+  ├── scanSe()       — sector close-up; bounded to current 1×1 sector; 4-colour channel adds planet (1-9 digits)
+  ├── scanLoFull()   — scanLo grid + side panel (letter/distance/bearing/heading/speed/name);
+  │                     name visibility gated by User.options[0] (SCANNAMES flag)
+  └── scantab        — lazy-initialized per-socket Map<letter, shipKey> (A-Z, up to 26 entries);
+                        cleared on: disconnect, ship death (COMBAT_SHIP_DESTROYED), dock/undock
+
+SetHandlerService (game/commands/handlers/set.handler.ts) — extended (feature 015)
+  ├── set scannames on|off  → persists to User.options[0] via Prisma + in-memory ShipState
+  ├── set scanhome on|off   → persists to User.options[1] via Prisma + in-memory ShipState
+  └── set ?                 → now lists all 4 options: auto-shield, auto-repair, scannames, scanhome
+
+useScanRender (frontend/src/socket/useScanRender.ts)
+  └── subscribes to scan:render Socket.io event
+  └── maintains array of ScanCard objects; overwrite mode (SCANHOME=on) replaces last card,
+      append mode (SCANHOME=off) pushes new card (capped)
+  └── exposes cards[] to ScanPanel
+
+ScanPanel (frontend/src/components/ScanPanel.tsx)
+  └── renders 30×15 monospace grid from ScanCell[]; colour-coded by channel field
+  └── optional side panel (sidePanel rows) rendered right of grid for 'lo-full' mode
+  └── mounted adjacent to ScanMap in App.tsx
 ```
