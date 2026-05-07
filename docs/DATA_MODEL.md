@@ -39,6 +39,18 @@ a 14-element cargo inventory (`BigInt[]`), three locked-torpedo slots
 (channel, distance, energy), ten active-decoy slots, and all AI/Cybertron
 control fields. Source: `WARSHP` in `GEMAIN.H`.
 
+**Feature 008 addition**:
+- `isEphemeral?: boolean` — in-memory only flag set to `true` on Droid ships (`@Droid-*` userid).
+  `ShipStateService.flush()` skips entries where `isEphemeral === true` — zero Prisma calls for
+  Droids. `removeFromGame` also skips the Prisma delete. Not persisted to the DB schema.
+
+**Feature 013 additions**:
+- `autoShield Boolean @default(false)` — player-toggled flag; when true the ship management tick
+  should auto-raise shields (wiring to repair tick deferred to feature 019).
+- `autoRepair Boolean @default(false)` — player-toggled flag; when true the ship management tick
+  should queue repair automatically (wiring deferred to feature 019).
+  Both columns added via migration `20260506235607_ship_auto_flags`.
+
 **Relations**: belongs to one User (FK enforced).
 
 ## Sector
