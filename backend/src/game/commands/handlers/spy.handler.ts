@@ -13,7 +13,7 @@ export class SpyHandlerService {
 
   readonly command: Command = {
     keyword: 'spy',
-    aliases: ['sp'],
+    aliases: [],
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, _args: string[], _ctx: CommandContext): CommandResult => {
