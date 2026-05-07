@@ -165,9 +165,10 @@ export class ScanHandlerService implements OnModuleInit {
     const mode: ScanRenderEvent['mode'] =
       (ship as ShipState & { scanHome?: boolean }).scanHome ? 'overwrite' : 'append';
 
+    const header = `Range: ${scanRange * 10} — Sector ${xsect},${ysect}`;
     return {
-      lines: [{ text: `Scanning sector...`, category: 'info' }],
-      scanRender: { kind: 'lo', mode, cells: grid, header: 'Scanning sector...' },
+      lines: [{ text: header, category: 'info' }],
+      scanRender: { kind: 'lo', mode, cells: grid, header },
     };
   }
 
