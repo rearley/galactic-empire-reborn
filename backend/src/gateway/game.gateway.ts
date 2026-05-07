@@ -242,7 +242,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (resultOrPromise instanceof Promise) {
         resultOrPromise
           .then((result) => {
-            client.emit('command:result', result);
+            this.emitCommandResult(client, result);
             this.processBroadcasts(result);
           })
           .catch((err: unknown) => {
@@ -252,7 +252,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
           });
       } else {
-        client.emit('command:result', resultOrPromise);
+        this.emitCommandResult(client, resultOrPromise);
         this.processBroadcasts(resultOrPromise);
       }
     } catch (err: unknown) {
@@ -547,6 +547,31 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
     const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
+  }
+
+  /**
+   * Emits command result events to the issuing socket.
+   *
+   * When `result.scanRender` is present, emits two disjoint events:
+   *   - `command:result` — a single `info`-category line with the header text only (for the EventLog).
+   *   - `scan:render` — the full `ScanRenderEvent` payload (for the ScanPanel).
+   *
+   * When `result.scanRender` is absent, emits only `command:result` with whatever
+   * lines the handler returned.
+   *
+   * Neither event is broadcast to a room — both are unicast to the issuing socket.
+   *
+   * @see specs/015-scan-modes/contracts/scan-render.md §1 ("Event routing canonical")
+   */
+  emitCommandResult(client: Socket, result: import('../game/commands/command.types').CommandResult): void {
+    if (result.scanRender) {
+      client.emit('command:result', {
+        lines: [{ text: result.scanRender.header, category: 'info' }],
+      });
+      client.emit('scan:render', result.scanRender);
+    } else {
+      client.emit('command:result', result);
+    }
   }
 
   /**
