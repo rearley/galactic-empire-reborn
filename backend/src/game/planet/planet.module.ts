@@ -7,6 +7,11 @@ import { MathRandomAdapter, RANDOM } from '../combat/random.port';
 import { PlanetStateService } from './planet-state.service';
 import { PlanetTickService } from './planet-tick.service';
 import { PlanetEconomyService } from './planet-economy.service';
+import { PlanetAttackService } from './planet-attack.service';
+import {
+  PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS,
+  loadPlattrt1, loadPlattrt2, loadPlattrf1, loadPlattrf2, loadPlattrf3, loadFireticks,
+} from '../commands/attack.config';
 
 /**
  * PlanetModule provides its OWN binding for the RANDOM port (rather than
@@ -21,8 +26,15 @@ import { PlanetEconomyService } from './planet-economy.service';
     PlanetStateService,
     PlanetTickService,
     PlanetEconomyService,
+    PlanetAttackService,
     { provide: RANDOM, useClass: MathRandomAdapter },
+    { provide: PLATTRT1, useFactory: () => loadPlattrt1() },
+    { provide: PLATTRT2, useFactory: () => loadPlattrt2() },
+    { provide: PLATTRF1, useFactory: () => loadPlattrf1() },
+    { provide: PLATTRF2, useFactory: () => loadPlattrf2() },
+    { provide: PLATTRF3, useFactory: () => loadPlattrf3() },
+    { provide: FIRETICKS, useFactory: () => loadFireticks() },
   ],
-  exports: [PlanetStateService, PlanetEconomyService],
+  exports: [PlanetStateService, PlanetEconomyService, PlanetAttackService],
 })
 export class PlanetModule {}

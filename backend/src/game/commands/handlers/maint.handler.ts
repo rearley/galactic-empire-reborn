@@ -7,6 +7,11 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MAINT_COST_NORMAL, MAINT_COST_NEUTRAL } from '../_ship-management-constants';
 
+/** Case-insensitive string equality (sameas from feature 003 parsing layer). @see GECMDS.C */
+function sameas(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 /** Planet index of the Zygor galactic market in the neutral zone (sector 0,0). */
 const ZYGOR_PLNUM_1 = 0 as const;
 const ZYGOR_PLNUM_2 = 1 as const;
@@ -45,11 +50,11 @@ export class MaintHandlerService {
     aliases: ['mai'],
     minArgs: 0,
     argMissingMessage: '',
-    handler: (ship: ShipState, _args: string[], _ctx: CommandContext): Promise<CommandResult> =>
-      this.handle(ship),
+    handler: (ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> =>
+      this.handle(ship, args),
   };
 
-  private async handle(ship: ShipState): Promise<CommandResult> {
+  private async handle(ship: ShipState, args: string[] = []): Promise<CommandResult> {
     // FR-206: must be in orbit.
     if (ship.where < 10) {
       return { lines: [{ text: formatMessage(MessageId.MAINT_NOT_ORBIT), category: 'system' }] };
@@ -77,6 +82,19 @@ export class MaintHandlerService {
     // FR-209: neutral zone but not Zygor.
     if (inNeutralZone && !isZygor) {
       return { lines: [{ text: formatMessage(MessageId.MAINT_NZ), category: 'system' }] };
+    }
+
+    // FR-014-060/061/062: planet password gate — inserted between FR-209 and FR-204.
+    // @see GECMDS.C:4471 MAINT2, :4479 MAINT3, research.md D10
+    const pwd = planet.password;
+    if (pwd && !sameas(pwd, 'none')) {
+      const providedArg = args[0] ?? '';
+      if (!providedArg) {
+        return { lines: [{ text: formatMessage(MessageId.MAINT2), category: 'system' }] };
+      }
+      if (!sameas(pwd, providedArg)) {
+        return { lines: [{ text: formatMessage(MessageId.MAINT3), category: 'system' }] };
+      }
     }
 
     // FR-204: no damage.

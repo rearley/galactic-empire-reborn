@@ -908,3 +908,45 @@ Original `cmd_set` (GECMDS.C:5190) manages `User.options[]` flags for scan displ
 `CLOAK_ENERGY_USE` is injected via DI token and loaded from `process.env.CLOAK_ENERGY_USE` at startup (default 50, min 1, max 32000). Pattern follows `midnight.config.ts`.
 
 **Reason**: Energy drain rate is an operational balance knob, not a protocol constant. Sysop should be able to tune it without recompiling.
+
+---
+
+## 2026-05-07 — 014-planet-attack: four key decisions
+
+**Context**: Feature 014 adds `att` (troop/fighter attack), `pln` (list owned planets), `pri` (price quote), and the deferred `mai` password gate from feature 013.
+
+**D1 — Per-planet mutex re-validation**
+
+`AttackHandlerService` runs a pre-lock cargo check (static gate) then acquires `PlanetStateService.withPlanetLock`. Inside the lock, it re-validates self-attack (planet may have been captured) and cargo (concurrent transfer may have depleted it) before deducting.
+
+**Reason**: Prevents both TOCTOU data races and over-deduction when two attackers race on the same planet. The pre-lock check is a fast-fail for the common case; the re-check inside the lock is the authoritative check.
+
+**Alternatives rejected**: Single lock at handler entry (holds lock too long); optimistic check only (TOCTOU vulnerability).
+
+---
+
+**D2 — PLATTR* as DI tokens with env-var overrides**
+
+All six combat coefficients (PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS) are injected as DI tokens with defaults from GEMAIN.C/GEMAIN.H and env-var overrides.
+
+**Reason**: Follows the CLOAK_ENERGY_USE pattern established in feature 013. Sysop can tune balance without recompiling; balance-regression tests can inject known values without env mutation.
+
+**Alternatives rejected**: Hard-coded constants (no sysop override); ConfigModule (unnecessary complexity for simple numeric values).
+
+---
+
+**D3 — attack_fig() ratio bug preserved (FR-014-019, SC-008)**
+
+`attackFighter` computes `ratio = left2 > 0 ? (left1/left2)*100 : 0`. When `left2 == 0` initially, `ratio = 0` — skipping ground-fire, return-fire, counter-kill, and item destruction. This matches the C source exactly.
+
+**Reason**: Fidelity to the original game. The original C code contains this bug; preserving it means players who learned the original behavior will find consistent mechanics. A dedicated bug-preservation test (T024) documents and enforces this.
+
+**Alternatives rejected**: Zero-guard fix — would change game balance and break fidelity.
+
+---
+
+**D4 (013 carried-forward) — maint password gate ordering (D10 in research.md)**
+
+The `mai` password gate (FR-014-060/061/062) is inserted between FR-209 (neutral zone) and FR-204 (no damage), matching the original GECMDS.C:4471 source order.
+
+**Reason**: Canonical source order is the spec. Changing the order would mean a NZ-non-Zygor player sees a password prompt instead of the NZ error — incorrect behavior.

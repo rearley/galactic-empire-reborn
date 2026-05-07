@@ -830,3 +830,45 @@ jammed invariants, and Cybertron spawn-visibility regression (T038 backfill).
 - Droid kill-score impact (whether kills count toward player score/rank) deferred to 009
 - T043 manual quickstart validation not run (requires live `ge_test` DB)
 - `droid.spawned` and `droid.killed` events not yet bridged to Socket.io client
+
+---
+
+## 2026-05-07 — feature 014-planet-attack
+
+**Completed**:
+- `attack.config.ts` — six DI tokens (PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS) with env-var overrides, following CLOAK_ENERGY_USE pattern
+- `_attack-constants.ts` — ITEM_DESTRUCTION_RANGE=15, AttackKind enum
+- `planet-attack.types.ts` — AttackOutcome interface
+- `planet-attack.service.ts` — attackTroop (10 steps) + attackFighter (11 steps, ratio bug preserved), callForHelp (owner alert + spy-mail roll), insertDistressMail
+- `attack.handler.ts` — `att` command with per-planet mutex, pre-lock + in-lock validation, FIRETICKS injection
+- `pln.handler.ts` — `pln` command: read-only planet list ordered by plnum
+- `price.handler.ts` — `pri` command: bare listing + quoted BUY precondition ladder
+- `maint.handler.ts` — FR-014-060/061/062 password gate inserted between FR-209 and FR-204
+- `planet.module.ts` + `commands.module.ts` — all new providers and DI tokens wired
+- `game.gateway.ts` — ATTACK_OWNER_ALERT_EVENT handler → user:${ownerUserid} Socket.io room
+- `ship-class-cache.service.ts` — canAttackPlanet added to ShipClassEntry interface
+
+**Tests**: 1836 total (up from 1712 before this feature); 10 new test files; 116 new tests:
+- attack.handler.spec.ts — all preconditions (FR-014-001..007), troop + fighter dispatch, flush count
+- attack-concurrent.spec.ts — mutex serialization, self-attack re-validation, no deduction on rejection
+- attack-troop-math.spec.ts — standoff, dominance win, retreat, full-wipe, item destruction, determinism
+- attack-fighter-math.spec.ts — AA fire, return-fire, counter-kill gate, high-ratio destruction, win condition
+- attack-fighter-math.spec.ts — ratio bug preservation (FR-014-019, SC-008)
+- call-for-help.spec.ts — owner alert emission, no alert when outnumbered/unowned, spy-mail gating
+- attack-mail.spec.ts — MESG02/03 (troop), MESG04/05 (fighter), no mail below ratio threshold
+- planet-attack-balance.spec.ts — all six DI token defaults pinned
+- pln.handler.spec.ts — listing, empty case, read-only, row format, performance < 200ms
+- maint-password.spec.ts — four password states, gate ordering (FR-209 before password before FR-204)
+- price.handler.spec.ts — six-precondition ladder, owner vs foreign pricing, bare listing, read-only
+
+**Decisions made**:
+- Per-planet mutex with in-lock re-validation (D1) — TOCTOU safety without over-locking
+- attack_fig() ratio bug preserved (D3 / FR-014-019 / SC-008) — exact C source fidelity
+- maint password gate ordering matches GECMDS.C:4471 canonical order (D4 / research.md D10)
+- PLATTR* as DI tokens (D2) — sysop-tunable, test-injectable, follows 013 CLOAK_ENERGY_USE pattern
+
+**Next**: 015-scan-modes — scan display customization (User.options[])
+
+**Known issues**:
+- T053 manual quickstart not run (requires live ge_test DB with seeded galaxy)
+- canAttackPlanet not yet populated by seed data — all ship classes default false in existing tests
