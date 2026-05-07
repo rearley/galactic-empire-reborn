@@ -28,10 +28,12 @@ export class ShipStateService implements OnModuleInit {
    * @see specs/012-social-commands/data-model.md §ShipState.teamcode
    */
   async onModuleInit(): Promise<void> {
-    const rows = await this.prisma.ship.findMany({ include: { user: { select: { teamcode: true } } } });
+    const rows = await this.prisma.ship.findMany({ include: { user: { select: { teamcode: true, options: true } } } });
     for (const row of rows) {
       const state = prismaShipToState(row);
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
+      state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
+      state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
       this.map.set(shipKey(state.userid, state.shipno), state);
     }
     this.logger.log(`Hydrated ${this.map.size} ships from Postgres`);

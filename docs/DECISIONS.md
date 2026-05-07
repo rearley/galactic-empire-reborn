@@ -950,3 +950,120 @@ All six combat coefficients (PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, F
 The `mai` password gate (FR-014-060/061/062) is inserted between FR-209 (neutral zone) and FR-204 (no damage), matching the original GECMDS.C:4471 source order.
 
 **Reason**: Canonical source order is the spec. Changing the order would mean a NZ-non-Zygor player sees a password prompt instead of the NZ error — incorrect behavior.
+
+---
+
+## 2026-05-07 — 015-scan-modes: D1-D7 deviations from C source
+
+**Context**: Feature 015 ports `scan_ra`, `scan_se`, and `scan_lo full` from GECMDS.C, and
+adds `SCANNAMES`/`SCANHOME` display options from GEMAIN.H `options[]`. Seven deliberate
+deviations from the C source were made for web-architecture or usability reasons.
+
+**D1 — `sca lo` plot chars → scantab letters (was `+`/`=`)**
+
+**Context**: `GECMDS.C:scan_lo` renders ships as `+` (auto-pilot) or `=` (normal) glyphs.
+
+**Decision**: Replace the `+`/`=` glyphs with scantab letter assignments (A-Z, nearest-first).
+
+**Reason**: Scantab letters are stable across `scan lo`, `scan ra`, and `scan se` — players
+can reference "ship B" in any mode. The original glyphs provide no targeting reference.
+
+**Alternatives rejected**: Keep `+`/`=` for `scan lo` and use letters only for `scan ra`/`scan se`
+(two different schemes would confuse players); numbered slots (A-Z is more readable).
+
+---
+
+**D2 — NOSCANTAB widened from 15 to 26 (full alphabet)**
+
+**Context**: The C source limits letter assignment to 15 ships (A-O). The full alphabet has 26.
+
+**Decision**: Use all 26 letters A-Z for scantab assignment.
+
+**Reason**: Modern servers can support more players; a 15-ship cap is an MajorBBS/8088 constraint
+with no gameplay justification. Widening to 26 is trivially safe and adds no complexity.
+
+**Alternatives rejected**: Keep 15-ship cap (artificial limit with no balance justification).
+
+---
+
+**D3 — SCANHOME uses typed socket event field (not ANSI escape codes)**
+
+**Context**: The original `SCANHOME` option emitted ANSI cursor-home sequences (`\033[H`) to
+overwrite the terminal display in place.
+
+**Decision**: `scan:render` wire payload carries `overwrite: boolean`. When `true`, the frontend
+`ScanPanel` replaces the previous card; when `false` it appends. No ANSI codes emitted.
+
+**Reason**: The web frontend is a React component, not a raw terminal emulator. ANSI escape codes
+are meaningless in the browser. The boolean field provides equivalent UX semantics cleanly.
+
+**Alternatives rejected**: Emit ANSI codes as part of line content (would appear as literal escape
+sequences in the UI); skip SCANHOME entirely (loses the overwrite-mode UX that some players prefer).
+
+---
+
+**D4 — Player options stored in `User.options Int[]` (no new DB column)**
+
+**Context**: `GEMAIN.H WARSUSR.options[30]` is a 30-byte array of player flags. The Prisma schema
+already stores this as `User.options Int[]`. SCANNAMES is at index 0; SCANHOME is at index 1.
+
+**Decision**: Persist SCANNAMES at `User.options[0]` and SCANHOME at `User.options[1]` using the
+existing `options` column. No new Prisma column or migration needed.
+
+**Reason**: The `options` array was designed for exactly this purpose in feature 001. Using it
+avoids a migration. The index assignments match the original C constants order.
+
+**Alternatives rejected**: New `scanNames`/`scanHome` Boolean columns (migration cost, redundant
+with the existing `options` column); `Ship.options` (display prefs are user-level, not ship-level).
+
+---
+
+**D5 — Scantab lifecycle: lazy init, clear on disconnect/death/dock**
+
+**Context**: The original C `NOSCANTAB` array was process-global, reset each time `scan_lo` was
+called. The NestJS port is per-socket and must handle disconnects, kills, and docking.
+
+**Decision**: Scantab is lazily initialized on first scan command per socket. It is cleared on:
+socket disconnect (`handleDisconnect`), ship death (`COMBAT_SHIP_DESTROYED` for that socket's
+ship), and when the ship docks (`ship.where >= 10`, checked at scan time).
+
+**Reason**: Lazy init avoids work for players who never scan. Death/dock clears ensure stale
+letter assignments do not persist across respawns or orbital transitions. The per-socket
+approach aligns with the web game's one-socket-per-ship constraint.
+
+**Alternatives rejected**: Scantab per-ship key (would survive disconnects, introducing
+stale entries); never-cleared scantab (stale assignments after respawn confuse players).
+
+---
+
+**D6 — Colour encoding uses semantic strings, not numeric channel codes**
+
+**Context**: The C source distinguishes ships by `GESTAT_USER` vs. CPU status flags (numeric).
+
+**Decision**: `ScanCell.colour` (and `ScanRenderEvent.grid[n].colour`) uses one of four string
+values: `'self'`, `'human'`, `'ai'`, `'planet'`. No numeric codes on the wire.
+
+**Reason**: Semantic string values are self-documenting, directly map to CSS class names in the
+frontend, and decouple the wire format from internal C status codes. The frontend needs to know
+"how to colour this cell," not the internal player-vs-AI distinction mechanism.
+
+**Alternatives rejected**: Numeric status codes (require frontend lookup table, fragile); single
+boolean `isAi` (loses the self/planet distinction needed for 4-channel `scan se`).
+
+---
+
+**D7 — `sca lo full` side-panel column layout matches `scan_sh` style**
+
+**Context**: The original `GECMDS.C:scan_lo` with SCANCOLS enabled output letter, distance,
+bearing, heading, speed in a fixed column format. Ship names were on a separate line when
+SCANNAMES was set.
+
+**Decision**: Side-panel rows are formatted as: letter (1 char), distance (right-justified 6-char),
+bearing (right-justified 4-char), heading (right-justified 4-char), speed (right-justified 5-char),
+optional name column when SCANNAMES=on. Column layout matches the `scan_sh` output style.
+
+**Reason**: Preserves the original display aesthetics for players who know the game. The `scan_sh`
+column widths are well-tested and familiar.
+
+**Alternatives rejected**: Arbitrary new column widths (non-fidelity); JSON-only side panel with
+no formatting (pushes all formatting to frontend, harder to keep in sync with original).

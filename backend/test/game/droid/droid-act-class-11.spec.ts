@@ -23,7 +23,9 @@ function makeShip(overrides: Partial<ShipState>): ShipState {
     titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
     firecntl: 0, destruct: 0, status: 2, cybmine: 255, cybskill: 0,
     cybupdate: 0, tick: 6, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0, dirty: false,
+    holdcourse: 0, topspeed: 8, warncntr: 0,
+    scanNames: false, scanHome: false,
+    dirty: false,
     ...overrides,
   };
 }

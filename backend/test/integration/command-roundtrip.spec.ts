@@ -48,6 +48,7 @@ function makeShipState(overrides: { userid: string; shipno: number; shipname: st
     minesnear: 0, lock: 0, holdcourse: 0,
     topspeed: overrides.topspeed ?? 5,
     warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
   };
 }
@@ -228,16 +229,16 @@ describe('command round-trip integration (US1)', () => {
   });
 
   // T038: US2 round-trip cases
-  it('scan → command:result carries scanGrid (US2)', async () => {
+  it('scan → scan:render event carries cells (US2)', async () => {
     const client = makeClient();
     await waitForEvent(client, 'command:result'); // welcome
     client.emit('command', { input: 'scan' });
-    const result = await waitForEvent<{ lines: unknown[]; scanGrid?: unknown[] }>(
+    const scanEvent = await waitForEvent<{ cells?: unknown[] }>(
       client,
-      'command:result',
+      'scan:render',
     );
-    expect(result.scanGrid).toBeDefined();
-    expect(Array.isArray(result.scanGrid)).toBe(true);
+    expect(scanEvent.cells).toBeDefined();
+    expect(Array.isArray(scanEvent.cells)).toBe(true);
     client.disconnect();
   });
 
@@ -393,21 +394,21 @@ describe('command round-trip integration (US1)', () => {
       await waitForEvent(client, 'command:result'); // welcome
 
       client.emit('command', { input: 'scan lo' });
-      const result = await waitForEvent<{ lines: unknown[]; scanGrid?: ScanCell[] }>(
+      const scanEvent = await waitForEvent<{ kind: string; cells: ScanCell[] }>(
         client,
-        'command:result',
+        'scan:render',
       );
 
-      expect(result.scanGrid).toBeDefined();
-      expect(Array.isArray(result.scanGrid)).toBe(true);
+      expect(scanEvent.cells).toBeDefined();
+      expect(Array.isArray(scanEvent.cells)).toBe(true);
 
       // T024: assert at least one planet cell with char 'O'
-      const planetCells = result.scanGrid!.filter((c) => c.type === 'planet');
+      const planetCells = scanEvent.cells.filter((c) => c.type === 'planet');
       expect(planetCells.length).toBeGreaterThan(0);
       expect(planetCells[0].char).toBe('O');
 
       // T024: assert at least one wormhole cell with char 'W'
-      const wormholeCells = result.scanGrid!.filter((c) => c.type === 'wormhole');
+      const wormholeCells = scanEvent.cells.filter((c) => c.type === 'wormhole');
       expect(wormholeCells.length).toBeGreaterThan(0);
       expect(wormholeCells[0].char).toBe('W');
     } finally {

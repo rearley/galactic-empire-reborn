@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
+import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -104,6 +105,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly wsAuthGuard: WsAuthGuard,
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
+    private readonly scanHandler: ScanHandlerService,
   ) {}
 
   /**
@@ -144,10 +146,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
       const state = prismaShipToState(ship);
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true } });
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
+        state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
+        state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
       } catch {
-        // Non-fatal: teamcode will be undefined; re-derived on next full hydration
+        // Non-fatal: teamcode/scanNames/scanHome will be defaults; re-derived on next full hydration
       }
       this.shipStateService.loadShip(state);
     }
@@ -192,6 +196,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`disconnect ${client.id}`);
+    // Clear scantab so stale letter assignments don't persist across sessions.
+    const userid = client.data.userid as string | undefined;
+    const activeShipNo = client.data.activeShipNo as number | undefined;
+    if (userid !== undefined && activeShipNo !== undefined) {
+      this.scanHandler.clearScantab(userid, activeShipNo);
+    }
     const removed = this.registry.remove(client.id);
     if (removed) {
       this.server.emit('player.left', { shipId: removed.shipId });
@@ -232,7 +242,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (resultOrPromise instanceof Promise) {
         resultOrPromise
           .then((result) => {
-            client.emit('command:result', result);
+            this.emitCommandResult(client, result);
             this.processBroadcasts(result);
           })
           .catch((err: unknown) => {
@@ -242,7 +252,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
           });
       } else {
-        client.emit('command:result', resultOrPromise);
+        this.emitCommandResult(client, resultOrPromise);
         this.processBroadcasts(resultOrPromise);
       }
     } catch (err: unknown) {
@@ -450,10 +460,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Ship destruction is broadcast galaxy-wide.
+   * Also clears the victim's scantab so stale assignments don't persist on respawn.
    * @see specs/006b-combat/contracts/combat-events.md
    */
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
+    // Parse shipno from victimShipKey ("userid:shipno") using the last segment.
+    const keyParts = event.victimShipKey.split(':');
+    const victimShipno = Number(keyParts[keyParts.length - 1]);
+    if (!isNaN(victimShipno)) {
+      this.scanHandler.clearScantab(event.victimUserid, victimShipno);
+    }
     this.server.emit(COMBAT_SHIP_DESTROYED, event);
   }
 
@@ -530,6 +547,31 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
     const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
+  }
+
+  /**
+   * Emits command result events to the issuing socket.
+   *
+   * When `result.scanRender` is present, emits two disjoint events:
+   *   - `command:result` — a single `info`-category line with the header text only (for the EventLog).
+   *   - `scan:render` — the full `ScanRenderEvent` payload (for the ScanPanel).
+   *
+   * When `result.scanRender` is absent, emits only `command:result` with whatever
+   * lines the handler returned.
+   *
+   * Neither event is broadcast to a room — both are unicast to the issuing socket.
+   *
+   * @see specs/015-scan-modes/contracts/scan-render.md §1 ("Event routing canonical")
+   */
+  emitCommandResult(client: Socket, result: import('../game/commands/command.types').CommandResult): void {
+    if (result.scanRender) {
+      client.emit('command:result', {
+        lines: [{ text: result.scanRender.header, category: 'info' }],
+      });
+      client.emit('scan:render', result.scanRender);
+    } else {
+      client.emit('command:result', result);
+    }
   }
 
   /**

@@ -7,6 +7,7 @@ import { CommandInput } from './components/CommandInput';
 import { ConnectionIndicator } from './components/ConnectionIndicator';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
+import { ScanPanel } from './components/ScanPanel';
 import { AuthScreen } from './auth/AuthScreen';
 import { ClassPickerPrompt } from './onboarding/ClassPickerPrompt';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
@@ -105,9 +106,12 @@ function Terminal(): React.JSX.Element {
           <EventLog lines={logLines} />
         </div>
 
-        {/* Main-right: ASCII sector-map panel */}
-        <div className="w-80 flex-shrink-0 border-r border-gray-800">
+        {/* Main-right: ASCII sector-map panel (legacy ScanMap) + new ScanPanel (015) */}
+        <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
           <ScanMap cells={scanCells} shipId={localShipId} />
+          <div className="flex-1 overflow-auto border-t border-gray-800">
+            <ScanPanel />
+          </div>
         </div>
 
         {/* Side: player-list panel (FR-002, FR-016..FR-018) */}

@@ -7,6 +7,7 @@ import type { ConnectedPlayer } from '../../src/gateway/connected-ships.registry
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 
 /**
  * Verifies player.snapshot is emitted to the joining socket only (not broadcast),
@@ -78,6 +79,7 @@ describe('GameGateway player.snapshot', () => {
     } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
+    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     gateway = new GameGateway(
       shipStateService as ShipStateService,
       {} as CommandRouterService,
@@ -85,6 +87,7 @@ describe('GameGateway player.snapshot', () => {
       mockWsGuard,
       mockPrisma,
       mockOnboarding,
+      mockScanHandler,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
