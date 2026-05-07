@@ -129,6 +129,8 @@ export class DroidSpawner {
       holdcourse: 0,
       topspeed,
       warncntr: 0,
+      scanNames: false,
+      scanHome: false,
       dirty: false,
       isEphemeral: true,
     };

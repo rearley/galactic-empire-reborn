@@ -63,6 +63,8 @@ export function prismaShipToState(row: Ship): ShipState {
     warncntr: row.warncntr,
     autoShield: row.autoShield,
     autoRepair: row.autoRepair,
+    scanNames: false,
+    scanHome: false,
     dirty: false,
   };
 }
@@ -74,6 +76,6 @@ export function prismaShipToState(row: Ship): ShipState {
  */
 export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { dirty, isEphemeral, teamcode, ...rest } = state;
+  const { dirty, isEphemeral, teamcode, scanNames, scanHome, ...rest } = state;
   return rest;
 }

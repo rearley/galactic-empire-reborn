@@ -162,8 +162,7 @@ export class ScanHandlerService implements OnModuleInit {
       char: '*',
     });
 
-    const mode: ScanRenderEvent['mode'] =
-      (ship as ShipState & { scanHome?: boolean }).scanHome ? 'overwrite' : 'append';
+    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
 
     const header = `Range: ${scanRange * 10} — Sector ${xsect},${ysect}`;
     return {

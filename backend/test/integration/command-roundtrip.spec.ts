@@ -48,6 +48,7 @@ function makeShipState(overrides: { userid: string; shipno: number; shipname: st
     minesnear: 0, lock: 0, holdcourse: 0,
     topspeed: overrides.topspeed ?? 5,
     warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
   };
 }
