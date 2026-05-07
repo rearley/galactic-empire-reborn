@@ -3,43 +3,122 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
-
-const VALID_OPTIONS = ['auto-shield', 'auto-repair'] as const;
-type ValidOption = (typeof VALID_OPTIONS)[number];
+import { PrismaService } from '../../../prisma/prisma.service';
 
 /**
- * Handles `set <auto-shield|auto-repair> <on|off>` and `set ?`.
+ * Registry entry for a toggleable ship option.
+ */
+interface SetOption {
+  /** Command-line name, e.g. 'auto-shield' */
+  name: string;
+  /** Display label used in `set ?` listing */
+  label: string;
+  get(ship: ShipState): boolean;
+  set(ship: ShipState, value: boolean, shipState: ShipStateService, prisma: PrismaService): Promise<void> | void;
+}
+
+/**
+ * Handles `set <option> <on|off>` and `set ?`.
  *
- * Deviation D4: canonical cmd_set (GECMDS.C:5190) manages scannames/scanhome/scanfull/filter
- * on User.options[]. This version manages auto-shield and auto-repair flags on ShipState.
- * @see research.md D4
+ * Options: auto-shield, auto-repair, scannames, scanhome.
+ * `set ?` lists all options with their current values on one pipe-separated line.
+ *
+ * scannames/scanhome are persisted via Prisma write-through (User.options[0/1])
+ * in addition to updating the in-memory ShipState cache.
+ *
  * @see GECMDS.C:5190 cmd_set (canonical — option set reinterpreted)
+ * @see research.md D4
+ * @see contracts/scan-render.md §4
  */
 @Injectable()
 export class SetHandlerService {
-  constructor(private readonly shipState: ShipStateService) {}
+  private readonly registry: SetOption[] = [
+    {
+      name: 'auto-shield',
+      label: 'auto-shield',
+      get: (ship): boolean => !!ship.autoShield,
+      set: (ship, value, shipState) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.autoShield = value;
+        });
+      },
+    },
+    {
+      name: 'auto-repair',
+      label: 'auto-repair',
+      get: (ship): boolean => !!ship.autoRepair,
+      set: (ship, value, shipState) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.autoRepair = value;
+        });
+      },
+    },
+    {
+      name: 'scannames',
+      label: 'scannames',
+      get: (ship) => ship.scanNames,
+      set: async (ship, value, shipState, prisma) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.scanNames = value;
+        });
+        const user = await prisma.user.findUnique({
+          where: { userid: ship.userid },
+          select: { options: true },
+        });
+        const options = [...(user?.options ?? [])];
+        while (options.length <= 0) options.push(0);
+        options[0] = value ? 1 : 0;
+        await prisma.user.update({ where: { userid: ship.userid }, data: { options } });
+      },
+    },
+    {
+      name: 'scanhome',
+      label: 'scanhome',
+      get: (ship) => ship.scanHome,
+      set: async (ship, value, shipState, prisma) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.scanHome = value;
+        });
+        const user = await prisma.user.findUnique({
+          where: { userid: ship.userid },
+          select: { options: true },
+        });
+        const options = [...(user?.options ?? [])];
+        while (options.length <= 1) options.push(0);
+        options[1] = value ? 1 : 0;
+        await prisma.user.update({ where: { userid: ship.userid }, data: { options } });
+      },
+    },
+  ];
+
+  constructor(
+    private readonly shipState: ShipStateService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   readonly command: Command = {
     keyword: 'set',
     aliases: [],
     minArgs: 1,
     argMissingMessage: formatMessage(MessageId.SET_FMT),
-    handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult =>
+    handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult | Promise<CommandResult> =>
       this.handle(ship, args),
   };
 
-  private handle(ship: ShipState, args: string[]): CommandResult {
+  private async handle(ship: ShipState, args: string[]): Promise<CommandResult> {
     const optArg = args[0]?.toLowerCase() ?? '';
 
     if (optArg === '?') {
-      const shieldVal = ship.autoShield ? 'ON' : 'OFF';
-      const repairVal = ship.autoRepair ? 'ON' : 'OFF';
+      const statusLine = this.registry
+        .map((opt) => `${opt.label}: ${opt.get(ship) ? 'ON' : 'OFF'}`)
+        .join(' | ');
       return {
-        lines: [{ text: formatMessage(MessageId.SET_STATUS, shieldVal, repairVal), category: 'info' }],
+        lines: [{ text: formatMessage(MessageId.SET_STATUS, statusLine), category: 'info' }],
       };
     }
 
-    if (!VALID_OPTIONS.includes(optArg as ValidOption)) {
+    const entry = this.registry.find((o) => o.name === optArg);
+    if (!entry) {
       return { lines: [{ text: formatMessage(MessageId.SET_UNKNOWN), category: 'system' }] };
     }
 
@@ -49,14 +128,7 @@ export class SetHandlerService {
     }
 
     const newVal = toggleArg === 'on';
-
-    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      if (optArg === 'auto-shield') {
-        s.autoShield = newVal;
-      } else {
-        s.autoRepair = newVal;
-      }
-    });
+    await entry.set(ship, newVal, this.shipState, this.prisma);
 
     const msgId = newVal ? MessageId.SET_OK_ON : MessageId.SET_OK_OFF;
     return { lines: [{ text: formatMessage(msgId, optArg), category: 'success' }] };
