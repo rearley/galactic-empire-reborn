@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
+import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -104,6 +105,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly wsAuthGuard: WsAuthGuard,
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
+    private readonly scanHandler: ScanHandlerService,
   ) {}
 
   /**
@@ -194,6 +196,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`disconnect ${client.id}`);
+    // Clear scantab so stale letter assignments don't persist across sessions.
+    const userid = client.data.userid as string | undefined;
+    const activeShipNo = client.data.activeShipNo as number | undefined;
+    if (userid !== undefined && activeShipNo !== undefined) {
+      this.scanHandler.clearScantab(userid, activeShipNo);
+    }
     const removed = this.registry.remove(client.id);
     if (removed) {
       this.server.emit('player.left', { shipId: removed.shipId });
@@ -452,10 +460,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Ship destruction is broadcast galaxy-wide.
+   * Also clears the victim's scantab so stale assignments don't persist on respawn.
    * @see specs/006b-combat/contracts/combat-events.md
    */
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
+    // Parse shipno from victimShipKey ("userid:shipno") using the last segment.
+    const keyParts = event.victimShipKey.split(':');
+    const victimShipno = Number(keyParts[keyParts.length - 1]);
+    if (!isNaN(victimShipno)) {
+      this.scanHandler.clearScantab(event.victimUserid, victimShipno);
+    }
     this.server.emit(COMBAT_SHIP_DESTROYED, event);
   }
 

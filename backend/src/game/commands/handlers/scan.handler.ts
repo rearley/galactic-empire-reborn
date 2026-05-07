@@ -7,6 +7,7 @@ import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } fro
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
+import { Scantab } from './helpers/scantab';
 
 /** Environment string table indexed by `enviorn` (0..3). @see GECMDS.C:2338-2349 */
 const ENV_STRINGS = [
@@ -47,12 +48,36 @@ export class ScanHandlerService implements OnModuleInit {
   private readonly logger = new Logger(ScanHandlerService.name);
   private readonly classCache = new Map<number, { scanRange: number }>();
 
+  /**
+   * Per-player scantab state — keyed by `${userid}#${shipno}`.
+   * Populated on `scan ra`/`scan se`; cleared on disconnect, death, or dock.
+   * @see contracts/scan-render.md §3
+   */
+  private readonly scantabMap = new Map<string, Scantab>();
+
   constructor(
     private readonly shipService: ShipStateService,
     private readonly prisma: PrismaService,
     private readonly galaxyService: GalaxyService,
     private readonly planetService: PlanetStateService,
   ) {}
+
+  /**
+   * Remove the scantab entry for a player — idempotent (no-op for missing keys).
+   * Call on disconnect, ship destruction, or dock.
+   * @see contracts/scan-render.md §3
+   */
+  clearScantab(userid: string, shipno: number): void {
+    this.scantabMap.delete(`${userid}#${shipno}`);
+  }
+
+  private getScantab(userid: string, shipno: number): Scantab | null {
+    return this.scantabMap.get(`${userid}#${shipno}`) ?? null;
+  }
+
+  private setScantab(userid: string, shipno: number, tab: Scantab): void {
+    this.scantabMap.set(`${userid}#${shipno}`, tab);
+  }
 
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({

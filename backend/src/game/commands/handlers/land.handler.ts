@@ -5,6 +5,7 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { ScanHandlerService } from './scan.handler';
 
 /**
  * Handles the `land` / `lan` command — land on the planet currently in orbit.
@@ -17,6 +18,7 @@ export class LandHandlerService {
     private readonly galaxyService: GalaxyService,
     private readonly shipService: ShipStateService,
     private readonly planetService: PlanetStateService,
+    private readonly scanHandler: ScanHandlerService,
   ) {}
 
   get command(): Command {
@@ -70,6 +72,8 @@ export class LandHandlerService {
         .claim(xsect, ysect, plnum, ship.userid, arg)
         .catch(() => undefined);
 
+      // Clear scantab on successful dock — stale letter assignments must not persist.
+      this.scanHandler.clearScantab(ship.userid, ship.shipno);
       return {
         lines: [
           { text: formatMessage(MessageId.LAND_CLAIMED, arg), category: 'success' },
@@ -79,6 +83,8 @@ export class LandHandlerService {
 
     // Owned by this player
     if (state.userid === ship.userid) {
+      // Clear scantab on successful dock.
+      this.scanHandler.clearScantab(ship.userid, ship.shipno);
       return {
         lines: [{ text: formatMessage(MessageId.LAND_OK, state.name), category: 'success' }],
       };
@@ -101,6 +107,8 @@ export class LandHandlerService {
         // so we simply allow if arg === "team" OR if they know the real password
         // For the team-pass case: allowed unconditionally when password == "team" + arg provided
         if (arg === 'team' || arg === '') {
+          // Clear scantab on successful dock.
+          this.scanHandler.clearScantab(ship.userid, ship.shipno);
           return { lines: [{ text: formatMessage(MessageId.BUYPAS4), category: 'success' }] };
         }
       }
@@ -109,6 +117,8 @@ export class LandHandlerService {
 
     // Password provided
     if (arg && arg === pwd) {
+      // Clear scantab on successful dock.
+      this.scanHandler.clearScantab(ship.userid, ship.shipno);
       return { lines: [{ text: formatMessage(MessageId.LAND_OK, state.name), category: 'success' }] };
     }
 
