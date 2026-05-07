@@ -57,6 +57,7 @@ function makeDroidState(overrides: Partial<ShipState> & { userid: string; shpcla
     status: GESTAT_AUTO, cybmine: 255, cybskill: 0, cybupdate: 0,
     tick: 0, emulate: 0, minesnear: 0, lock: 0, holdcourse: 0,
     topspeed: 4_000, warncntr: 0,
+    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false,
     dirty: false,
     isEphemeral: true,
@@ -77,6 +78,7 @@ function makePlayerState(): ShipState {
     repair: 0, hypha: 0, firecntl: 0, destruct: 0, status: GESTAT_USER,
     cybmine: 255, cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
+    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false,
     dirty: false,
   };

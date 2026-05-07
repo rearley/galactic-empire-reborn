@@ -129,6 +129,8 @@ export class DroidSpawner {
       holdcourse: 0,
       topspeed,
       warncntr: 0,
+      navTargetX: null,
+      navTargetY: null,
       scanNames: false,
       scanHome: false,
       dirty: false,
