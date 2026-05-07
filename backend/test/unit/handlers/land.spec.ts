@@ -5,6 +5,7 @@ import { LandHandlerService } from '../../../src/game/commands/handlers/land.han
 import { GalaxyService } from '../../../src/game/galaxy/galaxy.service';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
+import { ScanHandlerService } from '../../../src/game/commands/handlers/scan.handler';
 import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
@@ -26,6 +27,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 0, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
     ...overrides,
   };
@@ -56,10 +58,12 @@ function makeService(planetState: PlanetState | null) {
     claim: claimMock,
   };
 
+  const scanHandlerMock = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
   const svc = new LandHandlerService(
     galaxyMock as unknown as GalaxyService,
     shipMock as unknown as ShipStateService,
     planetMock as unknown as PlanetStateService,
+    scanHandlerMock,
   );
   return { svc, claimMock, planetMock };
 }

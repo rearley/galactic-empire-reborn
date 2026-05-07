@@ -23,6 +23,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 0, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
     ...overrides,
   };
@@ -58,15 +59,33 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
 }
 
 describe('ScanHandlerService', () => {
+  describe('scan lo — scanHome mode', () => {
+    it('scanLo returns mode overwrite when scanHome=true', async () => {
+      const { service } = makeService([]);
+      await service.onModuleInit();
+      const ship = makeShip({ scanHome: true });
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+      expect(result.scanRender!.mode).toBe('overwrite');
+    });
+
+    it('scanLo returns mode append when scanHome=false', async () => {
+      const { service } = makeService([]);
+      await service.onModuleInit();
+      const ship = makeShip({ scanHome: false });
+      const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+      expect(result.scanRender!.mode).toBe('append');
+    });
+  });
+
   describe('scan lo — empty range', () => {
-    it('returns scanGrid with only the self-cell when no ships in range', async () => {
+    it('returns scanRender with only the self-cell when no ships in range', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       const ship = makeShip();
       const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
-      expect(result.scanGrid).toBeDefined();
-      expect(result.scanGrid!.length).toBe(1);
-      const selfCell = result.scanGrid![0];
+      expect(result.scanRender).toBeDefined();
+      expect(result.scanRender!.cells.length).toBe(1);
+      const selfCell = result.scanRender!.cells[0];
       expect(selfCell.x).toBe(Math.floor(SCAN_GRID_WIDTH / 2));
       expect(selfCell.y).toBe(Math.floor(SCAN_GRID_HEIGHT / 2));
       expect(selfCell.type).toBe('self');
@@ -75,25 +94,31 @@ describe('ScanHandlerService', () => {
   });
 
   describe('scan lo — ship in range', () => {
-    it('AI ship (status=1) at projected cell appears with char "+"', async () => {
+    /**
+     * T028 — Deliberate deviation D1: `sca lo` now uses scantab letters (A..Z)
+     * instead of the original '+' (AI, status=1) and '=' (manual, status=0) glyphs.
+     * Tests updated to assert capital-letter chars rather than '+' / '='.
+     * @see specs/015-scan-modes/plan.md §D1
+     */
+    it('AI ship (status=1) at projected cell appears with a scantab letter (A-Z)', async () => {
       const playerShip = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
       const aiShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 1 });
       const { service } = makeService([playerShip, aiShip]);
       await service.onModuleInit();
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
-      const aiCell = result.scanGrid!.find(c => c.type === 'ship');
+      const aiCell = result.scanRender!.cells.find(c => c.type === 'ship');
       expect(aiCell).toBeDefined();
-      expect(aiCell!.char).toBe('+');
+      expect(aiCell!.char).toMatch(/^[A-Z]$/);
     });
 
-    it('manual ship (status=0) appears with char "="', async () => {
+    it('manual ship (status=0) appears with a scantab letter (A-Z)', async () => {
       const playerShip = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
       const manualShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 0 });
       const { service } = makeService([playerShip, manualShip]);
       await service.onModuleInit();
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
-      const shipCell = result.scanGrid!.find(c => c.type === 'ship');
-      expect(shipCell!.char).toBe('=');
+      const shipCell = result.scanRender!.cells.find(c => c.type === 'ship');
+      expect(shipCell!.char).toMatch(/^[A-Z]$/);
     });
 
     it('self ship is excluded from ship cells', async () => {
@@ -101,9 +126,9 @@ describe('ScanHandlerService', () => {
       const { service } = makeService([ship]);
       await service.onModuleInit();
       const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
-      const selfCells = result.scanGrid!.filter(c => c.type === 'self');
+      const selfCells = result.scanRender!.cells.filter(c => c.type === 'self');
       expect(selfCells).toHaveLength(1);
-      const shipCells = result.scanGrid!.filter(c => c.type === 'ship');
+      const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
       expect(shipCells).toHaveLength(0);
     });
 
@@ -114,7 +139,7 @@ describe('ScanHandlerService', () => {
       const { service } = makeService([playerShip, farShip], 100); // tiny scan range
       await service.onModuleInit();
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
-      expect(result.scanGrid!.filter(c => c.type === 'ship')).toHaveLength(0);
+      expect(result.scanRender!.cells.filter(c => c.type === 'ship')).toHaveLength(0);
     });
   });
 
@@ -125,9 +150,9 @@ describe('ScanHandlerService', () => {
       const ship = makeShip();
       const resultLo = service.command.handler(ship, ['lo'], {}) as CommandResult;
       const resultBare = service.command.handler(ship, [], {}) as CommandResult;
-      // Both should return a scanGrid with just the self-cell
-      expect(resultBare.scanGrid).toBeDefined();
-      expect(resultBare.scanGrid!.length).toBe(resultLo.scanGrid!.length);
+      // Both should return a scanRender with just the self-cell
+      expect(resultBare.scanRender).toBeDefined();
+      expect(resultBare.scanRender!.cells.length).toBe(resultLo.scanRender!.cells.length);
     });
   });
 
@@ -138,7 +163,7 @@ describe('ScanHandlerService', () => {
       const ship = makeShip();
       shipServiceMock.findByName.mockReturnValue(makeShip({ shipname: 'USS Target' }));
       const result = service.command.handler(ship, ['sh', 'USS', 'Target'], {}) as CommandResult;
-      expect(result.scanGrid).toBeUndefined();
+      expect(result.scanRender).toBeUndefined();
       expect(result.lines.length).toBeGreaterThan(0);
     });
 
@@ -147,7 +172,7 @@ describe('ScanHandlerService', () => {
       await service.onModuleInit();
       const result = service.command.handler(makeShip(), ['sh'], {}) as CommandResult;
       expect(result.lines[0].text).toBe(formatMessage(MessageId.SCANFMT));
-      expect(result.scanGrid).toBeUndefined();
+      expect(result.scanRender).toBeUndefined();
     });
   });
 
@@ -156,7 +181,7 @@ describe('ScanHandlerService', () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       const result = service.command.handler(makeShip(), ['pl', 'Earth'], {}) as CommandResult;
-      expect(result.scanGrid).toBeUndefined();
+      expect(result.scanRender).toBeUndefined();
     });
   });
 
@@ -269,7 +294,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
       const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
-      const planetCell = result.scanGrid!.find(c => c.type === 'planet');
+      const planetCell = result.scanRender!.cells.find(c => c.type === 'planet');
       expect(planetCell).toBeDefined();
       expect(planetCell!.char).toBe('O');
     });
@@ -285,7 +310,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
       const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
-      const wormholeCell = result.scanGrid!.find(c => c.type === 'wormhole');
+      const wormholeCell = result.scanRender!.cells.find(c => c.type === 'wormhole');
       expect(wormholeCell).toBeDefined();
       expect(wormholeCell!.char).toBe('W');
     });
@@ -302,9 +327,9 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       );
       await service.onModuleInit();
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
-      expect(result.scanGrid!.some(c => c.type === 'planet')).toBe(true);
-      expect(result.scanGrid!.some(c => c.type === 'ship')).toBe(true);
-      expect(result.scanGrid!.some(c => c.type === 'self')).toBe(true);
+      expect(result.scanRender!.cells.some(c => c.type === 'planet')).toBe(true);
+      expect(result.scanRender!.cells.some(c => c.type === 'ship')).toBe(true);
+      expect(result.scanRender!.cells.some(c => c.type === 'self')).toBe(true);
     });
   });
 
@@ -318,7 +343,7 @@ describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', (
       await service.onModuleInit();
       const ship = makeShip({ xcoord: 0, ycoord: 0 });
       const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
-      expect(result.scanGrid!.some(c => c.type === 'wormhole')).toBe(false);
+      expect(result.scanRender!.cells.some(c => c.type === 'wormhole')).toBe(false);
     });
   });
 });
@@ -392,8 +417,8 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
     expect(texts.some(t => t.startsWith('-'))).toBe(true);
     // SCAN_LOCATED_IN: "Located in sector (5,3)."
     expect(texts.some(t => t.includes('(5') && t.includes('3)'))).toBe(true);
-    // No scanGrid — scan pl is text-only
-    expect(result.scanGrid).toBeUndefined();
+    // No scanRender — scan pl is text-only
+    expect(result.scanRender).toBeUndefined();
   });
 
   it('scan pl NOTAPLANET returns NO_SUCH_PLANET message', async () => {

@@ -56,7 +56,9 @@ function buildHarness(seed = 1) {
         items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n],
         titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
         cybmine: 255, cybskill: 10, cybupdate: 50,
-        emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8000, warncntr: 0, dirty: false,
+        emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8000, warncntr: 0,
+    scanNames: false, scanHome: false,
+    dirty: false,
       };
       shipMap.set(`${slot.userid}:${slot.shipno}`, ship);
     }),

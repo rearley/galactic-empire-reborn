@@ -555,12 +555,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.JET_OK]: 'Jettisoned %d %s.',
   [MessageId.JET_FMT]: 'Usage: jettison <amt|ALL> <item>',
 
-  // set (feature 013) — GECMDS.C:5190 cmd_set reinterpreted
+  // set (feature 013/015) — GECMDS.C:5190 cmd_set reinterpreted
   [MessageId.SET_OK_ON]: 'Option %s set ON.',
   [MessageId.SET_OK_OFF]: 'Option %s set OFF.',
-  [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <auto-shield|auto-repair> <on|off>',
-  [MessageId.SET_STATUS]: 'auto-shield: %s   auto-repair: %s',
-  [MessageId.SET_FMT]: 'Usage: set <auto-shield|auto-repair> <on|off>',
+  [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
+  [MessageId.SET_STATUS]: '%s',
+  [MessageId.SET_FMT]: 'Usage: set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
 
   // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
   [MessageId.DESTRUCT_NZ]: 'Cannot self-destruct in the neutral zone.',

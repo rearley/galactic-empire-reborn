@@ -1,3 +1,43 @@
+## 2026-05-07 — 015-scan-modes: range radar / sector scan / lo-full / display options
+
+**Completed**:
+
+- **`sca ra <1-9>`**: Range radar scan with zoom levels 1-9. Formula: `effectiveRange = scanRange / (10-level)^2`. Shared scantab gives stable letter assignments A-Z (nearest-first). 3-colour channel: self shown as `*` at (15,7), human ships A-Z, ai ships A-Z.
+
+- **`sca se`**: Sector close-up scan bounded to the player's current 1×1 sector. 4-colour channel adds planet digits (plnum). Ships, mines, and planets all projected. Shares scantab with `sca ra`.
+
+- **`sca lo` (updated)**: Ship glyphs upgraded from `+`/`=` to scantab letters (A-Z) — deliberate D1 deviation from original `+`/`-` glyphs.
+
+- **`sca lo full`**: Extended local scan with right-side panel: letter/distance/bearing/heading/speed/name per detected ship. SCANNAMES flag controls name visibility.
+
+- **`set scannames on|off`**: Show ship names in `sca lo full` side panel. Persists to `User.options[0]` via Prisma + in-memory ShipState.
+
+- **`set scanhome on|off`**: Overwrite vs append mode for scan panel on the frontend. Persists to `User.options[1]`. `set ?` now lists all 4 options (auto-shield, auto-repair, scannames, scanhome).
+
+- **Gateway `emitCommandResult()` split**: header-only scan results emit as `command:result` (unicast); full grid payload emits as `scan:render` (unicast, typed Socket.io event).
+
+- **Frontend `useScanRender` hook**: subscribes to `scan:render`; maintains ScanCard array; overwrite/append driven by SCANHOME flag.
+
+- **Frontend `ScanPanel` component**: renders 30×15 monospace grid with colour-coding; optional side panel for `lo-full` mode. Mounted adjacent to ScanMap in App.tsx.
+
+**Tests**: 10 new test files, ~200 new tests. All pre-existing 003/004 `sca lo` fixtures updated for scantab letters.
+
+**Decisions made**:
+- D1: `sca lo` plot chars → scantab letters (was `+`/`=`) — enables consistent A-Z cross-scan targeting
+- D2: NOSCANTAB widened 15→26 to support the full alphabet
+- D3: SCANHOME uses typed Socket.io `scan:render.overwrite` field (not ANSI escape codes)
+- D4: Player options stored in `User.options Int[]` at indices 0 (SCANNAMES) and 1 (SCANHOME) — no new DB column
+- D5: Scantab lifecycle — lazy init, cleared on disconnect/death/dock
+- D6: Colour encoding uses semantic strings ('self'/'human'/'ai'/'planet') not numeric channel codes
+- D7: `sca lo full` side-panel formatting matches original scan_sh column style
+
+**Next**: 016-navigation-autopilot (nav autopilot, spy, hel, cls) or 019-physics-polish
+
+**Known issues**:
+- T053 manual quickstart not run (requires live ge_test DB with seeded galaxy)
+
+---
+
 ## 2026-05-07 — 013-ship-management: cloak / maint / transfer / jettison / set / destruct / abort / abandon
 
 **Completed**:
@@ -657,23 +697,13 @@ Also closes: maint password gate (`FR-210`, `GECMDS.C:4463`) — `mai [password]
 
 No test coverage yet. No spec exists.
 
-### 015 — Scan modes & display options (planned)
+### 015 — Scan modes & display options ✓ DONE
 
-`scan ra` and `scan se` currently return a placeholder error. These are core tactical
-tools needed for situational awareness in combat.
+`sca ra <1-9>`, `sca se`, `sca lo full`, `set scannames`, `set scanhome`.
+Shared scantab (A-Z letter assignments), 3/4-colour channel, frontend ScanPanel + useScanRender.
+All 7 D1-D7 deviations documented. ~200 new tests.
 
-- `sca ra [1-9]` — range radar: 30x15 ASCII grid showing all ships (lettered A-Z by
-  distance), mines (`.`), and self (`*`) within scan range; zoom level 1-9 adjusts the
-  range window (non-linear: `range = scanrange / ((10-x)^2)`). Source: `GECMDS.C:scan_ra`.
-- `sca se` — sector radar: same grid limited to the current sector; ships, mines, and
-  planets (`1-9`) with color coding by type (player vs AI). Source: `GECMDS.C:scan_se`.
-- `sca lo full` — extended local scan with a right-side panel: letter, distance, bearing,
-  heading, speed per detected ship; layout affected by `SCANNAMES` option. Source: `GECMDS.C:scan_lo`.
-- `set` display options — `SCANNAMES` (show ship name on separate line) and `SCANHOME`
-  (home-cursor positioning) stored in `User.options[]`; currently `set` only manages
-  `autoShield`/`autoRepair`. Source: `GECMDS.C:cmd_set`, `GEMAIN.H:options[]`.
-
-No test coverage yet. No spec exists.
+See feature log entry 2026-05-07 — 015-scan-modes above.
 
 ### 016 — Navigation autopilot & spy (planned)
 
@@ -777,9 +807,9 @@ All items from feature "Known issues / deferred" sections map to a planned featu
 
 | Deferred item | Source feature | Closes in |
 |---|---|---|
-| `scan ra` / `scan se` placeholder | 003 | 015 |
-| `scan lo full` panel | 003 | 015 |
-| `set` display options (SCANNAMES/SCANHOME) | 003/013 | 015 |
+| `scan ra` / `scan se` placeholder | 003 | 015 ✓ |
+| `scan lo full` panel | 003 | 015 ✓ |
+| `set` display options (SCANNAMES/SCANHOME) | 003/013 | 015 ✓ |
 | Maint password gate (FR-210) | 013 | 014 |
 | `set auto-repair` / `auto-shield` tick wiring | 013 | 019 |
 | AI kill scoring hookup | 007/008 | 019 |

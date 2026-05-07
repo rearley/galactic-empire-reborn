@@ -99,7 +99,7 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     PriceHandlerService,
     { provide: FIRETICKS, useFactory: () => loadFireticks() },
   ],
-  exports: [CommandRouterService],
+  exports: [CommandRouterService, ScanHandlerService],
 })
 export class CommandsModule implements OnModuleInit {
   constructor(

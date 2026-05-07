@@ -42,6 +42,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 1, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
+    scanNames: false, scanHome: false,
     dirty: false,
     autoShield: false,
     autoRepair: false,
@@ -85,7 +86,7 @@ function buildRouter() {
   router.register(new MaintHandlerService(mockShipState, mockPlanet, mockPrisma).command);
   router.register(new TransferHandlerService(mockShipState).command);
   router.register(new JettisonHandlerService(mockShipState).command);
-  router.register(new SetHandlerService(mockShipState).command);
+  router.register(new SetHandlerService(mockShipState, mockPrisma).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
   router.register(new AbandonHandlerService(mockShipState).command);
@@ -113,7 +114,7 @@ describe('command router dispatch — new keywords reach their handlers', () => 
   it('set ? → SET_STATUS', async () => {
     const { router, ship } = buildRouter();
     const result = await Promise.resolve(router.dispatch('set ?', ship, {})) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_STATUS, 'OFF', 'OFF'));
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
   });
 
   it('destruct → DESTRUCT_START (keyword, not NZ)', async () => {
