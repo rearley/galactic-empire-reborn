@@ -114,7 +114,7 @@ describe('command router dispatch — new keywords reach their handlers', () => 
   it('set ? → SET_STATUS', async () => {
     const { router, ship } = buildRouter();
     const result = await Promise.resolve(router.dispatch('set ?', ship, {})) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_STATUS, 'OFF', 'OFF'));
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
   });
 
   it('destruct → DESTRUCT_START (keyword, not NZ)', async () => {
