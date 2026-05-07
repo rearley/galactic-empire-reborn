@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 013-ship-management.
+Current module map as of feature 014-planet-attack.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -632,4 +632,40 @@ DroidModule event bus topology:
 
 ShipStateService.flush() modification:
   └── added early-continue when state.isEphemeral === true → zero Prisma calls for Droids
+```
+
+## PlanetAttackService additions (feature 014)
+
+```
+PlanetAttackService (game/planet/)
+  └── attackTroop(num, ship, planet): AttackOutcome — GECMDS.C:3580–3750
+  └── attackFighter(num, ship, planet): AttackOutcome — GECMDS.C:3788–3950
+  └── callForHelp (private) — GECMDS.C:3952–3994
+        owner real-time alert via EventEmitter2 → ATTACK_OWNER_ALERT_EVENT
+        spy-mail roll: won==1 OR gernd()%6==0, guarded by sendSpyMail flag
+  └── insertDistressMail (private) — Prisma mailStat.create, class=MAIL_CLASS_DISTRESS
+  └── injects: RANDOM, PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS
+
+attack.config.ts (game/commands/)
+  └── DI tokens: PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS
+  └── Defaults: 0.05 for all PLATTR*, 10 for FIRETICKS
+  └── Env-var overrides follow the CLOAK_ENERGY_USE pattern from feature 013
+
+Planet attack handlers (game/commands/handlers/)
+  AttackHandlerService  — "att": planet attack with troops or fighters
+    └── preconditions: orbit, canAttackPlanet, non-wormhole, self-attack, arg shape, cargo
+    └── per-planet mutex via PlanetStateService.withPlanetLock
+    └── re-validates self-attack and cargo inside lock (research.md D1)
+    └── injects: FIRETICKS, ShipClassCacheService, PlanetAttackService
+
+  PlnHandlerService     — "pln": list owned planets (read-only, no state mutation)
+    └── Prisma findMany({ where: {userid}, orderBy: {plnum: 'asc'} })
+    └── formats as %-20s  (xx,yy)  #zzz
+
+  PriceHandlerService   — "pri": price quote at orbited planet (read-only)
+    └── bare: lists all sellable items (or all items for owner)
+    └── quoted: BUY1→PRICEFMT→BUY7→BUY5→BUY4→BUY8→BUY3→PRICE_NO_CASH ladder
+
+GameGateway additions (feature 014):
+  └── @OnEvent(ATTACK_OWNER_ALERT_EVENT) → emits to user:${ownerUserid} Socket.io room
 ```

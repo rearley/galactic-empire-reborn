@@ -267,6 +267,49 @@ export enum MessageId {
   ABANDON_SECTOR = 'ABANDON_SECTOR',
   ABANDON_NO_SHIP = 'ABANDON_NO_SHIP',
 
+  // att (feature 014) — GECMDS.C:3515 cmd_attack
+  ATT_NOT_ORBIT = 'ATT_NOT_ORBIT',
+  ATT_NO_CAPABILITY = 'ATT_NO_CAPABILITY',
+  ATT_WORMHOLE = 'ATT_WORMHOLE',
+  ATT_SELF = 'ATT_SELF',
+  ATT_FORMAT = 'ATT_FORMAT',
+  ATT_NO_TROOPS = 'ATT_NO_TROOPS',
+  ATT_NO_FIGHTERS = 'ATT_NO_FIGHTERS',
+  ATT_DEFENDER_FIGHTER_KILL = 'ATT_DEFENDER_FIGHTER_KILL',
+  ATT_GROUND_TROOP_KILL = 'ATT_GROUND_TROOP_KILL',
+  ATT_ATTACKER_COUNTER_KILL = 'ATT_ATTACKER_COUNTER_KILL',
+  ATT_LOSS_REPORT = 'ATT_LOSS_REPORT',
+  ATT_WIN_TROOP = 'ATT_WIN_TROOP',
+  ATT_WIN_FIGHTER = 'ATT_WIN_FIGHTER',
+  ATT_RETREAT = 'ATT_RETREAT',
+  ATT_STANDOFF = 'ATT_STANDOFF',
+  ATT_ITEM_DESTROYED = 'ATT_ITEM_DESTROYED',
+  ATT_RESOLVED = 'ATT_RESOLVED',
+  ATT_OWNER_ALERT = 'ATT_OWNER_ALERT',
+  ATT_GROUND_AA = 'ATT_GROUND_AA',
+
+  // pln (feature 014) — GECMDS.C cmd_pln
+  PLN_HEADER = 'PLN_HEADER',
+  PLN_NONE = 'PLN_NONE',
+  PLN_ROW = 'PLN_ROW',
+
+  // pri (feature 014) — GECMDS.C:4284 cmd_price
+  PRICEFMT = 'PRICEFMT',
+  PRICE1 = 'PRICE1',
+  PRICE_NO_CASH = 'PRICE_NO_CASH',
+  BUY7 = 'BUY7',
+  BUY8 = 'BUY8',
+
+  // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
+  MAINT2 = 'MAINT2',
+  MAINT3 = 'MAINT3',
+
+  // distress mail types (feature 014) — GECMDS.C:3760-3771 / 3924-3936
+  MESG02 = 'MESG02',
+  MESG03 = 'MESG03',
+  MESG04 = 'MESG04',
+  MESG05 = 'MESG05',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -539,6 +582,49 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABANDON_OK]: 'You have abandoned ship %s.',
   [MessageId.ABANDON_SECTOR]: '%s has been abandoned by its captain.',
   [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
+
+  // att (feature 014) — GECMDS.C:3515 cmd_attack
+  [MessageId.ATT_NOT_ORBIT]: 'You must be orbiting a planet to attack.',
+  [MessageId.ATT_NO_CAPABILITY]: 'Your ship class cannot attack planets.',
+  [MessageId.ATT_WORMHOLE]: 'You cannot attack a wormhole.',
+  [MessageId.ATT_SELF]: 'You cannot attack your own planet.',
+  [MessageId.ATT_FORMAT]: 'Usage: att <amount> <troops|fighters>',
+  [MessageId.ATT_NO_TROOPS]: 'You do not have enough troops.',
+  [MessageId.ATT_NO_FIGHTERS]: 'You do not have enough fighters.',
+  [MessageId.ATT_DEFENDER_FIGHTER_KILL]: 'Defender fighters destroyed %d of your troops.',
+  [MessageId.ATT_GROUND_TROOP_KILL]: 'Defender ground troops killed %d more.',
+  [MessageId.ATT_ATTACKER_COUNTER_KILL]: 'Your forces eliminated %d defenders.',
+  [MessageId.ATT_LOSS_REPORT]: 'You lost %d; defenders lost %d.',
+  [MessageId.ATT_WIN_TROOP]: 'Your troops have overrun the defenders.',
+  [MessageId.ATT_WIN_FIGHTER]: 'You have wiped out the planet\'s defenders.',
+  [MessageId.ATT_RETREAT]: 'Your remaining troops surrender to the defenders.',
+  [MessageId.ATT_STANDOFF]: 'The attack ends in a standoff.',
+  [MessageId.ATT_ITEM_DESTROYED]: '%d %s on the planet were destroyed.',
+  [MessageId.ATT_RESOLVED]: 'Attack resolved. %d attackers survive.',
+  [MessageId.ATT_OWNER_ALERT]: 'ALERT: %s (%d,%d) is under attack by %s commanded by %s.',
+  [MessageId.ATT_GROUND_AA]: 'Ground anti-air shot down %d fighters.',
+
+  // pln (feature 014) — GECMDS.C cmd_pln
+  [MessageId.PLN_HEADER]: 'PLANETS  YOU  OWN:',
+  [MessageId.PLN_NONE]: 'You do not own any planets.',
+  [MessageId.PLN_ROW]: '%-20s  (%2d,%2d)  #%3d',
+
+  // pri (feature 014) — GECMDS.C:4284 cmd_price
+  [MessageId.PRICEFMT]: 'Usage: pri [amount item]',
+  [MessageId.PRICE1]: '%d %s @ %d cr ea = %d cr total',
+  [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
+  [MessageId.BUY7]: 'This planet has no owner.',
+  [MessageId.BUY8]: 'Your cargo hold cannot hold that many.',
+
+  // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
+  [MessageId.MAINT2]: 'This planet requires a password for maintenance.',
+  [MessageId.MAINT3]: 'Incorrect maintenance password.',
+
+  // distress mail types (feature 014) — research.md D3
+  [MessageId.MESG02]: '%s in sector (%d,%d) was attacked by %d troops from %s (cmdr %s); defenders held.',
+  [MessageId.MESG03]: '%s in sector (%d,%d) was overrun by %d troops from %s (cmdr %s); planet lost.',
+  [MessageId.MESG04]: '%s in sector (%d,%d) was attacked by %d fighters from %s (cmdr %s); defenders held.',
+  [MessageId.MESG05]: '%s in sector (%d,%d) was overrun by %d fighters from %s (cmdr %s); planet lost.',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',

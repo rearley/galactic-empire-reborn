@@ -53,6 +53,10 @@ import {
   DestructTickPayload,
   DestructBoomPayload,
 } from '../game/commands/ship-management-tick.service';
+import {
+  ATTACK_OWNER_ALERT_EVENT,
+  AttackOwnerAlertPayload,
+} from '../game/planet/planet-attack.service';
 
 interface SectorPayload {
   x: unknown;
@@ -451,6 +455,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     this.server.emit(COMBAT_SHIP_DESTROYED, event);
+  }
+
+  /** Planet-attack owner alert — emitted from PlanetAttackService.callForHelp. @see GECMDS.C:3952 call_4_help */
+  @OnEvent(ATTACK_OWNER_ALERT_EVENT)
+  handleAttackOwnerAlert(event: AttackOwnerAlertPayload): void {
+    this.server.to(`user:${event.ownerUserid}`).emit('event.log', {
+      category: 'system',
+      text: event.message,
+    });
   }
 
   /** Per-captain cloak-collapsed notification (energy starvation). @see GEFUNCS.C:1374 */
