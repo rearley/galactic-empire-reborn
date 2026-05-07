@@ -25,6 +25,9 @@ export interface CommandResult {
   scanRender?: ScanRenderEvent;
   /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
   broadcasts?: Array<{ room: string; event: string; payload: unknown }>;
+  /** When true, the frontend should clear the event log AFTER appending lines.
+   *  Used exclusively by the `cls` command. @see specs/016-navigation-spy/research.md D4 */
+  clearLog?: boolean;
 }
 
 export interface CommandResultLine {
