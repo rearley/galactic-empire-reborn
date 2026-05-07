@@ -267,6 +267,26 @@ export enum MessageId {
   ABANDON_SECTOR = 'ABANDON_SECTOR',
   ABANDON_NO_SHIP = 'ABANDON_NO_SHIP',
 
+  // nav (feature 016) — GECMDS.C:5120 cmd_navigate
+  NAVFMT = 'NAVFMT',
+  NAV01 = 'NAV01',
+  NAV_INACTIVE = 'NAV_INACTIVE',
+  NAV_STATUS = 'NAV_STATUS',
+  NAV_ARRIVED = 'NAV_ARRIVED',
+  NAV_ALREADY_THERE = 'NAV_ALREADY_THERE',
+
+  // spy (feature 016) — GECMDS.C cmd_spy
+  SPY1 = 'SPY1',
+  SPY0 = 'SPY0',
+  SPY0B = 'SPY0B',
+  SPY0C = 'SPY0C',
+  SPYM0 = 'SPYM0',
+  SPYM1 = 'SPYM1',
+
+  // hel (feature 016) — GECMDS.C cmd_help
+  HELFMT = 'HELFMT',
+  HEL_UNKNOWN = 'HEL_UNKNOWN',
+
   // att (feature 014) — GECMDS.C:3515 cmd_attack
   ATT_NOT_ORBIT = 'ATT_NOT_ORBIT',
   ATT_NO_CAPABILITY = 'ATT_NO_CAPABILITY',
@@ -582,6 +602,26 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABANDON_OK]: 'You have abandoned ship %s.',
   [MessageId.ABANDON_SECTOR]: '%s has been abandoned by its captain.',
   [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
+
+  // nav (feature 016) — GECMDS.C:5120 cmd_navigate
+  [MessageId.NAVFMT]: 'Usage: nav <x> <y>',
+  [MessageId.NAV01]: 'Course set for (%s,%s), bearing %s, distance %s.',
+  [MessageId.NAV_INACTIVE]: 'Autopilot inactive.',
+  [MessageId.NAV_STATUS]: 'Autopilot active — target (%s,%s), distance %s, bearing %s.',
+  [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',
+  [MessageId.NAV_ALREADY_THERE]: 'Already at target sector.',
+
+  // spy (feature 016) — GECMDS.C cmd_spy
+  [MessageId.SPY1]: 'You must be in orbit of a planet to plant a spy.',
+  [MessageId.SPY0]: 'You already own this planet.',
+  [MessageId.SPY0B]: 'You cannot plant a spy on a wormhole.',
+  [MessageId.SPY0C]: 'Spies cannot operate in the neutral zone.',
+  [MessageId.SPYM0]: 'You have no spy equipment aboard.',
+  [MessageId.SPYM1]: 'Spy successfully planted on %s.',
+
+  // hel (feature 016) — GECMDS.C cmd_help
+  [MessageId.HELFMT]: "Available help topics: navigation, combat, trade, planet, ship. Try 'hel <topic>'.",
+  [MessageId.HEL_UNKNOWN]: "Unknown help topic '%s'. Valid topics: navigation, combat, trade, planet, ship.",
 
   // att (feature 014) — GECMDS.C:3515 cmd_attack
   [MessageId.ATT_NOT_ORBIT]: 'You must be orbiting a planet to attack.',
