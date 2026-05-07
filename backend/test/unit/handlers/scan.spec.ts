@@ -94,7 +94,13 @@ describe('ScanHandlerService', () => {
   });
 
   describe('scan lo — ship in range', () => {
-    it('AI ship (status=1) at projected cell appears with char "+"', async () => {
+    /**
+     * T028 — Deliberate deviation D1: `sca lo` now uses scantab letters (A..Z)
+     * instead of the original '+' (AI, status=1) and '=' (manual, status=0) glyphs.
+     * Tests updated to assert capital-letter chars rather than '+' / '='.
+     * @see specs/015-scan-modes/plan.md §D1
+     */
+    it('AI ship (status=1) at projected cell appears with a scantab letter (A-Z)', async () => {
       const playerShip = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
       const aiShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 1 });
       const { service } = makeService([playerShip, aiShip]);
@@ -102,17 +108,17 @@ describe('ScanHandlerService', () => {
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       const aiCell = result.scanRender!.cells.find(c => c.type === 'ship');
       expect(aiCell).toBeDefined();
-      expect(aiCell!.char).toBe('+');
+      expect(aiCell!.char).toMatch(/^[A-Z]$/);
     });
 
-    it('manual ship (status=0) appears with char "="', async () => {
+    it('manual ship (status=0) appears with a scantab letter (A-Z)', async () => {
       const playerShip = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
       const manualShip = makeShip({ userid: 'u2', shipno: 1, xcoord: 0.1, ycoord: 0, status: 0 });
       const { service } = makeService([playerShip, manualShip]);
       await service.onModuleInit();
       const result = service.command.handler(playerShip, ['lo'], {}) as CommandResult;
       const shipCell = result.scanRender!.cells.find(c => c.type === 'ship');
-      expect(shipCell!.char).toBe('=');
+      expect(shipCell!.char).toMatch(/^[A-Z]$/);
     });
 
     it('self ship is excluded from ship cells', async () => {
