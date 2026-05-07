@@ -644,32 +644,86 @@ sysop-configurable `CLOAK_ENERGY_USE` DI token, `autoShield`/`autoRepair` DB col
 
 See feature log entry 2026-05-07 — 013-ship-management above.
 
-### 014 — Planet attack (planned)
+### 014 — Planet attack & planet commands (planned)
 
-`cmd_attack` — land troops and fighters to capture a planet (interacts with
-`PlanetState.men`, `PlanetState.troops`; uses `GEPLANET.C` combat formulas).
-`cmd_planet` — display full planet status (complement to `report cargo`).
-`cmd_price` — display current buy/sell prices for a planet's inventory.
+`att` — planetary assault: land troops and fighters to capture a planet; combat formula
+uses `PlanetState.men`, `.troops`, `.fighters`, `.ionc` from `GEPLANET.C`. Outcome
+depends on attacker vs defender population math — the primary endgame loop.
+`pln` — list all planets the player owns (name, sector, population, cash, defense).
+`pri` — display current buy/sell prices for every item at the orbited planet.
+
+No test coverage yet. No spec exists.
+
+### 015 — Navigation autopilot & utility (planned)
+
+`nav [x] [y]` — set an automatic course; ship navigates autonomously each physics tick
+until it arrives at the target sector or the command is cancelled. More than a heading
+calculator — requires per-tick waypoint logic in `PhysicsTickService`.
+`spy` — deploy a spy item to a planet (sets `Planet.spyowner`; returns intel on planet
+contents and defenses).
+`hel` / `?` — in-game help text (topic-keyed lookup).
+`cls` — clear the client's event log (client-side frontend command, no backend handler).
 
 No test coverage yet. No spec exists.
 
-### 015 — Navigation aids & help (planned)
+### 016 — Mail system (planned)
 
-`cmd_navigate` — compute heading and distance to a named planet or sector.
-`cmd_spy` — deploy a spy to a planet (sets `Planet.spyowner`).
-`cmd_gehelp` — in-game help text (topic-keyed lookup).
-`cmd_clear` — clear the client's event log display.
+Players currently have no way to read their mail even though `MailStat` rows are written
+by the midnight job (production reports) and combat (distress signals on PvP kill).
+Needs a command handler to list and read messages.
+`sen` is already implemented (012) for real-time broadcasts; this feature adds the
+persistent inbox: read, delete, list commands.
 
 No test coverage yet. No spec exists.
+
+### 017 — Team management (planned)
+
+`tea join/leave` is implemented (012) but teams must be manually seeded in the DB —
+no player can create one. Needs:
+- `tea create <name>` — create a new team (writes `Team` row)
+- `tea list` — list all teams with member counts
+- Team score display on `ros` roster
+
+No test coverage yet. No spec exists.
+
+### 018 — Physics & mechanics polish (planned)
+
+Deferred gaps from features 006a–013:
+- **Universe boundary wrap** — ships crossing `MAXX=30` / `MAXY=15` should wrap;
+  currently no enforcement.
+- **Overspeed engine damage** — ships exceeding 150% of rated warp take damage
+  per `GEFUNCS.C`; currently warn-and-apply only.
+- **Wormhole gravity** — `GEFUNCS.C:moveship` gravity pull toward wormhole entry;
+  currently wormholes are instant-teleport only.
+- **AI kill scoring** — Cybertron/Droid kills don't affect player `klscore`/rank;
+  deferred from feature 007/008; midnight job (009) exists but the hook wasn't wired.
+- **`set auto-repair` integration** — flag persists (013) but the repair tick doesn't
+  consume it yet; needs wiring into the SHIP_UPDATE tick.
+
+No test coverage yet. No spec exists.
+
+---
+
+### ★ PLAYTEST MILESTONE — after 014
+
+The core gameplay loop is complete when feature 014 ships:
+- Create ship → fight ships → colonize planet → attack enemy planets → midnight scoring
+- All 44 original commands from `gecmds[]` will be implemented
+- Cybertrons and Murdonian Transport provide PvE targets
+- Real-time multiplayer via Socket.io with sector event log
+- ASCII scan map, ship roster, frequency-based comms
+
+Features 015–018 are quality-of-life and depth additions; they can follow in post-playtest
+iterations based on feedback.
+
+---
 
 ### Deferred / cross-feature items
 
-- **AI scoring** (Cybertrons/Droids boosting/penalizing player rank) — deferred to 009
-- **Midnight job** (009) — score recalculation, planet production reports, mail purge
-- **Droid AI** (008) — ephemeral Droids + Murdonian Transport (`GEDROIDS.C`)
 - **Universe wrap** — ships crossing galaxy boundary should wrap; currently no boundary enforcement
 - **Gravity / wormhole travel** — wormhole entry (`GEFUNCS.C:moveship` gravity pull) not implemented
 - **Overspeed engine blow** — ship exceeding max warp should take damage; currently warn-and-apply only
+- **AI kill scoring** — Cybertron/Droid kills not counted against player rank (deferred from 007/008)
 
 ---
 
