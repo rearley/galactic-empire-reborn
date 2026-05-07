@@ -86,7 +86,7 @@ function buildRouter() {
   router.register(new MaintHandlerService(mockShipState, mockPlanet, mockPrisma).command);
   router.register(new TransferHandlerService(mockShipState).command);
   router.register(new JettisonHandlerService(mockShipState).command);
-  router.register(new SetHandlerService(mockShipState).command);
+  router.register(new SetHandlerService(mockShipState, mockPrisma).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
   router.register(new AbandonHandlerService(mockShipState).command);

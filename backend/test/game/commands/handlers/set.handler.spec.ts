@@ -6,6 +6,7 @@
  */
 import { SetHandlerService } from '../../../../src/game/commands/handlers/set.handler';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
+import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 
@@ -46,7 +47,13 @@ function makeService(ship: ShipState) {
       },
     ),
   } as unknown as ShipStateService;
-  return { handler: new SetHandlerService(mockShipState), mockShipState };
+  const mockPrisma = {
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ options: [] }),
+      update: jest.fn().mockResolvedValue({}),
+    },
+  } as unknown as PrismaService;
+  return { handler: new SetHandlerService(mockShipState, mockPrisma), mockShipState, mockPrisma };
 }
 
 // ---------------------------------------------------------------------------
@@ -54,19 +61,19 @@ function makeService(ship: ShipState) {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — auto-shield', () => {
-  it('set auto-shield on → autoShield=true, returns SET_OK_ON (SC-007)', () => {
+  it('set auto-shield on → autoShield=true, returns SET_OK_ON (SC-007)', async () => {
     const ship = makeShip({ autoShield: false });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, ['auto-shield', 'on'], {}) as { lines: { text: string; category: string }[] };
+    const result = await (handler.command.handler(ship, ['auto-shield', 'on'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
     expect(ship.autoShield).toBe(true);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_OK_ON, 'auto-shield'));
     expect(result.lines[0].category).toBe('success');
   });
 
-  it('set auto-shield off → autoShield=false, returns SET_OK_OFF', () => {
+  it('set auto-shield off → autoShield=false, returns SET_OK_OFF', async () => {
     const ship = makeShip({ autoShield: true });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, ['auto-shield', 'off'], {}) as { lines: { text: string }[] };
+    const result = await (handler.command.handler(ship, ['auto-shield', 'off'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(ship.autoShield).toBe(false);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_OK_OFF, 'auto-shield'));
   });
@@ -77,17 +84,17 @@ describe('SetHandlerService — auto-shield', () => {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — auto-repair', () => {
-  it('set auto-repair on → autoRepair=true', () => {
+  it('set auto-repair on → autoRepair=true', async () => {
     const ship = makeShip({ autoRepair: false });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['auto-repair', 'on'], {});
+    await (handler.command.handler(ship, ['auto-repair', 'on'], {}) as Promise<unknown>);
     expect(ship.autoRepair).toBe(true);
   });
 
-  it('set auto-repair off → autoRepair=false', () => {
+  it('set auto-repair off → autoRepair=false', async () => {
     const ship = makeShip({ autoRepair: true });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['auto-repair', 'off'], {});
+    await (handler.command.handler(ship, ['auto-repair', 'off'], {}) as Promise<unknown>);
     expect(ship.autoRepair).toBe(false);
   });
 });
@@ -97,26 +104,26 @@ describe('SetHandlerService — auto-repair', () => {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — set ? listing', () => {
-  it('returns SET_STATUS with both flag values (both off)', () => {
-    const ship = makeShip({ autoShield: false, autoRepair: false });
+  it('returns status line with all 4 options (all off)', async () => {
+    const ship = makeShip({ autoShield: false, autoRepair: false, scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, ['?'], {}) as { lines: { text: string; category: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_STATUS, 'OFF', 'OFF'));
+    const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
     expect(result.lines[0].category).toBe('info');
   });
 
-  it('returns SET_STATUS with both flag values (shield ON, repair OFF)', () => {
-    const ship = makeShip({ autoShield: true, autoRepair: false });
+  it('returns status line with shield ON, repair OFF', async () => {
+    const ship = makeShip({ autoShield: true, autoRepair: false, scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, ['?'], {}) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_STATUS, 'ON', 'OFF'));
+    const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: OFF | scanhome: OFF');
   });
 
-  it('returns SET_STATUS with both flags ON', () => {
-    const ship = makeShip({ autoShield: true, autoRepair: true });
+  it('returns status line with both legacy flags ON', async () => {
+    const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, ['?'], {}) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_STATUS, 'ON', 'ON'));
+    const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: OFF | scanhome: OFF');
   });
 });
 
@@ -125,26 +132,26 @@ describe('SetHandlerService — set ? listing', () => {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — rejection paths', () => {
-  it('unknown option → SET_UNKNOWN, no mutation', () => {
+  it('unknown option → SET_UNKNOWN, no mutation', async () => {
     const ship = makeShip();
     const { handler, mockShipState } = makeService(ship);
-    const result = handler.command.handler(ship, ['auto-coffee', 'on'], {}) as { lines: { text: string }[] };
+    const result = await (handler.command.handler(ship, ['auto-coffee', 'on'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_UNKNOWN));
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
 
-  it('valid option but missing toggle arg → SET_FMT', () => {
+  it('valid option but missing toggle arg → SET_FMT', async () => {
     const ship = makeShip();
     const { handler, mockShipState } = makeService(ship);
-    const result = handler.command.handler(ship, ['auto-shield'], {}) as { lines: { text: string }[] };
+    const result = await (handler.command.handler(ship, ['auto-shield'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_FMT));
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
 
-  it('valid option with invalid toggle value → SET_FMT', () => {
+  it('valid option with invalid toggle value → SET_FMT', async () => {
     const ship = makeShip();
     const { handler, mockShipState } = makeService(ship);
-    const result = handler.command.handler(ship, ['auto-shield', 'maybe'], {}) as { lines: { text: string }[] };
+    const result = await (handler.command.handler(ship, ['auto-shield', 'maybe'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_FMT));
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
