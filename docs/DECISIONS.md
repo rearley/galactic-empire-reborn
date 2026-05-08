@@ -1103,3 +1103,15 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 **Reason**: Zero new backend events, zero new frontend listeners, fully testable in isolation.
 
 **Alternatives rejected**: A separate `log:clear` socket event was rejected — more coupling, more test surface.
+
+---
+
+## 2026-05-08 — `mai` keyword dispatcher pattern (feature 017)
+
+**Context**: The `mai` keyword was previously an alias on `MaintHandlerService` (feature 014). Feature 017 adds inbox listing to `mai` (no-arg form), requiring the keyword to do different things depending on whether args are present.
+
+**Decision**: Remove `mai` from `MaintHandlerService.aliases` and create a new `MaiHandlerService` that owns the `mai` keyword. Its `handle()` method routes no-arg → inbox listing, any-arg → `this.maint.command.handler(ship, args, ctx)`.
+
+**Reason**: Threading inbox logic into `MaintHandlerService` would conflate two concerns (maintenance gate + inbox) in one class. A dedicated dispatcher is testable in isolation — the inbox path and maintenance delegation each have their own mocks. SC-005 (maintenance regression) is satisfied because the maintenance gate is called with the original args, not re-implemented.
+
+**Alternatives rejected**: Modifying `MaintHandlerService` to accept an injected inbox service and branch internally — rejected because it would grow a class that already has a well-defined single responsibility. Also rejected: registering two separate handlers for the same keyword — the CommandRouterService registry is keyed by keyword/alias, so only one handler can own `mai`.

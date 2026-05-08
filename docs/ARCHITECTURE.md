@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 016-navigation-spy.
+Current module map as of feature 017-mail-inbox.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -93,6 +93,10 @@ AppModule (app.module.ts)
   │     ├── RenameService — rename(userid, shipno, newName): validates format (1-19 printable, no spaces),
   │     │                    checks case-insensitive uniqueness, updates DB + in-memory; case-identical = no-op
   │     └── OnboardingState type — { step, classNumber?, shipId? }
+  ├── MailModule (game/mail/) — exports MailInboxService
+  │     ├── MailInboxRepository — Prisma queries on MailStat; findByUserid (stamp DESC, msgno DESC, class DESC); deleteOne (returns false on P2025)
+  │     ├── MailInboxService — list(userid)/resolveIndex(userid,index)/deleteByIndex(userid,index); R3 sender resolution (ShipStateService → raw dtime → "(system)"); R5 re-query per call
+  │     └── mail-render.ts — pure functions classLabel/formatListLine/formatDetail; no DI
   ├── CommandsModule (game/commands/) — exports CommandRouterService
   │     ├── CommandRouterService — alias-keyed registry; keyword lowercased, args preserve casing; minArgs guard
   │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange;

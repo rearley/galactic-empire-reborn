@@ -208,10 +208,10 @@ describe('MaintHandlerService — rejection paths', () => {
 });
 
 describe('MaintHandlerService — command metadata', () => {
-  it('keyword is "maint", alias includes "mai", minArgs is 0', () => {
+  it('keyword is "maint", no aliases (mai moved to MaiHandlerService, T013), minArgs is 0', () => {
     const { handler } = makeService();
     expect(handler.command.keyword).toBe('maint');
-    expect(handler.command.aliases).toContain('mai');
+    expect(handler.command.aliases).not.toContain('mai');
     expect(handler.command.minArgs).toBe(0);
   });
 });

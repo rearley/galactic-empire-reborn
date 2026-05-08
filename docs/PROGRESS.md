@@ -1,3 +1,17 @@
+## 2026-05-08 — 017-mail-inbox
+
+**Completed:** Three player commands — `mai` (list inbox or delegate to maintenance), `rea <index>` (read message detail), `del <index>` (hard-delete message). New `MailModule` with `MailInboxRepository`, `MailInboxService`, and `mail-render.ts`. `mai` alias dropped from `MaintHandlerService`; new `MaiHandlerService` dispatches no-arg → inbox, with-arg → maintenance. No schema change — reads/deletes existing `MailStat` rows. SC-001..SC-006 all satisfied.
+
+**Tests:** 100 new tests across 7 suites. Unit: mail-render (classLabel/formatListLine/formatDetail), mail-inbox.service (list/resolveIndex/deleteByIndex), mai.handler, rea.handler, del.handler, mail-schema-drift (FR-014/SC-003 guard). Integration: mail-inbox.integration (list, rea detail, del with double-delete, perf budget < 50ms for 50 rows). Regression: maint.handler.spec and command-router.dispatch.spec updated to reflect mai alias removal.
+
+**Decisions made:** `mai` gets its own `MaiHandlerService` dispatcher rather than threading inbox logic into `MaintHandlerService` — keeps the maintenance gate isolated. Sender resolution (R3) uses two-tier fallback: ShipStateService.findByUserid → raw dtime → "(system)". Indices re-resolved on every command invocation (R5) — no cross-command session state.
+
+**Next:** Feature 018 or endgame commands.
+
+**Known issues:** None.
+
+---
+
 ## 2026-05-07 — 016-navigation-spy
 
 **Completed:** Four player commands — `nav <x> <y>` (autopilot), `spy` (plant spy on planet), `hel`/`?` (in-game help), `cls` (clear screen). Two new Ship DB columns (`navTargetX`, `navTargetY`) + Prisma migration. Autopilot tick branch in `PhysicsTickService`. Spy-owner reveal in `scan pl`. `clearLog` directive added to `CommandResult` and honoured in frontend `command-result-handlers.ts`.
