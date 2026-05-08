@@ -15,7 +15,7 @@ import { valuePlanet } from './value-pl';
 import { buildProductionMailStat } from './mailstat-builder';
 import { PLTVCASH, PLTVDIV, TEAMBONU } from './midnight.constants';
 import { PLTYPE_PLNT } from '../constants';
-import { BASEPRICE } from '../constants/items';
+import { BASEPRICE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
@@ -293,6 +293,51 @@ export class MidnightRepository {
         data: { teamscore: { increment: TEAMBONU + memberShare } },
       });
     }
+  }
+
+  /**
+   * Reset neutral-zone planet inventories and randomize markup.
+   * Zygor-3 (plnum=1) gets all 14 items at 1032000; Nexus Prime (plnum=2) gets troops/men/food.
+   * Purchases never deplete stock (neutral() check in buy()), so this is cosmetic but faithful.
+   * @see GEMAIN.C:2147-2175 GE22e patch — "Updating Zygor" / "Updating T-station"
+   */
+  async refreshNeutralZone(tx: TxClient): Promise<void> {
+    // Zygor-3: all items — markup = baseprice*2 + rand()%baseprice  @see GEMAIN.C:2154
+    const zygorQty   = new Array<bigint>(NUMITEMS).fill(1032000n);
+    const zygorSell  = new Array<number>(NUMITEMS).fill(1);
+    const zygorMkup  = Array.from({ length: NUMITEMS }, (_, i) =>
+      BASEPRICE[i] * 2 + Math.floor(Math.random() * BASEPRICE[i]),
+    );
+    await tx.planet.update({
+      where: { xsect_ysect_plnum: { xsect: 0, ysect: 0, plnum: 1 } },
+      data: {
+        itemsQty: zygorQty,
+        itemsSell: zygorSell,
+        itemsMarkup2a: zygorMkup,
+      },
+    });
+
+    // Nexus Prime: troops, men, food only  @see GEMAIN.C:2162-2174
+    const nexusMkup = new Array<number>(NUMITEMS).fill(0);
+    nexusMkup[I_TROOPS] = BASEPRICE[I_TROOPS] * 2 + Math.floor(Math.random() * BASEPRICE[I_TROOPS]);
+    nexusMkup[I_MEN]    = BASEPRICE[I_MEN]    * 2 + Math.floor(Math.random() * BASEPRICE[I_MEN]);
+    nexusMkup[I_FOOD]   = BASEPRICE[I_FOOD]   * 2 + Math.floor(Math.random() * BASEPRICE[I_FOOD]);
+    const nexusQty  = new Array<bigint>(NUMITEMS).fill(0n);
+    nexusQty[I_TROOPS] = 1032000n;
+    nexusQty[I_MEN]    = 1032000n;
+    nexusQty[I_FOOD]   = 1032000n;
+    const nexusSell = new Array<number>(NUMITEMS).fill(0);
+    nexusSell[I_TROOPS] = 1;
+    nexusSell[I_MEN]    = 1;
+    nexusSell[I_FOOD]   = 1;
+    await tx.planet.update({
+      where: { xsect_ysect_plnum: { xsect: 0, ysect: 0, plnum: 2 } },
+      data: {
+        itemsQty: nexusQty,
+        itemsSell: nexusSell,
+        itemsMarkup2a: nexusMkup,
+      },
+    });
   }
 
   /**

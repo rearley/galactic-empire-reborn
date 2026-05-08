@@ -5,7 +5,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BASEPRICE, ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
-import { resolveItemKeyword, parseUint32 } from '../validators';
+import { ITEM_SHORT_KEYWORDS, resolveItemKeyword, parseUint32 } from '../validators';
 
 /**
  * Handles the `pri` command — price quote at the currently orbited planet.
@@ -49,15 +49,16 @@ export class PriceHandlerService {
 
     const isOwner = planet.userid !== null && planet.userid === ship.userid;
 
-    // Bare `pri` — list every sellable item. @see GECMDS.C:4284 no-args loop
+    // Bare `pri` — list every sellable item with keyword hint. @see GECMDS.C:4284 no-args loop
     if (args.length === 0) {
       const lines: Array<{ text: string; category: 'success' }> = [];
       for (let i = 0; i < NUMITEMS; i++) {
         const item = planet.items[i];
         if (item.sell || isOwner) {
           const unitPrice = isOwner ? BASEPRICE[i] : item.markup2a;
+          const kw = ITEM_SHORT_KEYWORDS[i] ?? '???';
           lines.push({
-            text: formatMessage(MessageId.PRICE1, 1, ITEM_NAMES[i], unitPrice, unitPrice),
+            text: `${ITEM_NAMES[i]} (${kw})  ${unitPrice} cr`,
             category: 'success',
           });
         }
@@ -82,11 +83,6 @@ export class PriceHandlerService {
       return { lines: [{ text: formatMessage(MessageId.PRICEFMT), category: 'system' }] };
     }
 
-    // BUY7: planet must have an owner.
-    if (!planet.userid) {
-      return { lines: [{ text: formatMessage(MessageId.BUY7), category: 'system' }] };
-    }
-
     // BUY5: amount must be > 0.
     if (qty === 0) {
       return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
@@ -94,9 +90,10 @@ export class PriceHandlerService {
 
     const item = planet.items[itemIndex];
 
-    // BUY4: sell flag or owner. @see GECMDS.C cmd_price — sell-flag check
+    // Item must be for sale or requester is owner.
+    // Unowned neutral-zone planets with explicit sell flags are open shops.
     if (!isOwner && !item.sell) {
-      return { lines: [{ text: formatMessage(MessageId.BUY4), category: 'system' }] };
+      return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
     }
 
     // BUY8: cargo capacity sufficient for amount.

@@ -95,7 +95,7 @@ function buildRouter() {
 
   router.register(new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT).command);
   router.register(new MaintHandlerService(mockMaintService).command);
-  router.register(new TransferHandlerService(mockShipState).command);
+  router.register(new TransferHandlerService(mockShipState, {} as any).command);
   router.register(new JettisonHandlerService(mockShipState).command);
   router.register(new SetHandlerService(mockShipState, mockPrisma).command);
   router.register(new DestructHandlerService(mockShipState).command);

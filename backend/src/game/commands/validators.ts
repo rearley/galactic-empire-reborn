@@ -7,7 +7,7 @@
 import { ITEM_NAMES } from '../constants/items';
 
 /** Short keyword aliases matching genearas() in the original game. */
-const ITEM_SHORT_KEYWORDS = [
+export const ITEM_SHORT_KEYWORDS = [
   'men', 'mis', 'tor', 'ion', 'fla', 'foo', 'fig', 'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy',
 ];
 
@@ -18,10 +18,12 @@ const ITEM_SHORT_KEYWORDS = [
  */
 export function resolveItemKeyword(keyword: string): number {
   const lower = keyword.toLowerCase();
-  // Try short keyword exact match first
-  const shortIdx = ITEM_SHORT_KEYWORDS.indexOf(lower);
-  if (shortIdx !== -1) return shortIdx;
-  // Try case-insensitive prefix match against full names
+  // genearas(kwrd[i], user_input): user input starts with the 3-letter keyword
+  // e.g. "Missles" starts with "mis" → missiles. @see GEFUNCS.C:2147 genearas
+  for (let i = 0; i < ITEM_SHORT_KEYWORDS.length; i++) {
+    if (lower.startsWith(ITEM_SHORT_KEYWORDS[i])) return i;
+  }
+  // Also accept a prefix of the full name (e.g. "missile" → missiles)
   for (let i = 0; i < ITEM_NAMES.length; i++) {
     if (ITEM_NAMES[i].toLowerCase().startsWith(lower)) return i;
   }

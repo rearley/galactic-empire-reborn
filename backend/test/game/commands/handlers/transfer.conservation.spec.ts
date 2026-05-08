@@ -49,7 +49,7 @@ function buildService(alice: ShipState, bob: ShipState) {
       },
     ),
   } as unknown as ShipStateService;
-  return new TransferHandlerService(mockShipState);
+  return new TransferHandlerService(mockShipState, {} as any);
 }
 
 /** Seeded PRNG (mulberry32) — deterministic across runs */

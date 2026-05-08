@@ -351,6 +351,10 @@ export class PlanetStateService implements OnModuleInit {
         return;
       }
 
+      // Skip unowned planets — matches GEMAIN.C:2132 `plptr->userid[0] != 0` guard.
+      // Neutral-zone planets are unowned and refreshed by midnight instead.
+      if (state.userid === null) return;
+
       // Delegate to PlanetEconomyService when wired (production); otherwise
       // fall back to the pure tick formula (legacy unit-test path).
       const newState = this.economy
@@ -364,6 +368,69 @@ export class PlanetStateService implements OnModuleInit {
         data: stateToPrismaUpdate(state),
       });
     }) as Promise<void>;
+  }
+
+  /**
+   * Transfer items from ship cargo down to planet surface.
+   * Caller must already hold the ship item in ship.items[itemIndex].
+   * Requires requester to own the planet.
+   * @see GECMDS.C:3300 trans_down
+   */
+  async depositToPlanet(
+    key: string,
+    requesterUserid: string,
+    itemIndex: number,
+    qty: bigint,
+  ): Promise<{ ok: true } | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' }> {
+    return this.runSerialized(key, async () => {
+      const state = this.map.get(key);
+      if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
+      if (state.userid !== requesterUserid) return { ok: false as const, reason: 'NOT_OWNER' as const };
+
+      state.items[itemIndex].qty += qty;
+
+      await this.prisma.planet.update({
+        where: { xsect_ysect_plnum: { xsect: state.xsect, ysect: state.ysect, plnum: state.plnum } },
+        data: stateToPrismaUpdate(state),
+      });
+
+      return { ok: true as const };
+    });
+  }
+
+  /**
+   * Transfer items from planet surface up to ship cargo.
+   * Requires requester to own the planet (or planet to be unowned — pre-claim loot).
+   * @see GECMDS.C:3354 trans_up
+   */
+  async withdrawFromPlanet(
+    key: string,
+    requesterUserid: string,
+    itemIndex: number,
+    qty: bigint,
+  ): Promise<{ ok: true } | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' | 'INSUFFICIENT' }> {
+    return this.runSerialized(key, async () => {
+      const state = this.map.get(key);
+      if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
+
+      // Allow owner OR unowned planet (trans_up from unclaimed planet)
+      if (state.userid !== null && state.userid !== requesterUserid) {
+        return { ok: false as const, reason: 'NOT_OWNER' as const };
+      }
+
+      if (state.items[itemIndex].qty < qty) {
+        return { ok: false as const, reason: 'INSUFFICIENT' as const };
+      }
+
+      state.items[itemIndex].qty -= qty;
+
+      await this.prisma.planet.update({
+        where: { xsect_ysect_plnum: { xsect: state.xsect, ysect: state.ysect, plnum: state.plnum } },
+        data: stateToPrismaUpdate(state),
+      });
+
+      return { ok: true as const };
+    });
   }
 }
 

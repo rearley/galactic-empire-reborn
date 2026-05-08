@@ -106,6 +106,9 @@ export class MidnightService implements OnApplicationBootstrap {
 
     try {
       const counters = await this.prisma.$transaction(async (tx) => {
+        this.logger.log('midnight: phase 0 — refresh neutral zone planets');
+        await this.repo.refreshNeutralZone(tx);
+
         this.logger.log('midnight: phase 1 — reset user accumulators');
         const usersUpdated = await this.repo.resetUserAccumulators(tx);
 
