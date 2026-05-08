@@ -94,6 +94,20 @@ export class ScanHandlerService implements OnModuleInit {
     this.scantabMap.set(`${userid}#${shipno}`, tab);
   }
 
+  private scanHelp(): CommandResult {
+    return {
+      lines: [
+        { text: 'Usage: scan <mode>', category: 'system' },
+        { text: '  sh      — ships in sector', category: 'system' },
+        { text: '  pl      — planets in sector', category: 'system' },
+        { text: '  ra      — range scan (tactical grid)', category: 'system' },
+        { text: '  se      — sector scan (wider view)', category: 'system' },
+        { text: '  lo      — local scan', category: 'system' },
+        { text: '  lo full — local scan, full detail', category: 'system' },
+      ],
+    };
+  }
+
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({
       select: { classNumber: true, scanRange: true },
@@ -144,9 +158,7 @@ export class ScanHandlerService implements OnModuleInit {
       return this.handleSectorScan(ship);
     }
 
-    return {
-      lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
-    };
+    return this.scanHelp();
   }
 
   /**
@@ -167,7 +179,7 @@ export class ScanHandlerService implements OnModuleInit {
     // Not-in-flight guard — orbit, docked, or dead (mirrors sca ra / sca se)
     if (ship.where >= 10) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
 
@@ -248,7 +260,7 @@ export class ScanHandlerService implements OnModuleInit {
     // Not-in-flight guard — orbit, docked, or dead
     if (ship.where >= 10) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
 
@@ -348,7 +360,7 @@ export class ScanHandlerService implements OnModuleInit {
     // Not-in-flight guard — orbit, docked, or dead
     if (ship.where >= 10) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
 
@@ -438,7 +450,7 @@ export class ScanHandlerService implements OnModuleInit {
     // Not-in-flight guard — orbit, docked, or dead
     if (ship.where >= 10) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
 
@@ -525,7 +537,7 @@ export class ScanHandlerService implements OnModuleInit {
   private scanSh(ship: ShipState, args: string[]): CommandResult {
     if (args.length === 0) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
     const name = args.join(' ');
@@ -560,7 +572,7 @@ export class ScanHandlerService implements OnModuleInit {
   private scanPl(ship: ShipState, args: string[]): CommandResult {
     if (args.length === 0) {
       return {
-        lines: [{ text: formatMessage(MessageId.SCANFMT), category: 'system' }],
+        ...this.scanHelp(),
       };
     }
 

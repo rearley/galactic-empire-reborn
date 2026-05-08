@@ -387,7 +387,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP13]: 'Cloak: inactive.',
 
   // scan — GECMDS.C:2138
-  [MessageId.SCANFMT]: 'Usage: scan <sh|pl|ra|se|lo>',
+  [MessageId.SCANFMT]: 'Usage: scan <mode>  (sh/pl/ra/se/lo)',
   [MessageId.TABROKE]: 'Tactical computer is offline.',
   [MessageId.JAMMER4]: 'Cannot scan while jammer is active.',
 

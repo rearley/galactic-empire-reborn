@@ -20,7 +20,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  rot <deg>      — set rotation delta (-180 to 180)',
       '  imp <pct>      — set impulse percentage (0-99)',
       '  war <warp>     — set warp factor',
-      '  sca            — scan current sector',
+      '  sca <mode>     — scan (sh=ships, pl=planets, ra=range, se=sector, lo=local)',
       '  lock <target>  — lock torpedoes/missiles on target',
       '  orb            — orbit nearest planet',
       '  land <name>    — land on planet',
