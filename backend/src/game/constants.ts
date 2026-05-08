@@ -279,7 +279,15 @@ export interface ProjectTarget {
  *   yf           = (target.y - ship.y) / yfactor + MAXY / 2.0
  *   emit if (0 <= xf < MAXX) && (0 <= yf < MAXY)
  *
- * @see GECMDS.C:2675 range = scanrange / 1000.0
+ * Coordinate scale correction: the original C source stored coords in a 0–300×0–150
+ * range (10 units per sector). Our backend uses 0–30×0–15 (1 unit per sector).
+ * The original formula produces a radius of scanRange/1000 in original units; in our
+ * units that is scanRange/10000. Dividing by 10000 instead of 1000 restores the
+ * correct projection — Interceptor (scanRange=100000) covers a 10-sector radius,
+ * matching the "100k = 10 sectors" comment in GECMDS.C:2668.
+ *
+ * @see GECMDS.C:2668 range = scanrange * 10.0 (display scale)
+ * @see GECMDS.C:2675 range = range / 10000.0  (coordinate scale)
  * @see GECMDS.C:2681 xfactor / yfactor projection
  * @see GECMDS.C:2718 bounds check
  * @see GEMAIN.H:121-122 MAXX=30, MAXY=15
@@ -289,8 +297,9 @@ export function projectRangeCell(
   target: ProjectTarget,
   scanRange: number,
 ): { x: number; y: number } | null {
-  // GECMDS.C:2675 — range = scanrange / 1000.0; then *2 for full diameter
-  const range = (scanRange / 1000.0) * 2.0;
+  // Original: range = scanrange/1000 in original coord units (0-300 scale).
+  // Our coords are 0-30 scale (10× smaller), so divide by 10000 instead of 1000.
+  const range = (scanRange / 10000.0) * 2.0;
   const xfactor = range / (SCAN_GRID_WIDTH - 1); // GECMDS.C:2681
   const yfactor = range / (SCAN_GRID_HEIGHT - 1); // GECMDS.C:2682
 
