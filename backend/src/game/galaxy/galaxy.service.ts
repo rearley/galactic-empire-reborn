@@ -5,7 +5,7 @@ import { MAXX, MAXY, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constan
 import { loadGalaxyConfig } from './galaxy.config';
 import { Rng } from './rng';
 import { S00, S00_PLNUM } from './s00';
-import { GalaxyConfig } from './galaxy.types';
+import { GalaxyConfig, GalaxyWormholeView } from './galaxy.types';
 
 /**
  * Galaxy generator and in-memory read model.
@@ -96,14 +96,20 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * All wormholes in the given sector. Empty array if none. O(1).
+   * All wormholes in the given sector as typed view objects. Empty array if none. O(1).
+   *
+   * `visible: boolean` maps the Prisma Int field (0=hidden, 1=visible) to a
+   * proper boolean so callers use type-safe semantics.
+   *
    * @throws if coords are out of range (programmer error)
+   * @see GEMAIN.H:473 — GALWORM.visible
    */
-  getSectorWormholes(xsect: number, ysect: number): readonly Wormhole[] {
+  getSectorWormholes(xsect: number, ysect: number): readonly GalaxyWormholeView[] {
     if (xsect < 0 || xsect >= MAXX || ysect < 0 || ysect >= MAXY) {
       throw new Error(`getSectorWormholes: out-of-range coords (${xsect}, ${ysect})`);
     }
-    return this.wormholesBySector.get(`${xsect},${ysect}`) ?? [];
+    const raw = this.wormholesBySector.get(`${xsect},${ysect}`) ?? [];
+    return raw.map((w) => ({ xcoord: w.xcoord, ycoord: w.ycoord, visible: w.visible === 1 }));
   }
 
   /**

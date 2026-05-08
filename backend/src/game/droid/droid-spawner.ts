@@ -133,6 +133,8 @@ export class DroidSpawner {
       navTargetY: null,
       scanNames: false,
       scanHome: false,
+      scanFull: false,
+      msgFilter: false,
       dirty: false,
       isEphemeral: true,
     };

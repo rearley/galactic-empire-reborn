@@ -1,0 +1,8 @@
+[
+  { "rngSeed": 1, "dmgMax": 200, "ton": 5000, "expected": 62 },
+  { "rngSeed": 1, "dmgMax": 200, "ton": 10000, "expected": 125 },
+  { "rngSeed": 1, "dmgMax": 200, "ton": 500, "expected": 12 },
+  { "rngSeed": 42, "dmgMax": 150, "ton": 7500, "expected": 67 },
+  { "rngSeed": 99, "dmgMax": 100, "ton": 10000, "expected": 26 },
+  { "rngSeed": 99, "dmgMax": 100, "ton": 1000, "expected": 2 }
+]

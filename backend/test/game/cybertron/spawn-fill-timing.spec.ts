@@ -58,7 +58,7 @@ function buildHarness(seed = 1) {
         cybmine: 255, cybskill: 10, cybupdate: 50,
         emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8000, warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
       };
       shipMap.set(`${slot.userid}:${slot.shipno}`, ship);

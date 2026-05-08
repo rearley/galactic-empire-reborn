@@ -13,7 +13,6 @@ import {
   MDAMMAX,
   MINERANGE,
   MISLSPED,
-  PRELOAD,
   TDAMMAX,
   TORPSPED,
 } from '../constants';
@@ -25,7 +24,8 @@ import {
   cdistance,
   decoyIntercept,
   mineFalloff,
-  randamage,
+  phaserReloadAmount,
+  rollHullDamage,
   shieldhit,
 } from './combat-math';
 import {
@@ -387,14 +387,16 @@ export class CombatTickService implements OnModuleInit {
 
   /** Per-ship combat work — filled in by subsequent user-story phases. */
   private processShipCombat(ship: ShipState, ctx: TickContext): void {
-    // Phaser reload (FR-004): phasr += PRELOAD, capped at class maxPhaser.
-    // Only ships with a phaser mounted accumulate charge.
-    // @see GEFUNCS.C — phaser reload pass
+    // Phaser reload: phasr += phasrtype * PRELOAD, capped at class maxPhaser.
+    // Only ships with a phaser mounted accumulate charge (phasrtype > 0).
+    // Interceptor double-reload bonus (shpclass==2) is commented out in shipped C.
+    // @see GEFUNCS.C:checkdam line 1031
     if (ship.phasrtype > 0) {
       try {
         const maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
+        const reloadAmt = phaserReloadAmount(ship.phasrtype);
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.phasr = Math.min(maxPhaser, s.phasr + PRELOAD);
+          s.phasr = Math.min(maxPhaser, s.phasr + reloadAmt);
         });
       } catch {
         // Class not in cache — skip reload silently; logged at hydration time.
@@ -567,7 +569,7 @@ export class CombatTickService implements OnModuleInit {
     } catch {
       // fall back to default
     }
-    const damage = randamage(this.random, dmgMax, ton);
+    const damage = rollHullDamage(this.random, dmgMax, ton);
     const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
     const result = shieldhit(carrier.shield, damage, shieldUp);
 

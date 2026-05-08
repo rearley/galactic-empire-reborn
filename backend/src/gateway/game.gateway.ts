@@ -7,7 +7,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
@@ -48,6 +48,8 @@ import {
   PhysicsSectorTransitionPayload,
 } from '../game/tick/sector-transition.subscriber';
 import { shipKey } from '../game/ship/ship-state.types';
+import { RANDOM, Random, gernd } from '../game/combat/random.port';
+import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
@@ -108,6 +110,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
+    @Inject(RANDOM) private readonly random: Random,
   ) {}
 
   /**
@@ -535,10 +538,56 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
   }
 
-  /** @see specs/010-react-frontend/data-model.md §C.2 */
+  /**
+   * Broadcast sector-transition event and emit beacon events to toSector rooms.
+   *
+   * For each transition: if there are observers in toSector and the
+   * C-source gate fires (gernd()%10===0), emit a `beacon` event to the
+   * toSector Socket.io room.
+   *
+   * @see specs/010-react-frontend/data-model.md §C.2
+   * @see GEFUNCS.C:808-816 — beacon-on-move gating conditions
+   */
   @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT)
   handleSectorTransition(event: PhysicsSectorTransitionPayload): void {
     this.server.emit('physics.sector-transition', event);
+
+    const { MAXX } = { MAXX: 30 };
+    const allShips = this.shipStateService.findAllShips();
+
+    for (const transition of event.transitions) {
+      const { shipId, fromSector, toSector } = transition;
+
+      // Condition 1: actual sector change
+      if (fromSector.x === toSector.x && fromSector.y === toSector.y) continue;
+
+      // Condition 2: at least one observer (non-mover) in toSector
+      const hasObserver = allShips.some(
+        (s) =>
+          shipKey(s.userid, s.shipno) !== shipId &&
+          Math.floor(s.xcoord) === toSector.x &&
+          Math.floor(s.ycoord) === toSector.y &&
+          (s.status === 1 || s.status === 2),
+      );
+      if (!hasObserver) continue;
+
+      // Condition 3: C-source 1-in-10 gate
+      if (gernd(this.random) % 10 !== 0) continue;
+
+      // Find the moving ship for its name
+      const movingShip = allShips.find((s) => shipKey(s.userid, s.shipno) === shipId);
+      if (!movingShip) continue;
+
+      const payload: BeaconEvent = {
+        shipId,
+        shipName: movingShip.shipname,
+        fromSector: fromSector.y * MAXX + fromSector.x,
+        toSector: toSector.y * MAXX + toSector.x,
+      };
+
+      const room = `sector:${toSector.x}:${toSector.y}`;
+      this.server.to(room).emit(BEACON_EVENT, payload);
+    }
   }
 
   /**
