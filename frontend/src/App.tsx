@@ -9,7 +9,6 @@ import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
 import { AuthScreen } from './auth/AuthScreen';
-import { ClassPickerPrompt } from './onboarding/ClassPickerPrompt';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { getToken, setToken } from './auth/tokenStore';
 import { connectSocket } from './socket/socketClient';
@@ -21,8 +20,8 @@ const MAX_LOG_ENTRIES = 500;
 /**
  * Root application component — five-region terminal UI (FR-002).
  * Gates on JWT token: renders AuthScreen when absent, terminal otherwise.
- * During onboarding (prompt:class-list / prompt:ship-name active), renders
- * the appropriate onboarding component instead of normal command input.
+ * During onboarding (prompt:ship-name active), renders ShipNamePrompt
+ * instead of normal command input.
  *
  * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/spec.md FR-002
@@ -69,15 +68,6 @@ function Terminal(): React.JSX.Element {
       : null;
 
   const renderBottomInput = (): React.JSX.Element => {
-    if (onboardingPrompt?.type === 'class-list') {
-      const classes = (onboardingPrompt.payload as { classes: Parameters<typeof ClassPickerPrompt>[0]['classes'] }).classes;
-      return (
-        <ClassPickerPrompt
-          classes={classes}
-          onSelect={(classNumber) => emitPromptReply(classNumber)}
-        />
-      );
-    }
     if (onboardingPrompt?.type === 'ship-name') {
       return (
         <ShipNamePrompt

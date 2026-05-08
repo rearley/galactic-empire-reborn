@@ -6,6 +6,7 @@ import { isValidShipName } from './name-validator';
 import { prismaShipToState } from '../ship/ship-state.mappers';
 import { ShipState } from '../ship/ship-state.types';
 import { ENGYMAX } from '../constants';
+import { START_CASH, START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
 
 export interface ClassListEntry {
   classNumber: number;
@@ -77,19 +78,17 @@ export class OnboardingService {
   }
 
   /**
-   * Finalizes onboarding: creates Ship row, loads into ShipStateService.
+   * Finalizes onboarding: creates Ship row with starting loadout, sets User.cash,
+   * loads ship into ShipStateService.
    * Returns the created ShipState — caller registers it in ConnectedShipsRegistry.
    *
    * Throws SpawnSectorMissingError if spawn sector is absent (fail-fast, FR-007).
    * Lets Prisma constraint errors propagate — caller disambiguates by constraint name.
    *
-   * @see GECMDS.C:4534 — cmd_new finalize
+   * @see GEFUNCS.C:initshp — ship initialisation (class 1, 3 flux pods, ENGYMAX)
+   * @see GEMAIN.C:521 STRTCASH — starting credits (5000)
    */
-  async finalize(
-    userid: string,
-    classNumber: number,
-    shipname: string,
-  ): Promise<ShipState> {
+  async finalize(userid: string, shipname: string): Promise<ShipState> {
     const spawnX = this.config.get<number>('SPAWN_SECTOR_X', 0);
     const spawnY = this.config.get<number>('SPAWN_SECTOR_Y', 0);
 
@@ -101,16 +100,15 @@ export class OnboardingService {
       throw new SpawnSectorMissingError(spawnX, spawnY);
     }
 
-    const shipClass = await this.prisma.shipClass.findUniqueOrThrow({
-      where: { classNumber },
-    });
+    // items[I_FLUX=4] = START_FLUX_PODS; all 14 slots initialised to 0n per NUMITEMS=14
+    const items: bigint[] = [0n, 0n, 0n, 0n, BigInt(START_FLUX_PODS), 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
     const ship = await this.prisma.ship.create({
       data: {
         userid,
         shipno: 1,
         shipname,
-        shpclass: classNumber,
+        shpclass: START_CLASS,
         xcoord: spawnX,
         ycoord: spawnY,
         energy: ENGYMAX,
@@ -123,13 +121,18 @@ export class OnboardingService {
         lmisslEnergy: [],
         decout: [],
         freq: [0, 0, 0],
-        items: [],
+        items,
       } as never,
+    });
+
+    await this.prisma.user.update({
+      where: { userid },
+      data: { cash: START_CASH },
     });
 
     const state = prismaShipToState(ship);
     this.shipStateService.loadShip(state);
-    this.logger.log(`Onboarding complete for ${userid}: ship "${shipname}" class ${classNumber}`);
+    this.logger.log(`Onboarding complete for ${userid}: ship "${shipname}" class ${START_CLASS}`);
     return state;
   }
 }

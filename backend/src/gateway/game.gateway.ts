@@ -85,9 +85,7 @@ interface GatewayError {
 type ValidCoord = { ok: true; x: number; y: number };
 type InvalidCoord = { ok: false; code: string; message: string };
 
-type OnboardingState =
-  | { step: 'AWAITING_CLASS' }
-  | { step: 'AWAITING_NAME'; selectedClass: number };
+type OnboardingState = { step: 'AWAITING_NAME' };
 
 /**
  * Handles Socket.io connections, handshake JWT auth, and command dispatch.
@@ -134,12 +132,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     if (!ship) {
-      // US1: New player — start onboarding flow
-      const onboardingState: OnboardingState = { step: 'AWAITING_CLASS' };
+      // New player — go directly to ship-name prompt (no class picker)
+      const onboardingState: OnboardingState = { step: 'AWAITING_NAME' };
       client.data.onboarding = onboardingState;
-
-      const classes = await this.onboardingService.buildClassListPayload();
-      client.emit('prompt:class-list', { step: 'CLASS', classes });
+      client.emit('prompt:ship-name', { step: 'NAME', rule: '1-19 printable ASCII' });
       return;
     }
 
@@ -285,28 +281,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    if (onboarding.step === 'AWAITING_CLASS') {
-      const classNumber = typeof body.value === 'number' ? body.value : parseInt(String(body.value), 10);
-      if (isNaN(classNumber) || !(await this.onboardingService.validateClassReply(classNumber))) {
-        const classes = await this.onboardingService.buildClassListPayload();
-        client.emit('prompt:class-list', { step: 'CLASS', classes, error: 'Invalid class selection.' });
-        return;
-      }
-      client.data.onboarding = { step: 'AWAITING_NAME', selectedClass: classNumber } satisfies OnboardingState;
-      client.emit('prompt:ship-name', {
-        step: 'NAME',
-        selectedClass: classNumber,
-        rule: '1-19 printable ASCII',
-      });
-      return;
-    }
-
     if (onboarding.step === 'AWAITING_NAME') {
       const name = typeof body.value === 'string' ? body.value.trim() : '';
       if (!this.onboardingService.validateNameReply(name)) {
         client.emit('prompt:ship-name', {
           step: 'NAME',
-          selectedClass: onboarding.selectedClass,
           rule: '1-19 printable ASCII',
           error: 'invalid-format',
         });
@@ -314,7 +293,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       try {
-        const state = await this.onboardingService.finalize(userid, onboarding.selectedClass, name);
+        const state = await this.onboardingService.finalize(userid, name);
         const shipId = shipKey(userid, state.shipno);
 
         const priorSocketId = this.registry.upsert(shipId, client.id);
@@ -368,7 +347,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // Name collision
           client.emit('prompt:ship-name', {
             step: 'NAME',
-            selectedClass: onboarding.selectedClass,
             rule: '1-19 printable ASCII',
             error: 'name-taken',
           });

@@ -164,7 +164,7 @@ describe('GameGateway handshake resolution', () => {
     }
   });
 
-  it('new player: valid JWT + no ship in DB → emits prompt:class-list', async () => {
+  it('new player: valid JWT + no ship in DB → emits prompt:ship-name', async () => {
     // Arrange: DB has no ship for this user
     prismaMock.ship.findFirst.mockResolvedValue(null);
 
@@ -174,11 +174,11 @@ describe('GameGateway handshake resolution', () => {
     });
 
     try {
-      const payload = await waitForEvent<{ step: string; classes: unknown[] }>(
+      const payload = await waitForEvent<{ step: string; rule: string }>(
         client,
-        'prompt:class-list',
+        'prompt:ship-name',
       );
-      expect(payload.step).toBe('CLASS');
+      expect(payload.step).toBe('NAME');
     } finally {
       client.disconnect();
     }

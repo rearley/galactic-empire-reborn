@@ -13,7 +13,7 @@ import type { UsePlayerListReturn } from '../state/usePlayerList';
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 export interface OnboardingPrompt {
-  type: 'class-list' | 'ship-name';
+  type: 'ship-name';
   payload: Record<string, unknown>;
 }
 
@@ -60,14 +60,10 @@ export function useSocket(
 
     const unsubResult = onCommandResult((payload) => setLastResult(payload));
 
-    const handleClassList = (payload: Record<string, unknown>) => {
-      setOnboardingPrompt({ type: 'class-list', payload });
-    };
     const handleShipName = (payload: Record<string, unknown>) => {
       setOnboardingPrompt({ type: 'ship-name', payload });
     };
 
-    socket.on('prompt:class-list', handleClassList);
     socket.on('prompt:ship-name', handleShipName);
 
     return () => {
@@ -75,7 +71,6 @@ export function useSocket(
       socket.off('disconnect', handleDisconnect);
       socket.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('connect_error', handleConnectError);
-      socket.off('prompt:class-list', handleClassList);
       socket.off('prompt:ship-name', handleShipName);
       unsubResult();
     };

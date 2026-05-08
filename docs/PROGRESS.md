@@ -1,3 +1,17 @@
+## 2026-05-08 — 021-onboarding-ship-purchase
+
+**Completed:** Restored original game onboarding progression (US1): new players receive a class 1 Interceptor with 5,000 credits and 3 flux pods automatically — no class picker shown. `OnboardingService.finalize(userid, shipname)` signature updated (removed `classNumber` param); always creates ship with `shpclass=START_CLASS` (1), `items[I_FLUX=4]=3n`, `energy=ENGYMAX`, `User.cash=START_CASH` (5000n). `GameGateway` `AWAITING_CLASS` state removed; new players go directly to `prompt:ship-name`. Added `new ship <N>` command (US2): `NewShipHandlerService` handles purchase at Zygor-3 (sector 0,0), validates orbit/sector/class/credits, creates Ship with same default loadout, decrements `User.cash`. Constants centralised in `backend/src/game/constants/onboarding.ts`. Frontend `ClassPickerPrompt.tsx` deleted; `App.tsx` and `useSocket.ts` cleaned of `class-list` branch.
+
+**Tests:** Balance regression tests pin `START_CASH=5000n`, `START_FLUX_PODS=3`, `START_CLASS=1`. Integration test verifies `finalize()` creates correct `shpclass`, `items`, and `User.cash`. Unit tests cover all 6 rejection paths + success for `new ship <N>`. Total: 20 new tests across 3 new suites; 256 existing suites continue to pass (1 pre-existing failure in `pln.handler.spec.ts` unrelated to this feature).
+
+**Decisions made:** `buildClassListPayload` and `validateClassReply` left on `OnboardingService` for possible future use (not called from gateway). New ship purchased via `new ship <N>` is loaded into `ShipStateService` but player must use `boa <N>` to board (FR-013 compliant). `new shield` returns a stub per contract.
+
+**Next:** Feature 022 or remaining commands.
+
+**Known issues:** None.
+
+---
+
 ## 2026-05-08 — 020-source-fidelity-audit
 
 **Completed:** Eight fidelity findings triaged and resolved. F-001: TS `randamage()` renamed to `rollHullDamage()` (was a hull-damage roll, not the C subsystem-damage routine); real `randamage()` added per `GEFUNCS.C:1956`. F-002: Phaser reload fixed from `+PRELOAD` to `phasrtype * PRELOAD` via new `phaserReloadAmount()` function. F-003: `GalaxyWormholeView` interface added with `visible: boolean`; `getSectorWormholes` returns this type; all scan.handler.ts checks changed to `!wormhole.visible`. F-004: N/A — `scan lo full` ordering is a deliberate TS enhancement. F-005: Beacon event added to `handleSectorTransition` in `GameGateway` with observer-check + `gernd()%10===0` gate. F-006: `scanfull` and `filter` options added to `SetHandlerService`; `ShipState` gains `scanFull` and `msgFilter`; `SET_OPTIONS_CATALOG` committed. F-007: `ENGYMAX` corrected 50000→65000; 25+ missing constants added; `GEMAIN_GAMEPLAY_PINS` bidirectional pin map added. F-008: Manual smoke tests created.

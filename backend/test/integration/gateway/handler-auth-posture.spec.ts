@@ -24,7 +24,7 @@ import { OnboardingService } from '../../../src/game/onboarding/onboarding.servi
 /**
  * Build a client that connects via JWT auth.token.
  * The WsAuthGuard mock will accept this token, look up no ship (prisma mock returns null),
- * and the gateway will enter onboarding mode (prompt:class-list).
+ * and the gateway will enter onboarding mode (prompt:ship-name).
  */
 function makeUnboundClient(port: number): Socket {
   return ioc(`http://localhost:${port}`, {
@@ -47,7 +47,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
   let app: INestApplication;
   let port: number;
   let client: Socket;
-  /** Resolves once the gateway emits prompt:class-list for the current client. */
+  /** Resolves once the gateway emits prompt:ship-name for the current client. */
   let onboardingReady: Promise<void>;
 
   const dispatchMock = jest.fn().mockReturnValue({ lines: [] });
@@ -111,10 +111,10 @@ describe('GameGateway handler auth posture (T020b)', () => {
 
   beforeEach((done) => {
     client = makeUnboundClient(port);
-    // Register the prompt:class-list listener BEFORE the connect fires so we
+    // Register the prompt:ship-name listener BEFORE the connect fires so we
     // never miss the event that handleConnection emits immediately on connect.
     onboardingReady = new Promise<void>((resolve) => {
-      client.once('prompt:class-list', () => resolve());
+      client.once('prompt:ship-name', () => resolve());
     });
     client.on('connect', done);
   });
@@ -124,7 +124,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
   });
 
   it('sector:join from unbound socket → rejection, no room join', async () => {
-    // Wait for onboarding prompt (confirms handleConnection completed, socket is in onboarding mode)
+    // Wait for ship-name prompt (confirms handleConnection completed, socket is in onboarding mode)
     await onboardingReady;
 
     client.emit('sector:join', { x: 1, y: 1 });
@@ -133,7 +133,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
   });
 
   it('sector:leave from unbound socket → rejection', async () => {
-    // Wait for onboarding prompt (confirms handleConnection completed, socket is in onboarding mode)
+    // Wait for ship-name prompt (confirms handleConnection completed, socket is in onboarding mode)
     await onboardingReady;
 
     client.emit('sector:leave', { x: 1, y: 1 });
@@ -143,7 +143,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
 
   it('command from unbound socket (no activeShipNo) → rejection, dispatch NOT called', async () => {
     dispatchMock.mockClear();
-    // Wait for onboarding prompt (confirms handleConnection completed, socket is in onboarding mode)
+    // Wait for ship-name prompt (confirms handleConnection completed, socket is in onboarding mode)
     await onboardingReady;
 
     client.emit('command', { input: 'scan' });

@@ -16,7 +16,7 @@ import { ShipState } from '../../ship/ship-state.types';
 export class HelpHandlerService {
   readonly command: Command = {
     keyword: 'hel',
-    aliases: ['?'],
+    aliases: ['?', 'help'],
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
