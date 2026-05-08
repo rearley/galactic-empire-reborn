@@ -42,7 +42,7 @@ function makeShip(userid: string, shipno: number): ShipState {
     cantexit: 0,
     teamcode: 0,
     scanNames: false,
-    scanHome: false,
+    scanHome: false, scanFull: false, msgFilter: false,
     torps: [],
     missiles: [],
     mines: [],

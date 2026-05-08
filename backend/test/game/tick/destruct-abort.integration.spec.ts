@@ -29,7 +29,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...overrides,
   };

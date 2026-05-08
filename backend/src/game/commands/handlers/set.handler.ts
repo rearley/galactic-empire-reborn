@@ -89,6 +89,42 @@ export class SetHandlerService {
         await prisma.user.update({ where: { userid: ship.userid }, data: { options } });
       },
     },
+    {
+      name: 'scanfull',
+      label: 'scanfull',
+      get: (ship) => ship.scanFull,
+      set: async (ship, value, shipState, prisma) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.scanFull = value;
+        });
+        const user = await prisma.user.findUnique({
+          where: { userid: ship.userid },
+          select: { options: true },
+        });
+        const options = [...(user?.options ?? [])];
+        while (options.length <= 2) options.push(0);
+        options[2] = value ? 1 : 0;
+        await prisma.user.update({ where: { userid: ship.userid }, data: { options } });
+      },
+    },
+    {
+      name: 'filter',
+      label: 'filter',
+      get: (ship) => ship.msgFilter,
+      set: async (ship, value, shipState, prisma) => {
+        shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.msgFilter = value;
+        });
+        const user = await prisma.user.findUnique({
+          where: { userid: ship.userid },
+          select: { options: true },
+        });
+        const options = [...(user?.options ?? [])];
+        while (options.length <= 3) options.push(0);
+        options[3] = value ? 1 : 0;
+        await prisma.user.update({ where: { userid: ship.userid }, data: { options } });
+      },
+    },
   ];
 
   constructor(

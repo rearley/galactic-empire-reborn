@@ -31,7 +31,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     autoShield: false,
     autoRepair: false,
@@ -105,11 +105,11 @@ describe('SetHandlerService — auto-repair', () => {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — set ? listing', () => {
-  it('returns status line with all 4 options (all off)', async () => {
-    const ship = makeShip({ autoShield: false, autoRepair: false, scanNames: false, scanHome: false });
+  it('returns status line with all 6 options (all off)', async () => {
+    const ship = makeShip({ autoShield: false, autoRepair: false, scanNames: false, scanHome: false, scanFull: false, msgFilter: false });
     const { handler } = makeService(ship);
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
     expect(result.lines[0].category).toBe('info');
   });
 
@@ -117,14 +117,14 @@ describe('SetHandlerService — set ? listing', () => {
     const ship = makeShip({ autoShield: true, autoRepair: false, scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: OFF | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
   });
 
   it('returns status line with both legacy flags ON', async () => {
     const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: OFF | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
   });
 });
 

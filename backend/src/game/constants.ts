@@ -5,6 +5,12 @@
 export const MAXX = 30 as const;
 export const MAXY = 15 as const;
 
+// ─── Movement/rotation constants ────────────────────────────────────────────
+
+/** Degrees rotated per tick when rotate command is active.
+ * @see GEMAIN.H:74 #define ROTAMT 20 */
+export const ROTAMT = 20 as const;
+
 /**
  * Physics tick interval in seconds.
  * @see GEMAIN.H TICKTIME
@@ -105,26 +111,76 @@ export const PLANTOCK_SECONDS = 1800 as const;
 export const PLANTIME_MIN_SECONDS = 4 as const;
 
 // ─── Combat constants (006b) ────────────────────────────────────────────────
-/** @see GEMAIN.H:xx #define PMINFIRE 60 — minimum phaser charge to fire */
+/** @see GEMAIN.H:81 #define PMINFIRE 60 — minimum phaser charge to fire */
 export const PMINFIRE = 60 as const;
-/** @see GEMAIN.H:xx #define PRELOAD 10 — phaser reload rate per tick */
+/** @see GEMAIN.H:80 #define PRELOAD 10 — phaser reload rate per tick */
 export const PRELOAD = 10 as const;
-/** @see GEMAIN.H:xx #define PHABIAS 2 — phaser arc bias (extra degrees) */
+/** @see GEMAIN.H:82 #define PENGUSE 57 — energy consumed per tick while phasers charge */
+export const PENGUSE = 57 as const;
+/** @see GEMAIN.H:83 #define PMINENG 500 — minimum ship energy required to fire phasers */
+export const PMINENG = 500 as const;
+/** @see GEMAIN.H:84 #define PHABIAS 2 — phaser arc bias (extra degrees) */
 export const PHABIAS = 2 as const;
-/** @see GEMAIN.H:xx #define SHHITENG 1000 — shield energy drained per phaser hit */
-export const SHHITENG = 1000 as const;
-/** @see GEMAIN.H:xx #define FIRETICKS 10 — battle-lock counter set on fire/hit */
-export const FIRETICKS = 10 as const;
-/** @see GEMAIN.H:xx #define DECOYTIME 15 — decoy slot lifetime in ticks */
-export const DECOYTIME = 15 as const;
-/** @see GEMAIN.H:xx #define HPBEAMW 5 — hyper-phaser beam width in degrees */
+/** @see GEMAIN.H:86 #define HPMINFIR 6000 — minimum flux energy to fire hyper-phaser */
+export const HPMINFIR = 6000 as const;
+/** @see GEMAIN.H:87 #define HPFIRAMT 5000 — flux energy consumed per hyper-phaser shot */
+export const HPFIRAMT = 5000 as const;
+/** @see GEMAIN.H:88 #define HPBEAMW 5 — hyper-phaser beam width in degrees */
 export const HPBEAMW = 5 as const;
-/** @see GEMAIN.H:xx MAXTORPS 3 — max incoming torpedo slots per target */
+/** @see GEMAIN.H:90 #define ENGYMAX 65000 — maximum energy a ship can have */
+export const ENGYMAX = 65000 as const;
+/** @see GEMAIN.H:91 #define ENGRECHG 1 — energy recharged per ship-update tick */
+export const ENGRECHG = 1 as const;
+/** @see GEMAIN.H:92 #define ENGYMIN 5000 — minimum flux energy for auto-load */
+export const ENGYMIN = 5000 as const;
+/** @see GEMAIN.H:94 #define SHMINPWR 200 — minimum power to raise shields */
+export const SHMINPWR = 200 as const;
+/** @see GEMAIN.H:95 #define SHENGUSE 100 — energy drained per tick while shields up */
+export const SHENGUSE = 100 as const;
+/** @see GEMAIN.H:96 #define SHHITENG 1000 — shield energy drained per phaser hit */
+export const SHHITENG = 1000 as const;
+/** @see GEMAIN.H:97 #define SHMAXCHG 10 — max shield charge level (full) */
+export const SHMAXCHG = 10 as const;
+/** @see GEMAIN.H:98 #define SHMINCHG 5 — minimum shield charge to be effective */
+export const SHMINCHG = 5 as const;
+/** @see GEMAIN.H:100 #define SCANADJ 40 — range-scanner display adjustment factor */
+export const SCANADJ = 40 as const;
+/** @see GEMAIN.H:102 #define TONFACT 15000.0 — tonnage factor divisor for damage scaling */
+export const TONFACT = 15000 as const;
+/** @see GEMAIN.H:10 #define FIRETICKS 10 — battle-lock counter set on fire/hit */
+export const FIRETICKS = 10 as const;
+/** @see GEMAIN.H:132 #define DECOYTIME 15 — decoy slot lifetime in ticks */
+export const DECOYTIME = 15 as const;
+/** @see GEMAIN.H:127 #define MAXDECOY 10 — maximum decoy slots per ship */
+export const MAXDECOY = 10 as const;
+/** @see GEMAIN.H:199 #define NUM_MINES 20 — maximum concurrent mines in the galaxy */
+export const NUM_MINES = 20 as const;
+/** @see GEMAIN.H:130 #define HYSCANRANGE 5 — hyperspace scan range (sectors) */
+export const HYSCANRANGE = 5 as const;
+/** @see GEMAIN.H:136 #define PLANTIME 55 — planet update tick interval */
+export const PLANTIME = 55 as const;
+/** @see GEMAIN.H:141 #define NUMITEMS 14 — number of cargo item types */
+export const NUMITEMS = 14 as const;
+/** @see GEMAIN.H:163 #define SHIELD_FACTOR 4 — shield absorption multiplier */
+export const SHIELD_FACTOR = 4 as const;
+/** @see GEMAIN.H:165 #define COUNTDOWN 20 — self-destruct countdown ticks */
+export const COUNTDOWN = 20 as const;
+/** @see GEMAIN.H:3 MAXTORPS 3 — max incoming torpedo slots per target */
 export const MAXTORPS = 3 as const;
-/** @see GEMAIN.H:xx MAXMISSL 3 — max incoming missile slots per target */
+/** @see GEMAIN.H:126 MAXMISSL 3 — max incoming missile slots per target */
 export const MAXMISSL = 3 as const;
-/** @see GEMAIN.H:xx #define MINERANGE 10000 — mine damage/warning radius */
+/** @see GEMAIN.H:195 #define MINERANGE 10000 — mine damage/warning radius */
 export const MINERANGE = 10000 as const;
+/** @see GEMAIN.H:197 #define DESTRUCTRANGE 10000 — self-destruct blast radius */
+export const DESTRUCTRANGE = 10000 as const;
+/** @see GEMAIN.H:201 #define TOPSHIELD 19 — highest shield class index */
+export const TOPSHIELD = 19 as const;
+/** @see GEMAIN.H:203 #define TOPPHASOR 19 — highest phaser class index */
+export const TOPPHASOR = 19 as const;
+/** @see GEMAIN.H:184 #define TELEDAM 17 — hull damage when ship hits universe edge */
+export const TELEDAM = 17 as const;
+/** @see GEMAIN.H:181 #define QUADMAXPERTICK 5 — max Cyberquad AI activations per physics tick */
+export const QUADMAXPERTICK = 5 as const;
 /** @see GEGLOBAL.H tdammax — max torpedo damage roll */
 export const TDAMMAX = 200 as const;
 /** @see GEGLOBAL.H mdammax — max missile damage roll */
@@ -141,8 +197,6 @@ export const MISLSPED = 300 as const;
 export const MISENGFC = 10 as const;
 /** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
 export const JAMTIME = 20 as const;
-/** @see GEGLOBAL.H engymax — canonical default ship energy maximum, restored by `flux`. */
-export const ENGYMAX = 50000 as const;
 
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;
@@ -248,3 +302,85 @@ export function projectRangeCell(
   }
   return null;
 }
+
+// ─── GEMAIN.H Gameplay Pin Map ────────────────────────────────────────────────
+/**
+ * Explicit map of every gameplay-affecting `#define` from GEMAIN.H.
+ * Used by `test/unit/gemain-pins.spec.ts` to assert both directions:
+ *   - Every gameplay define in GEMAIN.H appears here with the correct value.
+ *   - Every entry here appears in GEMAIN.H with the correct value.
+ *
+ * Constants excluded from this set are documented in the spec file.
+ *
+ * @see reference/ge-source/GEMAIN.H
+ * @see backend/test/unit/gemain-pins.spec.ts
+ */
+export const GEMAIN_GAMEPLAY_PINS: Readonly<Record<string, number>> = {
+  // ── Movement / Physics ─────────────────────────────────────────────────────
+  ROTENGUSE,
+  ROTAMT,
+  ACCENGAMT,
+  MOVENGMIN,
+  MOVENGUSE,
+  // ── Phaser / Weapon ────────────────────────────────────────────────────────
+  PRELOAD,
+  PMINFIRE,
+  PENGUSE,
+  PMINENG,
+  PHABIAS,
+  HPMINFIR,
+  HPFIRAMT,
+  HPBEAMW,
+  // ── Energy / Shields ───────────────────────────────────────────────────────
+  ENGYMAX,
+  ENGRECHG,
+  ENGYMIN,
+  SHMINPWR,
+  SHENGUSE,
+  SHHITENG,
+  SHMAXCHG,
+  SHMINCHG,
+  SHIELD_FACTOR,
+  // ── Scan ──────────────────────────────────────────────────────────────────
+  SCANADJ,
+  HYSCANRANGE,
+  // ── Tonnage / Damage ──────────────────────────────────────────────────────
+  TONFACT,
+  MINERANGE,
+  DESTRUCTRANGE,
+  TOPSHIELD,
+  TOPPHASOR,
+  TELEDAM,
+  // ── Galaxy ────────────────────────────────────────────────────────────────
+  MAXPLANETS,
+  MAXX,
+  MAXY,
+  SECTYPE_NORMAL,
+  PLTYPE_PLNT,
+  PLTYPE_WORM,
+  // ── Weapons / Items ────────────────────────────────────────────────────────
+  MAXTORPS,
+  MAXMISSL,
+  MAXDECOY,
+  NUM_MINES,
+  DECOYTIME,
+  NUMITEMS,
+  // ── Tick / Time ───────────────────────────────────────────────────────────
+  TICKTIME,
+  TICKTIME2,
+  CYBTICKTIME,
+  PLANTIME,
+  FIRETICKS,
+  COUNTDOWN,
+  // ── Cybertron AI ──────────────────────────────────────────────────────────
+  CYB_MINCLASS,
+  CYBSLO,
+  CYB_ALLOW,
+  CYB_MAXCASH,
+  CYB_BE_NICE,
+  CYB_BE_EASY,
+  CYB_BREAKOFF,
+  CYB_MINDAM,
+  CYBMAXPERTICK,
+  QUADMAXPERTICK,
+} as const;
