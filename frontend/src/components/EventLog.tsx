@@ -46,21 +46,26 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
   }, [lines, stickyBottom]);
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="flex-1 overflow-y-auto font-mono text-sm p-2 bg-black"
-      data-testid="event-log"
-    >
-      {capped.map((line, idx) => (
-        <div
-          key={idx}
-          className={CATEGORY_CLASS[line.category] ?? 'text-gray-100'}
-          data-testid={`log-line-${line.category}`}
-        >
-          {line.text}
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Event Log</span>
+      </div>
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto font-mono text-sm p-2 bg-black"
+        data-testid="event-log"
+      >
+        {capped.map((line, idx) => (
+          <div
+            key={idx}
+            className={CATEGORY_CLASS[line.category] ?? 'text-gray-100'}
+            data-testid={`log-line-${line.category}`}
+          >
+            {line.text}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

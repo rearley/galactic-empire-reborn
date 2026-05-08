@@ -143,25 +143,28 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
 export function ScanPanel(): React.JSX.Element {
   const cards = useScanRender();
 
-  if (cards.length === 0) {
-    return (
-      <div
-        className="font-mono text-xs text-gray-600 p-2"
-        data-testid="scan-panel-empty"
-      >
-        No scan data
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="overflow-auto bg-black p-1"
-      data-testid="scan-panel"
-    >
-      {cards.map((card, idx) => (
-        <ScanCard key={idx} event={card} />
-      ))}
-    </div>
+    <>
+      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Scan Data</span>
+      </div>
+      {cards.length === 0 ? (
+        <div
+          className="font-mono text-xs text-gray-600 p-2"
+          data-testid="scan-panel-empty"
+        >
+          No scan data
+        </div>
+      ) : (
+        <div
+          className="overflow-auto bg-black p-1"
+          data-testid="scan-panel"
+        >
+          {cards.slice().reverse().map((card, idx) => (
+            <ScanCard key={idx} event={card} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
