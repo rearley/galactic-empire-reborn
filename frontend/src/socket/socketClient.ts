@@ -50,11 +50,20 @@ export function onError(
   return () => socket.off('error', listener);
 }
 
+type AuthFailedCallback = () => void;
+let onAuthFailed: AuthFailedCallback | null = null;
+
+/** Register a callback invoked when the server rejects the token (expired/invalid). */
+export function onSocketAuthFailed(cb: AuthFailedCallback): void {
+  onAuthFailed = cb;
+}
+
 // Handle session-replaced and auth-required by clearing the local token.
 socket.on('error', (err: { code?: string }) => {
   if (err.code === 'SESSION_REPLACED' || err.code === 'AUTH_REQUIRED') {
     clearToken();
     socket.disconnect();
+    onAuthFailed?.();
   }
 });
 
