@@ -16,7 +16,7 @@ export class PlnHandlerService {
 
   readonly command: Command = {
     keyword: 'pln',
-    aliases: [],
+    aliases: ['pla'],
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, _args: string[], _ctx: CommandContext): Promise<CommandResult> =>
