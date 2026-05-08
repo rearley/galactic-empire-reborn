@@ -59,7 +59,7 @@ export function onSocketAuthFailed(cb: AuthFailedCallback): void {
 }
 
 // Handle session-replaced and auth-required by clearing the local token.
-socket.on('error', (err: { code?: string }) => {
+socket.on('error', (err: { code?: string; message?: string }) => {
   if (err.code === 'SESSION_REPLACED' || err.code === 'AUTH_REQUIRED') {
     clearToken();
     socket.disconnect();
