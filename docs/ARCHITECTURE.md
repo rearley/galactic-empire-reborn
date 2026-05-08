@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 017-mail-inbox.
+Current module map as of feature 018-team-management.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -97,6 +97,18 @@ AppModule (app.module.ts)
   │     ├── MailInboxRepository — Prisma queries on MailStat; findByUserid (stamp DESC, msgno DESC, class DESC); deleteOne (returns false on P2025)
   │     ├── MailInboxService — list(userid)/resolveIndex(userid,index)/deleteByIndex(userid,index); R3 sender resolution (ShipStateService → raw dtime → "(system)"); R5 re-query per call
   │     └── mail-render.ts — pure functions classLabel/formatListLine/formatDetail; no DI
+  ├── TeamModule (game/team/) — exports TeamService, TeamRepository
+  │     ├── TeamRepository — Prisma queries on Team/User: findByNameLower (case-insensitive name lookup),
+  │     │                     insertTeam (creates row with teamcount=1/teamscore=0/secret=""/flag=0),
+  │     │                     liveCountsGroupBy (User GROUP BY teamcode for live member counts),
+  │     │                     findTeamsByCodes (batch fetch by teamcode list — no N+1),
+  │     │                     getMaxTeamcode (MAX aggregate, 0n when empty)
+  │     ├── TeamService — create({ship,name,password}): Prisma $transaction(getMaxTeamcode+1 → insertTeam → User.update),
+  │     │                  retries up to 3× on P2002; mirrors ShipState.teamcode on success.
+  │     │                  joinByPassword({ship,name,password}): case-insensitive name, case-sensitive password.
+  │     │                  list(): two-query leaderboard (liveCountsGroupBy → findTeamsByCodes), sorted teamscore DESC/teamcode ASC, capped 20.
+  │     └── team-render.ts — renderTeamList(entries): header + fixed-width rows; "No teams have been formed." when empty.
+  │                           renderTeamCell(name|null): 12-char fixed-width column; truncate 11+… for >12; "---" for null/0/missing.
   ├── CommandsModule (game/commands/) — exports CommandRouterService
   │     ├── CommandRouterService — alias-keyed registry; keyword lowercased, args preserve casing; minArgs guard
   │     ├── ScanHandlerService — @Injectable scan/sc handler; reads ShipClass.scanRange;

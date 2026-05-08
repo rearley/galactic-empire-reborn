@@ -1,8 +1,11 @@
 import { CommandRouterService } from '../../../src/game/commands/command-router.service';
 import { RosHandlerService } from '../../../src/game/commands/handlers/ros.handler';
+import { TeamRepository } from '../../../src/game/team/team.repository';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
+
+const emptyTeamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as TeamRepository;
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -32,7 +35,7 @@ function buildRouter(users: Array<{ userid: string; score: bigint; kills: number
   const prismaMock = {
     user: { findMany: jest.fn().mockResolvedValue(users) },
   } as unknown as PrismaService;
-  const handler = new RosHandlerService(prismaMock);
+  const handler = new RosHandlerService(prismaMock, emptyTeamRepo);
   const router = new CommandRouterService();
   router.register(handler.command);
   return router;
@@ -56,7 +59,7 @@ describe('ros dispatch integration', () => {
 
   it('ros all passes to Prisma with all cap', async () => {
     const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-    const handler = new RosHandlerService(prismaMock);
+    const handler = new RosHandlerService(prismaMock, emptyTeamRepo);
     const router = new CommandRouterService();
     router.register(handler.command);
     await router.dispatch('ros all', makeShip(), ctx);

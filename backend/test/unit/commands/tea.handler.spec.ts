@@ -39,7 +39,12 @@ function makeHandler(
     },
   } as unknown as PrismaService;
   const shipStateSvcMock = {} as unknown as ShipStateService;
-  return new TeaHandlerService(prismaMock, shipStateSvcMock);
+  const teamSvcMock = {
+    create: jest.fn(),
+    joinByPassword: jest.fn(),
+    list: jest.fn().mockResolvedValue([]),
+  } as unknown as import('../../../src/game/team/team.service').TeamService;
+  return new TeaHandlerService(prismaMock, shipStateSvcMock, teamSvcMock);
 }
 
 const ctx: CommandContext = {};
@@ -101,69 +106,41 @@ describe('TeaHandlerService', () => {
     });
   });
 
-  describe('FR-026: tea <name> joins by exact case-insensitive match', () => {
-    it('sets ship.teamcode on successful join', async () => {
-      const ship = makeShip({ teamcode: undefined });
+  // FR-016a: single-token form now shows current team (changed in feature 018)
+  // Password-gated join tests are in test/team/tea.handler.spec.ts
+  describe('FR-026: tea <name> (single token) shows current team (FR-016a)', () => {
+    it('single-token shows team info, not a join attempt', async () => {
+      const ship = makeShip({ teamcode: 99n });
+      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
+      const result = await handler.command.handler(ship, ['Raiders'], ctx);
+      expect(result.lines[0].text).toMatch(/Raiders/);
+      expect(result.lines[0].category).toBe('info');
+    });
+
+    it('single-token does not change ship.teamcode', async () => {
+      const ship = makeShip({ teamcode: 99n });
       const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
       await handler.command.handler(ship, ['Raiders'], ctx);
       expect(ship.teamcode).toBe(99n);
     });
-
-    it('join is case-insensitive', async () => {
-      const ship = makeShip({ teamcode: undefined });
-      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
-      await handler.command.handler(ship, ['raiders'], ctx);
-      expect(ship.teamcode).toBe(99n);
-    });
-
-    it('sets dirty=true on join', async () => {
-      const ship = makeShip({ dirty: false });
-      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
-      await handler.command.handler(ship, ['raiders'], ctx);
-      expect(ship.dirty).toBe(true);
-    });
-
-    it('writes User.teamcode via Prisma on join', async () => {
-      const updateMock = jest.fn().mockResolvedValue({});
-      const ship = makeShip({ userid: 'u1' });
-      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' }, updateMock);
-      await handler.command.handler(ship, ['raiders'], ctx);
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userid: 'u1' } }),
-      );
-    });
-
-    it('returns success line on join', async () => {
-      const ship = makeShip();
-      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
-      const result = await handler.command.handler(ship, ['raiders'], ctx);
-      expect(result.lines[0].text).toMatch(/joined team Raiders/i);
-      expect(result.lines[0].category).toBe('success');
-    });
-
-    it('emits player.snapshot broadcast on join', async () => {
-      const ship = makeShip();
-      const handler = makeHandler({ teamcode: 99n, teamname: 'Raiders' });
-      const result = await handler.command.handler(ship, ['raiders'], ctx);
-      expect(result.broadcasts?.some((b) => b.event === 'player.snapshot')).toBe(true);
-    });
   });
 
-  describe('FR-027: non-existent team returns error, no state change', () => {
-    it('returns "No such team" error line', async () => {
+  // FR-027: no-such-team error now only applies to 2+ token join (feature 018 routing)
+  describe('FR-027: single-token non-keyword shows team status, does not error', () => {
+    it('single unknown token routes to show-team (not on team → info message)', async () => {
       const ship = makeShip({ teamcode: undefined });
       const result = await makeHandler(null).command.handler(ship, ['Unknown'], ctx);
-      expect(result.lines[0].text).toMatch(/No such team: Unknown/);
-      expect(result.lines[0].category).toBe('system');
+      expect(result.lines[0].category).toBe('info');
+      expect(result.lines[0].text).toMatch(/not on a team/i);
     });
 
-    it('does not change ship.teamcode on not-found', async () => {
+    it('does not change ship.teamcode on single-token', async () => {
       const ship = makeShip({ teamcode: undefined });
       await makeHandler(null).command.handler(ship, ['Unknown'], ctx);
       expect(ship.teamcode).toBeUndefined();
     });
 
-    it('does not set dirty on not-found', async () => {
+    it('does not set dirty on single-token', async () => {
       const ship = makeShip({ dirty: false });
       await makeHandler(null).command.handler(ship, ['Unknown'], ctx);
       expect(ship.dirty).toBe(false);

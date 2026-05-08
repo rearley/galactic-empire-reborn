@@ -106,7 +106,12 @@ describe('tea E2E round-trip', () => {
       user: { update: jest.fn().mockResolvedValue({}) } as never,
     };
     const shipSvcMock = {} as unknown as ShipStateService;
-    const handler = new TeaHandlerService(prismaMock as unknown as PrismaService, shipSvcMock);
+    const teamSvcMock = {
+      create: jest.fn(),
+      joinByPassword: jest.fn(),
+      list: jest.fn().mockResolvedValue([]),
+    } as unknown as import('../../src/game/team/team.service').TeamService;
+    const handler = new TeaHandlerService(prismaMock as unknown as PrismaService, shipSvcMock, teamSvcMock);
     router = new CommandRouterService();
     router.register(handler.command);
   });
@@ -135,20 +140,22 @@ describe('tea E2E round-trip', () => {
     });
   });
 
-  describe('tea <name> join', () => {
-    it('joins team and emits player.snapshot on success', async () => {
+  // Single-token form now routes to show-current-team (FR-016a change in feature 018)
+  describe('tea <name> single-token (FR-016a)', () => {
+    it('single-token shows team info, does not join', async () => {
       (prismaMock.team.findFirst as jest.Mock).mockResolvedValue({ teamcode: 99n, teamname: 'Pirates' });
-      const ship = makeShip({ teamcode: undefined });
+      const ship = makeShip({ teamcode: 99n });
       const result = await router.dispatch('tea Pirates', ship, ctx);
-      expect(ship.teamcode).toBe(99n);
-      expect(result.broadcasts?.some((b) => b.event === 'player.snapshot')).toBe(true);
+      expect(result.lines[0].category).toBe('info');
+      expect(result.lines[0].text).toMatch(/Pirates/);
     });
 
-    it('returns error when team not found', async () => {
+    it('single unknown token returns not-on-team info when not affiliated', async () => {
       (prismaMock.team.findFirst as jest.Mock).mockResolvedValue(null);
       const ship = makeShip({ teamcode: undefined });
       const result = await router.dispatch('tea Unknown', ship, ctx);
-      expect(result.lines[0].text).toMatch(/No such team: Unknown/);
+      expect(result.lines[0].category).toBe('info');
+      expect(result.lines[0].text).toMatch(/not on a team/i);
       expect(ship.teamcode).toBeUndefined();
     });
   });

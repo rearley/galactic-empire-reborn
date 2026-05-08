@@ -947,7 +947,7 @@ using the ship's `ShipState.teamcode`. Returns `Ship not found.` for no-match or
 
 ---
 
-## cmd_ros — leaderboard (feature 012)
+## cmd_ros — leaderboard (features 012, 018)
 
 **Source**: GECMDS.C (no direct equivalent; see GEMAIN.H for score/kills fields)
 
@@ -955,8 +955,13 @@ using the ship's `ShipState.teamcode`. Returns `Ship not found.` for no-match or
 
 `RosHandlerService` queries `Prisma.user.findMany` excluding any userid with prefix `Cybrg-`
 or `@Droid-`, ordered by `score DESC, kills DESC, userid ASC`. Default cap is
-`ROSTER_MAX` (env var, default 20); `ros all` raises cap to 200. Returns header + one row
-per user: rank, userid, score, kills, planets, population.
+`ROSTER_MAX` (env var, default 20); `ros all` raises cap to 200.
+
+**Team column (feature 018)**: After the user page query, collects distinct non-zero `teamcode`s
+and performs a single `TeamRepository.findTeamsByCodes` call (no N+1). Each row includes a fixed
+12-char team column between `UserID` and `Score`: team names ≤ 12 chars are padded; names > 12
+are truncated to 11 chars + `…`; null/0/missing teamcodes render `---` padded to 12. Header:
+`  Rank  UserID                Team         Score      Kills  Planets  Population`.
 
 ---
 
@@ -991,20 +996,37 @@ broadcasts. Event name: `message.send`. Not persisted.
 
 ---
 
-## cmd_tea — team affiliation (feature 012)
+## cmd_tea — team management (features 012, 018)
 
-**Source**: GECMDS.C:5277 `cmd_team` (subset; see D2 in DECISIONS.md for deviation)
+**Source**: GECMDS.C:5277 `cmd_team` (see D2 in DECISIONS.md for auto-assigned teamcode deviation)
 
-**Syntax**: `tea` / `tea <team-name>` / `tea leave`
+**Syntax**: `tea` / `tea leave` / `tea list` / `tea create <name…> <password>` / `tea <name…> <password>`
 
-`TeaHandlerService`:
-- No arg: returns current team (via `ShipState.teamcode` → name lookup) or "not on a team".
-- `tea <name>`: `Prisma.team.findFirst({ where: { teamname: { equals: name, mode: 'insensitive' } } })`;
-  exact case-insensitive match only (prefix/substring rejected). On match: updates
-  `User.teamcode` in Postgres, updates `ShipState.teamcode` in memory, sets `dirty = true`,
-  emits `player.snapshot` sentinel broadcast.
-- `tea leave`: clears both `User.teamcode` (null) and `ShipState.teamcode` (undefined),
-  sets `dirty = true`, emits `player.snapshot` sentinel broadcast.
+`TeaHandlerService` routes by first token:
+- No arg: shows current team (via `ShipState.teamcode` → name lookup) or "not on a team".
+- `tea leave`: clears `User.teamcode` (null) and `ShipState.teamcode` (undefined), sets `dirty = true`, emits `player.snapshot` broadcast.
+- `tea list`: returns sorted leaderboard via `TeamService.list()` (see below).
+- `tea create <name…> <password>`: creates a new team. Last token = password, preceding tokens = name (trimmed). Name ≤ 30 chars; password ≤ 8 chars, no whitespace. `TeamService.create` wraps `getMaxTeamcode+1 → insertTeam → User.update` in a Prisma transaction with up to 3 retries on P2002 (unique name race). Name casing preserved (FR-006). Emits `player.snapshot` on success.
+- `tea <name…> <password>` (≥ 2 tokens, not a keyword): password-gated join. Calls `TeamService.joinByPassword` — case-insensitive name match, case-sensitive password comparison. Emits `player.snapshot` on success.
+- Single non-keyword token (`tea Foo`): routes to show-current-team (FR-016a) — NOT a join attempt.
+
+### Team creation (feature 018 deviation from GECMDS.C:5277)
+
+The original required a player-supplied 5-digit `teamcode` and two passwords (`secret` for founder,
+`password` for members). This implementation auto-assigns `teamcode = MAX(teamcode) + 1` and uses a
+single plaintext join password (≤ 8 chars per FR-011a, vs original 10). `Team.secret` is stored as
+`""` and unused. A `LOWER(teamname)` unique partial index enforces case-insensitive uniqueness at the
+DB level. These deviations are explicitly authorised by spec lines 165–170.
+
+### `tea list` leaderboard
+
+`TeamService.list()` uses exactly two Prisma queries (no N+1):
+1. `User.groupBy({ by: ['teamcode'], where: { teamcode: { gt: 0n } }, _count: ... })` — live member counts.
+2. `Team.findMany({ where: { teamcode: { in: codes } } })` — fetches names and scores for surviving codes.
+
+Results sorted `teamscore DESC, teamcode ASC`, capped at `TEAM_LIST_DISPLAY_CAP = 20`. Teams with
+0 live members are excluded (FR-023a). `Team.teamcount` is not read (FR-023 — live count only).
+`MAXTEAMS = 50` (GEMAIN.H:240) is the global cap; the display cap of 20 is a documented deviation (D2 in research.md).
 
 ---
 

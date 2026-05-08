@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "Team_teamname_lower_key" ON "Team" (LOWER("teamname")) WHERE "teamcount" >= 0;

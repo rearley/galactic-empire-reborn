@@ -163,6 +163,16 @@ member count, cumulative score, password, secret pass-phrase, and a flag.
 Capacity is at least `MAXTEAMS=50`. Source: `TEAM` in `GEMAIN.H`. Players
 reference teams via `User.teamcode` (no enforced FK — original tolerance).
 
+**Feature 018 additions**:
+- `Team_teamname_lower_key` — `CREATE UNIQUE INDEX ON "Team" (LOWER("teamname")) WHERE "teamcount" >= 0`
+  (migration `20260508003817_team_name_unique_lower`). Enforces case-insensitive team name uniqueness
+  at the DB level. The `WHERE teamcount >= 0` predicate is always true (column default 0, never negative)
+  and is present to allow future refinement (e.g. exclude soft-deleted teams via `flag != 1`).
+- `Team.secret` — remains in schema but is unused by feature 018; stored as `""` on creation.
+- `Team.flag` — remains in schema; midnight job uses `flag = 1` for "removed"; feature 018 does not write it.
+- `Team.teamcount` — maintained by midnight job; **NOT** read by `tea list` (FR-023 requires live
+  `GROUP BY teamcode` on `User` table instead of this denormalised counter).
+
 ## Mail
 
 A standard message in a player's inbox, identified by `(userid, class, msgno)`.

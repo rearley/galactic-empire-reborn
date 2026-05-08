@@ -54,6 +54,8 @@ import { SpyHandlerService } from './handlers/spy.handler';
 import { MaiHandlerService } from './handlers/mai.handler';
 import { ReaHandlerService } from './handlers/rea.handler';
 import { DelHandlerService } from './handlers/del.handler';
+// Team management handlers (018)
+import { TeamModule } from '../team/team.module';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -64,7 +66,7 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule, TeamModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,

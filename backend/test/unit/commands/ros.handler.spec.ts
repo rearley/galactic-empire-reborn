@@ -42,7 +42,8 @@ function makeHandler(rows: UserRow[], rosterMax = 20): RosHandlerService {
   const prismaMock = {
     user: { findMany: jest.fn().mockResolvedValue(rows) },
   } as unknown as PrismaService;
-  return new RosHandlerService(prismaMock);
+  const repoMock = { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository;
+  return new RosHandlerService(prismaMock, repoMock);
 }
 
 const ctx: CommandContext = {};
@@ -79,14 +80,14 @@ describe('RosHandlerService', () => {
   describe('FR-010: ros all cap is 200', () => {
     it('passes take=200 to Prisma when "all" argument given', async () => {
       const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), ['all'], ctx);
       expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
     });
 
     it('"ALL" is case-insensitive', async () => {
       const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), ['ALL'], ctx);
       expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
     });
@@ -95,7 +96,7 @@ describe('RosHandlerService', () => {
   describe('FR-011: AI prefix exclusion', () => {
     it('excludes Cybrg- rows from the query', async () => {
       const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), [], ctx);
       const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
       expect(JSON.stringify(query.where)).toContain('Cybrg-');
@@ -103,7 +104,7 @@ describe('RosHandlerService', () => {
 
     it('excludes @Droid- rows from the query', async () => {
       const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), [], ctx);
       const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
       expect(JSON.stringify(query.where)).toContain('@Droid-');
@@ -113,7 +114,7 @@ describe('RosHandlerService', () => {
   describe('sort order', () => {
     it('passes score DESC, kills DESC, userid ASC orderBy to Prisma', async () => {
       const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), [], ctx);
       const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
       expect(query.orderBy).toEqual([{ score: 'desc' }, { kills: 'desc' }, { userid: 'asc' }]);
