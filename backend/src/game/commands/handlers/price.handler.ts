@@ -101,8 +101,7 @@ export class PriceHandlerService {
     for (let i = 0; i < NUMITEMS; i++) {
       usedTons += Number(ship.items[i] ?? 0n) * ITEM_TONS[i];
     }
-    const maxTons = 1000; // placeholder — exact from ShipClass.maxTons
-    const capacityRemaining = maxTons - usedTons;
+    const capacityRemaining = (ship.maxTons ?? 1000) - usedTons;
     if (capacityRemaining < qty * ITEM_TONS[itemIndex]) {
       return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
     }

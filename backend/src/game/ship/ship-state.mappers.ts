@@ -60,6 +60,7 @@ export function prismaShipToState(row: Ship): ShipState {
     lock: row.lock,
     holdcourse: row.holdcourse,
     topspeed: row.topspeed,
+    maxTons: 1000,
     warncntr: row.warncntr,
     autoShield: row.autoShield,
     autoRepair: row.autoRepair,

@@ -113,8 +113,7 @@ export class TransferHandlerService {
     for (let i = 0; i < NUMITEMS; i++) {
       usedTons += Number(ship.items[i] ?? 0n) * ITEM_TONS[i];
     }
-    const maxTons = 1000;
-    const freeTons = maxTons - usedTons;
+    const freeTons = (ship.maxTons ?? 1000) - usedTons;
     if (freeTons < qty * ITEM_TONS[itemIndex]) {
       return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
     }

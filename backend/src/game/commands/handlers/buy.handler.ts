@@ -81,8 +81,7 @@ export class BuyHandlerService {
     for (let i = 0; i < NUMITEMS; i++) {
       usedTons += Number(items[i] ?? 0n) * ITEM_TONS[i];
     }
-    const maxTons = 1000; // Placeholder — exact value from ShipClass.maxTons
-    const capacityRemaining = maxTons - usedTons;
+    const capacityRemaining = (ship.maxTons ?? 1000) - usedTons;
 
     const key = planetKey(xsect, ysect, plnum);
     const result = await this.planetService.buy(key, ship.userid, itemIndex, qty, capacityRemaining);
