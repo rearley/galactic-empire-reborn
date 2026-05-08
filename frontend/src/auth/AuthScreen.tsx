@@ -5,6 +5,7 @@ interface Props {
 }
 
 export function AuthScreen({ onAuthenticated }: Props): React.JSX.Element {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -14,15 +15,17 @@ export function AuthScreen({ onAuthenticated }: Props): React.JSX.Element {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
     try {
-      const res = await fetch('/auth/register', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       const body = await res.json() as Record<string, unknown>;
       if (!res.ok) {
-        const msg = (body.message as string | undefined) ?? 'Registration failed';
+        const msg = (body.message as string | undefined) ??
+          (mode === 'login' ? 'Login failed' : 'Registration failed');
         setError(msg);
         return;
       }
@@ -32,6 +35,11 @@ export function AuthScreen({ onAuthenticated }: Props): React.JSX.Element {
     } finally {
       setLoading(false);
     }
+  }
+
+  function switchMode(next: 'login' | 'register'): void {
+    setMode(next);
+    setError(null);
   }
 
   return (
@@ -67,7 +75,7 @@ export function AuthScreen({ onAuthenticated }: Props): React.JSX.Element {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-black border border-gray-600 text-gray-100 px-2 py-1"
-              autoComplete="new-password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
           </div>
           <button
@@ -75,9 +83,32 @@ export function AuthScreen({ onAuthenticated }: Props): React.JSX.Element {
             disabled={loading}
             className="w-full border border-yellow-600 py-1 text-yellow-400 hover:bg-yellow-900 disabled:opacity-50"
           >
-            Register
+            {mode === 'login' ? 'Login' : 'Register'}
           </button>
         </form>
+        <div className="mt-4 text-center text-xs text-gray-600">
+          {mode === 'login' ? (
+            <>
+              New pilot?{' '}
+              <button
+                onClick={() => switchMode('register')}
+                className="text-gray-400 hover:text-gray-200 underline"
+              >
+                Register
+              </button>
+            </>
+          ) : (
+            <>
+              Returning pilot?{' '}
+              <button
+                onClick={() => switchMode('login')}
+                className="text-gray-400 hover:text-gray-200 underline"
+              >
+                Login
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
