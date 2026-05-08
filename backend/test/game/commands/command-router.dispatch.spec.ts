@@ -45,7 +45,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     autoShield: false,
     autoRepair: false,
@@ -125,7 +125,7 @@ describe('command router dispatch — new keywords reach their handlers', () => 
   it('set ? → SET_STATUS', async () => {
     const { router, ship } = buildRouter();
     const result = await Promise.resolve(router.dispatch('set ?', ship, {})) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
   });
 
   it('destruct → DESTRUCT_START (keyword, not NZ)', async () => {

@@ -6,7 +6,7 @@ import {
   lineOfFire,
   mineFalloff,
   phaserDamage,
-  randamage,
+  rollHullDamage,
   shieldhit,
   tonFact,
 } from '../../../src/game/combat/combat-math';
@@ -123,22 +123,21 @@ describe('combat-math', () => {
     });
   });
 
-  describe('randamage — @see GEFUNCS.C:randamage', () => {
+  describe('rollHullDamage — projectile hull damage roll', () => {
     it('produces deterministic values with a seeded PRNG', () => {
       const r1 = new Mulberry32Adapter(42);
       const r2 = new Mulberry32Adapter(42);
-      expect(randamage(r1, 200, 5000)).toBe(randamage(r2, 200, 5000));
+      expect(rollHullDamage(r1, 200, 5000)).toBe(rollHullDamage(r2, 200, 5000));
     });
 
     it('respects tonnage scaling — bigger ship deals more damage', () => {
-      // Use a fixed-output stub so only the tonnage factor varies.
       const stub = { next: () => 0.5 };
-      expect(randamage(stub, 200, 1000)).toBeLessThan(randamage(stub, 200, 10000));
+      expect(rollHullDamage(stub, 200, 1000)).toBeLessThan(rollHullDamage(stub, 200, 10000));
     });
 
     it('returns 0 when rand returns 0', () => {
       const stub = { next: () => 0 };
-      expect(randamage(stub, 200, 5000)).toBe(0);
+      expect(rollHullDamage(stub, 200, 5000)).toBe(0);
     });
   });
 

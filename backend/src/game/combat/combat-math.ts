@@ -1,4 +1,4 @@
-import { MINEDAMMAX, MINERANGE, PHABIAS, SHHITENG } from '../constants';
+import { MINEDAMMAX, MINERANGE, PHABIAS, PRELOAD, SHHITENG } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -86,11 +86,56 @@ export function shieldhit(
 }
 
 /**
- * Randomized damage roll: `floor(rand * dmgMax * tonFact(ton))`.
- * @see GEFUNCS.C:randamage
+ * Hull damage roll for projectile hits: `floor(rand * dmgMax * tonFact(ton))`.
+ *
+ * This is the projectile-hit damage formula used in combat-tick.service.ts.
+ * It is distinct from the C `randamage()` subsystem-damage routine — see
+ * `randamage()` below for the faithful C implementation.
+ *
+ * @see GEFUNCS.C:1546 — incoming-weapon hit resolution
  */
-export function randamage(rand: Random, dmgMax: number, ton: number): number {
+export function rollHullDamage(rand: Random, dmgMax: number, ton: number): number {
   return Math.floor(rand.next() * dmgMax * tonFact(ton));
+}
+
+/**
+ * Per-tick phaser reload amount: `phasrtype * PRELOAD`.
+ *
+ * phasrtype=0 means no phaser mounted (returns 0).
+ * The Interceptor class double-reload bonus (`if shpclass==2 preload*=2`) is
+ * commented out in the shipped C source and is intentionally absent here.
+ *
+ * @see GEFUNCS.C:checkdam line 1031
+ */
+export function phaserReloadAmount(phasrtype: number): number {
+  return phasrtype * PRELOAD;
+}
+
+/**
+ * Assess random subsystem damage after a hit.
+ *
+ * Only fires when `damagePct > 20`. Rolls rndm((101 - damagePct) / 1.5);
+ * if 0, picks a subsystem (0–5) via gernd()%6 and damages it.
+ * Returns an object describing what (if anything) was hit.
+ *
+ * shieldtype === 20 (special shield class) is immune to random damage.
+ *
+ * @see GEFUNCS.C:randamage line 1956
+ */
+export function randamage(
+  rand: Random,
+  damagePct: number,
+  shieldtype: number,
+): { subsystem: 'shield' | 'phasor' | 'weapons' | 'engine' | 'none' | 'skipped' } {
+  if (shieldtype === 20) return { subsystem: 'skipped' };
+  if (damagePct <= 20) return { subsystem: 'none' };
+
+  const roll = Math.floor(rand.next() * ((101 - damagePct) / 1.5));
+  if (roll !== 0) return { subsystem: 'none' };
+
+  const which = Math.floor(rand.next() * 65536) % 6;
+  const subsystems = ['shield', 'phasor', 'weapons', 'weapons', 'engine', 'engine'] as const;
+  return { subsystem: subsystems[which] };
 }
 
 /**

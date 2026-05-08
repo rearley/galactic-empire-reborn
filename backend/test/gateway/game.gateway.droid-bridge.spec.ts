@@ -47,6 +47,7 @@ describe('GameGateway — droid event bridge', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { next: () => Math.random() } as any,
     );
 
     // Inject the mock socket.io Server

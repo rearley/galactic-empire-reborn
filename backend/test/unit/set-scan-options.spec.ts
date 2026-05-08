@@ -39,7 +39,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     autoShield: false,
     autoRepair: false,
@@ -197,7 +197,7 @@ describe('SetHandlerService — set ? listing format', () => {
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: ON | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: ON | scanhome: OFF | scanfull: OFF | filter: OFF');
     expect(result.lines[0].category).toBe('info');
   });
 
@@ -207,16 +207,16 @@ describe('SetHandlerService — set ? listing format', () => {
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF');
+    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
   });
 
   it('all options on', async () => {
-    const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: true, scanHome: true });
+    const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: true, scanHome: true, scanFull: true, msgFilter: true });
     const { handler } = makeService(ship);
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: ON | scanhome: ON');
+    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: ON | scanhome: ON | scanfull: ON | filter: ON');
   });
 });
 

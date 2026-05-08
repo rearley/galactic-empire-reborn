@@ -67,7 +67,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
     topspeed: 8000,
     warncntr: 0,
     navTargetX: null, navTargetY: null,
-    scanNames: false, scanHome: false,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...overrides,
   };

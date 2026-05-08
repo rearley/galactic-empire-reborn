@@ -1383,3 +1383,23 @@ Sender resolution (R3): `MailStat.dtime` (sender userid) → ShipStateService.fi
 Retention: midnight job purges `MailStat` rows older than 7 days (configurable via `MIDNIGHT_MAILDAYS`).
 
 No schema change. No cross-player access. No soft-delete state (FR-014, SC-003).
+
+---
+
+## Source Fidelity Audit Corrections (feature 020)
+
+**Source**: GEFUNCS.C, GEMAIN.H
+
+Eight gaps between the C source and TS port were identified and resolved:
+
+**Projectile hull damage roll** (`rollHullDamage`): The function previously named `randamage` computes `floor(rand * dmgMax * tonFact(ton))` — this is the projectile-hit hull damage roll, not the C `randamage()` routine. The C `randamage()` (GEFUNCS.C:1956) is a subsystem-damage function that only fires when `ptr->damage > 20.0` and rolls `rndm((101-damage)/1.5)` to decide if a subsystem is hit.
+
+**Phaser reload** (`phaserReloadAmount`): Reload was `phasr += PRELOAD`. C source does `preload = phasrtype * PRELOAD; phasr += preload` (GEFUNCS.C:checkdam:1031). Fixed to `phaserReloadAmount(phasrtype) = phasrtype * PRELOAD`. The Interceptor class double-reload bonus is intentionally absent — it is commented out in the shipped C source.
+
+**Wormhole visibility**: `getSectorWormholes` now returns `GalaxyWormholeView` with `visible: boolean` instead of the raw Prisma `Int`. Scan handler checks use `!wormhole.visible` (type-safe) instead of `!== 1`.
+
+**Beacon-on-move**: When a ship crosses an integer sector boundary, `GameGateway.handleSectorTransition` now emits a `beacon` Socket.io event to the `toSector` room if: (a) there are observers in toSector, and (b) `gernd()%10===0` (1-in-10 probability from GEFUNCS.C:811).
+
+**Set options** (`scanfull`, `filter`): `SetHandlerService` now handles all four options from `User.options[]`: scannames (index 0), scanhome (index 1), scanfull (index 2), filter (index 3). `ShipState` gains `scanFull` and `msgFilter` fields.
+
+**Balance constants** (`GEMAIN_GAMEPLAY_PINS`): `ENGYMAX` corrected 50000→65000. 25+ missing constants added to `constants.ts`. `GEMAIN_GAMEPLAY_PINS` bidirectional pin map provides compile-time drift detection.
