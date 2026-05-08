@@ -87,6 +87,8 @@ export interface ShipState {
   lock: number;
   holdcourse: number;
   topspeed: number;
+  /** Maximum cargo capacity in tons. Loaded from ShipClass.maxTons at hydration. @see GEMAIN.H WARSHP */
+  maxTons?: number;
   warncntr: number;
 
   /** Auto-shield flag — toggled by `set auto-shield on/off`. @see GECMDS.C:5190 cmd_set */

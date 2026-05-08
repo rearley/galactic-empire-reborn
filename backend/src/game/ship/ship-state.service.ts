@@ -30,15 +30,17 @@ export class ShipStateService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const [rows, classes] = await Promise.all([
       this.prisma.ship.findMany({ include: { user: { select: { teamcode: true, options: true } } } }),
-      this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true } }),
+      this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true, maxTons: true } }),
     ]);
     const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));
+    const maxTonsByClass = new Map(classes.map((c) => [c.classNumber, c.maxTons]));
 
     for (const row of rows) {
       const state = prismaShipToState(row);
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
       state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
       state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
+      state.maxTons = maxTonsByClass.get(state.shpclass) ?? 1000;
       // Self-heal: topspeed=0 on a warp-capable class means it was never set at creation.
       const classMaxWarp = maxWarpByClass.get(state.shpclass) ?? 0;
       if (state.topspeed === 0 && classMaxWarp > 0) {
