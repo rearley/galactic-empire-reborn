@@ -11,7 +11,7 @@ import { ScanPanel } from './components/ScanPanel';
 import { AuthScreen } from './auth/AuthScreen';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { getToken, setToken } from './auth/tokenStore';
-import { connectSocket, socket } from './socket/socketClient';
+import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
 import type { EventLogLine, ScanCell } from './types/contracts';
 import type { ScanRenderEvent } from './hooks/useScanRender';
@@ -29,6 +29,11 @@ const MAX_LOG_ENTRIES = 500;
  */
 export function App(): React.JSX.Element {
   const [token, setTokenState] = useState<string | null>(getToken());
+
+  useEffect(() => {
+    onSocketAuthFailed(() => setTokenState(null));
+    if (getToken()) connectSocket();
+  }, []);
 
   function handleAuthenticated(newToken: string): void {
     setToken(newToken);
