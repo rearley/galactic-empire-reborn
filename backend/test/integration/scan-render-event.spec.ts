@@ -63,7 +63,6 @@ function makeGateway(): GameGateway {
     prisma,
     onboardingService,
     scanHandler,
-    { next: () => Math.random() } as any,
   );
 }
 

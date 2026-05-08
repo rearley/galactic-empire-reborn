@@ -68,6 +68,25 @@ function Terminal(): React.JSX.Element {
     return () => { socket.off('scan:render', handleScanRender); };
   }, []);
 
+  useEffect(() => {
+    const handleEntered = (payload: { shipName: string }) => {
+      setLogLines((prev) =>
+        [...prev, { text: `${payload.shipName} has entered the sector.`, category: 'nav' as const }].slice(-MAX_LOG_ENTRIES),
+      );
+    };
+    const handleLeft = (payload: { shipName: string }) => {
+      setLogLines((prev) =>
+        [...prev, { text: `${payload.shipName} has left the sector.`, category: 'nav' as const }].slice(-MAX_LOG_ENTRIES),
+      );
+    };
+    socket.on('sector:ship-entered', handleEntered);
+    socket.on('sector:ship-left', handleLeft);
+    return () => {
+      socket.off('sector:ship-entered', handleEntered);
+      socket.off('sector:ship-left', handleLeft);
+    };
+  }, []);
+
   const shipNameError =
     onboardingPrompt?.type === 'ship-name'
       ? ((onboardingPrompt.payload as { error?: string }).error ?? null)

@@ -48,8 +48,6 @@ import {
   PhysicsSectorTransitionPayload,
 } from '../game/tick/sector-transition.subscriber';
 import { shipKey } from '../game/ship/ship-state.types';
-import { RANDOM, Random, gernd } from '../game/combat/random.port';
-import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
@@ -108,7 +106,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
-    @Inject(RANDOM) private readonly random: Random,
   ) {}
 
   /**
@@ -526,45 +523,45 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/010-react-frontend/data-model.md §C.2
    * @see GEFUNCS.C:808-816 — beacon-on-move gating conditions
    */
+  /**
+   * Broadcast sector-transition event to all clients (for ScanMap clear etc.)
+   * and emit MOVE2/MOVE3 sector-entry notices to the affected sector rooms.
+   *
+   * MOVE2: "X has left the sector." → emitted to fromSector room
+   * MOVE3: "X has entered the sector." → emitted to toSector room
+   * Both only fire when speed < 21000 (not at high warp) — faithful to
+   * GEFUNCS.C:714 which gates on `ptr->speed < 21000.0`.
+   *
+   * @see GEFUNCS.C:709-723 moveship sector-change branch
+   * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector)
+   * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector)
+   */
   @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT)
   handleSectorTransition(event: PhysicsSectorTransitionPayload): void {
     this.server.emit('physics.sector-transition', event);
 
-    const { MAXX } = { MAXX: 30 };
     const allShips = this.shipStateService.findAllShips();
 
     for (const transition of event.transitions) {
       const { shipId, fromSector, toSector } = transition;
 
-      // Condition 1: actual sector change
       if (fromSector.x === toSector.x && fromSector.y === toSector.y) continue;
 
-      // Condition 2: at least one observer (non-mover) in toSector
-      const hasObserver = allShips.some(
-        (s) =>
-          shipKey(s.userid, s.shipno) !== shipId &&
-          Math.floor(s.xcoord) === toSector.x &&
-          Math.floor(s.ycoord) === toSector.y &&
-          (s.status === 1 || s.status === 2),
-      );
-      if (!hasObserver) continue;
-
-      // Condition 3: C-source 1-in-10 gate
-      if (gernd(this.random) % 10 !== 0) continue;
-
-      // Find the moving ship for its name
       const movingShip = allShips.find((s) => shipKey(s.userid, s.shipno) === shipId);
       if (!movingShip) continue;
 
-      const payload: BeaconEvent = {
-        shipId,
-        shipName: movingShip.shipname,
-        fromSector: fromSector.y * MAXX + fromSector.x,
-        toSector: toSector.y * MAXX + toSector.x,
-      };
+      // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
+      if (movingShip.speed >= 21000) continue;
 
-      const room = `sector:${toSector.x}:${toSector.y}`;
-      this.server.to(room).emit(BEACON_EVENT, payload);
+      const name = movingShip.shipname;
+
+      this.server
+        .to(`sector:${fromSector.x}:${fromSector.y}`)
+        .emit('sector:ship-left', { shipId, shipName: name });
+
+      this.server
+        .to(`sector:${toSector.x}:${toSector.y}`)
+        .emit('sector:ship-entered', { shipId, shipName: name });
     }
   }
 

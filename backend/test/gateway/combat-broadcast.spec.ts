@@ -47,7 +47,6 @@ describe('GameGateway combat broadcasts', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
-      { next: () => Math.random() } as any,
     );
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };

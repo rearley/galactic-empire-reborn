@@ -21,7 +21,7 @@
  * @see specs/003-ship-commands/contracts/websocket-events.md
  */
 
-export type EventLogCategory = 'system' | 'info' | 'success' | 'combat';
+export type EventLogCategory = 'system' | 'info' | 'success' | 'combat' | 'nav' | 'chat';
 
 export interface EventLogLine {
   text: string;
