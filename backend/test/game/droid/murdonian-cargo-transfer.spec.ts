@@ -158,7 +158,7 @@ describe('T016 — Murdonian cargo transfer on kill', () => {
     await new Promise((r) => setImmediate(r));
 
     expect(killedEvents).toHaveLength(1);
-    expect(killedEvents[0].attackerShipKey).toBe('player1:1');
+    expect(killedEvents[0].killedBy).toBe('player1');
   });
 
   it('calls removeFromGame with the correct droid identity', async () => {
@@ -238,7 +238,7 @@ describe('T016 — Murdonian cargo transfer on kill', () => {
     expect(pop.get(DROID_CLASS_TRANSPORT)!.has(droidUserid)).toBe(false);
   });
 
-  it('droid.killed event payload includes classNumber=32 and victimShipKey', async () => {
+  it('droid.killed event payload includes shpclass=32 and shipId', async () => {
     const { svc, events, droidUserid } = buildHarness();
 
     const killedEvents: DroidKilledEvent[] = [];
@@ -262,7 +262,7 @@ describe('T016 — Murdonian cargo transfer on kill', () => {
     svc.onShipDestroyed(payload);
     await new Promise((r) => setImmediate(r));
 
-    expect(killedEvents[0].classNumber).toBe(DROID_CLASS_TRANSPORT);
-    expect(killedEvents[0].shipKey).toBe(`${droidUserid}:1`);
+    expect(killedEvents[0].shpclass).toBe(DROID_CLASS_TRANSPORT);
+    expect(killedEvents[0].shipId).toBe(droidUserid);
   });
 });

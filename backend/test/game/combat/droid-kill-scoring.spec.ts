@@ -67,7 +67,7 @@ describe('US6 — Droid kill scoring (FR-025/026)', () => {
       }));
       await new Promise((r) => setImmediate(r));
 
-      expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-1', points, true);
+      expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-1', points, true, false);
     },
   );
 
@@ -80,7 +80,7 @@ describe('US6 — Droid kill scoring (FR-025/026)', () => {
     }));
     await new Promise((r) => setImmediate(r));
 
-    expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-3', DROID_CLASS_POINTS[33], true);
+    expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-3', DROID_CLASS_POINTS[33], true, false);
     expect(applyCashPenalty).not.toHaveBeenCalled();
   });
 

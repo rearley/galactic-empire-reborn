@@ -7,6 +7,7 @@
  */
 
 export const PHYSICS_SECTOR_TRANSITION = 'physics.sector-transition' as const;
+export const PHYSICS_BOUNDARY_WRAPPED = 'physics.boundary-wrapped' as const;
 export const PHYSICS_HYPERSPACE = 'physics.hyperspace' as const;
 
 /**
@@ -26,6 +27,20 @@ export interface PhysicsSectorTransitionEvent {
   y: number;
   /** TickContext.firedAt. */
   tickAt: Date;
+}
+
+/**
+ * Emitted when a ship's coordinate is wrapped at the universe boundary.
+ * Internal event only — not routed to clients.
+ *
+ * @see GEFUNCS.C:651-705 moveship — univwrap branch
+ */
+export interface PhysicsBoundaryWrappedEvent {
+  shipId: string;
+  axis: 'x' | 'y' | 'both';
+  preCoord: { x: number; y: number };
+  postCoord: { x: number; y: number };
+  tickAt: number;
 }
 
 /**

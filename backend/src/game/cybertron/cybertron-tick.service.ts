@@ -50,6 +50,10 @@ import {
   CombatMissEvent,
   CombatShipDestroyedEvent,
 } from '../combat/combat-events';
+import {
+  CYBERTRON_SCORED_KILL,
+  CybertronScoredKillEvent,
+} from '../player/player-score.service';
 import { I_TORP, I_MINE, I_JAMMER, I_DECOY, I_ZIPPER } from '../constants/items';
 import {
   pickSpawnClass,
@@ -98,6 +102,9 @@ export class CybertronTickService implements OnModuleInit {
     );
     this.events.on('combat.ship-destroyed', (payload: unknown) =>
       this.onShipDestroyed(payload),
+    );
+    this.events.on(CYBERTRON_SCORED_KILL, (e: CybertronScoredKillEvent) =>
+      this.onCybertronScoredKill(e),
     );
     this.logger.log('CybertronTickService subscribed to PHYSICS tick');
   }
@@ -618,6 +625,19 @@ export class CybertronTickService implements OnModuleInit {
     return this.shipState.findAllShips().find(
       (s) => s.shipno === shipno && s.status === 1,
     );
+  }
+
+  /**
+   * Increment kill counter for a Cybertron attacker — triggered by CYBERTRON_SCORED_KILL
+   * event emitted from PlayerScoreService to avoid a circular module dependency.
+   * @see GECYBS.C — kill counter escalation (CYB_BE_NICE/CYB_BE_EASY thresholds)
+   */
+  private onCybertronScoredKill(e: CybertronScoredKillEvent): void {
+    const colonIdx = e.attackerShipKey.lastIndexOf(':');
+    if (colonIdx === -1) return;
+    const shipno = parseInt(e.attackerShipKey.slice(colonIdx + 1), 10);
+    if (isNaN(shipno)) return;
+    void this.repository.incrementKills(shipno, e.attackerUserid);
   }
 
   /**

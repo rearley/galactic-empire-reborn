@@ -134,6 +134,22 @@ export interface ShipState {
    * @see specs/012-social-commands/research.md D6
    */
   teamcode?: bigint;
+
+  /**
+   * Transient auto-shield trigger — set when the ship exits warp (hyperspace=exit).
+   * Consumed and cleared by ShipTickService.processShip on the next SHIP_UPDATE tick.
+   * In-memory only, no schema impact.
+   * @see specs/019-physics-polish/plan.md §T024 trigger-flag attachment sites
+   */
+  recentlyWarpedExit?: boolean;
+
+  /**
+   * Transient auto-shield trigger — set when the ship fires a self-torpedo.
+   * Consumed and cleared by ShipTickService.processShip on the next SHIP_UPDATE tick.
+   * In-memory only, no schema impact.
+   * @see specs/019-physics-polish/plan.md §T024 trigger-flag attachment sites
+   */
+  recentlySelfFiredTorp?: boolean;
 }
 
 // Ensure ShipState is compatible with Prisma's Ship shape (minus dirty).

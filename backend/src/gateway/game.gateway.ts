@@ -36,6 +36,8 @@ import {
 import {
   DroidEvents,
   DroidAnnoyEvent,
+  DroidSpawnedEvent,
+  DroidKilledEvent,
 } from '../game/droid/droid-events';
 import {
   ConnectedShipsRegistry,
@@ -547,6 +549,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
     const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
+  }
+
+  /**
+   * Bridge droid spawn to the sector room where it appeared.
+   * Frontend uses this to add ephemeral droids to the sector roster.
+   * @see GEDROIDS.C:98 droid_init
+   */
+  @OnEvent(DroidEvents.SPAWNED)
+  handleDroidSpawned(event: DroidSpawnedEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(DroidEvents.SPAWNED, event);
+  }
+
+  /**
+   * Bridge droid kill to the sector room (roster update) and global kills channel.
+   * @see GEDROIDS.C:534 droid_died
+   */
+  @OnEvent(DroidEvents.KILLED)
+  handleDroidKilled(event: DroidKilledEvent): void {
+    const room = `sector:${event.sector.x}:${event.sector.y}`;
+    this.server.to(room).emit(DroidEvents.KILLED, event);
+    this.server.to('kills').emit(DroidEvents.KILLED, event);
   }
 
   /**

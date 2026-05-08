@@ -6,8 +6,10 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import {
+  PHYSICS_BOUNDARY_WRAPPED,
   PHYSICS_HYPERSPACE,
   PHYSICS_SECTOR_TRANSITION,
+  PhysicsBoundaryWrappedEvent,
   PhysicsHyperspaceEvent,
   PhysicsSectorTransitionEvent,
 } from './physics-events';
@@ -17,7 +19,9 @@ import {
   rotationStep,
   sectorOf,
   tryEnergyDebit,
+  wrapCoord,
 } from './physics-math';
+import { MAXX, MAXY } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 
 /**
@@ -203,6 +207,13 @@ export class PhysicsTickService implements OnModuleInit {
         tickAt: ctx.firedAt,
       };
       this.events.emit(PHYSICS_HYPERSPACE, payload);
+
+      // Set auto-shield warp-exit trigger (T024 — consumed by ShipTickService.processShip).
+      if (accel.hyperspaceEvent === 'exit') {
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.recentlyWarpedExit = true;
+        });
+      }
     }
 
     // 3. Position integration (US1). Uses the *current* heading + speed.
@@ -211,20 +222,48 @@ export class PhysicsTickService implements OnModuleInit {
       const preY = ship.ycoord;
       const preSector = sectorOf({ x: preX, y: preY });
       const next = positionIntegration(preX, preY, ship.heading, ship.speed);
-      const postSector = sectorOf(next);
+
+      // Universe boundary wrap — only in normal space (where <= 1).
+      // @see GEFUNCS.C:651-705 moveship univwrap branch
+      let wrappedX = next.x;
+      let wrappedY = next.y;
+      let xWrapped = false;
+      let yWrapped = false;
+      if (ship.where <= 1) {
+        const wx = wrapCoord(next.x, MAXX);
+        const wy = wrapCoord(next.y, MAXY);
+        xWrapped = wx !== next.x;
+        yWrapped = wy !== next.y;
+        wrappedX = wx;
+        wrappedY = wy;
+      }
+
+      const postSector = sectorOf({ x: wrappedX, y: wrappedY });
 
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        s.xcoord = next.x;
-        s.ycoord = next.y;
+        s.xcoord = wrappedX;
+        s.ycoord = wrappedY;
       });
+
+      if (xWrapped || yWrapped) {
+        const axis = xWrapped && yWrapped ? 'both' : xWrapped ? 'x' : 'y';
+        const wrapped: PhysicsBoundaryWrappedEvent = {
+          shipId: shipKey(ship.userid, ship.shipno),
+          axis,
+          preCoord: { x: next.x, y: next.y },
+          postCoord: { x: wrappedX, y: wrappedY },
+          tickAt: ctx.firedAt.getTime(),
+        };
+        this.events.emit(PHYSICS_BOUNDARY_WRAPPED, wrapped);
+      }
 
       if (preSector.x !== postSector.x || preSector.y !== postSector.y) {
         const payload: PhysicsSectorTransitionEvent = {
           shipId: shipKey(ship.userid, ship.shipno),
           fromSector: preSector,
           toSector: postSector,
-          x: next.x,
-          y: next.y,
+          x: wrappedX,
+          y: wrappedY,
           tickAt: ctx.firedAt,
         };
         this.events.emit(PHYSICS_SECTOR_TRANSITION, payload);

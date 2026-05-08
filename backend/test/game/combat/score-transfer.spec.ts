@@ -48,7 +48,7 @@ describe('PlayerScoreService — COMBAT_SHIP_DESTROYED score transfer', () => {
     const { events, transferKillScore } = buildHarness();
     events.emit(COMBAT_SHIP_DESTROYED, makeEvent());
     await new Promise((r) => setImmediate(r));
-    expect(transferKillScore).toHaveBeenCalledWith('attacker', 'victim', 50, false);
+    expect(transferKillScore).toHaveBeenCalledWith('attacker', 'victim', 50, false, false);
   });
 
   it('calls transferKillScore with isAiVictim=true when victim is Cybrg-*', async () => {
@@ -58,7 +58,7 @@ describe('PlayerScoreService — COMBAT_SHIP_DESTROYED score transfer', () => {
       makeEvent({ victimUserid: 'Cybrg-7', victimShipKey: 'Cybrg-7:1', victimId: 'Cybrg-7:1' }),
     );
     await new Promise((r) => setImmediate(r));
-    expect(transferKillScore).toHaveBeenCalledWith('attacker', 'Cybrg-7', 50, true);
+    expect(transferKillScore).toHaveBeenCalledWith('attacker', 'Cybrg-7', 50, true, false);
   });
 
   it('calls transferKillScore with isAiVictim=true when victim is Droid-*', async () => {
@@ -68,7 +68,7 @@ describe('PlayerScoreService — COMBAT_SHIP_DESTROYED score transfer', () => {
       makeEvent({ victimUserid: '@Droid-3', victimShipKey: '@Droid-3:1', victimId: '@Droid-3:1' }),
     );
     await new Promise((r) => setImmediate(r));
-    expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-3', 50, true);
+    expect(transferKillScore).toHaveBeenCalledWith('attacker', '@Droid-3', 50, true, false);
   });
 
   it('skips transferKillScore when scoreAwarded is 0', async () => {
@@ -109,7 +109,7 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       ),
     };
     const repo = buildRepo(prisma);
-    await repo.transferKillScore('attacker', 'victim', 500, false);
+    await repo.transferKillScore('attacker', 'victim', 500, false, false);
 
     const victimCall = updateMock.mock.calls.find(
       (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'victim',
@@ -133,7 +133,7 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       ),
     };
     const repo = buildRepo(prisma);
-    await repo.transferKillScore('attacker', 'victim', 50, false);
+    await repo.transferKillScore('attacker', 'victim', 50, false, false);
 
     const victimCall = updateMock.mock.calls.find(
       (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'victim',
@@ -157,7 +157,7 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       ),
     };
     const repo = buildRepo(prisma);
-    await repo.transferKillScore('attacker', 'Cybrg-7', 50, true);
+    await repo.transferKillScore('attacker', 'Cybrg-7', 50, true, false);
 
     // findUnique should only be called for the attacker row, not for Cybrg-7.
     const victimLookup = findUniqueMock.mock.calls.find(
@@ -179,7 +179,7 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       ),
     };
     const repo = buildRepo(prisma);
-    await repo.transferKillScore('attacker', 'victim', 75, false);
+    await repo.transferKillScore('attacker', 'victim', 75, false, false);
 
     const attackerCall = updateMock.mock.calls.find(
       (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'attacker',

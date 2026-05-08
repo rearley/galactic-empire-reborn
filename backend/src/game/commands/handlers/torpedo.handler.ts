@@ -129,10 +129,12 @@ export class TorpedoHandlerService {
     });
 
     // Mutate firer — decrement ammo, drop shields, set battle-lock
+    // recentlySelfFiredTorp triggers auto-shield raise on next SHIP_UPDATE tick (T024).
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.items[I_TORP] = (s.items[I_TORP] ?? 0n) - 1n;
       s.shieldstat = 0;
       s.cantexit = FIRETICKS;
+      s.recentlySelfFiredTorp = true;
     });
 
     return {

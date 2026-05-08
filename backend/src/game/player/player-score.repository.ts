@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { scoreF2 } from './score.config';
 
 /**
  * Persistence layer for player score updates on kill.
- * Awards kill points to the attacker and deducts from the victim (floor at 0).
- * AI ships (isAiVictim=true) are never penalised.
+ * Awards kill points to the attacker (scaled by scoreF2) and deducts from the
+ * victim (floor at 0). AI ships (isAiVictim=true) are never penalised.
+ * AI attackers receive 1/10 of the normal transfer (GEFUNCS.C:1161 branch).
  *
  * @see GEFUNCS.C:killem (1143-1185)
  */
@@ -15,26 +17,37 @@ export class PlayerScoreRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Award `scr` to attacker score/klscore and deduct from victim (floor at 0).
-   * Runs as a single Prisma transaction. AI victims (isAiVictim=true) are skipped
-   * for deduction — Cybertrons and Droids have no meaningful score balance.
+   * Award a scoreF2-scaled transfer to attacker score/klscore and deduct the
+   * same transfer from victim (floor at 0). Runs as a single Prisma transaction.
+   * AI victims (isAiVictim=true) are skipped for deduction. AI attackers
+   * (isAiAttacker=true) receive 1/10 of the normal transfer per the original
+   * GEFUNCS.C:1161 branch ("ai can't earn that much").
    *
-   * @see GEFUNCS.C:killem (1164-1185)
+   * transfer (PvP)        = floor((scr / 100) * scoreF2)
+   * transfer (AI attack)  = floor((scr / 100) * scoreF2 / 10)
+   *
+   * @see GEFUNCS.C:1157-1185
+   * @see GEFUNCS.C:1161  AI 1/10 branch
    */
   async transferKillScore(
     attackerUserid: string,
     victimUserid: string,
     scr: number,
     isAiVictim: boolean,
+    isAiAttacker: boolean,
   ): Promise<void> {
-    const scrBig = BigInt(scr);
+    const base = (scr / 100) * scoreF2;
+    const rawTransfer = isAiAttacker ? base / 10 : base;
+    const transfer = Math.max(0, Math.floor(rawTransfer));
+    const transferBig = BigInt(transfer);
+
     try {
       await this.prisma.$transaction(async (tx) => {
         if (!isAiVictim) {
           const victim = await tx.user.findUnique({ where: { userid: victimUserid } });
           if (victim) {
-            const newScore = victim.score > scrBig ? victim.score - scrBig : 0n;
-            const newKlscore = victim.klscore > scrBig ? victim.klscore - scrBig : 0n;
+            const newScore = victim.score > transferBig ? victim.score - transferBig : 0n;
+            const newKlscore = victim.klscore > transferBig ? victim.klscore - transferBig : 0n;
             await tx.user.update({
               where: { userid: victimUserid },
               data: { score: newScore, klscore: newKlscore },
@@ -46,7 +59,7 @@ export class PlayerScoreRepository {
         if (attacker) {
           await tx.user.update({
             where: { userid: attackerUserid },
-            data: { score: { increment: scrBig }, klscore: { increment: scrBig } },
+            data: { score: { increment: transferBig }, klscore: { increment: transferBig } },
           });
         }
       });

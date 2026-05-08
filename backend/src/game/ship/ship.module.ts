@@ -1,8 +1,21 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ShipStateService } from './ship-state.service';
+import { ShipTickService } from './ship-tick.service';
+import { MaintenanceService } from './maintenance.service';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { PlanetModule } from '../planet/planet.module';
 
+/**
+ * ShipModule owns in-memory ship state and the 1-second ship-update tick.
+ * PlanetModule is imported via forwardRef to break the mutual dependency
+ * (PlanetModule imports ShipModule for ShipStateService).
+ */
 @Module({
-  providers: [ShipStateService],
-  exports: [ShipStateService],
+  imports: [
+    PrismaModule,
+    forwardRef(() => PlanetModule),
+  ],
+  providers: [ShipStateService, MaintenanceService, ShipTickService],
+  exports: [ShipStateService, MaintenanceService, ShipTickService],
 })
 export class ShipModule {}

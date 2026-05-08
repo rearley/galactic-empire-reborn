@@ -3,17 +3,20 @@
  * Covers FR-014-060 (no arg + passworded), FR-014-061 (wrong arg),
  * FR-014-062 (password == "none" bypass), FR-014-063 (correct arg),
  * and order-preservation (gate fires after FR-209, before FR-204).
+ *
+ * The password gate lives in MaintenanceService.evaluateGates; the handler
+ * passes args[0] as the passwordArg. These tests verify message routing
+ * from the gate reasons returned by MaintenanceService.
+ *
  * @see GECMDS.C:4471 MAINT2, :4479 MAINT3
+ * @see backend/src/game/ship/maintenance.service.ts MaintenanceService.evaluateGates
  * @see research.md D10
  */
 import { MaintHandlerService } from '../../../../src/game/commands/handlers/maint.handler';
-import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
-import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
-import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { MaintenanceService, GateResult } from '../../../../src/game/ship/maintenance.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { MAINT_COST_NORMAL } from '../../../../src/game/commands/_ship-management-constants';
-import { NUMITEMS } from '../../../../src/game/constants/items';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -31,7 +34,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     ltorpsChannel: [], ltorpsDistance: [],
     lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
     decout: [], jammer: 0, freq: [0, 0, 0],
-    items: Array(NUMITEMS).fill(0n) as bigint[],
+    items: Array(14).fill(0n) as bigint[],
     titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
     firecntl: 0, destruct: 0, status: 1, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
@@ -43,45 +46,16 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   };
 }
 
-function makePlanetWithPassword(password: string) {
-  return {
-    items: [{ qty: 50_000n }],
-    password,
-  };
+function makeService(gateResult: GateResult) {
+  const mockMaintenanceService = {
+    runMaintenance: jest.fn().mockResolvedValue(gateResult),
+  } as unknown as MaintenanceService;
+
+  const handler = new MaintHandlerService(mockMaintenanceService);
+  return { handler, mockMaintenanceService };
 }
 
-function makeService(opts: {
-  planet?: ReturnType<typeof makePlanetWithPassword> | null;
-  cash?: bigint;
-} = {}) {
-  const { planet = makePlanetWithPassword(''), cash = BigInt(MAINT_COST_NORMAL) * 2n } = opts;
-
-  const mutated: Partial<ShipState> = {};
-  const mockShipState = {
-    mutate: jest.fn().mockImplementation(
-      (_uid: string, _no: number, fn: (s: ShipState) => void) => {
-        const s = makeShip();
-        fn(s);
-        Object.assign(mutated, s);
-        return s;
-      },
-    ),
-  } as unknown as ShipStateService;
-
-  const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
-  } as unknown as PlanetStateService;
-
-  const mockPrisma = {
-    user: {
-      findUnique: jest.fn().mockResolvedValue({ cash }),
-      update: jest.fn().mockResolvedValue({}),
-    },
-  } as unknown as PrismaService;
-
-  const handler = new MaintHandlerService(mockShipState, mockPlanetService, mockPrisma);
-  return { handler, mockShipState, mockPrisma };
-}
+const OK_RESULT: GateResult = { ok: true, price: BigInt(MAINT_COST_NORMAL), repairAmt: 11 };
 
 type Lines = { lines: { text: string; category: string }[] };
 
@@ -90,66 +64,51 @@ type Lines = { lines: { text: string; category: string }[] };
 // ---------------------------------------------------------------------------
 
 describe('MaintHandlerService — password gate (T045)', () => {
-  it('FR-014-060: no arg + passworded planet → MAINT2 and cash unchanged', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('secret') });
+  it('FR-014-060: no arg + passworded planet → MAINT2', async () => {
+    const { handler, mockMaintenanceService } = makeService({ ok: false, reason: 'password-required' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT2));
-    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    // MaintenanceService was called with empty passwordArg (args[0] = undefined → args[0])
+    expect(mockMaintenanceService.runMaintenance).toHaveBeenCalledWith(ship, undefined);
   });
 
-  it('FR-014-061: wrong password arg → MAINT3 and cash unchanged', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('secret') });
+  it('FR-014-061: wrong password arg → MAINT3', async () => {
+    const { handler, mockMaintenanceService } = makeService({ ok: false, reason: 'wrong-password' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     const result = await handler.command.handler(ship, ['wrongpass'], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT3));
-    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    expect(mockMaintenanceService.runMaintenance).toHaveBeenCalledWith(ship, 'wrongpass');
   });
 
   it('FR-014-063: correct arg (case-insensitive) → maintenance proceeds', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('SECRET') });
+    const { handler } = makeService(OK_RESULT);
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
-    // Provide correct password in different case
     const result = await handler.command.handler(ship, ['secret'], {}) as Lines;
     expect(result.lines[0].text).toContain('Maintenance complete');
-    expect(mockPrisma.user.update).toHaveBeenCalled();
   });
 
-  it('FR-014-062: password == "none" → gate bypassed regardless of arg', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('none') });
-    const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
-    // No arg needed when password is "none"
-    const result = await handler.command.handler(ship, [], {}) as Lines;
-    expect(result.lines[0].text).toContain('Maintenance complete');
-    expect(mockPrisma.user.update).toHaveBeenCalled();
-  });
-
-  it('FR-014-062: password == "NONE" (case-insensitive) → gate bypassed', async () => {
-    const { handler } = makeService({ planet: makePlanetWithPassword('NONE') });
+  it('FR-014-062: password == "none" → gate bypassed, maintenance proceeds', async () => {
+    const { handler } = makeService(OK_RESULT);
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
     expect(result.lines[0].text).toContain('Maintenance complete');
   });
 
-  it('FR-014-062: empty password string → gate bypassed', async () => {
-    const { handler } = makeService({ planet: makePlanetWithPassword('') });
-    const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
-    const result = await handler.command.handler(ship, [], {}) as Lines;
-    expect(result.lines[0].text).toContain('Maintenance complete');
-  });
-
-  it('SC-007: no cash deduction on FR-014-060 rejection', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('secret') });
+  it('SC-007: no debit on password-required rejection', async () => {
+    // MaintenanceService returns gate rejection — applyMaintenance never runs
+    const { handler, mockMaintenanceService } = makeService({ ok: false, reason: 'password-required' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     await handler.command.handler(ship, [], {});
-    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    // Gate rejected — runMaintenance was called but returned ok=false (no cash deduction)
+    expect(mockMaintenanceService.runMaintenance).toHaveBeenCalledTimes(1);
   });
 
-  it('SC-007: no cash deduction on FR-014-061 rejection', async () => {
-    const { handler, mockPrisma } = makeService({ planet: makePlanetWithPassword('secret') });
+  it('SC-007: no debit on wrong-password rejection', async () => {
+    const { handler, mockMaintenanceService } = makeService({ ok: false, reason: 'wrong-password' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     await handler.command.handler(ship, ['wrong'], {});
-    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    expect(mockMaintenanceService.runMaintenance).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -159,10 +118,10 @@ describe('MaintHandlerService — password gate (T045)', () => {
 
 describe('MaintHandlerService — password gate ordering (T046)', () => {
   it('FR-209 (NZ non-Zygor) fires before password gate', async () => {
-    // Sector (0,0) plnum=2 → NZ non-Zygor AND planet has password
-    // Neutral zone error should be emitted, NOT MAINT2
-    const { handler } = makeService({ planet: makePlanetWithPassword('secret') });
-    // where=12 → plnum=2 (not Zygor 0 or 1), xcoord=0.5, ycoord=0.5 → sector (0,0) → NZ
+    // MaintenanceService returns nz-not-zygor (NZ check runs before password check
+    // inside evaluateGates — verified in maintenance.service.spec.ts T014).
+    // Handler must route to MAINT_NZ, not MAINT2.
+    const { handler } = makeService({ ok: false, reason: 'nz-not-zygor' });
     const ship = makeShip({ where: 12, xcoord: 0.5, ycoord: 0.5, damage: 30 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT_NZ));
@@ -170,9 +129,10 @@ describe('MaintHandlerService — password gate ordering (T046)', () => {
   });
 
   it('password gate fires before FR-204 (no damage)', async () => {
-    // Ship has NO damage (FR-204 would fire) AND planet is passworded
-    // Password error should be emitted, NOT MAINT_NO_DAMAGE
-    const { handler } = makeService({ planet: makePlanetWithPassword('secret') });
+    // MaintenanceService returns password-required (password check runs before
+    // damage check inside evaluateGates — verified in maintenance.service.spec.ts T014).
+    // Handler must route to MAINT2, not MAINT_NO_DAMAGE.
+    const { handler } = makeService({ ok: false, reason: 'password-required' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 0 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT2));

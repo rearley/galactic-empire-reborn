@@ -21,13 +21,26 @@ import { isAiUserid } from '../commands/helpers/ai-userid';
  */
 export const AI_VICTIM_PREFIXES = ['Cybrg-', '@Droid-'] as const;
 
+/** Internal event fired when a Cybertron attacker scores a kill — picked up by CybertronTickService. */
+export const CYBERTRON_SCORED_KILL = 'cybertron.scored-kill' as const;
+
+/** Payload for CYBERTRON_SCORED_KILL. */
+export interface CybertronScoredKillEvent {
+  attackerUserid: string;
+  attackerShipKey: string;
+}
+
 /**
  * Listens to COMBAT_SHIP_DESTROYED and forwards score updates to
  * PlayerScoreRepository. Skips when scoreAwarded=0 or no attacker.
  *
  * Also applies the CHGLOSER cash penalty on PvP kills (both sides non-AI).
+ * When the attacker is a Cybertron (Cybrg- prefix), emits CYBERTRON_SCORED_KILL
+ * so CybertronTickService can increment the DB kill counter without creating
+ * a circular module dependency (PlayerScoreModule → CybertronModule → CombatModule).
  *
  * @see GEFUNCS.C:killem (1087-1218)
+ * @see GECYBS.C — kill counter escalation
  */
 @Injectable()
 export class PlayerScoreService implements OnModuleInit {
@@ -48,12 +61,25 @@ export class PlayerScoreService implements OnModuleInit {
     if (!attackerUserid || scoreAwarded <= 0) return;
 
     const isAiVictim = isAiUserid(victimUserid);
-    await this.repo.transferKillScore(attackerUserid, victimUserid, scoreAwarded, isAiVictim);
+    const isAiAttacker = isAiUserid(attackerUserid);
+
+    await this.repo.transferKillScore(attackerUserid, victimUserid, scoreAwarded, isAiVictim, isAiAttacker);
 
     // CHGLOSER cash penalty: only when both sides are non-AI human players
     // @see GEFUNCS.C:killem (1087-1218 chgloser block)
-    if (!isAiVictim && this.chgLoserPercent > 0 && !isAiUserid(attackerUserid)) {
+    if (!isAiVictim && this.chgLoserPercent > 0 && !isAiAttacker) {
       await this.repo.applyCashPenalty(attackerUserid, victimUserid, this.chgLoserPercent);
+    }
+
+    // Cybertron kill counter — emit an event instead of calling CybertronRepository
+    // directly, to avoid a circular module dependency (PlayerScoreModule → CybertronModule
+    // → CombatModule → PlayerScoreModule). CybertronTickService handles the DB increment.
+    // @see GEFUNCS.C:1253 — droid attacker kills not persisted
+    if (isAiAttacker && attackerUserid.startsWith('Cybrg-') && event.attackerShipKey) {
+      this.events.emit(CYBERTRON_SCORED_KILL, {
+        attackerUserid,
+        attackerShipKey: event.attackerShipKey,
+      } satisfies CybertronScoredKillEvent);
     }
   }
 }

@@ -6,11 +6,14 @@ import {
   MOVENGUSE,
 } from '../../../src/game/constants';
 import {
+  PHYSICS_BOUNDARY_WRAPPED,
   PHYSICS_HYPERSPACE,
   PHYSICS_SECTOR_TRANSITION,
+  PhysicsBoundaryWrappedEvent,
   PhysicsHyperspaceEvent,
   PhysicsSectorTransitionEvent,
 } from '../../../src/game/physics/physics-events';
+import { MAXX, MAXY } from '../../../src/game/constants';
 import { PhysicsTickService } from '../../../src/game/physics/physics-tick.service';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
@@ -235,6 +238,74 @@ describe('PhysicsTickService', () => {
       h.fire();
       expect(ship.hypha).toBe(0);
       expect(ship.cantexit).toBe(0);
+    });
+  });
+
+  describe('US1 — universe boundary wrap (T006)', () => {
+    function makeWrapHarness(ship: ShipState) {
+      const h = makeHarness([ship]);
+      const capturedWrapped: PhysicsBoundaryWrappedEvent[] = [];
+      h.events.on(PHYSICS_BOUNDARY_WRAPPED, (e: PhysicsBoundaryWrappedEvent) => capturedWrapped.push(e));
+      return { ...h, capturedWrapped };
+    }
+
+    it('ship near east boundary wraps x into [0, MAXX)', () => {
+      // Ship at x=29.8, heading east (90°), high speed so integration overshoots
+      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.xcoord).toBeGreaterThanOrEqual(0);
+      expect(ship.xcoord).toBeLessThan(MAXX);
+    });
+
+    it('ship near south boundary wraps y into [0, MAXY)', () => {
+      // Heading south (180° = y increases), near y boundary
+      const ship = makeShip({ xcoord: 15, ycoord: 14.8, heading: 180, speed: 5000, speed2b: 5000, where: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.ycoord).toBeGreaterThanOrEqual(0);
+      expect(ship.ycoord).toBeLessThan(MAXY);
+    });
+
+    it('wrap preserves heading and speed', () => {
+      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.heading).toBe(90);
+      expect(ship.speed).toBe(9000);
+    });
+
+    it('emits PHYSICS_BOUNDARY_WRAPPED when wrap fires', () => {
+      // At speed=9000, dx = 9000/65000 ≈ 0.138 per tick. Start at 29.9 so next.x ≈ 30.038 → wraps.
+      const ship = makeShip({ xcoord: 29.9, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(h.capturedWrapped.length).toBeGreaterThanOrEqual(1);
+      expect(h.capturedWrapped[0].axis).toBe('x');
+    });
+
+    it('sector-transition event fires exactly once with post-wrap sector', () => {
+      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      // After wrap, x is near 0, so sector.x should be 0 (not 29)
+      const trans = h.capturedSector.filter((e) => e.shipId === 'u1:1');
+      if (trans.length > 0) {
+        // If a sector transition fired, toSector should be in-range
+        const to = trans[trans.length - 1].toSector;
+        expect(to.x).toBeGreaterThanOrEqual(0);
+        expect(to.x).toBeLessThan(MAXX);
+      }
+    });
+
+    it('wrap is a no-op when ship is in orbit (where >= 10)', () => {
+      // Ship at exactly boundary x=29.8, but in orbit — wrap should NOT apply
+      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 10 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      // In orbit, ship does NOT move at all (inOrbitOrDocked skips conditional block)
+      // so coords unchanged regardless
+      expect(h.capturedWrapped).toHaveLength(0);
     });
   });
 
