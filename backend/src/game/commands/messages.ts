@@ -49,6 +49,13 @@ export enum MessageId {
   REP24 = 'REP24',
   REP12 = 'REP12',
   REP13 = 'REP13',
+  REP25 = 'REP25',
+  REP26 = 'REP26',
+  REP27 = 'REP27',
+  REP28 = 'REP28',
+  REP30 = 'REP30',
+  REP31 = 'REP31',
+  REP31A = 'REP31A',
 
   // scan
   SCANFMT = 'SCANFMT',
@@ -363,7 +370,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.CANTROT]: 'Cannot rotate while reversing.',
 
   // report — GECMDS.C:1946
-  [MessageId.REPFMT]: 'Usage: report <nav|sys|cargo|wpns>',
+  [MessageId.REPFMT]: 'Usage: report <nav|sys|cargo|wpns|acc>',
   [MessageId.REP01]: '%s — %s',
   [MessageId.DASHES]: '--------------------------------',
   [MessageId.REP35]: 'Navigation:',
@@ -385,6 +392,14 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP24]: 'Phasors: none.',
   [MessageId.REP12]: 'Cloak: active.',
   [MessageId.REP13]: 'Cloak: inactive.',
+  // rep acc — GECMDS.C:2074
+  [MessageId.REP25]: 'Account:',
+  [MessageId.REP26]: 'Planets: none.',
+  [MessageId.REP27]: 'Planets owned: %d.',
+  [MessageId.REP28]: 'Credits: %s',
+  [MessageId.REP30]: 'Score: %s',
+  [MessageId.REP31]: 'Kills: %d.',
+  [MessageId.REP31A]: 'Team: %s',
 
   // scan — GECMDS.C:2138
   [MessageId.SCANFMT]: 'Usage: scan <mode>  (sh/pl/ra/se/lo)',

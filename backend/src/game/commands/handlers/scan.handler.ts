@@ -532,18 +532,51 @@ export class ScanHandlerService implements OnModuleInit {
 
   /**
    * Text-only scan of a named ship — no scanGrid field.
+   * Single-letter args do a scantab lookup (A..Z assigned by sca lo/ra/se) so that
+   * `sca sh a` finds the ship the player scanned as 'A', not a name substring match.
+   * Falls back to name search when arg is multi-char or the scantab has no such entry.
    * @see GECMDS.C:2190 scan_sh
    */
   private scanSh(ship: ShipState, args: string[]): CommandResult {
     if (args.length === 0) {
       return this.scanHelp();
     }
-    const name = args.join(' ');
-    const target = this.shipService.findByName(name);
-    if (!target) {
-      return {
-        lines: [{ text: `No ship named "${name}" found.`, category: 'system' }],
-      };
+    const arg = args.join(' ');
+
+    let target: ShipState | undefined;
+
+    // Single alpha char → scantab-only lookup (letter-based targeting, original game style)
+    if (arg.length === 1 && /^[a-zA-Z]$/.test(arg)) {
+      const letter = arg.toUpperCase();
+      const scantab = this.getScantab(ship.userid, ship.shipno);
+      if (!scantab || scantab.length === 0) {
+        return {
+          lines: [{ text: 'No scan data. Run "sca lo" first to assign ship letters.', category: 'system' }],
+        };
+      }
+      const entry = scantab.find((e) => e.letter === letter);
+      if (!entry) {
+        return {
+          lines: [{ text: `No ship assigned letter ${letter}. Run "sca lo" to update scan.`, category: 'system' }],
+        };
+      }
+      const hashIdx = entry.shipKey.lastIndexOf('#');
+      const entryUserid = entry.shipKey.slice(0, hashIdx);
+      const entryShipno = parseInt(entry.shipKey.slice(hashIdx + 1), 10);
+      target = this.shipService.get(entryUserid, entryShipno);
+      if (!target) {
+        return {
+          lines: [{ text: `Ship ${letter} is no longer active.`, category: 'system' }],
+        };
+      }
+    } else {
+      // Multi-char arg → name search
+      target = this.shipService.findByName(arg);
+      if (!target) {
+        return {
+          lines: [{ text: `No ship named "${arg}" found.`, category: 'system' }],
+        };
+      }
     }
     // Block scanning self — GECMDS.C:2209 (prints FOOLISH)
     if (target.userid === ship.userid && target.shipno === ship.shipno) {
@@ -563,7 +596,10 @@ export class ScanHandlerService implements OnModuleInit {
         lines: [{ text: `${target.shipname} is out of scanner range.`, category: 'system' }],
       };
     }
-    const bearing = 0; // TODO(006): compute bearing from GEFUNCS.C cbearing
+    // Bearing — GECMDS.C cbearing / GEFUNCS.C, same formula as scantab.ts calcBearing
+    const dx = target.xcoord - ship.xcoord;
+    const dy = target.ycoord - ship.ycoord;
+    const bearing = Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
     const ltr = target.status === 1 ? '+' : '=';
     return {
       lines: [

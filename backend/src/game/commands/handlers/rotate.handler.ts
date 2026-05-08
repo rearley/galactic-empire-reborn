@@ -44,6 +44,9 @@ export const rotateCommand: Command = {
     // TODO(006): see GECMDS.C:711 — useenergy gate (NOROTPW, normal branch)
     // TODO(006): see GECMDS.C:679 — useenergy gate (NOROTPW, hyperspace branch)
 
+    // Compute absolute target heading: current heading + relative rotation, normalised 0-359
+    // @see GECMDS.C:668 — head2b = (double)deg where deg = normal(heading + degrees)
+    ship.head2b = Math.round((ship.heading + value + 360) % 360);
     ship.degrees = value;
     ship.dirty = true;
 

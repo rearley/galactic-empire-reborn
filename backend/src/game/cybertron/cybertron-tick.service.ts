@@ -536,7 +536,9 @@ export class CybertronTickService implements OnModuleInit {
       }
 
       if (lowShipno === -1) {
-        // No eligible target — rest for a long while (@see GECYBS.C:733-737)
+        // No eligible target — wander at random speed and rest for a while (@see GECYBS.C:733-737)
+        ship.speed2b = this.random.next() * topSpeed;
+        ship.head2b = this.random.next() * 359.9;
         ship.tick = 255;
         ship.cybmine = 255;
         return;

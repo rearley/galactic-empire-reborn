@@ -103,6 +103,10 @@ export class OnboardingService {
     // items[I_FLUX=4] = START_FLUX_PODS; all 14 slots initialised to 0n per NUMITEMS=14
     const items: bigint[] = [0n, 0n, 0n, 0n, BigInt(START_FLUX_PODS), 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
+    // Topspeed = class maxWarp — set at creation, reduced by engine damage in combat
+    const shipClass = await this.prisma.shipClass.findUnique({ where: { classNumber: START_CLASS } });
+    const topspeed = shipClass?.maxWarp ?? 10;
+
     const ship = await this.prisma.ship.create({
       data: {
         userid,
@@ -112,6 +116,8 @@ export class OnboardingService {
         xcoord: spawnX,
         ycoord: spawnY,
         energy: ENGYMAX,
+        status: 1, // GESTAT_USER — active player ship @see GEMAIN.H:210
+        topspeed,
         phasr: 100, // 100% charge — @see GEFUNCS.C:222 initshp
         shield: 0, // shields down at spawn — @see GEFUNCS.C:229 initshp SHIELDDN
         ltorpsChannel: [],

@@ -80,6 +80,15 @@ export function prismaShipToState(row: Ship): ShipState {
  */
 export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { dirty, isEphemeral, teamcode, scanNames, scanHome, scanFull, msgFilter, ...rest } = state;
+  const {
+    dirty, isEphemeral, teamcode, scanNames, scanHome, scanFull, msgFilter,
+    // status: set at creation/death only, never via tick flush
+    status,
+    // userid/shipno: part of the where key, not updatable data
+    userid, shipno,
+    // recentlyWarpedExit: in-memory flag, no DB column
+    recentlyWarpedExit,
+    ...rest
+  } = state;
   return rest;
 }

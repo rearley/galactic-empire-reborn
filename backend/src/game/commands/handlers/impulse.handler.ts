@@ -1,13 +1,19 @@
 import { Command, CommandResult, CommandContext } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { valpcnt } from '../validators';
+import { valpcnt, valdegree } from '../validators';
 import { ShipState } from '../../ship/ship-state.types';
 
 /**
- * Handles the `impulse` / `imp` command — sets the ship's impulse speed percentage.
- * Hyperspace gate and helm gate are deferred to feature 006.
+ * Handles the `impulse` / `imp` command — sets the ship's impulse speed percentage
+ * and optionally a relative course change.
+ *
+ * Usage: imp <0-99> [degrees]
+ * - degrees is RELATIVE to current heading (added to heading, not absolute).
+ *   `imp 50` → maintain current heading at 50% impulse.
+ *   `imp 50 90` → turn 90° from current heading at 50% impulse.
  *
  * @see GECMDS.C:482 cmd_impulse
+ * @see GECMDS.C:519 deg = normal(heading + degrees) — relative rotation
  */
 export const impulseCommand: Command = {
   keyword: 'impulse',
@@ -21,36 +27,38 @@ export const impulseCommand: Command = {
       ship.navTargetY = null;
     }
 
-    const arg = args[0] ?? '';
-    const result = valpcnt(arg, 0, 99);
+    const speedArg = args[0] ?? '';
+    const speedResult = valpcnt(speedArg, 0, 99);
 
-    if (!result.ok) {
+    if (!speedResult.ok) {
       return {
-        lines: [
-          {
-            text: formatMessage(MessageId.NUMOOR, 0, 99),
-            category: 'system',
-          },
-        ],
+        lines: [{ text: formatMessage(MessageId.NUMOOR, 0, 99), category: 'system' }],
       };
     }
 
-    const value = result.value;
+    // Optional course arg — relative degrees added to current heading (@see GECMDS.C:502-505)
+    const courseArg = args[1] ?? '0';
+    const courseResult = valdegree(courseArg);
+    if (!courseResult.ok) {
+      return {
+        lines: [{ text: formatMessage(MessageId.NUMOOR, 0, 359), category: 'system' }],
+      };
+    }
 
     // TODO(006): see GECMDS.C:497 — where==1 hyperspace gate (IMPULSE1)
     // TODO(006): see GECMDS.C:550 — helm gate (HLBROKE)
 
+    const value = speedResult.value;
+    // Compute new heading: current heading + relative rotation, normalised 0-359
+    const deg = Math.round((ship.heading + courseResult.value) % 360);
+
     ship.percent = value;
     ship.speed2b = 1000.0 * (value / 100.0);
+    ship.head2b = deg;
     ship.dirty = true;
 
     return {
-      lines: [
-        {
-          text: formatMessage(MessageId.ENGFIRE, ship.heading),
-          category: 'success',
-        },
-      ],
+      lines: [{ text: formatMessage(MessageId.ENGFIRE, deg), category: 'success' }],
     };
   },
 };

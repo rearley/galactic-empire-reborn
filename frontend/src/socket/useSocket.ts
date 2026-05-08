@@ -83,8 +83,7 @@ export function useSocket(
       playerDispatch({ type: 'SNAPSHOT', payload });
       // Onboarding complete — clear prompt
       setOnboardingPrompt(null);
-      const local = payload.players.find((p) => p.shipId != null);
-      if (local) setLocalShipId(local.shipId);
+      if (payload.selfShipId) setLocalShipId(payload.selfShipId);
     };
 
     const handleJoined = (payload: PlayerJoinedPayload) => {

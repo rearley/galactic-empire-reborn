@@ -76,6 +76,11 @@ export class CybertronRepository {
         const state = prismaShipToState(ship as Parameters<typeof prismaShipToState>[0]);
         state.status = 2; // GESTAT_AUTO
         state.dirty = false;
+        // Kick-start movement — original sets speed2b = topspeed*500 on load (@see GECYBS.C:134)
+        // Our topspeed is in warp units where warp 1 = 1000, so multiply by 1000
+        if (state.speed2b === 0 && state.topspeed > 0) {
+          state.speed2b = state.topspeed * 1000;
+        }
         this.shipState.loadShip(state);
         count++;
       }
