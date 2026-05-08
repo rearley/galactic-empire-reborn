@@ -118,8 +118,10 @@ export class OnboardingService {
         energy: ENGYMAX,
         status: 1, // GESTAT_USER — active player ship @see GEMAIN.H:210
         topspeed,
-        phasr: 100, // 100% charge — @see GEFUNCS.C:222 initshp
-        shield: 0, // shields down at spawn — @see GEFUNCS.C:229 initshp SHIELDDN
+        phasr: 100,      // 100% charge — @see GEFUNCS.C:222 initshp
+        phasrtype: 1,   // basic phasors fitted at creation — @see GEFUNCS.C:234 initshp
+        shield: 0,      // shields down at spawn — @see GEFUNCS.C:229 initshp SHIELDDN
+        shieldtype: 1,  // standard shields fitted at creation — @see GEFUNCS.C:233 initshp
         ltorpsChannel: [],
         ltorpsDistance: [],
         lmisslChannel: [],

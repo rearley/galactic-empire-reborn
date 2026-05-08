@@ -215,7 +215,7 @@ export class ScanHandlerService implements OnModuleInit {
     for (const planet of planets) {
       const cell = projectRangeCell(ship, planet, scanRange);
       if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'O' });
+      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: String(planet.plnum) });
     }
 
     // 3. Project visible wormholes — GECMDS.C:2640 (004 wire-up)
@@ -257,13 +257,6 @@ export class ScanHandlerService implements OnModuleInit {
    * @see specs/015-scan-modes/plan.md §T032
    */
   private scanLoFull(ship: ShipState): CommandResult {
-    // Not-in-flight guard — orbit, docked, or dead
-    if (ship.where >= 10) {
-      return {
-        ...this.scanHelp(),
-      };
-    }
-
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
@@ -294,7 +287,7 @@ export class ScanHandlerService implements OnModuleInit {
     for (const planet of planets) {
       const cell = projectRangeCell(ship, planet, scanRange);
       if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'O' });
+      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: String(planet.plnum) });
     }
 
     // 3. Visible wormholes
@@ -618,14 +611,38 @@ export class ScanHandlerService implements OnModuleInit {
    * @see contracts/scan-projection.md §"scan pl"
    */
   private scanPl(ship: ShipState, args: string[]): CommandResult {
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
+
+    // No arg → list planets in current sector (@see GECMDS.C:2295 plnum loop)
     if (args.length === 0) {
-      return {
-        ...this.scanHelp(),
-      };
+      const sectorPlanets = this.galaxyService.getSectorPlanets(xsect, ysect);
+      if (sectorPlanets.length === 0) {
+        return { lines: [{ text: 'No planets in this sector.', category: 'system' }] };
+      }
+      const lines: CommandResult['lines'] = [
+        { text: `Planets in sector (${xsect}, ${ysect}):`, category: 'system' },
+      ];
+      for (const p of sectorPlanets) {
+        const label = p.name ? `${p.plnum}. ${p.name}` : `${p.plnum}. (unnamed)`;
+        const owner = p.userid ? ` — owned` : '';
+        lines.push({ text: `  ${label}${owner}`, category: 'info' });
+      }
+      lines.push({ text: 'Use "sca pl <number>" to scan a planet.', category: 'system' });
+      return { lines };
     }
 
-    const name = args.join(' ');
-    const planet = this.galaxyService.findPlanetByName(name);
+    // Numeric arg → plnum lookup in current sector (original GECMDS.C:2295)
+    const num = parseInt(args[0], 10);
+    let planet = !isNaN(num) && String(num) === args[0]
+      ? this.galaxyService.getSectorPlanets(xsect, ysect).find((p) => p.plnum === num) ?? null
+      : null;
+
+    // Name arg → cross-sector lookup (deviation D8)
+    if (!planet) {
+      const name = args.join(' ');
+      planet = this.galaxyService.findPlanetByName(name);
+    }
 
     if (!planet) {
       return {
@@ -654,9 +671,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     // GECMDS.C:2332 — bearing/distance only when planet is in player's sector
     // Omitted for cross-sector lookups (research.md Decision 8)
-    const shipXsect = Math.floor(ship.xcoord);
-    const shipYsect = Math.floor(ship.ycoord);
-    if (planet.xsect === shipXsect && planet.ysect === shipYsect) {
+    if (planet.xsect === xsect && planet.ysect === ysect) {
       const dist = Math.sqrt(
         Math.pow(planet.xcoord - ship.xcoord, 2) +
         Math.pow(planet.ycoord - ship.ycoord, 2),
@@ -690,7 +705,7 @@ export class ScanHandlerService implements OnModuleInit {
     });
 
     // Cross-sector location line
-    if (planet.xsect !== shipXsect || planet.ysect !== shipYsect) {
+    if (planet.xsect !== xsect || planet.ysect !== ysect) {
       lines.push({
         text: formatMessage(MessageId.SCAN_LOCATED_IN, planet.xsect, planet.ysect),
         category: 'info',

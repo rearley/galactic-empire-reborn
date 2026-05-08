@@ -25,7 +25,7 @@ export class PriceHandlerService {
 
   readonly command: Command = {
     keyword: 'pri',
-    aliases: [],
+    aliases: ['price'],
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>

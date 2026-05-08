@@ -11,6 +11,7 @@ export enum MessageId {
   IMPFMT = 'IMPFMT',
   IMPULSE1 = 'IMPULSE1',
   ENGFIRE = 'ENGFIRE',
+  ENGSTOP = 'ENGSTOP',
 
   // warp
   WARP01 = 'WARP01',
@@ -354,6 +355,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.IMPFMT]: 'Usage: impulse <0-99> [course]',
   [MessageId.IMPULSE1]: 'You cannot use impulse engines in hyperspace.',
   [MessageId.ENGFIRE]: 'Engines fired, new course %u degrees.',
+  [MessageId.ENGSTOP]: 'Engines cut. Coasting to a stop.',
 
   // warp — GECMDS.C:561
   [MessageId.WARP01]: 'Your ship has no warp drive.',

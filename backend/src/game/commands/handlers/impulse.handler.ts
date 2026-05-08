@@ -52,13 +52,20 @@ export const impulseCommand: Command = {
     // Compute new heading: current heading + relative rotation, normalised 0-359
     const deg = Math.round((ship.heading + courseResult.value) % 360);
 
+    // Leave orbit on engine fire — GECMDS.C:512 LEAVEORB
+    if (ship.where >= 10) ship.where = 0;
+
     ship.percent = value;
     ship.speed2b = 1000.0 * (value / 100.0);
     ship.head2b = deg;
     ship.dirty = true;
 
     return {
-      lines: [{ text: formatMessage(MessageId.ENGFIRE, deg), category: 'success' }],
+      lines: [
+        value === 0
+          ? { text: formatMessage(MessageId.ENGSTOP), category: 'success' }
+          : { text: formatMessage(MessageId.ENGFIRE, deg), category: 'success' },
+      ],
     };
   },
 };
