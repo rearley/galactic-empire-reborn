@@ -54,7 +54,7 @@ The defaults work for local dev. Set `JWT_SECRET` to something real if you care 
 ```bash
 cd backend
 npx prisma migrate deploy
-npm run seed
+npx prisma db seed
 ```
 
 Migrations create the schema. The seed populates the 18 ship classes. The galaxy generates
