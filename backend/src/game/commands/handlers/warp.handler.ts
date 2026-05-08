@@ -78,14 +78,26 @@ export class WarpHandlerService {
         });
       }
 
+      // Leave orbit on engine fire — GECMDS.C:617 LEAVEORB
+      if (ship.where >= 10) ship.where = 0;
+
+      const currentWarp = Math.round(ship.speed / 1000);
+
       ship.speed2b = 1000.0 * speed;
       ship.head2b = ship.heading;
       ship.dirty = true;
 
-      lines.push({
-        text: formatMessage(MessageId.ENGFIRE, ship.heading),
-        category: 'success',
-      });
+      let engMsg: string;
+      if (speed === 0) {
+        engMsg = formatMessage(MessageId.ENGSTOP);
+      } else if (speed > currentWarp) {
+        engMsg = `Engines fired. Accelerating to warp ${speed}.`;
+      } else if (speed < currentWarp) {
+        engMsg = `Engines fired. Decelerating to warp ${speed}.`;
+      } else {
+        engMsg = `Engines fired. Maintaining warp ${speed}.`;
+      }
+      lines.push({ text: engMsg, category: 'success' });
 
       return { lines };
     },

@@ -28,12 +28,26 @@ export class ShipStateService implements OnModuleInit {
    * @see specs/012-social-commands/data-model.md §ShipState.teamcode
    */
   async onModuleInit(): Promise<void> {
-    const rows = await this.prisma.ship.findMany({ include: { user: { select: { teamcode: true, options: true } } } });
+    const [rows, classes] = await Promise.all([
+      this.prisma.ship.findMany({ include: { user: { select: { teamcode: true, options: true } } } }),
+      this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true } }),
+    ]);
+    const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));
+
     for (const row of rows) {
       const state = prismaShipToState(row);
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
       state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
       state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
+      // Self-heal: topspeed=0 on a warp-capable class means it was never set at creation.
+      const classMaxWarp = maxWarpByClass.get(state.shpclass) ?? 0;
+      if (state.topspeed === 0 && classMaxWarp > 0) {
+        state.topspeed = classMaxWarp;
+        state.dirty = true;
+      }
+      // Self-heal: phasrtype/shieldtype=0 means they were never set at creation — @see GEFUNCS.C:233-234
+      if (state.phasrtype === 0) { state.phasrtype = 1; state.dirty = true; }
+      if (state.shieldtype === 0) { state.shieldtype = 1; state.dirty = true; }
       this.map.set(shipKey(state.userid, state.shipno), state);
     }
     this.logger.log(`Hydrated ${this.map.size} ships from Postgres`);
