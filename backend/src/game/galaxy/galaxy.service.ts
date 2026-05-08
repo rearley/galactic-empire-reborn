@@ -170,22 +170,17 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * Build item arrays for Zygor-3 (S00 index 0) — weapons & combat supplies.
-   * @see GEPLANET.C:678-715 build_plan_1
+   * Build item arrays for Zygor-3 (S00 index 0) — all items available (GE22e patch).
+   * @see GEMAIN.C:2147-2160 GE22e "Updating Zygor" midnight patch
    */
   private static s00ItemsPlan1(): {
     itemsQty: bigint[]; itemsSell: number[]; itemsMarkup2a: number[];
     itemsRate: number[]; itemsReserve: number[]; itemsSold2a: bigint[];
   } {
-    // sell mask for indices 0..13 (I_MISSL=1 I_TORP=2 I_ION=3 I_FLUX=4
-    //   I_FIGHTER=6 I_DECOY=7 I_ZIPPER=9 I_JAMMER=10 I_MINE=11)
-    const sellMask = [0,1,1,1,1,0,1,1,0,1,1,1,0,0];
-    const qty      = [32000n,32000n,32000n,32000n,32000n,0n,32000n,32000n,0n,32000n,32000n,32000n,0n,0n];
-    const markup   = Array.from({ length: NUMITEMS }, (_, i) => sellMask[i] ? BASEPRICE[i] * 2 : 0);
     return {
-      itemsQty: qty,
-      itemsSell: sellMask,
-      itemsMarkup2a: markup,
+      itemsQty: new Array<bigint>(NUMITEMS).fill(1032000n),
+      itemsSell: new Array<number>(NUMITEMS).fill(1),
+      itemsMarkup2a: Array.from({ length: NUMITEMS }, (_, i) => BASEPRICE[i] * 2),
       itemsRate: new Array(NUMITEMS).fill(0),
       itemsReserve: new Array(NUMITEMS).fill(0),
       itemsSold2a: new Array(NUMITEMS).fill(0n),

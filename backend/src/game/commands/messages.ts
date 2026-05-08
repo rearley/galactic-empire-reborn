@@ -241,6 +241,11 @@ export enum MessageId {
   TRAN_OK = 'TRAN_OK',
   TRAN_RECEIVED = 'TRAN_RECEIVED',
   TRAN_FMT = 'TRAN_FMT',
+  TRAN_NOT_ORBIT = 'TRAN_NOT_ORBIT',
+  TRAN_NOT_OWNER = 'TRAN_NOT_OWNER',
+  TRAN_PLANET_LOW = 'TRAN_PLANET_LOW',
+  TRAN_DOWN_OK = 'TRAN_DOWN_OK',
+  TRAN_UP_OK = 'TRAN_UP_OK',
 
   // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
   JET_NO_CARGO = 'JET_NO_CARGO',
@@ -585,7 +590,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TRAN_UNKNOWN_ITEM]: 'Usage: transfer <amt> <item|gold> <target-shipno>',
   [MessageId.TRAN_OK]: 'Transferred %d %s to %s.',
   [MessageId.TRAN_RECEIVED]: '%s transferred %d %s to you.',
-  [MessageId.TRAN_FMT]: 'Usage: transfer <amt> <item|gold> <target-shipno>',
+  [MessageId.TRAN_FMT]: 'Usage: tra down/up <qty> <item>  or  tra <qty> <item> <shipno>',
+  [MessageId.TRAN_NOT_ORBIT]: 'You must be in orbit to transfer to a planet.',
+  [MessageId.TRAN_NOT_OWNER]: 'You do not own this planet.',
+  [MessageId.TRAN_PLANET_LOW]: 'Planet does not have that many.',
+  [MessageId.TRAN_DOWN_OK]: 'Transferred %d %s down to %s.',
+  [MessageId.TRAN_UP_OK]: 'Transferred %d %s up from %s.',
 
   // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
   [MessageId.JET_NO_CARGO]: 'Insufficient cargo to jettison.',
@@ -667,7 +677,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PLN_ROW]: '%-20s  (%2d,%2d)  #%3d',
 
   // pri (feature 014) — GECMDS.C:4284 cmd_price
-  [MessageId.PRICEFMT]: 'Usage: pri [amount item]',
+  [MessageId.PRICEFMT]: 'Usage: price <qty> <item>  e.g. price 50 missiles  (bare: price lists items)',
   [MessageId.PRICE1]: '%d %s @ %d cr ea = %d cr total',
   [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
   [MessageId.BUY7]: 'This planet has no owner.',

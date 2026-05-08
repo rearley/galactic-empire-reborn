@@ -54,7 +54,7 @@ function makeService(sourceShip: ShipState, targetShip?: ShipState) {
     ),
   } as unknown as ShipStateService;
 
-  const handler = new TransferHandlerService(mockShipState);
+  const handler = new TransferHandlerService(mockShipState, {} as any);
   return { handler, mockShipState };
 }
 
