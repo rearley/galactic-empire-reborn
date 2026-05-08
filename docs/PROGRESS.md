@@ -1,3 +1,19 @@
+## 2026-05-08 — 018-team-management
+
+**Completed:** Full `tea` command set on top of feature 012's show/join/leave. Four capabilities added: (1) `tea create <name…> <password>` — atomic team creation with auto-assigned teamcode, case-insensitive uniqueness via LOWER(teamname) unique index + P2002 retry; (2) `tea <name…> <password>` — password-gated join (case-insensitive name, case-sensitive password); (3) `tea list` — live-counted leaderboard (two Prisma queries, no N+1), sorted teamscore DESC/teamcode ASC, capped 20; (4) `ros` team column — fixed 12-char column with ellipsis truncation and `---` placeholder, batched with one `findTeamsByCodes` call.
+
+New module `backend/src/game/team/` with `TeamService`, `TeamRepository`, `team-render.ts`, `team-name.ts`, `team.types.ts`. One Prisma migration (`20260508003817_team_name_unique_lower`) adds `CREATE UNIQUE INDEX "Team_teamname_lower_key" ON "Team" (LOWER("teamname"))`.
+
+**Tests:** 63 new tests across 4 suites in `test/team/`. Unit: `team-name.spec.ts` (parser/validator), `team.service.spec.ts` (create/joinByPassword/list + balance regression constants), `tea.handler.spec.ts` (all create/join/list output paths), `ros.handler.spec.ts` (team column, query budget). Existing `test/unit/commands/tea.handler.spec.ts` updated to reflect FR-016a change (single-token form now routes to show-current-team, not join attempt). All 2296 tests pass.
+
+**Decisions made:** See DECISIONS.md "2026-05-08 — Team creation: auto-assigned teamcode". `tea <name>` single-token form is NOT a join attempt (FR-016a) — it shows current team. This breaks feature-012's old single-token join behavior; existing tests updated and the change noted here.
+
+**Next:** Feature 019 or remaining endgame commands.
+
+**Known issues:** `team.integration.spec.ts` (T032) is deferred — concurrent-create race test requires a live Postgres DB and `Promise.all` race harness; unit tests cover the retry logic via mocks. Quickstart Scenarios A–F (T037) require a running game server and are a manual validation step.
+
+---
+
 ## 2026-05-08 — 017-mail-inbox
 
 **Completed:** Three player commands — `mai` (list inbox or delegate to maintenance), `rea <index>` (read message detail), `del <index>` (hard-delete message). New `MailModule` with `MailInboxRepository`, `MailInboxService`, and `mail-render.ts`. `mai` alias dropped from `MaintHandlerService`; new `MaiHandlerService` dispatches no-arg → inbox, with-arg → maintenance. No schema change — reads/deletes existing `MailStat` rows. SC-001..SC-006 all satisfied.

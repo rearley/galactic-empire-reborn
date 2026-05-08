@@ -4,6 +4,28 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-05-08 — Team creation: auto-assigned teamcode + single plaintext password
+
+**Context**: GECMDS.C:5277 `cmd_team` in the original required the player to supply a 5-digit
+`teamcode` manually, and maintained two passwords: `secret` (founder-only) and `password`
+(for joining members). Players also had to know a team's code to join it.
+
+**Decision**: Auto-assign `teamcode = MAX(teamcode) + 1`. Use a single `password` column for
+both creation and join. Remove the `secret`/founder distinction. Password limit reduced from
+10 to 8 characters (FR-011a). A `LOWER(teamname)` unique partial index enforces case-insensitive
+name uniqueness at the DB level with retry-on-race in the service layer (research D1).
+
+**Reason**: Modern UX — players should not need to coordinate 5-digit codes out of band.
+Single password simplifies the join flow. `MAXTEAMS=50` (GEMAIN.H:240) is retained as the
+hard cap; display cap of 20 is a spec deviation (research D2).
+
+**Alternatives rejected**: Keeping manual teamcode entry (friction, coordination burden).
+Storing passwords hashed (original stores plaintext; spec explicitly keeps plaintext for
+faithful recreation). Using `teamcount` as the live member counter in `tea list` (FR-023
+mandates live `GROUP BY` on `User.teamcode` to avoid stale counts from the midnight job).
+
+---
+
 ## 2026-05-02 — Physics tick uses `max_accel/10` for rotation (not ROTAMT)
 
 **Context**: GEMAIN.H defines `ROTAMT=20` but it is never referenced in any `.C`
