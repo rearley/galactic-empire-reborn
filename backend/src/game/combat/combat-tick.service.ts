@@ -154,6 +154,22 @@ export class CombatTickService implements OnModuleInit {
         return ka < kb ? -1 : ka > kb ? 1 : 0;
       });
 
+    // Pre-removal attacker snapshot — captures attacker userid and shipKey BEFORE
+    // any removeFromGame() runs. Closes the mutual-kill same-tick attribution gap
+    // where ship A is removed first, making ship B's attacker lookup return null
+    // even though both were alive at the start of kill resolution.
+    // @see specs/019-physics-polish/spec.md §Plan-Phase Decisions
+    const attackerSnapshot = new Map<string, { userid: string | null; shipKey: string | null }>();
+    for (const ship of ships) {
+      if (ship.damage < 100) continue;
+      if (ship.status !== 1 && ship.status !== 2) continue;
+      const attacker = this.findActiveAttackerByChannel(ship.lastfired, ship);
+      attackerSnapshot.set(shipKey(ship.userid, ship.shipno), {
+        userid: attacker ? attacker.userid : null,
+        shipKey: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+      });
+    }
+
     for (const victim of ships) {
       try {
         if (victim.damage < 100) continue;
@@ -161,6 +177,8 @@ export class CombatTickService implements OnModuleInit {
         if (victim.status !== 1 && victim.status !== 2) continue;
 
         const attackerChannel = victim.lastfired;
+        // Use pre-snapshot userid; fall back to live lookup for cargo access.
+        const snapshot = attackerSnapshot.get(shipKey(victim.userid, victim.shipno));
         const attacker = this.findActiveAttackerByChannel(attackerChannel, victim);
 
         const loot: Array<{ itemIndex: number; amount: bigint }> = [];
@@ -204,13 +222,17 @@ export class CombatTickService implements OnModuleInit {
         let scoreAwarded = 0;
         try { scoreAwarded = this.shipClassCache.getPoints(victim.shpclass); } catch { /* class not cached */ }
 
+        // Use snapshot for attackerUserid/attackerShipKey so mutual-kill
+        // scenarios correctly attribute kills even after the first removeFromGame().
+        const snapshotAttackerUserid = snapshot?.userid ?? null;
+        const snapshotAttackerShipKey = snapshot?.shipKey ?? null;
         const event: CombatShipDestroyedEvent = {
           victimId: shipKey(victim.userid, victim.shipno),
-          attackerId: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+          attackerId: snapshotAttackerShipKey,
           victimShipKey: shipKey(victim.userid, victim.shipno),
-          attackerShipKey: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+          attackerShipKey: snapshotAttackerShipKey,
           victimUserid: victim.userid,
-          attackerUserid: attacker ? attacker.userid : null,
+          attackerUserid: snapshotAttackerUserid,
           attackerChannel,
           // Weapon type is not separately tracked at kill time; the per-hit
           // events emitted earlier this tick carry the weapon. Leave null.

@@ -4,6 +4,20 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-05-08 — Feature 019: score_f2 = 100 default; Cybertron kill counter decoupled; mutual-kill snapshot
+
+**Context**: Three decisions made during feature 019 implementation.
+
+**Decision 1 — `score_f2 = 100` default**: `SCORE_F2` env var, range `[0, 32700]`, default 100 (matching GEMAIN.C:603 `numopt(SCRFACT, 0, 32700)` with the original default). Balance regression test in `constants.spec.ts` pins this. Out-of-range throws at module init.
+
+**Decision 2 — Cybertron kill counter via event emission**: `PlayerScoreService` emits `CYBERTRON_SCORED_KILL` instead of calling `CybertronRepository.incrementKills` directly. This breaks the `PlayerScoreModule → CybertronModule → CombatModule → PlayerScoreModule` circular dependency that would cause NestJS DI timing failures (providers instantiated before dependencies resolved with nested `forwardRef`). `CybertronTickService` consumes the event.
+
+**Decision 3 — Mutual-kill attacker snapshot**: In `CombatTickService.runKillResolution`, each victim's `attackerUserid` is captured from a pre-removal snapshot BEFORE any `removeFromGame()` runs. This ensures a Cybertron that kills and is killed on the same tick still has its kill attributed correctly.
+
+**Alternatives rejected**: `forwardRef` on all legs of the `PlayerScoreModule → CybertronModule` cycle — this initially appeared to work but caused `CybertronRepository.this.prisma` to be `undefined` in `onApplicationBootstrap` due to NestJS DI instantiation ordering with deeply nested `forwardRef`. EventEmitter decoupling is the correct pattern for breaking score → AI cycles.
+
+---
+
 ## 2026-05-08 — Team creation: auto-assigned teamcode + single plaintext password
 
 **Context**: GECMDS.C:5277 `cmd_team` in the original required the player to supply a 5-digit

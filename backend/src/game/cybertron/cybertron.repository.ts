@@ -204,6 +204,22 @@ export class CybertronRepository {
   }
 
   /**
+   * Atomically increment a Cybertron ship's kill count by 1.
+   * Used to track escalating difficulty per CYB_BE_NICE/CYB_BE_EASY thresholds.
+   * @see GECYBS.C — kill counter used for CYB_BE_NICE/CYB_BE_EASY escalation
+   */
+  async incrementKills(shipno: number, userid: string): Promise<void> {
+    try {
+      await this.prisma.ship.update({
+        where: { userid_shipno: { userid, shipno } },
+        data: { kills: { increment: 1 } },
+      });
+    } catch (err: unknown) {
+      this.logger.error(`incrementKills failed for ${userid}:${shipno}: ${err}`);
+    }
+  }
+
+  /**
    * Immediately flush Ship rows to Postgres for significant-event durability.
    * @see specs/007-cybertron-ai/plan.md FR-019, R-11
    */

@@ -120,10 +120,12 @@ export class DroidTickService implements OnModuleInit {
       if (!state) continue;
 
       const spawned: DroidSpawnedEvent = {
-        shipKey: shipKey(state.userid, state.shipno),
-        classNumber,
+        shipId: state.userid,
+        shipname: state.shipname,
+        shpclass: state.shpclass,
         sector: { x: Math.floor(state.xcoord), y: Math.floor(state.ycoord) },
-        tickAt: ctx.tickNumber,
+        ephemeral: true,
+        spawnedAt: Date.now(),
       };
       this.events.emit(DroidEvents.SPAWNED, spawned);
       this.logger.debug(`Spawned ${state.userid} class ${classNumber}`);
@@ -525,11 +527,12 @@ export class DroidTickService implements OnModuleInit {
 
     // Emit killed event before removal
     const killed: DroidKilledEvent = {
-      shipKey: event.victimShipKey,
-      classNumber: classNumber ?? droid?.shpclass ?? 0,
-      attackerShipKey: event.attackerShipKey ?? '',
+      shipId: userid,
+      shipname: droid?.shipname ?? userid,
+      shpclass: classNumber ?? droid?.shpclass ?? 0,
       sector: event.sector,
-      tickAt: Date.now(),
+      killedBy: event.attackerUserid ?? null,
+      killedAt: Date.now(),
     };
     this.events.emit(DroidEvents.KILLED, killed);
 

@@ -49,6 +49,105 @@ hydrated once on boot from `prisma.shipClass.findMany` and never re-fetched.
 
 ---
 
+## Universe Boundary Wrap (feature 019 — US1)
+
+**Source**: GEFUNCS.C:651-705 (`moveship` wrapping block)
+
+After position integration, `PhysicsTickService` calls `wrapCoord(value, max)` on each
+axis when `ship.where <= 1` (normal space or hyperspace — not orbit/docked):
+
+```
+wrapCoord(v, max) = ((v % max) + max) % max
+```
+
+`MAXX = 30`, `MAXY = 15`. Ships that cross the `x = 30` or `y = 15` boundary reappear at
+the opposite edge preserving heading, speed, cargo, and weapon locks. The `PHYSICS_BOUNDARY_WRAPPED`
+event is emitted with pre- and post-wrap coordinates for clients to update cached state.
+
+The `telezip` non-wrap fallback from the original is dead code under `univwrap=true`.
+
+---
+
+## Overspeed Engine Damage (feature 019 — US2)
+
+**Source**: GEFUNCS.C:733-792 (overspeed block inside `moveship`)
+
+On each `TickKind.SHIP_UPDATE` tick, `ShipTickService.processShip` calls `decideOverspeed(ship, rng)`:
+
+- **Not over threshold** (speed ≤ `topspeed * 1.5`): no-op.
+- **Recovery** (`intspeed <= topspeed` after a previous warning): resets `topspeed = floor(topspeed/warncntr)`, `warncntr = 0`; emits `WARPSPD`.
+- **Lottery miss** (`rng.intBelow(10) !== 0`): no-op this tick.
+- **Warning** (`warncntr <= 4`): increments `warncntr`; emits `WARPFAST + warncntr`.
+- **Engine break** (`warncntr > 4`): `damage += rng.intBelow(20)`, `topspeed = 0`, `speed2b = 0`; emits `WARPBRK`. Ship coasts to a stop on subsequent ticks.
+
+Balance: lottery probability `1/10` per overspeed tick; `diff < 0` is clamped to `5` in the warn branch.
+
+---
+
+## Auto-Repair Tick (feature 019 — US3)
+
+**Source**: GECMDS.C:cmd_maint (extracted into `MaintenanceService`)
+
+`MaintenanceService.evaluateGates(ship, passwordArg?)` checks these gates in order:
+1. `damage > 0` — nothing to repair.
+2. `cash >= cost` — `MAINT_COST_NORMAL = 200` or `MAINT_COST_NEUTRAL = 2500` when in neutral zone (Zygor class exempt).
+3. `tagged === 0` — not in combat lock.
+4. Not in neutral zone (unless Zygor class `ZYGORCLASS = 10`).
+5. When `passwordArg` is provided: planet password gate.
+
+On `TickKind.SHIP_UPDATE`, if `ship.autoRepair === true` and all gates pass, `runMaintenance(ship)` debits cash and queues repair. No player-facing message on tick-driven repairs (silent automation). Command callers pass `args[0]` as `passwordArg`; tick callers pass `undefined`.
+
+---
+
+## Auto-Shield Tick (feature 019 — US4)
+
+**Port-original QoL feature — no C source equivalent.**
+
+`decideAutoShield(ship)` returns `'raise'` when all of these hold:
+- `ship.autoShield === true`
+- `ship.shieldstat === 0` (shields currently down)
+- `ship.tagged === 0` (not in combat lock)
+- At least one trigger flag is set: `recentlyWarpedExit` or `recentlySelfFiredTorp`
+
+On `'raise'`, `ShipTickService` sets `shieldstat = 1` and clears the trigger flag.
+Trigger flags are in-memory only (not persisted to Postgres). Sources: warp-exit path in
+`physics-tick.service.ts` sets `recentlyWarpedExit = true`; torpedo-launch handler sets `recentlySelfFiredTorp = true`.
+
+---
+
+## AI Kill Scoring (feature 019 — US5)
+
+**Source**: GEFUNCS.C:killem (1143-1185), GEFUNCS.C:1161 (AI 1/10 branch), GECYBS.C (kill counter)
+
+Score deductions use `score_f2 = 100` (configurable via `SCORE_F2` env, range `[0, 32700]`):
+- **PvP**: `floor((scr / 100) * score_f2)` deducted from victim's `klscore` and `score`.
+- **AI attacker**: `floor((scr / 100) * score_f2 / 10)` — one-tenth of PvP rate.
+
+`CHGLOSER` cash penalty applies only to PvP kills (both sides non-AI).
+
+When a Cybertron attacker (`Cybrg-` prefix) scores a kill, `PlayerScoreService` emits
+`CYBERTRON_SCORED_KILL` to break the `PlayerScoreModule → CybertronModule` circular dependency.
+`CybertronTickService` listens and calls `cybertronRepository.incrementKills(shipno, userid)`.
+Droid attackers (`@Droid-`) do NOT increment the kill counter (GEFUNCS.C:1253).
+
+---
+
+## Droid Presence Bridge (feature 019 — US6)
+
+Ephemeral droid ships (`@Droid-N` userid prefix) are never persisted. Two lifecycle events
+are broadcast via Socket.io:
+
+- `droid.spawned` → emitted to the sector room (`sector:<x>:<y>`) when a droid spawns.
+  Payload includes `shipId`, `shipname`, `shpclass`, `sector`, `ephemeral: true`, `spawnedAt`.
+- `droid.killed` → emitted to both the sector room and the global `kills` channel on droid death.
+  Payload includes `shipId`, `killedBy` (attacker userid or `null` for mine kills), `shpclass`, `sector`.
+
+Frontend `useSectorRoster` hook listens to these events and maintains an in-memory droid list
+(component state only — never written to any persisted store). Droids appear in the sector
+roster with an `ephemeral` marker; they disappear on kill or disconnect/reconnect.
+
+---
+
 ## Command dispatch (feature 003)
 
 **Source**: GECMDS.C:111-225 (command table)

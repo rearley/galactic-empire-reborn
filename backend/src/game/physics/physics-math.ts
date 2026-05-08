@@ -137,6 +137,18 @@ export function tryEnergyDebit(
 }
 
 /**
+ * Wraps a coordinate into `[0, max)` using modular arithmetic.
+ * Applied after position integration when `ship.where <= 1` (in normal space).
+ * Guards against NaN and Infinity by returning 0 for non-finite inputs.
+ *
+ * @see GEFUNCS.C:651-705 moveship — univwrap branch
+ */
+export function wrapCoord(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return ((value % max) + max) % max;
+}
+
+/**
  * Derives the integer sector for a coordinate.
  *
  *   sector = { x: floor(x), y: floor(y) }

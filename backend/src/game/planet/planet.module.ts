@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { ShipModule } from '../ship/ship.module';
@@ -21,7 +21,7 @@ import {
  * inject a Mulberry32Adapter into whichever provider they exercise.
  */
 @Module({
-  imports: [PrismaModule, GalaxyModule, ShipModule, TickModule],
+  imports: [PrismaModule, GalaxyModule, forwardRef(() => ShipModule), forwardRef(() => TickModule)],
   providers: [
     PlanetStateService,
     PlanetTickService,

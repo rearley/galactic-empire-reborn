@@ -1,6 +1,6 @@
 # Architecture
 
-Current module map as of feature 018-team-management.
+Current module map as of feature 019-physics-polish.
 Updated at the end of every implement session per CLAUDE.md.
 
 ## Repository layout
@@ -14,7 +14,7 @@ galactic-empire-reborn/
       seed/
         ship-classes.ts      ← 18 ShipClass seed rows (static reference data)
     src/                     ← NestJS application (see module map below)
-    test/                    ← Jest test suite (203 suites / 1836 tests as of feature 014; ~200 more added in 015; additional suites added in 016)
+    test/                    ← Jest test suite (248 suites / 2421 tests as of feature 019)
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
@@ -119,10 +119,18 @@ AppModule (app.module.ts)
   │     ├── ReportHandlerService — @Injectable report/rep handler; reads ShipClass.typeName/hasCloak;
   │     │                           builds multi-line nav/sys/cargo/wpns read-out
   │     └── plain Command objects: rotateCommand, impulseCommand, warpCommand
-  ├── ShipModule (game/ship/) — exports ShipStateService
-  │     └── ShipStateService — owns in-memory Map<"userid:shipno", ShipState>; hydrates from
-  │                             Postgres on init; subscribes SHIP_UPDATE tick → async dirty flush;
-  │                             get/mutate/findByUserid/findAllShips/findByName
+  ├── ShipModule (game/ship/) — exports ShipStateService, MaintenanceService, ShipTickService
+  │     ├── ShipStateService — owns in-memory Map<"userid:shipno", ShipState>; hydrates from
+  │     │                       Postgres on init; subscribes SHIP_UPDATE tick → async dirty flush;
+  │     │                       get/mutate/findByUserid/findAllShips/findByName
+  │     ├── MaintenanceService — extracted gate logic + cash debit + repair-queue mutation from
+  │     │                         MaintHandlerService; public API: evaluateGates(ship, passwordArg?)
+  │     │                         and runMaintenance(ship, passwordArg?); shared by command handlers
+  │     │                         and ShipTickService; JSDoc @see GECMDS.C:cmd_maint
+  │     └── ShipTickService — subscribes TickKind.SHIP_UPDATE; per-ship processShip pipeline:
+  │                            decideOverspeed → apply deltas + emit WARPBRK/WARPSPD/WARPFAST;
+  │                            autoRepair gate → MaintenanceService.runMaintenance;
+  │                            autoShield gate → decideAutoShield → shieldstat=1 + clear trigger
   └── DebugController (debug/) — GET /debug/tick-stats → {shipUpdate, physics}
 
 ### Auth & onboarding flow

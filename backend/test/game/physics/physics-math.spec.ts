@@ -5,8 +5,67 @@ import {
   rotationStep,
   sectorOf,
   tryEnergyDebit,
+  wrapCoord,
 } from '../../../src/game/physics/physics-math';
-import { ACCENGAMT, COORD_SCALE, WARP_THRESHOLD } from '../../../src/game/constants';
+import { ACCENGAMT, COORD_SCALE, MAXX, MAXY, WARP_THRESHOLD } from '../../../src/game/constants';
+
+describe('wrapCoord — universe boundary modular wrap', () => {
+  describe('MAXX = 30 axis', () => {
+    it('in-range value is unchanged', () => {
+      expect(wrapCoord(15, MAXX)).toBeCloseTo(15);
+    });
+
+    it('positive overshoot wraps back into range', () => {
+      expect(wrapCoord(30.5, MAXX)).toBeCloseTo(0.5);
+    });
+
+    it('exact boundary value 30 wraps to 0', () => {
+      expect(wrapCoord(30, MAXX)).toBeCloseTo(0);
+    });
+
+    it('large overshoot wraps correctly (multiple wraps)', () => {
+      expect(wrapCoord(75, MAXX)).toBeCloseTo(15); // 75 % 30 = 15
+    });
+
+    it('just-below-zero negative wraps to near MAXX', () => {
+      expect(wrapCoord(-0.1, MAXX)).toBeCloseTo(29.9);
+    });
+
+    it('exactly 0 stays 0', () => {
+      expect(wrapCoord(0, MAXX)).toBeCloseTo(0);
+    });
+  });
+
+  describe('MAXY = 15 axis', () => {
+    it('positive overshoot wraps', () => {
+      expect(wrapCoord(15.2, MAXY)).toBeCloseTo(0.2);
+    });
+
+    it('negative undershoot wraps to near MAXY', () => {
+      expect(wrapCoord(-0.5, MAXY)).toBeCloseTo(14.5);
+    });
+
+    it('large warp-9 overshoot wraps within range', () => {
+      const result = wrapCoord(14.9 + 5, MAXY);
+      expect(result).toBeGreaterThanOrEqual(0);
+      expect(result).toBeLessThan(MAXY);
+    });
+  });
+
+  describe('guard cases', () => {
+    it('NaN input returns 0', () => {
+      expect(wrapCoord(NaN, MAXX)).toBe(0);
+    });
+
+    it('Infinity input returns 0', () => {
+      expect(wrapCoord(Infinity, MAXX)).toBe(0);
+    });
+
+    it('-Infinity input returns 0', () => {
+      expect(wrapCoord(-Infinity, MAXX)).toBe(0);
+    });
+  });
+});
 
 describe('physics-math', () => {
   describe('accelerationStep', () => {

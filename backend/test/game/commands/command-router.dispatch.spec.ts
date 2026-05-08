@@ -16,10 +16,12 @@ import { AbortHandlerService } from '../../../src/game/commands/handlers/abort.h
 import { AbandonHandlerService } from '../../../src/game/commands/handlers/abandon.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
+import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { CLOAK_ENERGY_USE_DEFAULT } from '../../../src/game/commands/cloak.config';
+import { MAINT_COST_NORMAL } from '../../../src/game/commands/_ship-management-constants';
 
 // ---------------------------------------------------------------------------
 // Ship factory
@@ -81,10 +83,18 @@ function buildRouter() {
     },
   } as unknown as PrismaService;
 
+  const mockMaintService = {
+    runMaintenance: jest.fn().mockResolvedValue({
+      ok: true,
+      price: BigInt(MAINT_COST_NORMAL),
+      repairAmt: 4,
+    }),
+  } as unknown as MaintenanceService;
+
   const router = new CommandRouterService();
 
   router.register(new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT).command);
-  router.register(new MaintHandlerService(mockShipState, mockPlanet, mockPrisma).command);
+  router.register(new MaintHandlerService(mockMaintService).command);
   router.register(new TransferHandlerService(mockShipState).command);
   router.register(new JettisonHandlerService(mockShipState).command);
   router.register(new SetHandlerService(mockShipState, mockPrisma).command);

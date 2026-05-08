@@ -1,3 +1,19 @@
+## 2026-05-08 — 019-physics-polish
+
+**Completed:** Six user stories shipping as one branch — (US1) universe boundary wrap (`wrapCoord` modulo `MAXX`/`MAXY` called after position integration; `PHYSICS_BOUNDARY_WRAPPED` event); (US2) overspeed engine damage (faithful port of `GEFUNCS.C:733-792` — `decideOverspeed` pure function, `warncntr` escalation, `WARPBRK`/`WARPSPD` events); (US3) auto-repair tick consumer (`MaintenanceService` extracted from `MaintHandlerService`, `ShipTickService.processShip` calls it when `autoRepair=true`); (US4) auto-shield tick consumer (`decideAutoShield` port-original QoL feature — raises shields on warp-exit or self-torp trigger when `autoShield=true` and ship not in combat lock); (US5) AI kill scoring (`score_f2 = 100` default, PvP formula `floor((scr/100)*score_f2)`, AI 1/10 branch, Cybertron kill counter via `CYBERTRON_SCORED_KILL` EventEmitter decoupling); (US6) droid presence bridged to players (`DROID_SPAWNED`/`DROID_KILLED` events in `GameGateway`, `useSectorRoster` hook in frontend, persistence invariant confirmed).
+
+New files: `backend/src/game/ship/ship-tick.service.ts`, `maintenance.service.ts`, `ship-overspeed.ts`, `auto-shield.ts`; `backend/src/game/player/score.config.ts`; `frontend/src/features/sector-roster/useSectorRoster.ts`. No Prisma migrations added.
+
+**Tests:** 248 backend suites / 2421 tests; 8 new frontend Vitest tests for `useSectorRoster`. New suites: `ship-tick.service`, `ship-tick.overspeed`, `ship-tick.auto-repair`, `ship-tick.auto-shield`, `maintenance.service`, `ship-overspeed`, `auto-shield`, `physics-tick.wrap` (in existing `physics-tick.service.spec.ts`), `player-score.service.ai`, `score.config`, `cybertron-increment-kills`, `droid-events`, `game.gateway.droid-bridge`, `droid-roster.invariant`, `useSectorRoster`.
+
+**Decisions made:** See DECISIONS.md. Key: `score_f2 = 100` default; Cybertron kill counter decoupled via event emission to break `PlayerScoreModule → CybertronModule → CombatModule` cycle; 3-way `ShipModule ↔ PlanetModule ↔ TickModule` circular dependency resolved with `forwardRef` on all three legs; `passwordArg?: string` param pattern distinguishes command vs tick callers of `MaintenanceService.runMaintenance`.
+
+**Next:** Feature 020 or remaining endgame commands.
+
+**Known issues:** T041 frontend spec is a hook unit test only; no E2E validation against a running server. T052 quickstart smoke test is a manual step for the PR description.
+
+---
+
 ## 2026-05-08 — 018-team-management
 
 **Completed:** Full `tea` command set on top of feature 012's show/join/leave. Four capabilities added: (1) `tea create <name…> <password>` — atomic team creation with auto-assigned teamcode, case-insensitive uniqueness via LOWER(teamname) unique index + P2002 retry; (2) `tea <name…> <password>` — password-gated join (case-insensitive name, case-sensitive password); (3) `tea list` — live-counted leaderboard (two Prisma queries, no N+1), sorted teamscore DESC/teamcode ASC, capped 20; (4) `ros` team column — fixed 12-char column with ellipsis truncation and `---` placeholder, batched with one `findTeamsByCodes` call.

@@ -15,6 +15,9 @@ export const DroidEvents = {
   KILLED: 'droid.killed',
 } as const;
 
+// Re-export ShipKey for use in consumers that need the composite key type.
+export type { ShipKey };
+
 /**
  * Fired when a Droid scans an in-range player and the annoy roll succeeds,
  * or when a Droid emits a call-for-help message to its attacker.
@@ -36,25 +39,41 @@ export interface DroidAnnoyEvent {
 }
 
 /**
- * Fired on each successful Droid spawn. Operational/observability only.
+ * Fired on each successful Droid spawn. Bridged by GameGateway to the sector room.
+ * Frontend uses this to add ephemeral droids to the sector roster.
  * @see GEDROIDS.C:98 droid_init
+ * @see specs/019-physics-polish/data-model.md §DroidSpawnedEvent
  */
 export interface DroidSpawnedEvent {
-  shipKey: ShipKey;
-  classNumber: number;
+  /** Droid userid, e.g. '@Droid-7'. */
+  shipId: string;
+  /** Display name of the droid ship. */
+  shipname: string;
+  /** Ship class: 31 (Scow), 32 (Murdonian Transport), 33 (Vakory Survey Drone). */
+  shpclass: number;
   sector: { x: number; y: number };
-  tickAt: number;
+  /** Literal constant — droids are never persisted. */
+  ephemeral: true;
+  /** Epoch ms (Date.now()). */
+  spawnedAt: number;
 }
 
 /**
- * Fired on each Droid death. Operational/observability only — the player-facing
- * kill notification is produced by the 006b combat.ship-destroyed chain.
+ * Fired on each Droid death. Bridged by GameGateway to the sector room and
+ * the global 'kills' channel so the frontend can remove the droid from its roster.
  * @see GEDROIDS.C:534 droid_died
+ * @see specs/019-physics-polish/data-model.md §DroidKilledEvent
  */
 export interface DroidKilledEvent {
-  shipKey: ShipKey;
-  classNumber: number;
-  attackerShipKey: ShipKey;
+  /** Droid userid, e.g. '@Droid-N'. */
+  shipId: string;
+  /** Display name of the droid ship. */
+  shipname: string;
+  /** Ship class: 31, 32, or 33. */
+  shpclass: number;
   sector: { x: number; y: number };
-  tickAt: number;
+  /** Attacker userid, or null for mine kills. */
+  killedBy: string | null;
+  /** Epoch ms (Date.now()). */
+  killedAt: number;
 }
