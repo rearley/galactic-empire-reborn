@@ -11,9 +11,10 @@ import { ScanPanel } from './components/ScanPanel';
 import { AuthScreen } from './auth/AuthScreen';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { getToken, setToken } from './auth/tokenStore';
-import { connectSocket } from './socket/socketClient';
+import { connectSocket, socket } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
 import type { EventLogLine, ScanCell } from './types/contracts';
+import type { ScanRenderEvent } from './hooks/useScanRender';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -56,11 +57,16 @@ function Terminal(): React.JSX.Element {
         (lines) => setLogLines((prev) => [...prev, ...lines].slice(-MAX_LOG_ENTRIES)),
         () => setLogLines([]),
       );
-      if (lastResult.scanGrid !== undefined) {
-        setScanCells(lastResult.scanGrid);
-      }
     }
   }, [lastResult]);
+
+  useEffect(() => {
+    const handleScanRender = (event: ScanRenderEvent) => {
+      setScanCells(event.cells as ScanCell[]);
+    };
+    socket.on('scan:render', handleScanRender);
+    return () => { socket.off('scan:render', handleScanRender); };
+  }, []);
 
   const shipNameError =
     onboardingPrompt?.type === 'ship-name'

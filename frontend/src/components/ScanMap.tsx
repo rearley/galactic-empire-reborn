@@ -101,11 +101,16 @@ export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Eleme
   }
 
   return (
-    <div
-      className="font-mono text-xs bg-black p-2 overflow-auto"
-      data-testid="scan-map"
-    >
-      {rows}
-    </div>
+    <>
+      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Sector Map</span>
+      </div>
+      <div
+        className="font-mono text-xs bg-black p-2 overflow-auto"
+        data-testid="scan-map"
+      >
+        {rows}
+      </div>
+    </>
   );
 }

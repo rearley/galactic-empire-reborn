@@ -38,7 +38,7 @@ export interface EventLogLine {
  *
  * @see specs/003-ship-commands/spec.md `Clarifications` 2026-05-02 Q2
  */
-export type ScanCellType = 'ship' | 'planet' | 'wormhole' | 'self';
+export type ScanCellType = 'ship' | 'planet' | 'wormhole' | 'mine' | 'self';
 
 /**
  * Range-scan grid dimensions, taken verbatim from the original game.

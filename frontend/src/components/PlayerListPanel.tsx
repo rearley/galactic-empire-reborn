@@ -6,7 +6,11 @@ interface PlayerListPanelProps {
 
 export function PlayerListPanel({ players }: PlayerListPanelProps) {
   return (
-    <div data-testid="player-list-panel" className="font-mono text-sm overflow-y-auto">
+    <div data-testid="player-list-panel" className="font-mono text-sm flex flex-col h-full">
+      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Players</span>
+      </div>
+      <div className="overflow-y-auto flex-1">
       {players.map((p) => (
         <div
           key={p.shipId}
@@ -22,6 +26,7 @@ export function PlayerListPanel({ players }: PlayerListPanelProps) {
           </span>
         </div>
       ))}
+      </div>
     </div>
   );
 }
