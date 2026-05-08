@@ -536,9 +536,7 @@ export class ScanHandlerService implements OnModuleInit {
    */
   private scanSh(ship: ShipState, args: string[]): CommandResult {
     if (args.length === 0) {
-      return {
-        ...this.scanHelp(),
-      };
+      return this.scanHelp();
     }
     const name = args.join(' ');
     const target = this.shipService.findByName(name);
@@ -547,11 +545,25 @@ export class ScanHandlerService implements OnModuleInit {
         lines: [{ text: `No ship named "${name}" found.`, category: 'system' }],
       };
     }
+    // Block scanning self — GECMDS.C:2209 (prints FOOLISH)
+    if (target.userid === ship.userid && target.shipno === ship.shipno) {
+      return {
+        lines: [{ text: 'You look in a mirror.', category: 'system' }],
+      };
+    }
+    const classInfo = this.classCache.get(ship.shpclass);
+    const scanRange = classInfo?.scanRange ?? 0;
     const dist = Math.sqrt(
       Math.pow(target.xcoord - ship.xcoord, 2) + Math.pow(target.ycoord - ship.ycoord, 2),
     );
-    // TODO(006): compute bearing properly from GEFUNCS.C
-    const bearing = 0;
+    const rawDist = dist * 10000;
+    // Out of range — GECMDS.C:2220
+    if (rawDist >= scanRange) {
+      return {
+        lines: [{ text: `${target.shipname} is out of scanner range.`, category: 'system' }],
+      };
+    }
+    const bearing = 0; // TODO(006): compute bearing from GEFUNCS.C cbearing
     const ltr = target.status === 1 ? '+' : '=';
     return {
       lines: [
