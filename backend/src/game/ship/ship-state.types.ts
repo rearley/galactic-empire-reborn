@@ -114,6 +114,16 @@ export interface ShipState {
    * @see GEMAIN.H:234 SCANHOME
    */
   scanHome: boolean;
+  /**
+   * Show full detail panel on scan lo output. Derived from User.options[2].
+   * @see GEMAIN.H:235 SCANFULL
+   */
+  scanFull: boolean;
+  /**
+   * Suppress non-critical server messages. Derived from User.options[3].
+   * @see GEMAIN.H:236 MSG_FILTER
+   */
+  msgFilter: boolean;
 
   /** In-memory only — true after any mutation; cleared after successful Prisma flush. */
   dirty: boolean;

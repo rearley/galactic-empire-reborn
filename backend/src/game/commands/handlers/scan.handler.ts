@@ -209,7 +209,7 @@ export class ScanHandlerService implements OnModuleInit {
     // 3. Project visible wormholes — GECMDS.C:2640 (004 wire-up)
     const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
     for (const wormhole of wormholes) {
-      if (wormhole.visible !== 1) continue;
+      if (!wormhole.visible) continue;
       const cell = projectRangeCell(ship, wormhole, scanRange);
       if (!cell) continue;
       grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
@@ -288,7 +288,7 @@ export class ScanHandlerService implements OnModuleInit {
     // 3. Visible wormholes
     const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
     for (const wormhole of wormholes) {
-      if (wormhole.visible !== 1) continue;
+      if (!wormhole.visible) continue;
       const cell = projectRangeCell(ship, wormhole, scanRange);
       if (!cell) continue;
       grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
@@ -478,7 +478,7 @@ export class ScanHandlerService implements OnModuleInit {
     // 1. Visible wormholes in this sector — lowest precedence
     const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
     for (const wh of wormholes) {
-      if (wh.visible !== 1) continue;
+      if (!wh.visible) continue;
       const { x, y } = project(wh.xcoord, wh.ycoord);
       put({ x, y, type: 'wormhole', char: 'W' });
     }

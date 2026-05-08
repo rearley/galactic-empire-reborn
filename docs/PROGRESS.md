@@ -1,3 +1,19 @@
+## 2026-05-08 — 020-source-fidelity-audit
+
+**Completed:** Eight fidelity findings triaged and resolved. F-001: TS `randamage()` renamed to `rollHullDamage()` (was a hull-damage roll, not the C subsystem-damage routine); real `randamage()` added per `GEFUNCS.C:1956`. F-002: Phaser reload fixed from `+PRELOAD` to `phasrtype * PRELOAD` via new `phaserReloadAmount()` function. F-003: `GalaxyWormholeView` interface added with `visible: boolean`; `getSectorWormholes` returns this type; all scan.handler.ts checks changed to `!wormhole.visible`. F-004: N/A — `scan lo full` ordering is a deliberate TS enhancement. F-005: Beacon event added to `handleSectorTransition` in `GameGateway` with observer-check + `gernd()%10===0` gate. F-006: `scanfull` and `filter` options added to `SetHandlerService`; `ShipState` gains `scanFull` and `msgFilter`; `SET_OPTIONS_CATALOG` committed. F-007: `ENGYMAX` corrected 50000→65000; 25+ missing constants added; `GEMAIN_GAMEPLAY_PINS` bidirectional pin map added. F-008: Manual smoke tests created.
+
+New files: `backend/src/gateway/events/beacon.event.ts`, `backend/src/game/commands/handlers/set-options.catalog.ts`; tests: `test/unit/gemain-pins.spec.ts`, `test/unit/roll-hull-damage.spec.ts`, `test/unit/interceptor-preload.spec.ts`, `test/unit/set-options-coverage.spec.ts`, `test/integration/wormhole-visibility.spec.ts`, `test/integration/beacon.spec.ts`, `test/fixtures/randamage.golden.json`, `test/manual/T053.manual.spec.ts`, `test/manual/T043.manual.spec.ts`, `test/manual/T077.manual.spec.ts`.
+
+**Tests:** +50 tests across 9 new suites. All findings covered by regression tests. Manual suite confirmed working.
+
+**Decisions made:** Interceptor double-reload bonus intentionally absent (commented out in shipped C source). `scan lo full` ordering not changed (deliberate enhancement). Beacon gate uses `gernd()%10===0` preserving the C-source 1-in-10 probability.
+
+**Next:** Feature 021 or remaining endgame commands.
+
+**Known issues:** None.
+
+---
+
 ## 2026-05-08 — 019-physics-polish
 
 **Completed:** Six user stories shipping as one branch — (US1) universe boundary wrap (`wrapCoord` modulo `MAXX`/`MAXY` called after position integration; `PHYSICS_BOUNDARY_WRAPPED` event); (US2) overspeed engine damage (faithful port of `GEFUNCS.C:733-792` — `decideOverspeed` pure function, `warncntr` escalation, `WARPBRK`/`WARPSPD` events); (US3) auto-repair tick consumer (`MaintenanceService` extracted from `MaintHandlerService`, `ShipTickService.processShip` calls it when `autoRepair=true`); (US4) auto-shield tick consumer (`decideAutoShield` port-original QoL feature — raises shields on warp-exit or self-torp trigger when `autoShield=true` and ship not in combat lock); (US5) AI kill scoring (`score_f2 = 100` default, PvP formula `floor((scr/100)*score_f2)`, AI 1/10 branch, Cybertron kill counter via `CYBERTRON_SCORED_KILL` EventEmitter decoupling); (US6) droid presence bridged to players (`DROID_SPAWNED`/`DROID_KILLED` events in `GameGateway`, `useSectorRoster` hook in frontend, persistence invariant confirmed).

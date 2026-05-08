@@ -88,6 +88,7 @@ describe('GameGateway player.snapshot', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { next: () => Math.random() } as any,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,

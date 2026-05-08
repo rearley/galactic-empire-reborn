@@ -5,6 +5,19 @@
  */
 
 /**
+ * Minimal wormhole view consumed by the scan renderer and other callers.
+ * `visible: boolean` is the type-safe equivalent of `GALWORM.visible` (int
+ * in the Prisma schema; 0 = hidden, 1 = visible in C source).
+ *
+ * @see GEMAIN.H:473 — GALWORM struct, visible field
+ */
+export interface GalaxyWormholeView {
+  xcoord: number;
+  ycoord: number;
+  visible: boolean;
+}
+
+/**
  * Runtime configuration loaded from environment variables.
  * @see specs/004-galaxy-generator/contracts/galaxy-config.md
  */

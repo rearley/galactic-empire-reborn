@@ -87,7 +87,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler);
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { next: () => Math.random() } as any);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: {
