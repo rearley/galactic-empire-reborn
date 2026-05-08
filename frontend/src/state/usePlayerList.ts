@@ -40,10 +40,8 @@ function reducer(state: State, action: Action): State {
     }
     case 'TRANSITION': {
       const next = new Map(state);
-      for (const t of action.payload.transitions) {
-        const existing = next.get(t.shipId);
-        if (existing) next.set(t.shipId, { ...existing, sector: t.toSector });
-      }
+      const existing = next.get(action.payload.shipId);
+      if (existing) next.set(action.payload.shipId, { ...existing, sector: action.payload.toSector });
       return next;
     }
     case 'RENAMED': {

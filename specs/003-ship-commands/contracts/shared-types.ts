@@ -9,7 +9,7 @@
  * @see specs/003-ship-commands/contracts/websocket-events.md
  */
 
-export type EventLogCategory = 'system' | 'info' | 'success' | 'combat';
+export type EventLogCategory = 'system' | 'info' | 'success' | 'combat' | 'nav' | 'chat';
 
 export interface EventLogLine {
   text: string;
@@ -26,7 +26,7 @@ export interface EventLogLine {
  *
  * @see specs/003-ship-commands/spec.md `Clarifications` 2026-05-02 Q2
  */
-export type ScanCellType = 'ship' | 'planet' | 'wormhole' | 'self';
+export type ScanCellType = 'ship' | 'planet' | 'wormhole' | 'mine' | 'self';
 
 /**
  * Range-scan grid dimensions, taken verbatim from the original game.
@@ -71,4 +71,6 @@ export interface CommandResultPayload {
   lines: EventLogLine[];
   /** present only when the command was `scan` (or an alias) */
   scanGrid?: ScanCell[];
+  /** When true, the frontend should clear the event log. Used by the `cls` command. */
+  clearLog?: boolean;
 }

@@ -54,8 +54,7 @@ export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Eleme
     if (!shipId) return;
 
     const handleTransition = (payload: PhysicsSectorTransitionPayload) => {
-      const crossed = payload.transitions.some((t) => t.shipId === shipId);
-      if (crossed) setDisplayCells(null);
+      if (payload.shipId === shipId) setDisplayCells(null);
     };
 
     socket.on(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);

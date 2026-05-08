@@ -6,7 +6,7 @@
  * structural parity is enforced by frontend/test/contracts-parity.spec.ts.
  *
  * New 010-era types (Sector, ConnectedPlayer, PlayerSnapshotPayload,
- * PlayerJoinedPayload, PlayerLeftPayload, SectorTransition,
+ * PlayerJoinedPayload, PlayerLeftPayload,
  * PhysicsSectorTransitionPayload) are canonical here — no external file to sync to.
  */
 
@@ -92,6 +92,8 @@ export interface ConnectedPlayer {
 /** Outbound: server → client `player.snapshot` — full list on join. */
 export interface PlayerSnapshotPayload {
   players: ConnectedPlayer[];
+  /** The connecting client's own shipId — set by the server so the client can self-identify. */
+  selfShipId?: string;
 }
 
 /** Outbound: server → client `player.joined` — new player connected. */
@@ -109,9 +111,13 @@ export interface SectorTransition {
   toSector: Sector;
 }
 
-/** Outbound: server → client `physics.sector-transition` — tick movement. */
+/** Outbound: server → client `physics.sector-transition` — single ship crossed a sector boundary. */
 export interface PhysicsSectorTransitionPayload {
-  transitions: SectorTransition[];
+  shipId: string;
+  fromSector: Sector;
+  toSector: Sector;
+  x: number;
+  y: number;
 }
 
 // ─── T005: Typed event-name constants ────────────────────────────────────────

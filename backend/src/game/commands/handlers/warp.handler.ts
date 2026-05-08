@@ -79,6 +79,7 @@ export class WarpHandlerService {
       }
 
       ship.speed2b = 1000.0 * speed;
+      ship.head2b = ship.heading;
       ship.dirty = true;
 
       lines.push({

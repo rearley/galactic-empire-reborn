@@ -43,12 +43,12 @@ export class ReportHandlerService implements OnModuleInit {
       aliases: ['rep'],
       minArgs: 1,
       argMissingMessage: formatMessage(MessageId.REPFMT),
-      handler: (ship: ShipState, args: string[], ctx: CommandContext): CommandResult =>
+      handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
         this.handle(ship, args, ctx),
     };
   }
 
-  private handle(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     const sub = args[0]?.toLowerCase() ?? '';
     const cls = this.classCache.get(ship.shpclass);
     const typeName = cls?.typeName ?? `Class ${ship.shpclass}`;
@@ -105,6 +105,10 @@ export class ReportHandlerService implements OnModuleInit {
       return { lines };
     }
 
+    if (sub === 'acc') {
+      return { lines: [...lines, ...await this.buildAcc(ship)] };
+    }
+
     // Unknown sub-command
     return {
       lines: [{ text: formatMessage(MessageId.REPFMT), category: 'system' }],
@@ -118,12 +122,13 @@ export class ReportHandlerService implements OnModuleInit {
 
     // Compute approximate sector coords from float universe coords.
     // setsect() in C source maps float coords to integer sector grid.
-    const xsect = Math.floor(ship.xcoord) + 1;
-    const ysect = Math.floor(ship.ycoord) + 1;
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
     const xcord = Math.floor((ship.xcoord % 1) * 100);
     const ycord = Math.floor((ship.ycoord % 1) * 100);
     const heading = Math.round(ship.heading);
-    const speedStr = ship.speed2b > 0 ? `warp ${(ship.speed2b / 1000).toFixed(1)}` : 'stopped';
+    const displaySpeed = ship.speed;
+    const speedStr = displaySpeed === 0 ? 'stopped' : displaySpeed < 1000 ? 'impulse' : `warp ${(displaySpeed / 1000).toFixed(1)}`;
 
     if (ship.where === 1) {
       // Hyperspace
@@ -195,6 +200,44 @@ export class ReportHandlerService implements OnModuleInit {
 
     const damageStr = ship.damage > 0 ? `${Math.round(ship.damage)}% hull damage` : 'none';
     lines.push({ text: formatMessage(MessageId.REP14, damageStr), category: 'info' });
+
+    return lines;
+  }
+
+  /** @see GECMDS.C:2074 acc section */
+  private async buildAcc(ship: ShipState): Promise<CommandResultLine[]> {
+    const lines: CommandResultLine[] = [];
+    lines.push({ text: formatMessage(MessageId.REP25), category: 'system' });
+
+    const user = await this.prisma.user.findUnique({
+      where: { userid: ship.userid },
+      select: { cash: true, score: true, kills: true, planets: true, teamcode: true },
+    });
+
+    if (!user) return lines;
+
+    if (user.planets === 0) {
+      lines.push({ text: formatMessage(MessageId.REP26), category: 'info' });
+    } else {
+      lines.push({ text: formatMessage(MessageId.REP27, user.planets), category: 'info' });
+    }
+
+    lines.push({ text: formatMessage(MessageId.REP28, user.cash.toLocaleString()), category: 'info' });
+
+    const score = user.score <= 0n ? '0' : user.score.toLocaleString();
+    lines.push({ text: formatMessage(MessageId.REP30, score), category: 'info' });
+
+    lines.push({ text: formatMessage(MessageId.REP31, user.kills), category: 'info' });
+
+    if (user.teamcode && user.teamcode > 0n) {
+      const team = await this.prisma.team.findUnique({
+        where: { teamcode: user.teamcode },
+        select: { teamname: true },
+      });
+      if (team) {
+        lines.push({ text: formatMessage(MessageId.REP31A, team.teamname), category: 'info' });
+      }
+    }
 
     return lines;
   }

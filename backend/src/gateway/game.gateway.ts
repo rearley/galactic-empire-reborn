@@ -44,9 +44,9 @@ import {
   ConnectedPlayer,
 } from './connected-ships.registry';
 import {
-  PHYSICS_SECTOR_TRANSITION_EVENT,
-  PhysicsSectorTransitionPayload,
-} from '../game/tick/sector-transition.subscriber';
+  PHYSICS_SECTOR_TRANSITION,
+  PhysicsSectorTransitionEvent,
+} from '../game/physics/physics-events';
 import { shipKey } from '../game/ship/ship-state.types';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -181,7 +181,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('command:result', {
       lines: [{ text: `Welcome aboard, ${activeShip.shipname}.`, category: 'system' }],
     });
-    client.emit('player.snapshot', { players: this.registry.list() });
+    client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
 
     const connectedPlayer: ConnectedPlayer = {
       shipId,
@@ -189,7 +189,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sector: { x: Math.floor(activeShip.xcoord), y: Math.floor(activeShip.ycoord) },
       shipClass: activeShip.shpclass,
     };
-    this.server.emit('player.joined', connectedPlayer);
+    // broadcast (not server.emit) — connecting client already has themselves via snapshot
+    client.broadcast.emit('player.joined', connectedPlayer);
   }
 
   handleDisconnect(client: Socket): void {
@@ -305,7 +306,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('command:result', {
           lines: [{ text: `Welcome aboard, ${state.shipname}.`, category: 'system' }],
         });
-        client.emit('player.snapshot', { players: this.registry.list() });
+        client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
 
         const connectedPlayer: ConnectedPlayer = {
           shipId,
@@ -313,7 +314,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           sector: { x: Math.floor(state.xcoord), y: Math.floor(state.ycoord) },
           shipClass: state.shpclass,
         };
-        this.server.emit('player.joined', connectedPlayer);
+        // broadcast — connecting client already has themselves via snapshot
+        client.broadcast.emit('player.joined', connectedPlayer);
 
       } catch (err: unknown) {
         if (err instanceof SpawnSectorMissingError) {
@@ -514,16 +516,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Broadcast sector-transition event and emit beacon events to toSector rooms.
-   *
-   * For each transition: if there are observers in toSector and the
-   * C-source gate fires (gernd()%10===0), emit a `beacon` event to the
-   * toSector Socket.io room.
-   *
-   * @see specs/010-react-frontend/data-model.md §C.2
-   * @see GEFUNCS.C:808-816 — beacon-on-move gating conditions
-   */
-  /**
    * Broadcast sector-transition event to all clients (for ScanMap clear etc.)
    * and emit MOVE2/MOVE3 sector-entry notices to the affected sector rooms.
    *
@@ -536,33 +528,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector)
    * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector)
    */
-  @OnEvent(PHYSICS_SECTOR_TRANSITION_EVENT)
-  handleSectorTransition(event: PhysicsSectorTransitionPayload): void {
+  @OnEvent(PHYSICS_SECTOR_TRANSITION)
+  handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
     this.server.emit('physics.sector-transition', event);
 
-    const allShips = this.shipStateService.findAllShips();
+    const { shipId, fromSector, toSector } = event;
 
-    for (const transition of event.transitions) {
-      const { shipId, fromSector, toSector } = transition;
+    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
 
-      if (fromSector.x === toSector.x && fromSector.y === toSector.y) continue;
+    const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
+    if (!movingShip) return;
 
-      const movingShip = allShips.find((s) => shipKey(s.userid, s.shipno) === shipId);
-      if (!movingShip) continue;
+    // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
+    if (movingShip.speed >= 21000) return;
 
-      // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
-      if (movingShip.speed >= 21000) continue;
+    const name = movingShip.shipname;
 
-      const name = movingShip.shipname;
+    this.server
+      .to(`sector:${fromSector.x}:${fromSector.y}`)
+      .emit('sector:ship-left', { shipId, shipName: name });
 
-      this.server
-        .to(`sector:${fromSector.x}:${fromSector.y}`)
-        .emit('sector:ship-left', { shipId, shipName: name });
-
-      this.server
-        .to(`sector:${toSector.x}:${toSector.y}`)
-        .emit('sector:ship-entered', { shipId, shipName: name });
-    }
+    this.server
+      .to(`sector:${toSector.x}:${toSector.y}`)
+      .emit('sector:ship-entered', { shipId, shipName: name });
   }
 
   /**

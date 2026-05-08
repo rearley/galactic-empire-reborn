@@ -148,8 +148,8 @@ model Ship {
   firecntl        Int    @default(0)
   /// WARSHP.destruct — byte
   destruct        Int    @default(0)
-  /// WARSHP.status — byte; record status
-  status          Int    @default(0)
+  /// WARSHP.status — byte; record status. 0=avail,1=user,2=auto @see GEMAIN.H GESTAT_*
+  status          Int    @default(1)
   /// WARSHP.cybmine
   cybmine         Int    @default(0)
   /// WARSHP.cybskill
