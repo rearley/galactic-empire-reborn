@@ -405,7 +405,7 @@ describe('cmd rename — unbound socket (T058)', () => {
     });
 
     // Wait for the onboarding prompt (not a welcome)
-    await waitForEvent(socket, 'prompt:class-list');
+    await waitForEvent(socket, 'prompt:ship-name');
 
     // Now try to send a command — the gateway rejects it since activeShipNo is unset
     const resultPromise = waitForEvent<{ lines: Array<{ text: string }> }>(

@@ -54,6 +54,8 @@ import { SpyHandlerService } from './handlers/spy.handler';
 import { MaiHandlerService } from './handlers/mai.handler';
 import { ReaHandlerService } from './handlers/rea.handler';
 import { DelHandlerService } from './handlers/del.handler';
+// Ship purchase handler (021)
+import { NewShipHandlerService } from './handlers/new-ship.handler';
 // Team management handlers (018)
 import { TeamModule } from '../team/team.module';
 import { ShipModule } from '../ship/ship.module';
@@ -119,6 +121,8 @@ import { MailModule } from '../mail/mail.module';
     MaiHandlerService,
     ReaHandlerService,
     DelHandlerService,
+    // Ship purchase handler (021)
+    NewShipHandlerService,
   ],
   exports: [CommandRouterService, ScanHandlerService],
 })
@@ -171,6 +175,8 @@ export class CommandsModule implements OnModuleInit {
     private readonly maiHandler: MaiHandlerService,
     private readonly reaHandler: ReaHandlerService,
     private readonly delHandler: DelHandlerService,
+    // Ship purchase handler (021)
+    private readonly newShipHandler: NewShipHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -225,5 +231,7 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.maiHandler.command);
     this.commandRouter.register(this.reaHandler.command);
     this.commandRouter.register(this.delHandler.command);
+    // Ship purchase command (021)
+    this.commandRouter.register(this.newShipHandler.command);
   }
 }
