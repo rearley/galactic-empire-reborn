@@ -1244,3 +1244,21 @@ Player in orbit of an enemy planet (`where >= 10`, not self-owned, not neutral z
 **Source**: GECMDS.C:117 `cmd_cls`
 
 `cls` returns an empty `CommandResult` with `clearLog: true`. The frontend `command-result-handlers.ts` honours this by calling the `clearLines` callback after appending any lines (zero lines in this case), wiping the event log. No backend state is mutated. Other players' logs are unaffected (unicast via `command:result`).
+
+---
+
+## Player Mail (mai / rea / del) (feature 017)
+
+**Source**: GEMAIN.H:220 (`MAIL_CLASS_DISTRESS=1`, `MAIL_CLASS_PRODRPT=3`), GEMAIN.H:531 (`MAILSTAT` struct)
+
+Players receive mail in their `MailStat` inbox when planets are attacked (distress signals, class 1) or produce resources at midnight (production reports, class 3). Mail is accessed via three commands:
+
+- **`mai`** — Lists all messages in newest-first order (stamp DESC, msgno DESC, class DESC). With an argument, delegates to maintenance gate (feature 014 FR-210 preserved).
+- **`rea <index>`** — Reads the class-specific detail for message at 1-based index. Production reports show planet/cash/debt/tax/14-item table. Distress signals show attacker/planet/sector. Read-only.
+- **`del <index>`** — Hard-deletes the message at 1-based index. Indices are re-resolved on each call (R5) — `del 2` twice against a 3-row inbox removes two different rows.
+
+Sender resolution (R3): `MailStat.dtime` (sender userid) → ShipStateService.findByUserid → raw dtime → `"(system)"`.
+
+Retention: midnight job purges `MailStat` rows older than 7 days (configurable via `MIDNIGHT_MAILDAYS`).
+
+No schema change. No cross-player access. No soft-delete state (FR-014, SC-003).

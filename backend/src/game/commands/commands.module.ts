@@ -50,6 +50,10 @@ import { NavHandlerService } from './handlers/nav.handler';
 import { HelpHandlerService } from './handlers/help.handler';
 import { ClsHandlerService } from './handlers/cls.handler';
 import { SpyHandlerService } from './handlers/spy.handler';
+// Mail inbox handlers (017)
+import { MaiHandlerService } from './handlers/mai.handler';
+import { ReaHandlerService } from './handlers/rea.handler';
+import { DelHandlerService } from './handlers/del.handler';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -57,9 +61,10 @@ import { PlanetModule } from '../planet/planet.module';
 import { PhysicsModule } from '../physics/physics.module';
 import { CombatModule } from '../combat/combat.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule],
+  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,
@@ -108,6 +113,10 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
     HelpHandlerService,
     ClsHandlerService,
     SpyHandlerService,
+    // Mail inbox handlers (017)
+    MaiHandlerService,
+    ReaHandlerService,
+    DelHandlerService,
   ],
   exports: [CommandRouterService, ScanHandlerService],
 })
@@ -156,6 +165,10 @@ export class CommandsModule implements OnModuleInit {
     private readonly helpHandler: HelpHandlerService,
     private readonly clsHandler: ClsHandlerService,
     private readonly spyHandler: SpyHandlerService,
+    // Mail inbox handlers (017)
+    private readonly maiHandler: MaiHandlerService,
+    private readonly reaHandler: ReaHandlerService,
+    private readonly delHandler: DelHandlerService,
   ) {}
 
   onModuleInit(): void {
@@ -206,5 +219,9 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.helpHandler.command);
     this.commandRouter.register(this.clsHandler.command);
     this.commandRouter.register(this.spyHandler.command);
+    // Mail inbox commands (017)
+    this.commandRouter.register(this.maiHandler.command);
+    this.commandRouter.register(this.reaHandler.command);
+    this.commandRouter.register(this.delHandler.command);
   }
 }

@@ -11,6 +11,7 @@ const config: Config = {
     "<rootDir>/test/game",
     "<rootDir>/test/gateway",
     "<rootDir>/test/balance",
+    "<rootDir>/test/mail",
   ],
   testMatch: ["**/*.spec.ts"],
   globalSetup: "<rootDir>/test/prisma-schema/helpers/global-setup.ts",

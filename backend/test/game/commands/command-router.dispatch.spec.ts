@@ -176,10 +176,10 @@ describe('command router dispatch — transfer and jettison (minArgs gate)', () 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.JET_FMT));
   });
 
-  it('maint alias "mai" → reaches maint handler (not UNKNOWN_CMD)', async () => {
+  it('maint keyword still reaches maint handler directly (mai alias removed in feature 017)', async () => {
     const { router, ship } = buildRouter();
-    const result = await Promise.resolve(router.dispatch('mai', ship, {})) as { lines: { text: string }[] };
-    // ship.where=10 (orbit), damage=10, NZ test needs planet mock — expect maint message family
+    const result = await Promise.resolve(router.dispatch('maint', ship, {})) as { lines: { text: string }[] };
+    // ship.where=10 (orbit), damage=10 — expect maint message family
     const text = result.lines[0].text;
     expect(text).not.toBe(formatMessage(MessageId.UNKNOWN_CMD));
   });

@@ -47,7 +47,7 @@ export class MaintHandlerService {
 
   readonly command: Command = {
     keyword: 'maint',
-    aliases: ['mai'],
+    aliases: [],
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> =>
