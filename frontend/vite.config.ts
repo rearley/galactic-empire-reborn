@@ -10,6 +10,9 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      '/auth': { target: 'http://localhost:3000', changeOrigin: true },
+      '/admin': { target: 'http://localhost:3000', changeOrigin: true },
+      '/debug': { target: 'http://localhost:3000', changeOrigin: true },
     },
   },
   test: {
