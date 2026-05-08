@@ -93,6 +93,13 @@ export class ShipStateService implements OnModuleInit {
    */
   findByName(name: string): ShipState | undefined {
     const lower = name.toLowerCase();
+    // Exact match first, then prefix, then substring — mirrors GECMDS.C:2190 scan_sh
+    for (const state of this.map.values()) {
+      if (state.shipname.toLowerCase() === lower) return state;
+    }
+    for (const state of this.map.values()) {
+      if (state.shipname.toLowerCase().startsWith(lower)) return state;
+    }
     for (const state of this.map.values()) {
       if (state.shipname.toLowerCase().includes(lower)) return state;
     }
