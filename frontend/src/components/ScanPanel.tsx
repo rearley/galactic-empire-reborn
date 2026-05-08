@@ -80,52 +80,49 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
         {event.header}
       </div>
 
-      {/* Grid + optional side panel side by side */}
-      <div className="flex gap-4">
-        {/* 30×15 monospace grid */}
-        <pre
-          className="font-mono text-xs leading-tight m-0 whitespace-pre"
-          data-testid="scan-card-grid"
-        >
-          {grid.map((row, y) => (
-            <span key={y} data-testid={`scan-row-${y}`}>
-              {row.map((cell, x) => (
-                <span
-                  key={x}
-                  style={cell.colour != null ? { color: cell.colour } : { color: DEFAULT_COLOUR }}
-                  data-testid={cell.char !== ' ' ? `scan-cell-${x}-${y}` : undefined}
-                >
-                  {cell.char}
-                </span>
-              ))}
-              {'\n'}
-            </span>
-          ))}
-        </pre>
-
-        {/* Side panel — only rendered when present */}
-        {event.sidePanel != null && event.sidePanel.length > 0 && (
-          <div
-            className="font-mono text-xs text-gray-300 whitespace-nowrap"
-            data-testid="scan-card-side-panel"
-          >
-            {event.sidePanel.map((row) => (
-              <div key={row.letter} data-testid={`side-panel-row-${row.letter}`}>
-                <span className="text-yellow-400">{row.letter}</span>
-                {' '}
-                {row.distance}pc
-                {' '}
-                Brg:{row.bearing}
-                {' '}
-                Hdg:{row.heading}
-                {' '}
-                {row.speedDisplay}
-                {row.name != null ? ` ${row.name}` : ''}
-              </div>
+      {/* 30×15 monospace grid */}
+      <pre
+        className="font-mono text-xs leading-tight m-0 whitespace-pre"
+        data-testid="scan-card-grid"
+      >
+        {grid.map((row, y) => (
+          <span key={y} data-testid={`scan-row-${y}`}>
+            {row.map((cell, x) => (
+              <span
+                key={x}
+                style={cell.colour != null ? { color: cell.colour } : { color: DEFAULT_COLOUR }}
+                data-testid={cell.char !== ' ' ? `scan-cell-${x}-${y}` : undefined}
+              >
+                {cell.char}
+              </span>
             ))}
-          </div>
-        )}
-      </div>
+            {'\n'}
+          </span>
+        ))}
+      </pre>
+
+      {/* Side panel legend — stacked below grid when present */}
+      {event.sidePanel != null && event.sidePanel.length > 0 && (
+        <div
+          className="font-mono text-xs text-gray-300 mt-1"
+          data-testid="scan-card-side-panel"
+        >
+          {event.sidePanel.map((row) => (
+            <div key={row.letter} data-testid={`side-panel-row-${row.letter}`}>
+              <span className="text-yellow-400">{row.letter}</span>
+              {' '}
+              {row.distance}pc
+              {' '}
+              Brg:{row.bearing}
+              {' '}
+              Hdg:{row.heading}
+              {' '}
+              {row.speedDisplay}
+              {row.name != null ? ` ${row.name}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

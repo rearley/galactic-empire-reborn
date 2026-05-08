@@ -111,7 +111,6 @@ function makeGateway(scanHandler: ScanHandlerService): GameGateway {
     {} as unknown as PrismaService,
     {} as unknown as OnboardingService,
     scanHandler,
-    { next: () => Math.random() } as any,
   );
 }
 
