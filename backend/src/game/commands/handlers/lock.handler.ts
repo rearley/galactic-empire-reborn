@@ -88,6 +88,7 @@ export class LockHandlerService {
       s.lock = target.shipno;
     });
 
-    return { lines: [{ text: formatMessage(MessageId.LOC_LOCKED), category: 'success' }] };
+    // LOCK02: show full ship name so player knows which ship matched the partial name.
+    return { lines: [{ text: `Target locked: ${target.shipname} (class ${target.shpclass}).`, category: 'success' }] };
   }
 }
