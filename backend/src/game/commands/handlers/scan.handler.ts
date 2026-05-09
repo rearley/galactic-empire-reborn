@@ -124,12 +124,12 @@ export class ScanHandlerService implements OnModuleInit {
       aliases: ['sc'],
       minArgs: 0,
       argMissingMessage: formatMessage(MessageId.SCANFMT),
-      handler: (ship: ShipState, args: string[], ctx: CommandContext): CommandResult =>
+      handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
         this.handle(ship, args, ctx),
     };
   }
 
-  private handle(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     // TODO(006): see GECMDS.C:2143 — tactical-computer gate (TABROKE)
     // TODO(006): see GECMDS.C:2150 — jammer gate (JAMMER4)
 
@@ -147,7 +147,7 @@ export class ScanHandlerService implements OnModuleInit {
     }
 
     if (sub === 'pl') {
-      return this.scanPl(ship, args.slice(1));
+      return await this.scanPl(ship, args.slice(1));
     }
 
     if (sub === 'ra') {
@@ -176,13 +176,6 @@ export class ScanHandlerService implements OnModuleInit {
    * @see GECMDS.C:2640 scan_lo
    */
   private scanLo(ship: ShipState): CommandResult {
-    // Not-in-flight guard — orbit, docked, or dead (mirrors sca ra / sca se)
-    if (ship.where >= 10) {
-      return {
-        ...this.scanHelp(),
-      };
-    }
-
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
@@ -206,25 +199,27 @@ export class ScanHandlerService implements OnModuleInit {
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Project planets in the player's current sector — GECMDS.C:2640 (004 wire-up)
-    // Sector coords derived from integer part of ship's galaxy-space coords
+    // 2. Project planets within scan range across all nearby sectors
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
+    const sectorRadius = Math.ceil(scanRange / 10000);
 
-    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
-    for (const planet of planets) {
-      const cell = projectRangeCell(ship, planet, scanRange);
-      if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: String(planet.plnum) });
-    }
-
-    // 3. Project visible wormholes — GECMDS.C:2640 (004 wire-up)
-    const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
-    for (const wormhole of wormholes) {
-      if (!wormhole.visible) continue;
-      const cell = projectRangeCell(ship, wormhole, scanRange);
-      if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
+    for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
+      for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
+        if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
+        for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
+          const cell = projectRangeCell(ship, planet, scanRange);
+          if (!cell) continue;
+          // 'P' for all planets — plnum is per-sector so using it across sectors creates duplicates
+          grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
+        }
+        for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
+          if (!wormhole.visible) continue;
+          const cell = projectRangeCell(ship, wormhole, scanRange);
+          if (!cell) continue;
+          grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
+        }
+      }
     }
 
     // 4. Self-cell — GECMDS.C:2721 map[MAXY/2][MAXX/2] = '*'
@@ -279,24 +274,26 @@ export class ScanHandlerService implements OnModuleInit {
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Planets in the player's current sector
+    // 2. Planets and wormholes within scan range across all nearby sectors
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
+    const sectorRadius = Math.ceil(scanRange / 10000);
 
-    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
-    for (const planet of planets) {
-      const cell = projectRangeCell(ship, planet, scanRange);
-      if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'planet', char: String(planet.plnum) });
-    }
-
-    // 3. Visible wormholes
-    const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
-    for (const wormhole of wormholes) {
-      if (!wormhole.visible) continue;
-      const cell = projectRangeCell(ship, wormhole, scanRange);
-      if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
+    for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
+      for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
+        if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
+        for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
+          const cell = projectRangeCell(ship, planet, scanRange);
+          if (!cell) continue;
+          grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
+        }
+        for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
+          if (!wormhole.visible) continue;
+          const cell = projectRangeCell(ship, wormhole, scanRange);
+          if (!cell) continue;
+          grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
+        }
+      }
     }
 
     // 4. Self-cell
@@ -440,13 +437,6 @@ export class ScanHandlerService implements OnModuleInit {
    * @see GECMDS.C:2562 scan_se
    */
   private handleSectorScan(ship: ShipState): CommandResult {
-    // Not-in-flight guard — orbit, docked, or dead
-    if (ship.where >= 10) {
-      return {
-        ...this.scanHelp(),
-      };
-    }
-
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
 
@@ -589,10 +579,11 @@ export class ScanHandlerService implements OnModuleInit {
         lines: [{ text: `${target.shipname} is out of scanner range.`, category: 'system' }],
       };
     }
-    // Bearing — GECMDS.C cbearing / GEFUNCS.C, same formula as scantab.ts calcBearing
+    // Relative bearing (0 = straight ahead) — matches cbearing(from, to, heading) in original.
     const dx = target.xcoord - ship.xcoord;
     const dy = target.ycoord - ship.ycoord;
-    const bearing = Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
+    const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+    const bearing = Math.round((absAngle - ship.heading + 360) % 360);
     const ltr = target.status === 1 ? '+' : '=';
     return {
       lines: [
@@ -610,7 +601,7 @@ export class ScanHandlerService implements OnModuleInit {
    * @see GECMDS.C:2295 scan_pl (deviation documented in research.md Decision 8)
    * @see contracts/scan-projection.md §"scan pl"
    */
-  private scanPl(ship: ShipState, args: string[]): CommandResult {
+  private async scanPl(ship: ShipState, args: string[]): Promise<CommandResult> {
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
 
@@ -663,8 +654,13 @@ export class ScanHandlerService implements OnModuleInit {
 
     // GECMDS.C:2330 — ownership (optional)
     if (planet.userid) {
+      const ownerRow = await this.prisma.user.findUnique({
+        where: { userid: planet.userid },
+        select: { username: true },
+      });
+      const ownerName = ownerRow?.username ?? planet.userid;
       lines.push({
-        text: formatMessage(MessageId.SCAN09, planet.userid),
+        text: formatMessage(MessageId.SCAN09, ownerName),
         category: 'info',
       });
     }

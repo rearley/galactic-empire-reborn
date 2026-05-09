@@ -5,6 +5,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { resolveItemKeyword, parseUint32 } from '../validators';
+import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
 
 /**
  * Handles the `admin` / `adm` command — planet owner configuration.
@@ -41,7 +42,30 @@ export class AdminHandlerService {
 
     const sub = args[0]?.toLowerCase();
     if (!sub) {
-      return { lines: [{ text: formatMessage(MessageId.ADM_MENU), category: 'system' }] };
+      // Bare adm — show planet inventory status
+      const lines: CommandResult['lines'] = [];
+      lines.push({ text: `${state.name} — Inventory`, category: 'system' });
+      lines.push({ text: '--------------------------------', category: 'system' });
+      let hasAny = false;
+      for (let i = 0; i < NUMITEMS; i++) {
+        const item = state.items[i];
+        const qty = Number(item.qty);
+        if (qty === 0 && item.rate === 0) continue;
+        hasAny = true;
+        const sellFlag = item.sell ? 'sell=Y' : 'sell=N';
+        const name = ITEM_NAMES[i];
+        const dots = '.'.repeat(Math.max(1, 20 - name.length));
+        lines.push({
+          text: `${name}${dots}${qty.toLocaleString()}  rate:${item.rate}  price:${item.markup2a}  ${sellFlag}  reserve:${item.reserve}`,
+          category: 'info',
+        });
+      }
+      if (!hasAny) {
+        lines.push({ text: '(no items in stock, no rates set)', category: 'info' });
+      }
+      lines.push({ text: `Tax rate: ${state.taxrate}%  Cash: ${Number(state.tax).toLocaleString()} cr`, category: 'info' });
+      lines.push({ text: `Commands: adm rate/markup/sellflag/reserve/tax/beacon/password`, category: 'system' });
+      return { lines };
     }
 
     const key = planetKey(xsect, ysect, plnum);
@@ -51,8 +75,8 @@ export class AdminHandlerService {
       case 'rate': {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
         const value = parseUint32(args[2] ?? '');
-        if (itemIndex === -1 || value === undefined) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+        if (itemIndex === -1 || value === undefined || value > 100) {
+          return { lines: [{ text: 'Rate must be 0–100.', category: 'system' }] };
         }
         change = { type: 'rate', itemIndex, value };
         break;

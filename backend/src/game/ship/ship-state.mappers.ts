@@ -87,8 +87,10 @@ export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
     status,
     // userid/shipno: part of the where key, not updatable data
     userid, shipno,
-    // recentlyWarpedExit: in-memory flag, no DB column
+    // in-memory only flags — no DB columns
     recentlyWarpedExit,
+    recentlySelfFiredTorp,
+    maxTons,
     ...rest
   } = state;
   return rest;

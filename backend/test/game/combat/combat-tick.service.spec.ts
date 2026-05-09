@@ -158,10 +158,11 @@ describe('CombatTickService', () => {
 
 describe('CombatTickService — phaser interaction (T018)', () => {
   it('after handler fires and tick runs, victim shield/damage mutate and combat.hit fires; phasr reloads on next tick', async () => {
+    // Alice heading 0 (north). Bearing 0 = straight ahead = north. Bob north of Alice (y decreases northward).
     const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 0, phasr: 100, phasrtype: 1 });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: 100, shield: 5000, shieldstat: 1, damage: 0, phasr: 100, phasrtype: 1,
+      xcoord: 0, ycoord: -0.01, shield: 5000, shieldstat: 1, damage: 0, phasr: 100, phasrtype: 1,
     });
     const h = await makeHarness([alice, bob]);
 
@@ -188,11 +189,12 @@ describe('CombatTickService — phaser interaction (T018)', () => {
     expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
     expect((hit!.payload as CombatHitEvent).attackerId).toBe(shipKey('a', 1));
 
-    // Drive a physics tick; phasr should reload by PRELOAD on each ship (capped at maxPhaser=1000)
+    // Drive a physics tick; phasr reloads only when < 100 (cap is 100, not class max)
     const phasrBefore = alice.phasr;
     await h.fire();
-    expect(alice.phasr).toBe(Math.min(1000, phasrBefore + PRELOAD));
-    expect(bob.phasr).toBe(Math.min(1000, 100 + PRELOAD));
+    expect(alice.phasr).toBe(Math.min(100, phasrBefore + PRELOAD));
+    // Bob's phasr starts at 100 (full) so no reload occurs
+    expect(bob.phasr).toBe(100);
   });
 });
 

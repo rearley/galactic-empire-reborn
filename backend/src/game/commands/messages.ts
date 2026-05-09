@@ -377,7 +377,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.CANTROT]: 'Cannot rotate while reversing.',
 
   // report — GECMDS.C:1946
-  [MessageId.REPFMT]: 'Usage: report <nav|sys|cargo|wpns|acc>',
+  [MessageId.REPFMT]: 'Usage: report <nav|sys|inv|cargo|wpns|acc>',
   [MessageId.REP01]: '%s — %s',
   [MessageId.DASHES]: '--------------------------------',
   [MessageId.REP35]: 'Navigation:',
@@ -713,5 +713,5 @@ export function formatMessage(id: MessageId, ...args: Array<string | number>): s
     const val = args[argIdx++];
     return val !== undefined ? String(val) : '';
   });
-  return result;
+  return result.replace(/%%/g, '%');
 }

@@ -53,9 +53,11 @@ describe('combat balance regression', () => {
 
   describe('PHABIAS — extends arc width', () => {
     it('target outside `percent` arc but within `percent + PHABIAS` resolves as hit', () => {
-      const firer = { xcoord: 0, ycoord: 0 };
+      // Firer heading north (heading=0). Bearing 0 = straight ahead = north.
+      // y decreases northward; 4.5° starboard of north: x=sin(4.5°)>0, y=-cos(4.5°)<0
+      const firer = { xcoord: 0, ycoord: 0, heading: 0 };
       const rad = (4.5 * Math.PI) / 180;
-      const target = { xcoord: 100 * Math.sin(rad), ycoord: 100 * Math.cos(rad) };
+      const target = { xcoord: 100 * Math.sin(rad), ycoord: -100 * Math.cos(rad) };
       // arc 6: halfWidth = (6+2)/2 = 4 → 4.5° just outside → MISS
       expect(lineOfFire(firer, target, 0, 6)).toBe(false);
       // arc 8: halfWidth = (8+2)/2 = 5 → 4.5° inside → HIT

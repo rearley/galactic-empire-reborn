@@ -17,7 +17,7 @@ export class FreHandlerService {
   get command(): Command {
     return {
       keyword: 'fre',
-      aliases: [],
+      aliases: ['freq'],
       minArgs: 2,
       argMissingMessage: 'Usage: fre <A|B|C> <number|hail>',
       handler: (ship: ShipState, args: string[], ctx: CommandContext): CommandResult =>

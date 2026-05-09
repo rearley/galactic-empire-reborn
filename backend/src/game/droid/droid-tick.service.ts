@@ -133,7 +133,9 @@ export class DroidTickService implements OnModuleInit {
   }
 
   private runDroidActions(ctx: TickContext): void {
-    const players = this.shipState.findAllShips().filter((s) => s.status === GESTAT_USER);
+    const players = this.shipState.findAllShips().filter(
+      (s) => s.status === GESTAT_USER && !(Math.floor(s.xcoord) === 0 && Math.floor(s.ycoord) === 0),
+    );
 
     for (const classNumber of DROID_CLASSES) {
       const pop = this.livePopulation.get(classNumber);
@@ -337,7 +339,8 @@ export class DroidTickService implements OnModuleInit {
 
     const dx = target.xcoord - droid.xcoord;
     const dy = target.ycoord - droid.ycoord;
-    const bearing = ((Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360;
+    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    const bearing = (absAngle - droid.heading + 360) % 360;
     const sector = { x: Math.floor(droid.xcoord), y: Math.floor(droid.ycoord) };
 
     this.events.emit(COMBAT_PHASER_FIRED, {
@@ -356,21 +359,31 @@ export class DroidTickService implements OnModuleInit {
     if (lineOfFire(droid, target, bearing, 100)) {
       const damage = phaserDamage(100, dist, maxPhaser);
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
-      const result = shieldhit(target.shield, Math.floor(damage), shieldUp);
-
-      this.shipState.mutate(target.userid, target.shipno, (v) => {
-        v.shield = result.newShield;
-        v.damage = v.damage + result.hullDamage;
-        v.lastfired = droid.shipno;
-        v.cantexit = FIRETICKS;
-      });
-
+      let hullDamage = Math.floor(damage);
+      let shieldConsumed = 0;
+      if (shieldUp) {
+        const r = shieldhit(target.shield, target.shieldtype, Math.floor(damage));
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.shield = r.newCharge;
+          if (r.knockedDown) v.shieldstat = 0;
+          v.lastfired = droid.shipno;
+          v.cantexit = FIRETICKS;
+        });
+        hullDamage = 0;
+        shieldConsumed = r.shieldConsumed;
+      } else {
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.damage = v.damage + hullDamage;
+          v.lastfired = droid.shipno;
+          v.cantexit = FIRETICKS;
+        });
+      }
       this.events.emit(COMBAT_HIT, {
         attackerId: shipKey(droid.userid, droid.shipno),
         victimId: shipKey(target.userid, target.shipno),
         weapon: 'phaser',
-        damageHull: result.hullDamage,
-        damageShield: result.shieldDamage,
+        damageHull: hullDamage,
+        damageShield: shieldConsumed,
         sector,
         tickAt: new Date(),
       } satisfies CombatHitEvent);
@@ -384,10 +397,10 @@ export class DroidTickService implements OnModuleInit {
   private fireHyperPhaser(droid: ShipState, target: ShipState, ddist: number): void {
     const { fightbackHyperspaceMaxDist } = this.config.global;
     if (ddist >= fightbackHyperspaceMaxDist) return;
-    // Hyperspace phaser uses same logic with hyper=true flag
     const dx = target.xcoord - droid.xcoord;
     const dy = target.ycoord - droid.ycoord;
-    const bearing = ((Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360;
+    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    const bearing = (absAngle - droid.heading + 360) % 360;
     const sector = { x: Math.floor(droid.xcoord), y: Math.floor(droid.ycoord) };
 
     this.events.emit(COMBAT_PHASER_FIRED, {
@@ -406,21 +419,32 @@ export class DroidTickService implements OnModuleInit {
     if (lineOfFire(droid, target, bearing, 100)) {
       const damage = phaserDamage(100, dist, maxPhaser);
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
-      const result = shieldhit(target.shield, Math.floor(damage), shieldUp);
-
-      this.shipState.mutate(target.userid, target.shipno, (v) => {
-        v.shield = result.newShield;
-        v.damage = v.damage + result.hullDamage;
-        v.lastfired = droid.shipno;
-        v.cantexit = FIRETICKS;
-      });
+      let hullDamage = Math.floor(damage);
+      let shieldConsumed = 0;
+      if (shieldUp) {
+        const r = shieldhit(target.shield, target.shieldtype, Math.floor(damage));
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.shield = r.newCharge;
+          if (r.knockedDown) v.shieldstat = 0;
+          v.lastfired = droid.shipno;
+          v.cantexit = FIRETICKS;
+        });
+        hullDamage = 0;
+        shieldConsumed = r.shieldConsumed;
+      } else {
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.damage = v.damage + hullDamage;
+          v.lastfired = droid.shipno;
+          v.cantexit = FIRETICKS;
+        });
+      }
 
       this.events.emit(COMBAT_HIT, {
         attackerId: shipKey(droid.userid, droid.shipno),
         victimId: shipKey(target.userid, target.shipno),
         weapon: 'phaser',
-        damageHull: result.hullDamage,
-        damageShield: result.shieldDamage,
+        damageHull: hullDamage,
+        damageShield: shieldConsumed,
         sector,
         tickAt: new Date(),
       } satisfies CombatHitEvent);

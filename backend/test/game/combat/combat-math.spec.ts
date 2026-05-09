@@ -11,7 +11,7 @@ import {
   tonFact,
 } from '../../../src/game/combat/combat-math';
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
-import { MINEDAMMAX, MINERANGE, PHABIAS, SHHITENG } from '../../../src/game/constants';
+import { MINEDAMMAX, MINERANGE, PHABIAS, SHIELD_FACTOR, SHMINCHG } from '../../../src/game/constants';
 
 describe('combat-math', () => {
   describe('cdistance — @see GEFUNCS.C:cdistance', () => {
@@ -30,19 +30,21 @@ describe('combat-math', () => {
     });
   });
 
-  describe('lineOfFire — @see GEFUNCS.C:firephas', () => {
-    const firer = { xcoord: 0, ycoord: 0 };
+  describe('lineOfFire — @see GECMDS.C:firep (bearing relative to firer heading)', () => {
+    // Coordinate system: y decreases going north (matches physics tick: ycoord -= cos(heading)).
+    // bearing is relative to firer.heading: 0 = straight ahead, 90 = starboard.
+    const firer = { xcoord: 0, ycoord: 0, heading: 0 }; // facing north
 
-    it('hits a target directly north (heading 0)', () => {
-      expect(lineOfFire(firer, { xcoord: 0, ycoord: 100 }, 0, 4)).toBe(true);
+    it('hits a target directly ahead (bearing 0, heading north → target at y<0)', () => {
+      expect(lineOfFire(firer, { xcoord: 0, ycoord: -100 }, 0, 4)).toBe(true);
     });
 
-    it('hits a target directly east (heading 90)', () => {
+    it('hits a target at relative bearing 90 (east, heading north)', () => {
       expect(lineOfFire(firer, { xcoord: 100, ycoord: 0 }, 90, 4)).toBe(true);
     });
 
     it('misses a target outside the arc', () => {
-      // target due east, firing north, narrow arc
+      // target due east (absolute), firer heading north, bearing 0 = north — east is 90° off
       expect(lineOfFire(firer, { xcoord: 100, ycoord: 0 }, 0, 4)).toBe(false);
     });
 
@@ -50,13 +52,22 @@ describe('combat-math', () => {
       expect(lineOfFire(firer, { xcoord: 0, ycoord: 0 }, 0, 10)).toBe(false);
     });
 
+    it('bearing is relative — rotating heading changes what you hit', () => {
+      const eastFirer = { xcoord: 0, ycoord: 0, heading: 90 }; // facing east
+      // Target is north (y<0). With heading 90, north is at relative bearing 270.
+      expect(lineOfFire(eastFirer, { xcoord: 0, ycoord: -100 }, 270, 4)).toBe(true);
+      // Bearing 0 when heading east hits eastward target, not northern target.
+      expect(lineOfFire(eastFirer, { xcoord: 0, ycoord: -100 }, 0, 4)).toBe(false);
+    });
+
     it('PHABIAS extends arc — target just outside `percent` falls inside `percent + PHABIAS`', () => {
-      // Place a target at exactly 4.5° bearing from firer.
+      // Target 4.5° starboard of north (firer heading 0, bearing 0).
+      // North is y decreasing; 4.5° east of north: x=sin(4.5°)>0, y=-cos(4.5°)<0
       const rad = (4.5 * Math.PI) / 180;
-      const target = { xcoord: 100 * Math.sin(rad), ycoord: 100 * Math.cos(rad) };
-      // arc width 6 → halfWidth (6+PHABIAS)/2 = 4 → 4.5° outside
+      const target = { xcoord: 100 * Math.sin(rad), ycoord: -100 * Math.cos(rad) };
+      // arc width 6 → halfWidth (6+PHABIAS)/2 = 4 → 4.5° outside → MISS
       expect(lineOfFire(firer, target, 0, 6)).toBe(false);
-      // arc width 8 → halfWidth (8+PHABIAS)/2 = 5 → 4.5° inside (PHABIAS pushes it in)
+      // arc width 8 → halfWidth (8+PHABIAS)/2 = 5 → 4.5° inside → HIT
       expect(lineOfFire(firer, target, 0, 8)).toBe(true);
       expect(PHABIAS).toBe(2);
     });
@@ -93,33 +104,43 @@ describe('combat-math', () => {
     });
   });
 
-  describe('shieldhit — @see GEFUNCS.C:shieldhit', () => {
-    it('passes full damage to hull when shields down', () => {
-      const r = shieldhit(10000, 50, false);
-      expect(r.hullDamage).toBe(50);
-      expect(r.shieldDamage).toBe(0);
-      expect(r.newShield).toBe(10000);
-    });
+  describe('shieldhit — @see GEFUNCS.C:2430 shieldhit', () => {
+    // dmax = 80 - shieldtype * SHIELD_FACTOR; knock = floor(dmax * damage/100)
+    // Hull always 0 (shields absorb everything); knockedDown when newCharge < SHMINCHG.
 
-    it('passes full damage to hull when shield is 0', () => {
-      const r = shieldhit(0, 50, true);
-      expect(r.hullDamage).toBe(50);
-      expect(r.shieldDamage).toBe(0);
-    });
-
-    it('absorbs damage through shields', () => {
-      const r = shieldhit(SHHITENG * 100, 30, true);
-      expect(r.shieldDamage).toBe(30);
+    it('type-1 shield absorbs 76% of incoming damage', () => {
+      // dmax = 80 - 1*4 = 76; knock = floor(76*100/100) = 76; newCharge = 200-76 = 124
+      const r = shieldhit(200, 1, 100);
       expect(r.hullDamage).toBe(0);
-      expect(r.newShield).toBe(SHHITENG * 100 - 30 * SHHITENG);
+      expect(r.shieldConsumed).toBe(76);
+      expect(r.newCharge).toBe(124);
+      expect(r.knockedDown).toBe(false);
+      expect(SHIELD_FACTOR).toBe(4);
     });
 
-    it('partial absorb when shield is depleted mid-hit', () => {
-      const r = shieldhit(SHHITENG * 5, 10, true);
-      // shield can absorb 5 points (5 * SHHITENG energy = full shield), 5 remain to hull
-      expect(r.shieldDamage).toBe(5);
-      expect(r.hullDamage).toBe(5);
-      expect(r.newShield).toBe(0);
+    it('type-5 shield absorbs 60% of incoming damage', () => {
+      // dmax = 80 - 5*4 = 60; knock = floor(60*50/100) = 30; newCharge = 200-30 = 170
+      const r = shieldhit(200, 5, 50);
+      expect(r.hullDamage).toBe(0);
+      expect(r.shieldConsumed).toBe(30);
+      expect(r.newCharge).toBe(170);
+      expect(r.knockedDown).toBe(false);
+    });
+
+    it('type-20 shield is impenetrable — no charge drain', () => {
+      // dmax = 0 for type 20; knock = 0; charge unchanged
+      const r = shieldhit(100, 20, 999);
+      expect(r.hullDamage).toBe(0);
+      expect(r.shieldConsumed).toBe(0);
+      expect(r.newCharge).toBe(100);
+      expect(r.knockedDown).toBe(false);
+    });
+
+    it('knocks shield down when newCharge falls below SHMINCHG', () => {
+      // Type 1, dmax=76; with charge=10 and damage=100: knock=76, newCharge=10-76=-66
+      const r = shieldhit(10, 1, 100);
+      expect(r.knockedDown).toBe(true);
+      expect(SHMINCHG).toBe(5);
     });
   });
 
