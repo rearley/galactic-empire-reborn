@@ -5,11 +5,6 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
 
-const SHIELD_NAMES: Record<number, string> = {
-  1: 'standard',
-  2: 'regenerative',
-  3: 'battle',
-};
 
 /**
  * Handles the `report` / `rep` command — multi-line ship status read-out.
@@ -19,20 +14,34 @@ const SHIELD_NAMES: Record<number, string> = {
 @Injectable()
 export class ReportHandlerService implements OnModuleInit {
   private readonly logger = new Logger(ReportHandlerService.name);
-  private readonly classCache = new Map<number, { typeName: string; hasCloak: boolean; maxTons: number }>();
+  private readonly classCache = new Map<number, {
+    typeName: string;
+    maxPhaser: number;
+    maxShields: number;
+    hasTorpedo: boolean;
+    hasMissile: boolean;
+    hasDecoy: boolean;
+    hasJammer: boolean;
+    hasZipper: boolean;
+    hasMine: boolean;
+    hasCloak: boolean;
+    maxTons: number;
+    maxWarp: number;
+  }>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({
-      select: { classNumber: true, typeName: true, hasCloak: true, maxTons: true },
+      select: {
+        classNumber: true, typeName: true,
+        maxPhaser: true, maxShields: true, hasTorpedo: true, hasMissile: true,
+        hasDecoy: true, hasJammer: true, hasZipper: true,
+        hasMine: true, hasCloak: true, maxTons: true, maxWarp: true,
+      },
     });
     for (const cls of classes) {
-      this.classCache.set(cls.classNumber, {
-        typeName: cls.typeName,
-        hasCloak: cls.hasCloak,
-        maxTons: cls.maxTons,
-      });
+      this.classCache.set(cls.classNumber, cls);
     }
     this.logger.log(`Cached ${this.classCache.size} ship class type names`);
   }
@@ -73,22 +82,25 @@ export class ReportHandlerService implements OnModuleInit {
       return { lines: [...lines, ...this.buildSys(ship, cls?.hasCloak ?? false)] };
     }
 
-    if (sub === 'cargo') {
+    if (sub === 'inv' || sub === 'cargo') {
       let totalTons = 0;
       for (let i = 0; i < NUMITEMS; i++) {
         const qty = Number(ship.items[i] ?? 0n);
         if (qty <= 0) continue;
-        const tons = qty * ITEM_TONS[i];
+        const itemTons = ITEM_TONS[i];
+        const tons = qty * itemTons;
         totalTons += tons;
+        const name = ITEM_NAMES[i];
+        const dots = '.'.repeat(Math.max(1, 26 - name.length));
         lines.push({
-          text: formatMessage(MessageId.REP_CARGO_LINE, qty, ITEM_NAMES[i]),
+          text: `${name}${dots}${qty.toLocaleString()}  (${itemTons} ton${itemTons !== 1 ? 's' : ''} ea)`,
           category: 'info',
         });
       }
       if (totalTons === 0) {
         lines.push({ text: formatMessage(MessageId.REP_CARGO_NONE), category: 'info' });
       }
-      const cap = cls?.maxTons ?? 0;
+      const cap = cls?.maxTons ?? ship.maxTons ?? 1000;
       lines.push({
         text: formatMessage(MessageId.REP_CARGO_TOTAL, Math.round(totalTons), cap),
         category: 'info',
@@ -97,11 +109,19 @@ export class ReportHandlerService implements OnModuleInit {
     }
 
     if (sub === 'wpns') {
-      lines.push({
-        text: 'No weapons configured.',
-        category: 'info',
-        // TODO(006): expand wpns body when combat system is implemented
-      });
+      const yn = (v: boolean) => v ? 'yes' : 'no';
+      lines.push({ text: 'Weapons & Systems:', category: 'system' });
+      lines.push({ text: `  Phasors:    type ${ship.phasrtype}  (upgradeable to type ${cls?.maxPhaser ?? '?'})`, category: 'info' });
+      lines.push({ text: `  Shields:    type ${ship.shieldtype}  (upgradeable to type ${cls?.maxShields ?? '?'})`, category: 'info' });
+      lines.push({ text: `  Torpedoes:  ${yn(cls?.hasTorpedo ?? false)}`, category: 'info' });
+      lines.push({ text: `  Missiles:   ${yn(cls?.hasMissile ?? false)}`, category: 'info' });
+      lines.push({ text: `  Decoys:     ${yn(cls?.hasDecoy ?? false)}`, category: 'info' });
+      lines.push({ text: `  Jammers:    ${yn(cls?.hasJammer ?? false)}`, category: 'info' });
+      lines.push({ text: `  Zippers:    ${yn(cls?.hasZipper ?? false)}`, category: 'info' });
+      lines.push({ text: `  Mines:      ${yn(cls?.hasMine ?? false)}`, category: 'info' });
+      lines.push({ text: `  Cloak:      ${yn(cls?.hasCloak ?? false)}`, category: 'info' });
+      lines.push({ text: `  Cargo:      ${cls?.maxTons ?? '?'} tons`, category: 'info' });
+      lines.push({ text: `  Max warp:   ${cls?.maxWarp ?? '?'}`, category: 'info' });
       return { lines };
     }
 
@@ -163,21 +183,18 @@ export class ReportHandlerService implements OnModuleInit {
     lines.push({ text: formatMessage(MessageId.REP09, energy), category: 'info' });
 
     if (ship.shieldtype > 0) {
-      const shieldName = SHIELD_NAMES[ship.shieldtype] ?? `type ${ship.shieldtype}`;
       if (ship.shieldstat === 1) {
-        // SHIELDUP
-        lines.push({ text: formatMessage(MessageId.REP10, shieldName, 100), category: 'info' });
+        const maxCharge = 40 + ship.shieldtype * 10;
+        const pct = maxCharge > 0 ? Math.max(0, Math.round((ship.shield * 100) / maxCharge)) : 0;
+        lines.push({ text: formatMessage(MessageId.REP10, ship.shieldtype, pct), category: 'info' });
       } else {
         lines.push({ text: formatMessage(MessageId.REP11), category: 'info' });
       }
     }
 
     if (ship.phasrtype > 0) {
-      if (ship.phasr > 0) {
-        lines.push({ text: formatMessage(MessageId.REP23, ship.phasrtype), category: 'info' });
-      } else {
-        lines.push({ text: formatMessage(MessageId.REP24, ship.phasrtype), category: 'info' });
-      }
+      const chargeStr = ship.phasr > 0 ? `${Math.round(ship.phasr)}% charged` : 'uncharged';
+      lines.push({ text: `Phasors: type ${ship.phasrtype}  (${chargeStr})`, category: 'info' });
     }
 
     lines.push({

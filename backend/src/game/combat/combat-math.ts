@@ -1,4 +1,4 @@
-import { MINEDAMMAX, MINERANGE, PHABIAS, PRELOAD, SHHITENG } from '../constants';
+import { MINEDAMMAX, MINERANGE, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -21,12 +21,14 @@ export function cdistance(
 /**
  * True if `victim` lies within the firing arc of `firer` at `bearing`,
  * with a half-width of `(beamWidth + PHABIAS) / 2` degrees on each side.
- * Bearings are degrees with north = 0, increasing clockwise.
  *
- * @see GEFUNCS.C:firephas
+ * `bearing` is relative to firer's heading (0 = straight ahead), matching the
+ * original `deg = normal(ptr->heading + ptr->degrees)` in GECMDS.C:firep.
+ *
+ * @see GECMDS.C:firep (deg = ptr->heading + ptr->degrees; vector() absolute angle)
  */
 export function lineOfFire(
-  firer: { xcoord: number; ycoord: number },
+  firer: { xcoord: number; ycoord: number; heading: number },
   victim: { xcoord: number; ycoord: number },
   bearing: number,
   beamWidth: number,
@@ -34,11 +36,12 @@ export function lineOfFire(
   const dx = victim.xcoord - firer.xcoord;
   const dy = victim.ycoord - firer.ycoord;
   if (dx === 0 && dy === 0) return false;
-  // atan2(x, y) → north=0, clockwise, in radians
-  const angle = (Math.atan2(dx, dy) * 180) / Math.PI;
-  const normalized = ((angle % 360) + 360) % 360;
+  // Absolute compass direction to victim: north=0, clockwise. y increases downward so -dy.
+  const victimAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  // Absolute firing direction = firer heading + relative bearing (mirrors original firep).
+  const firingAngle = (firer.heading + bearing + 360) % 360;
   const halfWidth = (beamWidth + PHABIAS) / 2;
-  let diff = Math.abs(normalized - bearing);
+  let diff = Math.abs(victimAngle - firingAngle);
   if (diff > 180) diff = 360 - diff;
   return diff <= halfWidth;
 }
@@ -61,28 +64,34 @@ export function tonFact(tonnage: number): number {
 }
 
 /**
- * Apply incoming damage through shields. Each unit of shield absorbs one
- * point of damage and drains `SHHITENG` energy from the shield reserve.
+ * Apply incoming damage through raised shields.
+ * Shields completely absorb the hit (hullDamage = 0); shield charge drains by `knock`.
+ * Returns knockedDown=true when charge falls below SHMINCHG (shield collapses).
  *
- * @see GEFUNCS.C:shieldhit
+ * Formula: dmax = 80 - (shieldtype * SHIELD_FACTOR); knock = floor(dmax * damage/100)
+ * shieldtype 20 is impenetrable (dmax = 0, no charge drain).
+ *
+ * @see GEFUNCS.C:2430 shieldhit
  */
 export function shieldhit(
-  shield: number,
+  shieldCharge: number,
+  shieldtype: number,
   damage: number,
-  shieldUp: boolean,
-): { newShield: number; hullDamage: number; shieldDamage: number } {
-  if (!shieldUp || shield <= 0) {
-    return { newShield: shield, hullDamage: damage, shieldDamage: 0 };
+): { newCharge: number; hullDamage: number; shieldConsumed: number; knockedDown: boolean } {
+  const dmax = shieldtype === 20 ? 0 : Math.max(0, 80 - shieldtype * SHIELD_FACTOR);
+  const knock = Math.floor(dmax * (damage / 100));
+  let newCharge = shieldCharge - knock;
+  let knockedDown = false;
+
+  if (newCharge <= 2) {
+    // Shield critically damaged — extra drain, collapses
+    newCharge = newCharge - knock * 3;
+    knockedDown = true;
+  } else if (newCharge < SHMINCHG) {
+    knockedDown = true;
   }
-  // Shield can absorb up to floor(shield / SHHITENG) points of damage.
-  const absorbCapacity = Math.floor(shield / SHHITENG);
-  const absorbed = Math.min(absorbCapacity, damage);
-  const energyDrained = absorbed * SHHITENG;
-  return {
-    newShield: Math.max(0, shield - energyDrained),
-    hullDamage: damage - absorbed,
-    shieldDamage: absorbed,
-  };
+
+  return { newCharge, hullDamage: 0, shieldConsumed: knock, knockedDown };
 }
 
 /**

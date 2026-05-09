@@ -97,7 +97,41 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     // TODO (US2): emit WARPBRK/WARPFAST/WARPSPD events to ship's socket when
     // GameGateway socket-routing is available for per-ship messages.
 
-    // 2. Auto-repair (US3, FR-005).
+    // 2. Repair tick — GEFUNCS.C:390 repairship
+    // Each 1s tick: subtract 3 hull damage, recalculate queue, clear when done.
+    if (ship.repair > 0) {
+      if (ship.cantexit > 0) {
+        // Combat interrupts repair — GEFUNCS.C:397
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.repair = 0; });
+      } else {
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.damage = s.damage > 3 ? s.damage - 3 : 0;
+          s.repair = Math.floor(s.damage / 3);
+          if (s.repair <= 1) {
+            s.repair = 0;
+            s.damage = 0;
+            s.phasr = 100;
+          }
+        });
+      }
+    }
+
+    // 3. Shield recharge — GEFUNCS.C:2491 shieldchg
+    // Each 1s tick: charge by shieldtype*3, costs shieldtype*SHENGUSE energy.
+    if (ship.shieldstat === 1 && ship.shieldtype > 0 && ship.shieldtype < 20) {
+      const maxCharge = 40 + ship.shieldtype * 10;
+      if (ship.shield < maxCharge) {
+        const energyCost = ship.shieldtype * 100; // SHENGUSE=100
+        if (ship.energy >= energyCost) {
+          this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+            s.energy = Math.max(0, s.energy - energyCost);
+            s.shield = Math.min(maxCharge, s.shield + s.shieldtype * 3);
+          });
+        }
+      }
+    }
+
+    // 4. Auto-repair (US3, FR-005).
     if (ship.autoRepair === true) {
       void this.maintenanceService.runAutoRepair(ship);
     }

@@ -162,6 +162,25 @@ export class ShipStateService implements OnModuleInit {
   }
 
   /**
+   * Immediately flush a single ship to Postgres then evict it from the in-memory map.
+   * Used on clean player disconnect so the saved position/state is current.
+   * @see GEMAIN.C:warhupa — gepdb(GEUPDATE) + remove from active list
+   */
+  async flushAndUnload(userid: string, shipno: number): Promise<void> {
+    const state = this.map.get(shipKey(userid, shipno));
+    if (!state || state.isEphemeral) return;
+    try {
+      await this.prisma.ship.update({
+        where: { userid_shipno: { userid, shipno } },
+        data: stateToPrismaUpdate(state),
+      });
+    } catch (err: unknown) {
+      this.logger.error(`flushAndUnload failed for ${shipKey(userid, shipno)}:`, err);
+    }
+    this.map.delete(shipKey(userid, shipno));
+  }
+
+  /**
    * Flushes all dirty ship states to Postgres. Called on every SHIP_UPDATE tick.
    * Each entry's flush is isolated — one failure does NOT prevent sibling flushes (FR-006).
    * @see GEMAIN.C main loop — tick-driven persistence

@@ -115,6 +115,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket): Promise<void> {
     this.logger.log(`connection ${client.id}`);
 
+    // Capture disconnect reason so handleDisconnect can distinguish client-side
+    // drops (transport close, ping timeout) from server-side causes (hot reload,
+    // server.disconnect()). Only client-side drops trigger the cantexit combat kill.
+    client.on('disconnect', (reason: string) => {
+      client.data.disconnectReason = reason;
+    });
+
     // Step 1: Validate JWT
     const payload = await this.wsAuthGuard.validate(client);
     if (!payload) return; // already disconnected by guard
@@ -143,6 +150,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!this.shipStateService.get(userid, ship.shipno)) {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
       const state = prismaShipToState(ship);
+      // Guard against loading a dead ship (damage >= 100) when the async DB
+      // reset from the kill handler hasn't completed yet — prevents re-kill loop.
+      if (state.damage >= 100) {
+        state.damage = 0;
+        state.energy = 65000;
+        state.xcoord = 0.5;
+        state.ycoord = 0.5;
+        state.heading = 0;
+        state.speed = 0;
+        state.where = 0;
+      }
       try {
         const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
@@ -183,10 +201,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
 
+    // Auto-join the player's current sector room so sector-scoped events (combat hits,
+    // phaser fire, etc.) are delivered without requiring a client-side sector:join message.
+    const sectorX = Math.floor(activeShip.xcoord);
+    const sectorY = Math.floor(activeShip.ycoord);
+    void client.join(`sector:${sectorX}:${sectorY}`);
+
     const connectedPlayer: ConnectedPlayer = {
       shipId,
       name: activeShip.shipname,
-      sector: { x: Math.floor(activeShip.xcoord), y: Math.floor(activeShip.ycoord) },
+      sector: { x: sectorX, y: sectorY },
       shipClass: activeShip.shpclass,
     };
     // broadcast (not server.emit) — connecting client already has themselves via snapshot
@@ -195,12 +219,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`disconnect ${client.id}`);
-    // Clear scantab so stale letter assignments don't persist across sessions.
     const userid = client.data.userid as string | undefined;
     const activeShipNo = client.data.activeShipNo as number | undefined;
+
     if (userid !== undefined && activeShipNo !== undefined) {
       this.scanHandler.clearScantab(userid, activeShipNo);
+
+      const ship = this.shipStateService.get(userid, activeShipNo);
+      if (ship) {
+        // Flush current state to DB and unload from memory.
+        // @see GEMAIN.C:warhupa — gepdb(GEUPDATE) + remove from active list
+        // TODO: re-enable cantexit combat-kill once server is stable (hot reload fires
+        // handleDisconnect with old code before fix compiles in, killing ships on every reload)
+        void this.shipStateService.flushAndUnload(userid, activeShipNo);
+      }
     }
+
     const removed = this.registry.remove(client.id);
     if (removed) {
       this.server.emit('player.left', { shipId: removed.shipId });
@@ -420,6 +454,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatHit(event: CombatHitEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_HIT, event);
+    // Victim may be in a different sector room (cross-sector phaser range) — deliver directly.
+    const victimSocketId = this.registry.getSocketId(event.victimId);
+    if (victimSocketId) {
+      const victimSocket = this.server.sockets.sockets.get(victimSocketId);
+      victimSocket?.emit(COMBAT_HIT, event);
+    }
   }
 
   @OnEvent(COMBAT_MISS)
@@ -447,13 +487,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
-    // Parse shipno from victimShipKey ("userid:shipno") using the last segment.
     const keyParts = event.victimShipKey.split(':');
     const victimShipno = Number(keyParts[keyParts.length - 1]);
     if (!isNaN(victimShipno)) {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
-    this.server.emit(COMBAT_SHIP_DESTROYED, event);
+
+    // Reset victim's DB row to neutral zone so they respawn at Zygor-3 on reconnect.
+    // @see GEFUNCS.C:killem — dead ships are removed from active world; player re-enters at start.
+    if (!isNaN(victimShipno)) {
+      void this.prisma.ship.updateMany({
+        where: { userid: event.victimUserid, shipno: victimShipno },
+        data: { damage: 0, energy: 65000, xcoord: 0.5, ycoord: 0.5, heading: 0, speed: 0, where: 0 },
+      });
+    }
+
+    // Serialize loot amounts as strings — BigInt is not JSON-serializable.
+    const payload = {
+      ...event,
+      loot: event.loot.map(l => ({ itemIndex: l.itemIndex, amount: l.amount.toString() })),
+    };
+    this.server.emit(COMBAT_SHIP_DESTROYED, payload);
   }
 
   /** Planet-attack owner alert — emitted from PlanetAttackService.callForHelp. @see GECMDS.C:3952 call_4_help */
@@ -538,6 +592,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
     if (!movingShip) return;
+
+    // Move the player's socket to the new sector room so they receive sector-scoped events.
+    const socketId = this.registry.getSocketId(shipId);
+    if (socketId) {
+      const playerSocket = this.server.sockets.sockets.get(socketId);
+      if (playerSocket) {
+        void playerSocket.leave(`sector:${fromSector.x}:${fromSector.y}`);
+        void playerSocket.join(`sector:${toSector.x}:${toSector.y}`);
+      }
+    }
 
     // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
     if (movingShip.speed >= 21000) return;

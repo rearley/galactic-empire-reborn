@@ -247,6 +247,14 @@ export class CombatTickService implements OnModuleInit {
         // Remove from active state map.
         this.shipState.removeFromGame(victim);
 
+        // Clear cybmine on any Cybertron targeting the dead ship so they don't
+        // immediately re-engage the player when they respawn. @see GEFUNCS.C:killem
+        for (const s of this.shipState.findAllShips()) {
+          if (s.status === 2 && s.cybmine === victim.shipno) {
+            s.cybmine = 255;
+          }
+        }
+
         // In-flight cleanup — clear any other ship's incoming projectile
         // slots that reference the dead ship's shipno as the firer (channel).
         this.clearInFlightFromDeadFirer(victim.shipno);
@@ -335,22 +343,32 @@ export class CombatTickService implements OnModuleInit {
         }
         const damage = mineFalloff(dist, ton);
         const shieldUp = ship.shieldstat === 1 && ship.shield > 0;
-        const result = shieldhit(ship.shield, damage, shieldUp);
-
         const channel = mine.channel;
-        this.shipState.mutate(ship.userid, ship.shipno, (v) => {
-          v.shield = result.newShield;
-          v.damage = v.damage + result.hullDamage;
-          v.lastfired = channel;
-        });
+        let hullDamage = damage;
+        let shieldConsumed = 0;
+        if (shieldUp) {
+          const r = shieldhit(ship.shield, ship.shieldtype, damage);
+          this.shipState.mutate(ship.userid, ship.shipno, (v) => {
+            v.shield = r.newCharge;
+            if (r.knockedDown) v.shieldstat = 0;
+            v.lastfired = channel;
+          });
+          hullDamage = 0;
+          shieldConsumed = r.shieldConsumed;
+        } else {
+          this.shipState.mutate(ship.userid, ship.shipno, (v) => {
+            v.damage = v.damage + hullDamage;
+            v.lastfired = channel;
+          });
+        }
 
         const sector = { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) };
         const hitEvent: CombatHitEvent = {
           attackerId: `?:${mine.channel}`,
           victimId: shipKey(ship.userid, ship.shipno),
           weapon: 'mine',
-          damageHull: result.hullDamage,
-          damageShield: result.shieldDamage,
+          damageHull: hullDamage,
+          damageShield: shieldConsumed,
           sector,
           tickAt: ctx.firedAt,
         };
@@ -391,16 +409,12 @@ export class CombatTickService implements OnModuleInit {
     // Only ships with a phaser mounted accumulate charge (phasrtype > 0).
     // Interceptor double-reload bonus (shpclass==2) is commented out in shipped C.
     // @see GEFUNCS.C:checkdam line 1031
-    if (ship.phasrtype > 0) {
-      try {
-        const maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
-        const reloadAmt = phaserReloadAmount(ship.phasrtype);
-        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.phasr = Math.min(maxPhaser, s.phasr + reloadAmt);
-        });
-      } catch {
-        // Class not in cache — skip reload silently; logged at hydration time.
-      }
+    if (ship.phasrtype > 0 && ship.phasr < 100) {
+      const reloadAmt = phaserReloadAmount(ship.phasrtype);
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.phasr = Math.min(100, s.phasr + reloadAmt);
+        s.energy = Math.max(0, s.energy - 57); // PENGUSE=57 per tick
+      });
     }
 
     // Decoy slot expiry — each active decoy decrements toward 0 each tick.
@@ -571,14 +585,25 @@ export class CombatTickService implements OnModuleInit {
     }
     const damage = rollHullDamage(this.random, dmgMax, ton);
     const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
-    const result = shieldhit(carrier.shield, damage, shieldUp);
-
-    this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
-      v.shield = result.newShield;
-      v.damage = v.damage + result.hullDamage;
-      v.lastfired = attackerChannel;
-      v.cantexit = FIRETICKS;
-    });
+    let hullDamage = damage;
+    let shieldConsumed = 0;
+    if (shieldUp) {
+      const r = shieldhit(carrier.shield, carrier.shieldtype, damage);
+      this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
+        v.shield = r.newCharge;
+        if (r.knockedDown) v.shieldstat = 0;
+        v.lastfired = attackerChannel;
+        v.cantexit = FIRETICKS;
+      });
+      hullDamage = 0;
+      shieldConsumed = r.shieldConsumed;
+    } else {
+      this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
+        v.damage = v.damage + hullDamage;
+        v.lastfired = attackerChannel;
+        v.cantexit = FIRETICKS;
+      });
+    }
 
     // Find the attacker ship (by shipno = channel) and set their cantexit too.
     const attacker = this.findShipByChannel(attackerChannel, carrier);
@@ -592,8 +617,8 @@ export class CombatTickService implements OnModuleInit {
       attackerId: attacker ? shipKey(attacker.userid, attacker.shipno) : `?:${attackerChannel}`,
       victimId: shipKey(carrier.userid, carrier.shipno),
       weapon,
-      damageHull: result.hullDamage,
-      damageShield: result.shieldDamage,
+      damageHull: hullDamage,
+      damageShield: shieldConsumed,
       sector: { x: Math.floor(carrier.xcoord), y: Math.floor(carrier.ycoord) },
       tickAt: ctx.firedAt,
     };

@@ -47,13 +47,17 @@ function calcDist(self: ShipState, other: ShipState): number {
 }
 
 /**
- * Calculate bearing from self to other in degrees (0..359).
- * @see GECMDS.C:2822
+ * Calculate relative bearing from self to other in degrees (0..359).
+ * 0 = straight ahead (target in direction of self.heading), 90 = 90° starboard, etc.
+ * Matches cbearing(ptr1, ptr2, heading) in gelib.c — heading-relative, not compass-absolute.
+ * @see GECMDS.C:2822 (cbearing(&warsptr->coord,&wptr->coord,warsptr->heading))
  */
 function calcBearing(self: ShipState, other: ShipState): number {
   const dx = other.xcoord - self.xcoord;
   const dy = other.ycoord - self.ycoord;
-  return Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
+  // Absolute compass angle: north=0, clockwise. y increases downward so negate dy.
+  const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  return Math.round((absAngle - self.heading + 360) % 360);
 }
 
 /**

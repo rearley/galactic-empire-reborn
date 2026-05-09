@@ -59,9 +59,12 @@ export class DroidSpawner {
     const usrn = this.nextSlotIndex;
     const shipname = `${typename}${usrn * usrn + Math.floor(this.rng.next() * 100)}`;
 
-    // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8
-    const xcoord = this.rng.next() * 39.9 - 19.8;
-    const ycoord = this.rng.next() * 39.9 - 19.8;
+    // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8; re-roll if neutral zone (0,0)
+    let xcoord: number, ycoord: number;
+    do {
+      xcoord = this.rng.next() * 39.9 - 19.8;
+      ycoord = this.rng.next() * 39.9 - 19.8;
+    } while (Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
 
     // @see GEDROIDS.C:146-163 — loadout: Murdonian gets heavy load, others get sparse
     const items =

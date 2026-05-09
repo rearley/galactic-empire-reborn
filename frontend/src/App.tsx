@@ -92,6 +92,65 @@ function Terminal(): React.JSX.Element {
     };
   }, []);
 
+  useEffect(() => {
+    const shipName = (shipId: string): string => {
+      return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];
+    };
+
+    const handlePhaserFired = (event: { shipId: string }) => {
+      if (event.shipId === localShipId) return;
+      setLogLines(prev =>
+        [...prev, { text: `${shipName(event.shipId)} fires phasers!`, category: 'combat' as const }].slice(-MAX_LOG_ENTRIES),
+      );
+    };
+
+    const handleCombatHit = (event: { attackerId: string; victimId: string; weapon: string; damageHull: number; damageShield: number }) => {
+      const attacker = shipName(event.attackerId);
+      if (event.victimId === localShipId) {
+        setLogLines(prev =>
+          [...prev, {
+            text: `** INCOMING ${event.weapon.toUpperCase()}! Hull -${Math.round(event.damageHull)}% shields -${Math.round(event.damageShield)}% from ${attacker} **`,
+            category: 'combat' as const,
+          }].slice(-MAX_LOG_ENTRIES),
+        );
+      } else {
+        const victim = shipName(event.victimId);
+        setLogLines(prev =>
+          [...prev, {
+            text: `${attacker} hits ${victim} (${event.weapon}, hull -${Math.round(event.damageHull)}%)`,
+            category: 'combat' as const,
+          }].slice(-MAX_LOG_ENTRIES),
+        );
+      }
+    };
+
+    const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null }) => {
+      if (event.victimId === localShipId) {
+        setLogLines(prev =>
+          [...prev, { text: `** YOUR SHIP HAS BEEN DESTROYED! **`, category: 'combat' as const }].slice(-MAX_LOG_ENTRIES),
+        );
+      } else {
+        const victim = players.find(p => p.shipId === event.victimId)?.name ?? event.victimUserid;
+        const attacker = event.attackerId ? shipName(event.attackerId) : 'unknown';
+        setLogLines(prev =>
+          [...prev, {
+            text: `${victim} has been destroyed by ${attacker}!`,
+            category: 'combat' as const,
+          }].slice(-MAX_LOG_ENTRIES),
+        );
+      }
+    };
+
+    socket.on('combat.phaser-fired', handlePhaserFired);
+    socket.on('combat.hit', handleCombatHit);
+    socket.on('combat.ship-destroyed', handleShipDestroyed);
+    return () => {
+      socket.off('combat.phaser-fired', handlePhaserFired);
+      socket.off('combat.hit', handleCombatHit);
+      socket.off('combat.ship-destroyed', handleShipDestroyed);
+    };
+  }, [players, localShipId]);
+
   const shipNameError =
     onboardingPrompt?.type === 'ship-name'
       ? ((onboardingPrompt.payload as { error?: string }).error ?? null)

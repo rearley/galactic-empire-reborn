@@ -274,6 +274,7 @@ export class CybertronTickService implements OnModuleInit {
     for (const target of this.shipState.findAllShips()) {
       if (target.status !== 1) continue;
       if (target.cloak === 10) continue;
+      if (this.isInNeutralZone(target)) continue; // neutral zone protects targets too
 
       const dist = cdistance(ship, target);
       const ddist = dist * 10_000;
@@ -310,7 +311,7 @@ export class CybertronTickService implements OnModuleInit {
         const targetCls = this.shipClassCache.get(target.shpclass);
         const mean = gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random);
         const canHit = ddist < tooclose || (targetCls?.cybCanAttack ?? false) || target.cantexit > 0;
-        if (mean && ddist < 30_000 && canHit) {
+        if (mean && ddist < 30_000 && canHit && !this.isInNeutralZone(target)) {
           this.cybFirePhaser(ship, target, ctx);
         }
         continue;
@@ -351,7 +352,8 @@ export class CybertronTickService implements OnModuleInit {
     const attackerId = shipKey(ship.userid, ship.shipno);
     const dx = target.xcoord - ship.xcoord;
     const dy = target.ycoord - ship.ycoord;
-    const bearing = ((Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360;
+    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    const bearing = (absAngle - ship.heading + 360) % 360;
     const sector = { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) };
     const tickAt = ctx.firedAt;
 
@@ -374,21 +376,33 @@ export class CybertronTickService implements OnModuleInit {
     if (lineOfFire(ship, target, bearing, 100)) {
       const damage = phaserDamage(100, dist, maxPhaser);
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
-      const result = shieldhit(target.shield, Math.floor(damage), shieldUp);
+      let hullDamage = Math.floor(damage);
+      let shieldConsumed = 0;
 
-      this.shipState.mutate(target.userid, target.shipno, (v) => {
-        v.shield = result.newShield;
-        v.damage = v.damage + result.hullDamage;
-        v.lastfired = ship.shipno;
-        v.cantexit = FIRETICKS;
-      });
+      if (shieldUp) {
+        const result = shieldhit(target.shield, target.shieldtype, Math.floor(damage));
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.shield = result.newCharge;
+          if (result.knockedDown) v.shieldstat = 0;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+        hullDamage = 0;
+        shieldConsumed = result.shieldConsumed;
+      } else {
+        this.shipState.mutate(target.userid, target.shipno, (v) => {
+          v.damage = v.damage + hullDamage;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+      }
 
       const hitEvent: CombatHitEvent = {
         attackerId,
         victimId: shipKey(target.userid, target.shipno),
         weapon: 'phaser',
-        damageHull: result.hullDamage,
-        damageShield: result.shieldDamage,
+        damageHull: hullDamage,
+        damageShield: shieldConsumed,
         sector,
         tickAt,
       };

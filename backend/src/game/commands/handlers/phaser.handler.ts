@@ -152,28 +152,40 @@ export class PhaserHandlerService {
 
       const damage = phaserDamage(dischargePercent, range, maxPhaser);
       const shieldUp = candidate.shieldstat === 1 && candidate.shield > 0;
-      const result = shieldhit(candidate.shield, Math.floor(damage), shieldUp);
+      let hullDamage = Math.floor(damage);
+      let shieldConsumed = 0;
 
-      this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
-        v.shield = result.newShield;
-        v.damage = v.damage + result.hullDamage;
-        v.lastfired = ship.shipno;
-        v.cantexit = FIRETICKS;
-      });
+      if (shieldUp) {
+        const r = shieldhit(candidate.shield, candidate.shieldtype, Math.floor(damage));
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+          v.shield = r.newCharge;
+          if (r.knockedDown) v.shieldstat = 0;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+        hullDamage = 0;
+        shieldConsumed = r.shieldConsumed;
+      } else {
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+          v.damage = v.damage + hullDamage;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+      }
 
       const hitEvent: CombatHitEvent = {
         attackerId,
         victimId: shipKey(candidate.userid, candidate.shipno),
         weapon: 'phaser',
-        damageHull: result.hullDamage,
-        damageShield: result.shieldDamage,
+        damageHull: hullDamage,
+        damageShield: shieldConsumed,
         sector: { x: sectorX, y: sectorY },
         tickAt,
       };
       this.events.emit(COMBAT_HIT, hitEvent);
       hits++;
       lines.push({
-        text: `Phaser hit on ${candidate.shipname}: shield -${result.shieldDamage}, hull -${result.hullDamage}.`,
+        text: `Phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,
         category: 'combat',
       });
     }

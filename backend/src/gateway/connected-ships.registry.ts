@@ -63,6 +63,10 @@ export class ConnectedShipsRegistry {
     return this.bySocketId.has(socketId);
   }
 
+  getSocketId(shipId: string): string | undefined {
+    return this.byShipId.get(shipId);
+  }
+
   /**
    * Returns current data for all connected ships.
    * Ships missing from the in-memory store (race condition) are skipped.

@@ -122,22 +122,20 @@ export class CybertronRepository {
           holdcourse: 0,
           status: 2, // GESTAT_AUTO
           items: [
-            BigInt(slot.loadout.fluxpod),
-            0n, // I_MISSILE
-            0n,
-            0n,
-            0n,
-            0n,
-            BigInt(slot.loadout.decoys),
-            BigInt(slot.loadout.torpedo),
-            0n,
-            0n,
-            0n,
-            BigInt(slot.loadout.mine),
-            0n,
-            BigInt(slot.loadout.jammers),
-            0n,
-            BigInt(slot.loadout.gold),
+            0n,                              // I_MEN     = 0
+            0n,                              // I_MISSL   = 1
+            BigInt(slot.loadout.torpedo),    // I_TORP    = 2
+            0n,                              // I_ION     = 3
+            BigInt(slot.loadout.fluxpod),    // I_FLUX    = 4
+            0n,                              // I_FOOD    = 5
+            0n,                              // I_FIGHTER = 6
+            BigInt(slot.loadout.decoys),     // I_DECOY   = 7
+            0n,                              // I_TROOPS  = 8
+            0n,                              // I_ZIPPER  = 9
+            BigInt(slot.loadout.jammers),    // I_JAMMER  = 10
+            BigInt(slot.loadout.mine),       // I_MINE    = 11
+            BigInt(slot.loadout.gold),       // I_GOLD    = 12
+            0n,                              // I_SPY     = 13
           ],
         },
       });
@@ -234,7 +232,7 @@ export class CybertronRepository {
         const [userid, shipnoStr] = key.split(':');
         const shipno = parseInt(shipnoStr, 10);
         const state = this.shipState.get(userid, shipno);
-        if (!state) continue;
+        if (!state || state.isEphemeral) continue;
         await this.prisma.ship.update({
           where: { userid_shipno: { userid, shipno } },
           data: stateToPrismaUpdate(state),
