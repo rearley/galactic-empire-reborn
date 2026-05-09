@@ -67,4 +67,12 @@ socket.on('error', (err: { code?: string; message?: string }) => {
   }
 });
 
+// Server kicked us because the User row no longer exists (e.g. DB was reset).
+// Clear the stale token so the client lands on the register screen.
+socket.on('auth:logout', () => {
+  clearToken();
+  socket.disconnect();
+  onAuthFailed?.();
+});
+
 export { socket };

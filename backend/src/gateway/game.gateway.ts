@@ -136,6 +136,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     if (!ship) {
+      // Before showing onboarding, verify the User row still exists. A valid JWT
+      // with no User row means the DB was reset under this account — force logout
+      // so the client lands on the register screen rather than hitting a crash
+      // when onboarding.finalize() tries to update a non-existent User.
+      const userExists = await this.prisma.user.findUnique({ where: { userid }, select: { userid: true } });
+      if (!userExists) {
+        client.emit('auth:logout', { reason: 'Account not found. Please register again.' });
+        client.disconnect(true);
+        return;
+      }
       // New player — go directly to ship-name prompt (no class picker)
       const onboardingState: OnboardingState = { step: 'AWAITING_NAME' };
       client.data.onboarding = onboardingState;
