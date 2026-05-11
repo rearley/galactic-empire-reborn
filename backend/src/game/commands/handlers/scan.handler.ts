@@ -560,6 +560,13 @@ export class ScanHandlerService implements OnModuleInit {
           lines: [{ text: `No ship named "${arg}" found.`, category: 'system' }],
         };
       }
+      // S-004: fully-cloaked targets are unscannable — mirrors C `findshp(name,1)`
+      // which returns -1 for `wptr->cloak >= 10`. @see GECMDS.C:1511
+      if (target.cloak >= 10) {
+        return {
+          lines: [{ text: `No ship named "${arg}" found.`, category: 'system' }],
+        };
+      }
     }
     // Block scanning self — GECMDS.C:2209 (prints FOOLISH)
     if (target.userid === ship.userid && target.shipno === ship.shipno) {
