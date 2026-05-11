@@ -14,7 +14,7 @@ describe('InvariantRegistry', () => {
       run: () => [],
     });
 
-    const result: Violation[] = registry.runAll({} as any);
+    const result: Violation[] = registry.runAll({});
 
     expect(result).toHaveLength(1);
     expect(result[0].rule).toBe('always-fails');
@@ -28,10 +28,11 @@ describe('InvariantRegistry', () => {
       run: () => { throw new Error('boom'); },
     });
 
-    const result = registry.runAll({} as any);
+    const result = registry.runAll({});
 
     expect(result).toHaveLength(1);
-    expect(result[0].rule).toBe('throws');
+    expect(result[0].rule).toBe('throws:internal-error');
+    expect(result[0].severity).toBe('MEDIUM');
     expect(result[0].detail).toContain('boom');
   });
 });
