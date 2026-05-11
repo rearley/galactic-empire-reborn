@@ -100,10 +100,11 @@ const ctx: CommandContext = {};
 describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
   it('happy path — Bob in Alice\'s firing arc takes damage and shield drops', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 0 });
-    // Bob due north at distance ~100 (small range)
+    // Bob due north at range 5 (within the C-001 scanRange gate of 10 sectors).
+    // Convention: y decreases northward — see GEFUNCS.C / lineOfFire atan2(dx,-dy).
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: 100, shield: 5000, shieldstat: 1, damage: 0,
+      xcoord: 0, ycoord: -5, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -157,12 +158,15 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
       speed: WARP_THRESHOLD, phasr: 1000,
     });
-    // Place Bob at 4 degrees off bearing 0. With percent=80 (impulse), arc would = 80
-    // (huge arc, easy hit). With hyper-phaser, beamWidth = 5 → halfWidth=(5+2)/2 = 3.5 → 4° = MISS.
+    // Place Bob 4 degrees off bearing 0 (compass north), range 5 (within
+    // C-001 scanRange gate). With percent=80 (impulse) the arc would be 80°
+    // wide (easy hit). With hyper-phaser, beamWidth = HPBEAMW = 5 → halfWidth
+    // = (5+2)/2 = 3.5 → 4° is OUTSIDE arc = MISS. Convention: y decreases
+    // northward, so north uses -cos and east uses +sin.
     const rad = (4 * Math.PI) / 180;
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 100 * Math.sin(rad), ycoord: 100 * Math.cos(rad),
+      xcoord: 5 * Math.sin(rad), ycoord: -5 * Math.cos(rad),
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -187,7 +191,7 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const ally = makeShip({
       userid: 'a', shipno: 2, shipname: 'Ally',
-      xcoord: 0, ycoord: 100, shield: 5000, shieldstat: 1,
+      xcoord: 0, ycoord: -5, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, ally]);
     h.handler.command.handler(alice, ['0', '50'], ctx);
@@ -199,12 +203,14 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
 
   it('PHABIAS arc-widening — target outside `percent` but within `percent + PHABIAS` is a hit', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    // target at 4.5° off bearing 0. With percent=6, halfWidth = (6+2)/2 = 4 → MISS.
-    // With percent=8, halfWidth = (8+2)/2 = 5 → HIT.
+    // Target 4.5° off bearing 0 (compass north), range 5 (within C-001
+    // scanRange gate). With percent=6, halfWidth = (6+2)/2 = 4 → MISS.
+    // With percent=8, halfWidth = (8+2)/2 = 5 → HIT (PHABIAS widens by 2°).
+    // Convention: y decreases northward.
     const rad = (4.5 * Math.PI) / 180;
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 100 * Math.sin(rad), ycoord: 100 * Math.cos(rad),
+      xcoord: 5 * Math.sin(rad), ycoord: -5 * Math.cos(rad),
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -226,7 +232,7 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
   it('sets cantexit = FIRETICKS on firer and on every hit victim', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0, cantexit: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 0, ycoord: 100,
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: -5,
       shield: 5000, shieldstat: 1, cantexit: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -237,9 +243,11 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
 
   it('emits COMBAT_MISS when no targets in arc', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    // bob due south, fire bearing 0 (north), narrow arc
+    // Bob due south at range 5 (within scanRange gate). Fire bearing 0 (north)
+    // — bob is at 180° from firing direction, well outside any arc.
+    // Convention: y decreases northward, so +y = south.
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 0, ycoord: -100,
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 5,
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
