@@ -349,6 +349,14 @@ export class CybertronTickService implements OnModuleInit {
   private cybFirePhaser(ship: ShipState, target: ShipState, ctx: TickContext): void {
     if (ship.phasr < PMINFIRE) return;
 
+    // A-002: defense-in-depth range gate. The engagement-scan loop already gates
+    // candidates on `ddist > scanRange`, but `cybFirePhaser` bypasses
+    // `PhaserHandlerService.handle()` and therefore inherits NONE of C-001's
+    // player-side gate. Mirror it here so future callers cannot bypass.
+    // @see specs/022-fidelity-audit-v2/findings.md A-002
+    const scanRangeGate = this.shipClassCache.get(ship.shpclass)?.scanRange ?? 100_000;
+    if (cdistance(ship, target) * 10_000 > scanRangeGate) return;
+
     const attackerId = shipKey(ship.userid, ship.shipno);
     const dx = target.xcoord - ship.xcoord;
     const dy = target.ycoord - ship.ycoord;

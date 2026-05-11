@@ -93,7 +93,9 @@ export function droidActClass12(
         (droid.where === 0 && attackerState.where === 0) ||
         (droid.where === 0 && attackerState.where >= 2)
       ) {
-        if (droid.phasr >= PMINFIRE && attackerState.cloak !== 10) {
+        // Range gate — see A-001 note in droid-act-class-11.ts.
+        // @see specs/022-fidelity-audit-v2/findings.md A-001
+        if (droid.phasr >= PMINFIRE && attackerState.cloak !== 10 && ddist < scanRange) {
           fireMode = 'normal';
         }
         // @see GEDROIDS.C:472 — torpedo volley j=gernd()%2
