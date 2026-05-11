@@ -1,5 +1,5 @@
 /**
- * T040 — Beacon socket event smoke test.
+ * T040 — Beacon socket event smoke test (S-005 regression restored).
  *
  * Verifies the four acceptance cases from the contract:
  *  1. Gate fires + observer present → beacon event emitted to toSector room.
@@ -8,18 +8,18 @@
  *  4. In-sector reposition (fromSector === toSector) → no beacon event.
  *
  * The gateway's `handleSectorTransition` must:
- *  - Accept `PhysicsSectorTransitionPayload` (existing)
- *  - For each transition, check `toSector` for observers
+ *  - Accept `PhysicsSectorTransitionEvent` (single transition)
+ *  - Check `toSector` for non-mover observers (status===1 or 2)
  *  - Roll `gernd(random) % 10 === 0`
  *  - If both conditions hold, emit `beacon` to the `sector:x:y` room
  *
  * @see GEFUNCS.C:808-816
- * @see specs/020-source-fidelity-audit/contracts/beacon-event.md
+ * @see specs/022-fidelity-audit-v2/findings.md S-005
  */
 
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { BEACON_EVENT, BeaconEvent } from '../../src/gateway/events/beacon.event';
-import { PhysicsSectorTransitionPayload } from '../../src/game/tick/sector-transition.subscriber';
+import { PhysicsSectorTransitionEvent } from '../../src/game/physics/physics-events';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 
 /** Minimal ShipState for observer checks. */
@@ -47,20 +47,13 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 /** Build a minimal gateway mock that exposes `handleSectorTransition`. */
 function buildGateway(options: {
-  /** Ships in the toSector (x=3, y=2) */
+  /** Ships in the toSector */
   observers: ShipState[];
+  /** Mover ship for findAllShips + name lookup */
+  mover: ShipState;
   /** If false, the random roll suppresses the beacon (gernd()%10 !== 0) */
   rollFires: boolean;
 }) {
-  const emittedBeacons: Array<{ room: string; event: BeaconEvent }> = [];
-
-  const serverMock = {
-    to: jest.fn().mockReturnThis(),
-    emit: jest.fn().mockImplementation((eventName: string, payload: BeaconEvent) => {
-      // Capture the last `to()` room via closure — we track calls separately.
-    }),
-  };
-
   // Track room + event together
   const roomEmits: Array<{ room: string; event: string; payload: unknown }> = [];
   const serverProxy = {
@@ -72,55 +65,68 @@ function buildGateway(options: {
     emit: (event: string, payload: unknown) => {
       roomEmits.push({ room: 'global', event, payload });
     },
+    sockets: { sockets: new Map() },
   };
 
-  // Moving ship (userid=mover, shipno=2, in toSector 3,2 after the move)
-  const moverShip = makeShip({
-    userid: 'mover', shipno: 2, shipname: 'Warprunner',
-    xcoord: 3.5, ycoord: 2.5,
-  });
-
-  const allShips = [moverShip, ...options.observers];
-
   // gernd(random) = floor(random.next() * 65536) % 10
-  // rollFires=true → we want result=0; rollFires=false → result=5
+  // rollFires=true → result=0; rollFires=false → result=5
   const randomNext = options.rollFires ? () => 0 / 65536 : () => 5 / 65536;
   const randomMock = { next: randomNext };
 
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(allShips),
-    get: jest.fn().mockReturnValue(moverShip),
+    findAllShips: jest.fn().mockReturnValue([options.mover, ...options.observers]),
+    get: jest.fn().mockReturnValue(options.mover),
+  };
+
+  const registryMock = {
+    getSocketId: jest.fn().mockReturnValue(null),
   };
 
   // Partial gateway — only the beacon-relevant fields
   const gw = {
     server: serverProxy,
     shipStateService: shipServiceMock,
+    registry: registryMock,
     random: randomMock,
-    handleSectorTransition: (GameGateway.prototype as unknown as { handleSectorTransition: (p: PhysicsSectorTransitionPayload) => void }).handleSectorTransition,
+    handleSectorTransition: (GameGateway.prototype as unknown as {
+      handleSectorTransition: (e: PhysicsSectorTransitionEvent) => void;
+    }).handleSectorTransition,
     roomEmits,
   };
 
   return gw;
 }
 
-describe('T040 — beacon event on sector transition', () => {
+describe('S-005 — beacon event on sector transition', () => {
   const fromSector = { x: 2, y: 2 };
-  const toSector   = { x: 3, y: 2 };
-  const fromFlat = fromSector.y * 30 + fromSector.x; // 2*30+2=62
-  const toFlat   = toSector.y   * 30 + toSector.x;   // 2*30+3=63
+  const toSector = { x: 3, y: 2 };
+  const MAXX = 30;
+  const fromFlat = fromSector.y * MAXX + fromSector.x;
+  const toFlat = toSector.y * MAXX + toSector.x;
 
-  const observer = makeShip({ userid: 'obs1', shipno: 1, xcoord: 3.5, ycoord: 2.5, status: 1 });
-  const payload: PhysicsSectorTransitionPayload = {
-    transitions: [{ shipId: 'mover:2', fromSector, toSector }],
+  const mover = makeShip({
+    userid: 'mover', shipno: 2, shipname: 'Warprunner',
+    xcoord: 3.5, ycoord: 2.5, speed: 0, status: 1,
+  });
+  const observer = makeShip({
+    userid: 'obs1', shipno: 1, shipname: 'Observer',
+    xcoord: 3.5, ycoord: 2.5, status: 1,
+  });
+
+  const event: PhysicsSectorTransitionEvent = {
+    shipId: 'mover:2',
+    fromSector,
+    toSector,
+    x: 3.5,
+    y: 2.5,
+    tickAt: new Date(),
   };
 
   it('gate fires + observer present → beacon emitted to toSector room', () => {
-    const { roomEmits, handleSectorTransition, server, shipStateService, random } = buildGateway({ observers: [observer], rollFires: true });
-    // Call the handler with `this` bound to a gateway-like object
-    handleSectorTransition.call({ server, shipStateService, random }, payload);
+    const gw = buildGateway({ observers: [observer], mover, rollFires: true });
+    gw.handleSectorTransition.call(gw, event);
 
-    const beaconEmits = roomEmits.filter((r) => r.event === BEACON_EVENT);
+    const beaconEmits = gw.roomEmits.filter((r) => r.event === BEACON_EVENT);
     expect(beaconEmits).toHaveLength(1);
     const beaconPayload = beaconEmits[0].payload as BeaconEvent;
     expect(beaconPayload.shipId).toBe('mover:2');
@@ -131,29 +137,40 @@ describe('T040 — beacon event on sector transition', () => {
   });
 
   it('gate suppressed → no beacon event', () => {
-    const { roomEmits, handleSectorTransition, server, shipStateService, random } = buildGateway({ observers: [observer], rollFires: false });
-    handleSectorTransition.call({ server, shipStateService, random }, payload);
+    const gw = buildGateway({ observers: [observer], mover, rollFires: false });
+    gw.handleSectorTransition.call(gw, event);
 
-    const beaconEmits = roomEmits.filter((r) => r.event === BEACON_EVENT);
+    const beaconEmits = gw.roomEmits.filter((r) => r.event === BEACON_EVENT);
     expect(beaconEmits).toHaveLength(0);
   });
 
   it('no observers in toSector → no beacon event', () => {
-    const { roomEmits, handleSectorTransition, server, shipStateService, random } = buildGateway({ observers: [], rollFires: true });
-    handleSectorTransition.call({ server, shipStateService, random }, payload);
+    const gw = buildGateway({ observers: [], mover, rollFires: true });
+    gw.handleSectorTransition.call(gw, event);
 
-    const beaconEmits = roomEmits.filter((r) => r.event === BEACON_EVENT);
+    const beaconEmits = gw.roomEmits.filter((r) => r.event === BEACON_EVENT);
     expect(beaconEmits).toHaveLength(0);
   });
 
   it('in-sector reposition → no beacon event', () => {
-    const inSectorPayload: PhysicsSectorTransitionPayload = {
-      transitions: [{ shipId: 'mover:2', fromSector: { x: 3, y: 2 }, toSector: { x: 3, y: 2 } }],
+    const inSectorEvent: PhysicsSectorTransitionEvent = {
+      ...event,
+      fromSector: { x: 3, y: 2 },
+      toSector: { x: 3, y: 2 },
     };
-    const { roomEmits, handleSectorTransition, server, shipStateService, random } = buildGateway({ observers: [observer], rollFires: true });
-    handleSectorTransition.call({ server, shipStateService, random }, inSectorPayload);
+    const gw = buildGateway({ observers: [observer], mover, rollFires: true });
+    gw.handleSectorTransition.call(gw, inSectorEvent);
 
-    const beaconEmits = roomEmits.filter((r) => r.event === BEACON_EVENT);
+    const beaconEmits = gw.roomEmits.filter((r) => r.event === BEACON_EVENT);
+    expect(beaconEmits).toHaveLength(0);
+  });
+
+  it('mover at high warp (speed >= 21000) → no beacon event (also suppresses sector notices)', () => {
+    const fastMover = { ...mover, speed: 21000 };
+    const gw = buildGateway({ observers: [observer], mover: fastMover, rollFires: true });
+    gw.handleSectorTransition.call(gw, event);
+
+    const beaconEmits = gw.roomEmits.filter((r) => r.event === BEACON_EVENT);
     expect(beaconEmits).toHaveLength(0);
   });
 });
