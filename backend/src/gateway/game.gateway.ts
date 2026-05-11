@@ -176,8 +176,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
         state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
         state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
+        state.scanFull = (userRow?.options?.[2] ?? 0) === 1;
+        state.msgFilter = (userRow?.options?.[3] ?? 0) === 1;
       } catch {
         // Non-fatal: teamcode/scanNames/scanHome will be defaults; re-derived on next full hydration
+      }
+      // P-002: hydrate maxTons from ShipClass; the mapper no longer hard-codes 1000.
+      try {
+        const cls = await this.prisma.shipClass.findFirst({
+          where: { classNumber: state.shpclass },
+          select: { maxTons: true },
+        });
+        state.maxTons = cls?.maxTons ?? undefined;
+      } catch {
+        // Non-fatal: leave maxTons undefined; cargo callers default to a safe value.
       }
       this.shipStateService.loadShip(state);
     }
