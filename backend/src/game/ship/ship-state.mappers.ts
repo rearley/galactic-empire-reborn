@@ -60,7 +60,9 @@ export function prismaShipToState(row: Ship): ShipState {
     lock: row.lock,
     holdcourse: row.holdcourse,
     topspeed: row.topspeed,
-    maxTons: 1000,
+    // maxTons intentionally NOT defaulted here — callers must set it from
+    // ShipClass.maxTons. Hard-coding 1000 silently overrode per-class caps
+    // on the gateway reconnect path. @see specs/022-fidelity-audit-v2/findings.md P-002
     warncntr: row.warncntr,
     autoShield: row.autoShield,
     autoRepair: row.autoRepair,
