@@ -337,6 +337,15 @@ export class DroidTickService implements OnModuleInit {
     if (droid.phasr < PMINFIRE) return;
     if (target.cloak === 10) return;
 
+    // A-002: defense-in-depth range gate. Decision functions (class 11/12)
+    // already gate on scanRange (A-001), but `firePhaser` bypasses
+    // `PhaserHandlerService.handle()` and therefore inherits NONE of C-001's
+    // player-side gate. Mirror it here so future callers cannot bypass.
+    // @see specs/022-fidelity-audit-v2/findings.md A-002
+    let scanRangeGate = 25_000;
+    try { scanRangeGate = this.classCache.getScanRange(droid.shpclass); } catch { /* fallback */ }
+    if (cdistance(droid, target) * 10_000 > scanRangeGate) return;
+
     const dx = target.xcoord - droid.xcoord;
     const dy = target.ycoord - droid.ycoord;
     const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
@@ -397,6 +406,15 @@ export class DroidTickService implements OnModuleInit {
   private fireHyperPhaser(droid: ShipState, target: ShipState, ddist: number): void {
     const { fightbackHyperspaceMaxDist } = this.config.global;
     if (ddist >= fightbackHyperspaceMaxDist) return;
+
+    // A-002: defense-in-depth range gate. C-source `firehp` has explicit
+    // `ddistance < shipclass.scanrange` (GECMDS.C:1054). Even though
+    // `fightbackHyperspaceMaxDist` caps at 30000, also enforce per-class
+    // scanRange so heavy-scanner classes don't outrange their own arc.
+    // @see specs/022-fidelity-audit-v2/findings.md A-002
+    let scanRangeGate = 25_000;
+    try { scanRangeGate = this.classCache.getScanRange(droid.shpclass); } catch { /* fallback */ }
+    if (ddist > scanRangeGate) return;
     const dx = target.xcoord - droid.xcoord;
     const dy = target.ycoord - droid.ycoord;
     const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
