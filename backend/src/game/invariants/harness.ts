@@ -15,18 +15,15 @@ export class InvariantRegistry {
       try {
         out.push(...inv.run(world));
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         out.push({
-          rule: inv.name,
+          rule: `${inv.name}:internal-error`,
           sourceRef: inv.sourceRef,
-          severity: 'HIGH',
-          detail: `invariant threw: ${(err as Error).message}`,
+          severity: 'MEDIUM',
+          detail: `invariant threw: ${msg}`,
         });
       }
     }
     return out;
-  }
-
-  count(): number {
-    return this.invariants.length;
   }
 }
