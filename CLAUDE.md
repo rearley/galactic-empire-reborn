@@ -191,6 +191,67 @@ Optional enhancement skills (use where valuable):
 
 Specs live in `/specs/` at the repo root, one folder per feature branch.
 
+## Workflow: spec-kit + superpowers
+
+spec-kit owns the **feature spine** (durable artifacts in `/specs/`).
+superpowers owns the **how** (TDD discipline, debugging, verification,
+parallel agents). They are complementary, not competing.
+
+### Default rules
+
+1. **New feature (something that warrants a `specs/NNN-*` folder):**
+   - If the idea is fuzzy, start with `superpowers:brainstorming` — its
+     job is to produce the crisp one-paragraph prompt you pass to
+     `/speckit-specify`. Without it, specify either makes assumptions
+     or fills spec.md with `[NEEDS CLARIFICATION]` markers
+   - If the idea is already clear, skip brainstorming. Run
+     `/speckit-specify` directly; optionally follow with
+     `/speckit-clarify` (narrower, up to 5 targeted questions against
+     the written spec) for a sanity check
+   - Then `/speckit-plan` → `/speckit-tasks`
+   - During `/speckit-implement`, follow `superpowers:test-driven-development`
+     (write the failing test first, then the code) and use
+     `superpowers:subagent-driven-development` when tasks.md has
+     independent parallelizable items
+   - Before claiming the feature done, run
+     `superpowers:verification-before-completion`
+
+   Rule of thumb:
+   - Fuzzy idea → brainstorm → specify
+   - Clear idea, want a sanity check → specify → clarify
+   - Crystal clear → specify directly
+
+2. **Bug / regression:**
+   - Use `superpowers:systematic-debugging` — do NOT create a
+     `specs/NNN-*` folder for a bug
+   - Fix + test + verify; commit directly
+
+3. **Ad-hoc work (refactor, chore, small change not worth a spec folder):**
+   - Use `superpowers:writing-plans` for the plan, skip speckit
+   - Still apply TDD and verification skills
+
+4. **Architecture / cross-cutting decision:**
+   - Brainstorm first, then write the decision into `docs/DECISIONS.md`
+   - No speckit folder needed
+
+### Overlap — pick one, not both
+
+| Tool A | Tool B | Prefer |
+|--------|--------|--------|
+| `/speckit-plan` | `superpowers:writing-plans` | speckit for features; superpowers for everything else |
+| `/speckit-tasks` + `/speckit-implement` | `superpowers:subagent-driven-development` | use them together — speckit produces tasks.md, subagent-driven executes parallelizable ones |
+| `/speckit-analyze` | manual review | speckit before `/speckit-implement` on non-trivial features |
+
+### Non-negotiables (apply regardless of which workflow)
+
+- TDD: failing test before implementation (the project's existing
+  "Testing Standards" section already requires this — superpowers'
+  TDD skill is the *how*)
+- Verification before completion: run the actual commands, don't
+  claim success from a clean diff
+- Update `docs/PROGRESS.md` etc. at end of every implement session
+  (already required below)
+
 **Planned feature sequence:**
 1. `001-prisma-schema` — DB schema from GEMAIN.H structs
 2. `002-tick-engine` — NestJS game loop + GameGateway skeleton
