@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TickService } from '../../src/game/tick/tick.service';
 import { TickKind } from '../../src/game/tick/tick.types';
+import { InvariantRegistry } from '../../src/game/invariants/harness';
 
 describe('TickService — cadence & lifecycle', () => {
   let service: TickService;
@@ -8,7 +9,7 @@ describe('TickService — cadence & lifecycle', () => {
 
   beforeEach(async () => {
     jest.useFakeTimers();
-    app = await Test.createTestingModule({ providers: [TickService] }).compile();
+    app = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     service = app.get(TickService);
     await app.init();
   });
@@ -63,7 +64,7 @@ describe('TickService — cadence & lifecycle', () => {
     jest.useRealTimers();
     jest.useFakeTimers();
 
-    const app2 = await Test.createTestingModule({ providers: [TickService] }).compile();
+    const app2 = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     const service2 = app2.get(TickService);
     await app2.init();
 

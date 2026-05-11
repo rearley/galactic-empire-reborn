@@ -1,5 +1,7 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TickContext, TickHandler, TickKind, Unsubscribe } from './tick.types';
+import { InvariantRegistry } from '../invariants/harness';
+import { WorldSnapshot } from '../invariants/invariants.types';
 
 /**
  * Drives the three game heartbeats using raw setInterval managed in lifecycle hooks.
@@ -10,6 +12,7 @@ import { TickContext, TickHandler, TickKind, Unsubscribe } from './tick.types';
  */
 @Injectable()
 export class TickService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TickService.name);
   private shipUpdateTimer: NodeJS.Timeout | null = null;
   private physicsTimer: NodeJS.Timeout | null = null;
   private planetUpdateTimer: NodeJS.Timeout | null = null;
@@ -20,6 +23,8 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     [TickKind.PHYSICS, new Set()],
     [TickKind.PLANET_UPDATE, new Set()],
   ]);
+
+  constructor(private readonly invariants: InvariantRegistry) {}
 
   private tickNumbers: Record<TickKind, number> = {
     [TickKind.SHIP_UPDATE]: 0,
@@ -87,6 +92,20 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     this.tickNumbers[kind]++;
     const ctx: TickContext = { kind, tickNumber: this.tickNumbers[kind], firedAt: new Date() };
     this.dispatch(kind, ctx);
+    if (kind === TickKind.PHYSICS && process.env.INVARIANTS_RUNTIME === '1') {
+      const violations = this.invariants.runAll(this.snapshotForInvariants());
+      if (violations.length > 0) {
+        this.logger.warn(
+          `invariant violations: ${violations
+            .map((v) => `${v.rule}(${v.severity}):${v.detail}`)
+            .join('; ')}`,
+        );
+      }
+    }
+  }
+
+  private snapshotForInvariants(): WorldSnapshot {
+    return {};
   }
 
   /** @see GEMAIN.C main loop — one bad subscriber must not stop siblings or the next tick. */
