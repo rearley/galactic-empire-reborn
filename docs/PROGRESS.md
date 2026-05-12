@@ -1,3 +1,23 @@
+## 2026-05-12 — 022 fidelity audit v2
+
+**Completed:** Four-subsystem C↔TS walk (persistence, combat ranges, AI targeting, scanners & visibility) across `reference/ge-source/` and the matching `backend/src` modules. 60+ findings filed in `specs/022-fidelity-audit-v2/findings.md` (P-001..P-021, C-001..C-016, A-001..A-011, S-001..S-014). 10+ HIGH findings fixed inline — most notably the AI fire-range gate (A-001/A-002) that resolved the across-the-map shot symptom motivating the audit, plus the player phaser range gate (C-001), the `scan lo` 10× projection fix (S-001), the `scan ra` sector-unit projection fix (S-003), `scan sh` cloak gate (S-004), beacon-on-move regression (S-005, F-005 regressed by `d75d337`), the Vakory scanRange seed pin (S-006), and the `maxTons`/`scanFull`/`msgFilter` reconnect hydration fix (P-002/P-003). A new `backend/src/game/invariants/` module hosts a runtime harness with 6 seed invariants (`weaponFireRangeRespected`, `aiCannotFireAcrossMap`, `aiRespectsNeutralZone`, `scanRangeMatchesScanType`, `inMemoryShipMatchesDb`, `noOrphanShipState`) wired into `TickService` via a snapshot-provider pattern behind `INVARIANTS_RUNTIME=1`.
+
+**Tests:** New specs under `backend/test/invariants/` (6 invariants × ≥2 cases each, plus harness aggregation + throw-isolation tests). Per-fix unit tests: `phaser.range.spec.ts`, `droid-act-class-11.spec.ts` + `droid-act-class-12.spec.ts` range-gate describes, `scan-lo-range.spec.ts`, `scan-ra-unit-fix.spec.ts`, `scan-sh-cloak.spec.ts`, `ship-class-scanrange-pin.spec.ts`, `ship-state.mappers.spec.ts`, and an updated `beacon.spec.ts`. `tsc` clean on touched files; pre-existing failures in `test/gateway/*` and `test/integration/scan-*.spec.ts` remain (constructor arity drift unrelated to this audit) and are tracked separately.
+
+**Decisions made:**
+- Runtime invariants gated behind `INVARIANTS_RUNTIME=1` (off in prod by default); Jest specs are the authoritative coverage and runtime is a defense-in-depth tripwire.
+- `dbShips` DB load deferred (P-021) — needs an async tick-dispatch branch before the `inMemoryShipMatchesDb` / `noOrphanShipState` runtime checks can `await` the Prisma fetch. The two invariants tolerate `dbShips=undefined` and early-return `[]`.
+- Cybertron Battle Cruiser `scanRange=1000` (class 22) left as wiki-faithful (S-006 note); 0.1-sector scan is suspect but no authority to override the wiki — flagged for design call.
+
+**Next:** User-driven dev playtest (T9) with `INVARIANTS_RUNTIME=1` to surface any runtime invariant violations during a 15-minute session. Several deferred HIGH findings remain — each deserves its own follow-up spec: C-002 (phaser damage formula rewrite), C-003 (lockon `fact > 0.7` gate), C-004 (mine handler validations + timer arg), C-005 (`ton_fact` direction + `damfact` schema field), C-009 (hyperphaser end-to-end), C-010 (`randamage` wiring + subsystem-damage flags), P-001 (kill-on-disconnect prod/dev gating), P-016 (midnight ↔ in-memory teamcode refresh), A-003 (`cyb_attack` `gebemean` gate).
+
+**Known issues:**
+- Workstation Postgres on :5432 conflicts with the docker-compose `db` service, blocking full `npm test` runs locally (CI unaffected).
+- Pre-existing TS errors in `test/gateway/*` and `test/integration/scan-*.spec.ts` (constructor arity drift) — unrelated to this audit; track in a separate cleanup.
+- P-001 (kill-on-disconnect during combat) still deferred — needs a prod/dev gating design before the C-canonical anti-rage-quit mechanic can be re-enabled.
+
+---
+
 ## 2026-05-08 — 021-onboarding-ship-purchase
 
 **Completed:** Restored original game onboarding progression (US1): new players receive a class 1 Interceptor with 5,000 credits and 3 flux pods automatically — no class picker shown. `OnboardingService.finalize(userid, shipname)` signature updated (removed `classNumber` param); always creates ship with `shpclass=START_CLASS` (1), `items[I_FLUX=4]=3n`, `energy=ENGYMAX`, `User.cash=START_CASH` (5000n). `GameGateway` `AWAITING_CLASS` state removed; new players go directly to `prompt:ship-name`. Added `new ship <N>` command (US2): `NewShipHandlerService` handles purchase at Zygor-3 (sector 0,0), validates orbit/sector/class/credits, creates Ship with same default loadout, decrements `User.cash`. Constants centralised in `backend/src/game/constants/onboarding.ts`. Frontend `ClassPickerPrompt.tsx` deleted; `App.tsx` and `useSocket.ts` cleaned of `class-list` branch.

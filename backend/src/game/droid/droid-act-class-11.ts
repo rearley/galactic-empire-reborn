@@ -104,8 +104,13 @@ export function droidActClass11(
         (droid.where === 0 && attackerState.where === 0) ||
         (droid.where === 0 && attackerState.where >= 2)
       ) {
-        // Normal space (or attacker in orbit)
-        if (droid.phasr >= PMINFIRE && attackerState.cloak !== 10) {
+        // Normal space (or attacker in orbit) — only fire if attacker is within scanner range.
+        // C-source `firep` relies on `pdamage` falloff at `disfact=20000+phasrtype*4000` to
+        // attenuate to zero; TS `phaserDamage` falloff is broken (audit 022 C-002), so we
+        // gate explicitly on scanRange (mirrors the player-side C-001 fix in
+        // PhaserHandlerService and the AI-side defense-in-depth gate in droid-tick.service).
+        // @see specs/022-fidelity-audit-v2/findings.md A-001
+        if (droid.phasr >= PMINFIRE && attackerState.cloak !== 10 && ddist < scanRange) {
           fireMode = 'normal';
         }
         if (droid.holdcourse === 0 && Math.floor(rng.next() * confuseDenom) === 0) {

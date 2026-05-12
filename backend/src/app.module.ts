@@ -14,10 +14,11 @@ import { CombatModule } from './game/combat/combat.module';
 import { CybertronModule } from './game/cybertron/cybertron.module';
 import { DroidModule } from './game/droid/droid.module';
 import { MidnightModule } from './game/midnight/midnight.module';
+import { InvariantsModule } from './game/invariants/invariants.module';
 import { DebugController } from './debug/debug.controller';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ScheduleModule.forRoot(), PrismaModule, AuthModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule, MidnightModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), ScheduleModule.forRoot(), PrismaModule, AuthModule, InvariantsModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule, MidnightModule],
   controllers: [DebugController],
 })
 export class AppModule {}

@@ -179,6 +179,17 @@ export class ScanHandlerService implements OnModuleInit {
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
+    // S-001: C `scan_lo` projects at 10× scanRange — the long-range overview.
+    // @see GECMDS.C:2668 range = scanrange * 10.0
+    // @see reference/wiki/player-ships.md:39 "long range scanner is 10x this value"
+    // The scantab detection gate remains at full scanRange so cloaking and
+    // range-based exclusion stay consistent with all other scan modes;
+    // only the *projection radius* widens. Ships beyond scanRange but within
+    // 10×scanRange are NOT projected (we don't know about them via the scantab).
+    // To match C's "iterate all ships and project" semantics we additionally
+    // project ships up to 10× scanRange that are NOT cloaked.
+    const projectionRange = scanRange * 10;
+
     // Build / update the scantab (D1: letters used for ship cells)
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
     const allShips = this.shipService.findAllShips();
@@ -193,29 +204,29 @@ export class ScanHandlerService implements OnModuleInit {
       const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
       if (!other) continue;
 
-      const cell = projectRangeCell(ship, other, scanRange);
+      const cell = projectRangeCell(ship, other, projectionRange);
       if (!cell) continue;
 
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Project planets within scan range across all nearby sectors
+    // 2. Project planets within long-range scan across all nearby sectors
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const sectorRadius = Math.ceil(scanRange / 10000);
+    const sectorRadius = Math.ceil(projectionRange / 10000);
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
         if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
-          const cell = projectRangeCell(ship, planet, scanRange);
+          const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
           // 'P' for all planets — plnum is per-sector so using it across sectors creates duplicates
           grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
         }
         for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
           if (!wormhole.visible) continue;
-          const cell = projectRangeCell(ship, wormhole, scanRange);
+          const cell = projectRangeCell(ship, wormhole, projectionRange);
           if (!cell) continue;
           grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
         }
@@ -232,7 +243,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
 
-    const header = `Range: ${scanRange / 10000}pc — Sector ${xsect},${ysect}`;
+    const header = `Range: ${projectionRange / 10000}pc — Sector ${xsect},${ysect}`;
     return {
       lines: [{ text: header, category: 'info' }],
       scanRender: { kind: 'lo', mode, cells: grid, header },
@@ -255,6 +266,9 @@ export class ScanHandlerService implements OnModuleInit {
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
+    // S-001: long-range projection — see scanLo for rationale.
+    const projectionRange = scanRange * 10;
+
     // Build / update the scantab
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
     const allShips = this.shipService.findAllShips();
@@ -268,28 +282,28 @@ export class ScanHandlerService implements OnModuleInit {
       const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
       if (!other) continue;
 
-      const cell = projectRangeCell(ship, other, scanRange);
+      const cell = projectRangeCell(ship, other, projectionRange);
       if (!cell) continue;
 
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Planets and wormholes within scan range across all nearby sectors
+    // 2. Planets and wormholes within long-range scan across all nearby sectors
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const sectorRadius = Math.ceil(scanRange / 10000);
+    const sectorRadius = Math.ceil(projectionRange / 10000);
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
         if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
-          const cell = projectRangeCell(ship, planet, scanRange);
+          const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
           grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
         }
         for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
           if (!wormhole.visible) continue;
-          const cell = projectRangeCell(ship, wormhole, scanRange);
+          const cell = projectRangeCell(ship, wormhole, projectionRange);
           if (!cell) continue;
           grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
         }
@@ -321,7 +335,7 @@ export class ScanHandlerService implements OnModuleInit {
     });
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-    const header = `Range: ${scanRange / 10000}pc — Sector ${xsect},${ysect}`;
+    const header = `Range: ${projectionRange / 10000}pc — Sector ${xsect},${ysect}`;
 
     return {
       lines: [{ text: header, category: 'info' }],
@@ -362,8 +376,13 @@ export class ScanHandlerService implements OnModuleInit {
 
     const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
 
-    // GECMDS.C:2510 — effective range for projection (zoom)
-    const effectiveRange = scanRange / Math.pow(10 - level, 2);
+    // GECMDS.C:2510 — effective range in raw units (e.g. scanrange=100000, level=1 → 1234)
+    const effectiveRangeRaw = scanRange / Math.pow(10 - level, 2);
+
+    // S-003: GECMDS.C:2517 — convert raw → sector units before projection.
+    // Without this divide-by-10000, xfactor is in raw-units-per-cell while
+    // target coords are in sector-units → every target collapses to the centre.
+    const effectiveRangeSectors = effectiveRangeRaw / 10000.0;
 
     // Build/update the scantab using the full scanRange for in-range detection
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -374,7 +393,7 @@ export class ScanHandlerService implements OnModuleInit {
     const cells: ScanCell[] = [];
 
     // Project each scantab entry onto the grid
-    const rangeDbl = 2 * effectiveRange;
+    const rangeDbl = 2 * effectiveRangeSectors;
     const xfactor = rangeDbl / (SCAN_GRID_WIDTH - 1);
     const yfactor = rangeDbl / (SCAN_GRID_HEIGHT - 1);
 
@@ -411,7 +430,9 @@ export class ScanHandlerService implements OnModuleInit {
 
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const header = `Range: ${effectiveRange} — Sector ${xsect},${ysect}`;
+    // Header shows raw effective range to preserve the C-source "Range: %ld" format
+    // (GECMDS.C:2515 SCAN24 — spr("%ld",(long)range) where range is still raw at that point).
+    const header = `Range: ${Math.round(effectiveRangeRaw)} — Sector ${xsect},${ysect}`;
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
 
@@ -556,6 +577,13 @@ export class ScanHandlerService implements OnModuleInit {
       // Multi-char arg → name search
       target = this.shipService.findByName(arg);
       if (!target) {
+        return {
+          lines: [{ text: `No ship named "${arg}" found.`, category: 'system' }],
+        };
+      }
+      // S-004: fully-cloaked targets are unscannable — mirrors C `findshp(name,1)`
+      // which returns -1 for `wptr->cloak >= 10`. @see GECMDS.C:1511
+      if (target.cloak >= 10) {
         return {
           lines: [{ text: `No ship named "${arg}" found.`, category: 'system' }],
         };

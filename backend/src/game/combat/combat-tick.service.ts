@@ -40,6 +40,11 @@ import {
   CombatMineWarningEvent,
   CombatShipDestroyedEvent,
 } from './combat-events';
+import {
+  AiFireEventForInvariants,
+  CombatEventForInvariants,
+  pushBounded,
+} from '../invariants/runtime-events';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
 const TORP_DECOY_THRESHOLD = 5000;
@@ -99,7 +104,43 @@ export class CombatTickService implements OnModuleInit {
       })),
     );
     this.unsubscribe = this.tickService.subscribe(TickKind.PHYSICS, (ctx) => this.onPhysicsTick(ctx));
+    this.tickService.registerSnapshotProvider('combatEvents', () => this.getRecentEvents());
+    this.tickService.registerSnapshotProvider('aiFireEvents', () => this.getRecentAiFireEvents());
     this.logger.log(`CombatTickService subscribed to PHYSICS — ${this.mineRegistry.getAll().length} mines hydrated`);
+  }
+
+  /**
+   * Bounded ring buffer of recent player/AI weapon-fire events for the
+   * `weaponFireRangeRespected` invariant. Producers (PhaserHandlerService,
+   * mine sweep here, AI tick services) push via {@link recordCombatEvent}.
+   * Bounded at `MAX_EVENTS` items (see runtime-events.ts).
+   */
+  private readonly recentCombatEvents: CombatEventForInvariants[] = [];
+  /**
+   * Bounded ring buffer of recent AI phaser fires for the AI-targeting
+   * invariants. Cybertron + Droid tick services push via
+   * {@link recordAiFireEvent}.
+   */
+  private readonly recentAiFireEvents: AiFireEventForInvariants[] = [];
+
+  /** @internal — pushed to by combat producers. */
+  recordCombatEvent(event: CombatEventForInvariants): void {
+    pushBounded(this.recentCombatEvents, event);
+  }
+
+  /** @internal — pushed to by AI tick services. */
+  recordAiFireEvent(event: AiFireEventForInvariants): void {
+    pushBounded(this.recentAiFireEvents, event);
+  }
+
+  /** @returns A frozen snapshot of recent combat events (≤ MAX_EVENTS). */
+  getRecentEvents(): ReadonlyArray<CombatEventForInvariants> {
+    return this.recentCombatEvents.slice();
+  }
+
+  /** @returns A frozen snapshot of recent AI fire events (≤ MAX_EVENTS). */
+  getRecentAiFireEvents(): ReadonlyArray<AiFireEventForInvariants> {
+    return this.recentAiFireEvents.slice();
   }
 
   private onPhysicsTick(ctx: TickContext): void {
@@ -373,6 +414,13 @@ export class CombatTickService implements OnModuleInit {
           tickAt: ctx.firedAt,
         };
         this.events.emit(COMBAT_HIT, hitEvent);
+        // Mine detonation: the mine is the "shooter"; MINERANGE is the cap.
+        this.recordCombatEvent({
+          weapon: 'mine',
+          shooter: { x: mine.xcoord, y: mine.ycoord },
+          target: { x: ship.xcoord, y: ship.ycoord },
+          maxRange: MINERANGE,
+        });
 
         const det: CombatMineDetonationEvent = {
           mineId: mine.id,
