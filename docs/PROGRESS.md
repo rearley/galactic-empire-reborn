@@ -1,4 +1,15 @@
-## 2026-05-12 — rescale scanRange seeds for the 30×15 galaxy
+## 2026-05-12 — second scanRange compression (final calibration)
+
+**Completed:** Tightened every `ShipClass.scanRange` further — the prior "compression" still left Interceptor's `sca lo` covering the whole 30×15 galaxy (20-sector projection radius × 2 → entire universe visible from any position). Verified that the C galaxy is also 30×15 (`MAXX=30, MAXY=15` in `GEMAIN.H`), so the wiki's 100k+ values never matched any actual C-canonical galaxy size — the original C `shipclass[]` from the `.cnf` file (unrecoverable) must have used smaller values. Recalibrated for our actual world:
+
+- Phaser/lock gate (scanRange / 10000): 0.5 sec (Lydorian Scow) → 4 sec (Death Star)
+- sca-lo overview (scanRange / 1000): 5 sec (Lydorian) → 40 sec (Death Star)
+- **Only Dreadnought-plus** reveals the full galaxy on `sca lo`
+- **Interceptor** = 10,000 (1-sector combat, 10-sector overview — meaningful for a starter ship in a 30-wide galaxy)
+
+C-canonical 10× formula in `scan.handler.ts` preserved — the change is purely seed values, which are TS-canonical anyway (the C `.cnf` source is gone).
+
+## 2026-05-12 — rescale scanRange seeds for the 30×15 galaxy (first pass — superseded)
 
 **Completed:** Compressed every `ShipClass.scanRange` seed so the values fit the TS port's 30×15 sector galaxy. Wiki-faithful values inherited from the original (much larger) game produced sca-lo projections that covered the whole galaxy from the starter Interceptor and weapon gates that let mid-class ships hit anything on the map. New curve: Interceptor 20_000 (2-sector phaser gate, 20-sector sca-lo overview — most but NOT all of the galaxy), Battle Cruiser 50_000 (first tier whose sca-lo covers the full galaxy diagonal), Dreadnought 75_000, Death Star 120_000. Cybertron Battle Cruiser jumps from the wiki-typo 1_000 (effectively blind) to 45_000. Murdonian Transport — the AI ship that motivated the original "shot from across the map" complaint — drops from 25_000 to 30_000 (≈3-sector phaser gate).
 
