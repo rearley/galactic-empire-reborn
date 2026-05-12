@@ -73,6 +73,13 @@ export class CybertronRepository {
       }
 
       for (const ship of user.ships) {
+        // Skip already-dead Cybertrons. Their slot stays in the DB but is
+        // not loaded into memory — otherwise runKillResolution re-processes
+        // the persisted kill on the first physics tick after boot and emits
+        // a phantom COMBAT_SHIP_DESTROYED to all clients. The spawn-slot
+        // tick replenishes the slot via createSpawn (upsert).
+        if (ship.damage >= 100) continue;
+
         const state = prismaShipToState(ship as Parameters<typeof prismaShipToState>[0]);
         state.status = 2; // GESTAT_AUTO
         state.dirty = false;
