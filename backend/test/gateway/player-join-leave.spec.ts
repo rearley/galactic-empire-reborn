@@ -7,6 +7,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../fixtures/mock-random';
 
 /**
  * Verifies player.joined broadcasts after snapshot and player.left fires on disconnect.
@@ -72,7 +73,7 @@ describe('GameGateway player.joined / player.left', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler);
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, mockRandom);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },

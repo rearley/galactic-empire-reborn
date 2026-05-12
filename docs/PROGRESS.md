@@ -12,7 +12,6 @@
 **Next:** User-driven dev playtest (T9) with `INVARIANTS_RUNTIME=1` to surface any runtime invariant violations during a 15-minute session. Several deferred HIGH findings remain — each deserves its own follow-up spec: C-002 (phaser damage formula rewrite), C-003 (lockon `fact > 0.7` gate), C-004 (mine handler validations + timer arg), C-005 (`ton_fact` direction + `damfact` schema field), C-009 (hyperphaser end-to-end), C-010 (`randamage` wiring + subsystem-damage flags), P-001 (kill-on-disconnect prod/dev gating), P-016 (midnight ↔ in-memory teamcode refresh), A-003 (`cyb_attack` `gebemean` gate).
 
 **Known issues:**
-- Pre-existing TS errors in `test/gateway/*` and `test/integration/scan-*.spec.ts` (constructor arity drift) — unrelated to this audit; track in a separate cleanup.
 - P-001 (kill-on-disconnect during combat) still deferred — needs a prod/dev gating design before the C-canonical anti-rage-quit mechanic can be re-enabled.
 
 ---

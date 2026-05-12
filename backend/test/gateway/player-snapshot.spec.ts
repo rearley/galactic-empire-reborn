@@ -8,6 +8,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../fixtures/mock-random';
 
 /**
  * Verifies player.snapshot is emitted to the joining socket only (not broadcast),
@@ -88,6 +89,7 @@ describe('GameGateway player.snapshot', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      mockRandom,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
