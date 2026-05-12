@@ -57,7 +57,7 @@ describe('LockHandlerService — `loc <target>`', () => {
     const h = makeHarness([alice, bob]);
     const result = h.command.handler(alice, ['Bob'], ctx) as CommandResult;
     expect(alice.lock).toBe(7);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.LOC_LOCKED));
+    expect(result.lines[0].text).toMatch(/Target locked: Bob/);
   });
 
   it('rejects locking onto self (LOC_SELF)', () => {
@@ -91,7 +91,7 @@ describe('LockHandlerService — `loc <target>`', () => {
     const bob = makeShip({ userid: 'b', shipno: 7, shipname: 'Bob', xcoord: 100, ycoord: 100 });
     const h = makeHarness([alice, bob]);
     const result = h.command.handler(alice, ['@'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.LOC_LOCKED));
+    expect(result.lines[0].text).toMatch(/Target locked: Bob/);
     expect(alice.lock).toBe(7);
   });
 

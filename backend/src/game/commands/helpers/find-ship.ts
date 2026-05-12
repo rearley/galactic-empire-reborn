@@ -57,11 +57,11 @@ export function findShip(
       (s) => s.shipno === lock && shipKey(s.userid, s.shipno) !== selfKey,
     );
     if (!isIngame(target)) {
-      return { ok: false, message: 'No target locked.', clearedLock: true };
+      return { ok: false, message: 'Locked target no longer in game.', clearedLock: true };
     }
     const dist = cdistance(contextShip, target);
     if (dist * 10000 > scanRange) {
-      return { ok: false, message: 'No target locked.', clearedLock: true };
+      return { ok: false, message: 'Locked target out of scanner range.', clearedLock: true };
     }
     return { ok: true, ship: target };
   }
