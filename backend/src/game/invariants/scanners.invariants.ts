@@ -40,18 +40,21 @@ function distance(a: Point, b: Point): number {
  * Asserts that every scanner result only reveals cells within the projection
  * range defined by the scanner's `scanRange` and the scan type.
  *
- * Scan-type ranges, pinned from the Task 5 walk:
- *   - `sca` (short scan)  — reveals targets where `cdistance * 10_000 ≤ scanRange`
- *                           (i.e. distance-in-sectors ≤ scanRange / 10_000).
- *   - `sca lo` (long scan) — projects up to `scanRange / 10_000` sectors radius.
- *                            S-001 confirmed Interceptor (scanRange=100_000) ⇒ 10-sector radius.
+ * Scan-type ranges:
+ *   - `sca` (short scan)   — distance-in-sectors ≤ `scanRange / 10_000`.
+ *   - `sca lo` (long scan) — projects up to
+ *                            `scanRange × SCAN_LO_PROJECTION_MULTIPLIER / 10_000`
+ *                            sectors radius. C uses ×10; we use a smaller multiplier
+ *                            calibrated for our 30×15 galaxy.
  *   - `sca ra` (range scan) — deferred: S-003 projection range is
  *                             `scanRange / ((10 - x)^2 * 10_000)` per cell, too
  *                             complex for a runtime invariant. Skipped here.
  *
  * @see reference/ge-source/GECMDS.C:2640-2721 scan_lo
- * @see backend/src/game/constants.ts projectRangeCell (S-001 doc)
+ * @see backend/src/game/constants.ts SCAN_LO_PROJECTION_MULTIPLIER
  */
+import { SCAN_LO_PROJECTION_MULTIPLIER } from '../constants';
+
 export const scanRangeMatchesScanType: Invariant = {
   name: 'scanRangeMatchesScanType',
   sourceRef: 'GECMDS.C:2640-2721 scan_lo + scanRange pin',
@@ -65,7 +68,7 @@ export const scanRangeMatchesScanType: Invariant = {
       if (type === 'sca ra') continue;
       let maxSectorRadius: number;
       if (type === 'sca lo') {
-        maxSectorRadius = item.scanRange / 10_000;
+        maxSectorRadius = (item.scanRange * SCAN_LO_PROJECTION_MULTIPLIER) / 10_000;
       } else if (type === 'sca' || type === 'sca short' || type === 'short') {
         // sca short reveals only the scanner's current sector + neighbours within scanRange.
         // Distance in sectors must be ≤ scanRange / 10_000.

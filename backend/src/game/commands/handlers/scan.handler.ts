@@ -6,7 +6,7 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, projectRangeCell } from '../../constants';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { ITEM_NAMES } from '../../constants/items';
 
@@ -188,7 +188,7 @@ export class ScanHandlerService implements OnModuleInit {
     // 10×scanRange are NOT projected (we don't know about them via the scantab).
     // To match C's "iterate all ships and project" semantics we additionally
     // project ships up to 10× scanRange that are NOT cloaked.
-    const projectionRange = scanRange * 10;
+    const projectionRange = scanRange * SCAN_LO_PROJECTION_MULTIPLIER;
 
     // Build / update the scantab (D1: letters used for ship cells)
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -267,7 +267,7 @@ export class ScanHandlerService implements OnModuleInit {
     const scanRange = classInfo?.scanRange ?? 0;
 
     // S-001: long-range projection — see scanLo for rationale.
-    const projectionRange = scanRange * 10;
+    const projectionRange = scanRange * SCAN_LO_PROJECTION_MULTIPLIER;
 
     // Build / update the scantab
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
