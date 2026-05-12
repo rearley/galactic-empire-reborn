@@ -168,6 +168,53 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
     });
   });
 
+  // ─── hydrateAll skips dead Cybertrons ─────────────────────────────────────
+
+  describe('hydrateAll — already-dead Cybertron rows', () => {
+    it('does NOT load Cybertrons with damage >= 100 into memory', async () => {
+      // Seed one alive and one dead Cybertron under unique test userids.
+      await prisma.user.upsert({
+        where: { userid: 'Cybrg-test-alive' },
+        create: { userid: 'Cybrg-test-alive', username: 'Cybrg-test-alive', cash: 0n },
+        update: { cash: 0n },
+      });
+      await prisma.user.upsert({
+        where: { userid: 'Cybrg-test-dead' },
+        create: { userid: 'Cybrg-test-dead', username: 'Cybrg-test-dead', cash: 0n },
+        update: { cash: 0n },
+      });
+      await prisma.ship.create({
+        data: {
+          userid: 'Cybrg-test-alive', shipno: 920, shipname: 'Alive',
+          shpclass: 21, xcoord: 1, ycoord: 1, damage: 0, status: 2,
+          items: Array(16).fill(0n),
+        },
+      });
+      await prisma.ship.create({
+        data: {
+          userid: 'Cybrg-test-dead', shipno: 921, shipname: 'Dead',
+          shpclass: 21, xcoord: 1, ycoord: 1, damage: 100, status: 0,
+          items: Array(16).fill(0n),
+        },
+      });
+
+      const loaded: { userid: string }[] = [];
+      const shipState = {
+        loadShip: jest.fn((s: { userid: string }) => loaded.push(s)),
+        findByUserid: jest.fn().mockReturnValue([]),
+        findAllShips: jest.fn().mockReturnValue([]),
+        get: jest.fn().mockReturnValue(undefined),
+      } as unknown as ShipStateService;
+
+      const repo = new CybertronRepository(prisma, shipState);
+      await repo.hydrateAll();
+
+      const testLoads = loaded.filter((s) => s.userid.startsWith('Cybrg-test-'));
+      expect(testLoads.map((s) => s.userid)).toContain('Cybrg-test-alive');
+      expect(testLoads.map((s) => s.userid)).not.toContain('Cybrg-test-dead');
+    });
+  });
+
   // ─── Spawn-slot collision: dead Cybertron row left in DB ─────────────────
 
   describe('createSpawn — stale dead Cybertron row in DB', () => {
