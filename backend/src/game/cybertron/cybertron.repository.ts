@@ -103,40 +103,71 @@ export class CybertronRepository {
         update: { cash },
       });
 
-      // Create Ship row
-      await tx.ship.create({
-        data: {
-          userid: slot.userid,
-          shipno: slot.shipno,
-          shipname: slot.shipname,
-          shpclass: slot.classNumber,
-          xcoord: slot.xcoord,
-          ycoord: slot.ycoord,
-          phasr: 100,
-          phasrtype: slot.phasrtype,
-          shieldtype: slot.shieldtype,
-          cybmine: 255,
-          cybskill: slot.cybskill,
-          tick: slot.tick,
-          cybupdate: 100,
-          holdcourse: 0,
-          status: 2, // GESTAT_AUTO
-          items: [
-            0n,                              // I_MEN     = 0
-            0n,                              // I_MISSL   = 1
-            BigInt(slot.loadout.torpedo),    // I_TORP    = 2
-            0n,                              // I_ION     = 3
-            BigInt(slot.loadout.fluxpod),    // I_FLUX    = 4
-            0n,                              // I_FOOD    = 5
-            0n,                              // I_FIGHTER = 6
-            BigInt(slot.loadout.decoys),     // I_DECOY   = 7
-            0n,                              // I_TROOPS  = 8
-            0n,                              // I_ZIPPER  = 9
-            BigInt(slot.loadout.jammers),    // I_JAMMER  = 10
-            BigInt(slot.loadout.mine),       // I_MINE    = 11
-            BigInt(slot.loadout.gold),       // I_GOLD    = 12
-            0n,                              // I_SPY     = 13
-          ],
+      // Upsert Ship row — reuses the slot when a previous Cybertron with the
+      // same userid/shipno died but its DB row wasn't deleted (P-007 in audit
+      // 022 — TS doesn't delete-on-death like C's GEDELETE path).
+      const shipData = {
+        userid: slot.userid,
+        shipno: slot.shipno,
+        shipname: slot.shipname,
+        shpclass: slot.classNumber,
+        xcoord: slot.xcoord,
+        ycoord: slot.ycoord,
+        phasr: 100,
+        phasrtype: slot.phasrtype,
+        shieldtype: slot.shieldtype,
+        cybmine: 255,
+        cybskill: slot.cybskill,
+        tick: slot.tick,
+        cybupdate: 100,
+        holdcourse: 0,
+        status: 2, // GESTAT_AUTO
+        items: [
+          0n,                              // I_MEN     = 0
+          0n,                              // I_MISSL   = 1
+          BigInt(slot.loadout.torpedo),    // I_TORP    = 2
+          0n,                              // I_ION     = 3
+          BigInt(slot.loadout.fluxpod),    // I_FLUX    = 4
+          0n,                              // I_FOOD    = 5
+          0n,                              // I_FIGHTER = 6
+          BigInt(slot.loadout.decoys),     // I_DECOY   = 7
+          0n,                              // I_TROOPS  = 8
+          0n,                              // I_ZIPPER  = 9
+          BigInt(slot.loadout.jammers),    // I_JAMMER  = 10
+          BigInt(slot.loadout.mine),       // I_MINE    = 11
+          BigInt(slot.loadout.gold),       // I_GOLD    = 12
+          0n,                              // I_SPY     = 13
+        ],
+      };
+      await tx.ship.upsert({
+        where: { userid_shipno: { userid: slot.userid, shipno: slot.shipno } },
+        create: shipData,
+        update: {
+          ...shipData,
+          damage: 0,
+          energy: 65000,
+          speed: 0,
+          speed2b: 0,
+          heading: 0,
+          head2b: 0,
+          where: 0,
+          shield: 0,
+          shieldstat: 0,
+          cloak: 0,
+          jammer: 0,
+          repair: 0,
+          cantexit: 0,
+          lastfired: 0,
+          lock: 0,
+          ltorpsChannel: [255, 255, 255],
+          ltorpsDistance: [0, 0, 0],
+          lmisslChannel: [255, 255, 255],
+          lmisslDistance: [0, 0, 0],
+          lmisslEnergy: [0, 0, 0],
+          decout: [],
+          minesnear: 0,
+          kills: 0,
+          hostile: 0,
         },
       });
     });

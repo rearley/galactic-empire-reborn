@@ -168,6 +168,62 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
     });
   });
 
+  // ─── Spawn-slot collision: dead Cybertron row left in DB ─────────────────
+
+  describe('createSpawn — stale dead Cybertron row in DB', () => {
+    it('reuses the slot when a Ship row already exists for (userid, shipno)', async () => {
+      // Pre-create a stale "dead" Cybertron row at the target slot.
+      await prisma.user.upsert({
+        where: { userid: 'Cybrg-test-911' },
+        create: { userid: 'Cybrg-test-911', username: 'Cybrg-test-911', cash: 0n },
+        update: { cash: 0n },
+      });
+      await prisma.ship.create({
+        data: {
+          userid: 'Cybrg-test-911',
+          shipno: 911,
+          shipname: 'OldDeadCyb',
+          shpclass: 21,
+          xcoord: 0.0,
+          ycoord: 0.0,
+          damage: 100,           // dead
+          status: 0,             // GESTAT_AVAIL
+          items: Array(16).fill(0n),
+        },
+      });
+
+      const { repo } = await buildRepo(prisma);
+
+      // New spawn at the SAME (userid, shipno) — used to throw P2002 unique
+      // constraint; now must succeed by overwriting the stale row.
+      await expect(
+        repo.createSpawn({
+          userid: 'Cybrg-test-911',
+          shipno: 911,
+          classNumber: 22,
+          shipname: 'FreshCyb',
+          xcoord: 5.5,
+          ycoord: 5.5,
+          phasrtype: 3,
+          shieldtype: 3,
+          loadout: { gold: 1000, torpedo: 5, fluxpod: 5, decoys: 5, jammers: 1, mine: 1 },
+          cybskill: 7,
+          tick: 8,
+        }),
+      ).resolves.not.toThrow();
+
+      // The row should now reflect the fresh spawn data.
+      const row = await prisma.ship.findUnique({
+        where: { userid_shipno: { userid: 'Cybrg-test-911', shipno: 911 } },
+      });
+      expect(row).not.toBeNull();
+      expect(row!.shipname).toBe('FreshCyb');
+      expect(row!.shpclass).toBe(22);
+      expect(row!.damage).toBe(0);
+      expect(row!.status).toBe(2);
+    });
+  });
+
   // ─── T056: hydrateAll reloads all Cybertrons ─────────────────────────────
 
   describe('T056 — hydrateAll loads all Cybrg-* ships into ShipStateService', () => {
