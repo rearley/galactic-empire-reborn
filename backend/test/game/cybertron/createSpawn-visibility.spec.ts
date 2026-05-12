@@ -28,7 +28,7 @@ function buildFakePrisma(returnedShip: Record<string, unknown>) {
     $transaction: jest.fn(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
         user: { upsert: upsertMock, findUnique: jest.fn().mockResolvedValue({ userid: 'Cybrg-test', cash: 1000n }) },
-        ship: { create: createMock },
+        ship: { upsert: createMock },
       };
       await fn(tx);
     }),
