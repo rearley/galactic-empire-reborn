@@ -3,6 +3,11 @@ import { TickContext, TickHandler, TickKind, Unsubscribe } from './tick.types';
 import { InvariantRegistry } from '../invariants/harness';
 import { WorldSnapshot } from '../invariants/invariants.types';
 
+/** Keys on WorldSnapshot a snapshot provider may populate. */
+export type SnapshotKey = Exclude<keyof WorldSnapshot, undefined>;
+/** Returns a slice value for one WorldSnapshot key (or undefined to skip). */
+export type SnapshotProvider = () => unknown;
+
 /**
  * Drives the three game heartbeats using raw setInterval managed in lifecycle hooks.
  * No @nestjs/schedule — reserved for feature 009's midnight @Cron.
@@ -23,6 +28,13 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     [TickKind.PHYSICS, new Set()],
     [TickKind.PLANET_UPDATE, new Set()],
   ]);
+
+  /**
+   * Services self-register slice providers via `registerSnapshotProvider`.
+   * The map is consulted only when `INVARIANTS_RUNTIME=1`, but providers
+   * always register at module init so flipping the flag mid-session is cheap.
+   */
+  private readonly snapshotProviders: Map<SnapshotKey, SnapshotProvider> = new Map();
 
   constructor(private readonly invariants: InvariantRegistry) {}
 
@@ -104,8 +116,39 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Register a provider for one slice of the WorldSnapshot. Called by services
+   * (ShipStateService, CombatTickService, AI tick services, PhaserHandlerService)
+   * at module init. Re-registering the same key replaces the prior provider.
+   *
+   * Population is opt-in per key: any key without a provider is left undefined
+   * and the corresponding invariant short-circuits via its narrowing helper.
+   *
+   * NOTE: `scanResults` is intentionally left without a runtime provider this
+   * round — the scan-range invariant runs primarily under Jest. The Task 8
+   * plan §"Recent scan results" defers the live wiring.
+   *
+   * NOTE: `dbShips` is deferred (P-021 in specs/022-fidelity-audit-v2/findings.md).
+   * Populating it requires an async pre-fetch keyed on the in-memory ship map
+   * — the `inMemoryShipMatchesDb` / `noOrphanShipState` invariants tolerate
+   * `dbShips` being undefined (they early-return `[]`).
+   */
+  registerSnapshotProvider(key: SnapshotKey, provider: SnapshotProvider): void {
+    this.snapshotProviders.set(key, provider);
+  }
+
   private snapshotForInvariants(): WorldSnapshot {
-    return {};
+    const snap: WorldSnapshot = {};
+    for (const [key, provider] of this.snapshotProviders) {
+      try {
+        const value = provider();
+        if (value !== undefined) (snap as Record<string, unknown>)[key] = value;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`snapshot provider for "${key}" threw: ${msg}`);
+      }
+    }
+    return snap;
   }
 
   /** @see GEMAIN.C main loop — one bad subscriber must not stop siblings or the next tick. */

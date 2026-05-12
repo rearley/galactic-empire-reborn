@@ -117,3 +117,93 @@ describe('TickService — cadence & lifecycle', () => {
     expect(count).toBe(3);
   });
 });
+
+describe('TickService — snapshot providers (Task 8)', () => {
+  let service: TickService;
+  let registry: InvariantRegistry;
+  let app: TestingModule;
+
+  beforeEach(async () => {
+    jest.useFakeTimers();
+    registry = new InvariantRegistry();
+    app = await Test.createTestingModule({
+      providers: [TickService, { provide: InvariantRegistry, useValue: registry }],
+    }).compile();
+    service = app.get(TickService);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    jest.useRealTimers();
+  });
+
+  it('snapshotForInvariants merges every registered provider slice', () => {
+    const ships = [{ shipId: 'u:1', xcoord: 1, ycoord: 2, energy: 100, damage: 0, lastFlushedAt: 0 }];
+    const combatEvents = [
+      { weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 1, y: 1 }, maxRange: 100 },
+    ];
+    const aiFireEvents = [
+      { shipClass: '20', shooter: { x: 0, y: 0 }, target: { x: 1, y: 1 }, scanRange: 50_000, distanceRaw: 1000 },
+    ];
+    service.registerSnapshotProvider('ships', () => ships);
+    service.registerSnapshotProvider('combatEvents', () => combatEvents);
+    service.registerSnapshotProvider('aiFireEvents', () => aiFireEvents);
+
+    let captured: unknown = null;
+    registry.register({
+      name: 'capture',
+      sourceRef: 'test',
+      run: (world) => {
+        captured = world;
+        return [];
+      },
+    });
+
+    process.env.INVARIANTS_RUNTIME = '1';
+    try {
+      jest.advanceTimersByTime(6000); // one PHYSICS tick
+    } finally {
+      delete process.env.INVARIANTS_RUNTIME;
+    }
+
+    expect(captured).toMatchObject({ ships, combatEvents, aiFireEvents });
+  });
+
+  it('snapshot is empty when INVARIANTS_RUNTIME is not set', () => {
+    const fn = jest.fn(() => [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }]);
+    service.registerSnapshotProvider('combatEvents', fn);
+
+    jest.advanceTimersByTime(6000); // PHYSICS tick
+
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('a throwing provider does not abort the snapshot for other providers', () => {
+    service.registerSnapshotProvider('ships', () => {
+      throw new Error('boom');
+    });
+    const goodSlice = [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }];
+    service.registerSnapshotProvider('combatEvents', () => goodSlice);
+
+    let captured: unknown = null;
+    registry.register({
+      name: 'capture',
+      sourceRef: 'test',
+      run: (world) => {
+        captured = world;
+        return [];
+      },
+    });
+
+    process.env.INVARIANTS_RUNTIME = '1';
+    try {
+      jest.advanceTimersByTime(6000);
+    } finally {
+      delete process.env.INVARIANTS_RUNTIME;
+    }
+
+    expect(captured).toMatchObject({ combatEvents: goodSlice });
+    expect((captured as { ships?: unknown }).ships).toBeUndefined();
+  });
+});

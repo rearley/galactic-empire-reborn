@@ -12,7 +12,7 @@
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { Inject, Optional } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
@@ -59,6 +59,7 @@ import {
   CombatHitEvent,
 } from '../combat/combat-events';
 import { cdistance, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
+import { CombatTickService } from '../combat/combat-tick.service';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
 
@@ -87,6 +88,7 @@ export class DroidTickService implements OnModuleInit {
     private readonly mineRepo: MineRepository,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    @Optional() private readonly combatTick?: CombatTickService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -365,6 +367,22 @@ export class DroidTickService implements OnModuleInit {
     try { maxPhaser = this.classCache.getMaxPhaser(droid.shpclass); } catch { /* fallback */ }
 
     const dist = cdistance(droid, target);
+    // Runtime invariants — record at fire time. scanRangeGate is the legal cap.
+    if (this.combatTick) {
+      this.combatTick.recordAiFireEvent({
+        shipClass: String(droid.shpclass),
+        shooter: { x: droid.xcoord, y: droid.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        scanRange: scanRangeGate,
+        distanceRaw: dist * 10_000,
+      });
+      this.combatTick.recordCombatEvent({
+        weapon: 'phaser',
+        shooter: { x: droid.xcoord, y: droid.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        maxRange: scanRangeGate / 10_000,
+      });
+    }
     if (lineOfFire(droid, target, bearing, 100)) {
       const damage = phaserDamage(100, dist, maxPhaser);
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
@@ -434,6 +452,22 @@ export class DroidTickService implements OnModuleInit {
     try { maxPhaser = this.classCache.getMaxPhaser(droid.shpclass); } catch { /* fallback */ }
 
     const dist = cdistance(droid, target);
+    // Runtime invariants — record at fire time.
+    if (this.combatTick) {
+      this.combatTick.recordAiFireEvent({
+        shipClass: String(droid.shpclass),
+        shooter: { x: droid.xcoord, y: droid.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        scanRange: scanRangeGate,
+        distanceRaw: ddist,
+      });
+      this.combatTick.recordCombatEvent({
+        weapon: 'hyper-phaser',
+        shooter: { x: droid.xcoord, y: droid.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        maxRange: scanRangeGate / 10_000,
+      });
+    }
     if (lineOfFire(droid, target, bearing, 100)) {
       const damage = phaserDamage(100, dist, maxPhaser);
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
