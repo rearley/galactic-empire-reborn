@@ -142,7 +142,6 @@ galactic-empire-reborn/
   reference/
     ge-source/         Original C source — READ ONLY
     wiki/              Game wiki reference
-  docker-compose.yml   Postgres 16 service
 ```
 
 See `docs/ARCHITECTURE.md` for the full module map and `docs/GAME_MECHANICS.md` for

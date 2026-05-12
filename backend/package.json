@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "db:up": "docker compose -f ../docker-compose.yml up -d db && docker compose -f ../docker-compose.yml exec -T db pg_isready -U ge",
-    "db:down": "docker compose -f ../docker-compose.yml down",
-    "db:reset": "docker compose -f ../docker-compose.yml down -v && npm run db:up",
+    "db:reset": "PGPASSWORD=ge psql -h localhost -U ge -d postgres -c 'DROP DATABASE IF EXISTS ge; CREATE DATABASE ge OWNER ge; DROP DATABASE IF EXISTS ge_test; CREATE DATABASE ge_test OWNER ge;' && npx prisma migrate deploy",
     "test": "jest",
     "test:manual": "jest --config jest.manual.config.ts",
     "prisma:generate": "prisma generate",
