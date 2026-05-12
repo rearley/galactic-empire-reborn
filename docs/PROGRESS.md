@@ -1,3 +1,21 @@
+## 2026-05-12 — rescale scanRange seeds for the 30×15 galaxy
+
+**Completed:** Compressed every `ShipClass.scanRange` seed so the values fit the TS port's 30×15 sector galaxy. Wiki-faithful values inherited from the original (much larger) game produced sca-lo projections that covered the whole galaxy from the starter Interceptor and weapon gates that let mid-class ships hit anything on the map. New curve: Interceptor 20_000 (2-sector phaser gate, 20-sector sca-lo overview — most but NOT all of the galaxy), Battle Cruiser 50_000 (first tier whose sca-lo covers the full galaxy diagonal), Dreadnought 75_000, Death Star 120_000. Cybertron Battle Cruiser jumps from the wiki-typo 1_000 (effectively blind) to 45_000. Murdonian Transport — the AI ship that motivated the original "shot from across the map" complaint — drops from 25_000 to 30_000 (≈3-sector phaser gate).
+
+**Tests:** `test/unit/ship-class-scanrange-pin.spec.ts` rewritten with the new pinned values plus a new assertion that the Interceptor's sca-lo radius is < 30 sectors (cannot cover the full galaxy). All scan, AI-targeting, droid range-gate, and invariant suites (90 tests) green.
+
+**Decisions made:**
+- Wiki was the **only** authority for the prior values; the original C `shipclass[]` lives in a runtime `.cnf` not part of the published source, so there is no "C-canonical" override to honor. Rescaling for map size is therefore a free design choice.
+- Battle Cruiser-tier is the first ship whose sca-lo covers the entire galaxy diagonal (~33 sectors). Below that, sca-lo is a meaningful tactical overview rather than a free map.
+- Phaser/lock gate (`scanRange / 10000` sectors) now ranges from ~2 sectors (small ships) to 12 sectors (Death Star) — meaningful within a 30-wide galaxy.
+- Seed file is the source of truth; `npx prisma db seed` was re-run against `ge` to apply the change to the live dev DB.
+
+**Next:** Live playtest to confirm the new values feel right. If Interceptor combat radius (2 sectors) is too tight, easiest dial is class 1's seed value.
+
+**Known issues:** None new.
+
+---
+
 ## 2026-05-12 — 022 fidelity audit v2
 
 **Completed:** Four-subsystem C↔TS walk (persistence, combat ranges, AI targeting, scanners & visibility) across `reference/ge-source/` and the matching `backend/src` modules. 60+ findings filed in `specs/022-fidelity-audit-v2/findings.md` (P-001..P-021, C-001..C-016, A-001..A-011, S-001..S-014). 10+ HIGH findings fixed inline — most notably the AI fire-range gate (A-001/A-002) that resolved the across-the-map shot symptom motivating the audit, plus the player phaser range gate (C-001), the `scan lo` 10× projection fix (S-001), the `scan ra` sector-unit projection fix (S-003), `scan sh` cloak gate (S-004), beacon-on-move regression (S-005, F-005 regressed by `d75d337`), the Vakory scanRange seed pin (S-006), and the `maxTons`/`scanFull`/`msgFilter` reconnect hydration fix (P-002/P-003). A new `backend/src/game/invariants/` module hosts a runtime harness with 6 seed invariants (`weaponFireRangeRespected`, `aiCannotFireAcrossMap`, `aiRespectsNeutralZone`, `scanRangeMatchesScanType`, `inMemoryShipMatchesDb`, `noOrphanShipState`) wired into `TickService` via a snapshot-provider pattern behind `INVARIANTS_RUNTIME=1`.
