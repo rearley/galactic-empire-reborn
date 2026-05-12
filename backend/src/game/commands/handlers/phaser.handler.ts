@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -26,6 +26,7 @@ import {
   PMINFIRE,
   WARP_THRESHOLD,
 } from '../../constants';
+import { CombatTickService } from '../../combat/combat-tick.service';
 
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
@@ -63,6 +64,7 @@ export class PhaserHandlerService {
     private readonly shipClassCache: ShipClassCacheService,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    @Optional() private readonly combatTick?: CombatTickService,
   ) {
     // random is reserved for future damage-roll integration (randamage).
     void this.random;
@@ -114,6 +116,7 @@ export class PhaserHandlerService {
     }
 
     const maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
+    const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
     const sectorX = Math.floor(ship.xcoord);
     const sectorY = Math.floor(ship.ycoord);
     const tickAt = new Date();
@@ -148,6 +151,15 @@ export class PhaserHandlerService {
       if (candidate.status !== 1 && candidate.status !== 2) continue;
 
       const range = cdistance(ship, candidate);
+      // C-001 audit 022: phasers must not reach beyond the firer's scanner range.
+      // Mirrors the implicit gate in C `pdamage` (damage falls to 0 at
+      // `disfact = 20000 + phasrtype*4000`) — we use scanRange (cdistance × 10000)
+      // as the canonical TS cap, matching every other weapon-target lookup
+      // (see helpers/find-ship.ts).
+      // @see GECMDS.C:946-1004 firep
+      // @see GEFUNCS.C:2060-2092 pdamage
+      // @see specs/022-fidelity-audit-v2/findings.md C-001
+      if (range * 10000 > scanRange) continue;
       if (!lineOfFire(ship, candidate, bearing, beamWidth)) continue;
 
       const damage = phaserDamage(dischargePercent, range, maxPhaser);
@@ -183,6 +195,15 @@ export class PhaserHandlerService {
         tickAt,
       };
       this.events.emit(COMBAT_HIT, hitEvent);
+      // Record for runtime invariant `weaponFireRangeRespected`. The legal
+      // cap for a player phaser is the firer's scanRange (in cdistance units:
+      // scanRange / 10_000 sectors), enforced by C-001.
+      this.combatTick?.recordCombatEvent({
+        weapon: 'phaser',
+        shooter: { x: ship.xcoord, y: ship.ycoord },
+        target: { x: candidate.xcoord, y: candidate.ycoord },
+        maxRange: scanRange / 10_000,
+      });
       hits++;
       lines.push({
         text: `Phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,

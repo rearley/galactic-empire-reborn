@@ -206,4 +206,40 @@ describe('T027 — Vakory Survey Drone (class 33) behavior matrix', () => {
       expect(action.fightback!.alterVector).toBeUndefined();
     });
   });
+
+  // ─── A-001: range gate on normal-space fightback ─────────────────────────
+  describe('A-001 — range gate: fightback respects scanRange', () => {
+    it('sets fireMode=null when attacker is beyond scanRange (across-the-map shot bug)', () => {
+      // Attacker 10 sectors away → ddist = 100_000 > SCAN_RANGE (25_000).
+      const attacker = makeShip({
+        userid: 'player-1', shipno: 2, status: GESTAT_USER,
+        where: 0, cloak: 0, xcoord: 10, ycoord: 0,
+      });
+      const droid = makeShip({
+        jammer: 0, cantexit: 1, lastfired: 2,
+        phasr: PMINFIRE, where: 0, damage: 0, xcoord: 0, ycoord: 0,
+      });
+      const rng = new Mulberry32Adapter(42);
+      const action = droidActClass12(droid, [attacker], SCAN_RANGE, ALTER_VECTOR_DENOM, DAMAGE_THRESHOLD, noop, noop, rng);
+
+      expect(action.fightback).toBeDefined();
+      expect(action.fightback!.fireMode).toBeNull();
+    });
+
+    it('sets fireMode=normal when attacker is just inside scanRange', () => {
+      // ddist ≈ 20_000 < SCAN_RANGE (25_000).
+      const attacker = makeShip({
+        userid: 'player-1', shipno: 2, status: GESTAT_USER,
+        where: 0, cloak: 0, xcoord: 2, ycoord: 0,
+      });
+      const droid = makeShip({
+        jammer: 0, cantexit: 1, lastfired: 2,
+        phasr: PMINFIRE, where: 0, damage: 0, xcoord: 0, ycoord: 0,
+      });
+      const rng = new Mulberry32Adapter(42);
+      const action = droidActClass12(droid, [attacker], SCAN_RANGE, ALTER_VECTOR_DENOM, DAMAGE_THRESHOLD, noop, noop, rng);
+
+      expect(action.fightback!.fireMode).toBe('normal');
+    });
+  });
 });

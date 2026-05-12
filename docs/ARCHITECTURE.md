@@ -571,6 +571,30 @@ Listener (cybertron-tick.service.ts):
   combat.ship-destroyed (victimUserid starts with 'Cybrg-') → transferCybertronGold
 ```
 
+## InvariantsModule (feature 022 — fidelity audit v2)
+
+```
+InvariantsModule (game/invariants/)
+  ├── InvariantRegistry  — in-process registry; register() / runAll(world) / count().
+  │                         Per-invariant try/catch — a throwing invariant surfaces as a
+  │                         HIGH violation rather than crashing the tick.
+  ├── invariants.types.ts — Severity, Violation, WorldSnapshot, Invariant interfaces.
+  ├── harness.ts          — InvariantRegistry implementation.
+  ├── combat-ranges.invariants.ts    — weaponFireRangeRespected
+  ├── ai-targeting.invariants.ts     — aiCannotFireAcrossMap, aiRespectsNeutralZone
+  ├── scanners.invariants.ts         — scanRangeMatchesScanType
+  └── ship-persistence.invariants.ts — inMemoryShipMatchesDb, noOrphanShipState
+```
+
+Wired into `TickService` via a post-physics hook gated by `INVARIANTS_RUNTIME=1`
+(off in prod by default). The hook calls `snapshotForInvariants()` — a
+snapshot-provider pattern that pulls slices from `ShipStateService`,
+`CombatTickService`, and the AI tick services. Violations are logged at
+`warn` level with `rule(severity):detail`. The `dbShips` slice is gated
+behind a second flag `INVARIANTS_DB_CHECK=1` (deferred runtime wiring —
+see finding P-021). Jest specs under `backend/test/invariants/` are the
+authoritative coverage; runtime invocation is a defense-in-depth tripwire.
+
 ## MidnightModule (feature 009)
 
 ```

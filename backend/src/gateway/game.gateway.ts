@@ -48,6 +48,8 @@ import {
   PhysicsSectorTransitionEvent,
 } from '../game/physics/physics-events';
 import { shipKey } from '../game/ship/ship-state.types';
+import { RANDOM, Random, gernd } from '../game/combat/random.port';
+import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
@@ -106,6 +108,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
+    @Inject(RANDOM) private readonly random: Random,
   ) {}
 
   /**
@@ -176,8 +179,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
         state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
         state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
+        state.scanFull = (userRow?.options?.[2] ?? 0) === 1;
+        state.msgFilter = (userRow?.options?.[3] ?? 0) === 1;
       } catch {
         // Non-fatal: teamcode/scanNames/scanHome will be defaults; re-derived on next full hydration
+      }
+      // P-002: hydrate maxTons from ShipClass; the mapper no longer hard-codes 1000.
+      try {
+        const cls = await this.prisma.shipClass.findFirst({
+          where: { classNumber: state.shpclass },
+          select: { maxTons: true },
+        });
+        state.maxTons = cls?.maxTons ?? undefined;
+      } catch {
+        // Non-fatal: leave maxTons undefined; cargo callers default to a safe value.
       }
       this.shipStateService.loadShip(state);
     }
@@ -625,6 +640,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`sector:${toSector.x}:${toSector.y}`)
       .emit('sector:ship-entered', { shipId, shipName: name });
+
+    // S-005: beacon-on-move (GEFUNCS.C:808-816). Re-emit BEACON_EVENT when:
+    //   (a) at least one OBSERVER ship is in the destination sector
+    //       (status === GESTAT_USER (1) or GESTAT_AUTO (2), excluding mover)
+    //   (b) gernd()%10 === 0 (1-in-10 probability gate from C source)
+    // Restores audit 020 F-005 which regressed in commit d75d337.
+    const allShips = this.shipStateService.findAllShips();
+    const hasObserver = allShips.some(
+      (s) =>
+        shipKey(s.userid, s.shipno) !== shipId &&
+        Math.floor(s.xcoord) === toSector.x &&
+        Math.floor(s.ycoord) === toSector.y &&
+        (s.status === 1 || s.status === 2),
+    );
+    if (!hasObserver) return;
+    if (gernd(this.random) % 10 !== 0) return;
+
+    const beaconPayload: BeaconEvent = {
+      shipId,
+      shipName: name,
+      fromSector: fromSector.y * MAXX + fromSector.x,
+      toSector: toSector.y * MAXX + toSector.x,
+    };
+    this.server.to(`sector:${toSector.x}:${toSector.y}`).emit(BEACON_EVENT, beaconPayload);
   }
 
   /**

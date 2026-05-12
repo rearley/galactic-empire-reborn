@@ -541,7 +541,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     maxWarp: 4,
     maxTons: 100,
     maxPrice: 25_000n,
-    scanRange: 20_000,
+    // @see reference/wiki/cpu-ships.md Vakory Survey Drone row — Scan column = 25000
+    scanRange: 25_000,
     points: 50,
     damageFactor: 100,
     cybCanAttack: false,

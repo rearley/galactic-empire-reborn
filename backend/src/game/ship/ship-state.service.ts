@@ -15,6 +15,12 @@ import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
 export class ShipStateService implements OnModuleInit {
   private readonly logger = new Logger(ShipStateService.name);
   private readonly map = new Map<string, ShipState>();
+  /**
+   * Timestamp (ms) of the most recent successful flush per ship. Used by the
+   * runtime-invariants snapshot to honour the FLUSH_SETTLE_MS window in
+   * `inMemoryShipMatchesDb`.
+   */
+  private readonly lastFlushedAt: Map<string, number> = new Map();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -40,6 +46,8 @@ export class ShipStateService implements OnModuleInit {
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
       state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
       state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
+      state.scanFull = (row.user?.options?.[2] ?? 0) === 1;
+      state.msgFilter = (row.user?.options?.[3] ?? 0) === 1;
       state.maxTons = maxTonsByClass.get(state.shpclass) ?? 1000;
       // Self-heal: topspeed=0 on a warp-capable class means it was never set at creation.
       const classMaxWarp = maxWarpByClass.get(state.shpclass) ?? 0;
@@ -56,6 +64,47 @@ export class ShipStateService implements OnModuleInit {
 
     // Register flush on every SHIP_UPDATE tick (1s cadence)
     this.tickService.subscribe(TickKind.SHIP_UPDATE, () => this.flush());
+
+    // Provide the `ships` slice of the invariant snapshot. The shape matches
+    // `isShipLike` (shipPersistenceInvariants) — `shipId` + the persisted
+    // numeric fields the invariant compares against DB rows.
+    // @see backend/src/game/invariants/ship-persistence.invariants.ts
+    this.tickService.registerSnapshotProvider('ships', () => this.snapshotShips());
+  }
+
+  /**
+   * Snapshot of every in-memory ship in the shape consumed by
+   * `inMemoryShipMatchesDb` / `noOrphanShipState`. Pure projection — does not
+   * mutate the underlying map. Returned array is intentionally a fresh copy.
+   */
+  private snapshotShips(): ReadonlyArray<{
+    shipId: string;
+    lastFlushedAt: number;
+    xcoord: number;
+    ycoord: number;
+    energy: number;
+    damage: number;
+  }> {
+    const out: Array<{
+      shipId: string;
+      lastFlushedAt: number;
+      xcoord: number;
+      ycoord: number;
+      energy: number;
+      damage: number;
+    }> = [];
+    for (const s of this.map.values()) {
+      if (s.isEphemeral) continue; // ephemeral ships have no DB row to compare against
+      out.push({
+        shipId: shipKey(s.userid, s.shipno),
+        lastFlushedAt: this.lastFlushedAt.get(shipKey(s.userid, s.shipno)) ?? 0,
+        xcoord: s.xcoord,
+        ycoord: s.ycoord,
+        energy: s.energy,
+        damage: s.damage,
+      });
+    }
+    return out;
   }
 
   /**
@@ -174,10 +223,12 @@ export class ShipStateService implements OnModuleInit {
         where: { userid_shipno: { userid, shipno } },
         data: stateToPrismaUpdate(state),
       });
+      this.lastFlushedAt.set(shipKey(userid, shipno), Date.now());
     } catch (err: unknown) {
       this.logger.error(`flushAndUnload failed for ${shipKey(userid, shipno)}:`, err);
     }
     this.map.delete(shipKey(userid, shipno));
+    this.lastFlushedAt.delete(shipKey(userid, shipno));
   }
 
   /**
@@ -195,6 +246,7 @@ export class ShipStateService implements OnModuleInit {
           data: stateToPrismaUpdate(state),
         });
         state.dirty = false;
+        this.lastFlushedAt.set(shipKey(state.userid, state.shipno), Date.now());
       } catch (err: unknown) {
         this.logger.error(
           `Flush failed for ${shipKey(state.userid, state.shipno)}:`,

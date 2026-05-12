@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TickService } from '../../src/game/tick/tick.service';
 import { TickKind } from '../../src/game/tick/tick.types';
+import { InvariantRegistry } from '../../src/game/invariants/harness';
 
 describe('TickService — cadence & lifecycle', () => {
   let service: TickService;
@@ -8,7 +9,7 @@ describe('TickService — cadence & lifecycle', () => {
 
   beforeEach(async () => {
     jest.useFakeTimers();
-    app = await Test.createTestingModule({ providers: [TickService] }).compile();
+    app = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     service = app.get(TickService);
     await app.init();
   });
@@ -63,7 +64,7 @@ describe('TickService — cadence & lifecycle', () => {
     jest.useRealTimers();
     jest.useFakeTimers();
 
-    const app2 = await Test.createTestingModule({ providers: [TickService] }).compile();
+    const app2 = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     const service2 = app2.get(TickService);
     await app2.init();
 
@@ -114,5 +115,95 @@ describe('TickService — cadence & lifecycle', () => {
     jest.advanceTimersByTime(3000);
     // All 3 ticks should have fired even though the async promise is pending
     expect(count).toBe(3);
+  });
+});
+
+describe('TickService — snapshot providers (Task 8)', () => {
+  let service: TickService;
+  let registry: InvariantRegistry;
+  let app: TestingModule;
+
+  beforeEach(async () => {
+    jest.useFakeTimers();
+    registry = new InvariantRegistry();
+    app = await Test.createTestingModule({
+      providers: [TickService, { provide: InvariantRegistry, useValue: registry }],
+    }).compile();
+    service = app.get(TickService);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    jest.useRealTimers();
+  });
+
+  it('snapshotForInvariants merges every registered provider slice', () => {
+    const ships = [{ shipId: 'u:1', xcoord: 1, ycoord: 2, energy: 100, damage: 0, lastFlushedAt: 0 }];
+    const combatEvents = [
+      { weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 1, y: 1 }, maxRange: 100 },
+    ];
+    const aiFireEvents = [
+      { shipClass: '20', shooter: { x: 0, y: 0 }, target: { x: 1, y: 1 }, scanRange: 50_000, distanceRaw: 1000 },
+    ];
+    service.registerSnapshotProvider('ships', () => ships);
+    service.registerSnapshotProvider('combatEvents', () => combatEvents);
+    service.registerSnapshotProvider('aiFireEvents', () => aiFireEvents);
+
+    let captured: unknown = null;
+    registry.register({
+      name: 'capture',
+      sourceRef: 'test',
+      run: (world) => {
+        captured = world;
+        return [];
+      },
+    });
+
+    process.env.INVARIANTS_RUNTIME = '1';
+    try {
+      jest.advanceTimersByTime(6000); // one PHYSICS tick
+    } finally {
+      delete process.env.INVARIANTS_RUNTIME;
+    }
+
+    expect(captured).toMatchObject({ ships, combatEvents, aiFireEvents });
+  });
+
+  it('snapshot is empty when INVARIANTS_RUNTIME is not set', () => {
+    const fn = jest.fn(() => [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }]);
+    service.registerSnapshotProvider('combatEvents', fn);
+
+    jest.advanceTimersByTime(6000); // PHYSICS tick
+
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('a throwing provider does not abort the snapshot for other providers', () => {
+    service.registerSnapshotProvider('ships', () => {
+      throw new Error('boom');
+    });
+    const goodSlice = [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }];
+    service.registerSnapshotProvider('combatEvents', () => goodSlice);
+
+    let captured: unknown = null;
+    registry.register({
+      name: 'capture',
+      sourceRef: 'test',
+      run: (world) => {
+        captured = world;
+        return [];
+      },
+    });
+
+    process.env.INVARIANTS_RUNTIME = '1';
+    try {
+      jest.advanceTimersByTime(6000);
+    } finally {
+      delete process.env.INVARIANTS_RUNTIME;
+    }
+
+    expect(captured).toMatchObject({ combatEvents: goodSlice });
+    expect((captured as { ships?: unknown }).ships).toBeUndefined();
   });
 });
