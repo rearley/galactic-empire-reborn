@@ -1,15 +1,16 @@
 /**
- * S-001 — `scan lo` projects at 10× scanRange (the long-range overview).
+ * `scan lo` projects at `scanRange × SCAN_LO_PROJECTION_MULTIPLIER`.
  *
- * Per GECMDS.C:2668 `range = scanrange * 10.0` and the wiki note
- * "long range scanner is 10x this value" (player-ships.md:39), the
- * `sca lo` mode covers an area 10× wider than the ship's scanner range,
- * making it the "see most of the galaxy at low fidelity" view.
+ * The C source hard-codes ×10 (`GECMDS.C:2668`), but that factor was
+ * calibrated for sysop-configurable universes up to UNIVMAX=32767. Our
+ * port hard-codes the minimum MAXX=30, MAXY=15, so the multiplier is
+ * dialled down via `SCAN_LO_PROJECTION_MULTIPLIER` in constants.ts.
  *
  * The scantab gate stays at `scanRange` so cloak/range exclusion is
  * consistent across modes — only the projection widens.
  *
- * @see GECMDS.C:2668 scan_lo range = scanrange * 10.0
+ * @see GECMDS.C:2668 scan_lo range = scanrange * 10.0 (C-canonical baseline)
+ * @see backend/src/game/constants.ts SCAN_LO_PROJECTION_MULTIPLIER
  * @see specs/022-fidelity-audit-v2/findings.md S-001
  */
 
@@ -69,21 +70,20 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
   );
 }
 
-describe('S-001 — scan lo uses 10× scanRange projection (long-range overview)', () => {
-  // For Interceptor scanRange=100000:
-  //   projection radius = scanRange*10 / 10000 = 100 sectors (whole galaxy)
+describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', () => {
+  // For a ship with scanRange=100000 and multiplier=3 (current value):
+  //   projection radius = scanRange*3 / 10000 = 30 sectors (full galaxy width)
   //   Scantab gate still 10 sectors (100000/10000) — only ships within 10 sectors
-  //   are KNOWN, but C scan_lo iterates all ships globally. The TS implementation
-  //   keeps the scantab gate to preserve cloak/range exclusion semantics.
+  //   are KNOWN, but planets/wormholes are projected up to the wider radius.
 
-  it('header reports 10× scanRange in parsecs', async () => {
+  it('header reports projectionRange in parsecs (multiplier × scanRange / 10000)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 100_000);
     await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
-    // 100000 * 10 / 10000 = 100 pc
-    expect(result.scanRender!.header).toContain('Range: 100pc');
+    // 100000 * 3 / 10000 = 30 pc
+    expect(result.scanRender!.header).toContain('Range: 30pc');
   });
 
   it('Interceptor sees a ship 9 sectors away in scan lo (within scantab gate, well within projection)', async () => {
@@ -98,13 +98,14 @@ describe('S-001 — scan lo uses 10× scanRange projection (long-range overview)
     expect(shipCells.length).toBe(1);
   });
 
-  it('Dreadnought scan lo projects at 500 parsecs (entire galaxy)', async () => {
+  it('large scanRange projects proportionally (500_000 → 150pc at 3×)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 500_000);
     await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
-    expect(result.scanRender!.header).toContain('Range: 500pc');
+    // 500000 * 3 / 10000 = 150 pc
+    expect(result.scanRender!.header).toContain('Range: 150pc');
   });
 
   it('self-cell at centre (15, 7)', async () => {

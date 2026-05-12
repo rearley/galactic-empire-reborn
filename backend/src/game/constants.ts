@@ -65,6 +65,25 @@ export const WARP_THRESHOLD = 1000 as const;
 export const COORD_SCALE = 65000 as const;
 
 /**
+ * Long-range scan (`sca lo`) projection multiplier — scaling factor applied
+ * to a ship's `scanRange` when projecting the long-range overview.
+ *
+ * **TS deviation from C-canonical.** The C source hard-codes `× 10` at
+ * `GECMDS.C:2668`, but that constant was calibrated for sysop-configurable
+ * universes up to 32,767 sectors wide (`UNIVMAX` is `numopt(UNIVMAX,10,32767)`
+ * in `GEMAIN.C:474`). Our port hard-codes the minimum `MAXX=30, MAXY=15`
+ * (the C-source minimum), so the 10× factor produces a galaxy-wide overview
+ * even for a starter Interceptor. A smaller factor restores the "long-range
+ * scan is wider than tactical scan but not the whole universe" intent.
+ *
+ * Dial this up or down to tune how much of the galaxy a ship reveals on
+ * `sca lo`. Tune in tandem with per-class `ShipClass.scanRange` (smaller
+ * scanRange tightens both tactical and overview; this constant adjusts the
+ * overview-to-tactical ratio).
+ */
+export const SCAN_LO_PROJECTION_MULTIPLIER = 3 as const;
+
+/**
  * Range-scan grid width — canonical value from original source.
  * Mirrors SCAN_GRID_WIDTH in specs/003-ship-commands/contracts/shared-types.ts.
  * @see GEMAIN.H:121 #define MAXX 30

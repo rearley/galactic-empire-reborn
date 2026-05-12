@@ -22,8 +22,9 @@ describe('scanRangeMatchesScanType', () => {
     expect(violations[0].severity).toBe('HIGH');
   });
 
-  it('passes a sca lo result where every revealed cell is within scanRange*10', () => {
-    // S-001 confirmed sca lo projects at scanRange * 10 (sector units).
+  it('passes a sca lo result where every revealed cell is within projection range', () => {
+    // sca lo projects at scanRange × SCAN_LO_PROJECTION_MULTIPLIER / 10000 sectors.
+    // scanRange=100000, multiplier=3 → 30-sector radius.
     const world = {
       scanResults: [
         {
@@ -41,13 +42,13 @@ describe('scanRangeMatchesScanType', () => {
     expect(scanRangeMatchesScanType.run(world)).toEqual([]);
   });
 
-  it('flags a sca lo result revealing a cell beyond scanRange*10 (sector units)', () => {
+  it('flags a sca lo result revealing a cell beyond the projection radius', () => {
     const world = {
       scanResults: [
         {
           scanType: 'sca lo',
           scanner: { x: 0, y: 0 },
-          // scanRange=10000 → sca lo projection radius = 10 sectors (scanRange/10000 * 10)
+          // scanRange=10000, multiplier=3 → projection radius = 3 sectors.
           // Revealed cell at 99,99 → ~140 sectors → must fail.
           scanRange: 10_000,
           revealed: [{ x: 99, y: 99 }],
