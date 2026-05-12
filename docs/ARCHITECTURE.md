@@ -21,10 +21,6 @@ galactic-empire-reborn/
   frontend/
     src/                     ← React + Vite + Tailwind terminal UI
     test/                    ← Vitest test suite
-  docker/
-    postgres/
-      init.sql               ← Creates ge_test alongside ge on first container start
-  docker-compose.yml         ← postgres:16-alpine service
   .env.example               ← DATABASE_URL, TEST_DATABASE_URL, JWT_SECRET templates
   reference/
     ge-source/               ← Original C source (READ ONLY)
@@ -43,10 +39,18 @@ committed alongside the schema change and deployed via `prisma migrate deploy` i
 
 ## Database
 
-Postgres 16 runs as the `db` service in `docker-compose.yml`. Two databases:
+Postgres 16 runs on the host machine (not in Docker). Two databases owned by role `ge`:
 
-- `ge` — development database (empty until feature 002 seeds the galaxy)
+- `ge` — development database
 - `ge_test` — test database (reset on every `npm test` run via `globalSetup`)
+
+Set up locally with:
+
+```sql
+CREATE ROLE ge WITH LOGIN PASSWORD 'ge' CREATEDB;
+CREATE DATABASE ge OWNER ge;
+CREATE DATABASE ge_test OWNER ge;
+```
 
 Connection strings are provided via environment variables:
 - `DATABASE_URL` — used by Prisma CLI and (eventually) the NestJS app

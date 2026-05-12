@@ -30,7 +30,6 @@ galactic-empire-reborn/
   frontend/         ← React/Vite application
   docs/             ← Living architecture documentation (always keep current)
   specs/            ← spec-kit feature specs
-  docker-compose.yml
   CLAUDE.md         ← This file
   README.md
 ```
