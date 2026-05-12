@@ -13,7 +13,7 @@ ASCII scan maps, persistent Cybertron AI, planet colonization, and midnight scor
 ### 1. Prerequisites
 
 - Node.js 20+
-- Docker + Docker Compose
+- PostgreSQL 16+ running on `localhost:5432`
 
 ### 2. Clone and install
 
@@ -30,15 +30,18 @@ cd ../frontend
 npm install
 ```
 
-### 3. Start the database
+### 3. Create the databases
 
-```bash
-cd backend
-npm run db:up
+Create role `ge` and the two databases on your local Postgres:
+
+```sql
+CREATE ROLE ge WITH LOGIN PASSWORD 'ge' CREATEDB;
+CREATE DATABASE ge OWNER ge;
+CREATE DATABASE ge_test OWNER ge;
 ```
 
-This starts a `postgres:16-alpine` container with the `ge` database (and a separate `ge_test`
-database for the test suite).
+(`ge` is the dev DB; `ge_test` is reset on every `npm test` run.) The connection strings in
+`backend/.env.example` assume these names and credentials.
 
 ### 4. Configure environment
 
