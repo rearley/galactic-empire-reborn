@@ -28,28 +28,28 @@ import { SHIP_CLASSES } from '../../prisma/seed/ship-classes';
 const PINNED_SCANRANGE: ReadonlyMap<number, number> = new Map([
   // ── Player ships ─────────────────────────────────────────────────────────
   // sca-lo (sectors) shown in trailing comment; phaser gate = that / 10.
-  [1, 20_000],     // Interceptor          —  20 / 2.0
-  [2, 25_000],     // Stealth Fighter      —  25 / 2.5
-  [3, 12_000],     // Heavy Freighter      —  12 / 1.2
-  [4, 28_000],     // Destroyer            —  28 / 2.8
-  [5, 30_000],     // Star Cruiser         —  30 / 3.0
-  [6, 50_000],     // Battle Cruiser       —  50 / 5.0  — first galaxy-wide sca-lo
-  [7, 40_000],     // Frigate              —  40 / 4.0
-  [8, 75_000],     // Dreadnought          —  75 / 7.5
-  [9, 18_000],     // Freight Barge        —  18 / 1.8
-  [34, 120_000],   // Sysopian Death Star  — 120 / 12.0
+  [1, 10_000],     // Interceptor          — 10 / 1.0
+  [2, 12_000],     // Stealth Fighter      — 12 / 1.2
+  [3, 8_000],      // Heavy Freighter      —  8 / 0.8
+  [4, 15_000],     // Destroyer            — 15 / 1.5  — half galaxy
+  [5, 18_000],     // Star Cruiser         — 18 / 1.8
+  [6, 25_000],     // Battle Cruiser       — 25 / 2.5
+  [7, 20_000],     // Frigate              — 20 / 2.0
+  [8, 30_000],     // Dreadnought          — 30 / 3.0  — full galaxy width
+  [9, 8_000],      // Freight Barge        —  8 / 0.8
+  [34, 40_000],    // Sysopian Death Star  — 40 / 4.0  — over galaxy
 
   // ── CPU combative ────────────────────────────────────────────────────────
-  [21, 25_000],    // Cybertron Scout            — 25 / 2.5
-  [22, 45_000],    // Cybertron Battle Cruiser   — 45 / 4.5  (was wiki-typo 1_000)
-  [23, 60_000],    // Cybertron Base Star        — 60 / 6.0
-  [24, 20_000],    // Sarten Attack Drone        — 20 / 2.0
-  [25, 55_000],    // Sarten Obliterator         — 55 / 5.5
+  [21, 10_000],    // Cybertron Scout            — 10 / 1.0
+  [22, 18_000],    // Cybertron Battle Cruiser   — 18 / 1.8  (was wiki-typo 1_000)
+  [23, 25_000],    // Cybertron Base Star        — 25 / 2.5
+  [24, 10_000],    // Sarten Attack Drone        — 10 / 1.0
+  [25, 20_000],    // Sarten Obliterator         — 20 / 2.0
 
   // ── CPU droid ────────────────────────────────────────────────────────────
-  [31, 12_000],    // Lydorian Garbage Scow      — 12 / 1.2
-  [32, 30_000],    // Murdonian Transport        — 30 / 3.0  (audit-motivating fightback ship)
-  [33, 25_000],    // Vakory Survey Drone        — 25 / 2.5
+  [31,  5_000],    // Lydorian Garbage Scow      —  5 / 0.5
+  [32, 12_000],    // Murdonian Transport        — 12 / 1.2  (audit-motivating fightback ship)
+  [33, 10_000],    // Vakory Survey Drone        — 10 / 1.0
 ]);
 
 describe('per-class scanRange seed pin (compressed for 30×15 galaxy)', () => {
