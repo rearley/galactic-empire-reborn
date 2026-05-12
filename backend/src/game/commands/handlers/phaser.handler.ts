@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -26,6 +26,7 @@ import {
   PMINFIRE,
   WARP_THRESHOLD,
 } from '../../constants';
+import { CombatTickService } from '../../combat/combat-tick.service';
 
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
@@ -63,6 +64,7 @@ export class PhaserHandlerService {
     private readonly shipClassCache: ShipClassCacheService,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    @Optional() private readonly combatTick?: CombatTickService,
   ) {
     // random is reserved for future damage-roll integration (randamage).
     void this.random;
@@ -193,6 +195,15 @@ export class PhaserHandlerService {
         tickAt,
       };
       this.events.emit(COMBAT_HIT, hitEvent);
+      // Record for runtime invariant `weaponFireRangeRespected`. The legal
+      // cap for a player phaser is the firer's scanRange (in cdistance units:
+      // scanRange / 10_000 sectors), enforced by C-001.
+      this.combatTick?.recordCombatEvent({
+        weapon: 'phaser',
+        shooter: { x: ship.xcoord, y: ship.ycoord },
+        target: { x: candidate.xcoord, y: candidate.ycoord },
+        maxRange: scanRange / 10_000,
+      });
       hits++;
       lines.push({
         text: `Phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,

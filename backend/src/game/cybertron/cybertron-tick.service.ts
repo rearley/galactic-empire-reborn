@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Inject } from '@nestjs/common';
+import { Inject, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import { ShipStateService } from '../ship/ship-state.service';
@@ -65,6 +65,7 @@ import {
   rollTorpedoCount,
 } from './cyb-decisions';
 import { pickTaunt } from './taunt-pool';
+import { CombatTickService } from '../combat/combat-tick.service';
 
 /**
  * Drives the Cybertron/Sartern AI state machine on every PHYSICS tick.
@@ -93,6 +94,7 @@ export class CybertronTickService implements OnModuleInit {
     private readonly repository: CybertronRepository,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    @Optional() private readonly combatTick?: CombatTickService,
   ) {}
 
   onModuleInit(): void {
@@ -374,6 +376,26 @@ export class CybertronTickService implements OnModuleInit {
       tickAt,
     };
     this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
+
+    // Runtime invariants: record AI fire + combat-range event at fire time.
+    // distanceRaw = cdistance × 10_000 (raw coord units); maxRange uses the
+    // same scanRange-derived cap as the player phaser path (C-001).
+    if (this.combatTick) {
+      const distanceRaw = cdistance(ship, target) * 10_000;
+      this.combatTick.recordAiFireEvent({
+        shipClass: String(ship.shpclass),
+        shooter: { x: ship.xcoord, y: ship.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        scanRange: scanRangeGate,
+        distanceRaw,
+      });
+      this.combatTick.recordCombatEvent({
+        weapon: 'phaser',
+        shooter: { x: ship.xcoord, y: ship.ycoord },
+        target: { x: target.xcoord, y: target.ycoord },
+        maxRange: scanRangeGate / 10_000,
+      });
+    }
 
     let maxPhaser = 1;
     try {
