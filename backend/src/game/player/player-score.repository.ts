@@ -57,9 +57,20 @@ export class PlayerScoreRepository {
 
         const attacker = await tx.user.findUnique({ where: { userid: attackerUserid } });
         if (attacker) {
+          // Bump User.kills only for human attackers — AI attackers don't have
+          // User rows (Cybrg-/@Droid- prefixes), and their kill counter lives
+          // on Ship.kills via CybertronRepository.incrementKills.
+          // @see GEFUNCS.C:1118 acctm — WARUSR.kills per-user kill counter
+          const userIncrement: { score: { increment: bigint }; klscore: { increment: bigint }; kills?: { increment: number } } = {
+            score: { increment: transferBig },
+            klscore: { increment: transferBig },
+          };
+          if (!isAiAttacker) {
+            userIncrement.kills = { increment: 1 };
+          }
           await tx.user.update({
             where: { userid: attackerUserid },
-            data: { score: { increment: transferBig }, klscore: { increment: transferBig } },
+            data: userIncrement,
           });
         }
       });

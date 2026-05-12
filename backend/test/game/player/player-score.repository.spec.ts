@@ -159,6 +159,37 @@ describe('PlayerScoreRepository.transferKillScore', () => {
     });
   });
 
+  describe('User.kills counter', () => {
+    it('increments attacker.kills on a human-attacker kill', async () => {
+      const { prisma, updateMock } = makePrisma({});
+      const repo = new PlayerScoreRepository(prisma as never);
+
+      await repo.transferKillScore('attacker', 'victim', 500, false, false);
+
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userid: 'attacker' },
+          data: expect.objectContaining({ kills: { increment: 1 } }),
+        }),
+      );
+    });
+
+    it('does NOT increment attacker.kills for AI attacker', async () => {
+      const { prisma, updateMock } = makePrisma({}, 'Cybrg-1');
+      const repo = new PlayerScoreRepository(prisma as never);
+
+      await repo.transferKillScore('Cybrg-1', 'victim', 1000, false, true);
+
+      const attackerCalls = updateMock.mock.calls.filter(
+        (call: [{ where: { userid: string }; data: Record<string, unknown> }]) =>
+          call[0].where.userid === 'Cybrg-1',
+      );
+      for (const [args] of attackerCalls) {
+        expect((args as { data: Record<string, unknown> }).data).not.toHaveProperty('kills');
+      }
+    });
+  });
+
   describe('AI victim (isAiVictim=true)', () => {
     it('skips victim deduction for AI victims', async () => {
       const { prisma, updateMock } = makePrisma({});
