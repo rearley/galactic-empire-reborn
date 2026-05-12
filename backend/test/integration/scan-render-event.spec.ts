@@ -25,6 +25,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../fixtures/mock-random';
 import { Socket } from 'socket.io';
 
 /** Minimal mock socket that records emitted events. */
@@ -63,6 +64,7 @@ function makeGateway(): GameGateway {
     prisma,
     onboardingService,
     scanHandler,
+    mockRandom,
   );
 }
 

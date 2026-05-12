@@ -19,6 +19,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../fixtures/mock-random';
 import {
   DroidEvents,
   DroidSpawnedEvent,
@@ -47,6 +48,7 @@ describe('GameGateway — droid event bridge', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      mockRandom,
     );
 
     // Inject the mock socket.io Server

@@ -15,6 +15,7 @@ import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { OnboardingService } from '../../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../../fixtures/mock-random';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
@@ -33,7 +34,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const mockPrisma = { ship: { findFirst: jest.fn(), updateMany: jest.fn() } } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway({} as ShipStateService, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler);
+    gateway = new GameGateway({} as ShipStateService, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, mockRandom);
     (gateway as unknown as { server: { to: jest.Mock; emit: jest.Mock } }).server = {
       to: toMock,
       emit: serverEmitMock,

@@ -26,6 +26,7 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { mockRandom } from '../fixtures/mock-random';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult, ScanRenderEvent } from '../../src/game/commands/command.types';
 import { Socket } from 'socket.io';
@@ -111,6 +112,7 @@ function makeGateway(scanHandler: ScanHandlerService): GameGateway {
     {} as unknown as PrismaService,
     {} as unknown as OnboardingService,
     scanHandler,
+    mockRandom,
   );
 }
 

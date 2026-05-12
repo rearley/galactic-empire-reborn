@@ -7,6 +7,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { mockRandom } from '../fixtures/mock-random';
 
 /**
  * Verifies the single-socket-per-ship invariant (FR-025a).
@@ -87,7 +88,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler);
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, mockRandom);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: {
