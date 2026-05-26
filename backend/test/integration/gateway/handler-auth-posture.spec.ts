@@ -75,6 +75,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
         ship: { findFirst: jest.fn().mockResolvedValue(null) }, // no ship → onboarding
         shipClass: { findMany: jest.fn().mockResolvedValue([]) }, // ShipClassCacheService.onModuleInit
         mine: { findMany: jest.fn().mockResolvedValue([]) },     // CombatTickService.onModuleInit
+        user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner resolution
       })
       .overrideProvider(GalaxyService).useValue({})
       .overrideProvider(PlanetStateService).useValue({ all: jest.fn().mockReturnValue([]) })

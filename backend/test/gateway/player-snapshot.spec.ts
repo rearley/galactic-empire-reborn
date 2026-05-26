@@ -28,9 +28,11 @@ describe('GameGateway player.snapshot', () => {
     handshake: { query: { userid } },
     data: {} as Record<string, unknown>,
     emit: jest.fn(),
+    on: jest.fn(),
     disconnect: jest.fn(),
     join: jest.fn(),
     leave: jest.fn(),
+    broadcast: { emit: jest.fn() },
   });
 
   beforeEach(() => {
@@ -143,6 +145,11 @@ describe('GameGateway player.snapshot', () => {
 
     (socket.emit as jest.Mock).mockImplementation((ev: string) => {
       emitOrder.push(`socket:${ev}`);
+    });
+    // player.joined is emitted via client.broadcast.emit, not server.emit —
+    // capture both paths into the same order tracker.
+    (socket.broadcast.emit as jest.Mock).mockImplementation((ev: string) => {
+      emitOrder.push(`server:${ev}`);
     });
     serverEmitMock.mockImplementation((ev: string) => {
       emitOrder.push(`server:${ev}`);
