@@ -1403,3 +1403,51 @@ Eight gaps between the C source and TS port were identified and resolved:
 **Set options** (`scanfull`, `filter`): `SetHandlerService` now handles all four options from `User.options[]`: scannames (index 0), scanhome (index 1), scanfull (index 2), filter (index 3). `ShipState` gains `scanFull` and `msgFilter` fields.
 
 **Balance constants** (`GEMAIN_GAMEPLAY_PINS`): `ENGYMAX` corrected 50000→65000. 25+ missing constants added to `constants.ts`. `GEMAIN_GAMEPLAY_PINS` bidirectional pin map provides compile-time drift detection.
+
+---
+
+## Range Model & AI Engagement
+
+**Coordinate scales** (three, intentional — do not "unify"):
+- **sector-units** (0..30 × 0..15): ship `xcoord`/`ycoord`, return value of `cdistance(a, b)`.
+- **raw units** (1 sector = 10,000): `ShipClass.scanRange`, `MINERANGE`, `DESTRUCTRANGE`, persisted `ltorpsDistance` / `lmisslDistance`, projectile speeds `TORPSPED`/`MISLSPED`, nav display.
+- **physics-integration units** (1 sector = `COORD_SCALE` = 65,000): denominator inside `dx = speed * sin(heading) / COORD_SCALE`. Never compared against a range.
+
+**Bridge between sector-units and raw units** — single helper:
+
+```ts
+// backend/src/game/combat/combat-math.ts
+export function inScanRange(a, b, scanRange): boolean {
+  return cdistance(a, b) * 10_000 <= scanRange;
+}
+```
+
+Every weapon range gate, scan visibility check, and AI fire decision goes through `inScanRange()`. Earlier code duplicated `cdistance(a, b) * 10_000 > scanRange` at ≈10 call sites; the helper is now the only place that knows the conversion factor.
+
+**Per-class scanRange calibration** (30×15 galaxy, diagonal ≈ 33.5 sectors). Pinned in `prisma/seed/ship-classes.ts` and `backend/src/game/droid/droid.config.ts`. Pinned by `test/unit/ship-class-scanrange-pin.spec.ts` and `test/game/droid/balance-regression.spec.ts`.
+
+| Class | Sectors | Reason |
+|-|-|-|
+| Interceptor / Stealth Fighter | 1.5 / 1.8 | starter-tier |
+| Heavy Freighter / Freight Barge | 1.5 | cargo, light scanners |
+| Destroyer / Star Cruiser | 2.5 / 2.8 | mid-tier combat |
+| Frigate / Battle Cruiser | 3.0 / 3.5 | heavy combat |
+| Dreadnought / Death Star | 4.0 / 5.0 | endgame |
+| Cybertron Scout | 2.5 | engages new players in adjacent sectors |
+| Cybertron Battle Cruiser / Base Star | 3.5 / 4.0 | mid/late-game antagonists |
+| Sarten Attack Drone / Obliterator | 2.0 / 3.5 | |
+| Lydorian Garbage Scow (passive) | 1.0 | trivial; never fights |
+| Murdonian Transport / Vakory | 2.5 / 3.0 | reactive fightback when attacked |
+
+**Cybertron AI** (`backend/src/game/cybertron/cybertron-tick.service.ts`): fully implemented per `GECYBS.C`. Per physics tick:
+- `runEngagementScan` — for each visible (in-scanRange, not-in-NZ) target: deploy zipper if mines nearby, roll breakoff, fire phasers + torpedoes via `cybAttack`.
+- `cybCheckLockon` — `pickPursuitBand` sets `speed2b` + `head2b` to close on the locked target, raising shields when transitioning out of hyperwarp.
+- `gebemean` — Cyberquads (`tough=CYB_TOUGH_1`) always mean; otherwise scales aggression with the target's kill count via `CYB_BE_NICE` (30 kills) and `CYB_BE_EASY` (60 kills). New players see softer Cybertrons.
+- `cybwhoops` — per-spawn `cybskill` in [3, 17] gives a 1-in-cybskill miss chance on weapon decisions.
+
+**Droid AI**:
+- Class 31 (Lydorian Garbage Scow) — passive, never fires.
+- Class 32 (Murdonian Transport) — reactive fightback only: requires `cantexit > 0` (battle-locked) and `lastfired >= 0`. Fires phasers in normal space and hyperspace.
+- Class 33 (Vakory Survey Drone) — reactive fightback + mine-laying + jammer deployment when damaged.
+
+**Test fixture**: `backend/test/integration/range-and-ai.spec.ts` is the canonical regression net for range + AI behavior. Scan matrix across every class at varied distances; end-to-end Cybertron lock → pursuit → phaser fire; neutral-zone immunity; far-distance closure proof.

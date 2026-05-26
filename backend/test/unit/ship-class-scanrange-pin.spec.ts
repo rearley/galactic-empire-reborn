@@ -21,35 +21,38 @@
 import { SHIP_CLASSES } from '../../prisma/seed/ship-classes';
 
 /**
- * Pinned values, rebalanced for the 30×15 galaxy. Smaller ships should NOT
- * see the whole map via sca-lo; only Battle Cruiser-tier and above earn
- * galaxy-wide overview.
+ * Pinned values, rebalanced (round 2) for the 30×15 galaxy. The earlier round
+ * compressed scanRange so far that AI ships effectively never saw a moving
+ * player — Cybertrons appeared inert in playtest. These values give every
+ * class a meaningful engagement bubble (≥1 sector) while keeping max vision
+ * to ~15% of the 33.5-sector diagonal so no single ship sees half the map.
+ *
+ * Phaser gate (sectors) = scanRange / 10_000.
  */
 const PINNED_SCANRANGE: ReadonlyMap<number, number> = new Map([
   // ── Player ships ─────────────────────────────────────────────────────────
-  // sca-lo (sectors) shown in trailing comment; phaser gate = that / 10.
-  [1, 10_000],     // Interceptor          — 10 / 1.0
-  [2, 12_000],     // Stealth Fighter      — 12 / 1.2
-  [3, 8_000],      // Heavy Freighter      —  8 / 0.8
-  [4, 15_000],     // Destroyer            — 15 / 1.5  — half galaxy
-  [5, 18_000],     // Star Cruiser         — 18 / 1.8
-  [6, 25_000],     // Battle Cruiser       — 25 / 2.5
-  [7, 20_000],     // Frigate              — 20 / 2.0
-  [8, 30_000],     // Dreadnought          — 30 / 3.0  — full galaxy width
-  [9, 8_000],      // Freight Barge        —  8 / 0.8
-  [34, 40_000],    // Sysopian Death Star  — 40 / 4.0  — over galaxy
+  [1, 15_000],     // Interceptor          — 1.5 sectors
+  [2, 18_000],     // Stealth Fighter      — 1.8
+  [3, 15_000],     // Heavy Freighter      — 1.5
+  [4, 25_000],     // Destroyer            — 2.5
+  [5, 28_000],     // Star Cruiser         — 2.8
+  [6, 35_000],     // Battle Cruiser       — 3.5
+  [7, 30_000],     // Frigate              — 3.0
+  [8, 40_000],     // Dreadnought          — 4.0
+  [9, 15_000],     // Freight Barge        — 1.5
+  [34, 50_000],    // Sysopian Death Star  — 5.0
 
   // ── CPU combative ────────────────────────────────────────────────────────
-  [21, 10_000],    // Cybertron Scout            — 10 / 1.0
-  [22, 18_000],    // Cybertron Battle Cruiser   — 18 / 1.8  (was wiki-typo 1_000)
-  [23, 25_000],    // Cybertron Base Star        — 25 / 2.5
-  [24, 10_000],    // Sarten Attack Drone        — 10 / 1.0
-  [25, 20_000],    // Sarten Obliterator         — 20 / 2.0
+  [21, 25_000],    // Cybertron Scout            — 2.5  (was 1.0 — invisible to players)
+  [22, 35_000],    // Cybertron Battle Cruiser   — 3.5
+  [23, 40_000],    // Cybertron Base Star        — 4.0
+  [24, 20_000],    // Sarten Attack Drone        — 2.0
+  [25, 35_000],    // Sarten Obliterator         — 3.5
 
   // ── CPU droid ────────────────────────────────────────────────────────────
-  [31,  5_000],    // Lydorian Garbage Scow      —  5 / 0.5
-  [32, 12_000],    // Murdonian Transport        — 12 / 1.2  (audit-motivating fightback ship)
-  [33, 10_000],    // Vakory Survey Drone        — 10 / 1.0
+  [31, 10_000],    // Lydorian Garbage Scow      — 1.0
+  [32, 25_000],    // Murdonian Transport        — 2.5
+  [33, 30_000],    // Vakory Survey Drone        — 3.0
 ]);
 
 describe('per-class scanRange seed pin (compressed for 30×15 galaxy)', () => {

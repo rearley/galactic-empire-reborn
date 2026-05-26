@@ -58,7 +58,7 @@ import {
   CombatPhaserFiredEvent,
   CombatHitEvent,
 } from '../combat/combat-events';
-import { cdistance, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
+import { cdistance, inScanRange, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
@@ -346,7 +346,7 @@ export class DroidTickService implements OnModuleInit {
     // @see specs/022-fidelity-audit-v2/findings.md A-002
     let scanRangeGate = 25_000;
     try { scanRangeGate = this.classCache.getScanRange(droid.shpclass); } catch { /* fallback */ }
-    if (cdistance(droid, target) * 10_000 > scanRangeGate) return;
+    if (!inScanRange(droid, target, scanRangeGate)) return;
 
     const dx = target.xcoord - droid.xcoord;
     const dy = target.ycoord - droid.ycoord;

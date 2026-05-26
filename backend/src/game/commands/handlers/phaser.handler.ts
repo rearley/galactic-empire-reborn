@@ -8,6 +8,7 @@ import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import {
   cdistance,
+  inScanRange,
   lineOfFire,
   phaserDamage,
   shieldhit,
@@ -152,14 +153,10 @@ export class PhaserHandlerService {
 
       const range = cdistance(ship, candidate);
       // C-001 audit 022: phasers must not reach beyond the firer's scanner range.
-      // Mirrors the implicit gate in C `pdamage` (damage falls to 0 at
-      // `disfact = 20000 + phasrtype*4000`) — we use scanRange (cdistance × 10000)
-      // as the canonical TS cap, matching every other weapon-target lookup
-      // (see helpers/find-ship.ts).
       // @see GECMDS.C:946-1004 firep
       // @see GEFUNCS.C:2060-2092 pdamage
       // @see specs/022-fidelity-audit-v2/findings.md C-001
-      if (range * 10000 > scanRange) continue;
+      if (!inScanRange(ship, candidate, scanRange)) continue;
       if (!lineOfFire(ship, candidate, bearing, beamWidth)) continue;
 
       const damage = phaserDamage(dischargePercent, range, maxPhaser);

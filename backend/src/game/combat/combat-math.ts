@@ -19,6 +19,22 @@ export function cdistance(
 }
 
 /**
+ * True if `b` is within `scanRange` raw units of `a`.
+ *
+ * Bridges the two coordinate scales used by the port: `cdistance()` returns
+ * sector-units (1 sector = 1.0), while every `scanRange` value is stored in
+ * raw units (1 sector = 10_000). Hides the `* 10_000` conversion that was
+ * historically duplicated across ~10 fire/scan call sites.
+ */
+export function inScanRange(
+  a: { xcoord: number; ycoord: number },
+  b: { xcoord: number; ycoord: number },
+  scanRange: number,
+): boolean {
+  return cdistance(a, b) * 10_000 <= scanRange;
+}
+
+/**
  * True if `victim` lies within the firing arc of `firer` at `bearing`,
  * with a half-width of `(beamWidth + PHABIAS) / 2` degrees on each side.
  *

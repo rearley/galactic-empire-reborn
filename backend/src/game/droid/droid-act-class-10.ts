@@ -10,7 +10,7 @@ import type { ShipState } from '../ship/ship-state.types';
 import type { Random } from '../combat/random.port';
 import { rollAnnoy, pickHoldCourseDuration } from './droid-decisions';
 import { DROID_ANNOY_DENOM } from '../constants';
-import { cdistance } from '../combat/combat-math';
+import { inScanRange } from '../combat/combat-math';
 
 export interface Class10Action {
   /** New speed2b when jammed */
@@ -50,8 +50,7 @@ export function droidActClass10(
 
   for (const player of players) {
     if (player.status !== 1) continue; // GESTAT_USER
-    const dist = cdistance(droid, player) * 10_000;
-    if (dist < scanRange) {
+    if (inScanRange(droid, player, scanRange)) {
       // @see GEDROIDS.C:278-283 — rollAnnoy(4, DRDMSG6, DRDMSG6)
       if (rollAnnoy(DROID_ANNOY_DENOM, rng)) {
         annoys.push({ target: player, message: pickMessage(droid.shipname, rng) });
