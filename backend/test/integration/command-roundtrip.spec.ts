@@ -36,8 +36,11 @@ function makeShipState(overrides: { userid: string; shipno: number; shipname: st
     shpclass: 1,
     heading: 0, head2b: 0, speed: 0, speed2b: 0,
     xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    // phasrtype:1, shieldtype:1 (not 0). ShipStateService.onModuleInit
+    // self-heals phasrtype/shieldtype 0 → 1 and marks the ship dirty, which
+    // would falsely fail "no ship.update calls" assertions.
+    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
+    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
     degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
     where: 0, ltorpsChannel: [], ltorpsDistance: [],
     lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
@@ -405,10 +408,10 @@ describe('command round-trip integration (US1)', () => {
       expect(scanEvent.cells).toBeDefined();
       expect(Array.isArray(scanEvent.cells)).toBe(true);
 
-      // T024: assert at least one planet cell with char 'O'
+      // Planet cell uses char 'P' (was 'O' in an earlier version of the renderer).
       const planetCells = scanEvent.cells.filter((c) => c.type === 'planet');
       expect(planetCells.length).toBeGreaterThan(0);
-      expect(planetCells[0].char).toBe('O');
+      expect(planetCells[0].char).toBe('P');
 
       // T024: assert at least one wormhole cell with char 'W'
       const wormholeCells = scanEvent.cells.filter((c) => c.type === 'wormhole');
