@@ -45,8 +45,16 @@ describe('GameGateway single-socket-per-ship invariant', () => {
         // Simulate socket.io calling handleDisconnect when disconnect(true) is called
         gateway.handleDisconnect(sock as never);
       }),
+      on: jest.fn(),
       join: jest.fn(),
       leave: jest.fn(),
+      broadcast: {
+        emit: jest.fn().mockImplementation((ev: string) => {
+          // gateway emits player.joined via broadcast (not server.emit); record
+          // under the server: prefix so existing event-order assertions match.
+          emitOrder.push(`server:${ev}`);
+        }),
+      },
     };
     return sock;
   };
@@ -54,6 +62,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
   const mockShipStateService = (): Partial<ShipStateService> => ({
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
+    flushAndUnload: jest.fn().mockResolvedValue(undefined),
   });
 
   beforeEach(() => {

@@ -35,14 +35,23 @@ describe('GameGateway player.joined / player.left', () => {
     handshake: { query: { userid } },
     data: {} as Record<string, unknown>,
     emit: jest.fn(),
+    on: jest.fn(),
     disconnect: jest.fn(),
     join: jest.fn(),
     leave: jest.fn(),
+    // gateway emits player.joined via client.broadcast.emit (not server.emit) —
+    // route those calls into serverEmitMock so existing assertions match.
+    broadcast: {
+      emit: jest.fn().mockImplementation((...args: unknown[]) => {
+        if (serverEmitMock) serverEmitMock(...args);
+      }),
+    },
   });
 
   const mockShipStateService = (): Partial<ShipStateService> => ({
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
+    flushAndUnload: jest.fn().mockResolvedValue(undefined),
   });
 
   beforeEach(() => {

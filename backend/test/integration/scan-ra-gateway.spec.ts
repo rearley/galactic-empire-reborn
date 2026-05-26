@@ -135,7 +135,7 @@ describe('T021 — sca ra 5 gateway integration', () => {
       gateway = makeGateway(scanService);
 
       // Execute the handler
-      const result = scanService.command.handler(self, ['ra', '5'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
 
       // Push through gateway event routing
       ({ socket, calls } = makeMockSocket());
@@ -208,7 +208,7 @@ describe('T021 — sca ra 5 gateway integration', () => {
       const scanService = await makeScanService([self]);
       const gateway = makeGateway(scanService);
 
-      const result = scanService.command.handler(self, ['ra', '5'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
       const { socket, calls } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })
         .emitCommandResult(socket, result);
@@ -226,7 +226,7 @@ describe('T021 — sca ra 5 gateway integration', () => {
       const scanService = await makeScanService([self]);
       const gateway = makeGateway(scanService);
 
-      const result = scanService.command.handler(self, ['ra', '5'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
       const { socket, calls: c } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })
         .emitCommandResult(socket, result);

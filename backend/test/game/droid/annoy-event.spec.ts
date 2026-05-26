@@ -88,8 +88,9 @@ function buildHarness(seed = 12) {
     shipno: 1,
     shipname: 'LydorianGarbageScow1',
     shpclass: DROID_CLASS_SCOW,
-    xcoord: 0,
-    ycoord: 0,
+    // Out of the neutral zone so runDroidActions doesn't filter the player out.
+    xcoord: 10,
+    ycoord: 7,
     jammer: 0,
     cantexit: 0,
     speed: 0,
@@ -102,8 +103,10 @@ function buildHarness(seed = 12) {
     shipno: 1,
     shipname: 'PlayerShip',
     shpclass: 5,
-    xcoord: 0.5,
-    ycoord: 0,
+    // Adjacent to the scow, out of the neutral zone so the runDroidActions
+    // player-filter (skips floor(x)===0 && floor(y)===0) keeps this player.
+    xcoord: 10.5,
+    ycoord: 7,
     status: GESTAT_USER,
     isEphemeral: undefined,
   });

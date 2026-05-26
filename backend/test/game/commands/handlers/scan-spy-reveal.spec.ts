@@ -104,9 +104,10 @@ function makeService(opts: {
     get: jest.fn().mockReturnValue(planetState),
   } as unknown as PlanetStateService;
 
-  // PrismaService only used in onModuleInit — not needed for unit tests
+  // PrismaService — shipClass.findMany for onModuleInit, user.findUnique for scanPl owner resolution.
   const mockPrisma = {
     shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+    user: { findUnique: jest.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
 
   const service = new ScanHandlerService(
@@ -122,8 +123,9 @@ function makeService(opts: {
   return { service, ship, planetState, ctx };
 }
 
-function lineTexts(result: unknown): string[] {
-  return (result as { lines: { text: string }[] }).lines.map(l => l.text);
+async function lineTexts(result: unknown): Promise<string[]> {
+  const r = await (result as Promise<{ lines: { text: string }[] }>);
+  return r.lines.map(l => l.text);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,11 +133,11 @@ function lineTexts(result: unknown): string[] {
 // ---------------------------------------------------------------------------
 
 describe('ScanHandlerService — scan pl spy reveal (T017)', () => {
-  it('spy owner (alice) sees per-item inventory block in scan pl output', () => {
+  it('spy owner (alice) sees per-item inventory block in scan pl output', async () => {
     const { service, ship, ctx } = makeService({ viewerUserId: 'alice', spyowner: 'alice' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
-    const texts = lineTexts(result);
+    const texts = await lineTexts(result);
 
     // The spy-owner reveal block must include at least one item inventory line.
     // Implementation will add lines containing item qty/sell info for the spy owner.
@@ -143,11 +145,11 @@ describe('ScanHandlerService — scan pl spy reveal (T017)', () => {
     expect(hasItemLine).toBe(true);
   });
 
-  it('non-spy-owner (bob) does NOT see item inventory lines in scan pl output', () => {
+  it('non-spy-owner (bob) does NOT see item inventory lines in scan pl output', async () => {
     const { service, ship, ctx } = makeService({ viewerUserId: 'bob', spyowner: 'alice' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
-    const texts = lineTexts(result);
+    const texts = await lineTexts(result);
 
     // Bob should see normal aggregate planet info but no item inventory block
     const hasItemLine = texts.some(t => /item|qty|sell|inventory/i.test(t));
@@ -156,31 +158,31 @@ describe('ScanHandlerService — scan pl spy reveal (T017)', () => {
     expect(texts.length).toBeGreaterThan(0);
   });
 
-  it('case-insensitive spyowner match — ALICE matches alice', () => {
+  it('case-insensitive spyowner match — ALICE matches alice', async () => {
     const { service, ship, ctx } = makeService({ viewerUserId: 'alice', spyowner: 'ALICE' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
-    const texts = lineTexts(result);
+    const texts = await lineTexts(result);
 
     const hasItemLine = texts.some(t => /item|qty|sell|inventory/i.test(t));
     expect(hasItemLine).toBe(true);
   });
 
-  it('case-insensitive spyowner match — Alice (mixed case) matches alice', () => {
+  it('case-insensitive spyowner match — Alice (mixed case) matches alice', async () => {
     const { service, ship, ctx } = makeService({ viewerUserId: 'alice', spyowner: 'Alice' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
-    const texts = lineTexts(result);
+    const texts = await lineTexts(result);
 
     const hasItemLine = texts.some(t => /item|qty|sell|inventory/i.test(t));
     expect(hasItemLine).toBe(true);
   });
 
-  it('viewer with matching userid but different case (ALICE) is treated as spy owner', () => {
+  it('viewer with matching userid but different case (ALICE) is treated as spy owner', async () => {
     const { service, ship, ctx } = makeService({ viewerUserId: 'ALICE', spyowner: 'alice' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
-    const texts = lineTexts(result);
+    const texts = await lineTexts(result);
 
     const hasItemLine = texts.some(t => /item|qty|sell|inventory/i.test(t));
     expect(hasItemLine).toBe(true);
