@@ -43,7 +43,7 @@ describe('GameGateway combat broadcasts', () => {
     gateway = new GameGateway(
       {} as ShipStateService,
       {} as CommandRouterService,
-      {} as ConnectedShipsRegistry,
+      { getSocketId: jest.fn().mockReturnValue(undefined) } as unknown as ConnectedShipsRegistry,
       mockWsGuard,
       mockPrisma,
       mockOnboarding,

@@ -141,7 +141,7 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
 
   test('self-cell is `*` at centre (15,7)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 10, ycoord: 5 });
-    const result = service.command.handler(self, ['ra', '3'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     const selfCells = result.scanRender!.cells.filter(c => c.type === 'self');
     expect(selfCells).toHaveLength(1);
     expect(selfCells[0].x).toBe(CENTRE_X);
@@ -152,36 +152,36 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
 
   test('level coercion: 0 → behaves like level 1', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const r0 = service.command.handler(self, ['ra', '0'], {}) as CommandResult;
-    const r1 = service.command.handler(self, ['ra', '1'], {}) as CommandResult;
+    const r0 = await (service.command.handler(self, ['ra', '0'], {}) as Promise<CommandResult>);
+    const r1 = await (service.command.handler(self, ['ra', '1'], {}) as Promise<CommandResult>);
     // Both should produce the same header effective_range
     expect(r0.scanRender!.header).toBe(r1.scanRender!.header);
   });
 
   test('level coercion: >9 → behaves like level 1', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const r10 = service.command.handler(self, ['ra', '10'], {}) as CommandResult;
-    const r1 = service.command.handler(self, ['ra', '1'], {}) as CommandResult;
+    const r10 = await (service.command.handler(self, ['ra', '10'], {}) as Promise<CommandResult>);
+    const r1 = await (service.command.handler(self, ['ra', '1'], {}) as Promise<CommandResult>);
     expect(r10.scanRender!.header).toBe(r1.scanRender!.header);
   });
 
   test('level coercion: non-numeric → behaves like level 1', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const rAbc = service.command.handler(self, ['ra', 'abc'], {}) as CommandResult;
-    const r1 = service.command.handler(self, ['ra', '1'], {}) as CommandResult;
+    const rAbc = await (service.command.handler(self, ['ra', 'abc'], {}) as Promise<CommandResult>);
+    const r1 = await (service.command.handler(self, ['ra', '1'], {}) as Promise<CommandResult>);
     expect(rAbc.scanRender!.header).toBe(r1.scanRender!.header);
   });
 
   test('level coercion: missing arg → behaves like level 1', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const rMissing = service.command.handler(self, ['ra'], {}) as CommandResult;
-    const r1 = service.command.handler(self, ['ra', '1'], {}) as CommandResult;
+    const rMissing = await (service.command.handler(self, ['ra'], {}) as Promise<CommandResult>);
+    const r1 = await (service.command.handler(self, ['ra', '1'], {}) as Promise<CommandResult>);
     expect(rMissing.scanRender!.header).toBe(r1.scanRender!.header);
   });
 
   test('header format: "Range: <r> — Sector <x>,<y>"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 10.7, ycoord: 5.2 });
-    const result = service.command.handler(self, ['ra', '3'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     const header = result.scanRender!.header;
     // Must match pattern "Range: <number> — Sector <xsect>,<ysect>"
     const xsect = Math.floor(10.7); // 10
@@ -196,7 +196,7 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     const { service: svc } = makeService([self, ai], SCAN_RANGE);
     await svc.onModuleInit();
 
-    const result = svc.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const result = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells.length).toBeGreaterThan(0);
     expect(shipCells[0].colour).toBe('ai');
@@ -208,7 +208,7 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     const { service: svc } = makeService([self, human], SCAN_RANGE);
     await svc.onModuleInit();
 
-    const result = svc.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const result = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells.length).toBeGreaterThan(0);
     expect(shipCells[0].colour).toBe('human');
@@ -216,19 +216,19 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
 
   test('kind is "ra"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const result = service.command.handler(self, ['ra', '3'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.kind).toBe('ra');
   });
 
   test('mode is "overwrite" when scanHome=true', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, scanHome: true });
-    const result = service.command.handler(self, ['ra', '3'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('overwrite');
   });
 
   test('mode is "append" when scanHome=false', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, scanHome: false });
-    const result = service.command.handler(self, ['ra', '3'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('append');
   });
 
@@ -239,14 +239,14 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     await svc.onModuleInit();
 
     // First call — ship gets letter A
-    const r1 = svc.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const r1 = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     // Find the letter assigned to the ship cell
     const shipCells1 = r1.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells1.length).toBeGreaterThan(0);
     const letter1 = shipCells1[0].char;
 
     // Second call — ship must keep the same letter
-    const r2 = svc.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const r2 = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const shipCells2 = r2.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells2.length).toBeGreaterThan(0);
     expect(shipCells2[0].char).toBe(letter1);
@@ -279,7 +279,7 @@ describe('T017 — sca ra unit: SC-002 projection accuracy across all 9 zoom lev
       const { service } = makeService(allShips, SCAN_RANGE);
       await service.onModuleInit();
 
-      const result = service.command.handler(self, ['ra', String(level)], {}) as CommandResult;
+      const result = await (service.command.handler(self, ['ra', String(level)], {}) as Promise<CommandResult>);
       expect(result.scanRender).toBeDefined();
 
       const effectiveRange = expectedEffectiveRange(SCAN_RANGE, level);
@@ -309,7 +309,7 @@ describe('T018 — sca ra: failure when not in flight', () => {
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeUndefined();
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
@@ -320,7 +320,7 @@ describe('T018 — sca ra: failure when not in flight', () => {
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeUndefined();
     expect(result.lines[0].category).toBe('system');
   });
@@ -330,7 +330,7 @@ describe('T018 — sca ra: failure when not in flight', () => {
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
   });
 });

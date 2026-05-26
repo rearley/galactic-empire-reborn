@@ -19,8 +19,11 @@ function makeShipRow(overrides: Partial<{
     shpclass: overrides.shpclass ?? 1,
     heading: 0, head2b: 0, speed: 0, speed2b: 0,
     xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    // phasrtype/shieldtype default to 1, not 0 — ShipStateService.onModuleInit
+    // self-heals 0 → 1 and marks dirty, which would falsify "dirty=false after
+    // hydration" and "zero writes when nothing is dirty" assertions below.
+    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
+    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
     degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
     where: 0, ltorpsChannel: [], ltorpsDistance: [],
     lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
@@ -34,8 +37,12 @@ function makeShipRow(overrides: Partial<{
 
 describe('ShipStateService', () => {
   let service: ShipStateService;
-  let prismaMock: { ship: { findMany: jest.Mock; update: jest.Mock } };
+  let prismaMock: {
+    ship: { findMany: jest.Mock; update: jest.Mock };
+    shipClass: { findMany: jest.Mock };
+  };
   let tickSubscribeMock: jest.Mock;
+  let registerSnapshotProviderMock: jest.Mock;
   let flushTick: (() => Promise<void>) | undefined;
 
   beforeEach(async () => {
@@ -44,6 +51,8 @@ describe('ShipStateService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
       },
+      // onModuleInit now awaits Promise.all([ship.findMany, shipClass.findMany]).
+      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
     };
     tickSubscribeMock = jest.fn().mockImplementation(
       (_kind: TickKind, handler: () => Promise<void>) => {
@@ -51,12 +60,19 @@ describe('ShipStateService', () => {
         return () => {};
       },
     );
+    registerSnapshotProviderMock = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShipStateService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: TickService, useValue: { subscribe: tickSubscribeMock } },
+        {
+          provide: TickService,
+          useValue: {
+            subscribe: tickSubscribeMock,
+            registerSnapshotProvider: registerSnapshotProviderMock,
+          },
+        },
       ],
     })
       .setLogger(new Logger())

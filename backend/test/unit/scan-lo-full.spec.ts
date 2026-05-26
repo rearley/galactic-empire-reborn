@@ -104,7 +104,7 @@ describe('T027 — sca lo: not-in-flight guard', () => {
     const { service } = makeService([]);
     await service.onModuleInit();
     const ship = makeShip({ where: 10 });
-    const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
     expect(result.scanRender).toBeUndefined();
@@ -114,7 +114,7 @@ describe('T027 — sca lo: not-in-flight guard', () => {
     const { service } = makeService([]);
     await service.onModuleInit();
     const ship = makeShip({ where: 20 });
-    const result = service.command.handler(ship, ['lo'], {}) as CommandResult;
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
     expect(result.scanRender).toBeUndefined();
@@ -130,7 +130,7 @@ describe('T027 — sca lo full: not-in-flight guard', () => {
     const { service } = makeService([]);
     await service.onModuleInit();
     const ship = makeShip({ where: 10 });
-    const result = service.command.handler(ship, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(ship, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
     expect(result.scanRender).toBeUndefined();
@@ -140,7 +140,7 @@ describe('T027 — sca lo full: not-in-flight guard', () => {
     const { service } = makeService([]);
     await service.onModuleInit();
     const ship = makeShip({ where: 20 });
-    const result = service.command.handler(ship, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(ship, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
     expect(result.scanRender).toBeUndefined();
@@ -161,7 +161,7 @@ describe('T027 — sca lo full: kind and sidePanel', () => {
     );
     const { service } = makeService([player, other]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
     expect(result.scanRender!.kind).toBe('lo-full');
     expect(result.scanRender!.sidePanel).toBeDefined();
@@ -172,7 +172,7 @@ describe('T027 — sca lo full: kind and sidePanel', () => {
     const player = makeShip({ userid: 'u1', shipno: 1 });
     const { service } = makeService([player]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.sidePanel).toBeDefined();
     expect(result.scanRender!.sidePanel!).toHaveLength(0);
   });
@@ -190,7 +190,7 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
   ): Promise<SidePanelRow[]> {
     const { service } = makeService([player, ...others]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     return result.scanRender!.sidePanel!;
   }
 
@@ -294,7 +294,7 @@ describe('T027 — sca lo full: SCANNAMES flag', () => {
     );
     const { service } = makeService([player, other]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const rows = result.scanRender!.sidePanel!;
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe('Ravager');
@@ -311,7 +311,7 @@ describe('T027 — sca lo full: SCANNAMES flag', () => {
     );
     const { service } = makeService([player, other]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const rows = result.scanRender!.sidePanel!;
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBeUndefined();
@@ -325,7 +325,7 @@ describe('T027 — sca lo full: SCANNAMES flag', () => {
     const ship3 = makeOther({ userid: 'u3', shipno: 1 }, { xcoord: 5.2, ycoord: 5 }, { shipname: 'Storm', speed: 1000 });
     const { service } = makeService([player, ship2, ship3]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const rows = result.scanRender!.sidePanel!;
     expect(rows).toHaveLength(2);
     rows.forEach(r => expect(typeof r.name).toBe('string'));
@@ -339,7 +339,7 @@ describe('T027 — sca lo full: SCANNAMES flag', () => {
     const ship3 = makeOther({ userid: 'u3', shipno: 1 }, { xcoord: 5.2, ycoord: 5 }, { shipname: 'Storm', speed: 1000 });
     const { service } = makeService([player, ship2, ship3]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const rows = result.scanRender!.sidePanel!;
     expect(rows).toHaveLength(2);
     rows.forEach(r => expect(r.name).toBeUndefined());
@@ -358,7 +358,7 @@ describe('T027 — sca lo full: side-panel ordering', () => {
     const far = makeOther({ userid: 'u3', shipno: 1 }, { xcoord: 5.3, ycoord: 5 }, { speed: 0 });
     const { service } = makeService([player, far, near]); // intentionally reversed
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const rows = result.scanRender!.sidePanel!;
     expect(rows).toHaveLength(2);
     expect(rows[0].distance).toBeLessThanOrEqual(rows[1].distance);
@@ -375,7 +375,7 @@ describe('T027 — showarpDisplay edge cases', () => {
     const other = makeOther({ userid: 'u2', shipno: 1 }, { xcoord: 5.1, ycoord: 5 }, { speed: 999 });
     const { service } = makeService([player, other]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('Impulse');
   });
 
@@ -384,7 +384,7 @@ describe('T027 — showarpDisplay edge cases', () => {
     const other = makeOther({ userid: 'u2', shipno: 1 }, { xcoord: 5.1, ycoord: 5 }, { speed: 1000 });
     const { service } = makeService([player, other]);
     await service.onModuleInit();
-    const result = service.command.handler(player, ['lo', 'full'], {}) as CommandResult;
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('Warp 1.0');
   });
 });

@@ -140,7 +140,7 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     const { service } = makeService([self, other]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells.length).toBeGreaterThan(0);
@@ -153,7 +153,7 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     const { service } = makeService([self, other]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
     expect(shipCells.length).toBe(0);
   });
@@ -165,7 +165,7 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     const { service } = makeService([self, other]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     for (const cell of result.scanRender!.cells) {
       expect(cell.x).toBeGreaterThanOrEqual(0);
       expect(cell.x).toBeLessThan(SCAN_GRID_WIDTH);
@@ -183,7 +183,7 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const selfCell = result.scanRender!.cells.find(c => c.type === 'self');
     expect(selfCell).toBeDefined();
     expect(selfCell!.colour).toBe('self');
@@ -195,7 +195,7 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const { service } = makeService([self, human]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const humanCells = result.scanRender!.cells.filter(c => c.colour === 'human');
     expect(humanCells.length).toBeGreaterThan(0);
   });
@@ -206,7 +206,7 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const { service } = makeService([self, ai]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const aiCells = result.scanRender!.cells.filter(c => c.colour === 'ai');
     expect(aiCells.length).toBeGreaterThan(0);
   });
@@ -217,7 +217,7 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const { service } = makeService([self], [planet]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const planetCells = result.scanRender!.cells.filter(c => c.type === 'planet');
     expect(planetCells.length).toBeGreaterThan(0);
     expect(planetCells[0].colour).toBe('planet');
@@ -234,7 +234,7 @@ describe('T022 SE-003 — planet digit matches GEPLANET indexing (plnum % 10)', 
       const { service } = makeService([self], [planet]);
       await service.onModuleInit();
 
-      const result = service.command.handler(self, ['se'], {}) as CommandResult;
+      const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
       const planetCells = result.scanRender!.cells.filter(c => c.type === 'planet');
       expect(planetCells.length).toBeGreaterThan(0);
       expect(planetCells[0].char).toBe(String(plnum % 10));
@@ -250,7 +250,7 @@ describe('T022 SE-004 — empty sector returns only self-cell `*`', () => {
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
     expect(result.scanRender!.cells).toHaveLength(1);
     expect(result.scanRender!.cells[0].type).toBe('self');
@@ -268,7 +268,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self, other]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     // Centre cell should be self, not ship
     const centreX = Math.floor(SCAN_GRID_WIDTH / 2);
     const centreY = Math.floor(SCAN_GRID_HEIGHT / 2);
@@ -292,7 +292,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self, other], [planet]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     // At the collision cell, type should be 'ship' (ship wins over planet)
     const gridX = Math.floor(relX * SCAN_GRID_WIDTH);
     const gridY = Math.floor(relY * SCAN_GRID_HEIGHT);
@@ -320,7 +320,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.kind).toBe('se');
   });
 
@@ -329,7 +329,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.header).toBe('Sector 5,7');
   });
 
@@ -338,7 +338,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('overwrite');
   });
 
@@ -347,7 +347,7 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('append');
   });
 });
@@ -360,7 +360,7 @@ describe('T023 FE-001 — sca se: failure when not in flight (where >= 10)', () 
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeUndefined();
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('system');
@@ -371,7 +371,7 @@ describe('T023 FE-001 — sca se: failure when not in flight (where >= 10)', () 
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeUndefined();
     expect(result.lines[0].category).toBe('system');
   });
@@ -381,7 +381,7 @@ describe('T023 FE-001 — sca se: failure when not in flight (where >= 10)', () 
     const { service } = makeService([self]);
     await service.onModuleInit();
 
-    const result = service.command.handler(self, ['se'], {}) as CommandResult;
+    const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
   });
 });
@@ -397,14 +397,14 @@ describe('T025 ST-001 — cross-mode letter stickiness: sca ra letter survives f
     await service.onModuleInit();
 
     // First: run sca ra to assign a letter
-    const raResult = service.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const raResult = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(raResult.scanRender).toBeDefined();
     const raCells = raResult.scanRender!.cells.filter(c => c.type === 'ship');
     expect(raCells.length).toBeGreaterThan(0);
     const raLetter = raCells[0].char;
 
     // Then: run sca se — letter must be preserved from the shared scantab
-    const seResult = service.command.handler(self, ['se'], {}) as CommandResult;
+    const seResult = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(seResult.scanRender).toBeDefined();
     const seCells = seResult.scanRender!.cells.filter(c => c.type === 'ship');
     expect(seCells.length).toBeGreaterThan(0);
@@ -418,13 +418,13 @@ describe('T025 ST-001 — cross-mode letter stickiness: sca ra letter survives f
     await service.onModuleInit();
 
     // First: run sca se
-    const seResult = service.command.handler(self, ['se'], {}) as CommandResult;
+    const seResult = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const seCells = seResult.scanRender!.cells.filter(c => c.type === 'ship');
     expect(seCells.length).toBeGreaterThan(0);
     const seLetter = seCells[0].char;
 
     // Then: run sca ra — letter must be preserved
-    const raResult = service.command.handler(self, ['ra', '5'], {}) as CommandResult;
+    const raResult = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const raCells = raResult.scanRender!.cells.filter(c => c.type === 'ship');
     expect(raCells.length).toBeGreaterThan(0);
     expect(raCells[0].char).toBe(seLetter);
