@@ -49,21 +49,21 @@ describe('ReportHandlerService — cargo sub-command', () => {
   it('empty cargo shows REP_CARGO_NONE', async () => {
     const { service } = makeService();
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text === formatMessage(MessageId.REP_CARGO_NONE))).toBe(true);
   });
 
   it('always includes REP_CARGO_TOTAL line', async () => {
     const { service } = makeService();
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text.includes('Total:'))).toBe(true);
   });
 
   it('REP_CARGO_TOTAL shows capacity from ship class', async () => {
     const { service } = makeService(250);
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     const totalLine = result.lines.find(l => l.text.includes('Total:'));
     expect(totalLine?.text).toContain('250');
   });
@@ -73,7 +73,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
-    const result = service.command.handler(makeShip({ items }), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text.includes(ITEM_NAMES[I_FOOD]))).toBe(true);
   });
 
@@ -82,7 +82,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 5n;
-    const result = service.command.handler(makeShip({ items }), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text === formatMessage(MessageId.REP_CARGO_NONE))).toBe(false);
   });
 
@@ -92,7 +92,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n; // 10 * ITEM_TONS[I_FOOD] tons
     const expectedTons = Math.round(10 * ITEM_TONS[I_FOOD]);
-    const result = service.command.handler(makeShip({ items }), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     const totalLine = result.lines.find(l => l.text.includes('Total:'));
     expect(totalLine?.text).toContain(String(expectedTons));
   });
@@ -103,7 +103,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
     items[I_MEN] = 5n;
-    const result = service.command.handler(makeShip({ items }), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     const cargoLines = result.lines.filter(l =>
       l.text.includes(ITEM_NAMES[I_FOOD]) || l.text.includes(ITEM_NAMES[I_MEN]),
     );
@@ -115,7 +115,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
-    const result = service.command.handler(makeShip({ items }), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     // I_MEN is 0 — should not appear
     expect(result.lines.some(l => l.text.includes(ITEM_NAMES[I_MEN]))).toBe(false);
   });
@@ -123,7 +123,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
   it('header contains REP01 with ship name', async () => {
     const { service } = makeService();
     await service.onModuleInit();
-    const result = service.command.handler(makeShip(), ['cargo'], {}) as CommandResult;
+    const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines[0].text).toContain('USS Test');
   });
 });

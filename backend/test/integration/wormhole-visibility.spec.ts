@@ -79,7 +79,7 @@ describe('T020 — wormhole visibility gate', () => {
       };
       const { svc } = makeService([hidden]);
       await svc.onModuleInit();
-      const result = svc.command.handler(makeShip(), ['lo'], {}) as CommandResult;
+      const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells).toHaveLength(0);
     });
@@ -90,7 +90,7 @@ describe('T020 — wormhole visibility gate', () => {
       };
       const { svc } = makeService([visible]);
       await svc.onModuleInit();
-      const result = svc.command.handler(makeShip(), ['lo'], {}) as CommandResult;
+      const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells.length).toBeGreaterThan(0);
       expect(wCells[0].char).toBe('W');
@@ -104,7 +104,7 @@ describe('T020 — wormhole visibility gate', () => {
       };
       const { svc } = makeService([hidden]);
       await svc.onModuleInit();
-      const result = svc.command.handler(makeShip(), ['se'], {}) as CommandResult;
+      const result = await (svc.command.handler(makeShip(), ['se'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells).toHaveLength(0);
     });
@@ -115,7 +115,7 @@ describe('T020 — wormhole visibility gate', () => {
       };
       const { svc } = makeService([visible]);
       await svc.onModuleInit();
-      const result = svc.command.handler(makeShip(), ['se'], {}) as CommandResult;
+      const result = await (svc.command.handler(makeShip(), ['se'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells.length).toBeGreaterThan(0);
       expect(wCells[0].char).toBe('W');

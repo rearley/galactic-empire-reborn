@@ -105,6 +105,8 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
         findUnique: jest.fn().mockResolvedValue(mockSector),
       } as unknown as PrismaService['sector'],
       shipClass: {
+        // OnboardingService.finalize now calls findUnique (not findUniqueOrThrow).
+        findUnique: jest.fn().mockResolvedValue(mockShipClass),
         findUniqueOrThrow: jest.fn().mockResolvedValue(mockShipClass),
       } as unknown as PrismaService['shipClass'],
       ship: {
