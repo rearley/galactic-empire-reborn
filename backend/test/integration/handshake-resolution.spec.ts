@@ -59,29 +59,38 @@ describe('GameGateway handshake resolution', () => {
   let shipStateServiceMock: {
     get: jest.Mock;
     findByUserid: jest.Mock;
+    findAllShips: jest.Mock;
     mutate: jest.Mock;
     size: jest.Mock;
     loadShip: jest.Mock;
+    flushAndUnload: jest.Mock;
   };
   let prismaMock: {
     ship: { findFirst: jest.Mock };
     shipClass: { findMany: jest.Mock };
     mine: { findMany: jest.Mock };
+    user: { findUnique: jest.Mock };
   };
 
   beforeEach(async () => {
     shipStateServiceMock = {
       get: jest.fn().mockReturnValue(undefined),
       findByUserid: jest.fn().mockReturnValue([]),
+      // Combat/ship ticks now call findAllShips on the service.
+      findAllShips: jest.fn().mockReturnValue([]),
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(0),
       loadShip: jest.fn(),
+      // Gateway calls flushAndUnload during disconnect.
+      flushAndUnload: jest.fn().mockResolvedValue(undefined),
     };
 
     prismaMock = {
       ship: { findFirst: jest.fn().mockResolvedValue(null) },
       shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       mine: { findMany: jest.fn().mockResolvedValue([]) },
+      // scan_pl uses prisma.user.findUnique for owner resolution.
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
     };
 
     const module: TestingModule = await Test.createTestingModule({

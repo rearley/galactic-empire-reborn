@@ -40,6 +40,8 @@ describe('ShipStateService.loadIfAbsent', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
       },
+      // onModuleInit awaits Promise.all([ship.findMany, shipClass.findMany]).
+      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const tickSubscribeMock = jest.fn().mockImplementation(
       (_kind: TickKind, _handler: () => Promise<void>) => () => {},
@@ -49,7 +51,13 @@ describe('ShipStateService.loadIfAbsent', () => {
       providers: [
         ShipStateService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: TickService, useValue: { subscribe: tickSubscribeMock } },
+        {
+          provide: TickService,
+          useValue: {
+            subscribe: tickSubscribeMock,
+            registerSnapshotProvider: jest.fn(),
+          },
+        },
       ],
     })
       .setLogger(new Logger())

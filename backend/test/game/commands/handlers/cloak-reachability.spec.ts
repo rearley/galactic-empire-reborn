@@ -73,17 +73,17 @@ describe('cloak reachability — torpedo.handler.ts:82 (firer cloaked)', () => {
     return new TorpedoHandlerService(mockShipState, mockShipClassCache, mockEvents, mockRandom);
   }
 
-  it('cloak=CLOAK_RAMP_FULL (10) on firer → TOR_CLOAK rejection', () => {
+  it('cloak=CLOAK_RAMP_FULL (10) on firer → TOR_CLOAK rejection', async () => {
     const service = makeTorpedoService();
     const firer = makeShip({ cloak: CLOAK_RAMP_FULL });
-    const result = service.command.handler(firer, ['1'], {}) as { lines: { text: string }[] };
+    const result = await (service.command.handler(firer, ['1'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.TOR_CLOAK));
   });
 
-  it('cloak=1 (CLOAK_RAMP_INIT) also triggers TOR_CLOAK (cloak > 0 gate)', () => {
+  it('cloak=1 (CLOAK_RAMP_INIT) also triggers TOR_CLOAK (cloak > 0 gate)', async () => {
     const service = makeTorpedoService();
     const firer = makeShip({ cloak: 1 });
-    const result = service.command.handler(firer, ['1'], {}) as { lines: { text: string }[] };
+    const result = await (service.command.handler(firer, ['1'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.TOR_CLOAK));
   });
 });
@@ -107,7 +107,7 @@ describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', 
   it('ship.cloak === CLOAK_RAMP_FULL (10) → report includes REP12 "Cloak: active."', async () => {
     const service = await makeReportService();
     const ship = makeShip({ cloak: CLOAK_RAMP_FULL, shpclass: 1 });
-    const result = service.command.handler(ship, ['sys'], {}) as { lines: { text: string }[] };
+    const result = await (service.command.handler(ship, ['sys'], {}) as Promise<{ lines: { text: string }[] }>);
     const texts = result.lines.map(l => l.text);
     expect(texts).toContain(formatMessage(MessageId.REP12));
     expect(texts).not.toContain(formatMessage(MessageId.REP13));
@@ -116,7 +116,7 @@ describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', 
   it('ship.cloak === 0 → report shows REP13 "Cloak: inactive." not REP12', async () => {
     const service = await makeReportService();
     const ship = makeShip({ cloak: 0, shpclass: 1 });
-    const result = service.command.handler(ship, ['sys'], {}) as { lines: { text: string }[] };
+    const result = await (service.command.handler(ship, ['sys'], {}) as Promise<{ lines: { text: string }[] }>);
     const texts = result.lines.map(l => l.text);
     expect(texts).toContain(formatMessage(MessageId.REP13));
     expect(texts).not.toContain(formatMessage(MessageId.REP12));
@@ -193,7 +193,7 @@ function buildCybertronHarness() {
 }
 
 describe('cloak reachability — cybertron-tick.service.ts:268 (scan loop skips cloak=10)', () => {
-  it('Cybertron does not acquire cloaked player (cloak=10) as a new target', () => {
+  it('Cybertron does not acquire cloaked player (cloak=10) as a new target', async () => {
     const { events, addShip, fireTick } = buildCybertronHarness();
 
     // Cybertron with no current target (cybmine=255)
@@ -222,7 +222,7 @@ describe('cloak reachability — cybertron-tick.service.ts:268 (scan loop skips 
 });
 
 describe('cloak reachability — cybertron-tick.service.ts:494 (current target cloaks → hold course)', () => {
-  it('Cybertron with existing lock on player who cloaks → holds course, does not fire', () => {
+  it('Cybertron with existing lock on player who cloaks → holds course, does not fire', async () => {
     const { events, addShip, fireTick } = buildCybertronHarness();
 
     // Player ship locked in cybertron's sights — now fully cloaked
@@ -252,7 +252,7 @@ describe('cloak reachability — cybertron-tick.service.ts:494 (current target c
 });
 
 describe('cloak reachability — cybertron-tick.service.ts:513 (acquisition scan skips cloak=10)', () => {
-  it('Cybertron scans for new target — cloaked player is invisible, uncloaked player is acquired', () => {
+  it('Cybertron scans for new target — cloaked player is invisible, uncloaked player is acquired', async () => {
     const { events, addShip, fireTick } = buildCybertronHarness();
 
     const cyb = makeShip({

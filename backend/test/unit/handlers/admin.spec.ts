@@ -32,11 +32,18 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(
-  planetState: { userid: string } | null = { userid: 'owner' },
+  planetState: { userid: string; items?: Array<{ qty: bigint; rate: number; sell: boolean }> } | null = { userid: 'owner' },
   adminChangeResult: { ok: boolean } = { ok: true },
 ) {
+  // ADM_MENU iterates planet.items[] looking for non-zero rate/qty entries.
+  // Provide a default empty items[] so the menu renders an empty list rather
+  // than crashing on `state.items[i]`.
+  const fullState = planetState ? {
+    items: Array.from({ length: 14 }, () => ({ qty: 0n, rate: 0, sell: false })),
+    ...planetState,
+  } : null;
   const applyAdminChangeMock = jest.fn().mockResolvedValue(adminChangeResult);
-  const getMock = jest.fn().mockReturnValue(planetState);
+  const getMock = jest.fn().mockReturnValue(fullState);
   const planetMock = {
     get: getMock,
     applyAdminChange: applyAdminChangeMock,
@@ -186,7 +193,7 @@ describe('AdminHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ADM_INVALID));
   });
 
-  it('keyword is "admin", alias includes "adm"', () => {
+  it('keyword is "admin", alias includes "adm"', async () => {
     const { svc } = makeService();
     expect(svc.command.keyword).toBe('admin');
     expect(svc.command.aliases).toContain('adm');
