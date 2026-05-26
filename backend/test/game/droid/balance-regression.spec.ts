@@ -86,9 +86,9 @@ describe('T039 — Droid AI balance-regression constants', () => {
 
   // ─── DROID_CLASS_DEFAULTS scan ranges ────────────────────────────────────────
 
-  it('DROID_CLASS_DEFAULTS[31].scanRange is 25000 (Scow)', () => {
+  it('DROID_CLASS_DEFAULTS[31].scanRange is 10000 (Scow — recalibrated for 30×15 galaxy)', () => {
     expect(DROID_CLASS_DEFAULTS[31]).toBeDefined();
-    expect(DROID_CLASS_DEFAULTS[31]!.scanRange).toBe(25000);
+    expect(DROID_CLASS_DEFAULTS[31]!.scanRange).toBe(10000);
   });
 
   it('DROID_CLASS_DEFAULTS[32].scanRange is 25000 (Murdonian Transport)', () => {
@@ -96,9 +96,9 @@ describe('T039 — Droid AI balance-regression constants', () => {
     expect(DROID_CLASS_DEFAULTS[32]!.scanRange).toBe(25000);
   });
 
-  it('DROID_CLASS_DEFAULTS[33].scanRange is 20000 (Vakory Survey Drone)', () => {
+  it('DROID_CLASS_DEFAULTS[33].scanRange is 30000 (Vakory Survey Drone — recalibrated)', () => {
     expect(DROID_CLASS_DEFAULTS[33]).toBeDefined();
-    expect(DROID_CLASS_DEFAULTS[33]!.scanRange).toBe(20000);
+    expect(DROID_CLASS_DEFAULTS[33]!.scanRange).toBe(30000);
   });
 
   // ─── DROID_CLASS_DEFAULTS: all three classes present ────────────────────────

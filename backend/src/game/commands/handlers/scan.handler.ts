@@ -8,6 +8,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
+import { inScanRange } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
 
 /**
@@ -600,9 +601,8 @@ export class ScanHandlerService implements OnModuleInit {
     const dist = Math.sqrt(
       Math.pow(target.xcoord - ship.xcoord, 2) + Math.pow(target.ycoord - ship.ycoord, 2),
     );
-    const rawDist = dist * 10000;
     // Out of range — GECMDS.C:2220
-    if (rawDist >= scanRange) {
+    if (!inScanRange(ship, target, scanRange)) {
       return {
         lines: [{ text: `${target.shipname} is out of scanner range.`, category: 'system' }],
       };

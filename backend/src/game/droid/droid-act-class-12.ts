@@ -15,7 +15,7 @@ import {
   missileAttached,
 } from './droid-decisions';
 import { DROID_ANNOY_DENOM, PMINFIRE } from '../constants';
-import { cdistance } from '../combat/combat-math';
+import { cdistance, inScanRange } from '../combat/combat-math';
 
 export interface Class12Action {
   jammedFlee?: { speed2b: number; holdcourse: number };
@@ -64,8 +64,7 @@ export function droidActClass12(
 
   for (const player of players) {
     if (player.status !== 1) continue;
-    const dist = cdistance(droid, player) * 10_000;
-    if (dist < scanRange) {
+    if (inScanRange(droid, player, scanRange)) {
       shieldCommand = droid.speed < 1000.0 ? 1 : 0;
       if (rollAnnoy(DROID_ANNOY_DENOM, rng)) {
         passiveAnnoys.push({ target: player, message: pickPassiveMsg(droid.shipname, rng) });

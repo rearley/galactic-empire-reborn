@@ -15,7 +15,7 @@ import {
   missileAttached,
 } from './droid-decisions';
 import { DROID_ANNOY_DENOM, PMINFIRE } from '../constants';
-import { cdistance } from '../combat/combat-math';
+import { cdistance, inScanRange } from '../combat/combat-math';
 
 export interface Class11Action {
   /** Set when jammed */
@@ -70,8 +70,7 @@ export function droidActClass11(
 
   for (const player of players) {
     if (player.status !== 1) continue;
-    const dist = cdistance(droid, player) * 10_000;
-    if (dist < scanRange) {
+    if (inScanRange(droid, player, scanRange)) {
       if (droid.holdcourse === 0) {
         // @see GEDROIDS.C:330 — if holdcourse==0, sub-warp drift
       }

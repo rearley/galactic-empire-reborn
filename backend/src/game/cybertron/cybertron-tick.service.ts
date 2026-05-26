@@ -37,6 +37,7 @@ import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
 import {
   cdistance,
+  inScanRange,
   lineOfFire,
   phaserDamage,
   shieldhit,
@@ -357,7 +358,7 @@ export class CybertronTickService implements OnModuleInit {
     // player-side gate. Mirror it here so future callers cannot bypass.
     // @see specs/022-fidelity-audit-v2/findings.md A-002
     const scanRangeGate = this.shipClassCache.get(ship.shpclass)?.scanRange ?? 100_000;
-    if (cdistance(ship, target) * 10_000 > scanRangeGate) return;
+    if (!inScanRange(ship, target, scanRangeGate)) return;
 
     const attackerId = shipKey(ship.userid, ship.shipno);
     const dx = target.xcoord - ship.xcoord;

@@ -1039,3 +1039,23 @@ jammed invariants, and Cybertron spawn-visibility regression (T038 backfill).
 **Known issues**:
 - T053 manual quickstart not run (requires live ge_test DB with seeded galaxy)
 - canAttackPlanet not yet populated by seed data — all ship classes default false in existing tests
+
+## 2026-05-26 — range coherence + AI engagement fix
+
+**Completed**:
+- New helper `inScanRange(a, b, scanRange)` in `combat/combat-math.ts` — collapses the duplicated `cdistance(a,b) * 10_000 > scanRange` pattern into one place. Used in scan handler, phaser handler, find-ship helper, droid acts/tick, cybertron tick.
+- Recalibrated per-class `scanRange` seeds in `prisma/seed/ship-classes.ts` and `droid/droid.config.ts` for the 30×15 galaxy (round 2). Previous compression made Cybertron Scout's effective vision 1.0 sector — players were drifting through it untouched. New values: Interceptor 1.5 sectors, Dreadnought 4.0, Cybertron Scout 2.5, Cybertron Base Star 4.0, Lydorian Scow 1.0, Murdonian 2.5, Vakory 3.0. No ship sees more than 15% of the map diagonal.
+- New integration test `test/integration/range-and-ai.spec.ts` (33 tests, all green): scan-matrix per class, neutral-zone immunity, end-to-end Cybertron lock acquisition + pursuit (head2b + speed2b) + phaser fire.
+- Updated `test/unit/ship-class-scanrange-pin.spec.ts` and `test/game/droid/balance-regression.spec.ts` to the new pinned values.
+
+**Tests**: +33 new tests in `test/integration/range-and-ai.spec.ts`; 2 existing scanRange pin suites updated.
+
+**Decisions made**:
+- Did NOT do a full sector-unit migration. Torpedoes/missiles persist locked distances on `ShipState.ltorpsDistance` in raw units; `TORPSPED`/`MISLSPED` are also raw; nav-display also raw. The hygiene win (one helper) without the migration blast radius was the right trade.
+- Cybertron AI was already complete (cybCheckLockon + pickPursuitBand sets head2b/speed2b; gebemean + cybwhoops apply CYB_BE_NICE / CYB_BE_EASY skill curves; cybAttack fires phasers + torps). The playtest "AI did not even try" was a scanRange compression bug, not missing pursuit logic. No new pursuit code added.
+- Droid 11/12 reactive fightback (only when ship.cantexit > 0 + lastfired set) preserved as-is — matches the original C, Murdonians are not aggressive predators.
+
+**Next**: monitor next playtest. If droids feel inert despite engaged-Cybertrons, revisit droid aggression separately.
+
+**Known issues**:
+- Pre-existing unrelated test crashes in scan-spy-reveal, scan-ra-gateway, scan-render-event, combat-tick.service, annoy-event, kill-attribution, murdonian-cargo-transfer — present on master before this work.

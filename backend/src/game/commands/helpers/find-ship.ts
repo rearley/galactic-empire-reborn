@@ -1,4 +1,4 @@
-import { cdistance } from '../../combat/combat-math';
+import { inScanRange } from '../../combat/combat-math';
 import { ShipState, shipKey } from '../../ship/ship-state.types';
 
 /**
@@ -59,8 +59,7 @@ export function findShip(
     if (!isIngame(target)) {
       return { ok: false, message: 'Locked target no longer in game.', clearedLock: true };
     }
-    const dist = cdistance(contextShip, target);
-    if (dist * 10000 > scanRange) {
+    if (!inScanRange(contextShip, target, scanRange)) {
       return { ok: false, message: 'Locked target out of scanner range.', clearedLock: true };
     }
     return { ok: true, ship: target };
@@ -74,8 +73,7 @@ export function findShip(
       continue; // never lock onto self
     }
     if (!candidate.shipname.toLowerCase().startsWith(needle)) continue;
-    const dist = cdistance(contextShip, candidate);
-    if (dist * 10000 > scanRange) continue;
+    if (!inScanRange(contextShip, candidate, scanRange)) continue;
     return { ok: true, ship: candidate };
   }
 
