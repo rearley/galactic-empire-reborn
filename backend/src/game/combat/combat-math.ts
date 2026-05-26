@@ -25,12 +25,24 @@ export function cdistance(
  * sector-units (1 sector = 1.0), while every `scanRange` value is stored in
  * raw units (1 sector = 10_000). Hides the `* 10_000` conversion that was
  * historically duplicated across ~10 fire/scan call sites.
+ *
+ * UNITS: `scanRange` must be in **raw units** (e.g. Interceptor=15_000,
+ * Dreadnought=40_000, Cybertron Base Star=40_000). Passing a sector-unit
+ * value (e.g. `1.5`) would make the result always-true since
+ * `cdistance × 10_000` rarely beats single-digit numbers. The guard below
+ * throws to catch this mistake at the call site; `0` is allowed as the
+ * "no scanner" sentinel.
  */
 export function inScanRange(
   a: { xcoord: number; ycoord: number },
   b: { xcoord: number; ycoord: number },
   scanRange: number,
 ): boolean {
+  if (scanRange !== 0 && scanRange < 1000) {
+    throw new Error(
+      `inScanRange: scanRange=${scanRange} looks like sector-units; expected raw units (×10_000) or 0`,
+    );
+  }
   return cdistance(a, b) * 10_000 <= scanRange;
 }
 
