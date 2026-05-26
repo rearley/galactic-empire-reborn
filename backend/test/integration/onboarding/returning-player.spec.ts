@@ -76,10 +76,12 @@ describe('Returning player (T046)', () => {
     // Ship is always warm in memory — hydration path is skipped
     const shipStateServiceMock = {
       findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
+      findAllShips: jest.fn().mockReturnValue([TEST_SHIP]),
       get: jest.fn().mockReturnValue(TEST_SHIP),
       loadShip: loadShipMock,
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
+      flushAndUnload: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
