@@ -2,6 +2,7 @@ import {
   cdistance,
   damstr,
   decoyIntercept,
+  inScanRange,
   jammerCounter,
   lineOfFire,
   mineFalloff,
@@ -27,6 +28,26 @@ describe('combat-math', () => {
       const a = { xcoord: 1, ycoord: 2 };
       const b = { xcoord: 4, ycoord: 6 };
       expect(cdistance(a, b)).toBe(cdistance(b, a));
+    });
+  });
+
+  describe('inScanRange — bridges sector-unit cdistance to raw-unit scanRange', () => {
+    const a = { xcoord: 5, ycoord: 5 };
+    it('true at 1 sector with scanRange=15_000 (Interceptor)', () => {
+      expect(inScanRange(a, { xcoord: 6, ycoord: 5 }, 15_000)).toBe(true);
+    });
+    it('false at 2 sectors with scanRange=15_000', () => {
+      expect(inScanRange(a, { xcoord: 7, ycoord: 5 }, 15_000)).toBe(false);
+    });
+    it('true at exact boundary (cdistance × 10_000 === scanRange)', () => {
+      expect(inScanRange(a, { xcoord: 6.5, ycoord: 5 }, 15_000)).toBe(true);
+    });
+    it('false for any non-coincident target when scanRange === 0 (no-scanner sentinel)', () => {
+      expect(inScanRange(a, { xcoord: 6, ycoord: 5 }, 0)).toBe(false);
+    });
+    it('throws when scanRange looks like sector-units (typo guard)', () => {
+      expect(() => inScanRange(a, { xcoord: 6, ycoord: 5 }, 1.5)).toThrow(/sector-units/);
+      expect(() => inScanRange(a, { xcoord: 6, ycoord: 5 }, 999)).toThrow(/sector-units/);
     });
   });
 
