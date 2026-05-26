@@ -88,6 +88,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
     const prismaUpdateMock = jest.fn().mockResolvedValue({});
 
     const mockPrisma = {
+      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       ship: {
         findMany: jest.fn().mockResolvedValue([]),
         update: prismaUpdateMock,
@@ -101,6 +102,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
         }
         return () => {};
       },
+      registerSnapshotProvider: jest.fn(),
     } as unknown as TickService;
 
     const svc = new ShipStateService(mockPrisma, mockTickService);
@@ -155,6 +157,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
     const prismaUpdateMock = jest.fn().mockResolvedValue({});
 
     const mockPrisma = {
+      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       ship: {
         findMany: jest.fn().mockResolvedValue([]),
         update: prismaUpdateMock,
@@ -166,6 +169,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
         if (kind === TickKind.SHIP_UPDATE) capturedFlush = fn;
         return () => {};
       },
+      registerSnapshotProvider: jest.fn(),
     } as unknown as TickService;
 
     const svc = new ShipStateService(mockPrisma, mockTickService);
@@ -186,6 +190,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
     const prismaUpdateMock = jest.fn().mockResolvedValue({});
 
     const mockPrisma = {
+      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       ship: {
         findMany: jest.fn().mockResolvedValue([]),
         update: prismaUpdateMock,
@@ -197,6 +202,7 @@ describe('T006 — ShipStateService.flush skips ephemeral ships', () => {
         if (kind === TickKind.SHIP_UPDATE) capturedFlush = fn;
         return () => {};
       },
+      registerSnapshotProvider: jest.fn(),
     } as unknown as TickService;
 
     const svc = new ShipStateService(mockPrisma, mockTickService);

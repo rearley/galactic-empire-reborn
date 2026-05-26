@@ -144,6 +144,7 @@ describe('command round-trip (planet) integration (T066)', () => {
       subscribe: jest.fn().mockImplementation(
         (_kind: TickKind, _handler: () => Promise<void>) => () => {},
       ),
+      registerSnapshotProvider: jest.fn(),
       startPlanetUpdateTimer: jest.fn(),
       onModuleInit: jest.fn(),
     };
@@ -263,11 +264,11 @@ describe('command round-trip (planet) integration (T066)', () => {
   // -------------------------------------------------------------------------
   // T066-3: report cargo on empty ship → REP_CARGO_NONE line
   // -------------------------------------------------------------------------
-  it('report cargo on empty ship → contains REP_CARGO_NONE line', () => {
+  it('report cargo on empty ship → contains REP_CARGO_NONE line', async () => {
     const ship = shipService.get(USERID, SHIPNO)!;
     expect(ship.items.every((qty) => qty === 0n)).toBe(true); // precondition
 
-    const result = commandRouter.dispatch('report cargo', ship, {}) as CommandResult;
+    const result = await (commandRouter.dispatch('report cargo', ship, {}) as Promise<CommandResult>);
 
     const hasNoneLine = result.lines.some(
       (l) => l.text === formatMessage(MessageId.REP_CARGO_NONE),
