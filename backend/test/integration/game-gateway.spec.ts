@@ -72,10 +72,12 @@ describe('GameGateway integration', () => {
   beforeAll(async () => {
     const shipServiceMock = {
       findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
+      findAllShips: jest.fn().mockReturnValue([TEST_SHIP]),
       get: jest.fn().mockReturnValue(TEST_SHIP),
       loadShip: jest.fn(),
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
+      flushAndUnload: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -90,6 +92,7 @@ describe('GameGateway integration', () => {
         shipClass: { findMany: jest.fn().mockResolvedValue([]) },
         mine: { findMany: jest.fn().mockResolvedValue([]) },
         ship: { findFirst: jest.fn().mockResolvedValue({ userid: TEST_USERID, shipno: 1 }) },
+        user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
