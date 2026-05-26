@@ -74,6 +74,7 @@ async function makeHarness(ships: ShipState[] = []): Promise<Harness> {
       subscribers.push(h);
       return () => {};
     },
+    registerSnapshotProvider: jest.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
   const mineRepo = {
@@ -225,6 +226,7 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
         subscribers.push(h);
         return () => {};
       },
+      registerSnapshotProvider: jest.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
     const mineRepo = {
@@ -437,6 +439,7 @@ describe('CombatTickService — mine sweep (T036)', () => {
         subscribers.push(h);
         return () => {};
       },
+      registerSnapshotProvider: jest.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
     const deleteSpy = jest.fn().mockResolvedValue(undefined);

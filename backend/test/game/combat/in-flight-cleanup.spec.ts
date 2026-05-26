@@ -69,6 +69,7 @@ async function makeHarness(ships: ShipState[], seed = 1) {
       subscribers.push(h);
       return () => {};
     },
+    registerSnapshotProvider: jest.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
   const mineRepo = {
