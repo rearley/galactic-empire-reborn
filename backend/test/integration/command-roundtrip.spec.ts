@@ -93,6 +93,7 @@ describe('command round-trip integration (US1)', () => {
           return () => {};
         },
       ),
+      registerSnapshotProvider: jest.fn(),
     };
 
     // Construct a real ShipStateService using the mocked deps, then initialise it manually
@@ -344,6 +345,7 @@ describe('command round-trip integration (US1)', () => {
           return () => {};
         },
       ),
+      registerSnapshotProvider: jest.fn(),
     };
 
     const localShipService = new ShipStateService(
