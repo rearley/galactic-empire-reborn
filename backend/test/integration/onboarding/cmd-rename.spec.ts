@@ -80,6 +80,9 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
     mutate: mutateSpy,
     loadShip: jest.fn(),
     size: jest.fn().mockReturnValue(1),
+    findAllShips: jest.fn().mockReturnValue([testShip]),
+    findByUserid: jest.fn().mockReturnValue([testShip]),
+    flushAndUnload: jest.fn().mockResolvedValue(undefined),
   };
 
   const module: TestingModule = await Test.createTestingModule({
@@ -99,6 +102,7 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
         }),
         update: jest.fn().mockResolvedValue({}),
       },
+      user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
     })
     .overrideProvider(WsAuthGuard)
     .useValue({
@@ -356,6 +360,7 @@ describe('cmd rename — unbound socket (T058)', () => {
           findFirst: jest.fn().mockResolvedValue(null), // no DB ship → goes to onboarding
           update: jest.fn().mockResolvedValue({}),
         },
+        user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
       })
       .overrideProvider(WsAuthGuard)
       .useValue({

@@ -138,7 +138,7 @@ describe('T026 — sca se gateway integration', () => {
       const scanService = await makeScanService([self, ai, human, outsider], 50_000);
       gateway = makeGateway(scanService);
 
-      const result = scanService.command.handler(self, ['se'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['se'], {}) as Promise<CommandResult>);
 
       const { socket, calls: c } = makeMockSocket();
       calls = c;
@@ -223,7 +223,7 @@ describe('T026 — sca se gateway integration', () => {
       const scanService = await makeScanService([self]);
       const gateway = makeGateway(scanService);
 
-      const result = scanService.command.handler(self, ['se'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['se'], {}) as Promise<CommandResult>);
       const { socket, calls } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })
         .emitCommandResult(socket, result);
@@ -242,13 +242,13 @@ describe('T026 — sca se gateway integration', () => {
       const gateway = makeGateway(scanService);
 
       // First call: sca ra
-      const raResult = scanService.command.handler(self, ['ra', '5'], {}) as CommandResult;
+      const raResult = await (scanService.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
       const raCells = raResult.scanRender!.cells.filter(c => c.type === 'ship');
       expect(raCells.length).toBeGreaterThan(0);
       const raLetter = raCells[0].char;
 
       // Second call: sca se
-      const seResult = scanService.command.handler(self, ['se'], {}) as CommandResult;
+      const seResult = await (scanService.command.handler(self, ['se'], {}) as Promise<CommandResult>);
       const { socket, calls } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })
         .emitCommandResult(socket, seResult);
@@ -269,7 +269,7 @@ describe('T026 — sca se gateway integration', () => {
       const scanService = await makeScanService([self]);
       const gateway = makeGateway(scanService);
 
-      const result = scanService.command.handler(self, ['se'], {}) as CommandResult;
+      const result = await (scanService.command.handler(self, ['se'], {}) as Promise<CommandResult>);
       const { socket, calls: c } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })
         .emitCommandResult(socket, result);
