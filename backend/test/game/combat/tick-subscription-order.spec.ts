@@ -48,7 +48,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
     const subscriptions: Array<{ kind: TickKind; owner: string }> = [];
     const handlers: Array<{ owner: string; fn: (c: TickContext) => void }> = [];
 
-    const tickStub: Pick<TickService, 'subscribe'> = {
+    const tickStub: Pick<TickService, 'subscribe' | 'registerSnapshotProvider'> = {
       subscribe: jest.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
         // Identify owner by parsing the handler — we'll tag during register below
         // Instead we tag when we register manually, so this just collects.
@@ -57,6 +57,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
         handlers.push({ owner, fn });
         return () => undefined;
       }),
+      registerSnapshotProvider: jest.fn(),
     };
 
     // Build a fake ship map.
