@@ -153,3 +153,16 @@ describe('T060 — GEMAIN.H ↔ TS balance constant pins', () => {
     expect(mismatches).toEqual([]);
   });
 });
+
+import { PDAMMAX, PFIRDST, TORFACT, MISFACT, SE100DAM, PHATOWRP } from '../../src/game/constants';
+
+describe('combat balance constants (Plan 1)', () => {
+  it('pins phaser + lock + self-zap defaults', () => {
+    expect(PDAMMAX).toBe(200);
+    expect(PFIRDST).toBe(1);
+    expect(TORFACT).toBeCloseTo(0.1, 10);
+    expect(MISFACT).toBeCloseTo(0.1, 10);
+    expect(SE100DAM).toBe(101);
+    expect(PHATOWRP).toBe(0);
+  });
+});
