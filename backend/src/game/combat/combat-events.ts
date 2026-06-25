@@ -60,6 +60,14 @@ export interface CombatMineWarningEvent {
   tickAt: Date;
 }
 
+export const COMBAT_SUBSYSTEM_DAMAGED = 'combat.subsystem-damaged' as const;
+export interface CombatSubsystemDamagedEvent {
+  victimId: string;
+  subsystem: string;
+  sector: { x: number; y: number };
+  tickAt: Date;
+}
+
 export const COMBAT_SHIP_DESTROYED = 'combat.ship-destroyed' as const;
 export interface CombatShipDestroyedEvent {
   victimId: string;
