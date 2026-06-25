@@ -120,8 +120,10 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
 
   it('rejects when target has all MAXMISSL slots occupied (MIS_FULL)', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    // bob must be within lock range (~4.93 sectors) so the lock-quality gate passes
+    // and we actually reach the slot-full check. Moved from ycoord:100 → ycoord:1.
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 100,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
       lmisslChannel: [99, 99, 99],
       lmisslDistance: [1000, 2000, 3000],
       lmisslEnergy: [500, 500, 500],
@@ -137,8 +139,9 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
       userid: 'a', shipno: 9, xcoord: 0, ycoord: 0,
       energy: 50000, items: itemsWith({ [I_MISSL]: 4n }),
     });
+    // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 50,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -165,11 +168,79 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
       speed: WARP_THRESHOLD,
     });
-    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 50 });
+    // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1 });
     const h = makeHarness([alice, bob]);
     const result = h.handler.command.handler(alice, ['Bob', '500'], ctx) as CommandResult;
     // Should not be rejected for warp
     expect(result.lines[0].text).not.toContain('warp');
     expect(bob.lmisslChannel[0]).toBe(1);
+  });
+});
+
+describe('missile lock + cloak gates (Plan 1 T7)', () => {
+  let firer: ShipState;
+  let cloaked: ShipState;
+  let handler: MissileHandlerService;
+  let spawnTarget: (opts: { sectorsAway: number }) => ShipState;
+
+  beforeEach(() => {
+    firer = makeShip({ userid: 'f', shipno: 10, shipname: 'Firer', xcoord: 0, ycoord: 0 });
+    cloaked = makeShip({ userid: 'c', shipno: 11, shipname: 'Cloaked', xcoord: 0, ycoord: 0, cloak: 0 });
+
+    let nextShipno = 100;
+    const allShips: ShipState[] = [firer, cloaked];
+    const shipMap = new Map<string, ShipState>();
+    for (const s of allShips) shipMap.set(shipKey(s.userid, s.shipno), s);
+
+    spawnTarget = ({ sectorsAway }) => {
+      const no = nextShipno++;
+      const t = makeShip({
+        userid: 't', shipno: no, shipname: `Target${no}`,
+        xcoord: sectorsAway, ycoord: 0,
+      });
+      allShips.push(t);
+      shipMap.set(shipKey(t.userid, t.shipno), t);
+      return t;
+    };
+
+    const shipState = {
+      findAllShips: () => Array.from(shipMap.values()),
+      get: (userid: string, shipno: number) => shipMap.get(shipKey(userid, shipno)),
+      mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
+        const s = shipMap.get(shipKey(userid, shipno));
+        if (!s) return undefined;
+        fn(s);
+        s.dirty = true;
+        return s;
+      },
+    } as unknown as ShipStateService;
+
+    const cache = new ShipClassCacheService({} as never);
+    cache.setForTest(1, {
+      maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000,
+      scanRange: 100_000_000, maxTons: 5000, hasTorpedo: true, hasMissile: true,
+    } as never);
+
+    const events = new EventEmitter2();
+    handler = new MissileHandlerService(shipState, cache, events, new Mulberry32Adapter(42));
+  });
+
+  it('refuses to fire while cloaked', () => {
+    cloaked.cloak = 10;
+    const res = handler.command.handler(cloaked, ['enemy', '5000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/cloak/i);
+  });
+
+  it('fails to lock a target beyond ~4.9 sectors', () => {
+    const farTarget = spawnTarget({ sectorsAway: 6 });
+    const res = handler.command.handler(firer, [farTarget.shipname, '5000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/lock/i);
+  });
+
+  it('locks a near target', () => {
+    const nearTarget = spawnTarget({ sectorsAway: 1 });
+    const res = handler.command.handler(firer, [nearTarget.shipname, '5000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/away/i);
   });
 });

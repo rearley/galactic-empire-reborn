@@ -148,6 +148,7 @@ export enum MessageId {
 
   // missile (feature 006b) — GECMDS.C:cmd_missl
   MIS_NOMIS = 'MIS_NOMIS',
+  MIS_CLOAK = 'MIS_CLOAK',
   MIS_NOAMMO = 'MIS_NOAMMO',
   MIS_FULL = 'MIS_FULL',
   MIS_FMT = 'MIS_FMT',
@@ -504,6 +505,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // missile (feature 006b)
   [MessageId.MIS_NOMIS]: 'No missile launcher mounted.',
+  [MessageId.MIS_CLOAK]: 'Cannot fire while cloaked.',
   [MessageId.MIS_NOAMMO]: 'No missiles in cargo.',
   [MessageId.MIS_FULL]: 'Target already has maximum missiles incoming.',
   [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
