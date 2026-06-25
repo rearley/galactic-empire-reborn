@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { isInNeutralZone } from './neutral-zone';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
@@ -362,12 +363,8 @@ export class CombatTickService implements OnModuleInit {
     for (const ship of ships) {
       // Skip ships not in game.
       if (ship.status !== 1 && ship.status !== 2) continue;
-      // Neutral zone (0,0) — ships at xcoord ∈ (-0.5, 0.5) and ycoord ∈ (-0.5, 0.5)
-      // are inside sector (0,0) and immune to mines (R-3).
-      if (
-        ship.xcoord > -0.5 && ship.xcoord < 0.5 &&
-        ship.ycoord > -0.5 && ship.ycoord < 0.5
-      ) {
+      // Neutral zone (0,0) — ships inside sector (0,0) are immune to mines (R-3).
+      if (isInNeutralZone(ship)) {
         continue;
       }
 
