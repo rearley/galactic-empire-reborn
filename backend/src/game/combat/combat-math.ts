@@ -216,8 +216,9 @@ export function mineFalloff(distance: number, ton: number): number {
 }
 
 /**
- * Lock-quality factor for a torpedo/missile (GECMDS.C:1378-1392). Caller fires
- * only when the result is > 0.7.
+ * Lock-quality factor for a torpedo/missile (GECMDS.C:1378-1392). Returns an
+ * unbounded quality score (not a 0-1 probability); caller fires only when the
+ * result is > 0.7.
  *
  * @param kind        'torpedo' or 'missile'
  * @param firerSpeed  firer's current speed

@@ -108,7 +108,7 @@ export class TorpedoHandlerService {
     if (isInNeutralZone(target)) {
       return { lines: [{ text: formatMessage(MessageId.LOCK_NEUTRAL), category: 'system' }] };
     }
-    // Fully-cloaked target is unlockable (GECMDS.C:1371 cloak<10).
+    // C source locks only when target cloak < 10; we reject when cloak >= 10 (fully cloaked = unlockable). @see GECMDS.C:1371
     if (target.cloak >= 10) {
       return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
     }
