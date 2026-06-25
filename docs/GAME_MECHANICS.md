@@ -907,6 +907,75 @@ wrong direction (heavier = took more damage). That implementation has been remov
 
 ---
 
+### Mine-laying validations + timer (feature 025, C-004)
+
+**Source**: GECMDS.C:1722-1781 `cmd_mine`
+
+The `min [timer]` command enforces six gates (in order):
+
+1. **Class gate** — `ShipClassCacheService.getHasMine(shpclass)` must be true; rejects with `MINE_NOCLASS` otherwise.
+2. **Cloak gate** — `ship.cloak === 0`; a cloaked ship cannot lay mines (GECMDS.C:1741-1745 — same gate as phaser/torpedo/missile).
+3. **Neutral-zone gate** — `isInNeutralZone(coord)` causes a plain refusal (`MINE_NEUT`) with no damage to the firer. This differs from phaser/torpedo/missile (`zaphim` self-zap); C `cmd_mine` simply returns with a message and does not call `zaphim`.
+4. **Inventory gate** — `items[I_MINE] > 0` in cargo; rejects with `MINE_NONE`.
+5. **Per-player cap** — `MineRegistry.countByDeployer(ship.channel) < USERMINES (200)`. Prevents carpet-bombing a sector with an entire ammo stack.
+6. **Timer arg** — optional integer `1..50`, default 30. Parsed from `args[0]` if present; out-of-range rejected with `MINE_TIMER`.
+
+On success: create mine via `MineRepository.create()` + `MineRegistry.add()`, decrement `items[I_MINE]`, set `cantexit = FIRETICKS` (GECMDS.C:1778).
+
+New constants: `USERMINES=200`, `MINE_TIMER_MIN=1`, `MINE_TIMER_MAX=50`.
+
+---
+
+### Phaser fire drops shields (feature 025, C-008)
+
+**Source**: GECMDS.C:930-933 `firep` (`shielddn(ptr,usrn)` before fire; `shieldup` at end)
+
+When a player fires phasers, `PhaserHandlerService` now sets `ship.shieldstat = 0` immediately on fire (shields down). This mirrors the C source's momentary shield-drop so the firer is vulnerable to incoming hits during the `FIRETICKS` battle-lock window. Shields are not auto-raised after the lock expires — the player must issue `shi up` to restore them.
+
+Firing is not gated on shield state (the C source drops shields as a side effect, not a precondition). The shield drop applies to both normal phaser (`firep`) and hyperphaser (`firehp`) paths.
+
+---
+
+### Hyperphaser separation (feature 025, C-009)
+
+**Source**: GECMDS.C:841-865 `cmd_phas` (hyper branch), GECMDS.C:1020-1094 `firehp`, GEFUNCS.C:2069-2077 `pdamage` warp branch
+
+When the firer's speed is at or above `WARP_THRESHOLD (1000)`, `PhaserHandlerService` routes to the real `firehp` path instead of treating it as a wide-arc normal phaser. Differences from the normal phaser path:
+
+| Property | Normal phaser (`firep`) | Hyperphaser (`firehp`) |
+|----------|------------------------|------------------------|
+| Energy cost | `phasr` charge (debited on reload tick) | `HPFIRAMT (5000)` flux energy on fire |
+| Energy gate | `phasr >= PMINFIRE (60)` | `energy >= HPMINFIR (6000)` (else `HP_NOPOW`) |
+| `hypha` flag | not set | set on firer (`hypha = 1`) |
+| Beam arc | `focus + PHABIAS` degrees half-angle | fixed `HPBEAMW (5°)` half-angle |
+| Target gate | any target in arc | victim must ALSO be at warp (`where === 1`) |
+| Damage formula | `PDAMMAX * (1-dist/disfact)^PFIRDST * (1-focus/11)^2 * (phasr/100)` | `HPDAMMAX * (1-dist/40000)^HPFIRDST * phasrtype / (1+victim.maxTons/TONFACT)` |
+| Range cap | `inScanRange` (soft via damage falloff) | hard `ddistance < scanRange` |
+| Neutral-zone | self-zap (`zaphim`) | self-zap (`zaphim`) |
+
+**`hyperPhaserDamage(dist, phasrtype, maxTons)`** is a new pure function in `combat-math.ts`. The `withinArc` helper refactors the existing `lineOfFire` arc check, keeping `lineOfFire` byte-identical.
+
+AI droid hyper-phaser call sites (`droid-act-class-11.ts`, `droid-act-class-12.ts`) now call `hyperPhaserDamage` instead of the normal `phaserDamage`.
+
+New constants: `HPDAMMAX=200`, `HPFIRDST=1` (tunable defaults; C `.cnf` sentinel is `1`).
+
+---
+
+### Combat-disconnect kill (feature 025, P-001)
+
+**Source**: GEMAIN.C:1397 `warhupa` (`if (warsptr->cantexit > 0) killem(warsptr,usrn)`)
+
+A player who disconnects while combat-locked (`cantexit > 0`) is now killed — the canonical anti-rage-quit mechanic. `GameGateway.handleDisconnect` checks the disconnect reason before applying:
+
+- **Client-side reasons** (`transport close`, `transport error`, `ping timeout`, `client namespace disconnect`) → kill path: `CombatService.processKill(ship, lastFiredAttacker)` + `COMBAT_SHIP_DESTROYED` broadcast (galaxy-wide, identical to a normal death). Kill credit is awarded to `ship.lastfired` attacker if one exists; otherwise `null` attacker (crash-kill).
+- **Server-side reasons** (`server namespace disconnect`, `forced close`) → no kill; ship is flushed and unloaded as before. This preserves hot-reload behavior in development without a `NODE_ENV` gate.
+
+Non-combat-locked disconnects (`cantexit === 0`) are unaffected.
+
+The `COMBAT_SHIP_DESTROYED` event reuse means the kill flow is byte-identical to a normal in-combat death: cargo loot, score transfer, lock-slot cleanup, `removeFromGame`, and broadcast all fire via the existing `CombatService.processKill` path.
+
+---
+
 ### Planet revolt (feature 006b)
 
 **Source**: GEPLANET.C:341-380
