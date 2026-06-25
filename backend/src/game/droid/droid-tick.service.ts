@@ -57,13 +57,10 @@ import {
   CombatShipDestroyedEvent,
   COMBAT_PHASER_FIRED,
   COMBAT_HIT,
-  COMBAT_SUBSYSTEM_DAMAGED,
   CombatPhaserFiredEvent,
   CombatHitEvent,
-  CombatSubsystemDamagedEvent,
 } from '../combat/combat-events';
-import { applyRandamage } from '../combat/randamage.apply';
-import { RandamageCaps } from '../combat/combat-math';
+import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 
@@ -427,25 +424,7 @@ export class DroidTickService implements OnModuleInit {
       } satisfies CombatHitEvent);
 
       // @see GEFUNCS.C:randamage — called after every droid phaser hit (GEDROIDS.C → GECMDS.C:999)
-      const droidPhasrCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
-      try { droidPhasrCaps.hasShields = this.classCache.getMaxShields(target.shpclass) > 0; } catch { /* fallback */ }
-      try { droidPhasrCaps.hasPhasers = this.classCache.getMaxPhaser(target.shpclass) > 0; } catch { /* fallback */ }
-      try {
-        droidPhasrCaps.hasTorpOrMissile =
-          this.classCache.getHasTorpedo(target.shpclass) ||
-          this.classCache.getHasMissile(target.shpclass);
-      } catch { /* fallback */ }
-      try { droidPhasrCaps.hasCloak = this.classCache.getHasCloak(target.shpclass); } catch { /* fallback */ }
-      const droidPhasrRnd = applyRandamage(this.random, target, droidPhasrCaps, target.shieldtype);
-      if (droidPhasrRnd.subsystem !== 'none' && droidPhasrRnd.subsystem !== 'skipped') {
-        const droidPhasrSubEvent: CombatSubsystemDamagedEvent = {
-          victimId: shipKey(target.userid, target.shipno),
-          subsystem: droidPhasrRnd.subsystem,
-          sector,
-          tickAt: droidPhasrTickAt,
-        };
-        this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, droidPhasrSubEvent);
-      }
+      applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidPhasrTickAt);
     }
 
     droid.phasr = 0;
@@ -526,25 +505,7 @@ export class DroidTickService implements OnModuleInit {
         } satisfies CombatHitEvent);
 
         // @see GEFUNCS.C:randamage — called after every droid hyper-phaser hit (GEDROIDS.C → GECMDS.C:1082)
-        const droidHypCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
-        try { droidHypCaps.hasShields = this.classCache.getMaxShields(target.shpclass) > 0; } catch { /* fallback */ }
-        try { droidHypCaps.hasPhasers = this.classCache.getMaxPhaser(target.shpclass) > 0; } catch { /* fallback */ }
-        try {
-          droidHypCaps.hasTorpOrMissile =
-            this.classCache.getHasTorpedo(target.shpclass) ||
-            this.classCache.getHasMissile(target.shpclass);
-        } catch { /* fallback */ }
-        try { droidHypCaps.hasCloak = this.classCache.getHasCloak(target.shpclass); } catch { /* fallback */ }
-        const droidHypRnd = applyRandamage(this.random, target, droidHypCaps, target.shieldtype);
-        if (droidHypRnd.subsystem !== 'none' && droidHypRnd.subsystem !== 'skipped') {
-          const droidHypSubEvent: CombatSubsystemDamagedEvent = {
-            victimId: shipKey(target.userid, target.shipno),
-            subsystem: droidHypRnd.subsystem,
-            sector,
-            tickAt: droidHypTickAt,
-          };
-          this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, droidHypSubEvent);
-        }
+        applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidHypTickAt);
       }
     }
     droid.phasr = 0;
