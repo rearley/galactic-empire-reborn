@@ -1,3 +1,25 @@
+## 2026-06-25 — 024-ai-presence (Plan 2 of 3)
+
+**Completed:**
+- **C-005 — per-class damage scaling**: replaced the wrong tonnage-based `tonFact` with `damageScale(damageFactor) = 100 / victim.damageFactor` (the authentic C `ton_fact`; the `ShipClass.damageFactor` field already existed and is seeded — Interceptor 90, Heavy Freighter 200, Cybertron Base Star 2000, Sarten Attack Drone 30). Higher damageFactor = tougher (takes less damage). Wired the victim's damageFactor into projectile-hit and mine-sweep damage in combat-tick; added `ShipClassCacheService.getDamageFactor`. @see GEFUNCS.C:2661
+- **A-003 — Cybertron phaser fire now gated on `gebemean`** (was only `!cybwhoops`), matching GECYBS.C:514; `gebemean` evaluated once per `cyb_attack` and reused for the torp-count roll (PRNG-correct).
+- **Boot-seed**: the galaxy now fills the Cybertron population to per-class `tot_to_create` (24 total) at startup via `onModuleInit` (was ~70 minutes to populate one-per-slot). Controlled by `CYBERTRON_BOOT_SEED` env (default true). Extracted `spawnOne`; one-per-slot runtime spawn unchanged.
+
+**Tests:** New suites: `test/unit/damage-scale.spec.ts`, `test/game/cybertron/cyb-attack-gebemean.spec.ts`, `test/game/cybertron/boot-seed.spec.ts`; regenerated `rollHullDamage` golden vectors for the new formula; service-level victim-damageFactor test. `tsc` clean. Full Jest suite at 66-fail baseline; zero combat/AI failures.
+
+**Decisions made:**
+- Boot-seed default-on; set `CYBERTRON_BOOT_SEED=false` to disable.
+- `gebemean` evaluated once per `cyb_attack` call and shared with the torpedo-count roll (PRNG-correct, matches C source).
+- `ShipClass.damageFactor` field already existed and was seeded — no schema migration required.
+
+**Next:** Plan 3 — subsystem damage (C-010), hyperphaser separation (C-009), mines (C-004), shield-drop-to-fire (C-008), combat-disconnect kill (P-001), midnight team staleness (P-016).
+
+**Known issues:**
+- Pre-existing ~66-test stale baseline in midnight/scan/onboarding/handlers suites — separate cleanup track, unrelated to combat/AI.
+- No Dockerfiles or `docker-compose.yml` exist despite `CLAUDE.md` mandating them for dev+prod. Recommend creating a separate task before any production deploy.
+
+---
+
 ## 2026-06-25 — 023-combat-feel (Plan 1 of 3)
 
 **Completed:**
