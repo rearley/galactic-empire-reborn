@@ -13,6 +13,7 @@ import {
   phaserDamage,
   shieldhit,
 } from '../../combat/combat-math';
+import { isInNeutralZone } from '../../combat/neutral-zone';
 import {
   COMBAT_HIT,
   COMBAT_MISS,
@@ -23,8 +24,9 @@ import {
 } from '../../combat/combat-events';
 import {
   FIRETICKS,
-  HPBEAMW,
+  PHATOWRP,
   PMINFIRE,
+  SE100DAM,
   WARP_THRESHOLD,
 } from '../../constants';
 import { CombatTickService } from '../../combat/combat-tick.service';
@@ -32,31 +34,40 @@ import { CombatTickService } from '../../combat/combat-tick.service';
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
  *
- * Validations (mirror GECMDS.C:cmd_phasor):
+ * Command form (GECMDS.C:cmd_phas 868-892):
+ *   `pha <degree>`           → focus defaults to 1
+ *   `pha <degree> <focus>`   → focus ∈ [0, 5]
+ *
+ * `degree` is a RELATIVE bearing ∈ [−180, 180]; the absolute firing direction
+ * is `heading + degree` (GEFUNCS.C:valdegree). The beam half-angle is
+ * `focus + PHABIAS` (GECMDS.C:954). Phaser always FULLY discharges on fire
+ * (`phasr → 0`, GECMDS.C:1006).
+ *
+ * Validations (mirror GECMDS.C:firep 914-1013):
  *   1. `phasrtype > 0` (phaser mounted) — else PHA_NOPHAS
  *   2. `phasr >= PMINFIRE` — else PHA_NOPOW
- *   3. bearing ∈ [0, 359] — else NUMOOR(0,359)
- *   4. percent ∈ [1, 100] — else NUMOOR(1,100)
- *   5. firer's `jammer > 0` — else JAMMER4 (FR-017)
+ *   3. degree ∈ [−180, 180] — else NUMOOR(−180, 180)
+ *   4. focus ∈ [0, 5] (when supplied) — else NUMOOR(0, 5)
+ *   5. firer not cloaked (`cloak == 0`) — else PHA_CLOAK (GECMDS.C:923)
+ *   6. firing inside the neutral zone self-zaps (GECMDS.C:937 zaphim):
+ *      firer takes SE100DAM hull damage, phasr → 0, no outgoing damage.
  *
- * Hyper-phaser path: when the firer's `speed >= WARP_THRESHOLD` (warp), the
- * beam width is fixed at `HPBEAMW=5°` regardless of the percent argument.
- * Below warp, beam width equals the percent argument.
+ * Per victim (GECMDS.C:946-1004): a victim at warp is unreachable unless
+ * `phasrtype >= PHATOWRP` (949); victims inside the neutral zone are immune
+ * (951); the candidate must be in scan range (C-001) and within the firing
+ * arc. Damage comes from `phaserDamage(...)` (integer) and is applied through
+ * raised shields via `shieldhit`, else straight to hull. Each hit victim and
+ * the firer get `cantexit = FIRETICKS`.
  *
- * For each ship in scan range (no team filter — friendly fire is allowed,
- * FR-005), `lineOfFire` decides hit; on hit `phaserDamage` → `shieldhit`
- * mutates `victim.shield` and `victim.damage` via `ShipStateService.mutate`.
- * Each victim's `lastfired` is set to the firer's `shipno` (channel) and
- * `cantexit` is set to FIRETICKS (FR-028a). The firer's `cantexit` is also
- * set to FIRETICKS, and `phasr` is debited by `(percent / 100) * maxPhaser`.
+ * Note: the hyper-phaser path (firer at warp) is Plan 3 / C-009. For Plan 1
+ * the firer simply fires the normal beam regardless of its own speed.
  *
  * Emits:
  *   - `combat.phaser-fired` once
  *   - `combat.hit` per victim hit
  *   - `combat.miss` once iff no victims hit
  *
- * @see GECMDS.C:cmd_phasor
- * @see GEFUNCS.C:firephas
+ * @see GECMDS.C:cmd_phas, GECMDS.C:firep
  */
 @Injectable()
 export class PhaserHandlerService {
@@ -74,7 +85,7 @@ export class PhaserHandlerService {
   readonly command: Command = {
     keyword: 'pha',
     aliases: ['phasor'],
-    minArgs: 2,
+    minArgs: 1,
     argMissingMessage: formatMessage(MessageId.PHA_FMT),
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
       return this.handle(ship, args);
@@ -92,53 +103,61 @@ export class PhaserHandlerService {
       return { lines: [{ text: formatMessage(MessageId.PHA_NOPOW), category: 'system' }] };
     }
 
-    // Parse args
-    const bearingArg = args[0] ?? '';
-    const percentArg = args[1] ?? '';
-    if (!/^-?\d+$/.test(bearingArg.trim()) || !/^-?\d+$/.test(percentArg.trim())) {
+    // Parse: pha <degree> [focus]
+    const degreeArg = (args[0] ?? '').trim();
+    if (!/^-?\d+$/.test(degreeArg)) {
       return { lines: [{ text: formatMessage(MessageId.PHA_FMT), category: 'system' }] };
     }
-    const bearing = parseInt(bearingArg, 10);
-    const percent = parseInt(percentArg, 10);
-
-    // 3. Bearing in [0, 359]
-    if (bearing < 0 || bearing > 359) {
-      return { lines: [{ text: formatMessage(MessageId.NUMOOR, 0, 359), category: 'system' }] };
+    const degree = parseInt(degreeArg, 10);
+    if (degree < -180 || degree > 180) {
+      return { lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }] };
+    }
+    let focus = 1; // `pha <degree>` ⇒ focus defaults to 1 (GECMDS.C:874)
+    if (args[1] !== undefined) {
+      const focusArg = args[1].trim();
+      if (!/^\d+$/.test(focusArg)) {
+        return { lines: [{ text: formatMessage(MessageId.PHA_FMT), category: 'system' }] };
+      }
+      focus = parseInt(focusArg, 10);
+      if (focus < 0 || focus > 5) {
+        return { lines: [{ text: formatMessage(MessageId.NUMOOR, 0, 5), category: 'system' }] };
+      }
     }
 
-    // 4. Percent in [1, 100]
-    if (percent < 1 || percent > 100) {
-      return { lines: [{ text: formatMessage(MessageId.NUMOOR, 1, 100), category: 'system' }] };
+    // 5. Cloak gate (GECMDS.C:923)
+    if (ship.cloak > 0) {
+      return { lines: [{ text: formatMessage(MessageId.PHA_CLOAK), category: 'system' }] };
     }
 
-    // 5. Jammer active on firer? (FR-017)
-    if (ship.jammer > 0) {
-      return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
-    }
-
-    const maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
     const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
     const sectorX = Math.floor(ship.xcoord);
     const sectorY = Math.floor(ship.ycoord);
     const tickAt = new Date();
     const attackerId = shipKey(ship.userid, ship.shipno);
 
-    // Hyper-phaser path?
-    const hyper = ship.speed >= WARP_THRESHOLD;
-    const beamWidth = hyper ? HPBEAMW : percent;
-    // In hyper-phaser the phasor is fully discharged (100%); else by `percent`.
-    const dischargePercent = hyper ? 100 : percent;
+    // Current phaser charge feeds the damage formula (phasr/100 scaling).
+    const phasrCharge = ship.phasr;
 
-    // Emit fired event
+    // Emit fired event. `bearing`/`percent` carry the relative degree/focus.
     const firedEvent: CombatPhaserFiredEvent = {
       shipId: attackerId,
-      bearing,
-      percent,
-      hyper,
+      bearing: degree,
+      percent: focus,
+      hyper: false,
       sector: { x: sectorX, y: sectorY },
       tickAt,
     };
     this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
+
+    // 6. Neutral-zone self-zap (GECMDS.C:937-941 zaphim): firer backfires.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.phasr = 0;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+    }
 
     // Find victims in arc.
     const allShips = this.shipState.findAllShips();
@@ -151,21 +170,34 @@ export class PhaserHandlerService {
       // Skip not ingame
       if (candidate.status !== 1 && candidate.status !== 2) continue;
 
-      const range = cdistance(ship, candidate);
+      const victimAtWarp = candidate.speed >= WARP_THRESHOLD;
+      // Victim-at-warp gate: only hit a warping victim if phasrtype >= PHATOWRP (GECMDS.C:949).
+      if (victimAtWarp && ship.phasrtype < PHATOWRP) continue;
+      // Victims inside the neutral zone are immune (GECMDS.C:951).
+      if (isInNeutralZone(candidate)) continue;
       // C-001 audit 022: phasers must not reach beyond the firer's scanner range.
-      // @see GECMDS.C:946-1004 firep
-      // @see GEFUNCS.C:2060-2092 pdamage
-      // @see specs/022-fidelity-audit-v2/findings.md C-001
+      // @see GECMDS.C:946-1004 firep  @see specs/022-fidelity-audit-v2/findings.md C-001
       if (!inScanRange(ship, candidate, scanRange)) continue;
-      if (!lineOfFire(ship, candidate, bearing, beamWidth)) continue;
+      if (!lineOfFire(ship, candidate, degree, focus)) continue;
 
-      const damage = phaserDamage(dischargePercent, range, maxPhaser);
+      const distRaw = cdistance(ship, candidate) * 10000;
+      const damage = phaserDamage({
+        phasrtype: ship.phasrtype,
+        phasr: phasrCharge,
+        distRaw,
+        focus,
+        victimMaxTons: this.shipClassCache.getMaxTons(candidate.shpclass),
+        victimAtWarp,
+      });
+      // C: `if (damage >= 1)` gates the hit.
+      if (damage < 1) continue;
+
       const shieldUp = candidate.shieldstat === 1 && candidate.shield > 0;
-      let hullDamage = Math.floor(damage);
+      let hullDamage = damage;
       let shieldConsumed = 0;
 
       if (shieldUp) {
-        const r = shieldhit(candidate.shield, candidate.shieldtype, Math.floor(damage));
+        const r = shieldhit(candidate.shield, candidate.shieldtype, damage);
         this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
           v.shield = r.newCharge;
           if (r.knockedDown) v.shieldstat = 0;
@@ -219,10 +251,9 @@ export class PhaserHandlerService {
       lines.push({ text: 'Phasers fired — no targets in arc.', category: 'combat' });
     }
 
-    // Debit firer
-    const drained = (dischargePercent / 100) * maxPhaser;
+    // Full discharge of the firer (GECMDS.C:1006).
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      s.phasr = s.phasr - drained;
+      s.phasr = 0;
       s.cantexit = FIRETICKS;
     });
 

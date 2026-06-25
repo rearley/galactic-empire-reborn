@@ -14,7 +14,7 @@ import {
   CombatHitEvent,
   CombatMissEvent,
 } from '../../../../src/game/combat/combat-events';
-import { FIRETICKS, PMINFIRE, WARP_THRESHOLD, HPBEAMW } from '../../../../src/game/constants';
+import { FIRETICKS, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -97,32 +97,30 @@ function makeHarness(
 
 const ctx: CommandContext = {};
 
-describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
+describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
   it('happy path — Bob in Alice\'s firing arc takes damage and shield drops', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 0 });
-    // Bob due north at range 5 (within the C-001 scanRange gate of 10 sectors).
-    // Convention: y decreases northward — see GEFUNCS.C / lineOfFire atan2(dx,-dy).
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 5, ycoord: 5 });
+    // Bob due north at range 1 (inside the normal-phaser damage curve; a
+    // phasrtype-1 beam reaches ~2.4 sectors). Convention: y decreases
+    // northward — see GEFUNCS.C / lineOfFire atan2(dx,-dy).
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: -5, shield: 5000, shieldstat: 1, damage: 0,
+      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
-    const result = h.handler.command.handler(alice, ['0', '50'], ctx) as CommandResult;
+    const result = h.handler.command.handler(alice, ['0', '0'], ctx) as CommandResult;
     expect(result.lines.length).toBeGreaterThan(0);
     expect(bob.shield).toBeLessThan(5000);
-    // Bob should take some damage (shield will absorb most, hull may take rest)
     expect(bob.dirty).toBe(true);
-    // Phaser charge consumed
-    expect(alice.phasr).toBe(100 - 500); // 50% of maxPhaser=1000 = 500 → 100-500=-400, but should be 100-500
-    // Actually: percent/100 * maxPhaser = 0.5 * 1000 = 500
-    // alice.phasr = 100 - 500 = -400 — but allow this raw value; semantic is "drained"
+    // Phaser always FULLY discharges on fire (GECMDS.C:1006).
+    expect(alice.phasr).toBe(0);
   });
 
   it('rejects when no phaser class mounted (phasrtype === 0)', () => {
     const alice = makeShip({ phasrtype: 0 });
     const h = makeHarness([alice]);
-    const result = h.handler.command.handler(alice, ['90', '50'], ctx) as CommandResult;
+    const result = h.handler.command.handler(alice, ['90', '0'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.PHA_NOPHAS));
     expect(alice.dirty).toBe(false);
   });
@@ -130,124 +128,104 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
   it('rejects when phasr < PMINFIRE', () => {
     const alice = makeShip({ phasr: PMINFIRE - 1 });
     const h = makeHarness([alice]);
-    const result = h.handler.command.handler(alice, ['90', '50'], ctx) as CommandResult;
+    const result = h.handler.command.handler(alice, ['90', '0'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.PHA_NOPOW));
     expect(alice.dirty).toBe(false);
   });
 
-  it('rejects bearing out of [0, 359]', () => {
+  it('rejects degree out of [-180, 180]', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
-    const result = h.handler.command.handler(alice, ['400', '50'], ctx) as CommandResult;
+    const result = h.handler.command.handler(alice, ['400', '0'], ctx) as CommandResult;
     expect(result.lines[0].category).toBe('system');
     expect(result.lines[0].text).toContain('out of range');
     expect(alice.dirty).toBe(false);
   });
 
-  it('rejects percent out of [1, 100]', () => {
+  it('rejects focus out of [0, 5]', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
-    const result = h.handler.command.handler(alice, ['90', '150'], ctx) as CommandResult;
+    const result = h.handler.command.handler(alice, ['90', '6'], ctx) as CommandResult;
     expect(result.lines[0].category).toBe('system');
     expect(result.lines[0].text).toContain('out of range');
     expect(alice.dirty).toBe(false);
   });
 
-  it('hyper-phaser path — when speed >= WARP_THRESHOLD uses HPBEAMW=5 not the percent arg', () => {
+  it('firer at warp still fires the normal beam (hyper-phaser is Plan 3 / out of scope)', () => {
     const alice = makeShip({
-      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
-      speed: WARP_THRESHOLD, phasr: 1000,
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, phasr: 100,
     });
-    // Place Bob 4 degrees off bearing 0 (compass north), range 5 (within
-    // C-001 scanRange gate). With percent=80 (impulse) the arc would be 80°
-    // wide (easy hit). With hyper-phaser, beamWidth = HPBEAMW = 5 → halfWidth
-    // = (5+2)/2 = 3.5 → 4° is OUTSIDE arc = MISS. Convention: y decreases
-    // northward, so north uses -cos and east uses +sin.
-    const rad = (4 * Math.PI) / 180;
+    // Bob due north at range 1 — squarely inside the firing arc.
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5 * Math.sin(rad), ycoord: -5 * Math.cos(rad),
-      shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0', '80'], ctx);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
 
-    // Hyper-phaser fired event flagged as hyper
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
     expect(fired).toBeDefined();
-    expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(true);
-    // 4° is outside hyper-phaser arc → no hit
+    // Plan 1 never flags hyper — the firer's own speed is ignored.
+    expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(false);
+    // Normal beam still lands a hit on the in-arc victim.
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
-    expect(hit).toBeUndefined();
-    // Should have a miss instead
-    const miss = h.emitted.find((e) => e.event === COMBAT_MISS);
-    expect(miss).toBeDefined();
-    // Confirm HPBEAMW reference was used
-    expect(HPBEAMW).toBe(5);
+    expect(hit).toBeDefined();
   });
 
   it('friendly fire allowed — same userid hit if in arc', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const ally = makeShip({
       userid: 'a', shipno: 2, shipname: 'Ally',
-      xcoord: 0, ycoord: -5, shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, ally]);
-    h.handler.command.handler(alice, ['0', '50'], ctx);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(ally.shield).toBeLessThan(5000);
     expect(ally.dirty).toBe(true);
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
   });
 
-  it('PHABIAS arc-widening — target outside `percent` but within `percent + PHABIAS` is a hit', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    // Target 4.5° off bearing 0 (compass north), range 5 (within C-001
-    // scanRange gate). With percent=6, halfWidth = (6+2)/2 = 4 → MISS.
-    // With percent=8, halfWidth = (8+2)/2 = 5 → HIT (PHABIAS widens by 2°).
-    // Convention: y decreases northward.
+  it('PHABIAS arc-widening — target outside `focus` but within `focus + PHABIAS` is a hit', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
+    // Target 4.5° off bearing 0 (compass north), range 1. The arc half-angle
+    // is `focus + PHABIAS` (GECMDS.C:954). With focus=3 the half-angle is
+    // 3 + 2 = 5 → 4.5° is INSIDE the arc = HIT; without the +PHABIAS widening
+    // (3°) it would MISS. Convention: y decreases northward.
     const rad = (4.5 * Math.PI) / 180;
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5 * Math.sin(rad), ycoord: -5 * Math.cos(rad),
+      xcoord: 5 + Math.sin(rad), ycoord: 5 - Math.cos(rad),
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0', '8'], ctx);
+    h.handler.command.handler(alice, ['0', '3'], ctx);
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
     expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
   });
 
-  it('rejects with JAMMER4 when firer\'s jammer > 0', () => {
-    const alice = makeShip({ jammer: 5 });
-    const h = makeHarness([alice]);
-    const result = h.handler.command.handler(alice, ['90', '50'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.JAMMER4));
-    expect(alice.dirty).toBe(false);
-  });
-
   it('sets cantexit = FIRETICKS on firer and on every hit victim', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0, cantexit: 0 });
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, cantexit: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 0, ycoord: -5,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
       shield: 5000, shieldstat: 1, cantexit: 0,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '50'], ctx);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(alice.cantexit).toBe(FIRETICKS);
     expect(bob.cantexit).toBe(FIRETICKS);
   });
 
   it('emits COMBAT_MISS when no targets in arc', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    // Bob due south at range 5 (within scanRange gate). Fire bearing 0 (north)
-    // — bob is at 180° from firing direction, well outside any arc.
-    // Convention: y decreases northward, so +y = south.
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
+    // Bob due south at range 1. Fire degree 0 (north) — bob is at 180° from
+    // the firing direction, well outside any arc. y decreases northward, +y = south.
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 0, ycoord: 5,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 6,
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -257,19 +235,86 @@ describe('PhaserHandlerService — `pha <bearing> <percent>`', () => {
     expect((miss!.payload as CombatMissEvent).attackerId).toBe(shipKey('a', 1));
   });
 
-  it('emits COMBAT_PHASER_FIRED with hyper=false at impulse speed', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, speed: 100 });
+  it('emits COMBAT_PHASER_FIRED with hyper=false carrying degree/focus', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, speed: 100 });
     const h = makeHarness([alice]);
-    h.handler.command.handler(alice, ['90', '50'], ctx);
+    h.handler.command.handler(alice, ['90', '5'], ctx);
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
     expect(fired).toBeDefined();
     expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(false);
     expect((fired!.payload as CombatPhaserFiredEvent).bearing).toBe(90);
-    expect((fired!.payload as CombatPhaserFiredEvent).percent).toBe(50);
+    expect((fired!.payload as CombatPhaserFiredEvent).percent).toBe(5);
   });
 
   it('keyword is "pha" with alias "phasor"', () => {
     const h = makeHarness([makeShip()]);
     expect(h.handler.command.keyword).toBe('pha');
+  });
+});
+
+describe('pha command semantics (Plan 1 T5)', () => {
+  const getShip = (h: Harness, s: ShipState): ShipState =>
+    h.shipMap.get(shipKey(s.userid, s.shipno))!;
+
+  it('accepts `pha <degree>` with focus defaulting to 1', () => {
+    // firer phasrtype>=1, phasr>=PMINFIRE, not cloaked, not in NZ, not at warp.
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['0'], ctx) as CommandResult;
+    expect(res.lines.some((l) => /no targets|hit/i.test(l.text))).toBe(true);
+  });
+
+  it('rejects degree outside −180..180', () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['200', '0'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/-180|180/);
+  });
+
+  it('rejects focus outside 0..5', () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['0', '6'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/0.*5|5/);
+  });
+
+  it('refuses to fire while cloaked', () => {
+    const cloaked = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, cloak: 10 });
+    const h = makeHarness([cloaked]);
+    const res = h.handler.command.handler(cloaked, ['0', '0'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/cloak/i);
+    expect(getShip(h, cloaked).phasr).toBe(100); // not discharged
+  });
+
+  it('firing inside the neutral zone self-zaps and deals no outgoing damage', () => {
+    const firerInNZ = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0, phasr: 100, phasrtype: 1 });
+    // Victim due north at range 1 (would be a clean in-arc hit if we fired normally).
+    const victim = makeShip({ userid: 'b', shipno: 2, xcoord: 0, ycoord: -1, damage: 0 });
+    const h = makeHarness([firerInNZ, victim]);
+    h.handler.command.handler(firerInNZ, ['0', '0'], ctx);
+    expect(getShip(h, firerInNZ).damage).toBeGreaterThanOrEqual(SE100DAM);
+    expect(getShip(h, firerInNZ).phasr).toBe(0); // self-zap also discharges
+    expect(getShip(h, victim).damage).toBe(0);
+  });
+
+  it('fully discharges phasr to 0 after firing', () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100 });
+    const h = makeHarness([firer]);
+    h.handler.command.handler(firer, ['0', '0'], ctx);
+    expect(getShip(h, firer).phasr).toBe(0);
+  });
+
+  it('still hits a victim at warp (PHATOWRP=0) — damage is halved but lands', () => {
+    // With PHATOWRP=0 any phaser can reach a warping victim; the damage is
+    // halved (T4) but still ≥1 at close range, so the hit lands.
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
+    const warpVictim = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: 2000, damage: 0,
+    });
+    const h = makeHarness([firer, warpVictim]);
+    const res = h.handler.command.handler(firer, ['0', '0'], ctx) as CommandResult;
+    expect(res.lines.some((l) => /hit/i.test(l.text))).toBe(true);
+    expect(getShip(h, warpVictim).damage).toBeGreaterThan(0);
   });
 });

@@ -135,6 +135,8 @@ export enum MessageId {
   PHA_NOPHAS = 'PHA_NOPHAS',
   PHA_NOPOW = 'PHA_NOPOW',
   PHA_FMT = 'PHA_FMT',
+  PHA_CLOAK = 'PHA_CLOAK',
+  WPN_ZAP = 'WPN_ZAP',
 
   // torpedo (feature 006b) — GECMDS.C:cmd_torpedo
   TOR_NOTOR = 'TOR_NOTOR',
@@ -484,7 +486,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // phaser (feature 006b) — GECMDS.C:cmd_phasor
   [MessageId.PHA_NOPHAS]: 'No phaser class mounted.',
   [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
-  [MessageId.PHA_FMT]: 'Format: pha <bearing> <percent>',
+  [MessageId.PHA_FMT]: 'Format: pha <degree -180..180> [focus 0-5]',
+  [MessageId.PHA_CLOAK]: 'Cannot fire while cloaked.',
+  [MessageId.WPN_ZAP]: 'You fired inside the neutral zone! Your own weapons backfire!',
 
   // torpedo (feature 006b)
   [MessageId.TOR_NOTOR]: 'No torpedo launcher mounted.',

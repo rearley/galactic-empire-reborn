@@ -92,16 +92,23 @@ function makeHarness(ships: ShipState[], scanRange: number): {
 const ctx: CommandContext = {};
 
 describe('PhaserHandlerService — C-001 range gate', () => {
+  // These tests isolate the scanRange gate from the phaser DAMAGE-falloff
+  // curve. A normal phaser (phasrtype 1) drops to zero damage at ~2.4 sectors
+  // (disfact = 20000 + 1*4000 = 24000 raw units), well inside a 10-sector scan
+  // range — so to prove the *scan-range* boundary specifically, we mount the
+  // sysop phaser (phasrtype 20), which deals a flat 101 damage at ANY distance.
+  // That way the only thing that can stop a hit is the scanRange gate itself.
+  // Firing direction: degree 90 relative to heading 0 ⇒ absolute east.
   it('does not hit a target outside scanRange (cdistance × 10000 > scanRange)', () => {
-    // scanRange = 100000 (Interceptor) ⇒ 10 sectors. Target at 20 sectors east.
-    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0, heading: 0 });
+    // scanRange = 100000 ⇒ 10 sectors. Target at 20 sectors east.
+    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20 });
     const farTarget = makeShip({
       userid: 'u2', shipno: 2, shipname: 'Far',
-      xcoord: 20, ycoord: 0, status: 1,
+      xcoord: 20, ycoord: 5, status: 1,
     });
     const { handler, emitted } = makeHarness([firer, farTarget], 100000);
 
-    handler.command.handler(firer, ['90', '100'], ctx);
+    handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     const misses = emitted.filter((e) => e.event === COMBAT_MISS);
@@ -111,14 +118,14 @@ describe('PhaserHandlerService — C-001 range gate', () => {
 
   it('still hits a target inside scanRange at the same bearing', () => {
     // 5 sectors east = cdistance 5 → 50000 units (well within 100000 scan range).
-    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0, heading: 0 });
+    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20 });
     const nearTarget = makeShip({
       userid: 'u3', shipno: 3, shipname: 'Near',
-      xcoord: 5, ycoord: 0, status: 1,
+      xcoord: 5, ycoord: 5, status: 1,
     });
     const { handler, emitted } = makeHarness([firer, nearTarget], 100000);
 
-    handler.command.handler(firer, ['90', '100'], ctx);
+    handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     expect(hits).toHaveLength(1);
@@ -128,14 +135,14 @@ describe('PhaserHandlerService — C-001 range gate', () => {
     // scanRange = 100000 ⇒ exactly 10 sectors. cdistance*10000 must be STRICTLY
     // less than scanRange to count, matching find-ship.ts: `dist*10000 > scanRange`
     // is the rejection threshold.
-    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0, heading: 0 });
+    const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20 });
     const boundary = makeShip({
       userid: 'u4', shipno: 4, shipname: 'Boundary',
-      xcoord: 10.001, ycoord: 0, status: 1,
+      xcoord: 10.001, ycoord: 5, status: 1,
     });
     const { handler, emitted } = makeHarness([firer, boundary], 100000);
 
-    handler.command.handler(firer, ['90', '100'], ctx);
+    handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     expect(hits).toHaveLength(0);
