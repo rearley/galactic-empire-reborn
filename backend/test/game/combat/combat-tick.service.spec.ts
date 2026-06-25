@@ -361,6 +361,37 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(bob.damage).toBeGreaterThan(0);
   });
 
+  it('victim damageFactor 200 scales hull damage to half of neutral (Plan 2 T1 review fix)', async () => {
+    // Helper: run the same missile-hit scenario (seed 99, alice→bob, shields down)
+    // but with an overridden damageFactor for the victim's ship class (class 1).
+    // Both runs get a fresh Mulberry32Adapter(99) so PRNG state is identical,
+    // meaning rand.next() returns the same value in both calls to rollHullDamage.
+    const runMissileHit = async (victimDamageFactor: number): Promise<number> => {
+      const alice = makeShip({ userid: 'a', shipno: 9, xcoord: 0, ycoord: 0 });
+      const bob = makeShip({
+        userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+        shield: 0, shieldstat: 0, damage: 0,
+        lmisslChannel: [9, 255, 255],
+        lmisslDistance: [10, 0, 0],
+        lmisslEnergy: [2000, 0, 0],
+      });
+      const h = await makeHarnessSeeded([alice, bob], 99);
+      // Override the damageFactor for class 1 (bob's shpclass) to the desired value.
+      h.classCache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, damageFactor: victimDamageFactor });
+      await h.fire();
+      return bob.damage;
+    };
+
+    const dmg100 = await runMissileHit(100); // neutral: multiplier = 1.0×
+    const dmg200 = await runMissileHit(200); // double factor: multiplier = 0.5×
+
+    // rollHullDamage = floor(rand * dmgMax * (100/factor)).
+    // Since floor(floor(x) * 0.5) === floor(x * 0.5) for all x ≥ 0, this
+    // identity holds regardless of the specific PRNG output.
+    expect(dmg100).toBeGreaterThan(0);
+    expect(dmg200).toBe(Math.floor(dmg100 * 0.5));
+  });
+
   it('decoy intercept — when carrier has active decoy and roll succeeds, emit COMBAT_DECOY_INTERCEPT and clear slot, no COMBAT_HIT', async () => {
     // Mulberry32(99) first next() ≈ 0.26 < 0.5 (DECODDS=50) → intercept fires.
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
