@@ -7,7 +7,7 @@ import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { Mulberry32Adapter } from '../../../../src/game/combat/random.port';
 import { cdistance } from '../../../../src/game/combat/combat-math';
-import { FIRETICKS, MAXTORPS, WARP_THRESHOLD } from '../../../../src/game/constants';
+import { FIRETICKS, MAXTORPS, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
 import { I_TORP } from '../../../../src/game/constants/items';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
@@ -172,11 +172,15 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
   });
 
   it('firing from inside the neutral zone self-zaps and does not lock (Plan 1 T8)', () => {
-    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const firer = makeShip({
+      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
+      items: itemsWith({ [I_TORP]: 1n }),
+    });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['Bob'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/neutral zone/i);
-    expect(firer.damage).toBeGreaterThanOrEqual(101);
+    expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
+    expect(firer.cantexit).toBe(FIRETICKS);
     // No target lock allocated — firer returned early
     expect(firer.ltorpsChannel.length).toBe(0);
   });
