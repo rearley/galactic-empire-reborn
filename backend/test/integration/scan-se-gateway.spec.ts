@@ -109,6 +109,7 @@ function makeGateway(scanHandler: ScanHandlerService): GameGateway {
     {} as unknown as OnboardingService,
     scanHandler,
     mockRandom,
+    { emit: jest.fn(), on: jest.fn() } as never,
   );
 }
 

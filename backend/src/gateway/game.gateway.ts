@@ -8,7 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Inject, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
@@ -100,6 +100,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(GameGateway.name);
 
+  /**
+   * Disconnect reasons produced by the CLIENT (browser drop, timeout).
+   * Server-side reasons ('server namespace disconnect', 'server shutting down')
+   * are NOT in this set and must never trigger the combat-kill.
+   *
+   * Note: 'transport error' (transient network blips) IS included here.
+   * A brief reconnect hiccup mid-combat is treated as a rage-quit — an accepted
+   * tradeoff matching the C anti-rage-quit intent (@see GEMAIN.C:warhupa line 1397).
+   */
+  private static readonly CLIENT_SIDE_REASONS = new Set([
+    'transport close',
+    'transport error',
+    'ping timeout',
+    'client namespace disconnect',
+  ]);
+
   constructor(
     private readonly shipStateService: ShipStateService,
     private readonly commandRouter: CommandRouterService,
@@ -109,6 +125,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
     @Inject(RANDOM) private readonly random: Random,
+    private readonly events: EventEmitter2,
   ) {}
 
   /**
@@ -242,7 +259,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.broadcast.emit('player.joined', connectedPlayer);
   }
 
-  handleDisconnect(client: Socket): void {
+  async handleDisconnect(client: Socket): Promise<void> {
     this.logger.log(`disconnect ${client.id}`);
     const userid = client.data.userid as string | undefined;
     const activeShipNo = client.data.activeShipNo as number | undefined;
@@ -259,23 +276,57 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // produced by NestJS hot-reload and graceful shutdown — they must never
         // trigger the kill. The reason-gate is sufficient: hot-reload calls
         // server.disconnect() which Socket.io maps to 'server namespace disconnect',
-        // a server-side reason not present in CLIENT_SIDE_REASONS below.
+        // a server-side reason not present in CLIENT_SIDE_REASONS.
         const reason = client.data.disconnectReason as string | undefined;
-        const CLIENT_SIDE_REASONS = new Set([
-          'transport close',
-          'transport error',
-          'ping timeout',
-          'client namespace disconnect',
-        ]);
-        const isClientSide = CLIENT_SIDE_REASONS.has(reason ?? '');
+        const isClientSide = GameGateway.CLIENT_SIDE_REASONS.has(reason ?? '');
 
         if (ship.cantexit > 0 && isClientSide) {
-          // Kill path: reset DB row to spawn defaults (mirrors handleCombatShipDestroyed),
-          // then evict from memory without flushing the stale in-combat state.
-          void this.prisma.ship.updateMany({
-            where: { userid, shipno: activeShipNo },
-            data: { damage: 0, energy: 65000, xcoord: 0.5, ycoord: 0.5, heading: 0, speed: 0, where: 0 },
-          });
+          // Kill path: emit COMBAT_SHIP_DESTROYED so the existing handler resets
+          // the DB row, broadcasts the kill, and PlayerScoreService awards credit.
+          // @see GEMAIN.C:warhupa killem — attacker attribution via ship.lastfired.
+
+          // Resolve attacker by lastfired channel (same logic as
+          // CombatTickService.findActiveAttackerByChannel).
+          const victimKey = shipKey(userid, activeShipNo);
+          const attackerShip = this.shipStateService.findAllShips().find(
+            (s) =>
+              s.shipno === ship.lastfired &&
+              shipKey(s.userid, s.shipno) !== victimKey &&
+              (s.status === 1 || s.status === 2),
+          );
+
+          // Look up kill-score points for the victim's ship class via Prisma.
+          // PlayerScoreService no-ops when scoreAwarded=0 or attackerUserid=null.
+          let scoreAwarded = 0;
+          try {
+            const cls = await this.prisma.shipClass.findFirst({
+              where: { classNumber: ship.shpclass },
+              select: { points: true },
+            });
+            scoreAwarded = cls?.points ?? 0;
+          } catch {
+            // Non-fatal: score defaults to 0; kill still fires without credit.
+          }
+
+          const destroyedEvent: CombatShipDestroyedEvent = {
+            victimId: victimKey,
+            attackerId: attackerShip ? shipKey(attackerShip.userid, attackerShip.shipno) : null,
+            victimShipKey: victimKey,
+            attackerShipKey: attackerShip ? shipKey(attackerShip.userid, attackerShip.shipno) : null,
+            victimUserid: userid,
+            attackerUserid: attackerShip ? attackerShip.userid : null,
+            attackerChannel: ship.lastfired,
+            weapon: null,
+            sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
+            tickAt: new Date(),
+            loot: [],
+            scoreAwarded,
+          };
+
+          // Emit via EventEmitter2 — triggers handleCombatShipDestroyed (DB reset +
+          // galaxy broadcast) and PlayerScoreService (kill credit transfer).
+          // removeFromGame is NOT done by the handler, so we call it explicitly here.
+          this.events.emit(COMBAT_SHIP_DESTROYED, destroyedEvent);
           this.shipStateService.removeFromGame(ship);
         } else {
           // Normal path: flush current state to DB and unload from memory.

@@ -49,6 +49,7 @@ describe('GameGateway combat broadcasts', () => {
       mockOnboarding,
       mockScanHandler,
       mockRandom,
+      { emit: jest.fn(), on: jest.fn() } as never,
     );
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
