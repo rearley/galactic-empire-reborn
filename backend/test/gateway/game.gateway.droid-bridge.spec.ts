@@ -49,6 +49,7 @@ describe('GameGateway — droid event bridge', () => {
       mockOnboarding,
       mockScanHandler,
       mockRandom,
+      { emit: jest.fn(), on: jest.fn() } as never,
     );
 
     // Inject the mock socket.io Server

@@ -3,9 +3,10 @@
  *
  * When a player disconnects while combat-locked (cantexit > 0) via a CLIENT-SIDE
  * Socket.io reason (transport close, ping timeout, etc.), their ship must be
- * killed (DB row reset to spawn defaults, memory state evicted) — mirroring the
- * handleCombatShipDestroyed path. Server-side disconnects (hot-reload, graceful
- * shutdown) and non-combat-locked disconnects must NOT trigger the kill.
+ * killed — COMBAT_SHIP_DESTROYED is emitted (triggering DB reset via
+ * handleCombatShipDestroyed + PlayerScoreService kill credit), and the ship is
+ * evicted from memory. Server-side disconnects (hot-reload, graceful shutdown)
+ * and non-combat-locked disconnects must NOT trigger the kill.
  *
  * @see GEMAIN.C:warhupa (line 1397) — if (cantexit > 0) killem(ship)
  * @see specs/025-combat-depth-persistence/plan.md P-001
@@ -19,6 +20,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
 
 describe('GameGateway — combat-disconnect kill (P-001)', () => {
@@ -28,9 +30,12 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let flushAndUnloadMock: jest.Mock;
   let removeFromGameMock: jest.Mock;
   let getSvcMock: jest.Mock;
+  let findAllShipsMock: jest.Mock;
+  let eventsEmitMock: jest.Mock;
+  let shipClassFindFirstMock: jest.Mock;
 
   /** Minimal ship state shape — cantexit controlled per-test. */
-  const makeShip = (cantexit: number) => ({
+  const makeShip = (cantexit: number, lastfired = 255, status = 1) => ({
     userid: 'user1',
     shipno: 1,
     shipname: 'Defiant',
@@ -38,6 +43,8 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     xcoord: 5.7,
     ycoord: 3.2,
     cantexit,
+    lastfired,
+    status,
   });
 
   /** Build a mock Socket with controllable client.data. */
@@ -68,6 +75,9 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     updateManyMock = jest.fn().mockResolvedValue({ count: 1 });
     flushAndUnloadMock = jest.fn().mockResolvedValue(undefined);
     removeFromGameMock = jest.fn();
+    findAllShipsMock = jest.fn().mockReturnValue([]);
+    eventsEmitMock = jest.fn();
+    shipClassFindFirstMock = jest.fn().mockResolvedValue({ points: 500 });
     // getSvcMock is replaced per-test to return the desired ship
     getSvcMock = jest.fn();
 
@@ -75,6 +85,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       get: getSvcMock,
       flushAndUnload: flushAndUnloadMock,
       removeFromGame: removeFromGameMock,
+      findAllShips: findAllShipsMock,
       findByUserid: jest.fn().mockReturnValue([]),
     };
 
@@ -86,12 +97,16 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: updateManyMock,
       },
+      shipClass: {
+        findFirst: shipClassFindFirstMock,
+      },
       user: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
     const mockOnboarding = {
       buildClassListPayload: jest.fn().mockResolvedValue([]),
     } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockEvents = { emit: eventsEmitMock, on: jest.fn() };
 
     gateway = new GameGateway(
       mockShipStateSvc as ShipStateService,
@@ -102,6 +117,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       mockOnboarding,
       mockScanHandler,
       mockRandom,
+      mockEvents as never,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
@@ -110,28 +126,23 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
   });
 
   // ------------------------------------------------------------------ //
-  // RED tests — these should FAIL before the implementation is in place //
+  // Kill path — COMBAT_SHIP_DESTROYED emitted, memory evicted, no flush //
   // ------------------------------------------------------------------ //
 
-  it('kills ship when combat-locked (cantexit>0) and disconnect reason is transport close', () => {
+  it('emits COMBAT_SHIP_DESTROYED and evicts ship when combat-locked and disconnect reason is transport close', async () => {
     getSvcMock.mockReturnValue(makeShip(3)); // cantexit = 3 → combat-locked
     const socket = makeSocket('transport close');
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
 
-    // DB row must be reset to spawn defaults (same as handleCombatShipDestroyed)
-    expect(updateManyMock).toHaveBeenCalledWith(
+    // COMBAT_SHIP_DESTROYED must be emitted via EventEmitter2
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
       expect.objectContaining({
-        where: { userid: 'user1', shipno: 1 },
-        data: expect.objectContaining({
-          damage: 0,
-          energy: 65000,
-          xcoord: 0.5,
-          ycoord: 0.5,
-          heading: 0,
-          speed: 0,
-          where: 0,
-        }),
+        victimUserid: 'user1',
+        victimShipKey: 'user1:1',
+        weapon: null,
+        loot: [],
       }),
     );
 
@@ -140,57 +151,157 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       expect.objectContaining({ userid: 'user1', shipno: 1 }),
     );
 
-    // Normal flush must NOT be called (DB was already reset above)
+    // Normal flush must NOT be called (kill path took over)
     expect(flushAndUnloadMock).not.toHaveBeenCalled();
+    // Inline updateMany must NOT be called (handler now owns the DB reset)
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
-  it('kills ship when combat-locked (cantexit>0) and disconnect reason is ping timeout', () => {
+  it('emits COMBAT_SHIP_DESTROYED when combat-locked and disconnect reason is ping timeout', async () => {
     getSvcMock.mockReturnValue(makeShip(5));
     const socket = makeSocket('ping timeout');
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
 
-    expect(updateManyMock).toHaveBeenCalled();
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({ victimUserid: 'user1' }),
+    );
     expect(removeFromGameMock).toHaveBeenCalled();
     expect(flushAndUnloadMock).not.toHaveBeenCalled();
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
-  it('does NOT kill ship when combat-locked but disconnect reason is server namespace disconnect (hot-reload)', () => {
+  it('attributes kill to attacker when lastfired matches an active ship', async () => {
+    // The victim's lastfired = 7 (attacker channel/shipno)
+    getSvcMock.mockReturnValue(makeShip(3, 7));
+    // findAllShips returns an active attacker ship with shipno === 7
+    findAllShipsMock.mockReturnValue([
+      {
+        userid: 'attacker-user',
+        shipno: 7,
+        shipname: 'Raider',
+        shpclass: 2,
+        xcoord: 5.0,
+        ycoord: 3.0,
+        status: 1,
+      },
+    ]);
+    const socket = makeSocket('transport close');
+
+    await gateway.handleDisconnect(socket as never);
+
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({
+        victimUserid: 'user1',
+        attackerUserid: 'attacker-user',
+        attackerShipKey: 'attacker-user:7',
+        scoreAwarded: 500, // from shipClassFindFirstMock
+      }),
+    );
+  });
+
+  it('emits with null attacker when lastfired has no matching active ship', async () => {
+    getSvcMock.mockReturnValue(makeShip(3, 42));
+    findAllShipsMock.mockReturnValue([]); // no ships → attacker not found
+    const socket = makeSocket('transport close');
+
+    await gateway.handleDisconnect(socket as never);
+
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({
+        victimUserid: 'user1',
+        attackerId: null,
+        attackerShipKey: null,
+        attackerUserid: null,
+      }),
+    );
+    // Kill still fires (victim dies + broadcast) even without attacker
+    expect(removeFromGameMock).toHaveBeenCalled();
+  });
+
+  it('includes scoreAwarded from shipClass lookup', async () => {
+    shipClassFindFirstMock.mockResolvedValue({ points: 750 });
+    getSvcMock.mockReturnValue(makeShip(3));
+    const socket = makeSocket('transport close');
+
+    await gateway.handleDisconnect(socket as never);
+
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({ scoreAwarded: 750 }),
+    );
+  });
+
+  it('uses scoreAwarded=0 when shipClass lookup fails', async () => {
+    shipClassFindFirstMock.mockRejectedValue(new Error('DB error'));
+    getSvcMock.mockReturnValue(makeShip(3));
+    const socket = makeSocket('transport close');
+
+    await gateway.handleDisconnect(socket as never);
+
+    expect(eventsEmitMock).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({ scoreAwarded: 0 }),
+    );
+    // Kill still fires despite score lookup failure
+    expect(removeFromGameMock).toHaveBeenCalled();
+  });
+
+  // ------------------------------------------------------------------ //
+  // No-kill path — normal flush, no kill event                          //
+  // ------------------------------------------------------------------ //
+
+  it('does NOT kill ship when combat-locked but disconnect reason is server namespace disconnect (hot-reload)', async () => {
     getSvcMock.mockReturnValue(makeShip(3)); // cantexit = 3 → combat-locked
     const socket = makeSocket('server namespace disconnect');
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
 
-    // Kill path must NOT run
-    expect(updateManyMock).not.toHaveBeenCalled();
+    // Kill event must NOT be emitted
+    expect(eventsEmitMock).not.toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.anything(),
+    );
     expect(removeFromGameMock).not.toHaveBeenCalled();
+    expect(updateManyMock).not.toHaveBeenCalled();
 
     // Normal flush must run instead
     expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
   });
 
-  it('does NOT kill ship when NOT combat-locked (cantexit===0) with a client-side disconnect reason', () => {
+  it('does NOT kill ship when NOT combat-locked (cantexit===0) with a client-side disconnect reason', async () => {
     getSvcMock.mockReturnValue(makeShip(0)); // cantexit = 0 → normal logout
     const socket = makeSocket('transport close');
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
 
-    // Kill path must NOT run
-    expect(updateManyMock).not.toHaveBeenCalled();
+    // Kill event must NOT be emitted
+    expect(eventsEmitMock).not.toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.anything(),
+    );
     expect(removeFromGameMock).not.toHaveBeenCalled();
+    expect(updateManyMock).not.toHaveBeenCalled();
 
     // Normal flush must run
     expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
   });
 
-  it('does NOT kill ship when disconnect reason is undefined (e.g. no prior client.on capture)', () => {
+  it('does NOT kill ship when disconnect reason is undefined (e.g. no prior client.on capture)', async () => {
     getSvcMock.mockReturnValue(makeShip(3)); // combat-locked
     const socket = makeSocket(undefined); // no reason captured
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
 
-    expect(updateManyMock).not.toHaveBeenCalled();
+    expect(eventsEmitMock).not.toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.anything(),
+    );
     expect(removeFromGameMock).not.toHaveBeenCalled();
+    expect(updateManyMock).not.toHaveBeenCalled();
     expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
   });
 });

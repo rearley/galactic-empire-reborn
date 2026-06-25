@@ -92,6 +92,7 @@ describe('GameGateway player.snapshot', () => {
       mockOnboarding,
       mockScanHandler,
       mockRandom,
+      { emit: jest.fn(), on: jest.fn() } as never,
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,

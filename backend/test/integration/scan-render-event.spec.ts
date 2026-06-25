@@ -65,6 +65,7 @@ function makeGateway(): GameGateway {
     onboardingService,
     scanHandler,
     mockRandom,
+    { emit: jest.fn(), on: jest.fn() } as never,
   );
 }
 
