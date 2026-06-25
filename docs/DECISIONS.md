@@ -1151,3 +1151,15 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 **Reason**: Threading inbox logic into `MaintHandlerService` would conflate two concerns (maintenance gate + inbox) in one class. A dedicated dispatcher is testable in isolation — the inbox path and maintenance delegation each have their own mocks. SC-005 (maintenance regression) is satisfied because the maintenance gate is called with the original args, not re-implemented.
 
 **Alternatives rejected**: Modifying `MaintHandlerService` to accept an injected inbox service and branch internally — rejected because it would grow a class that already has a well-defined single responsibility. Also rejected: registering two separate handlers for the same keyword — the CommandRouterService registry is keyed by keyword/alias, so only one handler can own `mai`.
+
+---
+
+## 2026-06-25 — Cybertron cyb_attack evaluates gebemean once
+
+**Context**: Original C `cyb_attack` (GECYBS.C:514 and :527) makes two INDEPENDENT `gebemean` (`gernd()%CYBSLO`) draws — one gating phaser fire, one suppressing the torpedo volley. A non-quad cyb facing a low-kill player could fire one weapon but not the other on a lucky roll.
+
+**Decision**: The TS port evaluates `gebemean` once per `cyb_attack` invocation and reuses it for both the phaser gate and the torpedo-count roll.
+
+**Reason**: Simpler and deterministic PRNG consumption — the pre-existing TS code already rolled it once. The divergence is confined to the 1-in-CYBSLO random branch against players with `kills < CYB_BE_NICE` (when quad or `kills ≥ CYB_BE_NICE` both C draws are deterministically equal anyway). The original author of the TS port flagged that region as possibly-dead code, and playtest will surface any cadence issues immediately.
+
+**Alternatives rejected**: Two independent draws for strict C fidelity — deferred; revisit if Cybertron fire cadence feels off in playtest.

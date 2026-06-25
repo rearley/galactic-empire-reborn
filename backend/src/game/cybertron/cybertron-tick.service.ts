@@ -803,7 +803,7 @@ export class CybertronTickService implements OnModuleInit {
       tick,
     });
 
-    const tickAt = ctx !== undefined && 'tickNumber' in ctx ? ctx.tickNumber : 0;
+    const tickAt = ctx ? ctx.tickNumber : 0;
     const payload: CybertronSpawnedPayload = {
       shipKey: `${userid}:${shipno}`,
       classNumber,

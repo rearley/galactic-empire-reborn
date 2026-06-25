@@ -20,6 +20,9 @@ const devOnlyControllers = process.env.NODE_ENV !== 'production' ? [CybertronDeb
  * @see GECYBS.C — cyb_lives state machine
  */
 @Module({
+  // PhysicsModule must stay imported — onModuleInit boot-seed reads ShipClassCacheService
+  // to populate spawn stats (phasrtype, shieldtype); dropping it would silently spawn
+  // Cybertrons with fallback phaser/shield type 1 (too weak for gameplay).
   imports: [CombatModule, PhysicsModule, ShipModule, TickModule, PrismaModule, EventEmitterModule],
   controllers: [...devOnlyControllers],
   providers: [CybertronTickService, CybertronRepository],
