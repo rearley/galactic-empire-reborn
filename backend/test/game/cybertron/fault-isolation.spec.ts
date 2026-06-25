@@ -119,6 +119,10 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
         if (n === 999) throw new Error('Class 999 not in cache');
         return 2;
       },
+      getMaxTons: (n: number) => {
+        if (n === 999) throw new Error('Class 999 not in cache');
+        return 900;
+      },
     } as unknown as ShipClassCacheService;
 
     const repository = {

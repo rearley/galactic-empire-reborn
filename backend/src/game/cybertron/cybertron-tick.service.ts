@@ -398,14 +398,16 @@ export class CybertronTickService implements OnModuleInit {
       });
     }
 
-    let maxPhaser = 1;
-    try {
-      maxPhaser = this.shipClassCache.getMaxPhaser(ship.shpclass);
-    } catch { /* fallback */ }
-
     const dist = cdistance(ship, target);
-    if (lineOfFire(ship, target, bearing, 100)) {
-      const damage = phaserDamage(100, dist, maxPhaser);
+    if (lineOfFire(ship, target, bearing, 0)) {
+      const damage = phaserDamage({
+        phasrtype: ship.phasrtype,
+        phasr: ship.phasr,
+        distRaw: dist * 10000,
+        focus: 0,
+        victimMaxTons: this.shipClassCache.getMaxTons(target.shpclass),
+        victimAtWarp: target.speed >= WARP_THRESHOLD,
+      });
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
       let hullDamage = Math.floor(damage);
       let shieldConsumed = 0;

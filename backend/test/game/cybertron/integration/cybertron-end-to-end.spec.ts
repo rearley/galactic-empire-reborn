@@ -108,6 +108,10 @@ function buildHarness(seed = 77) {
       const cls = classCache.get(n) as { maxPhaser?: number } | undefined;
       return cls?.maxPhaser ?? 1;
     },
+    getMaxTons: (n: number) => {
+      const cls = classCache.get(n) as { maxTons?: number } | undefined;
+      return cls?.maxTons ?? 100;
+    },
     setClass: (n: number, e: unknown) => classCache.set(n, e),
   } as unknown as ShipClassCacheService & { setClass: (n: number, e: unknown) => void };
 

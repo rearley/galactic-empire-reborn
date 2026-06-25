@@ -105,6 +105,7 @@ function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harn
   const classCache = {
     get: (_n: number): ShipClassEntry => BASE_CLASS_ENTRY,
     getMaxPhaser: (_n: number) => 5,
+    getMaxTons: (_n: number) => 500,
     getMaxShields: (_n: number) => 2,
   } as unknown as ShipClassCacheService;
 
@@ -238,6 +239,7 @@ describe('T035 — ephemerality invariants', () => {
       const classCache = {
         get: () => BASE_CLASS_ENTRY,
         getMaxPhaser: () => 5,
+        getMaxTons: () => 500,
         getMaxShields: () => 2,
       } as unknown as ShipClassCacheService;
 

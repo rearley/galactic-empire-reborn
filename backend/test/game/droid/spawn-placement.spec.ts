@@ -69,6 +69,7 @@ function buildSpawner(seed: number): { spawner: DroidSpawner; loadShipSpy: jest.
   const classCache = {
     get: (n: number) => entryFor(n),
     getMaxPhaser: (n: number) => entryFor(n)?.maxPhaser ?? 1,
+    getMaxTons: (n: number) => entryFor(n)?.maxTons ?? 100,
     getMaxShields: (n: number) => entryFor(n)?.maxShields ?? 1,
   } as unknown as ShipClassCacheService;
 

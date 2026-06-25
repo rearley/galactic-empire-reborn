@@ -102,6 +102,7 @@ function buildHarness() {
   const classCache = {
     get: (_n: number): ShipClassEntry => BASE_CLASS_ENTRY,
     getMaxPhaser: (_n: number) => 5,
+    getMaxTons: (_n: number) => 500,
     getMaxShields: (_n: number) => 2,
   } as unknown as ShipClassCacheService;
 

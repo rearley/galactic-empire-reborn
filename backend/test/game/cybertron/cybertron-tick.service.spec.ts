@@ -101,6 +101,8 @@ function buildHarness(seed = 42) {
   const classCache = new Map<number, ReturnType<ShipClassCacheService['get']>>();
   const shipClassCache = {
     get: (n: number) => classCache.get(n),
+    getMaxPhaser: (n: number) => { const e = classCache.get(n); if (!e) throw new Error(`Class ${n} not found`); return e.maxPhaser; },
+    getMaxTons: (n: number) => { const e = classCache.get(n); if (!e) throw new Error(`Class ${n} not found`); return e.maxTons; },
     setClass: (n: number, e: ReturnType<ShipClassCacheService['get']>) => classCache.set(n, e),
   } as unknown as ShipClassCacheService & { setClass: (n: number, e: unknown) => void };
 
