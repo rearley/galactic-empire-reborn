@@ -10,9 +10,11 @@ import {
   COMBAT_PHASER_FIRED,
   COMBAT_HIT,
   COMBAT_MISS,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatPhaserFiredEvent,
   CombatHitEvent,
   CombatMissEvent,
+  CombatSubsystemDamagedEvent,
 } from '../../../../src/game/combat/combat-events';
 import { FIRETICKS, HPFIRAMT, HPMINFIR, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
 
@@ -529,5 +531,69 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(h.emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
     // No fire event.
     expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
+  });
+});
+
+describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => {
+  const getShip = (h: Harness, s: ShipState): ShipState =>
+    h.shipMap.get(shipKey(s.userid, s.shipno))!;
+
+  // Seed 7: after phaser hit on bob at damage=0 → damage=70 (phasrtype=1 at range 1 sector).
+  // rand #1: roll check = floor(0.0117 * (31/1.5)) = 0 → proceed.
+  // rand #2: which = 4 → tactical.
+  // rand #3: magnitude = -floor(v3 * 80).
+  it('C-010: normal phaser hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and tactical mutated', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      shield: 0, shieldstat: 0, damage: 0,
+    });
+    // Seed 7 so rand #1 → roll check = 0 → subsystem hit
+    const random = new Mulberry32Adapter(7);
+    const shipMap = new Map<string, ShipState>();
+    shipMap.set(shipKey(alice.userid, alice.shipno), alice);
+    shipMap.set(shipKey(bob.userid, bob.shipno), bob);
+    const shipState = {
+      findAllShips: () => Array.from(shipMap.values()),
+      get: (uid: string, no: number) => shipMap.get(shipKey(uid, no)),
+      mutate: (uid: string, no: number, fn: (s: ShipState) => void) => {
+        const s = shipMap.get(shipKey(uid, no));
+        if (!s) return undefined;
+        fn(s);
+        s.dirty = true;
+        return s;
+      },
+    } as unknown as import('../../../../src/game/ship/ship-state.service').ShipStateService;
+    const cache = new ShipClassCacheService({} as never);
+    cache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000, scanRange: 100000, maxTons: 5000 } as never);
+    const events = new EventEmitter2();
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+    const handler = new PhaserHandlerService(shipState, cache, events, random);
+
+    handler.command.handler(alice, ['0', '0'], ctx);
+
+    // Bob must have been hit (damage > 0) and subsystem event emitted
+    expect(getShip({ handler, shipMap, events, emitted, cache }, bob).damage).toBeGreaterThan(0);
+    const subEvt = emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED);
+    expect(subEvt).toBeDefined();
+    expect((subEvt!.payload as CombatSubsystemDamagedEvent).victimId).toBe(shipKey('b', 2));
+    expect((subEvt!.payload as CombatSubsystemDamagedEvent).subsystem).toBe('tactical');
+    expect(getShip({ handler, shipMap, events, emitted, cache }, bob).tactical).not.toBe(0);
+  });
+
+  it('C-010: normal phaser hit with shields fully absorbing (hull=0, damage stays 0) — no COMBAT_SUBSYSTEM_DAMAGED', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      shield: 9999, shieldstat: 1, shieldtype: 1, damage: 0,
+    });
+    const h = makeHarness([alice, bob]);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+    // Shields absorbed hit, damage stays 0 ≤ 20 → rollRandamage returns 'none'
+    expect(h.emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED)).toBeUndefined();
   });
 });

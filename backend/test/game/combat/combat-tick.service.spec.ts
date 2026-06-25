@@ -12,8 +12,10 @@ import { CommandResult, CommandContext } from '../../../src/game/commands/comman
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
+  CombatSubsystemDamagedEvent,
 } from '../../../src/game/combat/combat-events';
 import {
   DECOYTIME,
@@ -419,6 +421,57 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(bob.ltorpsChannel[0]).toBe(255);
     // No hit emitted
     expect(emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+  });
+
+  // C-010: applyRandamage wired after every projectile hit.
+  // Seed 93: rand #1 → rollHullDamage, victim starts damage=50.
+  //   hullD=50 → damage=100; rand #2 gives roll=0; rand #3 → which=4 (tactical).
+  it('C-010: torpedo hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and subsystem field mutated', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0, phasrtype: 0 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      shield: 0, shieldstat: 0, damage: 50,
+      ltorpsChannel: [7, 255, 255],
+      ltorpsDistance: [10, 0, 0],
+    });
+    const h = await makeHarnessSeeded([alice, bob], 93);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+
+    const subEvt = emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED);
+    expect(subEvt).toBeDefined();
+    expect((subEvt!.payload as CombatSubsystemDamagedEvent).victimId).toBe('b:2');
+    expect((subEvt!.payload as CombatSubsystemDamagedEvent).subsystem).toBe('tactical');
+    // tactical field must be mutated (negative magnitude)
+    expect(bob.tactical).not.toBe(0);
+  });
+
+  it('C-010: torpedo hit with shields fully absorbing (hull=0, damage stays 0) — no COMBAT_SUBSYSTEM_DAMAGED', async () => {
+    const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0, phasrtype: 0 });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
+      shield: 9999, shieldstat: 1, shieldtype: 1, damage: 0,
+      ltorpsChannel: [7, 255, 255],
+      ltorpsDistance: [10, 0, 0],
+    });
+    const h = await makeHarnessSeeded([alice, bob], 93);
+
+    const emitted: Array<{ event: string; payload: unknown }> = [];
+    h.events.onAny((event: string | string[], payload: unknown) => {
+      const ev = Array.isArray(event) ? event.join('.') : event;
+      emitted.push({ event: ev, payload });
+    });
+
+    await h.fire();
+
+    // damage stays 0 (shields absorbed), rollRandamage returns 'none'
+    expect(emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED)).toBeUndefined();
   });
 
   it('FR-027.3 — carrier not ingame mid-flight: slot silently cleared, no hit, no decoy event', async () => {
