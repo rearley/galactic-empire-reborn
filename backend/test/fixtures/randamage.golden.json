@@ -1,8 +1,8 @@
 [
-  { "rngSeed": 1, "dmgMax": 200, "ton": 5000, "expected": 62 },
-  { "rngSeed": 1, "dmgMax": 200, "ton": 10000, "expected": 125 },
-  { "rngSeed": 1, "dmgMax": 200, "ton": 500, "expected": 12 },
-  { "rngSeed": 42, "dmgMax": 150, "ton": 7500, "expected": 67 },
-  { "rngSeed": 99, "dmgMax": 100, "ton": 10000, "expected": 26 },
-  { "rngSeed": 99, "dmgMax": 100, "ton": 1000, "expected": 2 }
+  { "rngSeed": 1,  "dmgMax": 200, "damageFactor": 90,   "expected": 139 },
+  { "rngSeed": 1,  "dmgMax": 200, "damageFactor": 100,  "expected": 125 },
+  { "rngSeed": 1,  "dmgMax": 200, "damageFactor": 125,  "expected": 100 },
+  { "rngSeed": 42, "dmgMax": 150, "damageFactor": 200,  "expected": 45  },
+  { "rngSeed": 99, "dmgMax": 100, "damageFactor": 2000, "expected": 1   },
+  { "rngSeed": 99, "dmgMax": 100, "damageFactor": 90,   "expected": 28  }
 ]
