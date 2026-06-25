@@ -233,12 +233,11 @@ export const SE100DAM = 101 as const;
 /** @see GEMAIN.C:598 numopt(PHATOWRP,0,100) — min phasrtype to hit a warping victim with normal phaser. */
 export const PHATOWRP = 0 as const;
 
-/** Shield status: raised. @see GEMAIN.H:159 #define SHIELDUP 1 */
-export const SHIELDUP = 1 as const;
-/** Shield status: lowered. @see GEMAIN.H:160 #define SHIELDDN 2 */
-export const SHIELDDN = 2 as const;
 /** Shield status: damaged (subsystem hit). @see GEMAIN.H:161 #define SHIELDDM 3 */
 export const SHIELDDM = 3 as const;
+// Note: SHIELDUP (1) and SHIELDDN (2) are C source values — the port uses 0=down, 1=up, 3=damaged.
+// SHIELDDN=2 does not match the port's usage (port uses 0 for "down"), so those constants were
+// removed to avoid confusion. SHIELDDM=3 is kept because it IS used in the port.
 
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;

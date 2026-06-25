@@ -40,7 +40,12 @@ export class LockHandlerService {
   };
 
   private handle(ship: ShipState, args: string[]): CommandResult {
-    // 1. Jammer reject — cannot acquire locks while jammed.
+    // 1. Fire control damaged — GECMDS.C:1346-1351 lockon first check (C-010, Fix 1)
+    if (ship.firecntl > 0) {
+      return { lines: [{ text: formatMessage(MessageId.FCBROKE), category: 'system' }] };
+    }
+
+    // 2. Jammer reject — cannot acquire locks while jammed.
     if (ship.jammer > 0) {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }

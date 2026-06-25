@@ -459,7 +459,9 @@ export class CombatTickService implements OnModuleInit {
     // Only ships with a phaser mounted accumulate charge (phasrtype > 0).
     // Interceptor double-reload bonus (shpclass==2) is commented out in shipped C.
     // @see GEFUNCS.C:checkdam line 1031
-    if (ship.phasrtype > 0 && ship.phasr < 100) {
+    // Negative phasr is handled only by the 1s ship-update tick (GEFUNCS.C:1015-1018 checkdam).
+    // The 6s reload must not lift negative phasr — gate requires phasr >= 0.
+    if (ship.phasrtype > 0 && ship.phasr >= 0 && ship.phasr < 100) {
       const reloadAmt = phaserReloadAmount(ship.phasrtype);
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.phasr = Math.min(100, s.phasr + reloadAmt);

@@ -95,7 +95,12 @@ export class MissileHandlerService {
       };
     }
 
-    // 3. Jammer
+    // 3. Fire control damaged — GECMDS.C:1346-1351 lockon first check (C-010, Fix 1)
+    if (ship.firecntl > 0) {
+      return { lines: [{ text: formatMessage(MessageId.FCBROKE), category: 'system' }] };
+    }
+
+    // 3b. Jammer
     if (ship.jammer > 0) {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }

@@ -102,4 +102,23 @@ describe('LockHandlerService — `loc <target>`', () => {
     expect(alice.lock).toBe(NOLOCK_SENTINEL);
     expect(result.lines[0].category).toBe('system');
   });
+
+  // Fix 1 — FCBROKE lock gate (@see GECMDS.C:1346-1351 lockon)
+  it('rejects with FCBROKE when firecntl > 0 (before jammer gate)', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', firecntl: 3 });
+    const bob = makeShip({ userid: 'b', shipno: 7, shipname: 'Bob', xcoord: 100, ycoord: 100 });
+    const h = makeHarness([alice, bob]);
+    const result = h.command.handler(alice, ['Bob'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.FCBROKE));
+    expect(alice.lock).toBe(NOLOCK_SENTINEL); // lock unchanged
+  });
+
+  it('firecntl=0: FCBROKE gate does not block loc command', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', firecntl: 0 });
+    const bob = makeShip({ userid: 'b', shipno: 7, shipname: 'Bob', xcoord: 100, ycoord: 100 });
+    const h = makeHarness([alice, bob]);
+    const result = h.command.handler(alice, ['Bob'], ctx) as CommandResult;
+    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.FCBROKE));
+    expect(alice.lock).toBe(7);
+  });
 });

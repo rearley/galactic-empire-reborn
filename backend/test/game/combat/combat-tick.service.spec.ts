@@ -708,6 +708,25 @@ describe('CombatTickService — decoy/jammer expiry (T036)', () => {
   });
 });
 
+// Fix 2 — negative phasr must NOT be lifted by the 6s reload path (GEFUNCS.C:1015-1018)
+describe('CombatTickService — negative phasr reload gate (Fix 2)', () => {
+  it('phasr=-5: physics reload does NOT lift while negative (stays at -5)', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: -5, energy: 50000 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    // Must remain negative — slow recovery is handled by ship-tick (1s), not combat-tick (6s)
+    expect(ship.phasr).toBe(-5);
+  });
+
+  it('phasr=0: reload begins at 0 (not blocked)', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: 0, energy: 50000 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    // phasr=0 is not negative, so normal reload applies
+    expect(ship.phasr).toBeGreaterThan(0);
+  });
+});
+
 describe('CombatTickService — battle-lock + shield gating (T052)', () => {
   it('decrements ship.cantexit by 1 per physics tick (FR-028a)', async () => {
     const ship = makeShip({ userid: 'a', shipno: 1, cantexit: 3 });

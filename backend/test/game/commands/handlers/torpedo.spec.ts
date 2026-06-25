@@ -196,4 +196,31 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     h.handler.command.handler(alice, ['Bob'], ctx);
     expect(bob.ltorpsChannel[1]).toBe(5);
   });
+
+  // Fix 1 — FCBROKE lock gate (@see GECMDS.C:1346-1351 lockon firecntl check)
+  it('rejects with FCBROKE when firecntl > 0 (fire control damaged)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
+      firecntl: 5, items: itemsWith({ [I_TORP]: 3n }),
+    });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
+    const h = makeHarness([alice, bob]);
+    const result = h.handler.command.handler(alice, ['Bob'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.FCBROKE));
+    // No torpedo should be allocated
+    expect(bob.ltorpsChannel.length).toBe(0);
+  });
+
+  it('firecntl=0: FCBROKE gate does not block (proceeds to lock)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
+      firecntl: 0, items: itemsWith({ [I_TORP]: 3n }),
+    });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
+    const h = makeHarness([alice, bob]);
+    const result = h.handler.command.handler(alice, ['Bob'], ctx) as CommandResult;
+    // Should NOT be FCBROKE — should proceed and succeed
+    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.FCBROKE));
+    expect(bob.ltorpsChannel[0]).toBe(1);
+  });
 });

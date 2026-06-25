@@ -146,21 +146,29 @@ describe('subsystem repair — firecntl', () => {
   });
 });
 
-describe('subsystem repair — shield', () => {
-  it('shield=-10, shieldstat=SHIELDDM: one tick moves shield toward 0 by 1', () => {
-    const ship = makeShip({ shield: -10, shieldstat: SHIELDDM });
+describe('subsystem repair — shield (Fix 4: rate = +shieldtype per tick)', () => {
+  it('shield=-10, shieldstat=SHIELDDM, shieldtype=1: one tick moves shield toward 0 by 1', () => {
+    const ship = makeShip({ shield: -10, shieldstat: SHIELDDM, shieldtype: 1 });
     const { fireTick } = makeHarness(ship);
     fireTick();
     expect(ship.shield).toBe(-9);
     expect(ship.shieldstat).toBe(SHIELDDM); // still damaged
   });
 
-  it('shield=-1, shieldstat=SHIELDDM: one tick brings shield to 0 and resets shieldstat to 0', () => {
-    const ship = makeShip({ shield: -1, shieldstat: SHIELDDM });
+  it('shield=-1, shieldstat=SHIELDDM, shieldtype=1: one tick brings shield to 0 and resets shieldstat to 0', () => {
+    const ship = makeShip({ shield: -1, shieldstat: SHIELDDM, shieldtype: 1 });
     const { fireTick } = makeHarness(ship);
     fireTick();
     expect(ship.shield).toBe(0);
     expect(ship.shieldstat).toBe(0); // back to down state
+  });
+
+  it('shield=-6, shieldstat=SHIELDDM, shieldtype=3: one tick moves shield by +3', () => {
+    const ship = makeShip({ shield: -6, shieldstat: SHIELDDM, shieldtype: 3 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.shield).toBe(-3);
+    expect(ship.shieldstat).toBe(SHIELDDM);
   });
 });
 
@@ -196,11 +204,35 @@ describe('subsystem repair — healthy ship no-op', () => {
   });
 });
 
+describe('subsystem repair — phasr (Fix 2: negative phasr recovers +1/tick via ship-update)', () => {
+  it('phasr=-8: one tick moves toward 0 by +1', () => {
+    const ship = makeShip({ phasr: -8 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.phasr).toBe(-7);
+  });
+
+  it('phasr=-1: one tick brings it to 0', () => {
+    const ship = makeShip({ phasr: -1 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.phasr).toBe(0);
+  });
+
+  it('phasr=0: no change (not negative)', () => {
+    const ship = makeShip({ phasr: 0 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.phasr).toBe(0);
+  });
+});
+
 describe('subsystem repair — all at once', () => {
   it('all damaged subsystems repair one step per tick', () => {
     const ship = makeShip({
       tactical: -5, helm: -3, cloak: -4, firecntl: 7,
-      shield: -10, shieldstat: SHIELDDM,
+      shield: -10, shieldstat: SHIELDDM, shieldtype: 1,
+      phasr: -4,
     });
     const { fireTick } = makeHarness(ship);
     fireTick();
@@ -210,5 +242,6 @@ describe('subsystem repair — all at once', () => {
     expect(ship.firecntl).toBe(6);
     expect(ship.shield).toBe(-9);
     expect(ship.shieldstat).toBe(SHIELDDM);
+    expect(ship.phasr).toBe(-3);
   });
 });

@@ -125,15 +125,18 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     // Unlike hull repair, cantexit does NOT interrupt — disruptions are temporary effects.
     // @see GECMDS.C C-010 / S-007 (Plan 4 Task 3)
     const needsSubsystemRepair = ship.tactical < 0 || ship.helm < 0 || ship.cloak < 0
-      || ship.firecntl > 0 || (ship.shieldstat === SHIELDDM && ship.shield < 0);
+      || ship.firecntl > 0 || ship.phasr < 0 || (ship.shieldstat === SHIELDDM && ship.shield < 0);
     if (needsSubsystemRepair) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         if (s.tactical < 0) s.tactical = Math.min(0, s.tactical + 1);
         if (s.helm < 0) s.helm = Math.min(0, s.helm + 1);
         if (s.cloak < 0) s.cloak = Math.min(0, s.cloak + 1);
         if (s.firecntl > 0) s.firecntl = Math.max(0, s.firecntl - 1);
+        // GEFUNCS.C:1015-1018 checkdam: negative phasr recovers +1/tick (energy-free, separate from preload)
+        if (s.phasr < 0) s.phasr = Math.min(0, s.phasr + 1);
         if (s.shieldstat === SHIELDDM && s.shield < 0) {
-          s.shield = Math.min(0, s.shield + 1);
+          // GEFUNCS.C:2473-2484 shieldrep: shield recovers at +shieldtype per tick (Fix 4)
+          s.shield = Math.min(0, s.shield + s.shieldtype);
           if (s.shield >= 0) {
             s.shieldstat = 0; // back to "down" state so player can re-raise shields
           }

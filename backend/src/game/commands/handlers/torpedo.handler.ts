@@ -90,12 +90,17 @@ export class TorpedoHandlerService {
       return { lines: [{ text: formatMessage(MessageId.TOR_NOAMMO), category: 'system' }] };
     }
 
-    // 5. Jammer
+    // 5. Fire control damaged — GECMDS.C:1346-1351 lockon first check (C-010, Fix 1)
+    if (ship.firecntl > 0) {
+      return { lines: [{ text: formatMessage(MessageId.FCBROKE), category: 'system' }] };
+    }
+
+    // 5b. Jammer
     if (ship.jammer > 0) {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }
 
-    // 5b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
+    // 5c. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
     if (isInNeutralZone(ship)) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;

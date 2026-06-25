@@ -190,6 +190,31 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     expect(result.lines[0].text).not.toContain('warp');
     expect(bob.lmisslChannel[0]).toBe(1);
   });
+
+  // Fix 1 — FCBROKE lock gate (@see GECMDS.C:1346-1351 lockon firecntl check)
+  it('rejects with FCBROKE when firecntl > 0 (fire control damaged)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
+      firecntl: 5, items: itemsWith({ [I_MISSL]: 3n }),
+    });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
+    const h = makeHarness([alice, bob]);
+    const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.FCBROKE));
+    expect(bob.lmisslChannel.length).toBe(0);
+  });
+
+  it('firecntl=0: FCBROKE gate does not block (proceeds to lock)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
+      firecntl: 0, items: itemsWith({ [I_MISSL]: 3n }),
+    });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
+    const h = makeHarness([alice, bob]);
+    const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
+    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.FCBROKE));
+    expect(bob.lmisslChannel[0]).toBe(1);
+  });
 });
 
 describe('missile lock + cloak gates (Plan 1 T7)', () => {
