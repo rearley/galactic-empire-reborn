@@ -113,6 +113,7 @@ function buildJammedHarness(seed = 42) {
   const classCache = {
     get: (_n: number): ShipClassEntry => SCOW_CLASS_ENTRY,
     getMaxPhaser: (_n: number) => 1,
+    getMaxTons: (_n: number) => 100,
     getMaxShields: (_n: number) => 1,
   } as unknown as ShipClassCacheService;
 

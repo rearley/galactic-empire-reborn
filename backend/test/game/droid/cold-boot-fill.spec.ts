@@ -87,6 +87,7 @@ function buildHarness(seed = 42) {
       return BASE_CLASS_ENTRY;
     },
     getMaxPhaser: (n: number) => n === DROID_CLASS_TRANSPORT ? 5 : 1,
+    getMaxTons: (n: number) => n === DROID_CLASS_TRANSPORT ? 500 : 100,
     getMaxShields: (n: number) => n === DROID_CLASS_TRANSPORT ? 2 : 1,
   } as unknown as ShipClassCacheService;
 

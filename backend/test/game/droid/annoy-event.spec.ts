@@ -133,6 +133,7 @@ function buildHarness(seed = 12) {
   const classCache = {
     get: (_n: number): ShipClassEntry => SCOW_CLASS_ENTRY,
     getMaxPhaser: (_n: number) => 1,
+    getMaxTons: (_n: number) => 100,
     getMaxShields: (_n: number) => 1,
   } as unknown as ShipClassCacheService;
 
@@ -286,6 +287,7 @@ describe('T017 — droid.annoy event integration', () => {
     const classCache2 = {
       get: (_n: number): ShipClassEntry => SCOW_CLASS_ENTRY,
       getMaxPhaser: () => 1,
+      getMaxTons: () => 100,
       getMaxShields: () => 1,
     } as unknown as ShipClassCacheService;
 

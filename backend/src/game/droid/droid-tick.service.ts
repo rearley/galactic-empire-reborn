@@ -36,6 +36,7 @@ import {
   FIRETICKS,
   JAMTIME,
   MAXTORPS,
+  WARP_THRESHOLD,
 } from '../constants';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import { buildDroidConfig } from './droid.config';
@@ -363,9 +364,6 @@ export class DroidTickService implements OnModuleInit {
       tickAt: new Date(),
     } satisfies CombatPhaserFiredEvent);
 
-    let maxPhaser = 1;
-    try { maxPhaser = this.classCache.getMaxPhaser(droid.shpclass); } catch { /* fallback */ }
-
     const dist = cdistance(droid, target);
     // Runtime invariants — record at fire time. scanRangeGate is the legal cap.
     if (this.combatTick) {
@@ -383,8 +381,15 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
-    if (lineOfFire(droid, target, bearing, 100)) {
-      const damage = phaserDamage(100, dist, maxPhaser);
+    if (lineOfFire(droid, target, bearing, 0)) {
+      const damage = phaserDamage({
+        phasrtype: droid.phasrtype,
+        phasr: droid.phasr,
+        distRaw: dist * 10000,
+        focus: 0,
+        victimMaxTons: this.classCache.getMaxTons(target.shpclass),
+        victimAtWarp: target.speed >= WARP_THRESHOLD,
+      });
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
       let hullDamage = Math.floor(damage);
       let shieldConsumed = 0;
@@ -448,9 +453,6 @@ export class DroidTickService implements OnModuleInit {
       tickAt: new Date(),
     } satisfies CombatPhaserFiredEvent);
 
-    let maxPhaser = 1;
-    try { maxPhaser = this.classCache.getMaxPhaser(droid.shpclass); } catch { /* fallback */ }
-
     const dist = cdistance(droid, target);
     // Runtime invariants — record at fire time.
     if (this.combatTick) {
@@ -468,8 +470,15 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
-    if (lineOfFire(droid, target, bearing, 100)) {
-      const damage = phaserDamage(100, dist, maxPhaser);
+    if (lineOfFire(droid, target, bearing, 0)) {
+      const damage = phaserDamage({
+        phasrtype: droid.phasrtype,
+        phasr: droid.phasr,
+        distRaw: dist * 10000,
+        focus: 0,
+        victimMaxTons: this.classCache.getMaxTons(target.shpclass),
+        victimAtWarp: target.speed >= WARP_THRESHOLD,
+      });
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
       let hullDamage = Math.floor(damage);
       let shieldConsumed = 0;

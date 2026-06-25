@@ -114,6 +114,10 @@ function buildHarness(seed = 42) {
       if (n === DROID_CLASS_TRANSPORT) return 5;
       return 1;
     },
+    getMaxTons: (n: number) => {
+      if (n === DROID_CLASS_TRANSPORT) return 500;
+      return 100;
+    },
     getMaxShields: (n: number) => {
       if (n === DROID_CLASS_TRANSPORT) return 2;
       return 1;
