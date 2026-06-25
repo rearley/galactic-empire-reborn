@@ -35,12 +35,16 @@ import {
   COMBAT_MINE_DETONATION,
   COMBAT_MINE_WARNING,
   COMBAT_SHIP_DESTROYED,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMineDetonationEvent,
   CombatMineWarningEvent,
   CombatShipDestroyedEvent,
+  CombatSubsystemDamagedEvent,
 } from './combat-events';
+import { applyRandamage } from './randamage.apply';
+import { RandamageCaps } from './combat-math';
 import {
   AiFireEventForInvariants,
   CombatEventForInvariants,
@@ -411,6 +415,28 @@ export class CombatTickService implements OnModuleInit {
           tickAt: ctx.firedAt,
         };
         this.events.emit(COMBAT_HIT, hitEvent);
+
+        // @see GEFUNCS.C:randamage — called after every mine hit (GECMDS.C:1999)
+        const mineCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
+        try { mineCaps.hasShields = this.shipClassCache.getMaxShields(ship.shpclass) > 0; } catch { /* fallback */ }
+        try { mineCaps.hasPhasers = this.shipClassCache.getMaxPhaser(ship.shpclass) > 0; } catch { /* fallback */ }
+        try {
+          mineCaps.hasTorpOrMissile =
+            this.shipClassCache.getHasTorpedo(ship.shpclass) ||
+            this.shipClassCache.getHasMissile(ship.shpclass);
+        } catch { /* fallback */ }
+        try { mineCaps.hasCloak = this.shipClassCache.getHasCloak(ship.shpclass); } catch { /* fallback */ }
+        const mineRnd = applyRandamage(this.random, ship, mineCaps, ship.shieldtype);
+        if (mineRnd.subsystem !== 'none' && mineRnd.subsystem !== 'skipped') {
+          const mineSubEvent: CombatSubsystemDamagedEvent = {
+            victimId: shipKey(ship.userid, ship.shipno),
+            subsystem: mineRnd.subsystem,
+            sector,
+            tickAt: ctx.firedAt,
+          };
+          this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, mineSubEvent);
+        }
+
         // Mine detonation: the mine is the "shooter"; MINERANGE is the cap.
         this.recordCombatEvent({
           weapon: 'mine',
@@ -668,6 +694,27 @@ export class CombatTickService implements OnModuleInit {
       tickAt: ctx.firedAt,
     };
     this.events.emit(COMBAT_HIT, hitEvent);
+
+    // @see GEFUNCS.C:randamage — called after every hit, outside shield if/else (GECMDS.C:999,1082)
+    const caps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
+    try { caps.hasShields = this.shipClassCache.getMaxShields(carrier.shpclass) > 0; } catch { /* fallback */ }
+    try { caps.hasPhasers = this.shipClassCache.getMaxPhaser(carrier.shpclass) > 0; } catch { /* fallback */ }
+    try {
+      caps.hasTorpOrMissile =
+        this.shipClassCache.getHasTorpedo(carrier.shpclass) ||
+        this.shipClassCache.getHasMissile(carrier.shpclass);
+    } catch { /* fallback */ }
+    try { caps.hasCloak = this.shipClassCache.getHasCloak(carrier.shpclass); } catch { /* fallback */ }
+    const rnd = applyRandamage(this.random, carrier, caps, carrier.shieldtype);
+    if (rnd.subsystem !== 'none' && rnd.subsystem !== 'skipped') {
+      const subEvent: CombatSubsystemDamagedEvent = {
+        victimId: shipKey(carrier.userid, carrier.shipno),
+        subsystem: rnd.subsystem,
+        sector: { x: Math.floor(carrier.xcoord), y: Math.floor(carrier.ycoord) },
+        tickAt: ctx.firedAt,
+      };
+      this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, subEvent);
+    }
   }
 
   /**

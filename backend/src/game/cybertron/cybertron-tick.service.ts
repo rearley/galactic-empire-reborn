@@ -46,11 +46,15 @@ import {
   COMBAT_PHASER_FIRED,
   COMBAT_HIT,
   COMBAT_MISS,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatPhaserFiredEvent,
   CombatHitEvent,
   CombatMissEvent,
   CombatShipDestroyedEvent,
+  CombatSubsystemDamagedEvent,
 } from '../combat/combat-events';
+import { applyRandamage } from '../combat/randamage.apply';
+import { RandamageCaps } from '../combat/combat-math';
 import {
   CYBERTRON_SCORED_KILL,
   CybertronScoredKillEvent,
@@ -459,6 +463,27 @@ export class CybertronTickService implements OnModuleInit {
         tickAt,
       };
       this.events.emit(COMBAT_HIT, hitEvent);
+
+      // @see GEFUNCS.C:randamage — called after every Cybertron phaser hit (GECYBS.C → GECMDS.C:999)
+      const cybCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
+      try { cybCaps.hasShields = this.shipClassCache.getMaxShields(target.shpclass) > 0; } catch { /* fallback */ }
+      try { cybCaps.hasPhasers = this.shipClassCache.getMaxPhaser(target.shpclass) > 0; } catch { /* fallback */ }
+      try {
+        cybCaps.hasTorpOrMissile =
+          this.shipClassCache.getHasTorpedo(target.shpclass) ||
+          this.shipClassCache.getHasMissile(target.shpclass);
+      } catch { /* fallback */ }
+      try { cybCaps.hasCloak = this.shipClassCache.getHasCloak(target.shpclass); } catch { /* fallback */ }
+      const cybRnd = applyRandamage(this.random, target, cybCaps, target.shieldtype);
+      if (cybRnd.subsystem !== 'none' && cybRnd.subsystem !== 'skipped') {
+        const cybSubEvent: CombatSubsystemDamagedEvent = {
+          victimId: shipKey(target.userid, target.shipno),
+          subsystem: cybRnd.subsystem,
+          sector,
+          tickAt,
+        };
+        this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, cybSubEvent);
+      }
     }
 
     ship.phasr = 0;
