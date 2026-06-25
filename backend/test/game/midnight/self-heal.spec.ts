@@ -14,6 +14,7 @@ import { PrismaModule } from '../../../src/prisma/prisma.module';
 import { MidnightService } from '../../../src/game/midnight/midnight.service';
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 async function truncateAll(prisma: PrismaService) {
   await prisma.midnightRun.deleteMany();
@@ -28,7 +29,7 @@ async function truncateAll(prisma: PrismaService) {
 async function makeApp() {
   const app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
   }).compile();
   const prisma = app.get(PrismaService);
   const service = app.get(MidnightService);

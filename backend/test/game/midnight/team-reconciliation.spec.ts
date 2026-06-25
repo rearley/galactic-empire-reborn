@@ -15,6 +15,7 @@ import { MidnightService } from '../../../src/game/midnight/midnight.service';
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TEAMBONU } from '../../../src/game/midnight/midnight.constants';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -33,7 +34,7 @@ async function truncateAll() {
 beforeAll(async () => {
   app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
   }).compile();
   prisma = app.get(PrismaService);
   service = app.get(MidnightService);
