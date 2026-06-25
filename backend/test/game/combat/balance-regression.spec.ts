@@ -58,10 +58,11 @@ describe('combat balance regression', () => {
       const firer = { xcoord: 0, ycoord: 0, heading: 0 };
       const rad = (4.5 * Math.PI) / 180;
       const target = { xcoord: 100 * Math.sin(rad), ycoord: -100 * Math.cos(rad) };
-      // arc 6: halfWidth = (6+2)/2 = 4 → 4.5° just outside → MISS
-      expect(lineOfFire(firer, target, 0, 6)).toBe(false);
-      // arc 8: halfWidth = (8+2)/2 = 5 → 4.5° inside → HIT
-      expect(lineOfFire(firer, target, 0, 8)).toBe(true);
+      // Beam half-angle is `focus + PHABIAS` (PHABIAS=2). degree is relative to heading.
+      // focus 2 → halfWidth = 2+2 = 4° → 4.5° just outside → MISS
+      expect(lineOfFire(firer, target, 0, 2)).toBe(false);
+      // focus 3 → halfWidth = 3+2 = 5° → 4.5° inside → HIT (PHABIAS widened the arc)
+      expect(lineOfFire(firer, target, 0, 3)).toBe(true);
     });
   });
 });

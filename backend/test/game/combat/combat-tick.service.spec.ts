@@ -160,10 +160,11 @@ describe('CombatTickService', () => {
 describe('CombatTickService — phaser interaction (T018)', () => {
   it('after handler fires and tick runs, victim shield/damage mutate and combat.hit fires; phasr reloads on next tick', async () => {
     // Alice heading 0 (north). Bearing 0 = straight ahead = north. Bob north of Alice (y decreases northward).
-    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 0, phasr: 100, phasrtype: 1 });
+    // Positioned off the neutral-zone origin (0,0) — firing in the NZ self-zaps the firer.
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', xcoord: 0, ycoord: 7, phasr: 100, phasrtype: 1 });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: -0.01, shield: 5000, shieldstat: 1, damage: 0, phasr: 100, phasrtype: 1,
+      xcoord: 0, ycoord: 6.99, shield: 5000, shieldstat: 1, damage: 0, phasr: 100, phasrtype: 1,
     });
     const h = await makeHarness([alice, bob]);
 
@@ -180,7 +181,10 @@ describe('CombatTickService — phaser interaction (T018)', () => {
       new Mulberry32Adapter(7),
     );
 
-    const result = handler.command.handler(alice, ['0', '50'], {} as CommandContext) as CommandResult;
+    // `pha <degree -180..180> [focus 0-5]`: degree 0 = dead ahead (north), focus 1.
+    // Bob sits 0.01 sectors dead ahead → inside the focus+PHABIAS arc and well
+    // within the phasrtype-1 falloff range, so a hit lands.
+    const result = handler.command.handler(alice, ['0', '1'], {} as CommandContext) as CommandResult;
     expect(result.lines.length).toBeGreaterThan(0);
 
     // Mutation visible after handler call
