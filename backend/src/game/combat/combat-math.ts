@@ -1,4 +1,4 @@
-import { MINEDAMMAX, MINERANGE, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG } from '../constants';
+import { MINEDAMMAX, MINERANGE, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -75,11 +75,39 @@ export function lineOfFire(
 }
 
 /**
- * Phaser damage formula: `(percent / 100) * maxPhaser / (1 + range / 100)`.
- * @see GEFUNCS.C:firephas
+ * Normal-phaser damage: ports `pdamage` (GEFUNCS.C:2060) plus the `firep`
+ * outer scaling (GECMDS.C:956-973).
+ *
+ *   disfact = 20000 + phasrtype*4000
+ *   dd      = max(0, 1 - distRaw/disfact)
+ *   fd      = 1 - focus/11
+ *   dp      = dd^PFIRDST * fd² * (phasr/100)
+ *   dam     = PDAMMAX * dp
+ *   factor  = dam * (1+phasrtype)/2.5 / (1 + victimMaxTons/TONFACT)
+ *   if victimAtWarp: factor /= 2
+ *   if phasrtype == 20 (sysop): return 101
+ *
+ * @see GEFUNCS.C:2060 pdamage  @see GECMDS.C:956-973 firep
  */
-export function phaserDamage(percent: number, range: number, maxPhaser: number): number {
-  return ((percent / 100) * maxPhaser) / (1 + range / 100);
+export function phaserDamage(args: {
+  phasrtype: number;
+  phasr: number;
+  distRaw: number;
+  focus: number;
+  victimMaxTons: number;
+  victimAtWarp: boolean;
+}): number {
+  const { phasrtype, phasr, distRaw, focus, victimMaxTons, victimAtWarp } = args;
+  if (phasrtype === 20) return 101; // sysop phaser
+  const disfact = 20000 + phasrtype * 4000;
+  const dd = Math.max(0, 1 - distRaw / disfact);
+  const fd = 1 - focus / 11;
+  const dp = Math.pow(dd, PFIRDST) * (fd * fd) * (phasr / 100);
+  const dam = PDAMMAX * dp;
+  const tonfact = 1 + victimMaxTons / TONFACT;
+  let factor = (dam * ((1 + phasrtype) / 2.5)) / tonfact;
+  if (victimAtWarp) factor /= 2;
+  return Math.floor(factor);
 }
 
 /**
