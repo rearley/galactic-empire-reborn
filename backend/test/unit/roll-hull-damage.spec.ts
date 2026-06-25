@@ -6,7 +6,7 @@
  * this test fails loudly.
  *
  * @see GEFUNCS.C:randamage — C source uses a separate subsystem-damage
- *   routine; the hull-damage roll (floor(rand * dmgMax * tonFact(ton)))
+ *   routine; the hull-damage roll (floor(rand * dmgMax * damageScale(damageFactor)))
  *   is the TS-side projectile-hit formula now named rollHullDamage.
  */
 
@@ -18,7 +18,7 @@ import { Mulberry32Adapter } from '../../src/game/combat/random.port';
 interface GoldenRow {
   rngSeed: number;
   dmgMax: number;
-  ton: number;
+  damageFactor: number;
   expected: number;
 }
 
@@ -33,9 +33,9 @@ describe('T011 — rollHullDamage golden vectors', () => {
   });
 
   it('matches every golden row', () => {
-    for (const { rngSeed, dmgMax, ton, expected } of rows) {
+    for (const { rngSeed, dmgMax, damageFactor, expected } of rows) {
       const rand = new Mulberry32Adapter(rngSeed);
-      const actual = rollHullDamage(rand, dmgMax, ton);
+      const actual = rollHullDamage(rand, dmgMax, damageFactor);
       expect(actual).toBe(expected);
     }
   });
