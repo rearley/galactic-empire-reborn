@@ -57,4 +57,16 @@ export class MineRegistry {
   sweepCandidates(): MineState[] {
     return Array.from(this.mines.values()).filter((m) => m.timer % 5 === 0);
   }
+
+  /**
+   * Count of live mines deployed by a given user (for per-player cap enforcement).
+   * @see GECMDS.C:1722 usermines
+   */
+  countByDeployer(userid: string): number {
+    let count = 0;
+    for (const m of this.mines.values()) {
+      if (m.deployedBy === userid) count++;
+    }
+    return count;
+  }
 }

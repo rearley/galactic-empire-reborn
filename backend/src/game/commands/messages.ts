@@ -154,7 +154,11 @@ export enum MessageId {
   MIS_FMT = 'MIS_FMT',
 
   // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  MIN_NOMINE = 'MIN_NOMINE',
+  MIN_CLOAK = 'MIN_CLOAK',
+  MIN_NEUTRAL = 'MIN_NEUTRAL',
   MIN_NOAMMO = 'MIN_NOAMMO',
+  MIN_FULL = 'MIN_FULL',
   MIN_DEPLOYED = 'MIN_DEPLOYED',
   ZIP_NOAMMO = 'ZIP_NOAMMO',
   ZIP_SWEPT = 'ZIP_SWEPT',
@@ -511,7 +515,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
 
   // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  [MessageId.MIN_NOMINE]: 'No mine launcher mounted.',
+  [MessageId.MIN_CLOAK]: 'Cannot lay mines while cloaked.',
+  [MessageId.MIN_NEUTRAL]: 'Cannot lay mines in the neutral zone.',
   [MessageId.MIN_NOAMMO]: 'No mines in cargo.',
+  [MessageId.MIN_FULL]: 'Your mine limit is deployed.',
   [MessageId.MIN_DEPLOYED]: 'Mine deployed.',
   [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
   [MessageId.ZIP_SWEPT]: 'Mines swept.',

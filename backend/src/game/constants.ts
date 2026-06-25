@@ -232,6 +232,13 @@ export const PHATOWRP = 0 as const;
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;
 
+/** Per-player live-mine deployment cap. @see GECMDS.C:1722 usermines */
+export const USERMINES = 200 as const;
+/** Minimum timer value for a deployed mine. @see GECMDS.C:1722 */
+export const MINE_TIMER_MIN = 1 as const;
+/** Maximum timer value for a deployed mine. @see GECMDS.C:1722 */
+export const MINE_TIMER_MAX = 50 as const;
+
 /**
  * Universe half-extent — coordinates valid in [-UNIVMAX, +UNIVMAX].
  * @see GEGLOBAL.H:134 univmax
