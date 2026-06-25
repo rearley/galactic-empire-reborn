@@ -1,3 +1,31 @@
+## 2026-06-25 — 023-combat-feel (Plan 1 of 3)
+
+**Completed:**
+- Phaser command restored to faithful original semantics: `pha <degree -180..180> [focus 0-5]` (focus defaults to 1 when omitted). Beam half-angle = `focus + PHABIAS` (effective cone 4–14°, was a ~77–204° cone that matched nothing in the C source). Always full discharge. Fixes the playtest-reported "phasers hit everything except my target" root cause — the handler was treating the second arg as a percent/width rather than a focus value. @see GECMDS.C:829-912, GECMDS.C:954.
+- Phaser damage now uses the C `pdamage` distance falloff: `disfact = 20000 + phasrtype*4000`; `dd = max(0, 1 - dist/disfact)`; `fd = 1 - focus/11`; `dp = dd^PFIRDST * fd² * (phasr/100)`; `damage = PDAMMAX * dp`. Damage drops to zero beyond ~2–2.4 sectors for a type-1 phaser. Fixes "shoot something multiple sectors away." @see GEFUNCS.C:2060-2093.
+- Torpedo and missile now require a lock-quality gate (`lockFact > 0.7`): `lockFact = (1.2 - speed/5000) * (5 - dist) / TORFACT` for torpedoes, `(5 - dist) / MISFACT` for missiles. Lock fails beyond ~4.9 sectors, against warping targets, against fully-cloaked targets, and against neutral-zone targets. @see GECMDS.C:1339-1430.
+- Firing any weapon (phaser, torpedo, missile) inside the neutral zone now self-zaps the firer: `damage += SE100DAM (101)` — instant kill. @see GECMDS.C:937, zaphim.
+- Cloak-fire gates: phaser and missile now refuse to fire while cloaked (torpedo already had the gate). Matches GECMDS.C:923-927, 1234-1238.
+- New tunable balance constants added to `constants.ts`: `PDAMMAX=200`, `PFIRDST=1`, `TORFACT=0.1`, `MISFACT=0.1`, `SE100DAM=101`, `PHATOWRP=0`. All pinned with balance-regression tests.
+- AI fire call sites (Cybertron, droid-class-11, droid-class-12) adapted to the new `pha`/`firePhaser` signatures (focus=0).
+
+**Tests:** Three new test suites — `test/unit/line-of-fire.spec.ts` (beam cone geometry), `test/unit/phaser-damage.spec.ts` (pdamage falloff, zero-at-disfact, focus factor), `test/unit/lock-fact.spec.ts` (lockFact gate at various distances/speeds). Adapted handler and combat suites. `tsc` clean. Full Jest suite runs at the pre-existing 66-fail baseline with zero combat failures.
+
+**Decisions made:**
+- `PDAMMAX=200` is a tunable default pending playtest — it may be too high or low; adjust via env before going live.
+- AI fire paths use `focus=0` (widest safe arc) to avoid breaking existing AI engagement behavior; full AI fire realism deferred to Plan 2 (AI presence).
+- Hyperphaser separation (C-009), `damfact`/`ton_fact` (C-005), mine handler validations (C-004), and subsystem damage (C-010) are explicitly out of scope — deferred to Plans 2 and 3.
+- `gebemean` gate on Cybertron phaser fire (A-003) remains deferred to Plan 2.
+
+**Next:** Plan 2 — AI presence: Cybertron boot-seeding, `gebemean` gate on `cyb_attack`, `damfact` schema field and `tonFact` rewrite, subsystem damage wiring.
+
+**Known issues:**
+- Pre-existing ~66-test stale baseline in midnight/scan/onboarding/handlers suites — separate cleanup track, unrelated to combat.
+- `CombatPhaserFiredEvent` payload fields `bearing`/`percent` now carry degree/focus respectively; frontend `App.tsx` reads `percent`. The field name is misleading but harmless until the event interface is next touched — recommend renaming `percent` → `focus` when that interface is revised.
+- No Dockerfiles or `docker-compose.yml` exist despite `CLAUDE.md` mandating them for dev+prod. Recommend creating a separate task for this before any production deploy.
+
+---
+
 ## 2026-05-12 — second scanRange compression (final calibration)
 
 **Completed:** Tightened every `ShipClass.scanRange` further — the prior "compression" still left Interceptor's `sca lo` covering the whole 30×15 galaxy (20-sector projection radius × 2 → entire universe visible from any position). Verified that the C galaxy is also 30×15 (`MAXX=30, MAXY=15` in `GEMAIN.H`), so the wiki's 100k+ values never matched any actual C-canonical galaxy size — the original C `shipclass[]` from the `.cnf` file (unrecoverable) must have used smaller values. Recalibrated for our actual world:
