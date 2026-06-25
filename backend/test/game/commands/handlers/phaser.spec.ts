@@ -402,14 +402,14 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
   });
 
-  it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hit + energy -= HPFIRAMT', () => {
+  it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hull hit + energy -= HPFIRAMT', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
-      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -418,7 +418,9 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
     expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
-    expect(getShip(h, bob).shield).toBeLessThan(5000);
+    // C-009 Fix 1: hyper bypasses shields — shield unchanged, hull takes damage.
+    expect(getShip(h, bob).shield).toBe(5000);
+    expect(getShip(h, bob).damage).toBeGreaterThan(0);
     // Flux energy debited; phasr NOT discharged (hyper uses flux, not charge).
     expect(getShip(h, alice).energy).toBe(50000 - HPFIRAMT);
     expect(getShip(h, alice).phasr).toBe(100);
@@ -461,6 +463,71 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(getShip(h, alice).damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(getShip(h, bob).damage).toBe(0);
     // No fire event when the beam never leaves the ship.
+    expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
+  });
+
+  // C-009 Fix 1 (RED): hyperphaser BYPASSES shields — damage goes straight to hull.
+  // C `firehp` (GECMDS.C:1078) does `wptr->damage += damage` with NO shieldhit call.
+  it('Fix1-RED: hyper-phaser hit on shields-up victim goes straight to HULL — shield unchanged, damageShield=0', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
+    });
+    const h = makeHarness([alice, bob]);
+
+    h.handler.command.handler(alice, ['0'], ctx);
+
+    const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    // Shield must NOT be drained — hyper bypasses shields.
+    expect(getShip(h, bob).shield).toBe(5000);
+    // Hull must take the hit.
+    expect(getShip(h, bob).damage).toBeGreaterThan(0);
+    // COMBAT_HIT event must have damageShield=0.
+    expect((hit!.payload as CombatHitEvent).damageShield).toBe(0);
+    expect((hit!.payload as CombatHitEvent).damageHull).toBeGreaterThan(0);
+  });
+
+  // C-009 Fix 2 (RED): hypha cooldown gate — fire sets hypha=1; re-fire returns HP_WAIT.
+  // C `firehp` sets ptr->hypha=1 (GECMDS.C:1040); cmd_phas blocks re-fire while hypha!=0.
+  it('Fix2a-RED: successful hyper fire sets firer hypha = 1', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: 50000, hypha: 0,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: WARP_THRESHOLD,
+    });
+    const h = makeHarness([alice, bob]);
+
+    h.handler.command.handler(alice, ['0'], ctx);
+
+    expect(getShip(h, alice).hypha).toBe(1);
+  });
+
+  it('Fix2b-RED: second hyper fire while hypha !== 0 → HP_WAIT, no energy debit, no hit', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: 50000, hypha: 1,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
+    });
+    const h = makeHarness([alice, bob]);
+
+    const res = h.handler.command.handler(alice, ['0'], ctx) as CommandResult;
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.HP_WAIT));
+    // No energy debited.
+    expect(getShip(h, alice).energy).toBe(50000);
+    // No hit event.
+    expect(h.emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+    // No fire event.
     expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
   });
 });

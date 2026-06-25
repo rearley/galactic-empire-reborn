@@ -18,8 +18,8 @@ const MINE_INITIAL_TIMER = 30;
  *
  * Validations (mirror GECMDS.C:1722-1781 cmd_mine):
  *   1. ship class has mine launcher (hasMine) → else MIN_NOMINE
- *   2. firer.cloak === 0 → else MIN_CLOAK
- *   3. not in neutral zone → else MIN_NEUTRAL (plain refusal, no self-zap)
+ *   2. not in neutral zone → else MIN_NEUTRAL  (C order: GECMDS.C:1727-1746)
+ *   3. firer.cloak === 0 → else MIN_CLOAK (plain refusal, no self-zap)
  *   4. firer.items[I_MINE] > 0n → else MIN_NOAMMO
  *   5. timer arg optional; if given must be in [MINE_TIMER_MIN, MINE_TIMER_MAX] → else NUMOOR
  *   6. live-mine count by deployer < USERMINES → else MIN_FULL
@@ -56,12 +56,13 @@ export class MineHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MIN_NOMINE), category: 'system' }] };
     }
 
-    if (ship.cloak > 0) {
-      return { lines: [{ text: formatMessage(MessageId.MIN_CLOAK), category: 'system' }] };
-    }
-
+    // C order (GECMDS.C:1727-1746): neutral-zone check PRECEDES cloak check.
     if (isInNeutralZone(ship)) {
       return { lines: [{ text: formatMessage(MessageId.MIN_NEUTRAL), category: 'system' }] };
+    }
+
+    if (ship.cloak > 0) {
+      return { lines: [{ text: formatMessage(MessageId.MIN_CLOAK), category: 'system' }] };
     }
 
     const ammo = ship.items[I_MINE] ?? 0n;
