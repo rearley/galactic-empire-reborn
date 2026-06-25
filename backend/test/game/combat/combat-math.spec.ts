@@ -1,5 +1,6 @@
 import {
   cdistance,
+  damageScale,
   damstr,
   decoyIntercept,
   inScanRange,
@@ -9,7 +10,6 @@ import {
   phaserDamage,
   rollHullDamage,
   shieldhit,
-  tonFact,
 } from '../../../src/game/combat/combat-math';
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { MINEDAMMAX, MINERANGE, PHABIAS, SHIELD_FACTOR, SHMINCHG } from '../../../src/game/constants';
@@ -113,18 +113,22 @@ describe('combat-math', () => {
     });
   });
 
-  describe('tonFact — @see GEFUNCS.C:ton_fact', () => {
-    it('clamps to 0.1 floor for tiny tonnage', () => {
-      expect(tonFact(0)).toBe(0.1);
-      expect(tonFact(500)).toBe(0.1);
+  describe('damageScale — @see GEFUNCS.C:2661 ton_fact', () => {
+    it('damageFactor 100 = neutral multiplier (1.0)', () => {
+      expect(damageScale(100)).toBeCloseTo(1.0, 10);
     });
 
-    it('clamps to 1.0 ceiling for huge tonnage', () => {
-      expect(tonFact(50000)).toBe(1.0);
+    it('damageFactor 200 (tough) halves incoming damage', () => {
+      expect(damageScale(200)).toBeCloseTo(0.5, 10);
     });
 
-    it('scales linearly inside the band', () => {
-      expect(tonFact(5000)).toBeCloseTo(0.5);
+    it('damageFactor 50 (fragile) doubles incoming damage', () => {
+      expect(damageScale(50)).toBeCloseTo(2.0, 10);
+    });
+
+    it('guards non-positive damageFactor → 1.0', () => {
+      expect(damageScale(0)).toBe(1);
+      expect(damageScale(-1)).toBe(1);
     });
   });
 
@@ -172,39 +176,52 @@ describe('combat-math', () => {
     it('produces deterministic values with a seeded PRNG', () => {
       const r1 = new Mulberry32Adapter(42);
       const r2 = new Mulberry32Adapter(42);
-      expect(rollHullDamage(r1, 200, 5000)).toBe(rollHullDamage(r2, 200, 5000));
+      // damageFactor=100 → damageScale=1.0 (neutral)
+      expect(rollHullDamage(r1, 200, 100)).toBe(rollHullDamage(r2, 200, 100));
     });
 
-    it('respects tonnage scaling — bigger ship deals more damage', () => {
+    it('fragile victim (low damageFactor) takes more damage than tough victim', () => {
       const stub = { next: () => 0.5 };
-      expect(rollHullDamage(stub, 200, 1000)).toBeLessThan(rollHullDamage(stub, 200, 10000));
+      // damageFactor=50 (fragile) → damageScale=2.0; damageFactor=200 (tough) → damageScale=0.5
+      expect(rollHullDamage(stub, 200, 50)).toBeGreaterThan(rollHullDamage(stub, 200, 200));
     });
 
     it('returns 0 when rand returns 0', () => {
       const stub = { next: () => 0 };
-      expect(rollHullDamage(stub, 200, 5000)).toBe(0);
+      expect(rollHullDamage(stub, 200, 100)).toBe(0);
+    });
+
+    it('computes correct value: floor(0.5 * 200 * (100/100)) = 100', () => {
+      const stub = { next: () => 0.5 };
+      expect(rollHullDamage(stub, 200, 100)).toBe(100);
     });
   });
 
   describe('mineFalloff — @see GEFUNCS.C:minesweep', () => {
     it('returns 0 at or beyond MINERANGE', () => {
-      expect(mineFalloff(MINERANGE, 5000)).toBe(0);
-      expect(mineFalloff(MINERANGE * 2, 5000)).toBe(0);
+      // damageFactor=100 → damageScale=1.0 (neutral)
+      expect(mineFalloff(MINERANGE, 100)).toBe(0);
+      expect(mineFalloff(MINERANGE * 2, 100)).toBe(0);
     });
 
     it('peaks at distance 0', () => {
-      expect(mineFalloff(0, 10000)).toBeGreaterThan(0);
+      expect(mineFalloff(0, 100)).toBeGreaterThan(0);
     });
 
-    it('cubic falloff — half-distance damage is 1/8 of full (scaled by tonFact)', () => {
-      const close = mineFalloff(0, 10000);
-      const half = mineFalloff(MINERANGE / 2, 10000);
+    it('cubic falloff — half-distance damage is 1/8 of full', () => {
+      const close = mineFalloff(0, 100);
+      const half = mineFalloff(MINERANGE / 2, 100);
       // half / close should approximate 0.125 (cube of 0.5)
       expect(half / close).toBeCloseTo(0.125, 1);
     });
 
-    it('caps at MINEDAMMAX scaled by tonFact', () => {
-      expect(mineFalloff(0, 10000)).toBeLessThanOrEqual(MINEDAMMAX);
+    it('caps at MINEDAMMAX for damageFactor=100 (neutral scaling)', () => {
+      expect(mineFalloff(0, 100)).toBeLessThanOrEqual(MINEDAMMAX);
+    });
+
+    it('tough victim (high damageFactor) takes less mine damage', () => {
+      // damageFactor=50 (fragile, scale=2.0) vs damageFactor=200 (tough, scale=0.5)
+      expect(mineFalloff(0, 50)).toBeGreaterThan(mineFalloff(0, 200));
     });
   });
 

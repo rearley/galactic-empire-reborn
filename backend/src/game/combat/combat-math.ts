@@ -111,12 +111,16 @@ export function phaserDamage(args: {
 }
 
 /**
- * Tonnage scaling factor: `clamp(tonnage / 10000, 0.1, 1.0)`.
- * @see GEFUNCS.C:ton_fact
+ * Per-class damage scaling: the multiplier applied to a rolled hit, equal to
+ * `100 / victim.damageFactor`. This is the C `ton_fact(victim, dmg)` =
+ * `dmg / (shipclass[victim].damfact / 100)` rearranged to a multiplier.
+ * Higher damageFactor = tougher (takes less). Non-positive guards to 1.0.
+ *
+ * @see GEFUNCS.C:2661 ton_fact
  */
-export function tonFact(tonnage: number): number {
-  const f = tonnage / 10000.0;
-  return Math.min(1.0, Math.max(0.1, f));
+export function damageScale(damageFactor: number): number {
+  if (damageFactor <= 0) return 1;
+  return 100 / damageFactor;
 }
 
 /**
@@ -151,16 +155,13 @@ export function shieldhit(
 }
 
 /**
- * Hull damage roll for projectile hits: `floor(rand * dmgMax * tonFact(ton))`.
+ * Hull damage roll for projectile hits, scaled by the victim's per-class
+ * damageFactor: `floor(rand * dmgMax * damageScale(victimDamageFactor))`.
  *
- * This is the projectile-hit damage formula used in combat-tick.service.ts.
- * It is distinct from the C `randamage()` subsystem-damage routine — see
- * `randamage()` below for the faithful C implementation.
- *
- * @see GEFUNCS.C:1546 — incoming-weapon hit resolution
+ * @see GEFUNCS.C:1546 incoming-weapon hit resolution + ton_fact
  */
-export function rollHullDamage(rand: Random, dmgMax: number, ton: number): number {
-  return Math.floor(rand.next() * dmgMax * tonFact(ton));
+export function rollHullDamage(rand: Random, dmgMax: number, victimDamageFactor: number): number {
+  return Math.floor(rand.next() * dmgMax * damageScale(victimDamageFactor));
 }
 
 /**
@@ -204,15 +205,15 @@ export function randamage(
 }
 
 /**
- * Cubic distance falloff for mine damage: damage scales with `(1 - d/MINERANGE)^3`,
- * scaled by tonFact, capped at MINEDAMMAX.
+ * Cubic distance falloff for mine damage, scaled by the victim's per-class
+ * damageFactor: `MINEDAMMAX * (1 - d/MINERANGE)^3 * damageScale(victimDamageFactor)`.
  *
- * @see GEFUNCS.C:minesweep
+ * @see GEFUNCS.C:minesweep + ton_fact
  */
-export function mineFalloff(distance: number, ton: number): number {
+export function mineFalloff(distance: number, victimDamageFactor: number): number {
   if (distance >= MINERANGE) return 0;
   const factor = 1 - distance / MINERANGE;
-  return Math.floor(MINEDAMMAX * factor * factor * factor * tonFact(ton));
+  return Math.floor(MINEDAMMAX * factor * factor * factor * damageScale(victimDamageFactor));
 }
 
 /**
