@@ -252,11 +252,35 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const ship = this.shipStateService.get(userid, activeShipNo);
       if (ship) {
-        // Flush current state to DB and unload from memory.
-        // @see GEMAIN.C:warhupa — gepdb(GEUPDATE) + remove from active list
-        // TODO: re-enable cantexit combat-kill once server is stable (hot reload fires
-        // handleDisconnect with old code before fix compiles in, killing ships on every reload)
-        void this.shipStateService.flushAndUnload(userid, activeShipNo);
+        // @see GEMAIN.C:warhupa (line 1397) — if (cantexit > 0) killem(ship)
+        // Anti-rage-quit: kill the ship if it disconnected mid-combat AND the
+        // disconnect was initiated by the CLIENT (not the server). Server-side
+        // reasons ('server namespace disconnect', 'server shutting down') are
+        // produced by NestJS hot-reload and graceful shutdown — they must never
+        // trigger the kill. The reason-gate is sufficient: hot-reload calls
+        // server.disconnect() which Socket.io maps to 'server namespace disconnect',
+        // a server-side reason not present in CLIENT_SIDE_REASONS below.
+        const reason = client.data.disconnectReason as string | undefined;
+        const CLIENT_SIDE_REASONS = new Set([
+          'transport close',
+          'transport error',
+          'ping timeout',
+          'client namespace disconnect',
+        ]);
+        const isClientSide = CLIENT_SIDE_REASONS.has(reason ?? '');
+
+        if (ship.cantexit > 0 && isClientSide) {
+          // Kill path: reset DB row to spawn defaults (mirrors handleCombatShipDestroyed),
+          // then evict from memory without flushing the stale in-combat state.
+          void this.prisma.ship.updateMany({
+            where: { userid, shipno: activeShipNo },
+            data: { damage: 0, energy: 65000, xcoord: 0.5, ycoord: 0.5, heading: 0, speed: 0, where: 0 },
+          });
+          this.shipStateService.removeFromGame(ship);
+        } else {
+          // Normal path: flush current state to DB and unload from memory.
+          void this.shipStateService.flushAndUnload(userid, activeShipNo);
+        }
       }
     }
 
