@@ -18,7 +18,7 @@ export function applyRandamage(
   caps: RandamageCaps,
   shieldtype: number,
 ): RandamageResult {
-  if (shieldtype === 20) return { subsystem: 'none', magnitude: 0 };
+  if (shieldtype === 20) return { subsystem: 'skipped', magnitude: 0 };
 
   const result = rollRandamage(rand, victim.damage, caps);
 
@@ -43,6 +43,7 @@ export function applyRandamage(
       victim.helm = result.magnitude;
       break;
     case 'none':
+    case 'skipped':
       break;
   }
 
