@@ -9,7 +9,7 @@ import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
-import { FIRETICKS, MAXTORPS, TORFACT, WARP_THRESHOLD } from '../../constants';
+import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WARP_THRESHOLD } from '../../constants';
 import { I_TORP } from '../../constants/items';
 
 /**
@@ -93,6 +93,15 @@ export class TorpedoHandlerService {
     // 5. Jammer
     if (ship.jammer > 0) {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
+    }
+
+    // 5b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
     }
 
     // 6. Target lookup

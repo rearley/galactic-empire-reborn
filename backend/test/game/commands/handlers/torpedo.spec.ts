@@ -131,9 +131,9 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
   });
 
   it('rejects when target has all MAXTORPS slots occupied (TOR_FULL)', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 1, ycoord: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
       // All 3 torpedo slots already occupied (channel != 255)
       ltorpsChannel: [99, 99, 99],
       ltorpsDistance: [1000, 2000, 3000],
@@ -146,12 +146,12 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
 
   it('happy path — allocates lowest free slot on target, decrements ammo, drops shields, sets cantexit', () => {
     const alice = makeShip({
-      userid: 'a', shipno: 7, xcoord: 0, ycoord: 0,
+      userid: 'a', shipno: 7, xcoord: 1, ycoord: 0,
       shieldstat: 1, items: itemsWith({ [I_TORP]: 3n }),
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: 1, // distance 1 sector — well within lock range
+      xcoord: 1, ycoord: 1, // distance 1 sector — well within lock range
     });
     const h = makeHarness([alice, bob]);
 
@@ -171,10 +171,20 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 
+  it('firing from inside the neutral zone self-zaps and does not lock (Plan 1 T8)', () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['Bob'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/neutral zone/i);
+    expect(firer.damage).toBeGreaterThanOrEqual(101);
+    // No target lock allocated — firer returned early
+    expect(firer.ltorpsChannel.length).toBe(0);
+  });
+
   it('happy path — allocates into first free slot when others occupied', () => {
-    const alice = makeShip({ userid: 'a', shipno: 5, xcoord: 0, ycoord: 0 });
+    const alice = makeShip({ userid: 'a', shipno: 5, xcoord: 1, ycoord: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
       ltorpsChannel: [99, 255, 100],
       ltorpsDistance: [1000, 0, 2000],
     });

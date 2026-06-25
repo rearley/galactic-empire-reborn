@@ -9,7 +9,7 @@ import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
-import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT } from '../../constants';
+import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 
 const MISSILE_CHARGE_MIN = 1;
@@ -104,6 +104,15 @@ export class MissileHandlerService {
     const ammo = ship.items[I_MISSL] ?? 0n;
     if (ammo <= 0n) {
       return { lines: [{ text: formatMessage(MessageId.MIS_NOAMMO), category: 'system' }] };
+    }
+
+    // 4b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
     }
 
     // 5. Target lookup
