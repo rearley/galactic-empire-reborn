@@ -583,25 +583,127 @@ which subscribes after `PhysicsTickService` (post-move coordinates guaranteed).
 
 ---
 
-### cmd_phasor / pha (feature 006b)
+### cmd_phasor / pha (features 006b + 023)
 
-**Source**: GECMDS.C:cmd_phasor, GECMDS.C:954, GEFUNCS.C:firephas
+**Source**: GECMDS.C:829-912 `cmd_phas`, GECMDS.C:914-1017 `firep`, GEFUNCS.C:2060-2093 `pdamage`
 
-Keywords: `pha <bearing> <percent>`
+Keywords: `pha <bearing> [focus]`
 
-Gates (in order): `phasrtype` mounted on ship class; `phasr >= PMINFIRE (60)`; bearing `-180..180`;
-percent `1..99`; firer's `jammer == 0` (JAMMER4 reject). Hyper-phaser path selected when
-`speed >= WARP_THRESHOLD (1000)`.
+Syntax (restored in feature 023 to match C source exactly):
+- `bearing` — relative heading delta, integer `-180..180` (GEFUNCS.C:1933 `valdegree`).
+- `focus` — beam focus, integer `0..5`, default `1` when omitted (GECMDS.C:829 `margc` check; GEFUNCS.C:1906 `valpcnt(margv[2],0,5)`).
 
-Arc resolution: `lineOfFire(firer, target, bearing, beamWidth)` where `beamWidth = percent`.
-`PHABIAS = 2` widens the effective arc — a target outside `percent` but within `percent + PHABIAS`
-is still a hit (GECMDS.C:954). Friendly fire is allowed (no team filter). Energy and phasr charge
-consumed on the firer. `cantexit = FIRETICKS` set on firer and on each victim hit.
+Gates (in order per GECMDS.C:914-941): `phasrtype` mounted on ship class; `phasr >= PMINFIRE (60)`;
+bearing `-180..180`; focus `0..5`; firer not cloaked (`cloak == 0` — C line 923-927);
+firer not in neutral zone (neutral-zone self-zap, C line 937 — see below);
+firer's `jammer == 0` (JAMMER4 reject). Hyper-phaser path selected when `speed >= WARP_THRESHOLD (1000)`.
 
-Phaser reload: `CombatTickService` adds `PRELOAD (10)` to `phasr` per tick, clamped to `maxPhaser`.
+**Beam half-angle**: `focus + PHABIAS (2)` degrees (GECMDS.C:954 `smallest(heading,deg) < percent+PHABIAS`).
+Effective cone range: 4° (focus=2) to 14° (focus=12, but focus is capped at 5 so max practical cone is
+7° half-angle). This is a tight directional weapon — the previous implementation used `percent` (0-99) as
+the beam width, producing 77–204° arcs that hit almost everything.
+
+Always full discharge: `phasr` is set to 0 on fire (GECMDS.C:1006 `warsptr->phasr = 0`). The `phasr`
+charge governs how much of `PDAMMAX` is delivered, not how much arc is covered.
+
+**Damage formula** (ported from GEFUNCS.C:2060-2093 `pdamage`, feature 023):
+```
+disfact = 20000 + phasrtype * 4000
+dd      = max(0, 1 - dist / disfact)          // dist in cdistance units (×10000 scale)
+fd      = 1 - focus / 11
+dp      = dd^PFIRDST * fd² * (phasr / 100)
+damage  = PDAMMAX * dp
+```
+With type-1 phaser and `PDAMMAX=200`/`PFIRDST=1`, damage falls to zero at `disfact=24000` ≈ 2.4 sectors.
+Previously TS used an ad-hoc `(p/100)*maxPhaser/(1+range/100)` formula with near-full damage at 20 sectors.
+
+Phaser reload: `CombatTickService` adds `phasrtype * PRELOAD (10)` to `phasr` per tick (F-002 fix),
+clamped to `maxPhaser`.
 
 Events emitted: `COMBAT_PHASER_FIRED`, `COMBAT_HIT` (per hit target), `COMBAT_MISS` (if arc empty).
 All sector-scoped.
+
+---
+
+### Phaser damage balance constants (feature 023)
+
+**Source**: GEMAIN.C:491-600 `numopt` calls — these are sysop-configurable defaults, not hardcoded.
+
+| Constant | Value | C default | Notes |
+|----------|-------|-----------|-------|
+| `PDAMMAX` | 200 | 1 (sentinel) | Max phaser damage; C ships with `.cnf` override. Tune during playtest. |
+| `PFIRDST` | 1 | 1 | Distance-falloff exponent; 1 = linear, >1 = steeper. |
+| `PHATOWRP` | 0 | 0 | Min `phasrtype` to hit a warping victim with a normal phaser. 0 = any phaser can. |
+| `TORFACT` | 0.1 | 0.1 | Torpedo lock-quality divisor (see below). |
+| `MISFACT` | 0.1 | 0.1 | Missile lock-quality divisor. |
+| `SE100DAM` | 101 | 101 | Self-zap hull damage for firing inside neutral zone (instant kill). |
+
+All six are pinned in `backend/src/game/constants.ts` and covered by balance-regression tests.
+
+---
+
+### Neutral-zone self-zap / fire gate (feature 023)
+
+**Source**: GECMDS.C:937-941 `firep`, GECMDS.C:1029-1035 `firehp`, GECMDS.C:1159-1163 `cmd_torp`,
+GECMDS.C:1234-1238 `cmd_missl`; GECMDS.C:1525-1532 `zaphim`
+
+Firing any weapon (phaser, torpedo, or missile) from inside the neutral zone sector (floor(x)==0 &&
+floor(y)==0) calls `zaphim`: `firer.damage += SE100DAM (101)`. Because `damage >= 100` triggers
+kill resolution on the next tick, this is an instant kill for the firer. No damage is applied to
+the intended target. The `cantexit` timer is still set (battle-lock persists).
+
+The neutral zone is checked using `isInNeutralZone(coord)` from `backend/src/game/combat/neutral-zone.ts`
+(extracted in feature 023 from the inline check in `combat-tick.service.ts` so all handlers share one predicate).
+
+Mine deployment in the neutral zone (C-004) is separately deferred.
+
+---
+
+### Cloak-fire gates (feature 023)
+
+**Source**: GECMDS.C:923-927 `firep` (`if (warsptr->cloak > 0) { prfmsg(PCLOKUP); return; }`);
+GECMDS.C:1234-1238 `cmd_missl`
+
+A cloaked ship cannot fire phasers or missiles. Torpedo already had this gate (GECMDS.C:1123-1128).
+With feature 023, all three player weapon commands are now consistent: the firer must be uncloaked
+(`ship.cloak === 0`) to fire. The gate is checked before arc/target resolution.
+
+Mine handler cloak gate (C-004) remains deferred.
+
+---
+
+### Lock-quality gate for torpedoes and missiles (feature 023)
+
+**Source**: GECMDS.C:1339-1430 `lockon`, invoked by `cmd_torp` (line 1188) and `cmd_missl` (line 1302)
+
+Lock acquisition requires a quality roll before the weapon slot is allocated:
+
+**Torpedo lock quality** (GECMDS.C:1358-1370):
+```
+lockFact = (1.2 - speed / 5000) * ((5.0 - dist) / TORFACT)
+```
+- Fails if target speed > `WARP_THRESHOLD` (warping target).
+- Fails if target is fully cloaked (`cloak >= 10`).
+- Fails if target is in the neutral zone.
+- Lock succeeds only if `lockFact > 0.7`.
+
+**Missile lock quality** (GECMDS.C:1394-1406):
+```
+lockFact = (5.0 - dist) / MISFACT
+```
+- No speed penalty for missiles (they can lock a warping target — matches C line 1232).
+- Same cloak and neutral-zone gates apply.
+- Lock succeeds only if `lockFact > 0.7`.
+
+With `TORFACT=0.1` and `MISFACT=0.1`, the `(5.0 - dist)` term reaches 0.7 at `dist ≈ 4.93` sectors,
+so both weapons reliably fail to lock beyond ~4.9 sectors. At 1 sector the torpedo quality is ≈5.8×
+the threshold (reliable); at 3 sectors ≈2.8× (still reliable but starting to degrade). The speed
+factor in torpedo lock penalises targets in hyperspace (`speed >= 1000`): `(1.2 - 1000/5000) = 1.0`
+at warp-1 but `(1.2 - 5000/5000) = 0.2` at warp-5 — combined with distance, a torpedo lock on a
+fast-warping target at 3+ sectors will fail.
+
+Before feature 023, TS allowed locks at any distance up to `scanRange` (~10 sectors for a starter ship)
+with no quality degradation.
 
 ---
 
