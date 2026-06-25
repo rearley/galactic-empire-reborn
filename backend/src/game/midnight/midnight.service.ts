@@ -15,11 +15,13 @@
 
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MidnightRepository, PhaseCounters } from './midnight.repository';
 import { MidnightCounters, hasRunForToday, recordRun } from './midnight-run.ledger';
 import { ADVISORY_LOCK_KEY } from './midnight.constants';
 import { loadMidnightConfig } from './midnight.config';
+import { MIDNIGHT_COMPLETED, MidnightCompletedPayload } from './midnight-events';
 
 export const MIDNIGHT_LOCK_HELD = 'MIDNIGHT_LOCK_HELD' as const;
 
@@ -42,6 +44,7 @@ export class MidnightService implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repo: MidnightRepository,
+    private readonly events: EventEmitter2,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -150,6 +153,15 @@ export class MidnightService implements OnApplicationBootstrap {
         ms: durationMs,
         ...counters,
       }));
+
+      // Notify in-memory services (e.g. ShipStateService) that the midnight pass
+      // completed successfully so they can refresh DB-backed cached state.
+      // Only emitted after transaction commit + recordRun — never on lock failure.
+      const payload: MidnightCompletedPayload = {
+        runDate: today.toISOString().slice(0, 10),
+        durationMs,
+      };
+      this.events.emit(MIDNIGHT_COMPLETED, payload);
 
       return counters;
     } finally {

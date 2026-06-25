@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ShipStateService } from './ship-state.service';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
@@ -13,6 +14,7 @@ import { PlanetModule } from '../planet/planet.module';
 @Module({
   imports: [
     PrismaModule,
+    EventEmitterModule,
     forwardRef(() => PlanetModule),
   ],
   providers: [ShipStateService, MaintenanceService, ShipTickService],

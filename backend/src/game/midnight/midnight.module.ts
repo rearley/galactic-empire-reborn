@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { MidnightService } from './midnight.service';
 import { MidnightRepository } from './midnight.repository';
@@ -12,7 +13,7 @@ import { AdminMidnightController } from './admin-midnight.controller';
  * @see specs/009-midnight-job/plan.md
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, EventEmitterModule],
   providers: [MidnightService, MidnightRepository, AdminTokenGuard],
   controllers: [AdminMidnightController],
   exports: [MidnightService],

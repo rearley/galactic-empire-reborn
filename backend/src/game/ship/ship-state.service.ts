@@ -1,9 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TickKind } from '../tick/tick.types';
 import { TickService } from '../tick/tick.service';
 import { ShipState, shipKey } from './ship-state.types';
 import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
+import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 
 /**
  * In-memory source of truth for all active ship state.
@@ -229,6 +231,61 @@ export class ShipStateService implements OnModuleInit {
     }
     this.map.delete(shipKey(userid, shipno));
     this.lastFlushedAt.delete(shipKey(userid, shipno));
+  }
+
+  /**
+   * Re-reads User.teamcode from Postgres for every in-memory ship and updates
+   * ShipState.teamcode to match. Called by the MIDNIGHT_COMPLETED event handler
+   * so players connected across midnight pick up the post-midnight teamcode
+   * (e.g. orphan reset to 0 by countTeamMembersAndResetOrphans).
+   *
+   * Only teamcode is refreshed here. Other midnight-mutated User fields (e.g.
+   * User.score, User.options) that may be cached on ShipState are out of scope —
+   * those are either not cached in-memory or are refreshed by other mechanisms.
+   *
+   * Empty-map case: no-op (skips the DB query entirely).
+   *
+   * @see src/game/midnight/midnight.repository.ts countTeamMembersAndResetOrphans
+   * @see specs/026-subsystem-damage task-4-brief.md P-016
+   */
+  async refreshTeamcodes(): Promise<void> {
+    if (this.map.size === 0) return;
+
+    const allUserids = Array.from(new Set(
+      Array.from(this.map.values()).map((s) => s.userid),
+    ));
+
+    const rows = await this.prisma.user.findMany({
+      where: { userid: { in: allUserids } },
+      select: { userid: true, teamcode: true },
+    });
+
+    const teamcodeByUserid = new Map<string, bigint | null>();
+    for (const row of rows) {
+      teamcodeByUserid.set(row.userid, row.teamcode);
+    }
+
+    for (const state of this.map.values()) {
+      if (!teamcodeByUserid.has(state.userid)) continue;
+      const dbTeamcode = teamcodeByUserid.get(state.userid)!;
+      // bigint | null from DB → bigint | undefined on ShipState
+      state.teamcode = dbTeamcode !== null ? dbTeamcode : undefined;
+    }
+  }
+
+  /**
+   * Listens for MIDNIGHT_COMPLETED and refreshes in-memory teamcodes from DB.
+   * Placed on ShipStateService (an already-running singleton) to avoid a
+   * separate listener service and prevent any circular-dependency concern —
+   * ShipStateService does NOT import MidnightService; it only imports the
+   * event constant string, which is a one-way data dependency.
+   *
+   * @see src/game/midnight/midnight-events.ts MIDNIGHT_COMPLETED
+   */
+  @OnEvent(MIDNIGHT_COMPLETED)
+  async onMidnightCompleted(): Promise<void> {
+    this.logger.log('midnight.completed received — refreshing in-memory teamcodes');
+    await this.refreshTeamcodes();
   }
 
   /**
