@@ -220,6 +220,10 @@ export const JAMTIME = 20 as const;
 export const PDAMMAX = 200 as const;
 /** @see GEMAIN.C:493 numopt(PFIRDST,1,20) — normal-phaser distance falloff exponent. */
 export const PFIRDST = 1 as const;
+/** @see GEMAIN.C:492 numopt(HPDAMMAX,1,200) — max hyper-phaser damage base (warp branch). */
+export const HPDAMMAX = 200 as const;
+/** @see GEMAIN.C:491 numopt(HPFIRDST,1,20) — hyper-phaser distance falloff exponent. */
+export const HPFIRDST = 1 as const;
 /** @see GEMAIN.C:506-507 numopt(TORFACT,1,50)/10 — torpedo lock-quality divisor. */
 export const TORFACT = 0.1 as const;
 /** @see GEMAIN.C:509-510 numopt(MISFACT,1,50)/10 — missile lock-quality divisor. */

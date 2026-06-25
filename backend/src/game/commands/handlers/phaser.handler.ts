@@ -8,10 +8,12 @@ import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import {
   cdistance,
+  hyperPhaserDamage,
   inScanRange,
   lineOfFire,
   phaserDamage,
   shieldhit,
+  withinArc,
 } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import {
@@ -24,6 +26,9 @@ import {
 } from '../../combat/combat-events';
 import {
   FIRETICKS,
+  HPBEAMW,
+  HPFIRAMT,
+  HPMINFIR,
   PHATOWRP,
   PMINFIRE,
   SE100DAM,
@@ -59,8 +64,9 @@ import { CombatTickService } from '../../combat/combat-tick.service';
  * raised shields via `shieldhit`, else straight to hull. Each hit victim and
  * the firer get `cantexit = FIRETICKS`.
  *
- * Note: the hyper-phaser path (firer at warp) is Plan 3 / C-009. For Plan 1
- * the firer simply fires the normal beam regardless of its own speed.
+ * Note: a firer AT warp (`speed >= WARP_THRESHOLD`) fires the HYPER-phaser
+ * instead — see {@link PhaserHandlerService.handleHyper} / `firehp`
+ * (GECMDS.C:1020). True separation landed in Plan 3 T3 (C-009).
  *
  * Emits:
  *   - `combat.phaser-fired` once
@@ -98,8 +104,9 @@ export class PhaserHandlerService {
       return { lines: [{ text: formatMessage(MessageId.PHA_NOPHAS), category: 'system' }] };
     }
 
-    // 2. Charged?
-    if (ship.phasr < PMINFIRE) {
+    // 2. Charged? (NORMAL beam only — the hyper-phaser is gated on flux energy,
+    //    not phasr charge, so a warping firer skips this check.)
+    if (ship.speed < WARP_THRESHOLD && ship.phasr < PMINFIRE) {
       return { lines: [{ text: formatMessage(MessageId.PHA_NOPOW), category: 'system' }] };
     }
 
@@ -127,6 +134,12 @@ export class PhaserHandlerService {
     // 5. Cloak gate (GECMDS.C:923)
     if (ship.cloak > 0) {
       return { lines: [{ text: formatMessage(MessageId.PHA_CLOAK), category: 'system' }] };
+    }
+
+    // C-009: a firer AT WARP fires the HYPER-phaser (firehp, GECMDS.C:1020),
+    // an entirely separate weapon — flux-gated, fixed 5° beam, warp-only victims.
+    if (ship.speed >= WARP_THRESHOLD) {
+      return this.handleHyper(ship, degree, focus);
     }
 
     const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
@@ -263,6 +276,142 @@ export class PhaserHandlerService {
       s.cantexit = FIRETICKS;
       s.shieldstat = 0;
     });
+
+    return { lines };
+  }
+
+  /**
+   * Hyper-phaser fire (firer AT warp). Ports `firehp` (GECMDS.C:1020-1094) —
+   * a distinct weapon from the normal beam:
+   *   - flux-gated: requires `energy >= HPMINFIR`, else HP_NOPOW (no fire/debit);
+   *   - costs `HPFIRAMT` flux energy (NOT a phasr discharge), keeps shields up;
+   *   - fixed `HPBEAMW` (5°) half-angle beam — focus is irrelevant to the arc;
+   *   - ONLY reaches victims at warp (`where==1`); neutral-zone victims immune;
+   *   - damage from `hyperPhaserDamage` (pdamage warp branch × `* phasrtype`).
+   * Firing inside the neutral zone self-zaps exactly like the normal path.
+   *
+   * @see GECMDS.C:1020 firehp  @see GEFUNCS.C:2069 pdamage (warp branch)
+   */
+  private handleHyper(ship: ShipState, degree: number, focus: number): CommandResult {
+    // Flux-energy gate (GECMDS.C:1029 HPMINFIR) — no fire, no debit.
+    if (ship.energy < HPMINFIR) {
+      return { lines: [{ text: formatMessage(MessageId.HP_NOPOW), category: 'system' }] };
+    }
+
+    const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
+    const sectorX = Math.floor(ship.xcoord);
+    const sectorY = Math.floor(ship.ycoord);
+    const tickAt = new Date();
+    const attackerId = shipKey(ship.userid, ship.shipno);
+
+    // Neutral-zone self-zap (GECMDS.C:1031 zaphim) — same backfire as normal,
+    // BEFORE any fired event leaks.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.phasr = 0;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+    }
+
+    // Beam leaves the ship (GECMDS.C:1037 HPFIRED). hyper=true.
+    const firedEvent: CombatPhaserFiredEvent = {
+      shipId: attackerId,
+      bearing: degree,
+      percent: focus,
+      hyper: true,
+      sector: { x: sectorX, y: sectorY },
+      tickAt,
+    };
+    this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
+
+    // Flux debit + battle-lock (GECMDS.C:1039-1041). Hyper does NOT discharge
+    // phasr (uses flux) and does NOT drop shields (firehp omits shielddn).
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.energy = s.energy - HPFIRAMT;
+      s.cantexit = FIRETICKS;
+    });
+
+    const allShips = this.shipState.findAllShips();
+    let hits = 0;
+    const lines: CommandResult['lines'] = [];
+
+    for (const candidate of allShips) {
+      if (candidate.userid === ship.userid && candidate.shipno === ship.shipno) continue;
+      if (candidate.status !== 1 && candidate.status !== 2) continue;
+      // Hyper-phaser ONLY reaches victims at warp (firehp where==1, GECMDS.C:1045).
+      if (candidate.speed < WARP_THRESHOLD) continue;
+      // Victims inside the neutral zone are immune (GECMDS.C:1047).
+      if (isInNeutralZone(candidate)) continue;
+      // Hard range cap (GECMDS.C:1054 ddistance < scanrange).
+      if (!inScanRange(ship, candidate, scanRange)) continue;
+      // Fixed 5° half-angle beam (HPBEAMW, GECMDS.C:1050) — NOT focus-based.
+      if (!withinArc(ship, candidate, degree, HPBEAMW)) continue;
+
+      const distRaw = cdistance(ship, candidate) * 10000;
+      const damage = hyperPhaserDamage({
+        phasrtype: ship.phasrtype,
+        distRaw,
+        victimMaxTons: this.shipClassCache.getMaxTons(candidate.shpclass),
+      });
+      if (damage < 1) continue;
+
+      const shieldUp = candidate.shieldstat === 1 && candidate.shield > 0;
+      let hullDamage = damage;
+      let shieldConsumed = 0;
+
+      if (shieldUp) {
+        const r = shieldhit(candidate.shield, candidate.shieldtype, damage);
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+          v.shield = r.newCharge;
+          if (r.knockedDown) v.shieldstat = 0;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+        hullDamage = 0;
+        shieldConsumed = r.shieldConsumed;
+      } else {
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+          v.damage = v.damage + hullDamage;
+          v.lastfired = ship.shipno;
+          v.cantexit = FIRETICKS;
+        });
+      }
+
+      const hitEvent: CombatHitEvent = {
+        attackerId,
+        victimId: shipKey(candidate.userid, candidate.shipno),
+        weapon: 'phaser',
+        damageHull: hullDamage,
+        damageShield: shieldConsumed,
+        sector: { x: sectorX, y: sectorY },
+        tickAt,
+      };
+      this.events.emit(COMBAT_HIT, hitEvent);
+      this.combatTick?.recordCombatEvent({
+        weapon: 'hyper-phaser',
+        shooter: { x: ship.xcoord, y: ship.ycoord },
+        target: { x: candidate.xcoord, y: candidate.ycoord },
+        maxRange: scanRange / 10_000,
+      });
+      hits++;
+      lines.push({
+        text: `Hyper-phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,
+        category: 'combat',
+      });
+    }
+
+    if (hits === 0) {
+      const missEvent: CombatMissEvent = {
+        attackerId,
+        weapon: 'phaser',
+        sector: { x: sectorX, y: sectorY },
+        tickAt,
+      };
+      this.events.emit(COMBAT_MISS, missEvent);
+      lines.push({ text: 'Hyper-phaser fired — no targets in arc.', category: 'combat' });
+    }
 
     return { lines };
   }

@@ -14,7 +14,7 @@ import {
   CombatHitEvent,
   CombatMissEvent,
 } from '../../../../src/game/combat/combat-events';
-import { FIRETICKS, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
+import { FIRETICKS, HPFIRAMT, HPMINFIR, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -151,15 +151,15 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect(alice.dirty).toBe(false);
   });
 
-  it('firer at warp still fires the normal beam (hyper-phaser is Plan 3 / out of scope)', () => {
+  it('firer at warp fires the HYPER-phaser (hyper=true) — C-009 true separation', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, phasr: 100,
+      speed: WARP_THRESHOLD, phasr: 100, energy: 50000,
     });
-    // Bob due north at range 1 — squarely inside the firing arc.
+    // Bob also at warp, due north at range 1 — inside the hyper beam arc.
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 4, speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -167,9 +167,8 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
 
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
     expect(fired).toBeDefined();
-    // Plan 1 never flags hyper — the firer's own speed is ignored.
-    expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(false);
-    // Normal beam still lands a hit on the in-arc victim.
+    // Hyper path flags the fired event.
+    expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(true);
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
   });
@@ -378,5 +377,90 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(hit).toBeDefined();
     expect(getShip(h, victim).shield).toBeLessThan(5000);
     expect(getShip(h, firer).phasr).toBe(0);
+  });
+});
+
+describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', () => {
+  const getShip = (h: Harness, s: ShipState): ShipState =>
+    h.shipMap.get(shipKey(s.userid, s.shipno))!;
+
+  it('firer at warp with energy < HPMINFIR → HP_NOPOW, no fire, no energy debit', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: HPMINFIR - 1,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+    });
+    const h = makeHarness([alice, bob]);
+
+    const res = h.handler.command.handler(alice, ['0'], ctx) as CommandResult;
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.HP_NOPOW));
+    // No flux spent and no fire event leaked.
+    expect(getShip(h, alice).energy).toBe(HPMINFIR - 1);
+    expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
+  });
+
+  it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hit + energy -= HPFIRAMT', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+    });
+    const h = makeHarness([alice, bob]);
+
+    h.handler.command.handler(alice, ['0'], ctx);
+
+    const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
+    expect(getShip(h, bob).shield).toBeLessThan(5000);
+    // Flux energy debited; phasr NOT discharged (hyper uses flux, not charge).
+    expect(getShip(h, alice).energy).toBe(50000 - HPFIRAMT);
+    expect(getShip(h, alice).phasr).toBe(100);
+    expect(getShip(h, alice).cantexit).toBe(FIRETICKS);
+  });
+
+  it('a NON-warp victim is NOT hit by the hyper-phaser', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
+      speed: WARP_THRESHOLD, energy: 50000,
+    });
+    // Bob in arc but sub-warp (speed 0) — hyper only reaches warp targets.
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      speed: 0, shield: 5000, shieldstat: 1,
+    });
+    const h = makeHarness([alice, bob]);
+
+    h.handler.command.handler(alice, ['0'], ctx);
+
+    expect(h.emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+    expect(getShip(h, bob).shield).toBe(5000);
+    // Still spent the flux on the (missed) hyper shot.
+    expect(getShip(h, alice).energy).toBe(50000 - HPFIRAMT);
+  });
+
+  it('firing the hyper-phaser inside the neutral zone self-zaps (WPN_ZAP, damage += SE100DAM)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
+      speed: WARP_THRESHOLD, energy: 50000, damage: 0,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: -1,
+      speed: WARP_THRESHOLD, damage: 0,
+    });
+    const h = makeHarness([alice, bob]);
+
+    const res = h.handler.command.handler(alice, ['0'], ctx) as CommandResult;
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.WPN_ZAP));
+    expect(getShip(h, alice).damage).toBeGreaterThanOrEqual(SE100DAM);
+    expect(getShip(h, bob).damage).toBe(0);
+    // No fire event when the beam never leaves the ship.
+    expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
   });
 });

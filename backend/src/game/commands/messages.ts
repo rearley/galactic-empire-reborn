@@ -137,6 +137,7 @@ export enum MessageId {
   PHA_FMT = 'PHA_FMT',
   PHA_CLOAK = 'PHA_CLOAK',
   WPN_ZAP = 'WPN_ZAP',
+  HP_NOPOW = 'HP_NOPOW',
 
   // torpedo (feature 006b) — GECMDS.C:cmd_torpedo
   TOR_NOTOR = 'TOR_NOTOR',
@@ -498,6 +499,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PHA_FMT]: 'Format: pha <degree -180..180> [focus 0-5]',
   [MessageId.PHA_CLOAK]: 'Cannot fire while cloaked.',
   [MessageId.WPN_ZAP]: 'You fired inside the neutral zone! Your own weapons backfire!',
+  [MessageId.HP_NOPOW]: 'Insufficient flux energy for hyper-phaser.',
 
   // torpedo (feature 006b)
   [MessageId.TOR_NOTOR]: 'No torpedo launcher mounted.',

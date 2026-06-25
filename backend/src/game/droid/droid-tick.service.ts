@@ -59,7 +59,7 @@ import {
   CombatPhaserFiredEvent,
   CombatHitEvent,
 } from '../combat/combat-events';
-import { cdistance, inScanRange, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
+import { cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
@@ -470,17 +470,13 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
-    // NOTE: True hyperphaser separation (C firehp/pdamage warp-branch logic
-    // with hpdammax/hpfirdst) is DEFERRED (Plan 1 audit C-009). This path
-    // advertises 'hyper-phaser' but currently deals normal-phaser damage.
+    // C-009: true hyper-phaser damage (firehp/pdamage warp branch with
+    // HPDAMMAX/HPFIRDST, scaled by `* phasrtype`). @see GECMDS.C:1020 firehp
     if (lineOfFire(droid, target, bearing, 0)) {
-      const damage = phaserDamage({
+      const damage = hyperPhaserDamage({
         phasrtype: droid.phasrtype,
-        phasr: droid.phasr,
         distRaw: dist * 10000,
-        focus: 0,
         victimMaxTons: this.classCache.getMaxTons(target.shpclass),
-        victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
       let hullDamage = damage;
