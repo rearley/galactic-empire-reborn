@@ -119,11 +119,11 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
   });
 
   it('rejects when target has all MAXMISSL slots occupied (MIS_FULL)', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 1, ycoord: 0 });
     // bob must be within lock range (~4.93 sectors) so the lock-quality gate passes
     // and we actually reach the slot-full check. Moved from ycoord:100 → ycoord:1.
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
       lmisslChannel: [99, 99, 99],
       lmisslDistance: [1000, 2000, 3000],
       lmisslEnergy: [500, 500, 500],
@@ -136,12 +136,12 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
 
   it('happy path — allocates slot on target with channel/distance/energy, deducts cost, sets cantexit', () => {
     const alice = makeShip({
-      userid: 'a', shipno: 9, xcoord: 0, ycoord: 0,
+      userid: 'a', shipno: 9, xcoord: 1, ycoord: 0,
       energy: 50000, items: itemsWith({ [I_MISSL]: 4n }),
     });
     // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -163,13 +163,23 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 
+  it('firing from inside the neutral zone self-zaps and does not lock (Plan 1 T8)', () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['Bob', '1000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/neutral zone/i);
+    expect(firer.damage).toBeGreaterThanOrEqual(101);
+    // No target lock allocated — firer returned early
+    expect(firer.lmisslChannel.length).toBe(0);
+  });
+
   it('missiles allowed at warp speed (no warp gate)', () => {
     const alice = makeShip({
-      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
+      userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
       speed: WARP_THRESHOLD,
     });
     // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
-    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1 });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
     const h = makeHarness([alice, bob]);
     const result = h.handler.command.handler(alice, ['Bob', '500'], ctx) as CommandResult;
     // Should not be rejected for warp
@@ -185,7 +195,7 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
   let spawnTarget: (opts: { sectorsAway: number }) => ShipState;
 
   beforeEach(() => {
-    firer = makeShip({ userid: 'f', shipno: 10, shipname: 'Firer', xcoord: 0, ycoord: 0 });
+    firer = makeShip({ userid: 'f', shipno: 10, shipname: 'Firer', xcoord: 0, ycoord: 1 });
     cloaked = makeShip({ userid: 'c', shipno: 11, shipname: 'Cloaked', xcoord: 0, ycoord: 0, cloak: 0 });
 
     let nextShipno = 100;
