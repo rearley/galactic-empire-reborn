@@ -6,9 +6,10 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
-import { cdistance } from '../../combat/combat-math';
+import { cdistance, lockFact } from '../../combat/combat-math';
+import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
-import { FIRETICKS, MAXMISSL, MISENGFC } from '../../constants';
+import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 
 const MISSILE_CHARGE_MIN = 1;
@@ -73,6 +74,11 @@ export class MissileHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MIS_NOMIS), category: 'system' }] };
     }
 
+    // 1b. Firer cloak gate — cannot fire while cloaked (mirrors torpedo, GECMDS.C:cmd_torpedo)
+    if (ship.cloak > 0) {
+      return { lines: [{ text: formatMessage(MessageId.MIS_CLOAK), category: 'system' }] };
+    }
+
     // Parse charge
     const chargeArg = args[1] ?? '';
     if (!/^-?\d+$/.test(chargeArg.trim())) {
@@ -108,6 +114,21 @@ export class MissileHandlerService {
       return { lines: [{ text: found.message, category: 'system' }] };
     }
     const target = found.ship;
+
+    // Target in neutral zone ⇒ fire control refuses (GECMDS.C:1363).
+    if (isInNeutralZone(target)) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_NEUTRAL), category: 'system' }] };
+    }
+    // Fully cloaked target is unlockable (GECMDS.C:1371).
+    if (target.cloak >= 10) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+    }
+    // Lock-quality gate (GECMDS.C:1378-1395) — missile branch: (5 - dist)/MISFACT.
+    const distSectors = cdistance(ship, target);
+    const fact = lockFact('missile', ship.speed, target.speed, distSectors, MISFACT);
+    if (fact <= 0.7) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+    }
 
     // 6. Find lowest free slot on target's lmissl
     let slot = -1;
