@@ -976,6 +976,52 @@ The `COMBAT_SHIP_DESTROYED` event reuse means the kill flow is byte-identical to
 
 ---
 
+### Subsystem damage + repair (feature 026, C-010 / S-007)
+
+**Source**: GEFUNCS.C:1956 (`randamage`), GECMDS.C:2143-2150 (`cmd_scan` TABROKE/JAMMER4 gates)
+
+After every weapon hit (phaser, hyperphaser, torpedo, missile, mine, Cybertron phaser/torp, droid phaser/torp), `applyRandamageAndEmit(victim, rng, emit)` is called. It:
+
+1. **Checks the precondition** — skipped if `victim.damage <= 20`. Only a ship already meaningfully damaged (>20%) is at risk of subsystem failure.
+2. **Rolls `gernd()%6`** to select a subsystem slot (0–5), then maps to the subsystem:
+
+| Roll | Subsystem | State change | Gate produced |
+|------|-----------|--------------|---------------|
+| 0 | Shields | `shield` set negative, `shieldstat = SHIELDDM (3)` | Shield recharge suspended |
+| 1 | Phasers | `phasr` set negative | Can't fire phasers |
+| 2 | Fire control | `firecntl = gernd()%20` | Lock command returns `FCBROKE` |
+| 3 | Cloak | `cloak` set negative | Can't activate cloak; ramp blocked |
+| 4 | Tactical | `tactical` set negative | `cmd_scan` returns `TABROKE` |
+| 5 | Helm | `helm` set negative | Heading change returns `HLBROKE` |
+
+3. **Class gate** — `shieldtype === 20` ships (the Zygor class) are immune; the roll returns discriminator `'skipped'` rather than `'none'` for call-site clarity.
+4. **Emits** `COMBAT_SUBSYSTEM_DAMAGED` (sector-scoped) with `{ shipId, subsystem, value }`.
+
+#### Subsystem effects
+
+| Subsystem | Blocked action | Message |
+|-----------|---------------|---------|
+| `tactical != 0` | `cmd_scan` (all subcommands) | `TABROKE` |
+| `jammer > 0` (self-jammed) | `cmd_scan` | `JAMMER4` |
+| `phasr < 0` | `cmd_pha` (fire) | Insufficient charge (existing gate) |
+| `firecntl > 0` | `cmd_lock` | `FCBROKE` |
+| `cloak < 0` | `cmd_cloak on` | Damaged-cloak gate (existing) |
+| `helm != 0` | `cmd_rot` (heading change) | `HLBROKE` |
+
+#### Subsystem repair over time
+
+`ShipTickService` (1s SHIP_UPDATE tick) calls `repairSubsystems(ship)` after the energy/shield update passes. Repair rules:
+
+- **Tactical, helm, cloak** (when negative): increment +1 per tick toward 0. Recovery: |value| ticks after the hit.
+- **Fire control** (`firecntl > 0`): decrement -1 per tick toward 0. Recovery: firecntl ticks after the hit.
+- **Phasers** (`phasr < 0`): recovered by the existing phaser reload (`phasrtype * PRELOAD` per physics tick); no special repair path needed.
+- **Shields** (damaged: `shield < 0`): increment +1 per tick. When `shield` reaches 0, `shieldstat` is reset to `down (0)` so the normal shield-recharge cycle can resume. Note: `shieldstat = SHIELDDM (3)` suspends recharge for the duration; the repair tick is the only way to exit this state.
+- **Cloak** (negative only): repaired by the subsystem tick. A *positive* cloak value is active cloaking and is managed by the cloak tick — not touched here.
+
+Repair runs regardless of `cantexit` (subsystem damage is temporary; it does not extend battle-lock).
+
+---
+
 ### Planet revolt (feature 006b)
 
 **Source**: GEPLANET.C:341-380
@@ -1187,6 +1233,14 @@ Delete all `Mail` rows where:
 **Source**: GEMAIN.C — `CHGLOSER` feature, `GEPCNT` percentage
 
 When a player kills another player (both non-AI), `PlayerScoreService` transfers `floor(loser.cash × chgLoserPercent / 100)` from the loser to the killer atomically in a Prisma transaction. Rate configured via `MIDNIGHT_CHGLOSER` env (default 0 = disabled). AI ships (prefix `Cybrg-` or `@Droid-`) never pay the penalty as either attacker or victim.
+
+### Midnight teamcode refresh (feature 026, P-016)
+
+**Source**: GEMAIN.C:gemidnighta (team reconciliation, lines 1204-1332)
+
+The midnight transaction can reassign or clear `User.teamcode` for any player (orphan handling, team dissolution). Players connected across midnight would keep a stale `ShipState.teamcode` until they disconnected.
+
+Fix: after the Prisma transaction commits successfully, `MidnightService` emits `MIDNIGHT_COMPLETED` on the shared EventEmitter2 bus. `ShipStateService` listens via `@OnEvent(MIDNIGHT_COMPLETED)` and calls `refreshTeamcodes()`, which re-reads `User.teamcode` for every ship currently in the in-memory map via a single `prisma.user.findMany` batched query. The handler is guarded with `.catch(err => logger.error(...))` to prevent an unhandled rejection from crashing the process if the DB call fails.
 
 ---
 

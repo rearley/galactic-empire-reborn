@@ -1162,4 +1162,21 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 
 **Reason**: Simpler and deterministic PRNG consumption — the pre-existing TS code already rolled it once. The divergence is confined to the 1-in-CYBSLO random branch against players with `kills < CYB_BE_NICE` (when quad or `kills ≥ CYB_BE_NICE` both C draws are deterministically equal anyway). The original author of the TS port flagged that region as possibly-dead code, and playtest will surface any cadence issues immediately.
 
+---
+
+## 2026-06-25 — randamage split into pure roll / mutator / emit-helper (feature 026)
+
+**Context**: `randamage` (GEFUNCS.C:1956) needed to be wired into 7 hit sites across 4 combat services (phaser, torpedo/missile/mine in `CombatTickService`, Cybertron, two droid classes). Each site follows the same pattern: roll the subsystem selection, mutate state, emit an event. The question was whether to inline that triple at every site, or extract helpers.
+
+**Decision**: Three-layer split:
+- `rollRandamage(damage, rng): RandamageRoll` — pure function, no side effects. Returns `{ subsystem, value, outcome: 'damaged'|'skipped'|'none' }`. Fully unit-testable with any seed.
+- `applyRandamage(ship, roll): void` — state mutator only. Applies the roll result to the in-memory `ShipState`. No I/O.
+- `applyRandamageAndEmit(victim, rng, emit): void` — composes the two above and calls the emit callback. This is the function called from all 7 hit sites; they pass the sector-scoped emit closure from their tick context.
+
+**`'skipped'` vs `'none'` discriminator**: `shieldtype=20` (Zygor class) bypasses the subsystem roll entirely. The outcome is `'skipped'` (not `'none'`), so callers can distinguish "immunity" from "roll produced no damage" in logs and tests.
+
+**Reason**: The pure/mutate/emit split follows the existing `rollHullDamage` → `applyHullDamage` pattern in the codebase. It keeps the logic testable in isolation and avoids duplicating the emit-and-mutate boilerplate at 7 call sites. The `'skipped'` discriminator was added after the first test pass revealed that class-immunity was silently swallowed in golden-vector tests.
+
+**Alternatives rejected**: Inline the triple at every hit site (7× duplication, hard to test); a single `randamageAndEmit` function taking every field as args (long signature, harder to mock the emit); making `rollRandamage` stateful by accepting `ShipState` directly (breaks purity, prevents golden-vector tests).
+
 **Alternatives rejected**: Two independent draws for strict C fidelity — deferred; revisit if Cybertron fire cadence feels off in playtest.
