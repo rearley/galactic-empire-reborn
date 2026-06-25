@@ -241,7 +241,10 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
   });
 
   test('Cybertron fires phasers at a player within scanRange', () => {
-    const { events, fireTick } = setup(1.0, 7);
+    const { events, fireTick, player } = setup(1.0, 7);
+    // kills > CYB_BE_NICE=30 → gebemean deterministically true (no PRNG roll needed),
+    // matching the fidelity-fix in A-003 where the phaser gate now requires gebemean.
+    player.kills = 50;
     const fires: unknown[] = [];
     events.on(COMBAT_PHASER_FIRED, (e) => fires.push(e));
     // Multiple ticks to allow cybwhoops misses; expect at least one fire over 20 ticks.

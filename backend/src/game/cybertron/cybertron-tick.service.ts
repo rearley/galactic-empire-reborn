@@ -447,18 +447,23 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
-   * Attack with phasers + torpedo volley, gated by cybwhoops.
+   * Attack with phasers + torpedo volley, gated by gebemean + phasr charge + cybwhoops.
+   * Matches GECYBS.C:514-519: `if (phasr >= PMINFIRE && gebemean(...) && !cybwhoops(...)) firep(...)`.
+   * gebemean is evaluated ONCE and reused for both the phaser gate and torpedo-count roll
+   * to preserve deterministic PRNG consumption (single call per cyb_attack invocation).
    * @see GECYBS.C:490-543 cyb_attack
    */
   private cybAttack(ship: ShipState, target: ShipState, tough: number, ddist: number, ctx: TickContext): void {
     const cls = this.shipClassCache.get(ship.shpclass);
 
-    if (!cybwhoops(ship.cybskill, this.random)) {
+    // Evaluate gebemean once — reused for phaser gate and torpedo-count roll (@see GECYBS.C:514,527)
+    const mean = gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random);
+    if (ship.phasr >= PMINFIRE && mean && !cybwhoops(ship.cybskill, this.random)) {
       this.cybFirePhaser(ship, target, ctx);
     }
 
     const torpCount = rollTorpedoCount(
-      tough, target.kills, cls?.hasTorpedo ?? false, gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random), CYB_BE_EASY, this.random,
+      tough, target.kills, cls?.hasTorpedo ?? false, mean, CYB_BE_EASY, this.random,
     );
     for (let i = 0; i < torpCount && i < MAXTORPS; i++) {
       // Refill one torp slot before launching (@see GECYBS.C:534)
