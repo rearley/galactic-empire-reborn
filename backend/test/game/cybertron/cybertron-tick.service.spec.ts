@@ -79,7 +79,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
 }
 
 /** Build a minimal test harness with mocked dependencies. */
-function buildHarness(seed = 42) {
+async function buildHarness(seed = 42) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -137,7 +137,7 @@ function buildHarness(seed = 42) {
   );
   // Disable boot seeding so isolated tick-cadence tests are not affected by startup spawns
   process.env.CYBERTRON_BOOT_SEED = 'false';
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   // Helper to fire a tick
   function fireTick(n = 1): void {
@@ -172,21 +172,21 @@ function buildHarness(seed = 42) {
 
 describe('T015 — spawn cadence: fires on modulo-30 tick', () => {
   it('createSpawn is called on tick 30 (modulo-30 slot)', async () => {
-    const { fireTick, repository } = buildHarness(1);
+    const { fireTick, repository } = await buildHarness(1);
     fireTick(30);
     await new Promise((r) => setImmediate(r)); // flush promises
     expect(repository.createSpawn).toHaveBeenCalled();
   });
 
   it('createSpawn is NOT called on tick 29', async () => {
-    const { fireTick, repository } = buildHarness(2);
+    const { fireTick, repository } = await buildHarness(2);
     fireTick(29);
     await new Promise((r) => setImmediate(r));
     expect(repository.createSpawn).not.toHaveBeenCalled();
   });
 
   it('spawned ship has Cybrg- userid prefix', async () => {
-    const { fireTick, repository, createdSpawns } = buildHarness(3);
+    const { fireTick, repository, createdSpawns } = await buildHarness(3);
     fireTick(30);
     await new Promise((r) => setImmediate(r));
     if (createdSpawns.length > 0) {
@@ -200,7 +200,7 @@ describe('T015 — spawn cadence: fires on modulo-30 tick', () => {
 
 describe('T016 — target acquisition: Cybertron acquires nearby player', () => {
   it('emits target-acquired and sets cybmine when player is in scan range outside NZ', async () => {
-    const { shipMap, events, fireTick } = buildHarness(10);
+    const { shipMap, events, fireTick } = await buildHarness(10);
 
     // Cybertron with tick=1 so it activates on the very first tick fired
     const cyb = makeShip({
@@ -234,7 +234,7 @@ describe('T016 — target acquisition: Cybertron acquires nearby player', () => 
 
 describe('T017 — hyperwarp: Cybertron enters hyperwarp for distant target', () => {
   it('Cybertron at distance ≥ hyperdist1 away transitions to where=1 and drops shields', async () => {
-    const { shipMap, fireTick } = buildHarness(42);
+    const { shipMap, fireTick } = await buildHarness(42);
 
     // Place Cybertron outside NZ; player 30 sectors away (hyperdist1=25 for class 21)
     const cyb = makeShip({
@@ -263,7 +263,7 @@ describe('T017 — hyperwarp: Cybertron enters hyperwarp for distant target', ()
 
 describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
   it('Cybertron dropping from hyperwarp (where=1 → brake band) restores shield to class max', async () => {
-    const { shipMap, fireTick } = buildHarness(42);
+    const { shipMap, fireTick } = await buildHarness(42);
 
     // Place Cybertron outside NZ in hyperwarp (where=1), distance 15 = brake band (hyperdist2=10 < 15 < hyperdist1=25)
     const cyb = makeShip({
@@ -293,7 +293,7 @@ describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
 describe('T035 — phaser engagement: Cybertron fires phasers in engagement scan', () => {
   it('emits combat.phaser-fired when Cybertron is at close range with charged phasers', async () => {
     const COMBAT_PHASER_FIRED = 'combat.phaser-fired';
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -325,7 +325,7 @@ describe('T035 — phaser engagement: Cybertron fires phasers in engagement scan
 describe('T036 — cyb_annoy: Cybertron taunts when attack conditions not met', () => {
   it('emits cybertron.taunt and NOT combat.phaser-fired for far player with cybCanAttack=false', async () => {
     const COMBAT_PHASER_FIRED = 'combat.phaser-fired';
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     // Cybertron in normal space, far from player
     const cyb = makeShip({
@@ -381,7 +381,7 @@ describe('T038 — breakoff roll: non-quad fires cybertron.broke-off at 1/CYB_BR
   });
 
   it('cybertron.broke-off event can be emitted (breakoff mechanism is wired)', async () => {
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
     let brokeOff = 0;
     events.on('cybertron.broke-off', () => brokeOff++);
 
@@ -415,7 +415,7 @@ describe('T038 — breakoff roll: non-quad fires cybertron.broke-off at 1/CYB_BR
 
 describe('T039 — Zipper branch: Cybertron deploys zipper when mines are near', () => {
   it('class with hasZipper=true and minesnear>0 deploys zipper, clears cybmine, and reverses course', async () => {
-    const { shipMap, fireTick } = buildHarness(55);
+    const { shipMap, fireTick } = await buildHarness(55);
 
     // Class 21 has hasZipper: true; give it zipper inventory
     const cyb = makeShip({
@@ -447,7 +447,7 @@ describe('T051 — cyb_check_damage: defensive response when damage > CYB_MINDAM
   it('Cybertron with damage=80 randomizes heading and depletes mine inventory on seeded roll', async () => {
     // Use a seed that passes all three: 1-in-10 damage check, 1-in-5 mine check
     // We run many ticks so at least one defensive response fires
-    const { shipMap, fireTick } = buildHarness(77);
+    const { shipMap, fireTick } = await buildHarness(77);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -480,7 +480,7 @@ describe('T051 — cyb_check_damage: defensive response when damage > CYB_MINDAM
 
 describe('T052 — jammed branch: Cybertron skips target acquisition when jammed', () => {
   it('Cybertron with jammer=50 does not acquire any target and randomizes heading', async () => {
-    const { shipMap, events, fireTick } = buildHarness(88);
+    const { shipMap, events, fireTick } = await buildHarness(88);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -519,7 +519,7 @@ describe('T052 — jammed branch: Cybertron skips target acquisition when jammed
 describe('T065 — Sartern cyb_lives uses class 24 hyperdist1/hyperdist2 config', () => {
   it('Sartern class 24 pursues at hyperwarp band using its own class 24 config (hyperdist1=25)', async () => {
     // Fresh harness — class 24 has hyperdist1=25 in the default configs (cybertron.config.ts)
-    const { shipMap, fireTick, shipClassCache } = buildHarness(66);
+    const { shipMap, fireTick, shipClassCache } = await buildHarness(66);
 
     // Register class 24 in the ship class cache
     (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(24, {
@@ -557,7 +557,7 @@ describe('T065 — Sartern cyb_lives uses class 24 hyperdist1/hyperdist2 config'
 describe('T064 — Sartern class 24: spawns via same code path with Cybrg- prefix', () => {
   it('spawn slot for class 24 uses Cybrg- userid prefix', async () => {
     // Set class 24 as only eligible class
-    const { fireTick, repository, createdSpawns, shipClassCache } = buildHarness(99);
+    const { fireTick, repository, createdSpawns, shipClassCache } = await buildHarness(99);
     (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(24, {
       maxAcceleration: 1200, maxWarp: 8, maxPhaser: 1, maxShields: 1,
       scanRange: 20_000, maxTons: 100, hasTorpedo: false, hasMissile: false,

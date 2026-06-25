@@ -127,7 +127,10 @@ export class CybertronTickService implements OnModuleInit {
       for (const classNumStr of Object.keys(this.classConfigs)) {
         const classNumber = Number(classNumStr);
         const target = this.classConfigs[classNumber].tot_to_create;
-        // Top up to tot_to_create; spawnOne self-limits, so loop at most `target` times
+        // Top up to tot_to_create; spawnOne self-limits, so loop at most `target` times.
+        // The deficit-correctness of this boot-seed loop depends on repository.createSpawn(...)
+        // synchronously loading the new ship into the in-memory map (via shipState.loadShip),
+        // so each subsequent findAllShips() count reflects the just-spawned ship.
         for (let i = 0; i < target; i++) {
           const spawned = await this.spawnOne(classNumber);
           if (!spawned) break;

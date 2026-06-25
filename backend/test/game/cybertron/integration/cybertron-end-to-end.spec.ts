@@ -81,7 +81,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
   };
 }
 
-function buildHarness(seed = 77) {
+async function buildHarness(seed = 77) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -159,7 +159,7 @@ function buildHarness(seed = 77) {
   );
   // Disable boot seeding so integration tests observe only tick-driven spawn behavior
   process.env.CYBERTRON_BOOT_SEED = 'false';
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -176,7 +176,7 @@ function buildHarness(seed = 77) {
 
 describe('T070-1 — spawn-fill: Cybertrons created on modulo-30 slot', () => {
   it('createSpawn is called after 30 ticks with Cybrg- userid', async () => {
-    const { repository, createdSpawns, fireTick } = buildHarness(1);
+    const { repository, createdSpawns, fireTick } = await buildHarness(1);
     fireTick(30);
     await new Promise((r) => setImmediate(r));
 
@@ -190,7 +190,7 @@ describe('T070-1 — spawn-fill: Cybertrons created on modulo-30 slot', () => {
 
 describe('T070-2 — target acquisition: Cybertron locks onto nearby player', () => {
   it('emits target-acquired and sets cybmine to player shipno', async () => {
-    const { shipMap, events, fireTick } = buildHarness(10);
+    const { shipMap, events, fireTick } = await buildHarness(10);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -221,7 +221,7 @@ describe('T070-2 — target acquisition: Cybertron locks onto nearby player', ()
 
 describe('T070-3 — engagement: Cybertron fires phasers at close player', () => {
   it('emits combat.phaser-fired within a few ticks when player is inside tooclose', async () => {
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     const cyb = makeShip({
       userid: 'Cybrg-201', shipno: 201, shpclass: 21, status: 2,
@@ -259,7 +259,7 @@ describe('T070-3 — engagement: Cybertron fires phasers at close player', () =>
 
 describe('T070-4 — damage response: Cybertron deploys mine when damage > CYB_MINDAM', () => {
   it('decrements mine inventory when damaged Cybertron triggers cyb_check_damage', async () => {
-    const { shipMap, fireTick } = buildHarness(55);
+    const { shipMap, fireTick } = await buildHarness(55);
 
     const initialMines = 10n;
     const cyb = makeShip({
@@ -288,7 +288,7 @@ describe('T070-4 — damage response: Cybertron deploys mine when damage > CYB_M
 
 describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transferGold', () => {
   it('calls repository.transferGold when a Cybrg-* ship is destroyed', async () => {
-    const { events, transferGoldMock } = buildHarness(42);
+    const { events, transferGoldMock } = await buildHarness(42);
 
     const killEvent: CombatShipDestroyedEvent = {
       victimId: 'Cybrg-300:300',
@@ -312,7 +312,7 @@ describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transf
   });
 
   it('does NOT call transferGold when a human player is destroyed', async () => {
-    const { events, transferGoldMock } = buildHarness(42);
+    const { events, transferGoldMock } = await buildHarness(42);
 
     const killEvent: CombatShipDestroyedEvent = {
       victimId: 'human1:1',
@@ -339,8 +339,8 @@ describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transf
 // ─── T076 Performance: full population + 100 humans under 1s ────────────────
 
 describe('T076 — performance: onPhysicsTick completes in <1 s at full population', () => {
-  it('24 Cybertrons + 100 player ships tick in <1000 ms', () => {
-    const { shipMap, fireTick } = buildHarness(99);
+  it('24 Cybertrons + 100 player ships tick in <1000 ms', async () => {
+    const { shipMap, fireTick } = await buildHarness(99);
 
     // Full Cybertron population (24 ships across classes 21+22)
     for (let i = 0; i < 24; i++) {
@@ -375,14 +375,14 @@ describe('T076 — performance: onPhysicsTick completes in <1 s at full populati
 describe('T070-6 — restart hydrate: onModuleInit calls hydrateAll', () => {
   it('calls hydrateAll exactly once on boot', async () => {
     // buildHarness calls svc.onModuleInit() (fire-and-forget); flush to let it complete
-    const { repository } = buildHarness(42);
+    const { repository } = await buildHarness(42);
     await new Promise((r) => setImmediate(r));
 
     expect(repository.hydrateAll).toHaveBeenCalledTimes(1);
   });
 
   it('subsequent ticks do not call hydrateAll again', async () => {
-    const { repository, fireTick } = buildHarness(42);
+    const { repository, fireTick } = await buildHarness(42);
     await new Promise((r) => setImmediate(r)); // flush onModuleInit hydration
     fireTick(5);
     await new Promise((r) => setImmediate(r));
