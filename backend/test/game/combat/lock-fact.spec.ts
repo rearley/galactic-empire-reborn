@@ -16,4 +16,9 @@ describe('lockFact (GECMDS.C:1378-1392)', () => {
     expect(lockFact('missile', 0, 0, 1, MISFACT)).toBeGreaterThan(0.7);
     expect(lockFact('missile', 0, 0, 5, MISFACT)).toBeLessThanOrEqual(0.7);
   });
+  it('torpedo: a moving firer produces a weaker lock than a stationary one (combined speed)', () => {
+    const stationary = lockFact('torpedo', 0, 0, 1, TORFACT);
+    const moving = lockFact('torpedo', 500, 0, 1, TORFACT);
+    expect(moving).toBeLessThan(stationary);
+  });
 });
