@@ -1,3 +1,30 @@
+## 2026-06-25 — 026-subsystem-damage (Plan 4 of 4)
+
+**Completed:**
+- **C-010 — subsystem (random) damage wired up**: `rollRandamage` (pure random roll) + `applyRandamage` (state mutator) + `applyRandamageAndEmit` helper now fire on every weapon hit — phaser, hyperphaser, torpedo, missile, mine, Cybertron, and droid. On a hit that pushes victim `damage > 20%`, a `gernd()%6` roll selects one subsystem to damage (class-gated): shields (`shield` set negative + `shieldstat=SHIELDDM=3`), phasers (`phasr` set negative), fire control (`firecntl` set to random 0–19), cloak (set negative), tactical (set negative), helm (set negative). `shieldtype=20` is immune (discriminator `'skipped'`). Emits `COMBAT_SUBSYSTEM_DAMAGED`. @see GEFUNCS.C:1956
+- **Subsystem effects + repair (C-010/S-007)**: scan is now gated — `TABROKE` when `tactical != 0`, `JAMMER4` when `jammer > 0` (S-007); heading change refused (`HLBROKE`) when `helm != 0`. Existing gates cover negative `phasr` (can't fire) and `firecntl > 0` (lock refused with `FCBROKE`). A 1s-tick subsystem-repair recovers negatives toward 0 (+1/tick for tactical/helm/cloak; `firecntl` -1/tick; damaged shield recovers and resets `shieldstat` to down so recharge can resume). Negative `phasr` recovers via the existing phaser reload. Only negative cloak is repaired — active (positive) cloak is untouched. Repair runs regardless of `cantexit` (temporary disruptions).
+- **P-016 — midnight teamcode staleness**: midnight now emits `MIDNIGHT_COMPLETED` after a successful transaction commit. `ShipStateService.refreshTeamcodes()` is wired via `@OnEvent(MIDNIGHT_COMPLETED)` and re-reads `User.teamcode` for every in-memory ship, so a player connected across midnight no longer carries a stale teamcode. Handler is guarded against unhandled rejection.
+
+**Tests:** New suites: `test/unit/randamage.spec.ts` (pure roll), randamage wiring tests across phaser/hyperphaser/torpedo/missile/mine/cybertron/droid combat suites, `test/game/ship/ship-tick.subsystem-repair.spec.ts`, scan/rotate gate tests for TABROKE/JAMMER4/HLBROKE/FCBROKE, midnight MIDNIGHT_COMPLETED emit tests and teamcode-refresh `@OnEvent` tests. `tsc` clean. Full Jest suite restored to the 66-fail baseline; zero new combat/ship failures.
+
+**Decisions made:**
+- `rollRandamage` is pure; `applyRandamage` is the mutator; `applyRandamageAndEmit` dedupes 7 hit sites.
+- `'skipped'` vs `'none'` discriminator for `shieldtype=20` immunity (clear intent at every call site).
+- Subsystem repair +1/tick recovers regardless of `cantexit` (temporary disruptions, not permanent damage).
+- Only negative cloak repaired — positive (active) cloak is managed by the cloak tick, not subsystem repair.
+- `HLBROKE` reused as the canonical helm-broken message; no new duplicate.
+- Midnight emits `MIDNIGHT_COMPLETED` post-commit (not inside the transaction).
+- `@OnEvent` teamcode refresh guarded against unhandled rejection.
+- `EventEmitterModule.forRoot` lives in `PhysicsModule` (project convention for shared event bus).
+
+**Next:** All four fidelity plans (combat-feel, AI-presence, combat-depth/persistence, subsystem-damage) are complete and merged. Remaining work is the two non-combat cleanup tracks: (a) the pre-existing ~66-test stale baseline (midnight DB / scan-* / onboarding / handlers), and (b) the missing Docker setup (no Dockerfiles/compose). Then live playtest + balance tuning.
+
+**Known issues:**
+- Pre-existing ~66-test stale baseline in midnight/scan/onboarding/handlers suites — separate cleanup track, unrelated to combat/ship.
+- No Dockerfiles or `docker-compose.yml` exist despite `CLAUDE.md` mandating them for dev+prod. Recommend creating a separate task before any production deploy.
+
+---
+
 ## 2026-06-25 — 025-combat-depth-persistence (Plan 3 of 3)
 
 **Completed:**
