@@ -40,7 +40,7 @@ export const rotateCommand: Command = {
     // @see GECMDS.C:723 — helm gate (HLBROKE, normal branch)
     if (ship.helm !== 0) {
       return {
-        lines: [{ text: formatMessage(MessageId.HELM_BROKE), category: 'system' }],
+        lines: [{ text: formatMessage(MessageId.HLBROKE), category: 'system' }],
       };
     }
 

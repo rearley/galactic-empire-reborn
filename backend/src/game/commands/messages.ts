@@ -358,7 +358,6 @@ export enum MessageId {
 
   // shared
   HLBROKE = 'HLBROKE',
-  HELM_BROKE = 'HELM_BROKE',
   NUMOOR = 'NUMOOR',
   UNKNOWN_CMD = 'UNKNOWN_CMD',
   SHIP_ABANDONED = 'SHIP_ABANDONED',
@@ -722,7 +721,6 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
-  [MessageId.HELM_BROKE]: 'Helm is offline — cannot change heading.',
   [MessageId.NUMOOR]: 'Number out of range (%d-%d).',
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
   [MessageId.SHIP_ABANDONED]: 'Your ship has been abandoned. Please create a new ship.',

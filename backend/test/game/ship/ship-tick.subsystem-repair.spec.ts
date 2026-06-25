@@ -174,6 +174,28 @@ describe('subsystem repair — cantexit independence', () => {
   });
 });
 
+describe('subsystem repair — positive cloak guard', () => {
+  it('active (positive) cloak is NOT touched by subsystem repair', () => {
+    const ship = makeShip({ cloak: 50, tactical: 0, helm: 0, firecntl: 0, shieldstat: 0 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.cloak).toBe(50); // repair must only lift NEGATIVE cloak
+  });
+});
+
+describe('subsystem repair — healthy ship no-op', () => {
+  it('fully healthy ship: no subsystem fields change after a tick', () => {
+    const ship = makeShip({ tactical: 0, helm: 0, cloak: 0, firecntl: 0, shieldstat: 0 });
+    const { fireTick } = makeHarness(ship);
+    fireTick();
+    expect(ship.tactical).toBe(0);
+    expect(ship.helm).toBe(0);
+    expect(ship.cloak).toBe(0);
+    expect(ship.firecntl).toBe(0);
+    expect(ship.shieldstat).toBe(0);
+  });
+});
+
 describe('subsystem repair — all at once', () => {
   it('all damaged subsystems repair one step per tick', () => {
     const ship = makeShip({
