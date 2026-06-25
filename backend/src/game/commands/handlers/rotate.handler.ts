@@ -37,9 +37,15 @@ export const rotateCommand: Command = {
 
     const value = result.value;
 
+    // @see GECMDS.C:723 — helm gate (HLBROKE, normal branch)
+    if (ship.helm !== 0) {
+      return {
+        lines: [{ text: formatMessage(MessageId.HELM_BROKE), category: 'system' }],
+      };
+    }
+
     // TODO(006): see GECMDS.C:685 — speed<0 gate (CANTROT, hyperspace branch)
     // TODO(006): see GECMDS.C:691 — useenergy gate (NOROTPW, hyperspace branch)
-    // TODO(006): see GECMDS.C:723 — helm gate (HLBROKE, normal branch)
     // TODO(006): see GECMDS.C:717 — speed<0 gate (CANTROT, normal branch)
     // TODO(006): see GECMDS.C:711 — useenergy gate (NOROTPW, normal branch)
     // TODO(006): see GECMDS.C:679 — useenergy gate (NOROTPW, hyperspace branch)

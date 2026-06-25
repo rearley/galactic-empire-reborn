@@ -96,3 +96,23 @@ describe('rotateCommand', () => {
     expect(result.lines[0].category).toBe('success');
   });
 });
+
+// ─── C-010: Helm gate ─────────────────────────────────────────────────────────
+
+describe('C-010 — rotate: helm gate (HELM_BROKE)', () => {
+  it('helm !== 0 → returns HELM_BROKE, heading unchanged', () => {
+    const ship = makeShip({ helm: -3, heading: 45, head2b: 45, degrees: 0 });
+    const result = rotateCommand.handler(ship, ['90'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.HELM_BROKE));
+    expect(result.lines[0].category).toBe('system');
+    expect(ship.head2b).toBe(45);  // unchanged
+    expect(ship.degrees).toBe(0);  // unchanged
+    expect(ship.dirty).toBe(false); // not mutated
+  });
+
+  it('helm = 0 → rotate proceeds normally', () => {
+    const ship = makeShip({ helm: 0 });
+    const result = rotateCommand.handler(ship, ['90'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, 90));
+  });
+});
