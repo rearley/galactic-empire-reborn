@@ -409,11 +409,11 @@ export class CybertronTickService implements OnModuleInit {
         victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
       const shieldUp = target.shieldstat === 1 && target.shield > 0;
-      let hullDamage = Math.floor(damage);
+      let hullDamage = damage;
       let shieldConsumed = 0;
 
       if (shieldUp) {
-        const result = shieldhit(target.shield, target.shieldtype, Math.floor(damage));
+        const result = shieldhit(target.shield, target.shieldtype, damage);
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.shield = result.newCharge;
           if (result.knockedDown) v.shieldstat = 0;

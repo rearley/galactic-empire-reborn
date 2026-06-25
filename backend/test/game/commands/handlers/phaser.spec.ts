@@ -295,6 +295,9 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(getShip(h, firerInNZ).damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(getShip(h, firerInNZ).phasr).toBe(0); // self-zap also discharges
     expect(getShip(h, victim).damage).toBe(0);
+    // No COMBAT_PHASER_FIRED should fire when the beam never leaves the ship.
+    const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
+    expect(fired).toBeUndefined();
   });
 
   it('fully discharges phasr to 0 after firing', () => {
@@ -316,5 +319,7 @@ describe('pha command semantics (Plan 1 T5)', () => {
     const res = h.handler.command.handler(firer, ['0', '0'], ctx) as CommandResult;
     expect(res.lines.some((l) => /hit/i.test(l.text))).toBe(true);
     expect(getShip(h, warpVictim).damage).toBeGreaterThan(0);
+    // Firer must be fully discharged after firing (GECMDS.C:1006).
+    expect(getShip(h, firer).phasr).toBe(0);
   });
 });
