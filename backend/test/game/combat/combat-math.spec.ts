@@ -81,15 +81,15 @@ describe('combat-math', () => {
       expect(lineOfFire(eastFirer, { xcoord: 0, ycoord: -100 }, 0, 4)).toBe(false);
     });
 
-    it('PHABIAS extends arc — target just outside `percent` falls inside `percent + PHABIAS`', () => {
-      // Target 4.5° starboard of north (firer heading 0, bearing 0).
+    it('PHABIAS extends arc — target just outside focus falls inside focus + PHABIAS', () => {
+      // Target 4.5° starboard of north (firer heading 0, degree 0).
       // North is y decreasing; 4.5° east of north: x=sin(4.5°)>0, y=-cos(4.5°)<0
       const rad = (4.5 * Math.PI) / 180;
       const target = { xcoord: 100 * Math.sin(rad), ycoord: -100 * Math.cos(rad) };
-      // arc width 6 → halfWidth (6+PHABIAS)/2 = 4 → 4.5° outside → MISS
-      expect(lineOfFire(firer, target, 0, 6)).toBe(false);
-      // arc width 8 → halfWidth (8+PHABIAS)/2 = 5 → 4.5° inside → HIT
-      expect(lineOfFire(firer, target, 0, 8)).toBe(true);
+      // focus 2 → halfAngle = 2+PHABIAS = 4 → 4.5° outside → MISS
+      expect(lineOfFire(firer, target, 0, 2)).toBe(false);
+      // focus 3 → halfAngle = 3+PHABIAS = 5 → 4.5° inside → HIT
+      expect(lineOfFire(firer, target, 0, 3)).toBe(true);
       expect(PHABIAS).toBe(2);
     });
   });

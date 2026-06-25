@@ -47,31 +47,31 @@ export function inScanRange(
 }
 
 /**
- * True if `victim` lies within the firing arc of `firer` at `bearing`,
- * with a half-width of `(beamWidth + PHABIAS) / 2` degrees on each side.
+ * True if `victim` lies within the phaser firing arc of `firer`.
  *
- * `bearing` is relative to firer's heading (0 = straight ahead), matching the
- * original `deg = normal(ptr->heading + ptr->degrees)` in GECMDS.C:firep.
+ * The firing direction is `firer.heading + degree` (degree is the player's
+ * RELATIVE bearing, −180..180, per GEFUNCS.C:valdegree). The beam half-angle
+ * is `focus + PHABIAS` degrees, matching the original hit test
+ * `smallest(vector(firer,victim), heading+degree) < focus + PHABIAS`.
  *
- * @see GECMDS.C:firep (deg = ptr->heading + ptr->degrees; vector() absolute angle)
+ * @see GECMDS.C:942,953-954 firep
  */
 export function lineOfFire(
   firer: { xcoord: number; ycoord: number; heading: number },
   victim: { xcoord: number; ycoord: number },
-  bearing: number,
-  beamWidth: number,
+  degree: number,
+  focus: number,
 ): boolean {
   const dx = victim.xcoord - firer.xcoord;
   const dy = victim.ycoord - firer.ycoord;
   if (dx === 0 && dy === 0) return false;
   // Absolute compass direction to victim: north=0, clockwise. y increases downward so -dy.
   const victimAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-  // Absolute firing direction = firer heading + relative bearing (mirrors original firep).
-  const firingAngle = (firer.heading + bearing + 360) % 360;
-  const halfWidth = (beamWidth + PHABIAS) / 2;
+  // Absolute firing direction = firer heading + relative degree.
+  const firingAngle = (firer.heading + degree + 360) % 360;
   let diff = Math.abs(victimAngle - firingAngle);
   if (diff > 180) diff = 360 - diff;
-  return diff <= halfWidth;
+  return diff < focus + PHABIAS;
 }
 
 /**
