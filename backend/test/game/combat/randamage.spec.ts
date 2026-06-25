@@ -143,10 +143,10 @@ describe('rollRandamage — @see GEFUNCS.C:randamage 1956', () => {
 });
 
 describe('applyRandamage — shieldtype 20 guard + mutation', () => {
-  it('shieldtype 20 → returns none, victim unchanged', () => {
+  it('shieldtype 20 → returns skipped, victim unchanged', () => {
     const victim = makeVictim({ damage: 80, shieldtype: 20, shield: 50 });
     const result = applyRandamage(seq(0, 0, 0.5), victim, ALL_CAPS, 20);
-    expect(result).toEqual({ subsystem: 'none', magnitude: 0 });
+    expect(result).toEqual({ subsystem: 'skipped', magnitude: 0 });
     expect(victim.shield).toBe(50); // no mutation
   });
 

@@ -60,6 +60,10 @@ export interface CombatMineWarningEvent {
   tickAt: Date;
 }
 
+/**
+ * Emitted when subsystem damage is rolled and applied during combat hit resolution.
+ * @see combatTickService, applyRandamage
+ */
 export const COMBAT_SUBSYSTEM_DAMAGED = 'combat.subsystem-damaged' as const;
 export interface CombatSubsystemDamagedEvent {
   victimId: string;

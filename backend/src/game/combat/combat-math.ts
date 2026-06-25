@@ -229,7 +229,7 @@ export function phaserReloadAmount(phasrtype: number): number {
   return phasrtype * PRELOAD;
 }
 
-export type RandamageSubsystem = 'shield' | 'phasor' | 'firecntl' | 'cloak' | 'tactical' | 'helm' | 'none';
+export type RandamageSubsystem = 'shield' | 'phasor' | 'firecntl' | 'cloak' | 'tactical' | 'helm' | 'none' | 'skipped';
 export interface RandamageResult {
   subsystem: RandamageSubsystem;
   magnitude: number;
