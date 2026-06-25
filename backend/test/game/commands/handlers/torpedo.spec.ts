@@ -133,7 +133,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
   it('rejects when target has all MAXTORPS slots occupied (TOR_FULL)', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 100,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
       // All 3 torpedo slots already occupied (channel != 255)
       ltorpsChannel: [99, 99, 99],
       ltorpsDistance: [1000, 2000, 3000],
@@ -151,7 +151,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 0, ycoord: 50, // distance 50
+      xcoord: 0, ycoord: 1, // distance 1 sector — well within lock range
     });
     const h = makeHarness([alice, bob]);
 
@@ -174,7 +174,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
   it('happy path — allocates into first free slot when others occupied', () => {
     const alice = makeShip({ userid: 'a', shipno: 5, xcoord: 0, ycoord: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 50,
+      userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0, ycoord: 1,
       ltorpsChannel: [99, 255, 100],
       ltorpsDistance: [1000, 0, 2000],
     });

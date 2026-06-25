@@ -6,9 +6,10 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
-import { cdistance } from '../../combat/combat-math';
+import { cdistance, lockFact } from '../../combat/combat-math';
+import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
-import { FIRETICKS, MAXTORPS, WARP_THRESHOLD } from '../../constants';
+import { FIRETICKS, MAXTORPS, TORFACT, WARP_THRESHOLD } from '../../constants';
 import { I_TORP } from '../../constants/items';
 
 /**
@@ -102,6 +103,21 @@ export class TorpedoHandlerService {
       return { lines: [{ text: found.message, category: 'system' }] };
     }
     const target = found.ship;
+
+    // Target in neutral zone ⇒ fire control refuses (GECMDS.C:1363).
+    if (isInNeutralZone(target)) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_NEUTRAL), category: 'system' }] };
+    }
+    // Fully-cloaked target is unlockable (GECMDS.C:1371 cloak<10).
+    if (target.cloak >= 10) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+    }
+    // Lock-quality gate (GECMDS.C:1378-1395).
+    const distSectors = cdistance(ship, target);
+    const fact = lockFact('torpedo', ship.speed, target.speed, distSectors, TORFACT);
+    if (fact <= 0.7) {
+      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+    }
 
     // 7. Find lowest free slot on target's ltorps
     let slot = -1;

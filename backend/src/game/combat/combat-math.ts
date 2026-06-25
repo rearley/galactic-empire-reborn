@@ -216,6 +216,31 @@ export function mineFalloff(distance: number, ton: number): number {
 }
 
 /**
+ * Lock-quality factor for a torpedo/missile (GECMDS.C:1378-1392). Caller fires
+ * only when the result is > 0.7.
+ *
+ * @param kind        'torpedo' or 'missile'
+ * @param firerSpeed  firer's current speed
+ * @param targetSpeed target's current speed
+ * @param distSectors cdistance(firer, target) in sector units
+ * @param factor      TORFACT (torpedo) or MISFACT (missile)
+ */
+export function lockFact(
+  kind: 'torpedo' | 'missile',
+  firerSpeed: number,
+  targetSpeed: number,
+  distSectors: number,
+  factor: number,
+): number {
+  if (kind === 'torpedo') {
+    if (targetSpeed > 999) return 0; // target at warp — torpedoes cannot lock
+    const speed = firerSpeed + targetSpeed;
+    return (1.2 - speed / 5000) * ((5.0 - distSectors) / factor);
+  }
+  return (5.0 - distSectors) / factor;
+}
+
+/**
  * Roll for decoy intercept. `decodds` is a 0-100 integer probability.
  * @see GECMDS.C:cmd_decoy
  */

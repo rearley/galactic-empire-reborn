@@ -345,6 +345,10 @@ export enum MessageId {
   MESG04 = 'MESG04',
   MESG05 = 'MESG05',
 
+  // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
+  LOCK_FAIL = 'LOCK_FAIL',
+  LOCK_NEUTRAL = 'LOCK_NEUTRAL',
+
   // shared
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
@@ -696,6 +700,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MESG03]: '%s in sector (%d,%d) was overrun by %d troops from %s (cmdr %s); planet lost.',
   [MessageId.MESG04]: '%s in sector (%d,%d) was attacked by %d fighters from %s (cmdr %s); defenders held.',
   [MessageId.MESG05]: '%s in sector (%d,%d) was overrun by %d fighters from %s (cmdr %s); planet lost.',
+
+  // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
+  [MessageId.LOCK_FAIL]: 'Cannot get a firing lock — target too distant or evading.',
+  [MessageId.LOCK_NEUTRAL]: 'Fire control refuses: target is in the neutral zone.',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
