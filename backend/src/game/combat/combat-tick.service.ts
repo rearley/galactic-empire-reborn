@@ -373,13 +373,13 @@ export class CombatTickService implements OnModuleInit {
 
       if (mine.timer === 0) {
         // Detonate — apply damage, emit hit + detonation.
-        let ton = 5000;
+        let damageFactor = 100;
         try {
-          ton = this.shipClassCache.getMaxTons(ship.shpclass);
+          damageFactor = this.shipClassCache.getDamageFactor(ship.shpclass);
         } catch {
           // fall back
         }
-        const damage = mineFalloff(dist, ton);
+        const damage = mineFalloff(dist, damageFactor);
         const shieldUp = ship.shieldstat === 1 && ship.shield > 0;
         const channel = mine.channel;
         let hullDamage = damage;
@@ -622,13 +622,13 @@ export class CombatTickService implements OnModuleInit {
     dmgMax: number,
     ctx: TickContext,
   ): void {
-    let ton = 5000;
+    let damageFactor = 100;
     try {
-      ton = this.shipClassCache.getMaxTons(carrier.shpclass);
+      damageFactor = this.shipClassCache.getDamageFactor(carrier.shpclass);
     } catch {
       // fall back to default
     }
-    const damage = rollHullDamage(this.random, dmgMax, ton);
+    const damage = rollHullDamage(this.random, dmgMax, damageFactor);
     const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
     let hullDamage = damage;
     let shieldConsumed = 0;

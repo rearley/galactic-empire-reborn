@@ -34,6 +34,8 @@ export interface ShipClassEntry {
   points: number;
   /** True if this ship class can attack planets (GEMAIN.H shipclass[].max_attk != 0). @see GECMDS.C:3520 */
   canAttackPlanet: boolean;
+  /** Per-class damage scaling denominator: multiplier = 100/damageFactor. @see GEFUNCS.C:2661 ton_fact */
+  damageFactor: number;
 }
 
 @Injectable()
@@ -64,6 +66,7 @@ export class ShipClassCacheService implements OnModuleInit {
         cybCanAttack: true,
         points: true,
         canAttackPlanet: true,
+        damageFactor: true,
       },
     });
     for (const row of rows) {
@@ -85,6 +88,7 @@ export class ShipClassCacheService implements OnModuleInit {
         cybCanAttack: row.cybCanAttack,
         points: row.points,
         canAttackPlanet: row.canAttackPlanet,
+        damageFactor: row.damageFactor,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -127,6 +131,11 @@ export class ShipClassCacheService implements OnModuleInit {
   /** Synchronous lookup. Throws if the class is not in the cache. */
   getMaxTons(classNumber: number): number {
     return this.entry(classNumber).maxTons;
+  }
+
+  /** Synchronous lookup. Throws if the class is not in the cache. @see GEFUNCS.C:2661 ton_fact */
+  getDamageFactor(classNumber: number): number {
+    return this.entry(classNumber).damageFactor;
   }
 
   /** Synchronous lookup. Throws if the class is not in the cache. */
@@ -173,6 +182,7 @@ export class ShipClassCacheService implements OnModuleInit {
       cybCanAttack: true,
       points: 0,
       canAttackPlanet: true,
+      damageFactor: 100,
       ...entry,
     });
   }
