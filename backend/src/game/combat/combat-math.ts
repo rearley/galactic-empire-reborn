@@ -1,4 +1,4 @@
-import { MINEDAMMAX, MINERANGE, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
+import { HPDAMMAX, HPFIRDST, MINEDAMMAX, MINERANGE, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -47,20 +47,22 @@ export function inScanRange(
 }
 
 /**
- * True if `victim` lies within the phaser firing arc of `firer`.
+ * True if `victim` lies within `halfAngleDeg` degrees of the firing direction
+ * `firer.heading + degree`. This is the shared arc core used by both the
+ * normal phaser (`lineOfFire`, half-angle `focus + PHABIAS`) and the
+ * hyper-phaser (fixed `HPBEAMW` half-angle, GECMDS.C:1050).
  *
- * The firing direction is `firer.heading + degree` (degree is the player's
- * RELATIVE bearing, −180..180, per GEFUNCS.C:valdegree). The beam half-angle
- * is `focus + PHABIAS` degrees, matching the original hit test
- * `smallest(vector(firer,victim), heading+degree) < focus + PHABIAS`.
+ * `degree` is the player's RELATIVE bearing (−180..180, per
+ * GEFUNCS.C:valdegree). Mirrors the original hit test
+ * `smallest(vector(firer,victim), heading+degree) < halfAngleDeg`.
  *
- * @see GECMDS.C:942,953-954 firep
+ * @see GEFUNCS.C:smallest, vector
  */
-export function lineOfFire(
+export function withinArc(
   firer: { xcoord: number; ycoord: number; heading: number },
   victim: { xcoord: number; ycoord: number },
   degree: number,
-  focus: number,
+  halfAngleDeg: number,
 ): boolean {
   const dx = victim.xcoord - firer.xcoord;
   const dy = victim.ycoord - firer.ycoord;
@@ -71,7 +73,26 @@ export function lineOfFire(
   const firingAngle = (firer.heading + degree + 360) % 360;
   let diff = Math.abs(victimAngle - firingAngle);
   if (diff > 180) diff = 360 - diff;
-  return diff < focus + PHABIAS;
+  return diff < halfAngleDeg;
+}
+
+/**
+ * True if `victim` lies within the NORMAL phaser firing arc of `firer`.
+ *
+ * The beam half-angle is `focus + PHABIAS` degrees, matching the original hit
+ * test `smallest(vector(firer,victim), heading+degree) < focus + PHABIAS`.
+ * Delegates to {@link withinArc} — behavior is byte-identical to the prior
+ * inlined implementation.
+ *
+ * @see GECMDS.C:942,953-954 firep
+ */
+export function lineOfFire(
+  firer: { xcoord: number; ycoord: number; heading: number },
+  victim: { xcoord: number; ycoord: number },
+  degree: number,
+  focus: number,
+): boolean {
+  return withinArc(firer, victim, degree, focus + PHABIAS);
 }
 
 /**
@@ -107,6 +128,37 @@ export function phaserDamage(args: {
   const tonfact = 1 + victimMaxTons / TONFACT;
   let factor = (dam * ((1 + phasrtype) / 2.5)) / tonfact;
   if (victimAtWarp) factor /= 2;
+  return Math.floor(factor);
+}
+
+/**
+ * Hyper-phaser damage: ports the `pdamage` WARP branch (GEFUNCS.C:2069-2077,
+ * firer `where==1`) folded into `firehp`'s outer scaling (GECMDS.C:1056-1067).
+ *
+ *   dd     = max(0, 1 - distRaw/40000)
+ *   dp     = dd^HPFIRDST
+ *   dam    = HPDAMMAX * dp
+ *   factor = dam * phasrtype / (1 + victimMaxTons/TONFACT)
+ *   if phasrtype == 20 (sysop): return 101
+ *
+ * Note the multiplier here is `* phasrtype` (NOT the normal path's
+ * `* (1+phasrtype)/2.5`), and the distance divisor is the fixed 40000 of the
+ * warp branch (not the phasrtype-scaled `disfact`).
+ *
+ * @see GEFUNCS.C:2069 pdamage (warp branch)  @see GECMDS.C:1020 firehp
+ */
+export function hyperPhaserDamage(args: {
+  phasrtype: number;
+  distRaw: number;
+  victimMaxTons: number;
+}): number {
+  const { phasrtype, distRaw, victimMaxTons } = args;
+  if (phasrtype === 20) return 101; // sysop phaser
+  const dd = Math.max(0, 1 - distRaw / 40000);
+  const dp = Math.pow(dd, HPFIRDST);
+  const dam = HPDAMMAX * dp;
+  const tonfact = 1 + victimMaxTons / TONFACT;
+  const factor = (dam * phasrtype) / tonfact;
   return Math.floor(factor);
 }
 
