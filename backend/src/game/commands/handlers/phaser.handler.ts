@@ -138,7 +138,20 @@ export class PhaserHandlerService {
     // Current phaser charge feeds the damage formula (phasr/100 scaling).
     const phasrCharge = ship.phasr;
 
+    // 6. Neutral-zone self-zap (GECMDS.C:937-941 zaphim): firer backfires.
+    // This must execute BEFORE emitting COMBAT_PHASER_FIRED so that no fired
+    // event leaks when the beam never actually leaves the ship.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.phasr = 0;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+    }
+
     // Emit fired event. `bearing`/`percent` carry the relative degree/focus.
+    // Only emitted once the beam actually leaves the ship (post-NZ check).
     const firedEvent: CombatPhaserFiredEvent = {
       shipId: attackerId,
       bearing: degree,
@@ -148,16 +161,6 @@ export class PhaserHandlerService {
       tickAt,
     };
     this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
-
-    // 6. Neutral-zone self-zap (GECMDS.C:937-941 zaphim): firer backfires.
-    if (isInNeutralZone(ship)) {
-      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        s.damage = s.damage + SE100DAM;
-        s.phasr = 0;
-        s.cantexit = FIRETICKS;
-      });
-      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
-    }
 
     // Find victims in arc.
     const allShips = this.shipState.findAllShips();
