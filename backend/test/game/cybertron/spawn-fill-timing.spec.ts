@@ -14,7 +14,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CYBERTRON_CLASS_DEFAULTS } from '../../../src/game/cybertron/cybertron.config';
 
-function buildHarness(seed = 1) {
+async function buildHarness(seed = 1) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -83,7 +83,7 @@ function buildHarness(seed = 1) {
   );
   // Disable boot seeding — this file tests the tick-based spawn cadence only
   process.env.CYBERTRON_BOOT_SEED = 'false';
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   // Register all AI classes 21-25
   for (const [classNumStr] of Object.entries(CYBERTRON_CLASS_DEFAULTS)) {
@@ -111,7 +111,7 @@ function buildHarness(seed = 1) {
 
 describe('T020c (SC-001) — spawn-fill: all AI classes reach tot_to_create within 150 ticks', () => {
   it('each class (21-25) reaches tot_to_create with fresh DB and 150 simulated ticks', async () => {
-    const { shipMap, fireTick } = buildHarness(1);
+    const { shipMap, fireTick } = await buildHarness(1);
 
     // 150 ticks = 5 spawn slots (150 / 30 = 5)
     // tot_to_create totals: 21:10, 22:5, 23:1, 24:6, 25:2 = 24 ships total
@@ -140,7 +140,7 @@ describe('T020c (SC-001) — spawn-fill: all AI classes reach tot_to_create with
 
   it('after 900 ticks (30 spawn slots), all classes with tot_to_create > 0 are filled', async () => {
     // 900 ticks / 30 = 30 spawn slots — more than enough to fill 24 ships across 5 classes
-    const { shipMap, fireTick } = buildHarness(7);
+    const { shipMap, fireTick } = await buildHarness(7);
     await fireTick(900);
 
     const classCounts = new Map<number, number>();
@@ -165,7 +165,7 @@ describe('T020c (SC-001) — spawn-fill: all AI classes reach tot_to_create with
   });
 
   it('Sartern classes 24 and 25 are filled via the same spawn path', async () => {
-    const { shipMap, fireTick } = buildHarness(13);
+    const { shipMap, fireTick } = await buildHarness(13);
     await fireTick(900);
 
     const class24Count = Array.from(shipMap.values()).filter((s) => s.status === 2 && s.shpclass === 24).length;
