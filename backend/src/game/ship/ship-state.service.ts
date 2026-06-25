@@ -285,7 +285,11 @@ export class ShipStateService implements OnModuleInit {
   @OnEvent(MIDNIGHT_COMPLETED)
   async onMidnightCompleted(): Promise<void> {
     this.logger.log('midnight.completed received — refreshing in-memory teamcodes');
-    await this.refreshTeamcodes();
+    try {
+      await this.refreshTeamcodes();
+    } catch (err: unknown) {
+      this.logger.error('refreshTeamcodes failed after midnight.completed', err as Error);
+    }
   }
 
   /**
