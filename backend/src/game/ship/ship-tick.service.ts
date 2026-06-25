@@ -6,6 +6,7 @@ import { ShipState } from './ship-state.types';
 import { decideOverspeed, OverspeedRng } from './ship-overspeed';
 import { MaintenanceService } from './maintenance.service';
 import { decideAutoShield } from './auto-shield';
+import { SHIELDDM } from '../constants';
 
 /**
  * Drives the 1-second SHIP_UPDATE tick for all active ships.
@@ -114,6 +115,30 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
           }
         });
       }
+    }
+
+    // 2b. Subsystem repair — temporary disruptions recover toward operational each tick.
+    // tactical/helm/cloak: negative values increment by +1 toward 0.
+    // firecntl: positive values decrement by -1 toward 0.
+    // shield (SHIELDDM state): negative shield value increments toward 0; when it reaches 0
+    //   shieldstat is cleared to 0 so the player can re-raise shields.
+    // Unlike hull repair, cantexit does NOT interrupt — disruptions are temporary effects.
+    // @see GECMDS.C C-010 / S-007 (Plan 4 Task 3)
+    const needsSubsystemRepair = ship.tactical < 0 || ship.helm < 0 || ship.cloak < 0
+      || ship.firecntl > 0 || (ship.shieldstat === SHIELDDM && ship.shield < 0);
+    if (needsSubsystemRepair) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        if (s.tactical < 0) s.tactical = Math.min(0, s.tactical + 1);
+        if (s.helm < 0) s.helm = Math.min(0, s.helm + 1);
+        if (s.cloak < 0) s.cloak = Math.min(0, s.cloak + 1);
+        if (s.firecntl > 0) s.firecntl = Math.max(0, s.firecntl - 1);
+        if (s.shieldstat === SHIELDDM && s.shield < 0) {
+          s.shield = Math.min(0, s.shield + 1);
+          if (s.shield >= 0) {
+            s.shieldstat = 0; // back to "down" state so player can re-raise shields
+          }
+        }
+      });
     }
 
     // 3. Shield recharge — GEFUNCS.C:2491 shieldchg

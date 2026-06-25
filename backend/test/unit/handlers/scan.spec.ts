@@ -445,3 +445,51 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
     expect(result.lines[0].text).toBe('No planets in this sector.');
   });
 });
+
+// ─── S-007: Subsystem gate tests ──────────────────────────────────────────────
+
+describe('S-007 — scan: tactical-computer gate (TABROKE)', () => {
+  it('tactical !== 0 → returns TABROKE, no scanRender', async () => {
+    const { service } = makeService([]);
+    await service.onModuleInit();
+    const ship = makeShip({ tactical: -5 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.TABROKE));
+    expect(result.scanRender).toBeUndefined();
+  });
+
+  it('tactical = 0 → scan proceeds normally', async () => {
+    const { service } = makeService([]);
+    await service.onModuleInit();
+    const ship = makeShip({ tactical: 0 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.scanRender).toBeDefined();
+  });
+});
+
+describe('S-007 — scan: jammer gate (JAMMER4)', () => {
+  it('jammer > 0 → returns JAMMER4, no scanRender', async () => {
+    const { service } = makeService([]);
+    await service.onModuleInit();
+    const ship = makeShip({ jammer: 5 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.JAMMER4));
+    expect(result.scanRender).toBeUndefined();
+  });
+
+  it('jammer = 0 → scan proceeds normally', async () => {
+    const { service } = makeService([]);
+    await service.onModuleInit();
+    const ship = makeShip({ jammer: 0 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.scanRender).toBeDefined();
+  });
+
+  it('tactical gate fires before jammer gate', async () => {
+    const { service } = makeService([]);
+    await service.onModuleInit();
+    const ship = makeShip({ tactical: -1, jammer: 5 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.TABROKE));
+  });
+});

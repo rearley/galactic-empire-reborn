@@ -131,8 +131,14 @@ export class ScanHandlerService implements OnModuleInit {
   }
 
   private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
-    // TODO(006): see GECMDS.C:2143 — tactical-computer gate (TABROKE)
-    // TODO(006): see GECMDS.C:2150 — jammer gate (JAMMER4)
+    // @see GECMDS.C:2143 — tactical-computer gate (TABROKE)
+    if (ship.tactical !== 0) {
+      return { lines: [{ text: formatMessage(MessageId.TABROKE), category: 'system' }] };
+    }
+    // @see GECMDS.C:2150 — jammer gate (JAMMER4)
+    if (ship.jammer > 0) {
+      return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
+    }
 
     const sub = args[0]?.toLowerCase() ?? 'lo';
 
