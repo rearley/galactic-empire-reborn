@@ -216,6 +216,18 @@ export const MISLSPED = 300 as const;
 export const MISENGFC = 10 as const;
 /** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
 export const JAMTIME = 20 as const;
+/** @see GEMAIN.C:494 numopt(PDAMMAX,1,200) — max normal-phaser damage base. Playtest-tunable. */
+export const PDAMMAX = 200 as const;
+/** @see GEMAIN.C:493 numopt(PFIRDST,1,20) — normal-phaser distance falloff exponent. */
+export const PFIRDST = 1 as const;
+/** @see GEMAIN.C:506-507 numopt(TORFACT,1,50)/10 — torpedo lock-quality divisor. */
+export const TORFACT = 0.1 as const;
+/** @see GEMAIN.C:509-510 numopt(MISFACT,1,50)/10 — missile lock-quality divisor. */
+export const MISFACT = 0.1 as const;
+/** @see GEMAIN.C:463 numopt(SE100DAM,1,101) — self-zap hull damage for firing in the neutral zone. */
+export const SE100DAM = 101 as const;
+/** @see GEMAIN.C:598 numopt(PHATOWRP,0,100) — min phasrtype to hit a warping victim with normal phaser. */
+export const PHATOWRP = 0 as const;
 
 /** @see GEMAIN.H:220 #define MAIL_CLASS_DISTRESS 1 — mail class for revolt/distress notices */
 export const MAIL_CLASS_DISTRESS = 1 as const;
