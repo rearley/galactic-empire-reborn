@@ -355,6 +355,8 @@ export enum MessageId {
   // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
   LOCK_FAIL = 'LOCK_FAIL',
   LOCK_NEUTRAL = 'LOCK_NEUTRAL',
+  // fire control damaged gate — GECMDS.C:1346-1351 lockon first check
+  FCBROKE = 'FCBROKE',
 
   // shared
   HLBROKE = 'HLBROKE',
@@ -718,6 +720,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
   [MessageId.LOCK_FAIL]: 'Cannot get a firing lock — target too distant or evading.',
   [MessageId.LOCK_NEUTRAL]: 'Fire control refuses: target is in the neutral zone.',
+  // fire control damaged gate — GECMDS.C:1346-1351 lockon
+  [MessageId.FCBROKE]: 'Fire control is damaged — cannot lock.',
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',

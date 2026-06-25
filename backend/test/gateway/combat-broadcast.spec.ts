@@ -14,11 +14,13 @@ import {
   COMBAT_MINE_DETONATION,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMineDetonationEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
+  CombatSubsystemDamagedEvent,
 } from '../../src/game/combat/combat-events';
 
 /**
@@ -119,5 +121,59 @@ describe('GameGateway combat broadcasts', () => {
     gateway.handleCombatMineDetonation(event);
     expect(toMock).toHaveBeenCalledWith('sector:8:4');
     expect(emitMock).toHaveBeenCalledWith(COMBAT_MINE_DETONATION, event);
+  });
+});
+
+// Fix 3 — COMBAT_SUBSYSTEM_DAMAGED routed to victim's socket
+describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
+  it('delivers per-subsystem event.log notice to the victim socket', () => {
+    const victimEmit = jest.fn();
+    const mockSocket = { emit: victimEmit };
+    const mockSockets = new Map<string, typeof mockSocket>();
+    mockSockets.set('victim-socket-id', mockSocket);
+
+    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
+    const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+
+    // Registry returns a socket ID for the victim
+    const mockRegistry = {
+      getSocketId: jest.fn().mockImplementation((id: string) =>
+        id === 'b:2' ? 'victim-socket-id' : undefined,
+      ),
+    } as unknown as ConnectedShipsRegistry;
+
+    const gw = new GameGateway(
+      {} as ShipStateService,
+      {} as CommandRouterService,
+      mockRegistry,
+      mockWsGuard,
+      mockPrisma,
+      mockOnboarding,
+      mockScanHandler,
+      mockRandom,
+      { emit: jest.fn(), on: jest.fn() } as never,
+    );
+
+    const emitMock2 = jest.fn();
+    const toMock2 = jest.fn().mockReturnValue({ emit: emitMock2 });
+    (gw as unknown as { server: unknown }).server = {
+      to: toMock2,
+      sockets: { sockets: mockSockets },
+    };
+
+    const event: CombatSubsystemDamagedEvent = {
+      victimId: 'b:2',
+      subsystem: 'phasr',
+      sector: { x: 3, y: 5 },
+      tickAt: new Date(),
+    };
+    gw.handleCombatSubsystemDamaged(event);
+    // Victim's socket should receive an event.log notice
+    expect(victimEmit).toHaveBeenCalledWith('event.log', expect.objectContaining({
+      category: expect.any(String),
+      text: expect.stringContaining('damaged'),
+    }));
   });
 });

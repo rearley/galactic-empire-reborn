@@ -21,12 +21,14 @@ import {
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
   COMBAT_SHIP_DESTROYED,
+  COMBAT_SUBSYSTEM_DAMAGED,
   CombatDecoyInterceptEvent,
   CombatHitEvent,
   CombatMineDetonationEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
   CombatShipDestroyedEvent,
+  CombatSubsystemDamagedEvent,
 } from '../game/combat/combat-events';
 import {
   CYBERTRON_EVENT,
@@ -578,6 +580,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatMineDetonation(event: CombatMineDetonationEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_MINE_DETONATION, event);
+  }
+
+  /**
+   * Routes subsystem-damage notice to the victim's own socket.
+   * C source does prfmsg(RND*)+outprfge to the victim on every subsystem hit.
+   * @see GEFUNCS.C randamage subsystem damage handlers (C-010, Fix 3)
+   */
+  @OnEvent(COMBAT_SUBSYSTEM_DAMAGED)
+  handleCombatSubsystemDamaged(event: CombatSubsystemDamagedEvent): void {
+    const subsystemMessages: Record<string, string> = {
+      shields:   'Shields damaged!',
+      phasr:     'Phasers damaged!',
+      firecntl:  'Fire control damaged!',
+      cloak:     'Cloak damaged!',
+      tactical:  'Tactical computer damaged!',
+      helm:      'Helm damaged!',
+    };
+    const text = subsystemMessages[event.subsystem] ?? `${event.subsystem} damaged!`;
+    const victimSocketId = this.registry.getSocketId(event.victimId);
+    if (victimSocketId) {
+      const victimSocket = this.server.sockets.sockets.get(victimSocketId);
+      victimSocket?.emit('event.log', { category: 'combat', text });
+    }
   }
 
   /**
