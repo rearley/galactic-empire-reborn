@@ -20,14 +20,11 @@ import {
   COMBAT_HIT,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
-  COMBAT_SUBSYSTEM_DAMAGED,
   CombatHitEvent,
   CombatMissEvent,
   CombatPhaserFiredEvent,
-  CombatSubsystemDamagedEvent,
 } from '../../combat/combat-events';
-import { applyRandamage } from '../../combat/randamage.apply';
-import { RandamageCaps } from '../../combat/combat-math';
+import { applyRandamageAndEmit } from '../../combat/randamage.apply';
 import {
   FIRETICKS,
   HPBEAMW,
@@ -243,25 +240,7 @@ export class PhaserHandlerService {
       this.events.emit(COMBAT_HIT, hitEvent);
 
       // @see GEFUNCS.C:randamage — called after every phaser hit (GECMDS.C:999)
-      const phasrCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
-      try { phasrCaps.hasShields = this.shipClassCache.getMaxShields(candidate.shpclass) > 0; } catch { /* fallback */ }
-      try { phasrCaps.hasPhasers = this.shipClassCache.getMaxPhaser(candidate.shpclass) > 0; } catch { /* fallback */ }
-      try {
-        phasrCaps.hasTorpOrMissile =
-          this.shipClassCache.getHasTorpedo(candidate.shpclass) ||
-          this.shipClassCache.getHasMissile(candidate.shpclass);
-      } catch { /* fallback */ }
-      try { phasrCaps.hasCloak = this.shipClassCache.getHasCloak(candidate.shpclass); } catch { /* fallback */ }
-      const phasrRnd = applyRandamage(this.random, candidate, phasrCaps, candidate.shieldtype);
-      if (phasrRnd.subsystem !== 'none' && phasrRnd.subsystem !== 'skipped') {
-        const phasrSubEvent: CombatSubsystemDamagedEvent = {
-          victimId: shipKey(candidate.userid, candidate.shipno),
-          subsystem: phasrRnd.subsystem,
-          sector: { x: sectorX, y: sectorY },
-          tickAt,
-        };
-        this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, phasrSubEvent);
-      }
+      applyRandamageAndEmit(this.random, this.events, this.shipClassCache, candidate, { x: sectorX, y: sectorY }, tickAt);
 
       // Record for runtime invariant `weaponFireRangeRespected`. The legal
       // cap for a player phaser is the firer's scanRange (in cdistance units:
@@ -410,25 +389,7 @@ export class PhaserHandlerService {
       this.events.emit(COMBAT_HIT, hitEvent);
 
       // @see GEFUNCS.C:randamage — called after every hyper-phaser hit (GECMDS.C:1082)
-      const hypCaps: RandamageCaps = { hasShields: false, hasPhasers: false, hasTorpOrMissile: false, hasCloak: false };
-      try { hypCaps.hasShields = this.shipClassCache.getMaxShields(candidate.shpclass) > 0; } catch { /* fallback */ }
-      try { hypCaps.hasPhasers = this.shipClassCache.getMaxPhaser(candidate.shpclass) > 0; } catch { /* fallback */ }
-      try {
-        hypCaps.hasTorpOrMissile =
-          this.shipClassCache.getHasTorpedo(candidate.shpclass) ||
-          this.shipClassCache.getHasMissile(candidate.shpclass);
-      } catch { /* fallback */ }
-      try { hypCaps.hasCloak = this.shipClassCache.getHasCloak(candidate.shpclass); } catch { /* fallback */ }
-      const hypRnd = applyRandamage(this.random, candidate, hypCaps, candidate.shieldtype);
-      if (hypRnd.subsystem !== 'none' && hypRnd.subsystem !== 'skipped') {
-        const hypSubEvent: CombatSubsystemDamagedEvent = {
-          victimId: shipKey(candidate.userid, candidate.shipno),
-          subsystem: hypRnd.subsystem,
-          sector: { x: sectorX, y: sectorY },
-          tickAt,
-        };
-        this.events.emit(COMBAT_SUBSYSTEM_DAMAGED, hypSubEvent);
-      }
+      applyRandamageAndEmit(this.random, this.events, this.shipClassCache, candidate, { x: sectorX, y: sectorY }, tickAt);
 
       this.combatTick?.recordCombatEvent({
         weapon: 'hyper-phaser',
