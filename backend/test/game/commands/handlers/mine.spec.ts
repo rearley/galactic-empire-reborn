@@ -3,6 +3,7 @@ import { MineHandlerService } from '../../../../src/game/commands/handlers/mine.
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { MineRegistry } from '../../../../src/game/combat/mine.registry';
 import { MineRepository } from '../../../../src/game/combat/mine.repository';
 import { I_MINE } from '../../../../src/game/constants/items';
@@ -61,7 +62,9 @@ function makeHarness(ships: ShipState[]) {
     findAllActive: jest.fn().mockResolvedValue([]),
   } as unknown as MineRepository;
 
-  const handler = new MineHandlerService(shipState, repo, registry);
+  const cache = new ShipClassCacheService({} as never);
+  cache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, hasMine: true } as never);
+  const handler = new MineHandlerService(shipState, repo, registry, cache);
   return { handler, shipMap, registry, repo };
 }
 
@@ -87,7 +90,7 @@ describe('MineHandlerService — `min`', () => {
   });
 
   it('rejects when items[I_MINE] <= 0 (MIN_NOAMMO)', async () => {
-    const alice = makeShip({ items: itemsWith({ [I_MINE]: 0n }) });
+    const alice = makeShip({ xcoord: 5, ycoord: 5, items: itemsWith({ [I_MINE]: 0n }) });
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_NOAMMO));
