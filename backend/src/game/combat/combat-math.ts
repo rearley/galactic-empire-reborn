@@ -229,31 +229,79 @@ export function phaserReloadAmount(phasrtype: number): number {
   return phasrtype * PRELOAD;
 }
 
+export type RandamageSubsystem = 'shield' | 'phasor' | 'firecntl' | 'cloak' | 'tactical' | 'helm' | 'none';
+export interface RandamageResult {
+  subsystem: RandamageSubsystem;
+  magnitude: number;
+}
+
+/** Capability gates for the six subsystem cases. */
+export interface RandamageCaps {
+  hasShields: boolean;
+  hasPhasers: boolean;
+  hasTorpOrMissile: boolean;
+  hasCloak: boolean;
+}
+
 /**
- * Assess random subsystem damage after a hit.
+ * Pure subsystem-damage roll. Returns the subsystem hit and the value to
+ * assign to that field. NO ship mutation — call {@link applyRandamage} to mutate.
  *
- * Only fires when `damagePct > 20`. Rolls rndm((101 - damagePct) / 1.5);
- * if 0, picks a subsystem (0–5) via gernd()%6 and damages it.
- * Returns an object describing what (if anything) was hit.
+ * Only fires when `damagePct > 20`. Rolls `floor(rand * (101-damagePct)/1.5)`;
+ * if the result is 0, picks a case 0-5 via `gernd()%6` and returns the hit.
+ * If the rolled case lacks the ship capability, returns `{subsystem:'none'}`.
  *
- * shieldtype === 20 (special shield class) is immune to random damage.
+ * magnitude: shield/phasor/cloak/tactical/helm = `-floor(rand*(damagePct+10))`;
+ *            firecntl = `floor(rand*65536)%20` (positive, 0-19).
  *
  * @see GEFUNCS.C:randamage line 1956
  */
-export function randamage(
+export function rollRandamage(
   rand: Random,
   damagePct: number,
-  shieldtype: number,
-): { subsystem: 'shield' | 'phasor' | 'weapons' | 'engine' | 'none' | 'skipped' } {
-  if (shieldtype === 20) return { subsystem: 'skipped' };
-  if (damagePct <= 20) return { subsystem: 'none' };
+  caps: RandamageCaps,
+): RandamageResult {
+  const none: RandamageResult = { subsystem: 'none', magnitude: 0 };
+
+  if (damagePct <= 20) return none;
 
   const roll = Math.floor(rand.next() * ((101 - damagePct) / 1.5));
-  if (roll !== 0) return { subsystem: 'none' };
+  if (roll !== 0) return none;
 
   const which = Math.floor(rand.next() * 65536) % 6;
-  const subsystems = ['shield', 'phasor', 'weapons', 'weapons', 'engine', 'engine'] as const;
-  return { subsystem: subsystems[which] };
+
+  switch (which) {
+    case 0: {
+      if (!caps.hasShields) return none;
+      const magnitude = -Math.floor(rand.next() * (damagePct + 10));
+      return { subsystem: 'shield', magnitude };
+    }
+    case 1: {
+      if (!caps.hasPhasers) return none;
+      const magnitude = -Math.floor(rand.next() * (damagePct + 10));
+      return { subsystem: 'phasor', magnitude };
+    }
+    case 2: {
+      if (!caps.hasTorpOrMissile) return none;
+      const magnitude = Math.floor(rand.next() * 65536) % 20;
+      return { subsystem: 'firecntl', magnitude };
+    }
+    case 3: {
+      if (!caps.hasCloak) return none;
+      const magnitude = -Math.floor(rand.next() * (damagePct + 10));
+      return { subsystem: 'cloak', magnitude };
+    }
+    case 4: {
+      const magnitude = -Math.floor(rand.next() * (damagePct + 10));
+      return { subsystem: 'tactical', magnitude };
+    }
+    case 5: {
+      const magnitude = -Math.floor(rand.next() * (damagePct + 10));
+      return { subsystem: 'helm', magnitude };
+    }
+    default:
+      return none;
+  }
 }
 
 /**

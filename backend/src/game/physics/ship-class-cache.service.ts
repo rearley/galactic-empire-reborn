@@ -25,6 +25,7 @@ export interface ShipClassEntry {
   hasJammer: boolean;
   hasMine: boolean;
   hasZipper: boolean;
+  hasCloak: boolean;
   noClaim: number;
   tough: number;
   cybLowestClassAttacks: number;
@@ -60,6 +61,7 @@ export class ShipClassCacheService implements OnModuleInit {
         hasJammer: true,
         hasMine: true,
         hasZipper: true,
+        hasCloak: true,
         noClaim: true,
         tough: true,
         cybLowestClassAttacks: true,
@@ -82,6 +84,7 @@ export class ShipClassCacheService implements OnModuleInit {
         hasJammer: row.hasJammer,
         hasMine: row.hasMine,
         hasZipper: row.hasZipper,
+        hasCloak: row.hasCloak,
         noClaim: row.noClaim,
         tough: row.tough,
         cybLowestClassAttacks: row.cybLowestClassAttacks,
@@ -148,6 +151,11 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).hasMissile;
   }
 
+  /** Synchronous lookup. Throws if the class is not in the cache. */
+  getHasCloak(classNumber: number): boolean {
+    return this.entry(classNumber).hasCloak;
+  }
+
   /** Synchronous lookup. Throws if the class is not in the cache. @see GEMAIN.H shipclass[].max_points */
   getPoints(classNumber: number): number {
     return this.entry(classNumber).points;
@@ -176,6 +184,7 @@ export class ShipClassCacheService implements OnModuleInit {
       hasJammer: false,
       hasMine: false,
       hasZipper: false,
+      hasCloak: false,
       noClaim: 3,
       tough: 0,
       cybLowestClassAttacks: 0,
