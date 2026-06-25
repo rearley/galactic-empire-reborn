@@ -100,7 +100,12 @@ function buildCybertronHarness(seed = 42) {
 
   const classCache = new Map<number, ReturnType<ShipClassCacheService['get']>>();
   for (const c of SHIP_CLASSES) classCache.set(c.classNumber, classCacheEntry(c) as never);
-  const shipClassCache = { get: (n: number) => classCache.get(n) } as unknown as ShipClassCacheService;
+  const shipClassCache = {
+    get: (n: number) => classCache.get(n),
+    // cybFirePhaser now feeds victimMaxTons into phaserDamage — the production
+    // ShipClassCacheService exposes getMaxTons; the fake must too or cybLives throws.
+    getMaxTons: (n: number) => (classCache.get(n) as { maxTons: number })?.maxTons ?? 5000,
+  } as unknown as ShipClassCacheService;
 
   const repository = {
     hydrateAll: jest.fn().mockResolvedValue(undefined),
@@ -300,6 +305,7 @@ describe('Murdonian (class 32) reactive fightback fires after a player hit', () 
       getScanRange: (n: number) => (classCache.get(n) as { scanRange: number })?.scanRange ?? 25_000,
       getMaxPhaser: (n: number) => (classCache.get(n) as { maxPhaser: number })?.maxPhaser ?? 5,
       getMaxShields: (n: number) => (classCache.get(n) as { maxShields: number })?.maxShields ?? 2,
+      getMaxTons: (n: number) => (classCache.get(n) as { maxTons: number })?.maxTons ?? 5000,
     } as unknown as ShipClassCacheService;
 
     const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;

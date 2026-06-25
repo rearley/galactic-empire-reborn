@@ -48,10 +48,12 @@ const ctx: CommandContext = {};
 
 describe('lock → tor @ integration', () => {
   it('player locks an AI droid, then tor @ resolves the locked target', () => {
-    const alice = makeShip({ userid: 'alice', shipno: 1, shipname: 'Alice' });
+    // Positioned well off the neutral-zone origin (0,0) — firing in the NZ now
+    // self-zaps the firer. Target is 0.5 sectors away → inside torpedo lock range.
+    const alice = makeShip({ userid: 'alice', shipno: 1, shipname: 'Alice', xcoord: 10, ycoord: 7 });
     const droid = makeShip({
       userid: '@Droid-1', shipno: 1, shipname: 'Murdonian',
-      shpclass: 11, status: 2, xcoord: 0.5, ycoord: 0,
+      shpclass: 11, status: 2, xcoord: 10.5, ycoord: 7,
     });
 
     const shipMap = new Map<string, ShipState>([
