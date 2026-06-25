@@ -18,6 +18,7 @@ import { MidnightRepository } from '../../../src/game/midnight/midnight.reposito
 import { AdminMidnightController } from '../../../src/game/midnight/admin-midnight.controller';
 import { AdminTokenGuard } from '../../../src/game/midnight/admin-token.guard';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const VALID_TOKEN = 'test-admin-token-secret';
 
@@ -42,7 +43,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
 
     const module = await Test.createTestingModule({
       imports: [PrismaModule, ScheduleModule.forRoot()],
-      providers: [MidnightService, MidnightRepository, AdminTokenGuard],
+      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
       controllers: [AdminMidnightController],
     }).compile();
 
@@ -111,7 +112,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
 
     const freshModule = await Test.createTestingModule({
       imports: [PrismaModule, ScheduleModule.forRoot()],
-      providers: [MidnightService, MidnightRepository, AdminTokenGuard],
+      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
       controllers: [AdminMidnightController],
     }).compile();
     const freshApp = freshModule.createNestApplication();
