@@ -255,9 +255,13 @@ export class PhaserHandlerService {
     }
 
     // Full discharge of the firer (GECMDS.C:1006).
+    // C-008: firer's shields drop for the battle-lock window — mirrors C `shielddn`
+    // called before fire in GECMDS.C:firep 930-933. No auto-raise flag exists for
+    // phaser (unlike `recentlySelfFiredTorp` for torpedoes), so re-raise is manual.
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.phasr = 0;
       s.cantexit = FIRETICKS;
+      s.shieldstat = 0;
     });
 
     return { lines };

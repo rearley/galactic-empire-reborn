@@ -250,6 +250,40 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const h = makeHarness([makeShip()]);
     expect(h.handler.command.keyword).toBe('pha');
   });
+
+  // C-008: firer's shields drop for the battle-lock window (mirrors C `shielddn` before fire)
+  it('C-008: firer shields-up (shieldstat=1) ends with shieldstat=0 AND cantexit=FIRETICKS after firing', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, shipname: 'Alice',
+      xcoord: 5, ycoord: 5,
+      shieldstat: 1, shield: 5000,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, shipname: 'Bob',
+      xcoord: 5, ycoord: 4,
+      shield: 5000, shieldstat: 1,
+    });
+    const h = makeHarness([alice, bob]);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+    expect(alice.shieldstat).toBe(0);
+    expect(alice.cantexit).toBe(FIRETICKS);
+  });
+
+  it('C-008: firer already shields-down (shieldstat=0) stays 0 after firing (no crash)', () => {
+    const alice = makeShip({
+      userid: 'a', shipno: 1, shipname: 'Alice',
+      xcoord: 5, ycoord: 5,
+      shieldstat: 0, shield: 0,
+    });
+    const bob = makeShip({
+      userid: 'b', shipno: 2, shipname: 'Bob',
+      xcoord: 5, ycoord: 4,
+    });
+    const h = makeHarness([alice, bob]);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+    expect(alice.shieldstat).toBe(0);
+    expect(alice.cantexit).toBe(FIRETICKS);
+  });
 });
 
 describe('pha command semantics (Plan 1 T5)', () => {
