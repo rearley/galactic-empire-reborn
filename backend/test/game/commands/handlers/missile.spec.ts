@@ -228,19 +228,21 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
 
   it('refuses to fire while cloaked', () => {
     cloaked.cloak = 10;
-    const res = handler.command.handler(cloaked, ['enemy', '5000'], ctx) as CommandResult;
+    const dummyTarget = spawnTarget({ sectorsAway: 1 });
+    const res = handler.command.handler(cloaked, [dummyTarget.shipname, '5000'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/cloak/i);
   });
 
   it('fails to lock a target beyond ~4.9 sectors', () => {
     const farTarget = spawnTarget({ sectorsAway: 6 });
     const res = handler.command.handler(firer, [farTarget.shipname, '5000'], ctx) as CommandResult;
-    expect(res.lines[0].text).toMatch(/lock/i);
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOCK_FAIL));
   });
 
   it('locks a near target', () => {
     const nearTarget = spawnTarget({ sectorsAway: 1 });
     const res = handler.command.handler(firer, [nearTarget.shipname, '5000'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/away/i);
+    expect(nearTarget.lmisslChannel[0]).toBe(firer.shipno);
   });
 });
