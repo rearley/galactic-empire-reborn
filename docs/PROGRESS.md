@@ -1,3 +1,29 @@
+## 2026-06-25 — 025-combat-depth-persistence (Plan 3 of 3)
+
+**Completed:**
+- **C-004 — mine-laying validations + timer**: `min [timer]` now validates ship-class `hasMine`, refuses while cloaked, refuses in the neutral zone (plain refusal, no self-zap — matches C `cmd_mine`), parses an optional timer arg (1–50, default 30), enforces a per-player live-mine cap (`USERMINES=200` via `MineRegistry.countByDeployer`), and sets `cantexit=FIRETICKS`. @see GECMDS.C:1722
+- **C-008 — phaser fire drops shields**: firing phasers sets the firer `shieldstat=0` for the FIRETICKS battle-lock window (vulnerable while firing); firing is not blocked by shield state. @see GECMDS.C:930-933
+- **C-009 — true hyperphaser separation**: a firer at warp now uses the real `firehp` path — requires flux `energy >= HPMINFIR(6000)` (else HP_NOPOW), debits `HPFIRAMT(5000)` (not phasr charge), only hits victims that are ALSO at warp, fixed `HPBEAMW(5°)` arc, hard scanRange cap, neutral-zone self-zap, damage via the C `pdamage` warp-branch (`dd=1-dist/40000`, `HPDAMMAX=200`/`HPFIRDST=1`) scaled by `phasrtype/(1+victim.maxTons/TONFACT)`. New `hyperPhaserDamage` + a `withinArc` helper underlying `lineOfFire`. Droid hyper-phaser call sites now use `hyperPhaserDamage` too. @see GECMDS.C:1020-1094, GEFUNCS.C:2069-2077
+- **P-001 — combat-disconnect kill**: a combat-locked ship (`cantexit > 0`) that disconnects via a client-side reason (transport close/error, ping timeout, client namespace disconnect) is now killed (anti-rage-quit), awarding kill credit to its `lastfired` attacker and broadcasting via `COMBAT_SHIP_DESTROYED`. Server-side reasons (hot-reload) and non-combat-locked disconnects are unaffected. @see GEMAIN.C:1397 warhupa
+
+**Tests:** New suites: `test/game/commands/handlers/mine.handler.spec.ts`, `test/unit/hyper-phaser-damage.spec.ts`, `test/integration/combat-disconnect.spec.ts`; extended `test/unit/phaser.spec.ts` and `test/unit/line-of-fire.spec.ts`; `withinArc` refactor keeps `lineOfFire` byte-identical. `tsc` clean. Full Jest suite at the 66-fail baseline; zero new combat/gateway failures.
+
+**Decisions made:**
+- `USERMINES=200`, `HPDAMMAX=200`, `HPFIRDST=1` added as tunable defaults to `constants.ts`.
+- Neutral-zone mining = plain refusal (no self-zap) — matches C `cmd_mine` which simply prints a reject message and returns, unlike `cmd_phas`/`cmd_torp`/`cmd_missl` which call `zaphim`.
+- P-001 gated on client-side disconnect reason (transport close, error, ping timeout, client namespace disconnect) — no `NODE_ENV` gate needed because hot-reload fires a server-side reason.
+- Disconnect-kill reuses `COMBAT_SHIP_DESTROYED` so kill credit and broadcast are identical to the normal death path.
+- Hyperphaser single-floor rounding consistent with the normal phaser path.
+
+**Next:** Plan 4 — subsystem damage (C-010: wire `randamage` + per-subsystem state fields + effects/repair) and midnight team staleness (P-016).
+
+**Known issues:**
+- Pre-existing ~66-test stale baseline in midnight/scan/onboarding/handlers suites — separate cleanup track, unrelated to combat/gateway.
+- No Dockerfiles or `docker-compose.yml` exist despite `CLAUDE.md` mandating them for dev+prod. Recommend creating a separate task before any production deploy.
+- No emit→@OnEvent integration test for `COMBAT_SHIP_DESTROYED` (pre-existing test-architecture pattern — applies to the normal death path too, not specific to this branch).
+
+---
+
 ## 2026-06-25 — 024-ai-presence (Plan 2 of 3)
 
 **Completed:**
