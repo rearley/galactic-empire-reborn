@@ -70,3 +70,11 @@ function envFloat(key: string, fallback: number): number {
   const n = parseFloat(v);
   return isNaN(n) ? fallback : n;
 }
+
+/**
+ * Whether to fill the Cybertron population to tot_to_create at boot (default true).
+ * Set CYBERTRON_BOOT_SEED=false to disable (useful for isolated tick-behavior tests).
+ */
+export function bootSeedEnabled(): boolean {
+  return process.env.CYBERTRON_BOOT_SEED !== 'false';
+}

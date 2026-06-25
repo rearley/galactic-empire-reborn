@@ -7,7 +7,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
 import { CybertronRepository } from './cybertron.repository';
-import { buildCybertronClassConfigs } from './cybertron.config';
+import { buildCybertronClassConfigs, bootSeedEnabled } from './cybertron.config';
 import type { CybertronClassConfig } from './cybertron.config';
 import {
   CYB_ALLOW,
@@ -98,7 +98,17 @@ export class CybertronTickService implements OnModuleInit {
     @Optional() private readonly combatTick?: CombatTickService,
   ) {}
 
-  onModuleInit(): void {
+  /**
+   * Subscribe to the PHYSICS tick, register event listeners, hydrate all Cybertron ships
+   * from DB into the in-memory map, and optionally boot-seed the population to tot_to_create.
+   *
+   * Boot seeding fills the deficit immediately so the galaxy is not empty on first boot.
+   * Controlled by CYBERTRON_BOOT_SEED env var (default true).
+   *
+   * @see GECYBS.C:88 cyb_init — loads existing Cybertron rows from DB
+   * @see specs/024-ai-presence/plan.md Task 3
+   */
+  async onModuleInit(): Promise<void> {
     this.unsubscribe = this.tickService.subscribe(
       TickKind.PHYSICS,
       (ctx) => this.onPhysicsTick(ctx),
@@ -110,15 +120,21 @@ export class CybertronTickService implements OnModuleInit {
       this.onCybertronScoredKill(e),
     );
     this.logger.log('CybertronTickService subscribed to PHYSICS tick');
-  }
 
-  /**
-   * Boot-time hydrate — load all Cybrg-* ships into ShipStateService before first tick.
-   * Called by CybertronModule after full NestJS DI initialization.
-   * @see GECYBS.C:88 cyb_init — loads existing Cybertron rows from DB
-   */
-  async onApplicationBootstrap(): Promise<void> {
     await this.repository.hydrateAll();
+
+    if (bootSeedEnabled()) {
+      for (const classNumStr of Object.keys(this.classConfigs)) {
+        const classNumber = Number(classNumStr);
+        const target = this.classConfigs[classNumber].tot_to_create;
+        // Top up to tot_to_create; spawnOne self-limits, so loop at most `target` times
+        for (let i = 0; i < target; i++) {
+          const spawned = await this.spawnOne(classNumber);
+          if (!spawned) break;
+        }
+      }
+      this.logger.log('Boot-seed complete');
+    }
   }
 
   private onPhysicsTick(_ctx: TickContext): void {
@@ -717,6 +733,11 @@ export class CybertronTickService implements OnModuleInit {
     }
   }
 
+  /**
+   * Per-slot spawn entry point: pick a class (1-in-30 tick cadence) and spawn one ship.
+   * One ship per slot — behavior unchanged from original game loop.
+   * @see GEMAIN.C outer loop (R-2); GECYBS.C cyb_init spawn cadence
+   */
   private async runSpawnSlot(ctx: TickContext): Promise<void> {
     try {
       const classCounts = new Map<number, number>();
@@ -729,51 +750,65 @@ export class CybertronTickService implements OnModuleInit {
       const chosenClass = pickSpawnClass(classCounts, this.classConfigs, this.random);
       if (chosenClass === null) return;
 
-      const config = this.classConfigs[chosenClass];
-      if (!config) return;
-
-      const currentCount = classCounts.get(chosenClass) ?? 0;
-      if (currentCount >= config.tot_to_create) return;
-
-      const allAiShipnos = new Set(
-        this.shipState.findAllShips().filter((s) => s.status === 2).map((s) => s.shipno),
-      );
-      let shipno = 200;
-      while (allAiShipnos.has(shipno)) shipno++;
-
-      const userid = `Cybrg-${shipno}`;
-      const clsEntry = this.shipClassCache.get(chosenClass);
-      const loadout = randomInitLoadout(config.cyb_gold, this.random);
-      const cybskill = randomCybSkill(this.random);
-      const tick = 6 + Math.floor(this.random.next() * 6);
-      const xcoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
-      const ycoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
-
-      await this.repository.createSpawn({
-        userid,
-        shipno,
-        classNumber: chosenClass,
-        shipname: `Cybrg-${shipno * shipno + Math.floor(this.random.next() * 100)}`,
-        xcoord,
-        ycoord,
-        phasrtype: clsEntry?.maxPhaser ?? 1,
-        shieldtype: clsEntry?.maxShields ?? 1,
-        loadout,
-        cybskill,
-        tick,
-      });
-
-      const payload: CybertronSpawnedPayload = {
-        shipKey: `${userid}:${shipno}`,
-        classNumber: chosenClass,
-        sector: { x: Math.floor(xcoord), y: Math.floor(ycoord) },
-        tickAt: ctx.tickNumber,
-      };
-      this.events.emit(CYBERTRON_EVENT.SPAWNED, payload);
-      this.logger.log(`Spawned ${userid} class ${chosenClass}`);
+      await this.spawnOne(chosenClass, ctx);
     } catch (err: unknown) {
       const stack = err instanceof Error ? err.stack : String(err);
       this.logger.error(`Spawn slot fault: ${stack}`);
     }
+  }
+
+  /**
+   * Create one AI ship of `classNumber` if below tot_to_create.
+   * Self-limiting: returns false immediately if the class is already at capacity.
+   * Used by both the per-slot tick cadence (runSpawnSlot) and the boot-seed loop (onModuleInit).
+   *
+   * @param classNumber  Cybertron/Sartern class number (21-25)
+   * @param ctx          Optional tick context; if provided, the SPAWNED event includes the tick number
+   * @returns            true if a ship was created, false if the class is already full
+   * @see GECYBS.C cyb birth
+   */
+  private async spawnOne(classNumber: number, ctx?: TickContext): Promise<boolean> {
+    const config = this.classConfigs[classNumber];
+    if (!config) return false;
+    const aiShips = this.shipState.findAllShips().filter((s) => s.status === 2);
+    const currentCount = aiShips.filter((s) => s.shpclass === classNumber).length;
+    if (currentCount >= config.tot_to_create) return false;
+
+    const allAiShipnos = new Set(aiShips.map((s) => s.shipno));
+    let shipno = 200;
+    while (allAiShipnos.has(shipno)) shipno++;
+
+    const userid = `Cybrg-${shipno}`;
+    const clsEntry = this.shipClassCache.get(classNumber);
+    const loadout = randomInitLoadout(config.cyb_gold, this.random);
+    const cybskill = randomCybSkill(this.random);
+    const tick = 6 + Math.floor(this.random.next() * 6);
+    const xcoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
+    const ycoord = this.random.next() * UNIVMAX * 2.0 - UNIVMAX;
+
+    await this.repository.createSpawn({
+      userid,
+      shipno,
+      classNumber,
+      shipname: `Cybrg-${shipno * shipno + Math.floor(this.random.next() * 100)}`,
+      xcoord,
+      ycoord,
+      phasrtype: clsEntry?.maxPhaser ?? 1,
+      shieldtype: clsEntry?.maxShields ?? 1,
+      loadout,
+      cybskill,
+      tick,
+    });
+
+    const tickAt = ctx !== undefined && 'tickNumber' in ctx ? ctx.tickNumber : 0;
+    const payload: CybertronSpawnedPayload = {
+      shipKey: `${userid}:${shipno}`,
+      classNumber,
+      sector: { x: Math.floor(xcoord), y: Math.floor(ycoord) },
+      tickAt,
+    };
+    this.events.emit(CYBERTRON_EVENT.SPAWNED, payload);
+    this.logger.log(`Spawned ${userid} class ${classNumber}`);
+    return true;
   }
 }
