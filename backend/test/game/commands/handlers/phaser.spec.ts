@@ -322,4 +322,27 @@ describe('pha command semantics (Plan 1 T5)', () => {
     // Firer must be fully discharged after firing (GECMDS.C:1006).
     expect(getShip(h, firer).phasr).toBe(0);
   });
+
+  it('phaser fires even when firer has jammer active (phasers do not lock)', () => {
+    // GECMDS.C:firep has no jammer check. Jammers block weapon LOCKING
+    // (torpedoes, missiles), not firing. Phasers don't lock so are unaffected.
+    const firer = makeShip({
+      userid: 'a', shipno: 1, xcoord: 0, ycoord: 7,
+      phasr: 100, phasrtype: 1, jammer: 5,
+    });
+    // Victim due north at range 1, in arc.
+    const victim = makeShip({
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 6,
+      shield: 5000, shieldstat: 1, damage: 0,
+    });
+    const h = makeHarness([firer, victim]);
+
+    h.handler.command.handler(firer, ['0', '0'], ctx);
+
+    // Phaser must fire and hit despite jammer.
+    const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
+    expect(hit).toBeDefined();
+    expect(getShip(h, victim).shield).toBeLessThan(5000);
+    expect(getShip(h, firer).phasr).toBe(0);
+  });
 });
