@@ -874,6 +874,39 @@ After each tick's combat passes, `CombatTickService` checks every ship for `dama
 
 ---
 
+### Per-class damage scaling / damageFactor (feature 024, C-005)
+
+**Source**: GEFUNCS.C:2661-2672 `ton_fact` — `damfact / (shipclass[shpclass].damfact / 100.0)`
+
+Every projectile hit and mine-sweep damage roll is multiplied by a per-class vulnerability scalar
+derived from the **victim's** `ShipClass.damageFactor`:
+
+```
+damageScale(damageFactor) = 100 / damageFactor
+```
+
+Higher `damageFactor` = tougher (takes less damage). A ship with `damageFactor=200` receives
+half damage (`scale=0.5`); one with `damageFactor=50` receives double (`scale=2.0`). Direction
+matches the C formula exactly — the divisor is `damfact/100`, so larger values suppress damage.
+
+Seeded example values (from `prisma/seed/ship-classes.ts`):
+
+| Class | damageFactor | damageScale | Interpretation |
+|-------|-------------|-------------|----------------|
+| Interceptor (1) | 90 | 1.11 | fragile starter — takes 11% extra |
+| Heavy Freighter (5) | 200 | 0.50 | durable cargo hull — half damage |
+| Cybertron Base Star (23) | 2000 | 0.05 | near-invincible; boss-tier |
+| Sarten Attack Drone (24) | 30 | 3.33 | glass cannon; triple damage taken |
+
+`CombatTickService` reads the victim's `damageFactor` via `ShipClassCacheService.getDamageFactor(shpclass)`
+and applies `damageScale` inside `rollHullDamage` (projectile hits) and `processMineSweep` (mine detonations).
+No change to the attacker's stats.
+
+The previous TS implementation used `clamp(tonnage/10000, 0.1, 1.0)` — a pure tonnage curve with the
+wrong direction (heavier = took more damage). That implementation has been removed.
+
+---
+
 ### Planet revolt (feature 006b)
 
 **Source**: GEPLANET.C:341-380
@@ -911,6 +944,14 @@ On boot, `CybertronRepository.hydrateAll` loads all `Cybrg-*` ships into `ShipSt
 clamps any `User.cash > CYB_MAXCASH (2_000_000)`. If population is below configured targets,
 a spawn slot fires every 30 physics ticks (≈3 minutes) via `repository.createSpawn`.
 
+**Boot-seed** (feature 024): `CybertronTickService.onModuleInit` immediately fills the population
+to each class's `tot_to_create` target (24 Cybertrons total across all classes) via the extracted
+`spawnOne` helper. This avoids the ~70-minute warm-up delay the one-per-slot runtime cadence would
+require to fully populate a cold server. Controlled by env var `CYBERTRON_BOOT_SEED` (default
+`true`; set `false` to restore the slow-fill behaviour, e.g. for integration tests that pre-seed
+their own ships). The per-slot runtime spawn cadence is unchanged and still fires for ongoing
+population maintenance after players kill Cybertrons.
+
 ### Per-ship state machine (`cyb_lives`)
 
 Fires when `ship.tick` counts down to 0 (each Cybertron has an independent countdown):
@@ -939,10 +980,18 @@ Fires when `ship.tick` counts down to 0 (each Cybertron has an independent count
 
 ### Difficulty scaling (`gebemean`)
 
+**Source**: GECYBS.C:432-453 (`gebemean`), GECYBS.C:514-520 (`cyb_attack`)
+
 - `kills < CYB_BE_NICE (30)`: 1-in-`CYBSLO (3)` chance of being mean (ordinary Cybertrons).
 - `kills >= CYB_BE_NICE`: always mean.
 - `kills >= CYB_BE_EASY (60)`: torpedo volley uses `rnd%6` (0–5); otherwise `rnd%2` (0–1).
 - Cyberquad (`tough=1`) is always mean regardless of player kills.
+
+`gebemean` is evaluated **once per `cyb_attack` call** (feature 024, A-003) and the resulting boolean
+is shared with the torpedo-count branch — matches GECYBS.C:514-520 where `gebemean` is called before
+both the phaser gate (`gebemean && !cybwhoops → firep`) and the torp-count roll. Prior to this fix,
+the phaser gate was missing the `gebemean` check, so Cybertrons fired phasers every tick against
+low-kill players instead of the intended `1-in-CYBSLO` frequency.
 
 ### Gold accumulation and transfer
 
