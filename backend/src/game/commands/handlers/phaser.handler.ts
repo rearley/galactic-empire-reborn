@@ -293,6 +293,13 @@ export class PhaserHandlerService {
    * @see GECMDS.C:1020 firehp  @see GEFUNCS.C:2069 pdamage (warp branch)
    */
   private handleHyper(ship: ShipState, degree: number, focus: number): CommandResult {
+    // Hypha cooldown gate (GECMDS.C:849-857): checked BEFORE the energy gate,
+    // matching cmd_phas order — hypha check precedes firehp call.
+    // Physics tick decrements hypha toward 0 (physics-tick.service.ts:~155).
+    if (ship.hypha !== 0) {
+      return { lines: [{ text: formatMessage(MessageId.HP_WAIT), category: 'system' }] };
+    }
+
     // Flux-energy gate (GECMDS.C:1029 HPMINFIR) — no fire, no debit.
     if (ship.energy < HPMINFIR) {
       return { lines: [{ text: formatMessage(MessageId.HP_NOPOW), category: 'system' }] };
@@ -326,11 +333,14 @@ export class PhaserHandlerService {
     };
     this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
 
-    // Flux debit + battle-lock (GECMDS.C:1039-1041). Hyper does NOT discharge
-    // phasr (uses flux) and does NOT drop shields (firehp omits shielddn).
+    // Flux debit + battle-lock + hypha cooldown (GECMDS.C:1039-1041).
+    // Hyper does NOT discharge phasr (uses flux) and does NOT drop shields
+    // (firehp omits shielddn). hypha=1 arms the cooldown — physics tick
+    // decrements it toward 0 (physics-tick.service.ts:~155).
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.energy = s.energy - HPFIRAMT;
       s.cantexit = FIRETICKS;
+      s.hypha = 1;
     });
 
     const allShips = this.shipState.findAllShips();
@@ -357,34 +367,20 @@ export class PhaserHandlerService {
       });
       if (damage < 1) continue;
 
-      const shieldUp = candidate.shieldstat === 1 && candidate.shield > 0;
-      let hullDamage = damage;
-      let shieldConsumed = 0;
-
-      if (shieldUp) {
-        const r = shieldhit(candidate.shield, candidate.shieldtype, damage);
-        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
-          v.shield = r.newCharge;
-          if (r.knockedDown) v.shieldstat = 0;
-          v.lastfired = ship.shipno;
-          v.cantexit = FIRETICKS;
-        });
-        hullDamage = 0;
-        shieldConsumed = r.shieldConsumed;
-      } else {
-        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
-          v.damage = v.damage + hullDamage;
-          v.lastfired = ship.shipno;
-          v.cantexit = FIRETICKS;
-        });
-      }
+      // C-009 Fix 1: firehp applies damage STRAIGHT TO HULL (`wptr->damage += damage`,
+      // GECMDS.C:1078) — no shieldhit call, shields are bypassed entirely.
+      this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+        v.damage = v.damage + damage;
+        v.lastfired = ship.shipno;
+        v.cantexit = FIRETICKS;
+      });
 
       const hitEvent: CombatHitEvent = {
         attackerId,
         victimId: shipKey(candidate.userid, candidate.shipno),
         weapon: 'phaser',
-        damageHull: hullDamage,
-        damageShield: shieldConsumed,
+        damageHull: damage,
+        damageShield: 0,
         sector: { x: sectorX, y: sectorY },
         tickAt,
       };
@@ -397,7 +393,7 @@ export class PhaserHandlerService {
       });
       hits++;
       lines.push({
-        text: `Hyper-phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,
+        text: `Hyper-phaser hit on ${candidate.shipname}: hull -${damage}.`,
         category: 'combat',
       });
     }

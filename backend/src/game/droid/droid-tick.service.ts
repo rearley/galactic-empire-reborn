@@ -34,6 +34,7 @@ import {
   GESTAT_AUTO,
   PMINFIRE,
   FIRETICKS,
+  HPBEAMW,
   JAMTIME,
   MAXTORPS,
   WARP_THRESHOLD,
@@ -59,7 +60,7 @@ import {
   CombatPhaserFiredEvent,
   CombatHitEvent,
 } from '../combat/combat-events';
-import { cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit } from '../combat/combat-math';
+import { cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
@@ -470,44 +471,33 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
-    // C-009: true hyper-phaser damage (firehp/pdamage warp branch with
-    // HPDAMMAX/HPFIRDST, scaled by `* phasrtype`). @see GECMDS.C:1020 firehp
-    if (lineOfFire(droid, target, bearing, 0)) {
+    // C-009 Fix 4: droid hyper arc = HPBEAMW (5°) — fixed beam width, NOT
+    // PHABIAS-based. `firehp` uses HPBEAMW half-angle (GECMDS.C:1050).
+    // C-009 Fix 1: firehp applies damage straight to hull (`wptr->damage += damage`,
+    // GECMDS.C:1078) — no shieldhit call, shields bypassed entirely.
+    if (withinArc(droid, target, bearing, HPBEAMW)) {
       const damage = hyperPhaserDamage({
         phasrtype: droid.phasrtype,
         distRaw: dist * 10000,
         victimMaxTons: this.classCache.getMaxTons(target.shpclass),
       });
-      const shieldUp = target.shieldstat === 1 && target.shield > 0;
-      let hullDamage = damage;
-      let shieldConsumed = 0;
-      if (shieldUp) {
-        const r = shieldhit(target.shield, target.shieldtype, damage);
+      if (damage >= 1) {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
-          v.shield = r.newCharge;
-          if (r.knockedDown) v.shieldstat = 0;
+          v.damage = v.damage + damage;
           v.lastfired = droid.shipno;
           v.cantexit = FIRETICKS;
         });
-        hullDamage = 0;
-        shieldConsumed = r.shieldConsumed;
-      } else {
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
-          v.damage = v.damage + hullDamage;
-          v.lastfired = droid.shipno;
-          v.cantexit = FIRETICKS;
-        });
-      }
 
-      this.events.emit(COMBAT_HIT, {
-        attackerId: shipKey(droid.userid, droid.shipno),
-        victimId: shipKey(target.userid, target.shipno),
-        weapon: 'phaser',
-        damageHull: hullDamage,
-        damageShield: shieldConsumed,
-        sector,
-        tickAt: new Date(),
-      } satisfies CombatHitEvent);
+        this.events.emit(COMBAT_HIT, {
+          attackerId: shipKey(droid.userid, droid.shipno),
+          victimId: shipKey(target.userid, target.shipno),
+          weapon: 'phaser',
+          damageHull: damage,
+          damageShield: 0,
+          sector,
+          tickAt: new Date(),
+        } satisfies CombatHitEvent);
+      }
     }
     droid.phasr = 0;
     droid.cantexit = FIRETICKS;
