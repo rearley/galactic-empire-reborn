@@ -81,6 +81,8 @@ function buildHarness(seed = 1) {
   const svc = new CybertronTickService(
     tickService, shipStateService, shipClassCache, repository, events, rand,
   );
+  // Disable boot seeding — this file tests the tick-based spawn cadence only
+  process.env.CYBERTRON_BOOT_SEED = 'false';
   svc.onModuleInit();
 
   // Register all AI classes 21-25

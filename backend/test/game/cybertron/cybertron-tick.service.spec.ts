@@ -135,6 +135,8 @@ function buildHarness(seed = 42) {
     events,
     rand,
   );
+  // Disable boot seeding so isolated tick-cadence tests are not affected by startup spawns
+  process.env.CYBERTRON_BOOT_SEED = 'false';
   svc.onModuleInit();
 
   // Helper to fire a tick

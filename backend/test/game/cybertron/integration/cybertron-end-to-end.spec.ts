@@ -157,6 +157,8 @@ function buildHarness(seed = 77) {
   const svc = new CybertronTickService(
     tickService, shipStateService, shipClassCache, repository, events, rand,
   );
+  // Disable boot seeding so integration tests observe only tick-driven spawn behavior
+  process.env.CYBERTRON_BOOT_SEED = 'false';
   svc.onModuleInit();
 
   function fireTick(n = 1): void {
@@ -370,19 +372,18 @@ describe('T076 — performance: onPhysicsTick completes in <1 s at full populati
 
 // ─── 6. Restart hydrate ───────────────────────────────────────────────────────
 
-describe('T070-6 — restart hydrate: onApplicationBootstrap calls hydrateAll', () => {
+describe('T070-6 — restart hydrate: onModuleInit calls hydrateAll', () => {
   it('calls hydrateAll exactly once on boot', async () => {
-    const { svc, repository } = buildHarness(42);
-
-    await svc.onApplicationBootstrap();
+    // buildHarness calls svc.onModuleInit() (fire-and-forget); flush to let it complete
+    const { repository } = buildHarness(42);
+    await new Promise((r) => setImmediate(r));
 
     expect(repository.hydrateAll).toHaveBeenCalledTimes(1);
   });
 
   it('subsequent ticks do not call hydrateAll again', async () => {
-    const { svc, repository, fireTick } = buildHarness(42);
-
-    await svc.onApplicationBootstrap();
+    const { repository, fireTick } = buildHarness(42);
+    await new Promise((r) => setImmediate(r)); // flush onModuleInit hydration
     fireTick(5);
     await new Promise((r) => setImmediate(r));
 
