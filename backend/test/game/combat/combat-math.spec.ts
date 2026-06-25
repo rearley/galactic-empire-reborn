@@ -94,19 +94,22 @@ describe('combat-math', () => {
     });
   });
 
-  describe('phaserDamage — @see GEFUNCS.C:firephas', () => {
-    it('returns 0 at percent 0', () => {
-      expect(phaserDamage(0, 10, 1000)).toBe(0);
+  describe('phaserDamage — @see GEFUNCS.C:2060 pdamage + GECMDS.C:956-973 firep', () => {
+    const base = { phasrtype: 1, phasr: 100, focus: 0, victimMaxTons: 0, victimAtWarp: false };
+
+    it('returns 0 when phasr is 0', () => {
+      expect(phaserDamage({ ...base, phasr: 0, distRaw: 0 })).toBe(0);
     });
 
     it('falls off with range', () => {
-      const close = phaserDamage(100, 0, 1000);
-      const far = phaserDamage(100, 1000, 1000);
+      const close = phaserDamage({ ...base, distRaw: 0 });
+      const far = phaserDamage({ ...base, distRaw: 10000 });
       expect(close).toBeGreaterThan(far);
     });
 
-    it('matches formula at zero range', () => {
-      expect(phaserDamage(50, 0, 1000)).toBe(500);
+    it('matches formula at point-blank for phasrtype=1 (160)', () => {
+      // disfact=24000, dd=1, fd=1, dp=1, dam=200; (2/2.5)/1 → 160
+      expect(phaserDamage({ ...base, distRaw: 0 })).toBe(160);
     });
   });
 
