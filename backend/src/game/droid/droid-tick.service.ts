@@ -470,6 +470,9 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
+    // NOTE: True hyperphaser separation (C firehp/pdamage warp-branch logic
+    // with hpdammax/hpfirdst) is DEFERRED (Plan 1 audit C-009). This path
+    // advertises 'hyper-phaser' but currently deals normal-phaser damage.
     if (lineOfFire(droid, target, bearing, 0)) {
       const damage = phaserDamage({
         phasrtype: droid.phasrtype,
