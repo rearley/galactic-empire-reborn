@@ -58,6 +58,11 @@ describe('GameGateway handler auth posture (T020b)', () => {
       get: jest.fn().mockReturnValue(undefined),
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(0),
+      // Combat/ship ticks call findAllShips on the service every tick.
+      findAllShips: jest.fn().mockReturnValue([]),
+      loadShip: jest.fn(),
+      // Gateway calls flushAndUnload during disconnect for bound sockets.
+      flushAndUnload: jest.fn().mockResolvedValue(undefined),
     };
     const registryMock = {
       upsert: jest.fn(),
@@ -75,7 +80,9 @@ describe('GameGateway handler auth posture (T020b)', () => {
         ship: { findFirst: jest.fn().mockResolvedValue(null) }, // no ship → onboarding
         shipClass: { findMany: jest.fn().mockResolvedValue([]) }, // ShipClassCacheService.onModuleInit
         mine: { findMany: jest.fn().mockResolvedValue([]) },     // CombatTickService.onModuleInit
-        user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner resolution
+        // scanPl owner resolution + onboarding User-exists guard: a live User
+        // row must resolve so the gateway emits prompt:ship-name (not auth:logout).
+        user: { findUnique: jest.fn().mockResolvedValue({ userid: 'onboarding-user-unbound' }) },
       })
       .overrideProvider(GalaxyService).useValue({})
       .overrideProvider(PlanetStateService).useValue({ all: jest.fn().mockReturnValue([]) })

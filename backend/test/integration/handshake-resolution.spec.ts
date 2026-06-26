@@ -89,8 +89,10 @@ describe('GameGateway handshake resolution', () => {
       ship: { findFirst: jest.fn().mockResolvedValue(null) },
       shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       mine: { findMany: jest.fn().mockResolvedValue([]) },
-      // scan_pl uses prisma.user.findUnique for owner resolution.
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      // scan_pl uses prisma.user.findUnique for owner resolution, and the
+      // gateway's onboarding User-exists guard requires a live User row before
+      // it will emit prompt:ship-name (otherwise it force-logs-out).
+      user: { findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
