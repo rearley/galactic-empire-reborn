@@ -3,9 +3,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
-import { ENGYMAX } from '../../constants';
+import { ENGYMAX, MAXSHIPS, GESTAT_AVAIL } from '../../constants';
 import { START_FLUX_PODS } from '../../constants/onboarding';
-import { prismaShipToState } from '../../ship/ship-state.mappers';
+import { formatMessage, MessageId } from '../messages';
 
 /**
  * Phaser/shield prices indexed by type-1 (type 1 = index 0).
@@ -129,13 +129,22 @@ export class NewShipHandlerService {
       };
     }
 
-    // Validate: sufficient credits
+    // Fetch user state (cash + fleet counters)
     const userRow = await this.prisma.user.findUnique({
       where: { userid: ship.userid },
-      select: { cash: true },
+      select: { cash: true, noships: true, topshipno: true },
     });
 
     const cash = userRow?.cash ?? 0n;
+    const noships = userRow?.noships ?? 0;
+    const topshipno = userRow?.topshipno ?? 0;
+
+    // Validate: fleet cap (@see GEMAIN.C MAXSHIPS)
+    if (noships >= MAXSHIPS) {
+      return { lines: [{ text: formatMessage(MessageId.NEW_FLEET_FULL), category: 'system' }] };
+    }
+
+    // Validate: sufficient credits
     if (cash < shipClass.maxPrice) {
       return {
         lines: [{
@@ -145,49 +154,54 @@ export class NewShipHandlerService {
       };
     }
 
-    // Determine next ship number for this user
-    const existingCount = await this.prisma.ship.count({ where: { userid: ship.userid } });
-    const newShipno = existingCount + 1;
+    // Allocate monotonic ship number — never reuse after deletion
+    const newShipno = topshipno + 1;
     const shipName = `${shipClass.typeName} #${newShipno}`;
 
     // items[I_FLUX=4] = START_FLUX_PODS; 14 slots per NUMITEMS=14
     const items: bigint[] = [0n, 0n, 0n, 0n, BigInt(START_FLUX_PODS), 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
-    const created = await this.prisma.ship.create({
-      data: {
-        userid: ship.userid,
-        shipno: newShipno,
-        shipname: shipName,
-        shpclass: classNumber,
-        xcoord: Math.floor(ship.xcoord),
-        ycoord: Math.floor(ship.ycoord),
-        energy: ENGYMAX,
-        phasr: 100,
-        shield: 0,
-        ltorpsChannel: [],
-        ltorpsDistance: [],
-        lmisslChannel: [],
-        lmisslDistance: [],
-        lmisslEnergy: [],
-        decout: [],
-        freq: [0, 0, 0],
-        items,
-      } as never,
-    });
+    // Atomic: create dormant ship + update user fleet counters and cash
+    await this.prisma.$transaction([
+      this.prisma.ship.create({
+        data: {
+          userid: ship.userid,
+          shipno: newShipno,
+          shipname: shipName,
+          shpclass: classNumber,
+          status: GESTAT_AVAIL,
+          xcoord: Math.floor(ship.xcoord),
+          ycoord: Math.floor(ship.ycoord),
+          energy: ENGYMAX,
+          phasr: 100,
+          shield: 0,
+          ltorpsChannel: [],
+          ltorpsDistance: [],
+          lmisslChannel: [],
+          lmisslDistance: [],
+          lmisslEnergy: [],
+          decout: [],
+          freq: [0, 0, 0],
+          items,
+        } as never,
+      }),
+      this.prisma.user.update({
+        where: { userid: ship.userid },
+        data: {
+          cash: { decrement: shipClass.maxPrice },
+          noships: { increment: 1 },
+          topshipno: newShipno,
+        },
+      }),
+    ]);
 
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { decrement: shipClass.maxPrice } },
-    });
-
-    const state = prismaShipToState(created);
-    this.shipStateService.loadShip(state);
+    // Dormant ship is NOT loaded into in-memory ShipStateService — buyer boards via `boa <n>`
 
     const remaining = cash - shipClass.maxPrice;
     return {
       lines: [{
-        text: `New ${shipClass.typeName} purchased. Credits remaining: ${remaining.toLocaleString()}. Board her with \`boa ${newShipno}\`.`,
-        category: 'success',
+        text: `New ${shipClass.typeName} purchased and docked at Zygor. Reconnect to fly her. Credits remaining: ${remaining.toLocaleString()}.`,
+        category: 'system',
       }],
     };
   }
