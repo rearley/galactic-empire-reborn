@@ -52,8 +52,8 @@ describe('GameGateway player.joined / player.left', () => {
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
     flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+    unboard: jest.fn().mockResolvedValue(undefined),
+    board: jest.fn(),
   });
 
   beforeEach(() => {
