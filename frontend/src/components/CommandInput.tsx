@@ -20,7 +20,7 @@ const MAX_HISTORY = 20;
  */
 export function CommandInput({ onSubmit }: CommandInputProps): React.JSX.Element {
   const [value, setValue] = useState('');
-  const [history, setHistory] = useState<CommandHistory>({
+  const [, setHistory] = useState<CommandHistory>({
     entries: [],
     cursor: -1,
     draft: '',
