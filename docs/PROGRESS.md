@@ -1162,3 +1162,32 @@ jammed invariants, and Cybertron spawn-visibility regression (T038 backfill).
 
 **Known issues**:
 - Pre-existing unrelated test crashes in scan-spy-reveal, scan-ra-gateway, scan-render-event, combat-tick.service, annoy-event, kill-attribution, murdonian-cargo-transfer — present on master before this work.
+
+---
+
+## 2026-06-26 — 029-scan-sh-detail (and broader cleanup session)
+
+**Completed:**
+- **S-008 — scan-sh intel block**: `scan sh <name>` now reveals Damage/Shields/Kills when neither player ship nor target ship is at warp, matching C canonical behavior (GECMDS.C:2244-2256). Abbreviated bearing/distance/speed/hull-size shown when either is warping. Full detail field set: typename, username, teamname, bearing, heading, range, sector, speed, length/width, damage, shieldstat, kills. Optional scanned-back feedback (SCAN1/2/3) remains deferred (minor).
+- **C-011 — cloak lock gate verification**: Target-cloak lock gate (`target.cloak >= 10` → LOCK_FAIL) already implemented in Plan 1 (branch 023) in both `torpedo.handler.ts:126` and `missile.handler.ts:137`. Disposition flipped from deferred to fixed; optional LOCK1/LOCK3 lockwarn feedback remains unported (minor).
+- **Full test baseline cleanup**: Greened 2743/2743 Jest suite (the 66 pre-existing stale failures fixed: midnight fixtures, harness mocks, stale assertions, scan-while-docked regression per spec 015). `tsc` clean.
+- **Docker Compose stack**: Added working `postgres+backend+frontend` stack (verified). Environment config in `.env.local`. Players can now test live gameplay against a containerized stack.
+- **Player-like Socket.io testing**: Demonstrated socket-level test patterns (fixtures, mocks, room subscriptions) against both unit-mocked and live-stack endpoints.
+
+**Tests:** Full suite 2743/2743 passing; zero open test failures. `tsc` strict mode clean.
+
+**Decisions made:**
+- **S-009 deferred**: A small mine-data-wiring feature (needs `MineRegistry` injected into `ScanHandlerService` + new `ScanCell.type: 'mine'` + `scan se` wiring). Not trivial polish; own task.
+- **P-007 family deferred**: Multi-ship-per-user model + dependent persistence findings (P-004/005/008/009/013/014) blocked by schema `@@unique([userid])` constraint — cannot honor C-canonical death/respawn without redesign. Flagged as architecture decision (NOT to be steamrolled). Deserves own spec once other features stabilize.
+
+**Next:**
+- Push master to origin (50 commits ahead, local only).
+- Live playtest + balance tuning (PDAMMAX, weapon ranges, Interceptor combat radius).
+- Optionally pursue P-007 multi-ship redesign (own spec) and S-009 scan-mines feature.
+
+**Known issues:**
+- P-007 multi-ship family deferred (architecture decision).
+- S-009 scan-mines deferred (small feature, requires DI wiring).
+- Optional C-011 lockwarn feedback (LOCK1/LOCK3 messages) unported (minor).
+- Optional S-008 scanned-back feedback (SCAN1/2/3 messages) unported (minor).
+- No other combat/AI fidelity gaps open.
