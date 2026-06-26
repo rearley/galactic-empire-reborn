@@ -123,6 +123,12 @@ export const PLTYPE_WORM = 3 as const;
  */
 export const MAXPLANETS = 9 as const;
 
+/**
+ * Max ships a player may own (env MAXSHIPS, 1–50).
+ * @see GEMAIN.C:462 numopt(MAXSHIPS,1,50)
+ */
+export const MAXSHIPS = Math.min(50, Math.max(1, Number(process.env.MAXSHIPS ?? 10))) as number;
+
 /** Planet lock-time in seconds. @see GEMAIN.C:469 (PLANTOCK; canonical default 30 minutes) */
 export const PLANTOCK_SECONDS = 1800 as const;
 
