@@ -283,9 +283,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const isClientSide = GameGateway.CLIENT_SIDE_REASONS.has(reason ?? '');
 
         if (ship.cantexit > 0 && isClientSide) {
-          // Kill path: emit COMBAT_SHIP_DESTROYED so the existing handler resets
-          // the DB row, broadcasts the kill, and PlayerScoreService awards credit.
-          // @see GEMAIN.C:warhupa killem — attacker attribution via ship.lastfired.
+          // Kill path: emit COMBAT_SHIP_DESTROYED so the existing handler DELETES
+          // the hull row (not a reset), broadcasts the kill, and PlayerScoreService
+          // awards credit. @see GEFUNCS.C:killem gepdb(GEDELETE) — attacker attribution
+          // via ship.lastfired.
 
           // Resolve attacker by lastfired channel (same logic as
           // CombatTickService.findActiveAttackerByChannel).
@@ -325,11 +326,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             scoreAwarded,
           };
 
-          // Emit via EventEmitter2 — triggers handleCombatShipDestroyed (DB reset +
+          // Emit via EventEmitter2 — triggers handleCombatShipDestroyed (hull DELETE +
           // galaxy broadcast) and PlayerScoreService (kill credit transfer).
-          // removeFromGame is NOT done by the handler, so we call it explicitly here.
+          // EventEmitter2 fires synchronously, so handleCombatShipDestroyed runs inline
+          // here and calls removeFromGame before this line returns. No explicit eviction
+          // needed after the emit.
+          // @see GEFUNCS.C:killem gepdb(GEDELETE) — dead ships are deleted, not reset.
           this.events.emit(COMBAT_SHIP_DESTROYED, destroyedEvent);
-          this.shipStateService.removeFromGame(ship);
         } else {
           // Normal path: flush current state to DB and unload from memory.
           void this.shipStateService.flushAndUnload(userid, activeShipNo);
@@ -619,11 +622,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Delete the victim's hull row and decrement the fleet count atomically.
-    // @see GEFUNCS.C:killem — dead ships are removed from the active world entirely.
+    // @see GEFUNCS.C:killem gepdb(GEDELETE) — dead ships are deleted from the world.
     // Guards:
     //   • deleteMany (not delete) is a no-op when the row is already gone (race safety).
     //   • noships decrement is skipped when count=0 (row was already deleted) or when
     //     noships is already 0 (underflow safety — mirrors C unsigned clamp behaviour).
+    //   • AI/droid ships have no persisted hull row, so deleteMany returns count=0 and
+    //     the decrement is naturally skipped — mirrors killem's class-type exemption.
+    //     @see GEFUNCS.C:1277
     if (!isNaN(victimShipno)) {
       void this.prisma.$transaction(async (tx) => {
         const { count } = await tx.ship.deleteMany({
@@ -634,12 +640,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             where: { userid: event.victimUserid },
             select: { noships: true },
           });
-          await tx.user.update({
-            where: { userid: event.victimUserid },
-            data: { noships: { decrement: (user?.noships ?? 0) > 0 ? 1 : 0 } },
-          });
+          if ((user?.noships ?? 0) > 0) {
+            await tx.user.update({
+              where: { userid: event.victimUserid },
+              data: { noships: { decrement: 1 } },
+            });
+          }
         }
-      });
+      }).catch((err: Error) => this.logger.error('death delete/decrement failed', err));
       this.shipStateService.removeFromGame({ userid: event.victimUserid, shipno: victimShipno });
     }
 
