@@ -1,3 +1,34 @@
+## 2026-06-26 — 030-multi-ship
+
+**Completed:**
+- **Fleet model (P-007/P-008/P-009)** — Ship is now many-per-user. The `@@unique([userid])` constraint was dropped; the composite PK `@@id([userid, shipno])` is the sole uniqueness guarantee. `User.noships` and `User.topshipno` are now live: incremented atomically on ship purchase, decremented on death (never reused, so ship numbers are monotonic). Data backfill migration sets `noships`/`topshipno` correctly for any existing one-ship users.
+- **Login ship-selection (`prompt:ship-select`)** — `handleConnection` now mirrors C `lookupshp`'s count-branch: 0 ships → onboarding free-starter; 1 ship → auto-board (unchanged); >1 ships → emit `prompt:ship-select { step, ships: [{ index, shipno, className, shipname, sector }] }`. Player replies via existing `prompt:reply { value }` (1-based index); invalid index re-emits the menu; valid index boards the chosen ship. @see GEFUNCS.C:319-384 selectship.
+- **Dormancy — DB-only idle ships** — `ShipStateService.onModuleInit` now loads **AI ships only** (`status=GESTAT_AUTO`) at boot; player ships are dormant until their owner connects. `board(state)` loads a ship into the live map + sets `status=GESTAT_USER`; `unboard(userid,shipno)` sets `status=GESTAT_AVAIL` + flushes + evicts. Non-active player ships are invisible, uninverted, and unticked. @see GEMAIN.C:warhupa; GEMAIN.H:209-210 GESTAT_AVAIL/USER.
+- **Buy cap + dormant create** — `new ship <class>` at Zygor now enforces `MAXSHIPS=10` fleet cap (env-tunable 1–50), allocates `shipno = topshipno+1` (monotonic, never reuses after deletion), creates the new hull with `status=GESTAT_AVAIL` (dormant — buyer keeps flying the active ship), and updates `noships`/`topshipno`/`cash` in a single transaction. Message updated: removes stale `boa <n>` reference. @see GECMDS.C:4558-4583.
+- **Death-delete (P-007/P-013/P-014)** — `handleCombatShipDestroyed` now deletes the killed hull row (`deleteMany` — safe no-op if already gone) and decrements `User.noships` atomically (no-op when count=0 to prevent underflow). `removeFromGame` evicts from the live map. Other owned ships are untouched. This path covers both the combat-tick kill and the P-001 client-disconnect combat-kill (both funnel via `COMBAT_SHIP_DESTROYED`). @see GEFUNCS.C:1087 killem gepdb(GEDELETE).
+- **42P10 fix** — removed `--skip-generate` from the global test setup so the Prisma client regenerates after each schema migration reset in the test DB, preventing P1001/P2021 errors on the new migration.
+
+**Closes:** P-007, P-008, P-009. **Advances:** P-013, P-014 (death path now correctly deletes + decrements; remaining deferred items in those findings are separate concerns).
+
+**Tests:** New suites: `test/gateway/combat-death-delete.spec.ts` (T5 delete/decrement contract), `test/integration/onboarding/ship-select.spec.ts` (T7-A/B/C/D ship-select socket tests), `test/integration/multi-ship-lifecycle.spec.ts` (T8 full-lifecycle: T8-A 2-ship → select #2 → dormancy; T8-B survivor auto-board; T8-C zero-fleet onboarding; T8-D death-delete service+DB). Full Jest suite green (0 failing). `tsc --noEmit` clean.
+
+**Decisions made:**
+- `MAXSHIPS=10` default (env-tunable 1–50, matching original `GEMAIN.C:462 numopt(MAXSHIPS,1,50)`).
+- Dormancy is DB-only: idle ships have no in-memory representation; live map = active world.
+- Login-only switching (no in-game `boa`) — faithful to C `CHOOSESH` running only at entry.
+- Free-starter when fleet empty: reuses onboarding.finalize() grant on 0-ship reconnect.
+- 42P10 fix: removed `--skip-generate` from global test setup so Prisma client regenerates after each DB reset in CI.
+
+**Known issues / deferred minors:**
+- Counter TOCTOU: `noships`/`topshipno` increments use per-column `{ increment: 1 }` (PK-mitigated — composite PK prevents true duplicate creation, so the counter drift window is brief and bounded).
+- `unboard` does two DB round-trips (updateMany for status + update inside flushAndUnload); could be merged in a future cleanup.
+- Session-replacement edge: a second socket connecting before the first fully boards may transiently see a stale registry entry. Existing "latest-wins" logic handles it but the window is narrow.
+- BigInt buy price parsed as string only (value string-only parse) — already established pattern.
+
+**Next:** Remaining deferred fidelity findings (S-009, C-002, P-004/P-005, etc.) or frontend work (010-react-frontend).
+
+---
+
 ## 2026-06-25 — 026-subsystem-damage (Plan 4 of 4)
 
 **Completed:**

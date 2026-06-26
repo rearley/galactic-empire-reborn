@@ -27,11 +27,19 @@ a teamcode referencing a deleted team. Source: `WARUSR` in `GEMAIN.H`.
 - `Ship_shipname_lower_idx` — `UNIQUE ON "Ship" (LOWER("shipname"))` (same pattern). Enforces
   case-insensitive ship name uniqueness for `cmd_rename`.
 
-**Relations**: owns many Ships, has many Mail messages and MailStat messages.
+**Feature 030 additions** (`030-multi-ship`):
+- `noships Int @default(0)` — current count of the user's ship rows. Incremented on `new ship` purchase and onboarding grant; decremented on ship death. Never goes below 0 (underflow guard). @see GEMAIN.H:296 WARUSR.noships; GEFUNCS.C:266 initshp; GEFUNCS.C:1272 killem.
+- `topshipno Int @default(0)` — highest `shipno` ever allocated to this user. Monotonically increasing; **never decremented** even when ships are deleted, so ship numbers are never reused. A new hull is always allocated `shipno = topshipno + 1`. @see GEMAIN.H:297 WARUSR.topshipno; GEFUNCS.C:267.
+
+Both were previously dead columns (always 0). They are now live after branch 030 and kept in sync atomically with ship creation/death transactions.
+
+**Relations**: owns many Ships (one-to-many, enforced by FK; previously one-to-one), has many Mail messages and MailStat messages.
 
 ## Ship
 
-A warship owned by a User, identified by the composite key `(userid, shipno)`.
+A warship owned by a User, identified by the composite primary key `(userid, shipno)`.
+**As of branch 030:** a single User may own up to `MAXSHIPS=10` Ship rows simultaneously (the old `@@unique([userid])` constraint was dropped). Each ship is individually identified by its `shipno` — allocated monotonically (`topshipno+1`) and never reused after deletion.
+
 Carries the complete real-time flight state: floating-point position and
 heading, speed, energy, phaser charge, shield state, damage percentage, class,
 a 14-element cargo inventory (`BigInt[]`), three locked-torpedo slots
