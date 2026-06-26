@@ -113,6 +113,8 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
         create: jest.fn().mockResolvedValue(createdShip),
       } as unknown as PrismaService['ship'],
       user: {
+        // Brand-new player by default: topshipno 0 → first ship gets shipno/topshipno 1.
+        findUnique: jest.fn().mockResolvedValue({ topshipno: 0 }),
         update: jest.fn().mockResolvedValue({ userid: USERID, cash: START_CASH }),
       } as unknown as PrismaService['user'],
     };
@@ -185,5 +187,24 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
 
     const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data['status']).toBe(1);
+  });
+
+  // P-007 final-review fix 4: the empty-fleet rebuild path must preserve the
+  // monotonic never-reuse invariant — a wiped player (topshipno=5) who claims a
+  // free starter must get shipno/topshipno 6, NOT a reset to 1.
+  it('allocates topshipno+1 for a wiped player (does NOT reset to 1)', async () => {
+    (prismaMock.user.findUnique as jest.Mock).mockResolvedValue({ topshipno: 5 });
+
+    await service.finalize(USERID, SHIPNAME);
+
+    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data['shipno']).toBe(6);
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userid: USERID },
+        data: expect.objectContaining({ noships: 1, topshipno: 6 }),
+      }),
+    );
   });
 });

@@ -195,7 +195,7 @@ export class NewShipHandlerService {
       }),
     ]);
 
-    // Dormant ship is NOT loaded into in-memory ShipStateService — buyer boards via `boa <n>`
+    // Dormant ship is NOT loaded into in-memory ShipStateService — reconnect to fly her (login-only switching)
 
     const remaining = cash - shipClass.maxPrice;
     return {

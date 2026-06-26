@@ -28,6 +28,7 @@ import { mockRandom } from '../fixtures/mock-random';
 
 describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let gateway: GameGateway;
+  let registry: ConnectedShipsRegistry;
   let serverEmitMock: jest.Mock;
   let updateManyMock: jest.Mock;
   let flushAndUnloadMock: jest.Mock;
@@ -95,7 +96,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       findByUserid: jest.fn().mockReturnValue([]),
     };
 
-    const registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
+    registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
 
     const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
     const mockPrisma = {
@@ -130,6 +131,10 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };
+
+    // Default: this socket ('sock-1') is the registered owner of the ship, as it
+    // would be in the real connection flow (upsert on board, remove on disconnect).
+    registry.upsert('user1:1', 'sock-1');
   });
 
   // ------------------------------------------------------------------ //
@@ -310,5 +315,33 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     expect(updateManyMock).not.toHaveBeenCalled();
     expect(unboardMock).toHaveBeenCalledWith('user1', 1);
     expect(flushAndUnloadMock).not.toHaveBeenCalled();
+  });
+
+  // ------------------------------------------------------------------ //
+  // Session-replacement guard (P-007 final-review fix 2): a stale       //
+  // socket whose ship was taken over by a newer socket must NOT unboard //
+  // the ship the new socket is actively flying.                         //
+  // ------------------------------------------------------------------ //
+
+  it('does NOT unboard when a newer socket has taken over the ship', async () => {
+    getSvcMock.mockReturnValue(makeShip(0)); // not combat-locked → normal (non-kill) path
+    const socket = makeSocket('transport close'); // client-side reason, but cantexit=0 → no kill
+    // A newer socket 'sock-2' has displaced 'sock-1' as the registered owner.
+    registry.upsert('user1:1', 'sock-2');
+
+    await gateway.handleDisconnect(socket as never); // socket.id === 'sock-1' (stale)
+
+    // The ship belongs to the live new socket — the stale socket must not evict it.
+    expect(unboardMock).not.toHaveBeenCalled();
+  });
+
+  it('DOES unboard when this socket still owns the ship (normal single-socket disconnect)', async () => {
+    getSvcMock.mockReturnValue(makeShip(0));
+    const socket = makeSocket('transport close');
+    // 'sock-1' is the owner (set in beforeEach) — normal logout.
+
+    await gateway.handleDisconnect(socket as never);
+
+    expect(unboardMock).toHaveBeenCalledWith('user1', 1);
   });
 });
