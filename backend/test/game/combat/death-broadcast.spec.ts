@@ -38,7 +38,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockShipState = { removeFromGame: jest.fn() } as unknown as ShipStateService;
-    gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
+    gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
     (gateway as unknown as { server: { to: jest.Mock; emit: jest.Mock } }).server = {
       to: toMock,
       emit: serverEmitMock,

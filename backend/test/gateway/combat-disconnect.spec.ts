@@ -122,6 +122,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { getTypeName: jest.fn() } as never,
       mockRandom,
       mockEvents as never,
     );

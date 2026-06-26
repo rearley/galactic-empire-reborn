@@ -108,6 +108,7 @@ function makeGateway(scanHandler: ScanHandlerService): GameGateway {
     {} as unknown as PrismaService,
     {} as unknown as OnboardingService,
     scanHandler,
+    { getTypeName: jest.fn() } as never,
     mockRandom,
     { emit: jest.fn(), on: jest.fn() } as never,
   );

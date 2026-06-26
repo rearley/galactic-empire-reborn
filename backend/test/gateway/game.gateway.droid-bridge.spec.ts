@@ -48,6 +48,7 @@ describe('GameGateway — droid event bridge', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { getTypeName: jest.fn() } as never,
       mockRandom,
       { emit: jest.fn(), on: jest.fn() } as never,
     );

@@ -68,7 +68,7 @@ describe('GameGateway handshake resolution', () => {
     board: jest.Mock;
   };
   let prismaMock: {
-    ship: { findFirst: jest.Mock };
+    ship: { findMany: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
     shipClass: { findMany: jest.Mock };
     mine: { findMany: jest.Mock };
     user: { findUnique: jest.Mock };
@@ -90,7 +90,11 @@ describe('GameGateway handshake resolution', () => {
     };
 
     prismaMock = {
-      ship: { findFirst: jest.fn().mockResolvedValue(null) },
+      ship: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       mine: { findMany: jest.fn().mockResolvedValue([]) },
       // scan_pl uses prisma.user.findUnique for owner resolution, and the
@@ -153,7 +157,7 @@ describe('GameGateway handshake resolution', () => {
   it('returning player: valid JWT + ship in DB → emits welcome command:result', async () => {
     // Arrange: DB has a ship for this user
     const dbShip = { userid: TEST_USERID, shipno: 1, shipname: 'USS Pioneer', shpclass: 1 };
-    prismaMock.ship.findFirst.mockResolvedValue(dbShip);
+    prismaMock.ship.findMany.mockResolvedValue([dbShip]);
 
     // ShipStateService.get returns undefined initially (triggers loadShip path)
     // then returns the ship after loadShip is called
@@ -181,7 +185,7 @@ describe('GameGateway handshake resolution', () => {
 
   it('new player: valid JWT + no ship in DB → emits prompt:ship-name', async () => {
     // Arrange: DB has no ship for this user
-    prismaMock.ship.findFirst.mockResolvedValue(null);
+    prismaMock.ship.findMany.mockResolvedValue([]);
 
     const client = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],

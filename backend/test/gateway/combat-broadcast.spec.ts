@@ -50,6 +50,7 @@ describe('GameGateway combat broadcasts', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { getTypeName: jest.fn() } as never,
       mockRandom,
       { emit: jest.fn(), on: jest.fn() } as never,
     );
@@ -152,6 +153,7 @@ describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { getTypeName: jest.fn() } as never,
       mockRandom,
       { emit: jest.fn(), on: jest.fn() } as never,
     );

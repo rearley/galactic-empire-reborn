@@ -93,7 +93,10 @@ describe('GameGateway integration', () => {
       .useValue({
         shipClass: { findMany: jest.fn().mockResolvedValue([]) },
         mine: { findMany: jest.fn().mockResolvedValue([]) },
-        ship: { findFirst: jest.fn().mockResolvedValue({ userid: TEST_USERID, shipno: 1 }) },
+        ship: {
+          findMany: jest.fn().mockResolvedValue([{ userid: TEST_USERID, shipno: 1, shipname: 'TestShip' }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
         user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
       })
       .overrideProvider(WsAuthGuard)
