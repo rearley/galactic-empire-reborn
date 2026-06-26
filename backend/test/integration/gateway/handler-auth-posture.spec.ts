@@ -63,6 +63,8 @@ describe('GameGateway handler auth posture (T020b)', () => {
       loadShip: jest.fn(),
       // Gateway calls flushAndUnload during disconnect for bound sockets.
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
     };
     const registryMock = {
       upsert: jest.fn(),

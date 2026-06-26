@@ -83,6 +83,8 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
     findAllShips: jest.fn().mockReturnValue([testShip]),
     findByUserid: jest.fn().mockReturnValue([testShip]),
     flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
   };
 
   const module: TestingModule = await Test.createTestingModule({
@@ -354,6 +356,8 @@ describe('cmd rename — unbound socket (T058)', () => {
         findByUserid: jest.fn().mockReturnValue([]),
         findAllShips: jest.fn().mockReturnValue([]), // ticks iterate all ships
         flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
       })
       .overrideProvider(PrismaService)
       .useValue({

@@ -64,6 +64,8 @@ describe('GameGateway handshake resolution', () => {
     size: jest.Mock;
     loadShip: jest.Mock;
     flushAndUnload: jest.Mock;
+    unboard: jest.Mock;
+    board: jest.Mock;
   };
   let prismaMock: {
     ship: { findFirst: jest.Mock };
@@ -83,6 +85,8 @@ describe('GameGateway handshake resolution', () => {
       loadShip: jest.fn(),
       // Gateway calls flushAndUnload during disconnect.
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
     };
 
     prismaMock = {

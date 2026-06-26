@@ -213,7 +213,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } catch {
         // Non-fatal: leave maxTons undefined; cargo callers default to a safe value.
       }
-      this.shipStateService.loadShip(state);
+      this.shipStateService.board(state);
     }
 
     client.data.activeShipNo = ship.shipno;
@@ -334,8 +334,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // @see GEFUNCS.C:killem gepdb(GEDELETE) — dead ships are deleted, not reset.
           this.events.emit(COMBAT_SHIP_DESTROYED, destroyedEvent);
         } else {
-          // Normal path: flush current state to DB and unload from memory.
-          void this.shipStateService.flushAndUnload(userid, activeShipNo);
+          // Normal path: persist dormant status + flush state + evict from map.
+          await this.shipStateService.unboard(userid, activeShipNo);
         }
       }
     }

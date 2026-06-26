@@ -83,6 +83,8 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const mockShipStateSvc: Partial<ShipStateService> = {
       get: jest.fn().mockReturnValue(undefined),
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
       removeFromGame: removeFromGameMock,
       findAllShips: jest.fn().mockReturnValue([]),
       findByUserid: jest.fn().mockReturnValue([]),

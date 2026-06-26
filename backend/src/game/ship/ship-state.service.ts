@@ -6,6 +6,7 @@ import { TickService } from '../tick/tick.service';
 import { ShipState, shipKey } from './ship-state.types';
 import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
+import { GESTAT_AUTO, GESTAT_USER, GESTAT_AVAIL } from '../constants';
 
 /**
  * In-memory source of truth for all active ship state.
@@ -37,7 +38,7 @@ export class ShipStateService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     const [rows, classes] = await Promise.all([
-      this.prisma.ship.findMany({ include: { user: { select: { teamcode: true, options: true } } } }),
+      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true } } } }),
       this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true, maxTons: true } }),
     ]);
     const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));
@@ -199,6 +200,53 @@ export class ShipStateService implements OnModuleInit {
     if (!this.map.has(key)) {
       this.map.set(key, state);
     }
+  }
+
+  /**
+   * Board a player ship: mark as active and load into the live world.
+   * Called by GameGateway.handleConnection on the player-ship hydrate path.
+   * Sets status to GESTAT_USER so the ship is visible to the physics tick,
+   * movement engine (MOVENGUSE gate), and combat system.
+   *
+   * @see GEMAIN.H:210 GESTAT_USER = 1 — active player ship
+   * @see GEMAIN.C main loop — only GESTAT_USER ships debit MOVENGUSE
+   * @see specs/030-multi-ship/task-6-brief.md T6
+   */
+  board(state: ShipState): void {
+    state.status = GESTAT_USER;
+    state.dirty = true;
+    this.map.set(shipKey(state.userid, state.shipno), state);
+  }
+
+  /**
+   * Unboard a player ship: persist as dormant (GESTAT_AVAIL) and remove from
+   * the live world. Called by GameGateway.handleDisconnect on clean (non-kill)
+   * disconnect.
+   *
+   * IMPORTANT: stateToPrismaUpdate intentionally strips `status` from the
+   * per-tick flush ("status: set at creation/death only"). This method explicitly
+   * persists GESTAT_AVAIL via updateMany (a no-op on 0 rows) so that a
+   * logout-after-death (ship row already deleted) does NOT crash with P2025.
+   *
+   * @see GEMAIN.C:warhupa — ship removed from active list on logout
+   * @see GEMAIN.H:209 GESTAT_AVAIL = 0 — dormant/unloaded ship slot
+   * @see src/game/ship/ship-state.mappers.ts stateToPrismaUpdate (status excluded)
+   * @see specs/030-multi-ship/task-6-brief.md T6
+   */
+  async unboard(userid: string, shipno: number): Promise<void> {
+    const state = this.map.get(shipKey(userid, shipno));
+    if (state) {
+      state.status = GESTAT_AVAIL;
+      state.dirty = true;
+    }
+    // Explicitly persist dormant status — stateToPrismaUpdate strips status from tick flush.
+    // updateMany is a no-op when 0 rows match (ship already deleted by death).
+    await this.prisma.ship.updateMany({
+      where: { userid, shipno },
+      data: { status: GESTAT_AVAIL },
+    });
+    // Flush remaining dirty state (position, energy, etc.) then evict from map.
+    await this.flushAndUnload(userid, shipno);
   }
 
   /**
