@@ -63,6 +63,8 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
     flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
   });
 
   beforeEach(() => {

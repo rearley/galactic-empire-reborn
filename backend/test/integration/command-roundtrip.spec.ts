@@ -62,7 +62,7 @@ describe('command round-trip integration (US1)', () => {
   let port: number;
   let shipServiceFake: ShipStateService;
   let prismaMock: {
-    ship: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    ship: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     shipClass: { findMany: jest.Mock };
     mine: { findMany: jest.Mock };
   };
@@ -80,6 +80,7 @@ describe('command round-trip integration (US1)', () => {
         findMany: jest.fn().mockResolvedValue([ship]),
         findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       shipClass: {
         findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false }]),
@@ -332,6 +333,7 @@ describe('command round-trip integration (US1)', () => {
         findMany: jest.fn().mockResolvedValue([ship]),
         findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       shipClass: {
         findMany: jest.fn().mockResolvedValue([

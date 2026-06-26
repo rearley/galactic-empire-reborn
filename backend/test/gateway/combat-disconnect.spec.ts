@@ -31,6 +31,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let serverEmitMock: jest.Mock;
   let updateManyMock: jest.Mock;
   let flushAndUnloadMock: jest.Mock;
+  let unboardMock: jest.Mock;
   let removeFromGameMock: jest.Mock;
   let getSvcMock: jest.Mock;
   let findAllShipsMock: jest.Mock;
@@ -77,6 +78,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     serverEmitMock = jest.fn();
     updateManyMock = jest.fn().mockResolvedValue({ count: 1 });
     flushAndUnloadMock = jest.fn().mockResolvedValue(undefined);
+    unboardMock = jest.fn().mockResolvedValue(undefined);
     removeFromGameMock = jest.fn();
     findAllShipsMock = jest.fn().mockReturnValue([]);
     eventsEmitMock = jest.fn();
@@ -87,6 +89,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     const mockShipStateSvc: Partial<ShipStateService> = {
       get: getSvcMock,
       flushAndUnload: flushAndUnloadMock,
+      unboard: unboardMock,
       removeFromGame: removeFromGameMock,
       findAllShips: findAllShipsMock,
       findByUserid: jest.fn().mockReturnValue([]),
@@ -268,8 +271,9 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     expect(removeFromGameMock).not.toHaveBeenCalled();
     expect(updateManyMock).not.toHaveBeenCalled();
 
-    // Normal flush must run instead
-    expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
+    // Normal path: unboard (persist AVAIL + flush + evict) must run instead
+    expect(unboardMock).toHaveBeenCalledWith('user1', 1);
+    expect(flushAndUnloadMock).not.toHaveBeenCalled();
   });
 
   it('does NOT kill ship when NOT combat-locked (cantexit===0) with a client-side disconnect reason', async () => {
@@ -286,8 +290,9 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     expect(removeFromGameMock).not.toHaveBeenCalled();
     expect(updateManyMock).not.toHaveBeenCalled();
 
-    // Normal flush must run
-    expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
+    // Normal path: unboard (persist AVAIL + flush + evict) must run
+    expect(unboardMock).toHaveBeenCalledWith('user1', 1);
+    expect(flushAndUnloadMock).not.toHaveBeenCalled();
   });
 
   it('does NOT kill ship when disconnect reason is undefined (e.g. no prior client.on capture)', async () => {
@@ -302,6 +307,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     );
     expect(removeFromGameMock).not.toHaveBeenCalled();
     expect(updateManyMock).not.toHaveBeenCalled();
-    expect(flushAndUnloadMock).toHaveBeenCalledWith('user1', 1);
+    expect(unboardMock).toHaveBeenCalledWith('user1', 1);
+    expect(flushAndUnloadMock).not.toHaveBeenCalled();
   });
 });

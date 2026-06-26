@@ -78,6 +78,8 @@ describe('GameGateway integration', () => {
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

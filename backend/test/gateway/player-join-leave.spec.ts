@@ -52,6 +52,8 @@ describe('GameGateway player.joined / player.left', () => {
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
     flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
   });
 
   beforeEach(() => {
@@ -118,7 +120,7 @@ describe('GameGateway player.joined / player.left', () => {
     await gateway.handleConnection(socket as never);
     serverEmitMock.mockClear();
 
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
     expect(serverEmitMock).toHaveBeenCalledWith('player.left', { shipId: 'user1:1' });
   });
 

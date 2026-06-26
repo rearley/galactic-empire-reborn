@@ -82,6 +82,8 @@ describe('Returning player (T046)', () => {
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -197,6 +199,8 @@ describe('Warm cache (T047)', () => {
       mutate: jest.fn(),
       size: jest.fn().mockReturnValue(1),
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      board: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
