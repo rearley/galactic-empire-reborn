@@ -3,12 +3,15 @@
  *
  * When a player disconnects while combat-locked (cantexit > 0) via a CLIENT-SIDE
  * Socket.io reason (transport close, ping timeout, etc.), their ship must be
- * killed — COMBAT_SHIP_DESTROYED is emitted (triggering DB reset via
- * handleCombatShipDestroyed + PlayerScoreService kill credit), and the ship is
- * evicted from memory. Server-side disconnects (hot-reload, graceful shutdown)
- * and non-combat-locked disconnects must NOT trigger the kill.
+ * killed — COMBAT_SHIP_DESTROYED is emitted (triggering hull DELETE via
+ * handleCombatShipDestroyed + PlayerScoreService kill credit). Memory eviction
+ * happens inside handleCombatShipDestroyed (synchronous EventEmitter2 dispatch),
+ * which is covered by combat-death-delete.spec.ts. Server-side disconnects
+ * (hot-reload, graceful shutdown) and non-combat-locked disconnects must NOT
+ * trigger the kill.
  *
  * @see GEMAIN.C:warhupa (line 1397) — if (cantexit > 0) killem(ship)
+ * @see GEFUNCS.C:killem gepdb(GEDELETE) — dead ships are deleted, not reset
  * @see specs/025-combat-depth-persistence/plan.md P-001
  */
 import 'reflect-metadata';
@@ -146,10 +149,9 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       }),
     );
 
-    // Ship must be evicted from memory
-    expect(removeFromGameMock).toHaveBeenCalledWith(
-      expect.objectContaining({ userid: 'user1', shipno: 1 }),
-    );
+    // Memory eviction is done by handleCombatShipDestroyed (synchronous EventEmitter2
+    // dispatch). The mocked events.emit does not invoke the handler, so we do not
+    // assert removeFromGame here — coverage lives in combat-death-delete.spec.ts.
 
     // Normal flush must NOT be called (kill path took over)
     expect(flushAndUnloadMock).not.toHaveBeenCalled();
@@ -167,7 +169,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       COMBAT_SHIP_DESTROYED,
       expect.objectContaining({ victimUserid: 'user1' }),
     );
-    expect(removeFromGameMock).toHaveBeenCalled();
+    // removeFromGame is called by handleCombatShipDestroyed (covered in combat-death-delete.spec.ts)
     expect(flushAndUnloadMock).not.toHaveBeenCalled();
     expect(updateManyMock).not.toHaveBeenCalled();
   });
@@ -218,8 +220,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
         attackerUserid: null,
       }),
     );
-    // Kill still fires (victim dies + broadcast) even without attacker
-    expect(removeFromGameMock).toHaveBeenCalled();
+    // Kill fires; eviction handled by handleCombatShipDestroyed (see combat-death-delete.spec.ts)
   });
 
   it('includes scoreAwarded from shipClass lookup', async () => {
@@ -246,8 +247,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       COMBAT_SHIP_DESTROYED,
       expect.objectContaining({ scoreAwarded: 0 }),
     );
-    // Kill still fires despite score lookup failure
-    expect(removeFromGameMock).toHaveBeenCalled();
+    // Kill fires; eviction handled by handleCombatShipDestroyed (see combat-death-delete.spec.ts)
   });
 
   // ------------------------------------------------------------------ //

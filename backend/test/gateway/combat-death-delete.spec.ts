@@ -203,13 +203,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     await Promise.resolve();
     await Promise.resolve();
 
-    // decrement value must be 0, not 1
-    expect(userUpdateMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userid: 'user1' },
-        data: { noships: { decrement: 0 } },
-      }),
-    );
+    // user.update must NOT be called at all — skip the no-op write
+    // (underflow guard: noships is 0, so we skip issuing decrement: 0 to avoid a pointless DB write)
+    expect(userUpdateMock).not.toHaveBeenCalled();
   });
 
   // ------------------------------------------------------------------ //
