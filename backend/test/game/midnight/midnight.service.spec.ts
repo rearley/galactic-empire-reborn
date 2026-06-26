@@ -23,6 +23,7 @@ import { valuePlanet } from '../../../src/game/midnight/value-pl';
 import { BASEPRICE, NUMITEMS, I_MEN } from '../../../src/game/constants/items';
 import { PLTYPE_PLNT } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,6 +91,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
+  await seedNeutralZonePlanets(prisma);
 });
 
 // ---------------------------------------------------------------------------
