@@ -22,10 +22,14 @@ export default async function globalSetup(): Promise<void> {
 
   const schemaPath = path.resolve(__dirname, "../../../prisma/schema.prisma");
 
-  // Apply schema.prisma to the test DB without generating the client.
+  // Apply schema.prisma to the test DB and regenerate the Prisma client so
+  // the generated query engine always matches the current schema.  The
+  // --skip-generate flag was previously used here; that left a stale client
+  // whenever a schema constraint was dropped (e.g. dropping @@unique([userid])
+  // on Ship), causing ON CONFLICT to reference the old constraint → 42P10.
   // Uses --force-reset so each full run starts from a clean slate.
   execSync(
-    `npx prisma db push --force-reset --skip-generate --schema="${schemaPath}"`,
+    `npx prisma db push --force-reset --schema="${schemaPath}"`,
     {
       env: { ...process.env, DATABASE_URL: url },
       stdio: "inherit",
