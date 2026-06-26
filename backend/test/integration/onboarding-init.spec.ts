@@ -168,4 +168,22 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
     await service.finalize(USERID, SHIPNAME);
     expect(shipStateServiceMock.loadShip).toHaveBeenCalledTimes(1);
   });
+
+  it('sets User.noships=1 and topshipno=1 via prisma.user.update (fleet counters)', async () => {
+    await service.finalize(USERID, SHIPNAME);
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userid: USERID },
+        data: expect.objectContaining({ noships: 1, topshipno: 1 }),
+      }),
+    );
+  });
+
+  it('creates Ship with status=1 (GESTAT_USER) explicitly', async () => {
+    await service.finalize(USERID, SHIPNAME);
+
+    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(call.data['status']).toBe(1);
+  });
 });

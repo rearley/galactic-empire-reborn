@@ -5,7 +5,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { isValidShipName } from './name-validator';
 import { prismaShipToState } from '../ship/ship-state.mappers';
 import { ShipState } from '../ship/ship-state.types';
-import { ENGYMAX } from '../constants';
+import { ENGYMAX, GESTAT_USER } from '../constants';
 import { START_CASH, START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
 
 export interface ClassListEntry {
@@ -116,7 +116,7 @@ export class OnboardingService {
         xcoord: spawnX,
         ycoord: spawnY,
         energy: ENGYMAX,
-        status: 1, // GESTAT_USER — active player ship @see GEMAIN.H:210
+        status: GESTAT_USER, // active player ship @see GEMAIN.H:210
         topspeed,
         phasr: 100,      // 100% charge — @see GEFUNCS.C:222 initshp
         phasrtype: 1,   // basic phasors fitted at creation — @see GEFUNCS.C:234 initshp
@@ -135,7 +135,7 @@ export class OnboardingService {
 
     await this.prisma.user.update({
       where: { userid },
-      data: { cash: START_CASH },
+      data: { cash: START_CASH, noships: 1, topshipno: 1 },
     });
 
     const state = prismaShipToState(ship);
