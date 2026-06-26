@@ -8,7 +8,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
-import { inScanRange } from '../../combat/combat-math';
+import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
 
 /**
@@ -624,14 +624,30 @@ export class ScanHandlerService implements OnModuleInit {
     const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
     const bearing = Math.round((absAngle - ship.heading + 360) % 360);
     const ltr = target.status === 1 ? '+' : '=';
-    return {
-      lines: [
-        {
-          text: `${ltr} ${target.shipname} — class ${target.shpclass}, range ${dist.toFixed(1)}, bearing ${bearing}.`,
-          category: 'info',
-        },
-      ],
+    const briefLine: CommandResult['lines'][number] = {
+      text: `${ltr} ${target.shipname} — class ${target.shpclass}, range ${dist.toFixed(1)}, bearing ${bearing}.`,
+      category: 'info',
     };
+
+    // S-008: reveal damage/shields/kills intel when NEITHER ship is at warp.
+    // GECMDS.C:2244-2256: gate is `warsptr->where != 1 && wptr->where != 1`.
+    // where === 1 is hyperspace/at-warp; orbit (>= 10) and normal (0) DO reveal intel.
+    if (ship.where !== 1 && target.where !== 1) {
+      const dmgLabel = `Damage: ${damstr(target.damage)}`;
+      const shieldLabel =
+        target.shieldstat === 1 ? 'Shields: up' :
+        target.shieldstat === 3 ? 'Shields: damaged' :
+        'Shields: down';
+      const killsLabel = `Kills: ${target.kills}`;
+      return {
+        lines: [
+          briefLine,
+          { text: `${dmgLabel}  ${shieldLabel}  ${killsLabel}`, category: 'info' },
+        ],
+      };
+    }
+
+    return { lines: [briefLine] };
   }
 
   /**
