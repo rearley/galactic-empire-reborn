@@ -71,10 +71,13 @@ describe('AdminHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ADM_NOT_OWNER));
   });
 
-  it('no sub-command returns ADM_MENU', async () => {
+  it('no sub-command renders the planet inventory status', async () => {
     const { svc } = makeService();
     const result = await svc.command.handler(makeShip(), [], {});
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.ADM_MENU));
+    // Bare `adm` now lists the owned planet's inventory/admin status rather than
+    // a static ADM_MENU. (Header reads "<planet name> — Inventory".)
+    expect(result.lines[0].text).toMatch(/Inventory/);
+    expect(result.lines[0].category).toBe('system');
   });
 
   it('unknown sub-command returns ADM_INVALID', async () => {

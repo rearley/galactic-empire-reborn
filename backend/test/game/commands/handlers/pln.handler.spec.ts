@@ -149,10 +149,10 @@ describe('PlnHandlerService — read-only (FR-014-041)', () => {
 // ---------------------------------------------------------------------------
 
 describe('PlnHandlerService — command metadata (T033)', () => {
-  it('keyword is "pln" with no aliases', () => {
+  it('keyword is "pln" with alias "pla"', () => {
     const { handler } = makeHandler([]);
     expect(handler.command.keyword).toBe('pln');
-    expect(handler.command.aliases).toHaveLength(0);
+    expect(handler.command.aliases).toEqual(['pla']);
   });
 
   it('minArgs is 0', () => {

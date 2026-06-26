@@ -72,7 +72,7 @@ describe("ShipClass entity", () => {
     expect(found.maxWarp).toBe(10);
     expect(found.maxTons).toBe(1_000);
     expect(found.maxPrice).toBe(65_000n);
-    expect(found.scanRange).toBe(100_000);
+    expect(found.scanRange).toBe(15_000);
     expect(found.points).toBe(750);
     expect(found.cybCanAttack).toBe(true);
     expect(found.cybLowestClassAttacks).toBe(1);

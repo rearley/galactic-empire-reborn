@@ -74,8 +74,11 @@ export class AdminHandlerService {
     switch (sub) {
       case 'rate': {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
+        if (itemIndex === -1) {
+          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+        }
         const value = parseUint32(args[2] ?? '');
-        if (itemIndex === -1 || value === undefined || value > 100) {
+        if (value === undefined || value > 100) {
           return { lines: [{ text: 'Rate must be 0–100.', category: 'system' }] };
         }
         change = { type: 'rate', itemIndex, value };

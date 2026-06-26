@@ -144,15 +144,17 @@ describe('PriceHandlerService — PRICEFMT: arg format errors', () => {
 });
 
 // ---------------------------------------------------------------------------
-// BUY7 — planet has no owner
+// Unowned planet — open shop (no BUY7 "no owner" rejection anymore)
 // ---------------------------------------------------------------------------
 
-describe('PriceHandlerService — BUY7: planet has no owner', () => {
-  it('returns BUY7 when planet.userid is null', async () => {
+describe('PriceHandlerService — unowned planet is an open shop', () => {
+  it('quotes a sellable item on an unowned planet instead of rejecting with BUY7', async () => {
+    // Neutral-zone / unowned planets with explicit sell flags are open shops.
     const { handler } = makeHandler({ planet: makePlanet({ userid: null }) });
     const ship = makeShip({ where: 10 });
     const result = await handler.command.handler(ship, ['10', 'foo'], {}) as Lines;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY7));
+    expect(result.lines[0].text).toContain('Food');
+    expect(result.lines[0].category).toBe('success');
   });
 });
 
@@ -170,16 +172,16 @@ describe('PriceHandlerService — BUY5: zero quantity', () => {
 });
 
 // ---------------------------------------------------------------------------
-// BUY4 — item not for sale
+// BUY5 — item not for sale (foreign buyer, sell flag false)
 // ---------------------------------------------------------------------------
 
-describe('PriceHandlerService — BUY4: item not for sale', () => {
-  it('returns BUY4 when sell flag is false and buyer is not owner', async () => {
+describe('PriceHandlerService — BUY5: item not for sale', () => {
+  it('returns BUY5 when sell flag is false and buyer is not owner', async () => {
     // I_TROOPS (index 8) is NOT in sellIdx
     const { handler } = makeHandler();
     const ship = makeShip({ where: 10, userid: 'buyer' }); // not the owner
     const result = await handler.command.handler(ship, ['10', 'tro'], {}) as Lines;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY4));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY5));
   });
 });
 
@@ -333,10 +335,10 @@ describe('PriceHandlerService — read-only (T040)', () => {
 // ---------------------------------------------------------------------------
 
 describe('PriceHandlerService — command metadata', () => {
-  it('keyword is "pri" with no aliases', () => {
+  it('keyword is "pri" with alias "price"', () => {
     const { handler } = makeHandler();
     expect(handler.command.keyword).toBe('pri');
-    expect(handler.command.aliases).toHaveLength(0);
+    expect(handler.command.aliases).toEqual(['price']);
   });
 
   it('minArgs is 0', () => {

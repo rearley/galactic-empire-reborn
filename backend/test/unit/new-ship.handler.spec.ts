@@ -218,11 +218,11 @@ describe('NewShipHandlerService', () => {
     });
   });
 
-  describe('new shield <type> — stub message', () => {
-    it('returns not-available stub', async () => {
+  describe('new shield <type> — live upgrade handler', () => {
+    it('rejects a non-numeric shield type with an invalid-type message', async () => {
       const { service } = makeService();
       const result = await service.command.handler(makeShip(), ['shield', 'type-a'], {});
-      expect(result.lines[0].text).toMatch(/not yet available/i);
+      expect(result.lines[0].text).toMatch(/invalid type/i);
     });
   });
 });
