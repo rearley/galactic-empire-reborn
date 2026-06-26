@@ -599,8 +599,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Reload from DB to ensure the hull row still exists (could have been destroyed mid-select).
       const shipRow = await this.prisma.ship.findFirst({ where: { userid, shipno: chosen.shipno } });
       if (shipRow) {
-        client.data.pendingShipSelect = undefined;
         await this.boardShipAndWelcome(client, userid, shipRow);
+        client.data.pendingShipSelect = undefined;
         return;
       }
       // Ship no longer exists — fall through to re-emit menu
