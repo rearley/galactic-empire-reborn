@@ -240,15 +240,17 @@ describe('Ship-select T7-B: 1 ship → auto-boards without selection menu', () =
     socket.disconnect();
   });
 
-  it('1 ship → activeShipNo is set (board() called)', async () => {
+  it('1 ship → auto-board used warm cache: get() called for shipno 1, board() NOT called', async () => {
+    getMock.mockClear();
+    boardMock.mockClear();
     const socket = makeClient(port);
 
     await waitForEvent(socket, 'command:result');
 
-    // board() should have been called (ship was already in warm cache via getMock)
-    // but since get() returns the ship (warm), board() is NOT called in the hydration path.
-    // However, get() returning the ship means the warm-cache path is used.
-    // activeShipNo is set — verified by receiving the welcome message.
+    // get() must have been called with (TEST_USERID, 1) — confirms auto-board ran for ship 1
+    expect(getMock).toHaveBeenCalledWith(TEST_USERID, 1);
+    // board() is NOT called when get() already returns the ship (warm-cache hit)
+    expect(boardMock).not.toHaveBeenCalled();
 
     socket.disconnect();
   });
@@ -331,11 +333,12 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
   let boardMock: jest.Mock;
   let prismaMock: { ship: { findMany: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock }; shipClass: { findMany: jest.Mock }; mine: { findMany: jest.Mock }; user: { findUnique: jest.Mock } };
 
+  // shipno 1 and 4: index 1 = shipno 1, index 2 = shipno 4 — makes index ≠ shipno for index 2
   const ship1 = makePrismaShip(1, 'Falcon', 1, 5.5, 3.5);
-  const ship2 = makePrismaShip(2, 'Hawk', 2, 12.5, 7.5);
+  const ship2 = makePrismaShip(4, 'Hawk', 2, 12.5, 7.5);
 
   beforeAll(async () => {
-    const shipState2 = makeShipState({ userid: TEST_USERID, shipno: 2, shipname: 'Hawk', xcoord: 12, ycoord: 7 });
+    const shipState2 = makeShipState({ userid: TEST_USERID, shipno: 4, shipname: 'Hawk', xcoord: 12, ycoord: 7 });
 
     // Simulate in-memory map: board() stores the state, get() retrieves it.
     const inMemoryMap = new Map<string, ShipState>();
@@ -346,18 +349,29 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
       return inMemoryMap.get(`${userid}:${shipno}`);
     });
 
+    // findFirst honors the where-clause so an off-by-one or always-index-1 bug would fail.
+    const makeFindFirstImpl = () =>
+      jest.fn().mockImplementation((args: { where: { userid: string; shipno: number } }) => {
+        const shipno = args?.where?.shipno;
+        if (shipno === 1) return Promise.resolve(ship1);
+        if (shipno === 4) return Promise.resolve(ship2);
+        return Promise.resolve(null);
+      });
+
     prismaMock = {
       shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       mine: { findMany: jest.fn().mockResolvedValue([]) },
       ship: {
         findMany: jest.fn().mockResolvedValue([ship1, ship2]),
-        findFirst: jest.fn().mockResolvedValue(ship2), // returns ship2 when selected
+        findFirst: makeFindFirstImpl(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
         findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }),
       },
     };
+
+    void shipState2; // used implicitly via inMemoryMap after boarding
 
     const shipStateServiceMock = {
       findByUserid: jest.fn().mockReturnValue([]),
@@ -421,14 +435,14 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
 
   afterAll(async () => { await app.close(); }, 10000);
 
-  it('valid reply "2" → boards ship at index 2, emits welcome + snapshot', async () => {
+  it('valid reply "2" → boards ship at index 2 (shipno 4, not 2), emits welcome + snapshot', async () => {
     boardMock.mockClear();
     const socket = makeClient(port);
 
     // Wait for the selection menu
     await waitForEvent(socket, 'prompt:ship-select');
 
-    // Reply with a valid index
+    // Reply with index 2 — which maps to shipno 4 (Hawk), NOT shipno 2
     const [result, snapshot] = await Promise.all([
       waitForEvent<{ lines: Array<{ text: string }> }>(socket, 'command:result'),
       waitForEvent<{ players: unknown[] }>(socket, 'player.snapshot'),
@@ -437,6 +451,10 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
 
     expect(result.lines[0].text).toMatch(/Welcome aboard/i);
     expect(snapshot).toHaveProperty('players');
+
+    // Core contract: board() was called with the ship at index 2 = shipno 4, NOT shipno 2.
+    // An off-by-one or always-index-1 bug would make this fail.
+    expect(boardMock).toHaveBeenCalledWith(expect.objectContaining({ shipno: 4 }));
 
     socket.disconnect();
   });
@@ -474,5 +492,38 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
     expect(boardMock).not.toHaveBeenCalled();
 
     socket.disconnect();
+  });
+
+  it('race: ship destroyed mid-select → findFirst returns null → re-emits menu, does not board', async () => {
+    boardMock.mockClear();
+    const socket = makeClient(port);
+
+    // Wait for initial selection menu (findMany still returns 2 ships)
+    await waitForEvent(socket, 'prompt:ship-select');
+
+    // Simulate the selected ship being destroyed between menu and reply:
+    // findFirst now returns null regardless of shipno.
+    prismaMock.ship.findFirst.mockResolvedValue(null);
+
+    const reEmit = waitForEvent<{ step: string }>(socket, 'prompt:ship-select');
+
+    // Send a valid index (1) — but the ship no longer exists in DB
+    socket.emit('prompt:reply', { value: '1' });
+
+    const menu = await reEmit;
+    // Menu re-emitted — the null-guard path fired
+    expect(menu.step).toBe('SHIP_SELECT');
+    // board() must NOT have been called
+    expect(boardMock).not.toHaveBeenCalled();
+
+    socket.disconnect();
+
+    // Restore findFirst for subsequent tests (if any)
+    prismaMock.ship.findFirst.mockImplementation((args: { where: { userid: string; shipno: number } }) => {
+      const shipno = args?.where?.shipno;
+      if (shipno === 1) return Promise.resolve(ship1);
+      if (shipno === 4) return Promise.resolve(ship2);
+      return Promise.resolve(null);
+    });
   });
 });
