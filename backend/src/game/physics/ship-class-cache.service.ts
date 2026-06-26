@@ -37,6 +37,8 @@ export interface ShipClassEntry {
   canAttackPlanet: boolean;
   /** Per-class damage scaling denominator: multiplier = 100/damageFactor. @see GEFUNCS.C:2661 ton_fact */
   damageFactor: number;
+  /** Human-readable ship class name (e.g. "Scout", "Destroyer"). Used in the ship-select menu. */
+  typeName: string;
 }
 
 @Injectable()
@@ -69,6 +71,7 @@ export class ShipClassCacheService implements OnModuleInit {
         points: true,
         canAttackPlanet: true,
         damageFactor: true,
+        typeName: true,
       },
     });
     for (const row of rows) {
@@ -92,6 +95,7 @@ export class ShipClassCacheService implements OnModuleInit {
         points: row.points,
         canAttackPlanet: row.canAttackPlanet,
         damageFactor: row.damageFactor,
+        typeName: row.typeName,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -161,6 +165,15 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).points;
   }
 
+  /**
+   * Returns the human-readable class name (e.g. "Scout"), or undefined if
+   * the class is not in the cache. Used by the ship-selection menu on login.
+   * @see specs/030-multi-ship/task-7-brief.md
+   */
+  getTypeName(classNumber: number): string | undefined {
+    return this.cache.get(classNumber)?.typeName;
+  }
+
   private entry(classNumber: number): ShipClassEntry {
     const entry = this.cache.get(classNumber);
     if (!entry) throw new Error(`ShipClass ${classNumber} not in cache`);
@@ -192,6 +205,7 @@ export class ShipClassCacheService implements OnModuleInit {
       points: 0,
       canAttackPlanet: true,
       damageFactor: 100,
+      typeName: '',
       ...entry,
     });
   }

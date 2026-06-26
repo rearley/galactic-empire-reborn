@@ -123,11 +123,12 @@ describe('Session replaced (T048)', () => {
         shipClass: { findMany: jest.fn().mockResolvedValue([]) },
         mine: { findMany: jest.fn().mockResolvedValue([]) },
         ship: {
-          findFirst: jest.fn().mockResolvedValue({
+          findMany: jest.fn().mockResolvedValue([{
             userid: TEST_USERID,
             shipno: TEST_SHIPNO,
             shipname: 'StarFalcon',
-          }),
+          }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
       })
       .overrideProvider(WsAuthGuard)

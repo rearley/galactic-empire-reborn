@@ -70,7 +70,7 @@ describe('GameGateway player.joined / player.left', () => {
     } as unknown as WsAuthGuard;
     const mockPrisma = {
       ship: {
-        findFirst: jest.fn().mockResolvedValue({
+        findMany: jest.fn().mockResolvedValue([{
           userid: 'user1',
           shipno: 1,
           shipname: 'Defiant',
@@ -78,13 +78,14 @@ describe('GameGateway player.joined / player.left', () => {
           xcoord: 5.7,
           ycoord: 3.2,
           items: Array(16).fill(0n),
-        }),
+        }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },

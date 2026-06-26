@@ -97,12 +97,13 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
       shipClass: { findMany: jest.fn().mockResolvedValue([]) },
       mine: { findMany: jest.fn().mockResolvedValue([]) },
       ship: {
-        findFirst: jest.fn().mockResolvedValue({
+        findMany: jest.fn().mockResolvedValue([{
           userid: TEST_USERID,
           shipno: TEST_SHIPNO,
           shipname: INITIAL_NAME,
-        }),
+        }]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
     })
@@ -364,8 +365,9 @@ describe('cmd rename — unbound socket (T058)', () => {
         shipClass: { findMany: jest.fn().mockResolvedValue([]) },
         mine: { findMany: jest.fn().mockResolvedValue([]) },
         ship: {
-          findFirst: jest.fn().mockResolvedValue(null), // no DB ship → goes to onboarding
+          findMany: jest.fn().mockResolvedValue([]), // no DB ships → goes to onboarding
           update: jest.fn().mockResolvedValue({}),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         // scanPl owner lookup + onboarding User-exists guard: a live User row
         // must resolve so the gateway emits prompt:ship-name (not auth:logout).

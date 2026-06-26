@@ -12,6 +12,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { MAXX, MAXY } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
+import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
 import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
 import {
@@ -89,6 +90,16 @@ type InvalidCoord = { ok: false; code: string; message: string };
 
 type OnboardingState = { step: 'AWAITING_NAME' };
 
+/** Per-entry data stored in client.data while a multi-ship player is choosing a ship. */
+interface PendingShipSelectEntry {
+  index: number;
+  shipno: number;
+  shpclass: number;
+  shipname: string;
+  xcoord: number;
+  ycoord: number;
+}
+
 /**
  * Handles Socket.io connections, handshake JWT auth, and command dispatch.
  * @see GECMDS.C:111-225 command table
@@ -126,13 +137,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
+    private readonly shipClassCache: ShipClassCacheService,
     @Inject(RANDOM) private readonly random: Random,
     private readonly events: EventEmitter2,
   ) {}
 
   /**
-   * On connection: validate JWT, resolve ship, emit welcome or onboarding prompt.
+   * On connection: validate JWT, resolve ship(s), emit welcome or onboarding prompt.
+   *
+   * Mirrors C `lookupshp` count-branch:
+   *   0 ships → new-player onboarding
+   *   1 ship  → auto-board (existing returning-player path)
+   *   >1 ship → emit `prompt:ship-select` menu; wait for `prompt:reply`
+   *
    * @see specs/011-onboarding/contracts/websocket-events.md §Connection
+   * @see specs/030-multi-ship/task-7-brief.md T7
    */
   async handleConnection(client: Socket): Promise<void> {
     this.logger.log(`connection ${client.id}`);
@@ -152,12 +171,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.userid = userid;
     client.data.username = payload.username;
 
-    // Step 2: Look up existing Ship in DB
-    let ship = await this.prisma.ship.findFirst({
+    // Step 2: Look up ALL ships for this user, ordered by shipno (deterministic).
+    // Replaces the previous non-deterministic findFirst — selection is now explicit.
+    const ships = await this.prisma.ship.findMany({
       where: { userid },
+      orderBy: { shipno: 'asc' },
     });
 
-    if (!ship) {
+    if (ships.length === 0) {
+      // No ships — new player onboarding path.
       // Before showing onboarding, verify the User row still exists. A valid JWT
       // with no User row means the DB was reset under this account — force logout
       // so the client lands on the register screen rather than hitting a crash
@@ -175,13 +197,54 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    // US2: Returning player — hydrate and bind
+    if (ships.length === 1) {
+      // Exactly one ship — auto-board it (original single-ship returning-player path).
+      await this.boardShipAndWelcome(client, userid, ships[0]);
+      return;
+    }
+
+    // >1 ships: present the ship-selection menu; do NOT board yet.
+    // Store enough data in client.data to re-emit the menu on invalid reply.
+    client.data.pendingShipSelect = ships.map((s, i): PendingShipSelectEntry => ({
+      index: i + 1,
+      shipno: s.shipno,
+      shpclass: s.shpclass,
+      shipname: s.shipname,
+      xcoord: s.xcoord,
+      ycoord: s.ycoord,
+    }));
+    client.emit('prompt:ship-select', {
+      step: 'SHIP_SELECT',
+      ships: ships.map((s, i) => ({
+        index: i + 1,
+        shipno: s.shipno,
+        className: this.shipClassCache.getTypeName(s.shpclass) ?? `class ${s.shpclass}`,
+        shipname: s.shipname,
+        sector: { x: Math.floor(s.xcoord), y: Math.floor(s.ycoord) },
+      })),
+    });
+    // Wait for prompt:reply — handled by handleShipSelectReply via handlePromptReply.
+  }
+
+  /**
+   * Shared helper: hydrate a Prisma ship row into memory (if not already warm),
+   * register in the ConnectedShipsRegistry, and emit the welcome sequence.
+   *
+   * Used by both the single-ship connection path and the multi-ship selection reply.
+   *
+   * @see specs/030-multi-ship/task-7-brief.md §boardShipAndWelcome
+   */
+  private async boardShipAndWelcome(
+    client: Socket,
+    userid: string,
+    ship: { shipno: number; shipname: string; shpclass: number; xcoord: number; ycoord: number; damage: number; energy: number; heading: number; speed: number; where: number; [key: string]: unknown },
+  ): Promise<void> {
     const shipId = shipKey(userid, ship.shipno);
 
     // Hydrate into memory if not already loaded
     if (!this.shipStateService.get(userid, ship.shipno)) {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
-      const state = prismaShipToState(ship);
+      const state = prismaShipToState(ship as never);
       // Guard against loading a dead ship (damage >= 100) when the async DB
       // reset from the kill handler hasn't completed yet — prevents re-kill loop.
       if (state.damage >= 100) {
@@ -402,7 +465,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Handles onboarding prompt replies (class selection + ship name).
+   * Handles prompt replies for both ship-selection (multi-ship players) and
+   * onboarding (new players entering a ship name).
+   *
+   * Ship-select branch fires when `client.data.pendingShipSelect` is set (>1 ships
+   * were found on connect). Valid 1-based index → `boardShipAndWelcome`; invalid
+   * → re-emit `prompt:ship-select` with the stored fleet list.
+   *
+   * @see specs/030-multi-ship/task-7-brief.md T7 §handlePromptReply
    * @see specs/011-onboarding/contracts/websocket-events.md §prompt:reply
    */
   @SubscribeMessage('prompt:reply')
@@ -410,8 +480,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: PromptReplyPayload,
   ): Promise<void> {
-    const onboarding = client.data.onboarding as OnboardingState | undefined;
     const userid = client.data.userid as string | undefined;
+
+    // ── Multi-ship selection branch ──────────────────────────────────────────
+    const pendingShipSelect = client.data.pendingShipSelect as PendingShipSelectEntry[] | undefined;
+    if (pendingShipSelect && userid) {
+      await this.handleShipSelectReply(client, userid, pendingShipSelect, body.value);
+      return;
+    }
+
+    // ── Onboarding branch ────────────────────────────────────────────────────
+    const onboarding = client.data.onboarding as OnboardingState | undefined;
 
     if (!onboarding || !userid) {
       client.emit('error', { code: 'NOT_IN_ONBOARDING', message: 'Not in onboarding.' } satisfies GatewayError);
@@ -494,6 +573,50 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('error', { code: 'INTERNAL', message: 'Failed to create ship.' } satisfies GatewayError);
       }
     }
+  }
+
+  /**
+   * Processes a `prompt:reply` value when `pendingShipSelect` is set.
+   * Parses `value` as a 1-based index into the pending fleet list:
+   *   - Valid index + ship found in DB → boards it via `boardShipAndWelcome`, clears pending.
+   *   - Invalid index OR ship no longer in DB → re-emits `prompt:ship-select` with the
+   *     stored fleet list (no extra DB round-trip for the menu).
+   *
+   * @see specs/030-multi-ship/task-7-brief.md T7
+   */
+  private async handleShipSelectReply(
+    client: Socket,
+    userid: string,
+    pending: PendingShipSelectEntry[],
+    rawValue: unknown,
+  ): Promise<void> {
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+    const indexNum = parseInt(value, 10);
+    const isValidIndex = !Number.isNaN(indexNum) && indexNum >= 1 && indexNum <= pending.length;
+
+    if (isValidIndex) {
+      const chosen = pending[indexNum - 1];
+      // Reload from DB to ensure the hull row still exists (could have been destroyed mid-select).
+      const shipRow = await this.prisma.ship.findFirst({ where: { userid, shipno: chosen.shipno } });
+      if (shipRow) {
+        client.data.pendingShipSelect = undefined;
+        await this.boardShipAndWelcome(client, userid, shipRow);
+        return;
+      }
+      // Ship no longer exists — fall through to re-emit menu
+    }
+
+    // Invalid index or ship gone — re-emit the selection menu with the stored fleet list.
+    client.emit('prompt:ship-select', {
+      step: 'SHIP_SELECT',
+      ships: pending.map(e => ({
+        index: e.index,
+        shipno: e.shipno,
+        className: this.shipClassCache.getTypeName(e.shpclass) ?? `class ${e.shpclass}`,
+        shipname: e.shipname,
+        sector: { x: Math.floor(e.xcoord), y: Math.floor(e.ycoord) },
+      })),
+    });
   }
 
   @SubscribeMessage('sector:join')

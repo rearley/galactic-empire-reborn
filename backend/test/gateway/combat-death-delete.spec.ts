@@ -106,6 +106,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
+      { getTypeName: jest.fn() } as never,
       mockRandom,
       mockEvents as never,
     );

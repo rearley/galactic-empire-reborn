@@ -79,7 +79,7 @@ describe('GameGateway handler auth posture (T020b)', () => {
       .overrideProvider(ShipStateService).useValue(shipServiceMock)
       .overrideProvider(CommandRouterService).useValue({ register: jest.fn(), dispatch: dispatchMock })
       .overrideProvider(PrismaService).useValue({
-        ship: { findFirst: jest.fn().mockResolvedValue(null) }, // no ship → onboarding
+        ship: { findMany: jest.fn().mockResolvedValue([]) }, // no ships → onboarding
         shipClass: { findMany: jest.fn().mockResolvedValue([]) }, // ShipClassCacheService.onModuleInit
         mine: { findMany: jest.fn().mockResolvedValue([]) },     // CombatTickService.onModuleInit
         // scanPl owner resolution + onboarding User-exists guard: a live User
