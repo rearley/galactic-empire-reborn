@@ -147,6 +147,20 @@ describe('Dormancy — board()', () => {
     expect(svc.get('player-1', 1)).toBe(state);
   });
 
+  it('persists status=GESTAT_USER to DB via prisma.ship.updateMany (fire-and-forget)', async () => {
+    const { svc, updateManyMock } = await buildSvc([]);
+    const state = makeState({ userid: 'player-1', shipno: 1, status: GESTAT_AVAIL });
+
+    svc.board(state);
+    // Allow the microtask queue to drain so the fire-and-forget promise resolves
+    await Promise.resolve();
+
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: { userid: 'player-1', shipno: 1 },
+      data: { status: GESTAT_USER },
+    });
+  });
+
   it('board() is idempotent — calling twice does not duplicate in map', async () => {
     const { svc } = await buildSvc([]);
     const state = makeState({ userid: 'player-1', shipno: 1 });

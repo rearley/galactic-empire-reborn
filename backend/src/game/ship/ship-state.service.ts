@@ -216,6 +216,13 @@ export class ShipStateService implements OnModuleInit {
     state.status = GESTAT_USER;
     state.dirty = true;
     this.map.set(shipKey(state.userid, state.shipno), state);
+    // board/unboard are the sole persisters of ship.status.
+    // The tick flush (stateToPrismaUpdate) intentionally strips status — see ship-state.mappers.ts:88.
+    // Fire-and-forget: updateMany is a no-op if the row is somehow absent; mirrors unboard's explicit persist.
+    void this.prisma.ship.updateMany({
+      where: { userid: state.userid, shipno: state.shipno },
+      data: { status: GESTAT_USER },
+    }).catch((err: Error) => this.logger.error('board status persist failed', err));
   }
 
   /**
