@@ -183,7 +183,6 @@ model Ship {
   user User @relation(fields: [userid], references: [userid])
 
   @@id([userid, shipno])
-  @@unique([userid])
 }
 
 // ─── Sector (GALSECT) ───────────────────────────────────────────────────────
