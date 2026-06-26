@@ -14,7 +14,7 @@ export async function register(username: string, password: string): Promise<Auth
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  const body = await res.json() as Record<string, unknown>;
+  const body = await res.json() as unknown;
   if (!res.ok) {
     throw body as AuthError;
   }
@@ -27,7 +27,7 @@ export async function login(username: string, password: string): Promise<AuthRes
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  const body = await res.json() as Record<string, unknown>;
+  const body = await res.json() as unknown;
   if (!res.ok) {
     throw body as AuthError;
   }
