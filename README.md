@@ -8,6 +8,45 @@ ASCII scan maps, persistent Cybertron AI, planet colonization, and midnight scor
 
 ---
 
+## Quick start (Docker — recommended)
+
+Bring up the full stack (PostgreSQL + backend + nginx/frontend) with one command:
+
+```bash
+docker compose up -d
+```
+
+- Frontend: [http://localhost:8080](http://localhost:8080)
+- Backend API: [http://localhost:3000](http://localhost:3000)
+
+On first boot the backend automatically runs Prisma migrations, seeds the 18 ship classes,
+and generates the 30×15 galaxy. Subsequent boots detect no pending migrations and skip seeding
+(seed uses `upsert`, so it is safe to re-run).
+
+### Overriding JWT_SECRET for production
+
+The default `JWT_SECRET` in `docker-compose.yml` is a dev placeholder. For any real deployment
+set it via environment variable before starting:
+
+```bash
+JWT_SECRET=your-long-random-secret docker compose up -d
+```
+
+Or create a `.env` file at the repo root:
+
+```
+JWT_SECRET=your-long-random-secret
+```
+
+### Stopping the stack
+
+```bash
+docker compose down          # stops containers, keeps the data volume
+docker compose down -v       # stops containers AND deletes all data
+```
+
+---
+
 ## Quick start (dev server)
 
 ### 1. Prerequisites
