@@ -5,6 +5,64 @@ Updated at the end of every implement session per CLAUDE.md.
 
 ---
 
+## Fleet Ownership (feature 030-multi-ship)
+
+**Source**: GEFUNCS.C:104-145 (`lookupshp`), 264-267 (`initshp` counter wiring), 319-384 (`findships`/`selectship`), 1270-1281 (`killem`); GECMDS.C:4558-4583 (`cmd_new` — new ship at Zygor); GEMAIN.H:296-297 (`noships`/`topshipno`), 550-556 (`SHPKEY`).
+
+### Buying a ship — Zygor neutral-zone purchase
+
+A player in sector (0,0) orbiting a Zygor planet may issue `new ship <class>` to purchase an additional hull. Rules enforced:
+
+1. **Fleet cap**: `noships >= MAXSHIPS` (default 10, env-tunable 1–50) → rejected (`NEW_FLEET_FULL`).
+2. **Credit check**: `cash < shipClass.maxPrice` → rejected.
+3. **Allocate**: `shipno = User.topshipno + 1` (monotonic; never reuses a deleted number).
+4. **Create dormant**: new Ship row created with `status = GESTAT_AVAIL` (0). It is NOT loaded into the live in-memory map — the buyer continues flying their current ship.
+5. **Atomic update**: ship create + `User.cash` decrement + `noships++` + `topshipno = newShipno` all in one Prisma transaction.
+
+To fly the new hull, the player disconnects and reconnects; the login ship-selection menu appears (see below).
+
+### Login ship-selection (`prompt:ship-select`)
+
+On every connection `handleConnection` runs the C `lookupshp` count-branch:
+
+| Ships owned | Action |
+|-------------|--------|
+| 0 | New-player onboarding: emit `prompt:ship-name`, grant free `START_CLASS` starter, `noships=1`. |
+| 1 | Auto-board: load the single ship into the live map, `status = GESTAT_USER`, emit welcome. |
+| >1 | Emit `prompt:ship-select { step: 'SHIP_SELECT', ships: [...] }` — a numbered fleet list (index, shipno, className, shipname, sector). Wait for `prompt:reply { value: '<1-based-index>' }`. |
+
+**Selection reply**:
+- Invalid index or non-numeric → re-emit `prompt:ship-select` (mirrors C `selectship` re-prompt).
+- Valid index → load the chosen ship, board it (`status = GESTAT_USER`), emit welcome + `player.snapshot`.
+- Race: if the chosen ship no longer exists in DB between menu and reply → re-emit menu.
+
+@see GEFUNCS.C:319-384 `findships`/`selectship`.
+
+### Dormancy — idle ships are DB-only
+
+Only the **active** ship (the one boarded at login) is in the live in-memory map. Idle owned ships are dormant: DB rows only, not ticked, not scannable, not attackable.
+
+- **Boot hydration**: `ShipStateService.onModuleInit` loads **AI ships** (`status=GESTAT_AUTO`) only. Player ships are not loaded until their owner connects.
+- **Board** (login): Prisma row → `ShipState`, `status = GESTAT_USER`, inserted into the live map.
+- **Unboard** (clean logout): `status = GESTAT_AVAIL` persisted, state flushed, evicted from live map.
+- **Tick/combat**: operate only on the live map; dormant ships are automatically excluded.
+
+### Death — delete + free-starter-if-empty
+
+Death permanently removes the hull:
+
+1. `handleCombatShipDestroyed` (from combat tick or P-001 disconnect-kill).
+2. `prisma.ship.deleteMany({ where: { userid, shipno } })` — `deleteMany` is a safe no-op if the row was already removed (race guard).
+3. If `count > 0` and `User.noships > 0`: `noships--`. Never decrements below 0.
+4. `removeFromGame` evicts from the in-memory map. Other owned ships are untouched.
+5. On next login: if `noships == 0`, the 0-ship branch fires (onboarding free-starter grant).
+
+`topshipno` is **never** decremented — ship numbers are monotonic and not reused.
+
+@see GEFUNCS.C:1087 `killem`, 1270-1281; GEFUNCS.C:266-267 `initshp` counter wiring.
+
+---
+
 ## Movement (feature 006a)
 
 **Source**: GEFUNCS.C:441-460 (`rotship`), 469-573 (`accel`), 617-792 (`moveship`)
