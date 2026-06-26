@@ -618,13 +618,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
 
-    // Reset victim's DB row to neutral zone so they respawn at Zygor-3 on reconnect.
-    // @see GEFUNCS.C:killem — dead ships are removed from active world; player re-enters at start.
+    // Delete the victim's hull row and decrement the fleet count atomically.
+    // @see GEFUNCS.C:killem — dead ships are removed from the active world entirely.
+    // Guards:
+    //   • deleteMany (not delete) is a no-op when the row is already gone (race safety).
+    //   • noships decrement is skipped when count=0 (row was already deleted) or when
+    //     noships is already 0 (underflow safety — mirrors C unsigned clamp behaviour).
     if (!isNaN(victimShipno)) {
-      void this.prisma.ship.updateMany({
-        where: { userid: event.victimUserid, shipno: victimShipno },
-        data: { damage: 0, energy: 65000, xcoord: 0.5, ycoord: 0.5, heading: 0, speed: 0, where: 0 },
+      void this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.ship.deleteMany({
+          where: { userid: event.victimUserid, shipno: victimShipno },
+        });
+        if (count > 0) {
+          const user = await tx.user.findUnique({
+            where: { userid: event.victimUserid },
+            select: { noships: true },
+          });
+          await tx.user.update({
+            where: { userid: event.victimUserid },
+            data: { noships: { decrement: (user?.noships ?? 0) > 0 ? 1 : 0 } },
+          });
+        }
       });
+      this.shipStateService.removeFromGame({ userid: event.victimUserid, shipno: victimShipno });
     }
 
     // Serialize loot amounts as strings — BigInt is not JSON-serializable.
