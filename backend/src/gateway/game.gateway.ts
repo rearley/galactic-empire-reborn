@@ -10,7 +10,7 @@ import {
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
-import { MAXX, MAXY } from '../game/constants';
+import { MAXX, MAXY, GESTAT_AUTO } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
@@ -245,16 +245,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!this.shipStateService.get(userid, ship.shipno)) {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
       const state = prismaShipToState(ship as never);
-      // Guard against loading a dead ship (damage >= 100) when the async DB
-      // reset from the kill handler hasn't completed yet — prevents re-kill loop.
+      // In the delete-model a dead hull (damage >= 100) is removed from the world,
+      // so such a row should not normally reach here. If one does (race with the
+      // death-delete that hasn't completed yet), do NOT resurrect it — treat it as
+      // not-boardable and surface an error instead of rewriting it to full health.
       if (state.damage >= 100) {
-        state.damage = 0;
-        state.energy = 65000;
-        state.xcoord = 0.5;
-        state.ycoord = 0.5;
-        state.heading = 0;
-        state.speed = 0;
-        state.where = 0;
+        client.emit('error', { code: 'SHIP_DESTROYED', message: 'That ship has been destroyed.' } satisfies GatewayError);
+        return;
       }
       try {
         const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true } });
@@ -398,7 +395,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           this.events.emit(COMBAT_SHIP_DESTROYED, destroyedEvent);
         } else {
           // Normal path: persist dormant status + flush state + evict from map.
-          await this.shipStateService.unboard(userid, activeShipNo);
+          //
+          // Session-replacement guard: only unboard if THIS socket is still the
+          // registered owner of the ship. If a newer socket displaced us
+          // (latest-wins, see boardShipAndWelcome ~line 288), the ship now belongs
+          // to that live socket — unboarding it here (status AVAIL + eviction) would
+          // strand the new session shipless ('No active ship') until it reconnects.
+          // A stale socket must only clean up its own registration (done below).
+          const shipId = shipKey(userid, activeShipNo);
+          if (this.registry.getSocketId(shipId) === client.id) {
+            await this.shipStateService.unboard(userid, activeShipNo);
+          }
         }
       }
     }
@@ -744,17 +751,38 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
 
-    // Delete the victim's hull row and decrement the fleet count atomically.
-    // @see GEFUNCS.C:killem gepdb(GEDELETE) — dead ships are deleted from the world.
-    // Guards:
+    // Delete the victim's hull row and decrement the fleet count atomically — but
+    // ONLY for PLAYER ships. AI (status AUTO) hulls are managed by the AI layer
+    // (Cybertron/Droid), never here:
+    //   • Cybertron rows are PERSISTED and must LINGER after death so the
+    //     respawn-slot upsert (createSpawn) can reuse the slot; hydrateAll skips
+    //     rows with damage>=100. Deleting the row here would both remove the AI
+    //     hull AND, being fire-and-forget, race the respawn upsert → orphan a
+    //     freshly-respawned AI ship (in memory, no DB row).
+    //   • Droids have no persisted hull row, so deleteMany would be a no-op anyway.
+    // Determine player-vs-AI by the victim's status: prefer the in-memory status
+    // (the combat emitter still holds the victim in memory at emit time); if the
+    // ship was already evicted from memory, fall back to the DB row's status read
+    // inside the transaction before deleting.
+    // @see GEFUNCS.C:killem gepdb(GEDELETE) — dead PLAYER ships are deleted.
+    // Guards (player path):
     //   • deleteMany (not delete) is a no-op when the row is already gone (race safety).
-    //   • noships decrement is skipped when count=0 (row was already deleted) or when
-    //     noships is already 0 (underflow safety — mirrors C unsigned clamp behaviour).
-    //   • AI/droid ships have no persisted hull row, so deleteMany returns count=0 and
-    //     the decrement is naturally skipped — mirrors killem's class-type exemption.
-    //     @see GEFUNCS.C:1277
+    //   • noships decrement is skipped when count=0 or when noships is already 0
+    //     (underflow safety — mirrors C unsigned clamp behaviour).
     if (!isNaN(victimShipno)) {
+      const inMemoryStatus = this.shipStateService.get(event.victimUserid, victimShipno)?.status;
       void this.prisma.$transaction(async (tx) => {
+        let status: number | undefined = inMemoryStatus;
+        if (status === undefined) {
+          const row = await tx.ship.findFirst({
+            where: { userid: event.victimUserid, shipno: victimShipno },
+            select: { status: true },
+          });
+          status = row?.status;
+        }
+        // AI hull — death/persistence owned by the AI layer; never delete or decrement.
+        if (status === GESTAT_AUTO) return;
+
         const { count } = await tx.ship.deleteMany({
           where: { userid: event.victimUserid, shipno: victimShipno },
         });

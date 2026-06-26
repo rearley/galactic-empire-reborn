@@ -550,7 +550,9 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
     removeFromGameMock = jest.fn();
 
     const txMock = {
-      ship: { deleteMany: deleteManyMock },
+      // findFirst is the in-transaction AI-status fallback used when the victim is
+      // not in memory (get → undefined here). status 1 = PLAYER → delete proceeds.
+      ship: { deleteMany: deleteManyMock, findFirst: jest.fn().mockResolvedValue({ status: 1 }) },
       user: { findUnique: userFindUniqueMock, update: userUpdateMock },
     };
     transactionMock = jest.fn().mockImplementation(
@@ -604,7 +606,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('killing ship #2 (of 2) — deleteMany targets shipno:2 only, noships 2 → 1', async () => {
     const gw = buildGateway(2);
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // Only ship #2 deleted — ship #1 untouched
     expect(deleteManyMock).toHaveBeenCalledWith({
@@ -627,7 +629,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('killing ship #2 does NOT evict ship #1 from memory', async () => {
     const gw = buildGateway(2);
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // removeFromGame must have been called exactly once with shipno:2
     expect(removeFromGameMock).toHaveBeenCalledTimes(1);
@@ -639,7 +641,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('killing last ship (noships 1 → 0) — decrements to 0 (triggers free-starter path on reconnect)', async () => {
     const gw = buildGateway(1);
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(deleteManyMock).toHaveBeenCalledWith({
       where: { userid: TEST_USERID, shipno: 1 },
@@ -654,7 +656,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('noships underflow guard — does NOT decrement when noships already 0', async () => {
     const gw = buildGateway(0); // stale/raced state: noships already 0
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(userUpdateMock).not.toHaveBeenCalled();
     expect(removeFromGameMock).toHaveBeenCalledWith({ userid: TEST_USERID, shipno: 1 });
@@ -665,7 +667,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('row already gone (deleteMany count=0) → no noships decrement (race safety)', async () => {
     const gw = buildGateway(2, 0); // deletedCount=0 → already deleted
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(deleteManyMock).toHaveBeenCalledTimes(1);
     expect(userUpdateMock).not.toHaveBeenCalled();
@@ -678,7 +680,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
   it('broadcasts COMBAT_SHIP_DESTROYED galaxy-wide after the delete transaction', async () => {
     const gw = buildGateway(2);
     gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
-    await Promise.resolve(); await Promise.resolve();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(serverEmitMock).toHaveBeenCalledWith(
       COMBAT_SHIP_DESTROYED,

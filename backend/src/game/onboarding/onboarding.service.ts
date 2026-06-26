@@ -107,10 +107,20 @@ export class OnboardingService {
     const shipClass = await this.prisma.shipClass.findUnique({ where: { classNumber: START_CLASS } });
     const topspeed = shipClass?.maxWarp ?? 10;
 
+    // Allocate a monotonic ship number — never reuse after deletion. This path also
+    // serves the empty-fleet rebuild (a player who lost their whole fleet claiming a
+    // free starter): a wiped player with topshipno=5 must get shipno 6, NOT a reset
+    // to 1, preserving the never-reuse invariant. Brand-new player (topshipno 0) → 1.
+    const userRow = await this.prisma.user.findUnique({
+      where: { userid },
+      select: { topshipno: true },
+    });
+    const newShipno = (userRow?.topshipno ?? 0) + 1;
+
     const ship = await this.prisma.ship.create({
       data: {
         userid,
-        shipno: 1,
+        shipno: newShipno,
         shipname,
         shpclass: START_CLASS,
         xcoord: spawnX,
@@ -135,7 +145,7 @@ export class OnboardingService {
 
     await this.prisma.user.update({
       where: { userid },
-      data: { cash: START_CASH, noships: 1, topshipno: 1 },
+      data: { cash: START_CASH, noships: 1, topshipno: newShipno },
     });
 
     const state = prismaShipToState(ship);

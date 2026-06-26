@@ -54,8 +54,16 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
   let removeFromGameMock: jest.Mock;
   let serverEmitMock: jest.Mock;
 
-  /** Build gateway with a configurable noships value. */
-  const buildGateway = (noships: number, deletedCount = 1) => {
+  /**
+   * Build gateway with a configurable noships value.
+   * @param victimStatus  optional in-memory status for the victim. When provided,
+   *                       shipStateService.get returns a ship with this status
+   *                       (1 = USER/player, 2 = AUTO/AI). When omitted, get returns
+   *                       undefined (victim already evicted → handler falls back to
+   *                       reading the DB row's status via tx.ship.findFirst).
+   * @param dbStatus       status returned by the in-transaction findFirst fallback.
+   */
+  const buildGateway = (noships: number, deletedCount = 1, victimStatus?: number, dbStatus = 1) => {
     serverEmitMock = jest.fn();
     deleteManyMock = jest.fn().mockResolvedValue({ count: deletedCount });
     userFindUniqueMock = jest.fn().mockResolvedValue({ noships });
@@ -64,7 +72,10 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
 
     // $transaction callback form — passes a tx proxy to the callback
     const txMock = {
-      ship: { deleteMany: deleteManyMock },
+      ship: {
+        deleteMany: deleteManyMock,
+        findFirst: jest.fn().mockResolvedValue({ status: dbStatus }),
+      },
       user: { findUnique: userFindUniqueMock, update: userUpdateMock },
     };
     transactionMock = jest.fn().mockImplementation(
@@ -81,7 +92,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     } as unknown as PrismaService;
 
     const mockShipStateSvc: Partial<ShipStateService> = {
-      get: jest.fn().mockReturnValue(undefined),
+      get: jest.fn().mockReturnValue(victimStatus !== undefined ? { status: victimStatus } : undefined),
       flushAndUnload: jest.fn().mockResolvedValue(undefined),
       unboard: jest.fn().mockResolvedValue(undefined),
       board: jest.fn(),
@@ -127,8 +138,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
 
     gateway.handleCombatShipDestroyed(event);
     // Let the void transaction resolve
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // ship.deleteMany must target the exact (userid, shipno)
     expect(deleteManyMock).toHaveBeenCalledWith({
@@ -152,8 +164,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 1);
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(serverEmitMock).toHaveBeenCalledWith(
       COMBAT_SHIP_DESTROYED,
@@ -171,8 +184,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 1); // killing shipno 1
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // deleteMany must specify shipno: 1 — no wildcard, no omitted shipno
     expect(deleteManyMock).toHaveBeenCalledWith({
@@ -186,8 +200,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 2); // killing shipno 2
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(deleteManyMock).toHaveBeenCalledWith({
       where: { userid: 'user1', shipno: 2 },
@@ -203,8 +218,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 1);
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // user.update must NOT be called at all — skip the no-op write
     // (underflow guard: noships is 0, so we skip issuing decrement: 0 to avoid a pointless DB write)
@@ -220,8 +236,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 1);
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // deleteMany was called
     expect(deleteManyMock).toHaveBeenCalledTimes(1);
@@ -234,10 +251,61 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const event = makeDestroyedEvent('user1', 1);
 
     gateway.handleCombatShipDestroyed(event);
-    await Promise.resolve();
-    await Promise.resolve();
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // Memory eviction should still happen regardless of DB row existence
     expect(removeFromGameMock).toHaveBeenCalledWith({ userid: 'user1', shipno: 1 });
+  });
+
+  // ------------------------------------------------------------------ //
+  // AI exemption: persistent AI (Cybertron) hulls must NOT be deleted   //
+  // and noships must NOT be decremented (P-007 final-review fix 1).      //
+  // ------------------------------------------------------------------ //
+
+  it('does NOT delete the hull or decrement noships for a CYBERTRON victim (status AUTO)', async () => {
+    // Victim is an AI ship still in memory with status AUTO (2).
+    gateway = buildGateway(2, 1, /* victimStatus */ 2);
+    const event = makeDestroyedEvent('Cybrg-1', 5);
+
+    gateway.handleCombatShipDestroyed(event);
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    // AI hulls are owned by the Cybertron/Droid layer — the player-death handler
+    // must neither delete the row nor touch the fleet counter.
+    expect(deleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the DB row status: AI row (status AUTO) is exempt when evicted from memory', async () => {
+    // get → undefined (already evicted), DB findFirst → status AUTO (2).
+    gateway = buildGateway(2, 1, /* victimStatus */ undefined, /* dbStatus */ 2);
+    const event = makeDestroyedEvent('Cybrg-1', 5);
+
+    gateway.handleCombatShipDestroyed(event);
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(deleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('DOES delete + decrement for a PLAYER victim still in memory (status USER)', async () => {
+    gateway = buildGateway(2, 1, /* victimStatus */ 1);
+    const event = makeDestroyedEvent('user1', 1);
+
+    gateway.handleCombatShipDestroyed(event);
+    // Flush enough microtasks for the void $transaction chain (status read →
+    // deleteMany → findUnique → update) to settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(deleteManyMock).toHaveBeenCalledWith({ where: { userid: 'user1', shipno: 1 } });
+    expect(userUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userid: 'user1' }, data: { noships: { decrement: 1 } } }),
+    );
   });
 });
