@@ -108,6 +108,10 @@ export enum MessageId {
   BUYPAS3 = 'BUYPAS3',
   BUYPAS4 = 'BUYPAS4',
 
+  // multi-ship (feature 030) — ship creation/selection
+  NEW_FLEET_FULL = 'NEW_FLEET_FULL',
+  SHIP_SELECT_HEADER = 'SHIP_SELECT_HEADER',
+
   // sell (feature 005) — GECMDS.C:4103 cmd_sell
   SELLFMT = 'SELLFMT',
   SELL1 = 'SELL1',
@@ -473,6 +477,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.BUYPAS1]: 'Trade password required.',
   [MessageId.BUYPAS3]: 'This planet trades only with its team.',
   [MessageId.BUYPAS4]: 'Welcome, fellow team-mate.',
+
+  // multi-ship (feature 030) — ship creation/selection
+  [MessageId.NEW_FLEET_FULL]: 'Your fleet is full — you cannot own more ships.',
+  [MessageId.SHIP_SELECT_HEADER]: 'Choose your ship:',
 
   // sell (feature 005) — GECMDS.C:4103 cmd_sell
   [MessageId.SELLFMT]: 'Use: sell <quantity> <item>',

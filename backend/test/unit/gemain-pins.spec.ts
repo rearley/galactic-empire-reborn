@@ -154,7 +154,7 @@ describe('T060 — GEMAIN.H ↔ TS balance constant pins', () => {
   });
 });
 
-import { PDAMMAX, PFIRDST, TORFACT, MISFACT, SE100DAM, PHATOWRP } from '../../src/game/constants';
+import { PDAMMAX, PFIRDST, TORFACT, MISFACT, SE100DAM, PHATOWRP, MAXSHIPS } from '../../src/game/constants';
 
 describe('combat balance constants (Plan 1)', () => {
   it('pins phaser + lock + self-zap defaults', () => {
@@ -164,5 +164,13 @@ describe('combat balance constants (Plan 1)', () => {
     expect(MISFACT).toBeCloseTo(0.1, 10);
     expect(SE100DAM).toBe(101);
     expect(PHATOWRP).toBe(0);
+  });
+});
+
+import { MAXSHIPS as _MAXSHIPS } from '../../src/game/constants';
+
+describe('multi-ship constants (030)', () => {
+  it('pins MAXSHIPS default (P-007)', () => {
+    expect(_MAXSHIPS).toBe(10);
   });
 });
