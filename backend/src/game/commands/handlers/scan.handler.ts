@@ -142,6 +142,16 @@ export class ScanHandlerService implements OnModuleInit {
 
     const sub = args[0]?.toLowerCase() ?? 'lo';
 
+    // Not-in-flight guard for the grid scan modes (ra / se / lo / lo full).
+    // Docked, in-orbit, or dead (where >= 10) → a single system-category line and
+    // NO scanRender. Text lookups (sh / pl) are unaffected.
+    // @see specs/015-scan-modes/spec.md FR-011, SC-006
+    // @see specs/015-scan-modes/data-model.md §"Invalid state"
+    // @see specs/015-scan-modes/plan.md §"On failure ... non-negotiable"
+    if ((sub === 'lo' || sub === 'ra' || sub === 'se') && ship.where >= 10) {
+      return { lines: [{ text: formatMessage(MessageId.SCAN_NOT_IN_FLIGHT), category: 'system' }] };
+    }
+
     if (sub === 'lo') {
       if (args[1]?.toLowerCase() === 'full') {
         return this.scanLoFull(ship);
@@ -368,12 +378,7 @@ export class ScanHandlerService implements OnModuleInit {
    * @see GECMDS.C:2510 range = scanrange / pow(10.0 - scan_level, 2.0)
    */
   private handleRangeScan(ship: ShipState, args: string[]): CommandResult {
-    // Not-in-flight guard — orbit, docked, or dead
-    if (ship.where >= 10) {
-      return {
-        ...this.scanHelp(),
-      };
-    }
+    // Not-in-flight guard is enforced centrally in handle() (spec 015 FR-011/SC-006).
 
     // Parse and coerce level: 0 | >9 | non-numeric | missing → 1
     let level = parseInt(args[0] ?? '', 10);

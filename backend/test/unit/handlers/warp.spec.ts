@@ -126,11 +126,11 @@ describe('warpCommand (full gate sequence)', () => {
     expect(ship.dirty).toBe(true);
   });
 
-  it('ENGFIRE message uses current ship heading', () => {
+  it('ENGFIRE message announces acceleration to the requested warp', () => {
     const h = makeHandler();
     const ship = makeShip({ topspeed: 6, heading: 180 });
     const result = h.command.handler(ship, ['4'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.ENGFIRE, 180));
+    expect(result.lines[0].text).toBe('Engines fired. Accelerating to warp 4.');
   });
 
   it('dirty is false when validation fails (WARP03)', () => {

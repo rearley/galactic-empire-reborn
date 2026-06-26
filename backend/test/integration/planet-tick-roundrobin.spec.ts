@@ -1,5 +1,6 @@
 /**
- * T044 — PlanetTickService advances exactly one planet per PLANET_UPDATE firing in round-robin order.
+ * T044 — PlanetTickService ticks every owned planet on each PLANET_UPDATE firing,
+ * at a fixed PLANTIME cadence (GEMAIN.H:136 PLANTIME 55).
  */
 
 import { PlanetTickService } from '../../src/game/planet/planet-tick.service';
@@ -7,9 +8,7 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { TickService } from '../../src/game/tick/tick.service';
 import { TickKind } from '../../src/game/tick/tick.types';
 import { planetKey } from '../../src/game/planet/planet-state.types';
-
-const PLANTOCK_SECONDS = 1800;
-const PLANTIME_MIN_SECONDS = 4;
+import { PLANTIME } from '../../src/game/constants';
 
 function buildMocks(fakePlanets: Array<{ xsect: number; ysect: number; plnum: number }>) {
   const tickedKeys: string[] = [];
@@ -39,14 +38,14 @@ function buildMocks(fakePlanets: Array<{ xsect: number; ysect: number; plnum: nu
   };
 }
 
-describe('T044 — PlanetTickService round-robin', () => {
+describe('T044 — PlanetTickService all-planets-per-tick', () => {
   const fakePlanets = [
     { xsect: 1, ysect: 0, plnum: 1 },
     { xsect: 1, ysect: 0, plnum: 2 },
     { xsect: 2, ysect: 1, plnum: 1 },
   ];
 
-  it('each planet is ticked exactly once per N firings (N=3)', async () => {
+  it('ticks every owned planet exactly once per firing (N=3)', async () => {
     const { planetServiceMock, tickServiceMock, tickedKeys, getHandler } =
       buildMocks(fakePlanets);
 
@@ -56,7 +55,7 @@ describe('T044 — PlanetTickService round-robin', () => {
     const handler = getHandler();
     expect(handler).toBeDefined();
 
-    for (let i = 0; i < fakePlanets.length; i++) await handler!();
+    await handler!();
 
     expect(tickedKeys).toHaveLength(fakePlanets.length);
     for (const p of fakePlanets) {
@@ -64,7 +63,7 @@ describe('T044 — PlanetTickService round-robin', () => {
     }
   });
 
-  it('fires wrap around — second cycle ticks same order', async () => {
+  it('each firing ticks the full set in the same order', async () => {
     const { planetServiceMock, tickServiceMock, tickedKeys, getHandler } =
       buildMocks(fakePlanets);
 
@@ -74,12 +73,13 @@ describe('T044 — PlanetTickService round-robin', () => {
     const handler = getHandler()!;
     const N = fakePlanets.length;
 
-    // Fire 2 full cycles
-    for (let i = 0; i < N * 2; i++) await handler();
+    // Fire 2 ticks — each ticks the whole set
+    await handler();
+    await handler();
 
     expect(tickedKeys).toHaveLength(N * 2);
 
-    // First and second cycle must visit the same keys in the same order
+    // Both firings must visit the same keys in the same order
     const firstCycle = tickedKeys.slice(0, N);
     const secondCycle = tickedKeys.slice(N, N * 2);
     expect(secondCycle).toEqual(firstCycle);
@@ -98,18 +98,13 @@ describe('T044 — PlanetTickService round-robin', () => {
     expect(planetServiceMock.runEconomicTickFor).not.toHaveBeenCalled();
   });
 
-  it('startPlanetUpdateTimer called with cadence based on planet count (N=3 → 600 000 ms)', async () => {
+  it('startPlanetUpdateTimer called with the fixed PLANTIME cadence (55 000 ms)', async () => {
     const { planetServiceMock, tickServiceMock } = buildMocks(fakePlanets);
 
     const svc = new PlanetTickService(planetServiceMock, tickServiceMock);
     await svc.onModuleInit();
 
-    const N = fakePlanets.length; // 3
-    const expectedIntervalSec = Math.max(
-      PLANTIME_MIN_SECONDS,
-      Math.floor(PLANTOCK_SECONDS / Math.max(1, N)),
-    ); // floor(1800/3) = 600
-    const expectedMs = expectedIntervalSec * 1000; // 600 000
+    const expectedMs = PLANTIME * 1000; // 55 000
 
     expect(tickServiceMock.startPlanetUpdateTimer).toHaveBeenCalledWith(expectedMs);
   });

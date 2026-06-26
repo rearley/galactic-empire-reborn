@@ -62,6 +62,7 @@ export enum MessageId {
   SCANFMT = 'SCANFMT',
   TABROKE = 'TABROKE',
   JAMMER4 = 'JAMMER4',
+  SCAN_NOT_IN_FLIGHT = 'SCAN_NOT_IN_FLIGHT',
 
   // scan pl — planet status block (feature 004)
   // @see specs/004-galaxy-generator/contracts/scan-projection.md §"Message catalogue additions"
@@ -427,6 +428,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCANFMT]: 'Usage: scan <mode>  (sh/pl/ra/se/lo)',
   [MessageId.TABROKE]: 'Tactical computer is offline.',
   [MessageId.JAMMER4]: 'Cannot scan while jammer is active.',
+  [MessageId.SCAN_NOT_IN_FLIGHT]: 'You must be in flight to use that scan mode.',
 
   // scan pl — planet status block (feature 004)
   // @see GECMDS.C:2316 (no-planet path); GECMDS.C:2326-2356 (planet status block)

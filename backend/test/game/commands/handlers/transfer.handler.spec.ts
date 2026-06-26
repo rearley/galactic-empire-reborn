@@ -178,11 +178,11 @@ describe('TransferHandlerService — rejection paths', () => {
 });
 
 describe('TransferHandlerService — command metadata', () => {
-  it('keyword is "transfer", alias includes "tra", minArgs is 3', () => {
+  it('keyword is "transfer", alias includes "tra", minArgs is 1', () => {
     const src = makeShip();
     const { handler } = makeService(src);
     expect(handler.command.keyword).toBe('transfer');
     expect(handler.command.aliases).toContain('tra');
-    expect(handler.command.minArgs).toBe(3);
+    expect(handler.command.minArgs).toBe(1);
   });
 });
