@@ -351,6 +351,9 @@ describe('cmd rename — unbound socket (T058)', () => {
         mutate: mutateSpy,
         loadShip: jest.fn(),
         size: jest.fn().mockReturnValue(0),
+        findByUserid: jest.fn().mockReturnValue([]),
+        findAllShips: jest.fn().mockReturnValue([]), // ticks iterate all ships
+        flushAndUnload: jest.fn().mockResolvedValue(undefined),
       })
       .overrideProvider(PrismaService)
       .useValue({
@@ -360,7 +363,9 @@ describe('cmd rename — unbound socket (T058)', () => {
           findFirst: jest.fn().mockResolvedValue(null), // no DB ship → goes to onboarding
           update: jest.fn().mockResolvedValue({}),
         },
-        user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
+        // scanPl owner lookup + onboarding User-exists guard: a live User row
+        // must resolve so the gateway emits prompt:ship-name (not auth:logout).
+        user: { findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }) },
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
