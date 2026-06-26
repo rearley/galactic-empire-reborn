@@ -19,6 +19,7 @@ import { AdminMidnightController } from '../../../src/game/midnight/admin-midnig
 import { AdminTokenGuard } from '../../../src/game/midnight/admin-token.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 const VALID_TOKEN = 'test-admin-token-secret';
 
@@ -64,6 +65,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
 
   beforeEach(async () => {
     await truncateAll(prisma);
+    await seedNeutralZonePlanets(prisma);
     jest.restoreAllMocks();
   });
 

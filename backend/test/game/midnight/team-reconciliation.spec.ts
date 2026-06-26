@@ -16,6 +16,7 @@ import { MidnightRepository } from '../../../src/game/midnight/midnight.reposito
 import { ScheduleModule } from '@nestjs/schedule';
 import { TEAMBONU } from '../../../src/game/midnight/midnight.constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -48,6 +49,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
+  await seedNeutralZonePlanets(prisma);
 });
 
 describe('US4 — team reconciliation (T027)', () => {

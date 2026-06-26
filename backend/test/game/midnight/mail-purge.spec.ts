@@ -16,6 +16,7 @@ import { MidnightRepository } from '../../../src/game/midnight/midnight.reposito
 import { ScheduleModule } from '@nestjs/schedule';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -25,6 +26,7 @@ async function truncateAll() {
   await prisma.midnightRun.deleteMany();
   await prisma.mailStat.deleteMany();
   await prisma.mail.deleteMany();
+  await prisma.planet.deleteMany();
   await prisma.ship.deleteMany();
   await prisma.user.deleteMany();
 }
@@ -46,6 +48,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
+  await seedNeutralZonePlanets(prisma);
   // Create a user to satisfy Mail FK
   await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
 });

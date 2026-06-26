@@ -18,6 +18,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { NUMITEMS, I_MEN } from '../../../src/game/constants/items';
 import { PLTYPE_PLNT } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -56,6 +57,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
+  await seedNeutralZonePlanets(prisma);
 });
 
 describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {

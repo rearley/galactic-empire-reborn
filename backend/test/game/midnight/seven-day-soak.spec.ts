@@ -17,6 +17,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { PLTYPE_PLNT } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -93,6 +94,9 @@ beforeAll(async () => {
       },
     ],
   });
+
+  // Seed neutral-zone planets required by refreshNeutralZone
+  await seedNeutralZonePlanets(prisma);
 }, 30_000);
 
 afterAll(async () => {

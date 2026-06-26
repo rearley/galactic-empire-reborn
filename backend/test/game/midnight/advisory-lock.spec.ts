@@ -12,6 +12,7 @@ import { MidnightService, MidnightLockHeldError } from '../../../src/game/midnig
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { seedNeutralZonePlanets } from './neutral-zone.fixture';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -44,6 +45,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
+  await seedNeutralZonePlanets(prisma);
 });
 
 describe('advisory lock concurrency (FR-004a)', () => {
