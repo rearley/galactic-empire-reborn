@@ -89,7 +89,12 @@ test.describe('multiplayer — two concurrent clients', () => {
 
       // Put both in the same non-neutral sector, a short distance apart.
       await outfitShip(request, { shipname: shipA, x: MEETING_POINT.x, y: MEETING_POINT.y });
-      await outfitShip(request, { shipname: shipB, x: MEETING_POINT.x + 0.05, y: MEETING_POINT.y });
+      // 0.4 sectors apart: same sector (18.5 and 18.9 both floor to 18),
+      // inside the 1.5-sector scan range that builds the
+      // scantab, but far enough to land on a DIFFERENT grid cell. `sca lo`
+      // projects 4.5 sectors across 30 columns (~0.3 sectors per cell) and
+      // paints the self-marker last, so a closer ship is overwritten by '*'.
+      await outfitShip(request, { shipname: shipB, x: MEETING_POINT.x + 0.4, y: MEETING_POINT.y });
 
       await expect
         .poll(async () => pilotSector(pageA), { timeout: 30_000, intervals: [3_000] })
@@ -103,12 +108,17 @@ test.describe('multiplayer — two concurrent clients', () => {
 
       // A local scan from A must paint a ship cell for B (planet/self cells are
       // separate testids, so this is specifically another ship).
-      await sendCommand(pageA, 'sca lo');
+      //
+      // Re-scan inside the poll: the map only repaints when a scan.render event
+      // arrives, so polling the cell count without issuing a fresh scan can
+      // never converge. Re-teleport B alongside A too — neither ship is
+      // guaranteed to be at rest, and drift separates them over physics ticks.
       await expect
-        .poll(async () => pageA.locator('[data-testid^="cell-ship-"]').count(), {
-          timeout: 30_000,
-          intervals: [3_000],
-        })
+        .poll(async () => {
+          await outfitShip(request, { shipname: shipB, x: MEETING_POINT.x + 0.4, y: MEETING_POINT.y });
+          await sendCommand(pageA, 'sca lo');
+          return pageA.locator('[data-testid^="cell-ship-"]').count();
+        }, { timeout: 45_000, intervals: [3_000] })
         .toBeGreaterThan(0);
     } finally {
       await ctxA.close();

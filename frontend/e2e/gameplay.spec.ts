@@ -161,4 +161,35 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     await sendCommand(page, 'scanner lo');
     await expect(page.locator(LOG)).toContainText(/Range:.*Sector/i);
   });
+
+  test('orbiting: a pilot can enter orbit around a planet and leave under power', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Orb'));
+
+    // Onboarding spawns at sector 0,0, which holds five named planets
+    // (Zygor-3, Nexus Prime, Caldor IV, Minera, Draconis).
+    await sendCommand(page, 'orb 1');
+    await expect(page.locator(LOG)).toContainText(/Now in orbit around .+\./i);
+
+    // Firing engines leaves orbit — GECMDS.C:512 LEAVEORB.
+    await sendCommand(page, 'imp 30');
+    await expect(page.locator(LOG)).toContainText(/Engines fired/i);
+
+    // ...and the ship is under way again rather than still docked.
+    await expect
+      .poll(async () => {
+        await page.locator(INPUT).fill('rep nav');
+        await page.locator(INPUT).press('Enter');
+        await page.waitForTimeout(2_000);
+        return await page.locator(LOG).innerText();
+      }, { timeout: 30_000, intervals: [3_000] })
+      .toMatch(/Speed: impulse/i);
+  });
+
+  test('orbiting a planet number that is not there is refused', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('NoOrb'));
+
+    // Sector 0,0 has five planets, so slot 9 is empty.
+    await sendCommand(page, 'orb 9');
+    await expect(page.locator(LOG)).not.toContainText(/Now in orbit/i);
+  });
 });

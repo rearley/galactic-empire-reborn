@@ -126,7 +126,10 @@ Vite starts on **port 5173**. Open [http://localhost:5173](http://localhost:5173
 ## Playing the game
 
 1. **Register** a new account via the auth screen
-2. **Choose a ship class** (1–10; class 2 Stealth Fighter or class 5 Star Cruiser recommended for new players)
+2. **Start in a class 1 Interceptor** — new pilots always receive one, along with 5,000 credits and
+   3 flux pods (feature 021 restored the original `initshp` behaviour; there is no class picker).
+   Upgrades are bought in-game with `new ship <N>` at Zygor-3 in sector 0,0. There are **nine**
+   player classes (1-9); class 34 is the admin-only Sysopian Death Star.
 3. **Name your ship**
 4. **Type commands** in the terminal input
 

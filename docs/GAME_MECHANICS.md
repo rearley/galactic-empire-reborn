@@ -748,6 +748,47 @@ Mine handler cloak gate (C-004) remains deferred.
 
 ---
 
+### Ship class table — canon vs. this port
+
+Canonical values: `reference/wiki/player-ships.md` (GE 3.2e, from MBMGESHP.MSG). There are **nine**
+player classes (1-9); class 34 is the admin-only Sysopian Death Star. Pinned by
+`test/balance/ship-class-scaling.balance.spec.ts`.
+
+Every attribute matches canon exactly — shields, phaser, acceleration, warp, tons, price, points,
+damage factor, and every capability flag — **except `scanRange`**, which was deliberately compressed
+for the fixed 30x15 grid (commits `3bc1dff`, `11ade00`); canon values reach 500 000 raw units
+(50 sectors), which spans the whole playfield.
+
+| Class | canon scan | ours | ratio |
+|-------|-----------:|-----:|------:|
+| Interceptor | 100 000 | 15 000 | 0.150 |
+| Stealth Fighter | 200 000 | 18 000 | 0.090 |
+| Heavy Freighter | 50 000 | 15 000 | 0.300 |
+| Destroyer | 100 000 | 25 000 | 0.250 |
+| Star Cruiser | 200 000 | 28 000 | 0.140 |
+| Battle Cruiser | 250 000 | 35 000 | 0.140 |
+| Frigate | 250 000 | 30 000 | 0.120 |
+| Dreadnought | 500 000 | 40 000 | 0.080 |
+| Freight Barge | 200 000 | 15 000 | 0.075 |
+
+**The compression is not proportional** — the factor spans 0.075 to 0.300, a 4x spread — so it does
+not merely shrink the scale, it reorders the classes:
+
+- **Canonical ties are broken.** Battle Cruiser and Frigate are both 250 000 in canon (now 35 000 vs
+  30 000); Stealth Fighter, Star Cruiser and Freight Barge are all 200 000 (now 18 000 / 28 000 /
+  15 000).
+- **The Freight Barge loses its scanner entirely.** Canon gives it 200 000 — twice the Interceptor's
+  — which suits an unarmed hauler that needs to see trouble coming. Here it is 15 000, tied with the
+  Interceptor at the bottom.
+- **The Dreadnought's defining advantage is flattened.** Canon is 500 000, exactly double the next
+  best; here it is 40 000 against the Battle Cruiser's 35 000 — a 1.14x edge.
+
+A proportional rescale at the Interceptor's own factor (0.15) would preserve every relationship and
+still fit the grid, topping out at 75 000 (7.5 sectors) for the Dreadnought. The tests pin the
+current values so any change is deliberate.
+
+---
+
 ### Which AI attacks unprovoked?
 
 **Only Cybertrons.** Droids are purely reactive.
