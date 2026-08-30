@@ -33,6 +33,7 @@ vi.mock('../../src/socket/socketClient', () => ({
   sendCommand: vi.fn(),
   onCommandResult: vi.fn(() => () => {}),
   onError: vi.fn(() => () => {}),
+  onSocketAuthFailed: vi.fn(),
 }));
 
 // Mock useSocket so the Terminal component renders without a live socket.

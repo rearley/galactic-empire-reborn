@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 // Provide a stored token so App skips AuthScreen and renders the terminal
@@ -20,6 +20,7 @@ vi.mock('../src/socket/socketClient', () => ({
   sendCommand: vi.fn(),
   onCommandResult: vi.fn(() => () => {}),
   onError: vi.fn(() => () => {}),
+  onSocketAuthFailed: vi.fn(),
 }));
 
 // Mock useSocket to return a controlled status
