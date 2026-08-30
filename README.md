@@ -169,6 +169,23 @@ npm run test:manual    # manual smoke tests (requires live DB)
 ```bash
 cd frontend
 npm test               # Vitest suite
+npm run test:e2e       # Playwright browser E2E (requires a live stack)
+```
+
+`npm run test:e2e` drives a real Chromium against the running app: register a pilot, complete
+onboarding, round-trip commands, and assert the terminal UI renders correctly. **Postgres and the
+backend must already be running** (`npm run start:dev` in `backend/`); Vite is started automatically
+and an existing dev server is reused.
+
+This layer exists for defects nothing else can see. The event log once collapsed the column padding
+that `who`/`ros`/`pla` emit — destroying every ASCII table — and it was invisible to the backend
+suite, the Vitest suite and the no-mock integration layer alike, because it was a CSS rule. That
+specific regression is pinned in `frontend/e2e/gameplay.spec.ts`.
+
+First run on a new machine needs the browser binary:
+
+```bash
+cd frontend && npx playwright install chromium
 ```
 
 ---

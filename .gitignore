@@ -27,3 +27,8 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# Playwright browser-level E2E artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
