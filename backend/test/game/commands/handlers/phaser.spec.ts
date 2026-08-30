@@ -588,7 +588,13 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     expect(getShip({ handler, shipMap, events, emitted, cache }, bob).tactical).not.toBe(0);
   });
 
-  it('C-010: normal phaser hit with shields fully absorbing (hull=0, damage stays 0) — no COMBAT_SUBSYSTEM_DAMAGED', () => {
+  it('normal phaser vs raised shields: hull fully deflected, shield charge spent', () => {
+    // Phasers are the ONE weapon where raised shields do confer full hull
+    // immunity. GECMDS.C:982-995 applies `wptr->damage += damage` only in the
+    // `shieldstat != SHIELDUP` branch; otherwise it calls
+    // shieldhit(wptr, othusn, damage) and prints PDEFLECT. Torpedoes, missiles
+    // and mines all DO damage the hull through shields — see
+    // shield-projectile-fidelity.spec.ts and mine-shield-fidelity.spec.ts.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
@@ -596,7 +602,10 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     });
     const h = makeHarness([alice, bob]);
     h.handler.command.handler(alice, ['0', '0'], ctx);
-    // Shields absorbed hit, damage stays 0 ≤ 20 → rollRandamage returns 'none'
+
+    expect(bob.damage).toBe(0);              // hull untouched — PDEFLECT
+    expect(bob.shield).toBeLessThan(9999);   // but charge WAS spent
+    // damage stays 0 <= 20 -> rollRandamage returns 'none'
     expect(h.emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED)).toBeUndefined();
   });
 });

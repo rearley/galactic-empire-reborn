@@ -227,4 +227,45 @@ describe('applyRandamage — shieldtype 20 guard + mutation', () => {
     const result = applyRandamage(seq(0, 0, 0.5), victim, ALL_CAPS, 1);
     expect(result).toEqual({ subsystem: 'none', magnitude: 0 });
   });
+
+  describe('the damage > 101 ceiling (documented divergence from C)', () => {
+    /**
+     * C: `a = (int)rndm((101.0 - ptr->damage)/1.5); if (a == 0) {...}`
+     *    (GEFUNCS.C:1969)
+     *
+     * Above 101 total damage the argument goes negative, and the two languages
+     * round differently: C's `(int)` truncates TOWARD ZERO (so anything in
+     * (-1, 0] becomes 0 and randamage fires), while JS `Math.floor` rounds
+     * toward -Infinity (so only an exact -0 stays 0). The port therefore fires
+     * in a NARROWER band above the ceiling, not never — `Math.floor(-0)` is -0
+     * and `-0 === 0` is true, so a zero draw still fires.
+     *
+     * Left as-is deliberately: what `rndm()` returns for a negative argument is
+     * not knowable from the reference source — rndm is a MajorBBS library
+     * function with no source here — so matching C exactly would be guesswork.
+     * The region is also effectively unreachable: ships are destroyed at
+     * damage >= 100 (combat-tick.service.ts), so a victim only sits above 101
+     * for the remainder of the tick in which it dies.
+     */
+    it('a zero draw still fires above the ceiling (Math.floor(-0) === 0)', () => {
+      const victim = makeVictim({ damage: 150, shieldtype: 1 });
+      const result = applyRandamage(seq(0, 0, 0.5), victim, ALL_CAPS, 1);
+      expect(result.subsystem).not.toBe('none');
+    });
+
+    it('a non-zero draw does NOT fire above the ceiling, where C would', () => {
+      // 0.5 * ((101-150)/1.5) = -16.3 -> Math.floor = -17 (no fire),
+      // whereas C's (int) of the same magnitude band can still yield 0.
+      const victim = makeVictim({ damage: 150, shieldtype: 1 });
+      const result = applyRandamage(seq(0.5, 0, 0.5), victim, ALL_CAPS, 1);
+      expect(result).toEqual({ subsystem: 'none', magnitude: 0 });
+    });
+
+    it('still fires just below the ceiling, where C and this port agree', () => {
+      // (101-100)/1.5 = 0.667 -> rand 0 -> floor(0) === trunc(0) === 0 -> fires
+      const victim = makeVictim({ damage: 100, shieldtype: 1 });
+      const result = applyRandamage(seq(0, 0, 0.5), victim, ALL_CAPS, 1);
+      expect(result.subsystem).not.toBe('none');
+    });
+  });
 });
