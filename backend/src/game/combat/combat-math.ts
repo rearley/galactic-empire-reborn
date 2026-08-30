@@ -216,6 +216,29 @@ export function rollHullDamage(rand: Random, dmgMax: number, victimDamageFactor:
   return Math.floor(rand.next() * dmgMax * damageScale(victimDamageFactor));
 }
 
+/** Mine shields-up divisor spread: `gernd()%5`. @see GEFUNCS.C:1447 */
+export const MINE_SHIELD_DIVISOR_SPREAD = 5 as const;
+/** Mine shields-up drain bonus: `shieldhit(..., damage+20)`. @see GEFUNCS.C:1450 */
+export const MINE_SHIELD_DRAIN_BONUS = 20 as const;
+
+/**
+ * Mine hull damage when the victim's shields are raised.
+ *
+ * GEFUNCS.C:1447 divides the falloff damage by `gernd()%5 + shieldtype`, so a
+ * higher shield Mark reduces mine damage. Hull damage is still applied — the
+ * common `wptr->damage += damage` at GEFUNCS.C:1463 runs for both branches.
+ *
+ * Shield CHARGE plays no part here; it is the pool that decides how long shields
+ * remain up, not a damage multiplier.
+ *
+ * @see GEFUNCS.C:1441-1463 mine detonation
+ */
+export function mineShieldedDamage(rand: Random, damage: number, shieldtype: number): number {
+  const divisor = Math.floor(rand.next() * MINE_SHIELD_DIVISOR_SPREAD) + shieldtype;
+  if (divisor <= 0) return Math.floor(damage);
+  return Math.floor(damage / divisor);
+}
+
 /** Shield drain roll on a shielded projectile hit: `(gernd()%20)+10`. @see GEFUNCS.C:1563 */
 export const SHIELD_DRAIN_MIN = 10 as const;
 export const SHIELD_DRAIN_SPREAD = 20 as const;
