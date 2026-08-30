@@ -424,8 +424,10 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
   });
 
   // C-010: applyRandamage wired after every projectile hit.
-  // Seed 93: rand #1 → rollHullDamage, victim starts damage=50.
-  //   hullD=50 → damage=100; rand #2 gives roll=0; rand #3 → which=4 (tactical).
+  // Seed 128: rand #1 → rollHullDamage, victim starts damage=50.
+  // Reseeded from 93 when TDAMMAX was clamped to its numopt ceiling of 100
+  // (GEMAIN.C:508) — the smaller roll shifted the PRNG sequence so the old seed
+  // no longer produced a subsystem hit, leaving this path unexercised.
   it('C-010: torpedo hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and subsystem field mutated', async () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0, phasrtype: 0 });
     const bob = makeShip({
@@ -434,7 +436,7 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
       ltorpsChannel: [7, 255, 255],
       ltorpsDistance: [10, 0, 0],
     });
-    const h = await makeHarnessSeeded([alice, bob], 93);
+    const h = await makeHarnessSeeded([alice, bob], 128);
 
     const emitted: Array<{ event: string; payload: unknown }> = [];
     h.events.onAny((event: string | string[], payload: unknown) => {

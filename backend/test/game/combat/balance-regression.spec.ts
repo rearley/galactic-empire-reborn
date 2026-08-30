@@ -25,8 +25,11 @@ describe('combat balance regression', () => {
   it('MAXTORPS === 3', () => expect(MAXTORPS).toBe(3));
   it('MAXMISSL === 3', () => expect(MAXMISSL).toBe(3));
   it('MINERANGE === 10000', () => expect(MINERANGE).toBe(10000));
-  it('TDAMMAX === 200', () => expect(TDAMMAX).toBe(200));
-  it('MDAMMAX === 300', () => expect(MDAMMAX).toBe(300));
+  // numopt CLAMPS both of these to 1..100 (GEMAIN.C:508, 511). The previous
+  // pins of 200/300 encoded values the original cannot produce.
+  // @see test/balance/projectile-dammax.balance.spec.ts
+  it('TDAMMAX === 100 (numopt ceiling)', () => expect(TDAMMAX).toBe(100));
+  it('MDAMMAX === 100 (numopt ceiling)', () => expect(MDAMMAX).toBe(100));
   it('MINEDAMMAX === 150', () => expect(MINEDAMMAX).toBe(150));
   it('DECODDS === 50', () => expect(DECODDS).toBe(50));
   it('TORPSPED === 500', () => expect(TORPSPED).toBe(500));
