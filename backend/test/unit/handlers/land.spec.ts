@@ -70,64 +70,64 @@ function makeService(planetState: PlanetState | null) {
 }
 
 describe('LandHandlerService', () => {
-  it('not in orbit returns LAND_NOT_ORBIT', () => {
+  it('not in orbit returns LAND_NOT_ORBIT', async () => {
     const { svc } = makeService(null);
-    const result = svc.command.handler(makeShip({ where: 0 }), [], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ where: 0 }), [], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_NOT_ORBIT));
   });
 
-  it('unowned with no name arg returns LAND_NAME_PROMPT', () => {
+  it('unowned with no name arg returns LAND_NAME_PROMPT', async () => {
     const { svc } = makeService(makePlanetState({ userid: null }));
-    const result = svc.command.handler(makeShip(), [], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip(), [], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_NAME_PROMPT));
   });
 
-  it('unowned with valid name calls claim and returns LAND_CLAIMED', () => {
+  it('unowned with valid name calls claim and returns LAND_CLAIMED', async () => {
     const { svc, claimMock } = makeService(makePlanetState({ userid: null }));
-    const result = svc.command.handler(makeShip(), ['Aurora'], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip(), ['Aurora'], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'Aurora'));
     // claim is fire-and-forget, called eventually
   });
 
-  it('unowned with whitespace-only arg returns LAND_NAME_PROMPT (treated as no name)', () => {
+  it('unowned with whitespace-only arg returns LAND_NAME_PROMPT (treated as no name)', async () => {
     const { svc } = makeService(makePlanetState({ userid: null }));
-    const result = svc.command.handler(makeShip(), ['   '], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip(), ['   '], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_NAME_PROMPT));
   });
 
-  it('unowned with name > 19 chars returns LAND_INVALID_NAME', () => {
+  it('unowned with name > 19 chars returns LAND_INVALID_NAME', async () => {
     const { svc } = makeService(makePlanetState({ userid: null }));
-    const result = svc.command.handler(makeShip(), ['A'.repeat(20)], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip(), ['A'.repeat(20)], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_INVALID_NAME));
   });
 
-  it('owned by self returns LAND_OK', () => {
+  it('owned by self returns LAND_OK', async () => {
     const { svc } = makeService(makePlanetState({ userid: 'u1', name: 'Aurora' }));
-    const result = svc.command.handler(makeShip({ userid: 'u1' }), [], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ userid: 'u1' }), [], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_OK, 'Aurora'));
   });
 
-  it('owned by other with no password set returns LAND_REFUSED', () => {
+  it('owned by other with no password set returns LAND_REFUSED', async () => {
     const { svc } = makeService(makePlanetState({ userid: 'other', password: '', name: 'Nova' }));
-    const result = svc.command.handler(makeShip({ userid: 'u1' }), [], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ userid: 'u1' }), [], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_REFUSED));
   });
 
-  it('owned by other with password="none" returns LAND_REFUSED', () => {
+  it('owned by other with password="none" returns LAND_REFUSED', async () => {
     const { svc } = makeService(makePlanetState({ userid: 'other', password: 'none', name: 'Nova' }));
-    const result = svc.command.handler(makeShip({ userid: 'u1' }), [], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ userid: 'u1' }), [], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_REFUSED));
   });
 
-  it('owned by other with correct password returns LAND_OK', () => {
+  it('owned by other with correct password returns LAND_OK', async () => {
     const { svc } = makeService(makePlanetState({ userid: 'other', password: 'secret', name: 'Nova' }));
-    const result = svc.command.handler(makeShip({ userid: 'u1' }), ['secret'], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ userid: 'u1' }), ['secret'], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_OK, 'Nova'));
   });
 
-  it('owned by other with wrong password returns LAND_PASSFAIL', () => {
+  it('owned by other with wrong password returns LAND_PASSFAIL', async () => {
     const { svc } = makeService(makePlanetState({ userid: 'other', password: 'secret', name: 'Nova' }));
-    const result = svc.command.handler(makeShip({ userid: 'u1' }), ['wrong'], {}) as CommandResult;
+    const result = (await svc.command.handler(makeShip({ userid: 'u1' }), ['wrong'], {})) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_PASSFAIL));
   });
 

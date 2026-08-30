@@ -93,6 +93,7 @@ export enum MessageId {
   LAND_NAME_PROMPT = 'LAND_NAME_PROMPT',
   LAND_INVALID_NAME = 'LAND_INVALID_NAME',
   LAND_CLAIMED = 'LAND_CLAIMED',
+  LAND_PLANET_LIMIT = 'LAND_PLANET_LIMIT',
   LAND_OK = 'LAND_OK',
   LAND_REFUSED = 'LAND_REFUSED',
   LAND_PASSFAIL = 'LAND_PASSFAIL',
@@ -463,13 +464,19 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.LAND_NAME_PROMPT]: 'What would you like to name this planet? (Up to 19 characters.)',
   [MessageId.LAND_INVALID_NAME]: 'That is not a valid planet name.',
   [MessageId.LAND_CLAIMED]: 'You have claimed %s. It is now your planet.',
+  // Per-player planet cap. @see GECMDS.C:3487 waruptr->planets >= max_plnts
+  [MessageId.LAND_PLANET_LIMIT]: 'You already hold the maximum of %s planets.',
   [MessageId.LAND_OK]: 'You have landed on %s.',
   [MessageId.LAND_REFUSED]: 'Landing refused — this planet is closed.',
   [MessageId.LAND_PASSFAIL]: 'Landing refused — incorrect password.',
 
   // buy (feature 005) — GECMDS.C:4201 cmd_buy
   [MessageId.BUYFMT]: 'Use: buy <quantity> <item>',
-  [MessageId.BUY1]: 'You must be landed on a planet to buy goods.',
+  // The gate is `where < 10`, i.e. NOT IN ORBIT — identical to C's cmd_buy
+  // (GECMDS.C:4212). Orbit is sufficient; landing is not required. The previous
+  // wording said "landed" and sent playtesters hunting for a landing step that
+  // does not gate trade.
+  [MessageId.BUY1]: 'You must be in orbit around a planet to buy goods.',
   [MessageId.BUY2]: '%d %s purchased for %d credits.',
   [MessageId.BUY3]: "That would deplete the planet's reserve.",
   [MessageId.BUY4]: 'Your cargo holds are full.',
@@ -489,14 +496,16 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SELL3]: "You don't have that many %s.",
 
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
-  [MessageId.ADM_NOT_LANDED]: 'You must be landed on your planet to administer it.',
+  // Same `where < 10` orbit gate as buy — see BUY1.
+  [MessageId.ADM_NOT_LANDED]: 'You must be in orbit around your planet to administer it.',
   [MessageId.ADM_NOT_OWNER]: 'You are not the owner of this planet.',
   [MessageId.ADM_MENU]: 'Admin options: rate, markup, sellflag, reserve, tax, beacon, password',
   [MessageId.ADM_INVALID]: 'Invalid value.',
   [MessageId.ADM_OK]: 'Setting saved.',
 
   // withdraw (feature 005)
-  [MessageId.WTHDR_NOT_LANDED]: 'You must be landed on your planet to withdraw taxes.',
+  // Same `where < 10` orbit gate as buy — see BUY1.
+  [MessageId.WTHDR_NOT_LANDED]: 'You must be in orbit around your planet to withdraw taxes.',
   [MessageId.WTHDR_NOT_OWNER]: 'You are not the owner of this planet.',
   [MessageId.WTHDR_OK]: 'Withdrew %d credits from planet tax pool.',
   [MessageId.WTHDR_NONE]: 'There are no taxes to withdraw.',

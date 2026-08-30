@@ -54,7 +54,7 @@ export const SYSOP_OPTIONS = {
   MAXPLNTS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:468', implemented: true },
   NUMSHIPS: { min: 1, max: 500, default: 500, cReference: 'GEMAIN.C:470', implemented: false,
     note: 'Not enforced: in C this only SIZES the ship array (nships = nterms + numships, GEMAIN.C:697). There is no runtime gate on it, so adding one would be an invention rather than a port.' },
-  MAXDROID: { min: 0, max: 500, default: 500, cReference: 'GEMAIN.C:471', implemented: true },
+  MAXDROID: { min: 0, max: 500, default: 6, cReference: 'GEMAIN.C:471', implemented: true },
   PLODDS: { min: 1, max: 20, default: 4, cReference: 'GEMAIN.C:472', implemented: false },
   WORMODDS: { min: 1, max: 100, default: 10, cReference: 'GEMAIN.C:473', implemented: false },
   UNIVMAX: { min: 10, max: 32767, default: 15, cReference: 'GEMAIN.C:474', implemented: true },
