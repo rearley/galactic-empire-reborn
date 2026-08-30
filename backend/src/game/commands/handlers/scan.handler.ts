@@ -6,7 +6,7 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell } from '../../constants';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
@@ -122,7 +122,9 @@ export class ScanHandlerService implements OnModuleInit {
   get command(): Command {
     return {
       keyword: 'scan',
-      aliases: ['sc'],
+      // 'sca' is the canonical verb in the original command table
+      // (GECMDS.C:158), which matched on the first 3 characters.
+      aliases: ['sca', 'sc'],
       minArgs: 0,
       argMissingMessage: formatMessage(MessageId.SCANFMT),
       handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
@@ -234,7 +236,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
+        if (sx < 0 || sx >= MAXX || sy < 0 || sy >= MAXY) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
           const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
@@ -312,7 +314,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        if (sx < 0 || sx >= 30 || sy < 0 || sy >= 15) continue;
+        if (sx < 0 || sx >= MAXX || sy < 0 || sy >= MAXY) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
           const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
@@ -503,20 +505,30 @@ export class ScanHandlerService implements OnModuleInit {
       cellMap.set(`${cell.x},${cell.y}`, cell);
     };
 
-    // 1. Visible wormholes in this sector — lowest precedence
-    const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
-    for (const wh of wormholes) {
-      if (!wh.visible) continue;
-      const { x, y } = project(wh.xcoord, wh.ycoord);
-      put({ x, y, type: 'wormhole', char: 'W' });
-    }
+    // Ships legitimately fly outside the generated sector grid — Cybertrons spawn
+    // across the whole universe (GECYBS.C:158 `rndm(univmax*2.0) - univmax`), so
+    // negative sectors are normal. The galaxy is only generated for
+    // 0..MAXX-1 x 0..MAXY-1 and getSectorPlanets/getSectorWormholes throw outside
+    // it, so skip the terrain lookups there rather than crashing the command.
+    // The long-range projection path applies the same guard.
+    const inGalaxy = xsect >= 0 && xsect < MAXX && ysect >= 0 && ysect < MAXY;
 
-    // 2. Planets in this sector
-    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
-    for (const planet of planets) {
-      const { x, y } = project(planet.xcoord, planet.ycoord);
-      const char = String(planet.plnum % 10);
-      put({ x, y, type: 'planet', char, colour: 'planet' });
+    // 1. Visible wormholes in this sector — lowest precedence
+    if (inGalaxy) {
+      const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
+      for (const wh of wormholes) {
+        if (!wh.visible) continue;
+        const { x, y } = project(wh.xcoord, wh.ycoord);
+        put({ x, y, type: 'wormhole', char: 'W' });
+      }
+
+      // 2. Planets in this sector
+      const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
+      for (const planet of planets) {
+        const { x, y } = project(planet.xcoord, planet.ycoord);
+        const char = String(planet.plnum % 10);
+        put({ x, y, type: 'planet', char, colour: 'planet' });
+      }
     }
 
     // 3. Other ships in this sector (from scantab for letter assignment)
