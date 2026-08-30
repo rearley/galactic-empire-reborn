@@ -142,7 +142,7 @@ Vite starts on **port 5173**. Open [http://localhost:5173](http://localhost:5173
 | `rot 180` | Rotate to heading 180° |
 | `imp 50` | Set impulse power to 50% (0-99) |
 | `war 10` | Engage warp 10 |
-| `pha 75 100` | Fire phasers at bearing 75°, 100% charge |
+| `pha 0 1` | Fire phasers `<degree>` off current heading, `<focus>` 0-5 (0 = tightest, most damage) |
 | `tor @` | Fire torpedo at locked target |
 | `orb 1` | Orbit planet #1 in current sector |
 | `pla` | List your owned planets |
