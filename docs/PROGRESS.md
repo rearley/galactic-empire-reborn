@@ -1,3 +1,43 @@
+## 2026-08-30 (later still) — sysop config file + population caps wired
+
+**Completed:**
+- **`backend/config/game.config.json`** — all 51 sysop options the original exposed via
+  `numopt(NAME, min, max)` (GEMAIN.C:459-524), grouped by domain, resolved as
+  default -> file -> environment (environment wins, for Docker/CI). Every value is clamped to the
+  C bounds, and out-of-range values are clamped *and warned*; an unknown option name or non-numeric
+  value is a hard error so a typo fails loudly. Previously 5 were env-tunable and 46 hardcoded.
+- **Population caps wired** — MAXPLRS, MAXPLNTS and MAXDROID were declared but inert:
+  - `MAXPLRS` gates ENTRY, not registration. GEMAIN.C:2769 checks `numwar < gemaxplrs` where
+    `numwar` is players currently in game, so it caps concurrent SEATS. Enforced in
+    `handleConnection`; verified live with `MAXPLRS=1`, which logged
+    `game full (1/1) — refusing usr_...` and refused the second pilot.
+  - `MAXPLNTS` is **per player**, not galaxy-wide — GECMDS.C:3487 checks the claiming user's own
+    `planets` count. Enforced in `PlanetStateService.claim`.
+  - `MAXDROID` caps total droids across classes; previously only a per-class cap existed, so the
+    real ceiling was classes x per-class. Guard mutation-tested (0 spawns with it, 6 without).
+- **`decoyIntercept` converted to the C 1-in-N form.** Since feature 006b (2026-05-03) the port read
+  `decodds` as a 0-100 percentage where GEFUNCS.C:1585 rolls `gernd() % decodds == 0`. Same knob,
+  different parameterisation — which made it incomparable to the C bounds and initially forced a
+  special case in the config loader. The switch is behaviour-preserving: the old DECODDS=50 (50%
+  intercept) is exactly decodds=2.
+
+**Tests:** 2989 passing across 311 suites; Playwright 17/17. New: `game-config.spec.ts` (22),
+`population-caps.spec.ts` (5), `planet-cap.spec.ts` (3), plus MAXDROID cases in `spawn-cap`.
+
+**Known issues:**
+- **PLANET_LIMIT is enforced but not surfaced.** A claim beyond MAXPLNTS is correctly refused — the
+  planet is not taken — but the player still sees the optimistic `LAND_CLAIMED` line, because
+  `land.handler` is synchronous and the claim is fire-and-forget. Surfacing it requires making the
+  handler async, which is a command-router contract change. Documented in the handler.
+- `NUMSHIPS` is deliberately left unenforced: in C it only sizes the ship array
+  (`nships = nterms + numships`, GEMAIN.C:697), with no runtime gate, so adding one would be an
+  invention. 24 of the 51 options now back a live constant; the rest are declared with bounds so the
+  gap stays visible.
+- MAXDROID's shipped default (500) never binds — the natural ceiling is 3 classes x 2 = 6. The cap
+  is correct but currently inert; a test documents this rather than pretending otherwise.
+
+---
+
 ## 2026-08-30 (later) — Combat playtest: five defects, and the testing gap that hid them
 
 **Completed:**
