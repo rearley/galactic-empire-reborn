@@ -206,10 +206,26 @@ export const TOPPHASOR = 19 as const;
 export const TELEDAM = 17 as const;
 /** @see GEMAIN.H:181 #define QUADMAXPERTICK 5 — max Cyberquad AI activations per physics tick */
 export const QUADMAXPERTICK = 5 as const;
-/** @see GEGLOBAL.H tdammax — max torpedo damage roll */
-export const TDAMMAX = 200 as const;
-/** @see GEGLOBAL.H mdammax — max missile damage roll */
-export const MDAMMAX = 300 as const;
+/**
+ * Max torpedo damage roll.
+ *
+ * `numopt(TDAMMAX,1,100)` CLAMPS this to 100 — the port previously used 200, a
+ * value the original cannot produce. Torpedo damage rolls as
+ * `tdammax * rndm(.5)` (GEFUNCS.C:1555), so at 200 a torpedo reached the
+ * 100-damage kill threshold outright; at the legal ceiling it tops out near 50.
+ * Env-overridable for playtest tuning, clamped to the original's bounds.
+ *
+ * @see GEMAIN.C:508 tdammax = (double)numopt(TDAMMAX,1,100)
+ */
+export const TDAMMAX = Math.min(100, Math.max(1, Number(process.env.TDAMMAX ?? 100))) as number;
+/**
+ * Max missile damage roll.
+ *
+ * `numopt(MDAMMAX,1,100)` clamps this to 100; the port previously used 300.
+ *
+ * @see GEMAIN.C:511 mdammax = (double)numopt(MDAMMAX,1,100)
+ */
+export const MDAMMAX = Math.min(100, Math.max(1, Number(process.env.MDAMMAX ?? 100))) as number;
 /** @see GEGLOBAL.H minedammax — max mine damage */
 export const MINEDAMMAX = 150 as const;
 /** @see GEGLOBAL.H decodds — decoy intercept probability (0-100 integer) */
