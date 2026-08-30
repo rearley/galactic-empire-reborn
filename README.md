@@ -140,7 +140,7 @@ Vite starts on **port 5173**. Open [http://localhost:5173](http://localhost:5173
 | `rep nav` | Navigation report (heading, speed, position) |
 | `rep sys` | Systems report (energy, damage, shields) |
 | `rot 180` | Rotate to heading 180° |
-| `imp 5000` | Set impulse speed to 5000 |
+| `imp 50` | Set impulse power to 50% (0-99) |
 | `war 10` | Engage warp 10 |
 | `pha 75 100` | Fire phasers at bearing 75°, 100% charge |
 | `tor @` | Fire torpedo at locked target |
