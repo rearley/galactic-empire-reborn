@@ -28,6 +28,8 @@ import {
   phaserReloadAmount,
   rollHullDamage,
   rollProjectileHullDamage,
+  mineShieldedDamage,
+  MINE_SHIELD_DRAIN_BONUS,
   SHIELD_DRAIN_MIN,
   SHIELD_DRAIN_SPREAD,
   shieldhit,
@@ -394,13 +396,19 @@ export class CombatTickService implements OnModuleInit {
         let hullDamage = damage;
         let shieldConsumed = 0;
         if (shieldUp) {
-          const r = shieldhit(ship.shield, ship.shieldtype, damage);
+          // GEFUNCS.C:1447 — shields DIVIDE mine damage by (gernd()%5 +
+          // shieldtype); hull damage is still applied (the common
+          // `wptr->damage += damage` at GEFUNCS.C:1463 covers both branches).
+          hullDamage = mineShieldedDamage(this.random, damage, ship.shieldtype);
+          // GEFUNCS.C:1450 — drain uses the REDUCED damage plus 20.
+          const r = shieldhit(ship.shield, ship.shieldtype, hullDamage + MINE_SHIELD_DRAIN_BONUS);
+          const applied = hullDamage;
           this.shipState.mutate(ship.userid, ship.shipno, (v) => {
+            v.damage = v.damage + applied;
             v.shield = r.newCharge;
             if (r.knockedDown) v.shieldstat = 0;
             v.lastfired = channel;
           });
-          hullDamage = 0;
           shieldConsumed = r.shieldConsumed;
         } else {
           this.shipState.mutate(ship.userid, ship.shipno, (v) => {
