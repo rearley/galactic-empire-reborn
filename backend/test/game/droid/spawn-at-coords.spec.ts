@@ -79,6 +79,22 @@ describe('DroidSpawner — coordinate override', () => {
     expect(state.speed2b).toBeGreaterThan(0);
   });
 
+  it('accepts an explicit name so a test can address exactly one target', () => {
+    // The generated name is `${typename}${usrn*usrn + rnd%100}` (GEDROIDS.C:155),
+    // which collides readily. `loc <name>` matches globally by name, so an
+    // ambiguous name makes a browser test lock a droid on the far side of the
+    // galaxy and report "out of scanner range".
+    const { spawner } = buildSpawner(42);
+    const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 }, true, 'E2ETarget-XYZ')!;
+    expect(state.shipname).toBe('E2ETarget-XYZ');
+  });
+
+  it('falls back to the generated name when none is supplied', () => {
+    const { spawner } = buildSpawner(42);
+    const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 })!;
+    expect(state.shipname).toMatch(/Murdonian Transport\d+/);
+  });
+
   it('leaves the rest of the spawn intact (class, shields, phaser)', () => {
     const { spawner } = buildSpawner(42);
     const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 })!;

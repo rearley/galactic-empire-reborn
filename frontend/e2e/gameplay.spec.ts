@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName } from './helpers';
 
 /**
  * Frontend + backend gameplay smoke test.
@@ -13,53 +14,6 @@ import { test, expect, type Page } from '@playwright/test';
  * 6-second physics tick with AI ships moving, so anything pinned to a specific
  * coordinate or damage number would be flaky by construction.
  */
-
-/**
- * Unique per run — accounts AND ship names persist in the dev database, and
- * `Ship_shipname_lower_idx` is a UNIQUE index on LOWER(shipname). Reusing a
- * fixed ship name makes the second run fail with an empty event log.
- */
-function uniqueName(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
-}
-
-/** Ship names are capped at 19 characters by the onboarding prompt. */
-function uniqueShipName(prefix: string): string {
-  return `${prefix}${Date.now().toString(36).slice(-5)}${Math.floor(Math.random() * 100)}`.slice(0, 19);
-}
-
-const LOG = '[data-testid="event-log"]';
-const INPUT = '[data-testid="command-input"]';
-
-/** Register a fresh pilot and complete onboarding, leaving the terminal ready. */
-async function startNewPilot(page: Page, shipName: string): Promise<void> {
-  await page.goto('/');
-
-  // AuthScreen opens in login mode; the first /register/i control is the switch.
-  await page.getByRole('button', { name: /register/i }).click();
-  await page.getByLabel(/username/i).fill(uniqueName('e2e'));
-  await page.getByLabel(/password/i).fill('E2ePass123!');
-  await page.getByRole('button', { name: /^register$/i }).click();
-
-  // Onboarding grants a class 1 Interceptor and asks for a ship name.
-  const prompt = page.getByText(/enter a name for your ship/i);
-  await expect(prompt).toBeVisible();
-  await page.locator('input[type="text"]').fill(shipName);
-  await page.locator('input[type="text"]').press('Enter');
-
-  await expect(page.locator(LOG)).toContainText(`Welcome aboard, ${shipName}.`);
-  await expect(page.locator(INPUT)).toBeVisible();
-}
-
-/** Send a command and wait for the log to grow. */
-async function sendCommand(page: Page, command: string): Promise<void> {
-  const before = await page.locator(`${LOG} > *`).count();
-  await page.locator(INPUT).fill(command);
-  await page.locator(INPUT).press('Enter');
-  await expect
-    .poll(async () => page.locator(`${LOG} > *`).count(), { timeout: 15_000 })
-    .toBeGreaterThan(before);
-}
 
 test.describe('gameplay smoke — frontend against a live backend', () => {
   test('a new pilot can register, board a ship, and get command responses', async ({ page }) => {

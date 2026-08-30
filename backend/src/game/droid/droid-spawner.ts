@@ -56,6 +56,11 @@ export class DroidSpawner {
     at?: { x: number; y: number },
     /** Dev-only: spawn stationary so a playtester can land repeatable hits. */
     stationary?: boolean,
+    /**
+     * Dev-only explicit name. The generated name collides readily, and `loc`
+     * matches globally by name, so tests need an unambiguous target.
+     */
+    nameOverride?: string,
   ): ShipState | null {
     const userid = this.allocateUserid(livePopulation);
     const shipno = 1;
@@ -68,7 +73,7 @@ export class DroidSpawner {
 
     // @see GEDROIDS.C:129 — shipname = shipclass.shipname + usrn*usrn + gernd()%100
     const usrn = this.nextSlotIndex;
-    const shipname = `${typename}${usrn * usrn + Math.floor(this.rng.next() * 100)}`;
+    const shipname = nameOverride ?? `${typename}${usrn * usrn + Math.floor(this.rng.next() * 100)}`;
 
     // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8; re-roll if neutral zone (0,0)
     let xcoord: number, ycoord: number;

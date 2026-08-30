@@ -31,6 +31,7 @@ export class DroidDebugController {
     @Query('x') xParam?: string,
     @Query('y') yParam?: string,
     @Query('stationary') stationaryParam?: string,
+    @Query('name') nameParam?: string,
   ): object {
     const classNumber = parseInt(classParam, 10);
     if (!VALID_CLASSES.includes(classNumber as typeof VALID_CLASSES[number])) {
@@ -53,7 +54,8 @@ export class DroidDebugController {
     // Droids normally spawn with a random drift speed (GEDROIDS.C:166), which
     // outruns a torpedo lock in the seconds between spawning and firing.
     const stationary = stationaryParam === 'true' || stationaryParam === '1';
-    const state = this.spawner.spawn(classNumber, this.droidTick.getLivePopulation(), at, stationary);
+    const name = nameParam?.trim() || undefined;
+    const state = this.spawner.spawn(classNumber, this.droidTick.getLivePopulation(), at, stationary, name);
     if (!state) {
       return { ok: false, reason: 'spawn returned null' };
     }

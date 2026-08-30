@@ -53,9 +53,15 @@ export function findShip(
     // matches by `shipno`, excluding self. This convention is project-wide
     // (ltorpsChannel, lmisslChannel, lastfired, Mine.channel all store shipno values).
     const selfKey = shipKey(contextShip.userid, contextShip.shipno);
-    const target = allShips.find(
-      (s) => s.shipno === lock && shipKey(s.userid, s.shipno) !== selfKey,
-    );
+    // Prefer the composite key: `lock` holds only the target's shipno, and every
+    // droid (plus every player's first ship) is shipno 1, so matching on it
+    // alone can resolve to a completely different ship. C's lock is a global
+    // slot index (GECMDS.C:1443). Fall back to shipno for state that predates
+    // lockKey.
+    const lockKey = contextShip.lockKey;
+    const target = lockKey
+      ? allShips.find((s) => shipKey(s.userid, s.shipno) === lockKey && shipKey(s.userid, s.shipno) !== selfKey)
+      : allShips.find((s) => s.shipno === lock && shipKey(s.userid, s.shipno) !== selfKey);
     if (!isIngame(target)) {
       return { ok: false, message: 'Locked target no longer in game.', clearedLock: true };
     }
