@@ -158,7 +158,10 @@ import { PDAMMAX, PFIRDST, TORFACT, MISFACT, SE100DAM, PHATOWRP, MAXSHIPS } from
 
 describe('combat balance constants (Plan 1)', () => {
   it('pins phaser + lock + self-zap defaults', () => {
-    expect(PDAMMAX).toBe(200);
+    // PDAMMAX is a sysop option, not a GEMAIN.H define: numopt(PDAMMAX,1,200)
+    // gives only the bounds. 25 is the playtest default (env-overridable) —
+    // 200 made every phaser one-shot, since ships die at damage >= 100.
+    expect(PDAMMAX).toBe(25);
     expect(PFIRDST).toBe(1);
     expect(TORFACT).toBeCloseTo(0.1, 10);
     expect(MISFACT).toBeCloseTo(0.1, 10);

@@ -1,3 +1,4 @@
+import { PDAMMAX } from '../../../src/game/constants';
 import { phaserDamage } from '../../../src/game/combat/combat-math';
 
 describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GECMDS.C:956-973)', () => {
@@ -5,8 +6,9 @@ describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GEC
 
   it('point-blank deals substantial damage', () => {
     const d = phaserDamage({ ...base, distRaw: 0 });
-    // disfact=24000, dd=1, fd=1, dp=1*1*(100/100)=1, dam=PDAMMAX*1=200; (1+1)/2.5=0.8; tonfact=1 -> 160
-    expect(d).toBe(160);
+    // disfact=24000, dd=1, fd=1, dp=1*1*(100/100)=1, dam=PDAMMAX; (1+1)/2.5=0.8; tonfact=1
+    // Derived from PDAMMAX so the test survives playtest retuning.
+    expect(d).toBe(Math.floor(PDAMMAX * 0.8));
   });
 
   it('falls to zero at/after disfact (24000 raw = 2.4 sectors for phasrtype 1)', () => {
@@ -15,8 +17,8 @@ describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GEC
   });
 
   it('half-disfact deals roughly half (linear pfirdist=1)', () => {
-    // dist=12000 -> dd=0.5 -> dp=0.5 -> dam=100 -> *0.8 -> 80
-    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(80);
+    // dist=12000 -> dd=0.5 -> dp=0.5 -> dam=PDAMMAX/2 -> *0.8
+    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(Math.floor(PDAMMAX * 0.5 * 0.8));
   });
 
   it('heavier victim takes less (tonfact divisor)', () => {

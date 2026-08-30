@@ -538,12 +538,15 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
   const getShip = (h: Harness, s: ShipState): ShipState =>
     h.shipMap.get(shipKey(s.userid, s.shipno))!;
 
-  // Seed 7: after phaser hit on bob at damage=0 → damage=70 (phasrtype=1 at range 1 sector).
+  // Seed 7: phaser hit on bob at damage=0 must push hull damage past the C-010
+  // threshold of 20. phasrtype is 10 (not 1) because PDAMMAX is now 25 — at
+  // phasrtype 1 and one sector's range a hit lands around 8, below the
+  // threshold, and would no longer exercise this path at all.
   // rand #1: roll check = floor(0.0117 * (31/1.5)) = 0 → proceed.
   // rand #2: which = 4 → tactical.
   // rand #3: magnitude = -floor(v3 * 80).
   it('C-010: normal phaser hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and tactical mutated', () => {
-    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 10 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
       shield: 0, shieldstat: 0, damage: 0,

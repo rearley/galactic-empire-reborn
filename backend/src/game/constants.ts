@@ -222,8 +222,22 @@ export const MISLSPED = 300 as const;
 export const MISENGFC = 10 as const;
 /** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
 export const JAMTIME = 20 as const;
-/** @see GEMAIN.C:494 numopt(PDAMMAX,1,200) — max normal-phaser damage base. Playtest-tunable. */
-export const PDAMMAX = 200 as const;
+/**
+ * Max normal-phaser damage base.
+ *
+ * `numopt(PDAMMAX,1,200)` supplies only the clamp bounds — the actual value came
+ * from a sysop `.cnf` that is not part of the reference source, so there is no
+ * canonical figure to preserve. The port initially took the upper bound (200),
+ * which made every phaser type one-shot: ships die at `damage >= 100`
+ * (combat-tick.service.ts), and phasrtype 1 already computed 155.
+ *
+ * 25 gives combat an arc — a maxed phaser kills in one point-blank hit, weaker
+ * phasers and longer shots take several. Override via the PDAMMAX env var to
+ * retune during playtest without a rebuild; clamped to the original's bounds.
+ *
+ * @see GEMAIN.C:494 numopt(PDAMMAX,1,200)
+ */
+export const PDAMMAX = Math.min(200, Math.max(1, Number(process.env.PDAMMAX ?? 25))) as number;
 /** @see GEMAIN.C:493 numopt(PFIRDST,1,20) — normal-phaser distance falloff exponent. */
 export const PFIRDST = 1 as const;
 /** @see GEMAIN.C:492 numopt(HPDAMMAX,1,200) — max hyper-phaser damage base (warp branch). */

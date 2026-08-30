@@ -39,15 +39,13 @@ describe('starter Interceptor phaser reach', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it('DOCUMENTED BALANCE GAP: even the weakest phaser one-shots at point-blank', () => {
-    // combat-tick.service.ts:180 kills any ship at damage >= 100. With
-    // PDAMMAX=200 (docs/GAME_MECHANICS.md marks it "tune during playtest" —
-    // the C reads it from a .cnf we do not have, and numopt(PDAMMAX,1,200)
-    // only gives the bounds) every phaser type exceeds that in a single hit.
-    // This asserts the CURRENT state so the gap stays visible; when PDAMMAX is
-    // tuned this test should be revisited along with it.
-    expect(shot(500, 1)).toBeGreaterThan(KILL_THRESHOLD);
-    expect(shot(500, 19)).toBeGreaterThan(KILL_THRESHOLD);
+  it('combat has an arc: weak phasers no longer one-shot, maxed ones still do', () => {
+    // combat-tick.service.ts:180 kills any ship at damage >= 100. Under the
+    // original PDAMMAX=200 every phaser type cleared that in one hit
+    // (phasrtype 1 => 155). At the tuned default of 25 only the heaviest
+    // phasers one-shot at point-blank. @see test/balance/pdammax.balance.spec.ts
+    expect(shot(500, 1)).toBeLessThan(KILL_THRESHOLD);
+    expect(shot(500, 19)).toBeGreaterThanOrEqual(KILL_THRESHOLD);
   });
 
   it('does real damage at point-blank range', () => {
