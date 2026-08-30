@@ -44,6 +44,7 @@ export class ShipDebugController {
     @Query('damage') damageParam?: string,
     @Query('x') xParam?: string,
     @Query('y') yParam?: string,
+    @Query('shpclass') shpclassParam?: string,
   ): object {
     if (!shipname) throw new BadRequestException('shipname is required');
 
@@ -72,6 +73,17 @@ export class ShipDebugController {
       at = { x, y };
     }
 
+    // Hull class swap. Weapon availability is per class (the class 1 Interceptor
+    // has hasMissile=false), so testing missiles at all requires a class 2+ hull.
+    let shpclass: number | undefined;
+    if (shpclassParam !== undefined) {
+      const n = Number(shpclassParam);
+      if (!Number.isInteger(n) || n < 1) {
+        throw new BadRequestException('shpclass must be a positive integer');
+      }
+      shpclass = n;
+    }
+
     const target = this.shipState.findByName(shipname);
     if (!target) throw new BadRequestException(`no live ship named '${shipname}'`);
 
@@ -85,6 +97,7 @@ export class ShipDebugController {
         s.xcoord = at.x;
         s.ycoord = at.y;
       }
+      if (shpclass !== undefined) s.shpclass = shpclass;
     });
     if (!updated) throw new BadRequestException(`ship '${shipname}' is no longer live`);
 
@@ -97,6 +110,7 @@ export class ShipDebugController {
       mines: Number(updated.items[I_MINE]),
       xcoord: updated.xcoord,
       ycoord: updated.ycoord,
+      shpclass: updated.shpclass,
     };
   }
 }

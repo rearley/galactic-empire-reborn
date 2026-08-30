@@ -128,6 +128,32 @@ describe('POST /debug/ship/outfit', () => {
     expect(ship.ycoord).toBe(-7.25);
   });
 
+  it('switches the hull class when shpclass is given', () => {
+    const ship = makeShip({ shpclass: 1 });
+    const { controller } = build(ship);
+
+    controller.outfit('Reliant', undefined, undefined, undefined, undefined, undefined, undefined, '2');
+
+    expect(ship.shpclass).toBe(2);
+  });
+
+  it('leaves the hull class alone when shpclass is omitted', () => {
+    const ship = makeShip({ shpclass: 1 });
+    const { controller } = build(ship);
+
+    controller.outfit('Reliant', '3', undefined, undefined, undefined, undefined, undefined, undefined);
+
+    expect(ship.shpclass).toBe(1);
+  });
+
+  it('rejects a shpclass that is not a positive integer', () => {
+    const ship = makeShip();
+    const { controller } = build(ship);
+    expect(() =>
+      controller.outfit('Reliant', undefined, undefined, undefined, undefined, undefined, undefined, '0'),
+    ).toThrow(BadRequestException);
+  });
+
   it('rejects an unknown ship rather than silently doing nothing', () => {
     const { controller } = build(undefined);
     expect(() => controller.outfit('Nonexistent', '1', undefined, undefined, undefined)).toThrow(BadRequestException);
