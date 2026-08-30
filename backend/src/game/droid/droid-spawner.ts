@@ -54,6 +54,8 @@ export class DroidSpawner {
      * get a target in front of them. Bypasses the neutral-zone re-roll too.
      */
     at?: { x: number; y: number },
+    /** Dev-only: spawn stationary so a playtester can land repeatable hits. */
+    stationary?: boolean,
   ): ShipState | null {
     const userid = this.allocateUserid(livePopulation);
     const shipno = 1;
@@ -87,7 +89,7 @@ export class DroidSpawner {
         : randomSparseLoadout(this.rng);
 
     // @see GEDROIDS.C:166 — speed2b = rndm(topspeed * 1000.0)
-    const speed2b = this.rng.next() * (topspeed * 1000.0);
+    const speed2b = stationary ? 0 : this.rng.next() * (topspeed * 1000.0);
 
     // @see GEDROIDS.C:170 — tick = CYBTICKTIME + gernd()%CYBTICKTIME
     const tick = CYBTICKTIME + Math.floor(this.rng.next() * CYBTICKTIME);

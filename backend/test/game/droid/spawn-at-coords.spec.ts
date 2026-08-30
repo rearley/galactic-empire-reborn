@@ -65,6 +65,20 @@ describe('DroidSpawner — coordinate override', () => {
     }
   });
 
+  it('spawns stationary when asked, so a lock can be held long enough to fire', () => {
+    // Droids normally get `speed2b = rndm(topspeed * 1000)` (GEDROIDS.C:166),
+    // which outruns a torpedo lock during a hands-on test.
+    const { spawner } = buildSpawner(42);
+    const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 }, true)!;
+    expect(state.speed2b).toBe(0);
+  });
+
+  it('still drifts by default', () => {
+    const { spawner } = buildSpawner(42);
+    const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 })!;
+    expect(state.speed2b).toBeGreaterThan(0);
+  });
+
   it('leaves the rest of the spawn intact (class, shields, phaser)', () => {
     const { spawner } = buildSpawner(42);
     const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 })!;
