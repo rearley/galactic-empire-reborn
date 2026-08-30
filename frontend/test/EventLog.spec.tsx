@@ -17,6 +17,25 @@ describe('EventLog', () => {
     expect(logLines[2].textContent).toBe('Third line');
   });
 
+  it('preserves runs of whitespace so fixed-width command tables stay aligned', () => {
+    // `who`, `ros`, `pla` and `pri` pad their columns with spaces
+    // (who.handler.ts uses padEnd(22)/padEnd(20)/padStart(5)). Without a
+    // whitespace-preserving class the browser collapses those runs and the
+    // ASCII table loses its alignment entirely.
+    const lines: EventLogLine[] = [
+      { text: '  Shipname               Class                Sector  Kills', category: 'info' },
+      { text: 'Defiant               Interceptor          ( 0, 0)      0', category: 'info' },
+    ];
+    render(<EventLog lines={lines} />);
+    const logLines = screen.getAllByTestId(/^log-line-/);
+
+    for (const line of logLines) {
+      expect(line.className).toMatch(/whitespace-pre/);
+    }
+    // The padding must survive into the DOM, not be normalised away.
+    expect(logLines[0].textContent).toContain('               Class');
+  });
+
   it('applies per-category className for system, success, combat', () => {
     const lines: EventLogLine[] = [
       { text: 'sys', category: 'system' },

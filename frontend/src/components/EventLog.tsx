@@ -59,7 +59,10 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
         {capped.map((line, idx) => (
           <div
             key={idx}
-            className={CATEGORY_CLASS[line.category] ?? 'text-gray-100'}
+            // whitespace-pre-wrap keeps the column padding that who/ros/pla/pri
+            // emit (padEnd/padStart) from being collapsed by the browser, while
+            // still wrapping long narrative lines inside the panel.
+            className={`whitespace-pre-wrap ${CATEGORY_CLASS[line.category] ?? 'text-gray-100'}`}
             data-testid={`log-line-${line.category}`}
           >
             {line.text}
