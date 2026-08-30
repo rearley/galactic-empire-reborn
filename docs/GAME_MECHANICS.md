@@ -687,16 +687,34 @@ All sector-scoped.
 
 **Source**: GEMAIN.C:491-600 `numopt` calls — these are sysop-configurable defaults, not hardcoded.
 
-| Constant | Value | C default | Notes |
-|----------|-------|-----------|-------|
-| `PDAMMAX` | 200 | 1 (sentinel) | Max phaser damage; C ships with `.cnf` override. Tune during playtest. |
-| `PFIRDST` | 1 | 1 | Distance-falloff exponent; 1 = linear, >1 = steeper. |
-| `PHATOWRP` | 0 | 0 | Min `phasrtype` to hit a warping victim with a normal phaser. 0 = any phaser can. |
-| `TORFACT` | 0.1 | 0.1 | Torpedo lock-quality divisor (see below). |
-| `MISFACT` | 0.1 | 0.1 | Missile lock-quality divisor. |
-| `SE100DAM` | 101 | 101 | Self-zap hull damage for firing inside neutral zone (instant kill). |
+`numopt(NAME, lo, hi)` supplies the CLAMP BOUNDS, not a default — the value itself came from a
+sysop `.cnf` that is not part of the reference source. Two consequences the port originally got
+wrong, both found during playtesting:
 
-All six are pinned in `backend/src/game/constants.ts` and covered by balance-regression tests.
+1. Where the bounds are wide, the value is a free balance choice (`PDAMMAX`).
+2. Where the port exceeded a bound, the value was one the original **cannot produce** — a fidelity
+   defect, not a preference (`TDAMMAX`, `MDAMMAX`, `JAMTIME`).
+
+| Constant | Value | numopt bounds | Notes |
+|----------|-------|---------------|-------|
+| `PDAMMAX` | 25 | 1..200 | Max phaser damage. Was 200 — every phaser type one-shot, since ships die at damage >= 100 (phasrtype 1 computed 155). 25 gives combat an arc: only heavy phasers one-shot at point-blank. Env-overridable. |
+| `TDAMMAX` | 100 | 1..**100** | Max torpedo damage roll. Was **200** — twice the maximum the original permits. Torpedo damage rolls `tdammax * rndm(.5)`, so at 200 a single torpedo reached the kill threshold outright. |
+| `MDAMMAX` | 100 | 1..**100** | Max missile damage roll. Was **300** — three times the permitted maximum. |
+| `JAMTIME` | 10 | 1..**10** | Jammer counter on deploy. Was **20** — jammers lasted twice the maximum duration. |
+| `MINEDAMMAX` | 150 | 1..200 | Max mine damage. Checked and correct. |
+| `PFIRDST` | 1 | 1..20 | Distance-falloff exponent; 1 = linear, >1 = steeper. |
+| `PHATOWRP` | 0 | 0..100 | Min `phasrtype` to hit a warping victim with a normal phaser. 0 = any phaser can. |
+| `TORFACT` | 0.1 | 1..50, then `/10` | Torpedo lock-quality divisor. Raw option 1 — correct. |
+| `MISFACT` | 0.1 | 1..50, then `/10` | Missile lock-quality divisor. Raw option 1 — correct. |
+| `SE100DAM` | 101 | 1..101 | Self-zap hull damage for firing inside neutral zone (instant kill). |
+
+**`DECODDS` is deliberately NOT comparable to its 1..20 bound.** C uses a 1-in-N roll
+(`gernd()%decodds==0`); `decoyIntercept` uses a percentage (`rand*100 < decodds`). The port's 50
+means 50% intercept, inside C's achievable 5..100% range — a different parameterisation, not an
+out-of-range value.
+
+All are pinned in `backend/src/game/constants.ts` and covered by balance-regression tests;
+`TDAMMAX`/`MDAMMAX`/`JAMTIME`/`PDAMMAX` are additionally env-overridable for playtest tuning.
 
 ---
 
@@ -727,6 +745,29 @@ With feature 023, all three player weapon commands are now consistent: the firer
 (`ship.cloak === 0`) to fire. The gate is checked before arc/target resolution.
 
 Mine handler cloak gate (C-004) remains deferred.
+
+---
+
+### Weapon reach — can a starter ship shoot across the galaxy?
+
+No. Two independent limits apply to the normal phaser, and both are pinned by
+`phaser-range-characterisation.spec.ts`:
+
+1. **C-001 scanRange gate** — the beam is capped at the firer's `scanRange`: 15 000 units
+   (1.5 sectors) for a class 1 Interceptor.
+2. **`pdamage` falloff** — damage reaches zero at `disfact = 20000 + phasrtype*4000`, i.e. 60 000
+   units (6 sectors) at phasrtype 10.
+
+A shot one galaxy-width away (300 000 units) does nothing.
+
+**Divergence worth knowing:** the port is STRICTER than the original here. In C only the
+HYPER-phaser checks `scanrange` (GECMDS.C:1054). The normal phaser (GECMDS.C:946) iterates every
+ship in the game and relies solely on the `pdamage` falloff, applying damage only `if (damage >= 1)`.
+The C-001 gate added in feature 022 is a port addition.
+
+Because the gate binds at roughly a quarter of `disfact`, falloff across a starter ship's usable
+envelope is shallow — at `PDAMMAX=25` an Interceptor deals 108 at point-blank and 81 at its maximum
+range.
 
 ---
 
@@ -802,6 +843,31 @@ target ships at warp (no warp gate).
 
 Tick travel: same decoy-intercept and hit resolution as torpedoes, using `MISLSPED` for travel.
 Decoy threshold for missiles: `<3000` (vs `<5000` for torpedoes).
+
+---
+
+### Mine blast radius — unit handling
+
+**Source**: GEFUNCS.C:1428-1432, GEMAIN.H:195 `MINERANGE 10000`
+
+`MINERANGE` is 10000 RAW units, i.e. exactly one sector. `cdistance` returns SECTORS, so the
+comparison must convert first — C does exactly that:
+
+```c
+ddist = cdistance(&mptr->coord, &wptr->coord);
+ddist *= 10000;                        /* sectors -> raw units */
+if (ddist < (double)MINERANGE && ...)
+```
+
+The port compared the sector-valued `cdistance` result directly against 10000. Since sector
+distances are single digits, `dist > MINERANGE` was never true, the guard never skipped anyone, and
+**every ship in the galaxy sat inside every mine's blast**. Found in playtest: one mine destroyed
+all 20 Cybertrons in a single tick, every kill credited to the deployer.
+
+This is the general hazard — `cdistance` is in sectors while every range constant
+(`MINERANGE`, `scanRange`, `disfact`, `MISLRANGE`) is in raw units. Any comparison between them
+needs the `* 10_000` conversion. Covered by `mine-range-units.spec.ts` and a `processMineSweep`
+regression in `combat-tick.service.spec.ts`.
 
 ---
 
@@ -894,6 +960,36 @@ Keywords: `shi up` / `shi dn`
 Toggles `ship.shieldstat`. No energy cost. No auto-raise: `CombatTickService` does not reset
 `shieldstat` between ticks. Firing a torpedo lowers shields (`shieldstat = down`) on the firer and
 they remain lowered until the player explicitly raises them (`shi up`).
+
+#### What shields actually do — it differs per weapon
+
+Shields are gated on BOTH `shieldstat === 1` and `shield > 0`: raised shields with no charge behave
+exactly like shields down.
+
+**Shield CHARGE never scales hull damage for any weapon.** Charge is the pool that decides how long
+shields stay up. What varies the damage is the shield MARK (`shieldtype`) and, for projectiles, the
+binary raised/lowered state.
+
+| Weapon | Hull damage with shields UP | Shield charge drain | C reference |
+|--------|------------------------------|---------------------|-------------|
+| Phaser | **None** — fully deflected (`PDEFLECT`) | `shieldhit(victim, damage)` — scales with the deflected damage | GECMDS.C:982-995 |
+| Torpedo / missile | **Halved** — roll is `[0, 0.5) * tdammax` instead of `[0.5, 1)` | `shieldhit(victim, (gernd()%20)+10)` — an independent 10..29 roll | GEFUNCS.C:1552-1576 |
+| Mine | **Divided by `(gernd()%5 + shieldtype)`** — the shield Mark is the divisor | `shieldhit(victim, damage + 20)` — uses the REDUCED damage | GEFUNCS.C:1441-1463 |
+
+The phaser is the only weapon that confers outright immunity. For torpedoes, missiles and mines the
+`damage +=` assignment sits OUTSIDE the shield if/else in the C source, so hull damage always lands.
+Mines are the only weapon where the Mark scales hull damage directly.
+
+`shieldhit` itself (GEFUNCS.C:2430) only drains charge and never applies hull damage — the caller
+owns that decision, which is why the three weapons differ. Drain is
+`knock = (80 - shieldtype*SHIELD_FACTOR) * (dam/100)`, so a higher Mark loses less charge per hit.
+Below `SHMINCHG` the shield is knocked down; at `<= 2` it takes an extra `knock*3` and collapses.
+
+**Port history:** all three paths originally set `hullDamage = 0` whenever shields were up, making a
+shielded ship invulnerable to every weapon. Only the phaser case was correct. The torpedo/missile
+and mine paths were fixed after playtesting showed a direct mine hit reporting `Hull -0%`. Covered by
+`shield-projectile-fidelity.spec.ts`, `mine-shield-fidelity.spec.ts`, and the phaser deflect case in
+`phaser.spec.ts`.
 
 ---
 

@@ -1,3 +1,86 @@
+## 2026-08-30 (later) — Combat playtest: five defects, and the testing gap that hid them
+
+**Completed:**
+- **`numopt` bound violations fixed.** These supply CLAMP bounds, not defaults — a value outside them
+  is one the original cannot produce. `TDAMMAX` 200→100 (bound 100), `MDAMMAX` 300→100 (bound 100),
+  `JAMTIME` 20→10 (bound 10). All numopt-derived constants were audited; `MINEDAMMAX`, `TORFACT`,
+  `MISFACT` checked and correct. `DECODDS` deliberately left alone — C uses a 1-in-N roll where the
+  port uses a percentage, so its 50 is not comparable to the 1..20 bound.
+- **`PDAMMAX` 200→25** (env-tunable) — a free balance choice inside its 1..200 bound. At 200 every
+  phaser type one-shot (ships die at damage >= 100; phasrtype 1 computed 155). Now only heavy
+  phasers one-shot at point-blank.
+- **Mine blast radius was galaxy-wide.** `MINERANGE` is 10 000 RAW units but `cdistance` returns
+  SECTORS; C does `ddist *= 10000` before the comparison and the port did not. The guard never fired,
+  so every ship in the galaxy was inside every mine. One mine destroyed all 20 Cybertrons in a single
+  tick.
+- **Shields granted total immunity on three weapon paths.** All set `hullDamage = 0` when shields
+  were up. Only the phaser was correct. Fixed torpedo/missile (damage halved via disjoint roll
+  ranges) and mine (damage divided by `gernd()%5 + shieldtype`); both also had the wrong shieldhit
+  drain argument. See GAME_MECHANICS.md §Shields for the per-weapon table.
+- **`sca` verb + 3-char prefix matching**, **`scan se` out-of-bounds crash**, **event-log whitespace
+  collapse** — see the earlier entry.
+- **Playtest tooling** (all dev-only, `NODE_ENV !== 'production'`): `/debug/ship/outfit`
+  (ordnance, damage, hull class, shields, teleport) and `/debug/droid/spawn` (coordinates,
+  stationary). Without these, weapon testing was unreachable — clearing the neutral zone by flying
+  takes minutes of warp and a Cybertron destroyed the test ship on three consecutive attempts.
+- **Ship destruction is now logged.** It previously happened in complete silence, which made three
+  lost ships indistinguishable from a bug across two sessions. The first line after the fix
+  identified the killer immediately.
+
+**Tests:** 2919 passing across 305 suites (from 2743 at session start). New: `pdammax.balance`,
+`projectile-dammax.balance`, `jamtime.balance`, `shield-projectile-fidelity`, `mine-shield-fidelity`,
+`mine-range-units`, `phaser-range-characterisation`, `command-router-prefix`, `scan-verb-alias`,
+`scan-se-out-of-bounds`, `database-url`, `health`, `combat-spatial.e2e`.
+
+**The testing gap — why 2743 green tests missed all of this:**
+
+Every defect above was found by PLAYING, not by testing, and in each case the test that should have
+caught it mocked or pinned the very thing that was wrong:
+
+| Defect | Why the unit suite could not see it |
+|--------|-------------------------------------|
+| Mine blast radius | Every mine-sweep test placed ship and mine at IDENTICAL coords (100,100) — distance 0, so the range guard was never exercised |
+| `scan se` crash | All 26 specs touching GalaxyService stub it with a mock that never throws |
+| Shield immunity | The spec was named "shields fully absorbing" but only asserted no subsystem event fired — it passed while documenting wrong behaviour |
+| TDAMMAX/MDAMMAX | `balance-regression` PINNED the out-of-bounds values |
+| Event-log whitespace | A CSS-level defect; no test asserted the class |
+
+The lesson is not "write more unit tests" — it is that mocked collaborators and zero-distance
+fixtures cannot expose spatial or integration truth. `test/e2e/combat-spatial.e2e.spec.ts` is the
+start of the missing layer: it boots the real AppModule with no mocks and asserts behaviour that
+depends on actual distances between real entities.
+
+**Testing layers — what catches what:**
+
+| Layer | Catches | Cost |
+|-------|---------|------|
+| Unit with mocks | Formula correctness in isolation | Fast; blind to integration and to anything the mock papers over |
+| Unit with REAL fixtures (non-zero distances, real constants) | Spatial/geometry defects — this is what the mine bug actually needed | Fast; the cheapest fix for the gap |
+| No-mock integration (`test/e2e/combat-spatial.e2e.spec.ts`) | Wiring across the real service graph | ~9s for a full AppModule boot — cheap enough for the default suite |
+| Browser (Playwright) | Rendering and layout: whitespace collapse, scan-map glyphs, panel sizing | Slowest; the only layer that can see CSS-level defects |
+
+Note the mine and shield defects did NOT need a browser to catch — they needed unit fixtures with
+real distances instead of everything at (100,100). Only the event-log whitespace collapse genuinely
+required a browser.
+
+**Next:**
+- Extend the no-mock layer: projectile flight across real distances, scan projection at sector
+  boundaries and outside the grid, neutral-zone gating.
+- Add a browser-level (Playwright) smoke test for the terminal UI — register, onboard, `sca lo`,
+  assert the map renders glyphs and that a padded `who` table keeps its columns.
+- Audit remaining combat fixtures for zero-distance setups, the pattern that hid the mine bug.
+- Verify Cybertron spawn density (24 at boot) against the original; a class 1 starter dies within
+  minutes of leaving Zygor.
+
+**Known issues:**
+- No CI, so none of the above runs automatically.
+- Missiles/torpedoes verified live; mines verified live; phaser-vs-shields verified by test only
+  (the live attempt could not be reproduced before targets drifted).
+- randamage >101 ceiling diverges from C in a narrow band — documented and pinned, not changed,
+  because `rndm(negative)` behaviour is unknowable from the reference source.
+
+---
+
 ## 2026-08-30 — Playtest enablement: /health route + test/dev DB isolation
 
 **Completed:**

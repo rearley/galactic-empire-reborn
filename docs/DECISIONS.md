@@ -4,6 +4,46 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-30 — numopt bounds are a fidelity contract; shield behaviour is per-weapon
+
+**Context**: Playtesting combat surfaced a cluster of defects that unit tests could not see, because
+the tests encoded the same wrong assumptions as the code. Three distinct classes emerged.
+
+**Decision 1 — treat `numopt(NAME, lo, hi)` bounds as a fidelity contract.** These are CLAMP bounds,
+not defaults; the value lived in a sysop `.cnf` absent from the reference source. Where the port
+exceeded a bound it produced values the original cannot generate, which is a defect rather than a
+balance preference: `TDAMMAX` 200 (bound 100), `MDAMMAX` 300 (bound 100), `JAMTIME` 20 (bound 10).
+All are now clamped and env-overridable. Where bounds are wide the value stays a free choice —
+`PDAMMAX` was set to 25 out of 1..200 so combat has an arc instead of every phaser one-shotting.
+Every numopt-derived constant was audited against its bound; `MINEDAMMAX`, `TORFACT` and `MISFACT`
+were checked and are correct.
+
+**Decision 2 — shields are modelled per weapon, not uniformly.** All three damage paths originally
+set `hullDamage = 0` when shields were up. Only the phaser was right. In C the `damage +=`
+assignment sits OUTSIDE the shield if/else for torpedoes, missiles and mines, so hull damage always
+lands; shields reduce it (halved roll for projectiles, divided by the shield Mark for mines) and
+cost charge. Applying one uniform "fix" would have broken the phaser path, which genuinely does
+deflect outright.
+
+**Decision 3 — leave `DECODDS` and the randamage >101 ceiling alone.** `DECODDS` looks out of bounds
+(50 vs 1..20) but is not comparable: C uses a 1-in-N roll, the port a percentage, and 50% sits inside
+C's achievable range. The randamage ceiling diverges because C's `(int)` truncates toward zero while
+JS `Math.floor` rounds toward -Infinity, but `rndm()`'s behaviour for a negative argument is not
+knowable from the reference source, and the region is unreachable in practice (ships die at damage
+>= 100). Both are documented and pinned rather than changed.
+
+**Reason**: A bound violation is objectively wrong and can be fixed without judgement. A value inside
+the bounds is a design choice that belongs to the project owner. A divergence that depends on
+unavailable source is a guess, and guessing is worse than documenting.
+
+**Alternatives rejected**:
+- *Clamp every constant that looks out of range* — would have "fixed" DECODDS, which is correctly
+  parameterised differently.
+- *Apply one shield model to all weapons* — would have broken the phaser deflect path.
+- *Match C's randamage truncation* — depends on undefined `rndm(negative)` behaviour.
+
+---
+
 ## 2026-08-30 — Prisma datasource URL is resolved explicitly, and test runs bind to TEST_DATABASE_URL
 
 **Context**: `PrismaService` extended `PrismaClient` with no datasource override, so Prisma read
