@@ -4,6 +4,44 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-30 — Prisma datasource URL is resolved explicitly, and test runs bind to TEST_DATABASE_URL
+
+**Context**: `PrismaService` extended `PrismaClient` with no datasource override, so Prisma read
+`DATABASE_URL` from the environment — the development database `ge`. Around 20 spec files build a Nest
+testing module around `PrismaModule` and then call `deleteMany()` or `TRUNCATE`. Only the separate
+`test/prisma-schema/helpers/prisma-test-client.ts` helper pointed at `TEST_DATABASE_URL`. The result was
+that running `npm test` truncated the *development* database. This surfaced as an unplayable world: the
+`Planet` table was empty while `GalaxyMeta` survived, and because the galaxy generator treats the presence
+of `GalaxyMeta` as its "already generated" signal, the galaxy could never regenerate — orbiting,
+colonization and the Zygor-3 ship purchase were all dead, and the midnight job crashed on boot.
+
+**Decision**: Resolve the connection string explicitly in `src/prisma/database-url.ts`. Under Jest
+(`JEST_WORKER_ID` present, or `NODE_ENV=test`) `PrismaService` binds to `TEST_DATABASE_URL`; otherwise it
+uses `DATABASE_URL`. When running under test with `TEST_DATABASE_URL` unset it throws rather than
+connecting to the dev database.
+
+**Reason**: The failure was silent and destructive, and destroyed exactly the state a developer needs in
+order to playtest. Detection belongs at the single place every consumer goes through, not in each spec.
+Throwing rather than falling back is deliberate: the silent fallback is what caused the data loss.
+
+**History**: This was never previously fixed, despite appearing to be. `src/prisma/prisma.service.ts` has
+one commit in its entire history (`36a1d33`, feature 002); no commit on any branch has added a
+`datasources` override under `backend/src/`, and `jest.config.ts` never had `setupFiles`. The bug dates
+from feature 002. Commit `109e27a` (2026-06-26) addressed only the symptom — it added
+`neutral-zone.fixture.ts` and seeded Zygor/Nexus Prime after `truncateAll()` in 9 midnight specs, making
+those specs green again while the truncation of the dev database continued. That removed the last visible
+signal. Treating the failing test rather than the data loss is the trap to avoid repeating here.
+
+**Alternatives rejected**:
+- *Fix the ~20 offending specs to use the test client* — leaves the trap armed for every future spec.
+- *Re-seed dev data after each destructive spec (what `109e27a` effectively did)* — hides the loss instead
+  of preventing it, and silences the only signal that the isolation is broken.
+- *Point `DATABASE_URL` at `ge_test` in a Jest setup file* — mutating a process-wide variable that the dev
+  server also reads is fragile, and offers no protection when a spec constructs its own client.
+- *Make the guard a lint rule* — cannot catch a testing module assembled at runtime.
+
+---
+
 ## 2026-05-08 — Feature 019: score_f2 = 100 default; Cybertron kill counter decoupled; mutual-kill snapshot
 
 **Context**: Three decisions made during feature 019 implementation.

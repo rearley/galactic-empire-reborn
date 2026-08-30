@@ -37,6 +37,14 @@ All schema changes go through `prisma migrate dev --name <name>` — migration f
 committed alongside the schema change and deployed via `prisma migrate deploy` in CI.
 `PrismaService` extends `PrismaClient` and is provided globally via `@Global() PrismaModule`.
 
+`PrismaService` resolves its connection string through `src/prisma/database-url.ts`
+rather than letting Prisma read `DATABASE_URL` implicitly. Under Jest
+(`JEST_WORKER_ID` set, or `NODE_ENV=test`) it binds to `TEST_DATABASE_URL`, and
+throws if that variable is missing instead of falling back to the dev database.
+This is a data-safety guard: ~20 specs build a testing module around
+`PrismaModule` and then truncate tables, so without it a full `npm test` run
+destroyed development game state.
+
 ## Database
 
 Postgres 16 runs on the host machine (not in Docker). Two databases owned by role `ge`:
@@ -61,7 +69,12 @@ Connection strings are provided via environment variables:
 ```
 AppModule (app.module.ts)
   ├── PrismaModule (prisma/) — @Global(), exports PrismaService
-  │     └── PrismaService — extends PrismaClient, connects on init, disconnects on destroy
+  │     ├── PrismaService — extends PrismaClient, connects on init, disconnects on destroy
+  │     │     └── datasource URL from database-url.ts (test runs bind to TEST_DATABASE_URL)
+  │     └── database-url.ts — resolveDatabaseUrl(): dev vs test DB selection
+  ├── HealthController (health/) — GET /health, unauthenticated
+  │     └── 200 {status,database,uptime} | 503 when Postgres unreachable
+  │     └── backs the docker-compose backend healthcheck
   ├── TickModule (game/tick/) — @Global(), exports TickService + SectorTransitionSubscriber
   │     ├── TickService — raw setInterval(1000) + setInterval(6000) in onModuleInit;
   │     │                 clearInterval in onModuleDestroy; pluggable subscriber registry
