@@ -748,6 +748,63 @@ Mine handler cloak gate (C-004) remains deferred.
 
 ---
 
+### Which AI attacks unprovoked?
+
+**Only Cybertrons.** Droids are purely reactive.
+
+| AI | Initiates? | Gate |
+|----|-----------|------|
+| Cybertron / Cyberquad (classes 21-25) | **Yes** | `gebemean` (GECYBS.C:432): cyberquads always; players over `CYB_BE_NICE` (30) kills always; otherwise `gernd()%CYBSLO == 0` — with `CYBSLO=3` that is still **1 in 3** for a brand-new pilot |
+| Lydorian Garbage Scow (31) | No | fight-back only |
+| Murdonian Transport (32) | No | fight-back only |
+| Vakory Survey Drone (33) | No | fight-back only |
+
+The droid fight-back trigger is `cantexit > 0 && lastfired >= 0` (GEDROIDS.C:447) — `cantexit` is
+set by `FIRETICKS` when the droid is hit and `lastfired` records the attacker's channel. A droid
+that has never been shot at never shoots. Confirmed in playtest: a Murdonian Transport ignored a
+ship parked 300 units away until it was torpedoed, then returned fire immediately.
+
+So leaving the neutral zone exposes a new pilot to Cybertrons only — but a 1-in-3 hostility roll
+against a class 1 Interceptor is enough to be lethal, which matched playtest experience (three
+starter ships lost in quick succession).
+
+**Note the port's droid gate uses `lastfired >= 0` where C uses `> 0`** (flagged in a code comment
+in `droid-act-class-11.ts`). That makes channel 0 a valid attacker in the port but not in C.
+
+---
+
+### Population limits vs. galaxy size — NOT IMPLEMENTED
+
+The original caps population through four sysop options. **None of them exist in this port:**
+
+| C option | Bound | Purpose | Port |
+|----------|-------|---------|------|
+| `MAXPLRS` | 1..256 | Maximum concurrent players | **absent** |
+| `NUMSHIPS` | 1..500 | Total ships in the universe | **absent** |
+| `MAXDROID` | 0..500 | Droid population cap | **absent** |
+| `MAXPLNTS` | 1..256 | Planet cap | **absent** |
+
+Player registration is therefore unbounded, and nothing ties population to galaxy size.
+
+Current density: **450 sectors** (30x15) with **24 Cybertrons** seeded at boot (per-class
+`tot_to_create`, env-tunable via `CYBERTRON_CLASS_<n>_TOT_TO_CREATE`). Droid population is separate.
+
+**A caveat on what MAXX/MAXY mean.** In the original these are the dimensions of the ASCII SCAN
+GRID, not the galaxy: `xfactor = (univmax*2)/(MAXX-1)`, `yfactor = (univmax*2)/(MAXY-1)`
+(GECMDS.C:2746) projects a universe spanning `-univmax..+univmax` on BOTH axes onto a 30x15
+character display. Sectors are created lazily on demand — `getsector()` is documented as "look up
+sector, if not found make one" (GEPLANET.C:384).
+
+This port instead pre-generates a fixed 30x15 sector grid, which is a deliberate, documented
+decision (DECISIONS.md, feature 004 — wormhole destinations were clamped to the grid for the same
+reason). The unreconciled consequence is that **AI spawn still uses the C formula**
+`rndm(univmax*2) - univmax` (GECYBS.C:158, GEDROIDS.C:135), placing ships at negative sectors
+outside the generated grid — `who` routinely lists Cybertrons at coordinates like (-13,-7). That is
+what made `scan se` throw out of bounds. Spawn bounds should be reconciled with the grid decision
+the same way wormhole destinations were.
+
+---
+
 ### Weapon reach — can a starter ship shoot across the galaxy?
 
 No. Two independent limits apply to the normal phaser, and both are pinned by

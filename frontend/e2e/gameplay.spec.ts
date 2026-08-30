@@ -123,4 +123,88 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     const whiteSpace = await header.evaluate((el) => getComputedStyle(el).whiteSpace);
     expect(whiteSpace).toMatch(/^pre/);
   });
+
+  test('scanning renders planet and ship glyphs into the sector map (UI)', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Map'));
+
+    // Onboarding spawns at sector 0,0 — the neutral zone, which holds five
+    // named planets including Zygor-3. A local scan must therefore paint
+    // planet glyphs, not just empty-space dots.
+    await sendCommand(page, 'sca lo');
+
+    const map = page.locator('[data-testid="scan-map"]');
+    await expect(map).toBeVisible();
+
+    // Planet cells carry data-testid="cell-planet-<x>-<y>"; the local ship is
+    // cell-self-*. Assert the grid is actually populated rather than blank.
+    await expect
+      .poll(async () => page.locator('[data-testid^="cell-planet-"]').count(), { timeout: 20_000 })
+      .toBeGreaterThan(0);
+    await expect(page.locator('[data-testid^="cell-self-"]')).toHaveCount(1);
+  });
+
+  test('sca se renders the numbered planets of the current sector (UI)', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Sect'));
+
+    await sendCommand(page, 'sca se');
+
+    // The sector-scan card renders its own grid with per-planet digits.
+    const card = page.locator('[data-testid="scan-card"]').first();
+    await expect(card).toBeVisible();
+    await expect(page.locator('[data-testid="scan-card-header"]').first()).toContainText(/Sector\s*0\s*,\s*0/);
+
+    const grid = page.locator('[data-testid="scan-card-grid"]').first();
+    // Sector 0,0 holds five planets, rendered as digits 1-9.
+    await expect.poll(async () => (await grid.innerText()).replace(/\s/g, '').length, { timeout: 20_000 })
+      .toBeGreaterThan(0);
+  });
+
+  test('movement: impulse with a course changes heading and moves the ship', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Move'));
+
+    // NOTE: `imp <pct>` with no course argument resets the course to the
+    // current heading — it does NOT preserve a pending `rot`. That is faithful:
+    // C defaults the course arg to "0" and valdegree stores it into
+    // warsptr->degrees as a side effect (GEFUNCS.C:1943), so
+    // `deg = normal(heading + degrees)` collapses to the current heading.
+    // Supply the course with the impulse to turn and accelerate in one order.
+    await sendCommand(page, 'imp 50 90');
+    await expect(page.locator(LOG)).toContainText(/Engines fired, new course 90 degrees/i);
+
+    // The world advances on a 6s physics tick; poll rep nav until the reported
+    // heading has actually swung to 90 rather than asserting a fixed value.
+    await expect
+      .poll(async () => {
+        await page.locator(INPUT).fill('rep nav');
+        await page.locator(INPUT).press('Enter');
+        await page.waitForTimeout(2_000);
+        const text = await page.locator(LOG).innerText();
+        const matches = [...text.matchAll(/Heading: (\d+) degrees/g)];
+        return matches.length ? Number(matches[matches.length - 1][1]) : -1;
+      }, { timeout: 45_000, intervals: [3_000] })
+      .toBe(90);
+
+    await expect(page.locator(LOG)).toContainText(/Speed: impulse/);
+  });
+
+  test('rejects an out-of-range impulse value rather than accepting it silently', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Rng'));
+
+    // README once documented `imp 5000`; the real gate is valpcnt(arg, 0, 99).
+    await sendCommand(page, 'imp 5000');
+    await expect(page.locator(LOG)).toContainText(/out of range \(0-99\)/i);
+  });
+
+  test('an unknown verb is reported, and 2-character input is not a valid verb', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('Verb'));
+
+    // gesearch matches on the first 3 characters (GECMDS.C:249), so `sc` is
+    // NOT a scan verb — strncmp("sc","sca",3) compares '\0' against 'a'.
+    await sendCommand(page, 'sc lo');
+    await expect(page.locator(LOG)).toContainText(/Unknown command/i);
+
+    // ...but any input whose first 3 characters match does resolve.
+    await sendCommand(page, 'scanner lo');
+    await expect(page.locator(LOG)).toContainText(/Range:.*Sector/i);
+  });
 });
