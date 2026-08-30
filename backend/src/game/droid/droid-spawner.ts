@@ -45,7 +45,16 @@ export class DroidSpawner {
    * Returns the created ShipState, or null if the class is not recognized.
    * @see GEDROIDS.C:98-173 droid_init
    */
-  spawn(classNumber: number, livePopulation: Map<number, Set<string>>): ShipState | null {
+  spawn(
+    classNumber: number,
+    livePopulation: Map<number, Set<string>>,
+    /**
+     * Dev-only placement override. When supplied the droid is dropped at
+     * exactly these coordinates instead of being scattered, so a playtester can
+     * get a target in front of them. Bypasses the neutral-zone re-roll too.
+     */
+    at?: { x: number; y: number },
+  ): ShipState | null {
     const userid = this.allocateUserid(livePopulation);
     const shipno = 1;
 
@@ -61,10 +70,15 @@ export class DroidSpawner {
 
     // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8; re-roll if neutral zone (0,0)
     let xcoord: number, ycoord: number;
-    do {
-      xcoord = this.rng.next() * 39.9 - 19.8;
-      ycoord = this.rng.next() * 39.9 - 19.8;
-    } while (Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
+    if (at) {
+      xcoord = at.x;
+      ycoord = at.y;
+    } else {
+      do {
+        xcoord = this.rng.next() * 39.9 - 19.8;
+        ycoord = this.rng.next() * 39.9 - 19.8;
+      } while (Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
+    }
 
     // @see GEDROIDS.C:146-163 — loadout: Murdonian gets heavy load, others get sparse
     const items =
