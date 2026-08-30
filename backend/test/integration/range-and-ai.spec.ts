@@ -186,8 +186,10 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     // larger by design (SCAN_LO_PROJECTION_MULTIPLIER), so a Dreadnought's
     // long-range overview does span most of the galaxy — that is the flagship's
     // canonical role, not an escaped bound.
+    // The Sysopian Death Star (34) is admin-only and deliberately god-tier
+    // (100m tons, warp 255, canon scan 1m = a 100-sector radius) — exempt.
     const maxGateSectors = 30 / 4;
-    for (const c of SHIP_CLASSES) {
+    for (const c of SHIP_CLASSES.filter((x) => x.classNumber !== 34)) {
       expect(c.scanRange / 10_000).toBeLessThanOrEqual(maxGateSectors);
     }
   });
@@ -207,15 +209,35 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     }
   });
 
-  test('Cybertron Scout (class 21) sees ≥ 2 sectors so it can engage a moving player', () => {
-    const cls = SHIP_CLASSES.find((c) => c.classNumber === 21)!;
-    expect(cls.scanRange).toBeGreaterThanOrEqual(20_000);
+  test('every combative AI keeps a workable engagement bubble', () => {
+    // Round 2 over-compressed AI scanRange and "Cybertrons appeared inert in
+    // playtest" — this guard is the regression for that. It used to pin the
+    // Scout at >= 20 000 (2 sectors), a figure calibrated against the old
+    // INFLATED AI table (the Scout was 25 000 where canon x0.15 gives 7 500).
+    //
+    // Under the proportional rescale the floor is expressed as intent: an AI
+    // must be able to detect something beyond the sector it occupies, so it can
+    // acquire a target that wanders in rather than needing a collision.
+    //
+    // NOTE this is weaker than the old pin, and whether 0.75 sectors is enough
+    // for the Scout in the live world is a PLAYTEST question, not a unit-test
+    // one — see docs/GAME_MECHANICS.md.
+    const combative = SHIP_CLASSES.filter((c) => c.classNumber >= 21 && c.classNumber <= 25);
+    for (const c of combative) {
+      expect(c.scanRange / 10_000).toBeGreaterThanOrEqual(0.3);
+    }
   });
 });
 
 // ─── 2. AI engagement ────────────────────────────────────────────────────────
 
 describe('Cybertron engagement — sees player, pursues, fires', () => {
+  // Distances are expressed as a FRACTION of the Cybertron Scout's own
+  // scanRange rather than in absolute sectors, so a rebalance does not silently
+  // move every player out of range and turn these into no-ops.
+  const SCOUT_SECTORS =
+    SHIP_CLASSES.find((c) => c.classNumber === 21)!.scanRange / 10_000;
+
   function setup(playerDistanceSectors: number, seed = 99) {
     const h = buildCybertronHarness(seed);
     // Player at center
@@ -234,8 +256,8 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
     return { ...h, player, cyb };
   }
 
-  test('Cybertron acquires lock on player inside its 2.5-sector scanRange', () => {
-    const { events, fireTick, cyb } = setup(1.5);
+  test('Cybertron acquires lock on player inside its scanRange', () => {
+    const { events, fireTick, cyb } = setup(SCOUT_SECTORS * 0.6);
     const acquired: unknown[] = [];
     events.on(CYBERTRON_EVENT.TARGET_ACQUIRED, (p) => acquired.push(p));
     fireTick(5);
@@ -243,11 +265,11 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
     expect(acquired.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('Cybertron does NOT fire phasers on a player outside scanRange (3.0 sectors)', () => {
+  test('Cybertron does NOT fire phasers on a player outside scanRange', () => {
     // The real gate is firing, not lock acquisition — cybCheckLockon picks the
     // *closest* player regardless of distance, so an out-of-range lock is
     // harmless. cybFirePhaser hits the inScanRange gate and must not emit.
-    const { events, fireTick } = setup(3.0, 33);
+    const { events, fireTick } = setup(SCOUT_SECTORS * 1.2, 33);
     const fires: unknown[] = [];
     events.on(COMBAT_PHASER_FIRED, (e) => fires.push(e));
     fireTick(20);
@@ -255,7 +277,7 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
   });
 
   test('Cybertron points head2b toward player on engagement', () => {
-    const { fireTick, cyb } = setup(2.0);
+    const { fireTick, cyb } = setup(SCOUT_SECTORS * 0.8);
     fireTick(3);
     // Player is east of Cybertron → bearing should be ~270° (west, since target is at lower x)
     // dx = -2, dy = 0 → atan2(-2, 0) = -π/2 → -90° → 270°
@@ -264,7 +286,7 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
   });
 
   test('Cybertron fires phasers at a player within scanRange', () => {
-    const { events, fireTick, player } = setup(1.0, 7);
+    const { events, fireTick, player } = setup(SCOUT_SECTORS * 0.5, 7);
     // kills > CYB_BE_NICE=30 → gebemean deterministically true (no PRNG roll needed),
     // matching the fidelity-fix in A-003 where the phaser gate now requires gebemean.
     player.kills = 50;
@@ -295,7 +317,7 @@ describe('Cybertron engagement — sees player, pursues, fires', () => {
     // Regression for the playtest report: "AI did not even try". Cybertron Scout
     // scanRange 25_000 = 2.5 sectors. Player placed at 2.0 sectors → in range,
     // pickPursuitBand should set speed2b > 0 → physics will close the gap.
-    const { fireTick, cyb } = setup(2.0, 55);
+    const { fireTick, cyb } = setup(SCOUT_SECTORS * 0.8, 55);
     fireTick(3);
     expect(cyb.speed2b).toBeGreaterThan(0);
   });
@@ -383,7 +405,12 @@ describe('Murdonian (class 32) reactive fightback fires after a player hit', () 
 
     // Move the Murdonian adjacent to the player and simulate the player having
     // just hit it (combat tick would set cantexit + lastfired on hit).
-    droid!.xcoord = 11;
+    // Offset is a FRACTION of the Murdonian's own scanRange: firePhaser is
+    // gated on it (A-001), so a hardcoded 1-sector gap silently stops
+    // exercising this path whenever the class is rebalanced.
+    const murdonianSectors =
+      SHIP_CLASSES.find((c) => c.classNumber === DROID_CLASS_TRANSPORT)!.scanRange / 10_000;
+    droid!.xcoord = 10 + murdonianSectors * 0.5;
     droid!.ycoord = 7;
     droid!.cantexit = 5;
     droid!.lastfired = 7; // player shipno

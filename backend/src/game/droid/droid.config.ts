@@ -32,11 +32,11 @@ export interface DroidGlobalConfig {
 /** Class-specific defaults (verbatim from reference/wiki/cpu-ships.md and GEDROIDS.C). */
 export const DROID_CLASS_DEFAULTS: Record<number, DroidClassConfig> = {
   // Lydorian Garbage Scow — class 31
-  31: { scanRange: 10_000, topspeed: 1, maxPhaser: 1, maxShields: 1 },
+  31: { scanRange: 3_750, topspeed: 1, maxPhaser: 1, maxShields: 1 },
   // Murdonian Transport — class 32
-  32: { scanRange: 25_000, topspeed: 8, maxPhaser: 5, maxShields: 2 },
+  32: { scanRange: 3_750, topspeed: 8, maxPhaser: 5, maxShields: 2 },
   // Vakory Survey Drone — class 33
-  33: { scanRange: 30_000, topspeed: 4, maxPhaser: 1, maxShields: 1 },
+  33: { scanRange: 3_750, topspeed: 4, maxPhaser: 1, maxShields: 1 },
 };
 
 export const DROID_GLOBAL_DEFAULTS: DroidGlobalConfig = {

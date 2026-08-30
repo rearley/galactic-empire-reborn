@@ -58,19 +58,19 @@ const PINNED_SCANRANGE: ReadonlyMap<number, number> = new Map([
   [7, 37_500],     // Frigate              — 3.75 / 11.3 (ties Battle Cruiser, as in canon)
   [8, 75_000],     // Dreadnought          — 7.5 / 22.5  (2x the next best, as in canon)
   [9, 30_000],     // Freight Barge        — 3.0 / 9.0   (2x the Interceptor, as in canon)
-  [34, 50_000],    // Sysopian Death Star  — 5.0
+  [34, 150_000],    // Sysopian Death Star  — 5.0
 
   // ── CPU combative ────────────────────────────────────────────────────────
-  [21, 25_000],    // Cybertron Scout            — 2.5  (was 1.0 — invisible to players)
-  [22, 35_000],    // Cybertron Battle Cruiser   — 3.5
-  [23, 40_000],    // Cybertron Base Star        — 4.0
-  [24, 20_000],    // Sarten Attack Drone        — 2.0
-  [25, 35_000],    // Sarten Obliterator         — 3.5
+  [21, 7_500],    // Cybertron Scout            — 2.5  (was 1.0 — invisible to players)
+  [22, 15_000],    // Cybertron Battle Cruiser   — 3.5
+  [23, 30_000],    // Cybertron Base Star        — 4.0
+  [24, 3_000],    // Sarten Attack Drone        — 2.0
+  [25, 60_000],    // Sarten Obliterator         — 3.5
 
   // ── CPU droid ────────────────────────────────────────────────────────────
-  [31, 10_000],    // Lydorian Garbage Scow      — 1.0
-  [32, 25_000],    // Murdonian Transport        — 2.5
-  [33, 30_000],    // Vakory Survey Drone        — 3.0
+  [31, 3_750],    // Lydorian Garbage Scow      — 1.0
+  [32, 3_750],    // Murdonian Transport        — 2.5
+  [33, 3_750],    // Vakory Survey Drone        — 3.0
 ]);
 
 describe('per-class scanRange seed pin (compressed for 30×15 galaxy)', () => {
