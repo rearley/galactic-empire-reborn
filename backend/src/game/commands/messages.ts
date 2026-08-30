@@ -94,6 +94,7 @@ export enum MessageId {
   LAND_INVALID_NAME = 'LAND_INVALID_NAME',
   LAND_CLAIMED = 'LAND_CLAIMED',
   LAND_PLANET_LIMIT = 'LAND_PLANET_LIMIT',
+  LAND_NEUTRAL_ZONE = 'LAND_NEUTRAL_ZONE',
   LAND_OK = 'LAND_OK',
   LAND_REFUSED = 'LAND_REFUSED',
   LAND_PASSFAIL = 'LAND_PASSFAIL',
@@ -466,6 +467,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.LAND_CLAIMED]: 'You have claimed %s. It is now your planet.',
   // Per-player planet cap. @see GECMDS.C:3487 waruptr->planets >= max_plnts
   [MessageId.LAND_PLANET_LIMIT]: 'You already hold the maximum of %s planets.',
+  // Nothing in sector 0,0 is claimable — it holds the trade hub.
+  [MessageId.LAND_NEUTRAL_ZONE]: 'Neutral zone planets cannot be claimed.',
   [MessageId.LAND_OK]: 'You have landed on %s.',
   [MessageId.LAND_REFUSED]: 'Landing refused — this planet is closed.',
   [MessageId.LAND_PASSFAIL]: 'Landing refused — incorrect password.',

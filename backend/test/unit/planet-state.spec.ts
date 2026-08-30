@@ -143,7 +143,9 @@ describe('PlanetStateService — runSerialized preserves FIFO', () => {
 
 describe('PlanetStateService — claim()', () => {
   async function setup(overrides: Partial<PlanetState> = {}) {
-    const planet = makePlanet({ xsect: 0, ysect: 0, plnum: 1, ...overrides });
+    // Sector (5,7), not (0,0): nothing in the neutral zone is claimable, so a
+    // 0,0 fixture would exercise that guard instead of the claim logic here.
+    const planet = makePlanet({ xsect: 5, ysect: 7, plnum: 1, ...overrides });
     const prisma = makePrisma([planet]);
     const ships = makeShips();
     const svc = new PlanetStateService(prisma as any, ships as any);
@@ -153,34 +155,34 @@ describe('PlanetStateService — claim()', () => {
 
   it('happy path mutates in-memory + flushes to Postgres', async () => {
     const { svc, prisma } = await setup({ userid: null });
-    const result = await svc.claim(0, 0, 1, 'u1', 'Aurora');
+    const result = await svc.claim(5, 7, 1, 'u1', 'Aurora');
     expect(result).toEqual({ ok: true });
-    expect(svc.get(0, 0, 1)?.userid).toBe('u1');
-    expect(svc.get(0, 0, 1)?.name).toBe('Aurora');
+    expect(svc.get(5, 7, 1)?.userid).toBe('u1');
+    expect(svc.get(5, 7, 1)?.name).toBe('Aurora');
     expect(prisma.planet.update).toHaveBeenCalledTimes(1);
   });
 
   it('returns OWNED if planet already has a userid', async () => {
     const { svc } = await setup({ userid: 'existing' });
-    const result = await svc.claim(0, 0, 1, 'u2', 'Nova');
+    const result = await svc.claim(5, 7, 1, 'u2', 'Nova');
     expect(result).toEqual({ ok: false, reason: 'OWNED' });
   });
 
   it('returns INVALID_NAME for empty name', async () => {
     const { svc } = await setup({ userid: null });
-    const result = await svc.claim(0, 0, 1, 'u1', '');
+    const result = await svc.claim(5, 7, 1, 'u1', '');
     expect(result).toEqual({ ok: false, reason: 'INVALID_NAME' });
   });
 
   it('returns INVALID_NAME for name > 19 chars', async () => {
     const { svc } = await setup({ userid: null });
-    const result = await svc.claim(0, 0, 1, 'u1', 'A'.repeat(20));
+    const result = await svc.claim(5, 7, 1, 'u1', 'A'.repeat(20));
     expect(result).toEqual({ ok: false, reason: 'INVALID_NAME' });
   });
 
   it('returns INVALID_NAME for non-printable bytes', async () => {
     const { svc } = await setup({ userid: null });
-    const result = await svc.claim(0, 0, 1, 'u1', 'Bad\x00Name');
+    const result = await svc.claim(5, 7, 1, 'u1', 'Bad\x00Name');
     expect(result).toEqual({ ok: false, reason: 'INVALID_NAME' });
   });
 
@@ -193,8 +195,8 @@ describe('PlanetStateService — claim()', () => {
   it('serializes concurrent claim attempts on same key', async () => {
     const { svc } = await setup({ userid: null });
     const [r1, r2] = await Promise.all([
-      svc.claim(0, 0, 1, 'u1', 'First'),
-      svc.claim(0, 0, 1, 'u2', 'Second'),
+      svc.claim(5, 7, 1, 'u1', 'First'),
+      svc.claim(5, 7, 1, 'u2', 'Second'),
     ]);
     // Exactly one should succeed and one should get OWNED
     const results = [r1, r2];

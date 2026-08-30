@@ -831,6 +831,51 @@ across Cybertron classes and match the wiki.
 
 ---
 
+### The neutral zone (sector 0,0)
+
+Two different things share the name, and conflating them causes bugs:
+
+| Concept | Test | Used for |
+|---------|------|----------|
+| Neutral **bubble** | `isInNeutralZone(coord)` — coords within ±0.5 of the origin | Combat rules: firing here self-zaps for SE100DAM, mines skip ships inside it |
+| Neutral **sector** | `NEUTRAL_ZONE_SECTOR` — `floor(coord) === 0` on both axes | Sector-wide rules, e.g. nothing here is claimable |
+
+The sector is the larger area. The five neutral-zone planets sit at 0.2..0.8 on each axis — inside
+sector 0,0, but mostly OUTSIDE the combat bubble.
+
+**Neutral-zone planets cannot be claimed.** Sector 0,0 holds Zygor-3 (where `new ship <N>` is bought
+and most trade happens), Nexus Prime, Caldor IV, Minera and Draconis. Found in playtest: landing on
+Zygor-3 prompted for a name and the claim succeeded — the hub was renamed and player-owned.
+
+C prevents this differently: `build_plan_1`/`build_plan_2` copy `s00[idx].owner` into
+`planet.userid` (GEPLANET.C:671, 737), so neutral-zone planets are created ALREADY OWNED and the
+claim path — which only fires when `plptr->userid[0] == 0` (GECMDS.C:3486) — never triggers. This
+port's `S00Entry` has the same `owner` field but leaves it empty, so they were created unowned.
+
+The guard here is on the SECTOR rather than on ownership: it states the rule directly and holds even
+if a neutral-zone planet is somehow released. The C `s00[]` table is not in the reference source, so
+the intended owner value is unknown and inventing a system account would be a guess.
+
+Midnight restocks the hub by COORDINATES (`xsect: 0, ysect: 0, plnum: 1`), not by name, so a rename
+never corrupted the nightly refresh — the damage was purely to gameplay.
+
+---
+
+### Trading requires ORBIT, not landing
+
+`buy`, `admin` and `withdraw` all gate on `where < 10`, and `orb` sets `where = 10 + plnum`, so
+`>= 10` IS the orbit state. That matches C's `cmd_buy` exactly (GECMDS.C:4212
+`if (warsptr->where < 10)`).
+
+Their messages used to read "You must be landed on a planet…", which is wrong and actively
+misleading — a playtester went looking for a landing step that does not gate trade. All three now
+say "in orbit". Verified live: `buy 5 foo` from orbit returns "5 Food Cases purchased for 4 credits".
+
+Bare `pri` lists all 14 items with their 3-letter codes and prices; `buy <qty> <item-code>` takes a
+quantity first.
+
+---
+
 ### Which AI attacks unprovoked?
 
 **Only Cybertrons.** Droids are purely reactive.

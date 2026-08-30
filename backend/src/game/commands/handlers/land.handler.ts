@@ -79,9 +79,11 @@ export class LandHandlerService {
         const text =
           claimed.reason === 'PLANET_LIMIT'
             ? formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS))
-            : claimed.reason === 'OWNED'
-              ? formatMessage(MessageId.LAND_REFUSED)
-              : formatMessage(MessageId.LAND_INVALID_NAME);
+            : claimed.reason === 'NEUTRAL_ZONE'
+              ? formatMessage(MessageId.LAND_NEUTRAL_ZONE)
+              : claimed.reason === 'OWNED'
+                ? formatMessage(MessageId.LAND_REFUSED)
+                : formatMessage(MessageId.LAND_INVALID_NAME);
         return { lines: [{ text, category: 'system' }] };
       }
 
