@@ -1,3 +1,4 @@
+import { TDAMMAX } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { CombatTickService } from '../../../src/game/combat/combat-tick.service';
@@ -424,15 +425,19 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
   });
 
   // C-010: applyRandamage wired after every projectile hit.
-  // Seed 128: rand #1 → rollHullDamage, victim starts damage=50.
-  // Reseeded from 93 when TDAMMAX was clamped to its numopt ceiling of 100
-  // (GEMAIN.C:508) — the smaller roll shifted the PRNG sequence so the old seed
-  // no longer produced a subsystem hit, leaving this path unexercised.
+  //
+  // Victim starts at damage=0 (was 50). rollRandamage computes
+  // `floor(rand * ((101 - damagePct)/1.5))` and only fires when that is 0
+  // (combat-math.ts), so once total damage passes 101 the term goes negative
+  // and subsystem damage can NEVER fire. With the shields-down branch now
+  // rolling [0.5,1) * TDAMMAX per GEFUNCS.C:1566, a victim starting at 50
+  // overshoots that ceiling and this path silently stopped being exercised.
+  // Starting from 0 keeps the post-hit total inside the 21..100 window.
   it('C-010: torpedo hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and subsystem field mutated', async () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0, phasrtype: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
-      shield: 0, shieldstat: 0, damage: 50,
+      shield: 0, shieldstat: 0, damage: 0,
       ltorpsChannel: [7, 255, 255],
       ltorpsDistance: [10, 0, 0],
     });
@@ -454,7 +459,12 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(bob.tactical).not.toBe(0);
   });
 
-  it('C-010: torpedo hit with shields fully absorbing (hull=0, damage stays 0) — no COMBAT_SUBSYSTEM_DAMAGED', async () => {
+  it('torpedo hit with shields UP still damages the hull and drains the shield', async () => {
+    // GEFUNCS.C:1552-1562 — the shields-up branch applies hull damage
+    // (`ptr->damage += damfact`) AND calls shieldhit. Shields halve the roll,
+    // they are not immunity. This previously asserted "damage stays 0", which
+    // described the port's incorrect behaviour rather than the original's.
+    // @see test/game/combat/shield-projectile-fidelity.spec.ts
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0, phasrtype: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
@@ -464,16 +474,11 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     });
     const h = await makeHarnessSeeded([alice, bob], 93);
 
-    const emitted: Array<{ event: string; payload: unknown }> = [];
-    h.events.onAny((event: string | string[], payload: unknown) => {
-      const ev = Array.isArray(event) ? event.join('.') : event;
-      emitted.push({ event: ev, payload });
-    });
-
     await h.fire();
 
-    // damage stays 0 (shields absorbed), rollRandamage returns 'none'
-    expect(emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED)).toBeUndefined();
+    expect(bob.damage).toBeGreaterThan(0);        // not immune
+    expect(bob.damage).toBeLessThan(TDAMMAX / 2); // but halved vs an unshielded hit
+    expect(bob.shield).toBeLessThan(9999);        // charge was spent
   });
 
   it('FR-027.3 — carrier not ingame mid-flight: slot silently cleared, no hit, no decoy event', async () => {
@@ -624,6 +629,31 @@ describe('CombatTickService — mine sweep (T036)', () => {
     );
     await h.fire();
     expect(alice.damage).toBeGreaterThan(0);
+  });
+
+  it('range — a ship two sectors away is NOT damaged by the mine', async () => {
+    // GEFUNCS.C:1428-1432 converts to raw units before the range test
+    // (`ddist *= 10000`) and MINERANGE is 10000 raw = one sector. The port
+    // compared the sector-valued cdistance directly against 10000, so the guard
+    // never fired and EVERY ship in the galaxy was inside the blast. In
+    // playtest a single mine destroyed all 20 Cybertrons in one tick.
+    const near = makeShip({
+      userid: 'near', shipno: 1, xcoord: 100.02, ycoord: 100, damage: 0,
+      shield: 0, shieldstat: 0, status: 1,
+    });
+    const far = makeShip({
+      userid: 'far', shipno: 1, xcoord: 102, ycoord: 100, damage: 0,
+      shield: 0, shieldstat: 0, status: 1,
+    });
+    const h = await makeMineHarness(
+      [near, far],
+      [{ id: 1, channel: 1, timer: 1, xcoord: 100, ycoord: 100, deployedBy: 'x' }],
+      99,
+    );
+    await h.fire();
+
+    expect(near.damage).toBeGreaterThan(0);  // same sector — inside the blast
+    expect(far.damage).toBe(0);              // two sectors away — untouched
   });
 
   it('detonation — timer===0 emits COMBAT_HIT { weapon:mine } and COMBAT_MINE_DETONATION, mine destroyed', async () => {

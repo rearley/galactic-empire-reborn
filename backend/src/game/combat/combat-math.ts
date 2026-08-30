@@ -216,6 +216,33 @@ export function rollHullDamage(rand: Random, dmgMax: number, victimDamageFactor:
   return Math.floor(rand.next() * dmgMax * damageScale(victimDamageFactor));
 }
 
+/** Shield drain roll on a shielded projectile hit: `(gernd()%20)+10`. @see GEFUNCS.C:1563 */
+export const SHIELD_DRAIN_MIN = 10 as const;
+export const SHIELD_DRAIN_SPREAD = 20 as const;
+
+/**
+ * Projectile hull damage, branching on whether the victim's shields are up.
+ *
+ * GEFUNCS.C:1552-1576 applies hull damage in BOTH branches — raising shields
+ * halves the incoming roll and costs charge, it does not grant immunity:
+ *
+ *   shields UP    damfact = tdammax * rndm(.5)        -> [0, 0.5) * dmgMax
+ *   shields DOWN  damfact = tdammax * (rndm(.5)+.5)   -> [0.5, 1) * dmgMax
+ *
+ * Both are then passed through ton_fact, which is damageScale here.
+ *
+ * @see GEFUNCS.C:1552 torpedo hit  @see GEFUNCS.C:2661 ton_fact
+ */
+export function rollProjectileHullDamage(
+  rand: Random,
+  dmgMax: number,
+  victimDamageFactor: number,
+  shieldsUp: boolean,
+): number {
+  const factor = shieldsUp ? rand.next() * 0.5 : rand.next() * 0.5 + 0.5;
+  return Math.floor(dmgMax * factor * damageScale(victimDamageFactor));
+}
+
 /**
  * Per-tick phaser reload amount: `phasrtype * PRELOAD`.
  *
