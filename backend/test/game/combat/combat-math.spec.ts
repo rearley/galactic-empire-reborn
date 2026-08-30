@@ -11,6 +11,7 @@ import {
   rollHullDamage,
   shieldhit,
 } from '../../../src/game/combat/combat-math';
+import { PDAMMAX } from '../../../src/game/constants';
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { MINEDAMMAX, MINERANGE, PHABIAS, SHIELD_FACTOR, SHMINCHG } from '../../../src/game/constants';
 
@@ -107,9 +108,10 @@ describe('combat-math', () => {
       expect(close).toBeGreaterThan(far);
     });
 
-    it('matches formula at point-blank for phasrtype=1 (160)', () => {
-      // disfact=24000, dd=1, fd=1, dp=1, dam=200; (2/2.5)/1 → 160
-      expect(phaserDamage({ ...base, distRaw: 0 })).toBe(160);
+    it('matches formula at point-blank for phasrtype=1', () => {
+      // disfact=24000, dd=1, fd=1, dp=1, dam=PDAMMAX; (2/2.5)/tonfact=0.8
+      // Derived from PDAMMAX so the test survives playtest retuning.
+      expect(phaserDamage({ ...base, distRaw: 0 })).toBe(Math.floor(PDAMMAX * 0.8));
     });
   });
 
