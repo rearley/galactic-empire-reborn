@@ -1,3 +1,100 @@
+## 2026-08-30 — Playtest enablement: /health route + test/dev DB isolation
+
+**Completed:**
+- **`GET /health` route** (`backend/src/health/health.controller.ts`) — unauthenticated liveness/readiness
+  probe returning `{status, database, uptime}`. Returns 200 when a `SELECT 1` against Postgres succeeds,
+  503 when it does not. `docker-compose.yml` already healthchecked the backend with
+  `wget -qO- http://localhost:3000/health`, but no such route existed, so the backend container
+  would have sat permanently `unhealthy`.
+- **Test runs no longer destroy the dev database** — `PrismaService` took no datasource override, so it
+  resolved `DATABASE_URL` (the dev DB `ge`). ~20 specs build a Nest testing module around `PrismaModule`
+  and then call `deleteMany()`/`TRUNCATE`, so `npm test` silently wiped dev game state. Root-caused from
+  an observed symptom: `Planet` emptied while `GalaxyMeta` survived, leaving a galaxy that could never
+  regenerate (the generator skips when `GalaxyMeta` exists) — every planet-dependent mechanic dead and
+  the midnight job crashing on Zygor-3. Fixed with `src/prisma/database-url.ts`: under Jest, bind to
+  `TEST_DATABASE_URL` and throw if unset rather than fall back to the dev DB.
+- **`npm run db:reset` was broken** — passed four statements in a single `psql -c`, which psql wraps in a
+  transaction, so it always failed with `DROP DATABASE cannot run inside a transaction block`. Split into
+  separate `-c` flags.
+- **Frontend build unblocked** — `tsc --noEmit` failed with 37 errors (all in `test/`), so `npm run build`
+  (`tsc && vite build`) failed locally and in CI. The Docker image built only because its Dockerfile copies
+  `src` and not `test`. Now clean.
+- **Stale frontend tests repaired (13 failures)** — all were tests lagging behind intentional source
+  changes, not product bugs: `physics.sector-transition` moved from a batched `{transitions: [...]}` shape
+  to one flat event per transition (backend and frontend contracts already agree; only the tests and the
+  `contracts-parity` guard still asserted the old shape), `AuthScreen` now opens in login mode so the
+  `/register/i` button the tests clicked was the mode switch, `ScanPanel` renders newest-scan-first per
+  commit `6ae0f32`, and two `socketClient` mocks omitted the later-added `onSocketAuthFailed` export.
+
+**Tests:** Backend 2827/2827 across 293 suites, exit 0. Frontend 135/135. `tsc --noEmit` clean both sides;
+`npm run build` green both sides. New specs: `test/integration/health/health.spec.ts` (3 cases: 200 ok,
+503 on DB down, no auth required) and `test/unit/prisma/database-url.spec.ts` (5 cases, including a live
+assertion that the running suite resolves to `ge_test` and not `ge`). Dev-DB integrity verified directly:
+223 planets before a full `npm test`, 223 after.
+
+**Decisions made:**
+- The `contracts-parity` guard is compile-time only and Vitest does not typecheck, so it silently passed
+  while asserting a contract that no longer existed. It is only a real guard as long as `tsc` runs in CI.
+- `PrismaService` fails loudly when `TEST_DATABASE_URL` is missing under test rather than defaulting —
+  a silent fallback is what caused the data loss.
+- `test/useSectorRoster.spec.tsx` used Node's `events` module; the frontend has no `@types/node`, so it
+  now uses a small local emitter instead of adding a Node dependency to a browser-only package.
+
+**Next:**
+- Playtest at http://localhost:5175 (backend :3000, Vite on 5175 because 5173 is taken by another project).
+- Ensure CI runs `tsc --noEmit` on the frontend, otherwise the parity guard stays inert.
+
+**Audit — additional gotchas found:**
+- **(fixed) 20 balance constants had zero test coverage**, violating the CLAUDE.md rule that every
+  gameplay-affecting `GEMAIN.H` constant must have a test that fails if it changes: `DESTRUCTRANGE`,
+  `ENGRECHG`, `ENGYMIN`, `HYSCANRANGE`, `MAXPLANETS`, `MINE_TIMER_MAX`, `MINE_TIMER_MIN`, `NUM_MINES`,
+  `PENGUSE`, `PMINENG`, `QUADMAXPERTICK`, `ROTAMT`, `SCANADJ`, `SECTYPE_NORMAL`, `SHENGUSE`, `SHMAXCHG`,
+  `SHMINPWR`, `TELEDAM`, `TOPPHASOR`, `TOPSHIELD`. All 20 values were verified correct against the C
+  source; the gap was detection, not correctness. Pinned in
+  `test/balance/unpinned-constants.balance.spec.ts` (21 cases), and the guard was mutation-tested
+  (ROTAMT 20->21 fails the suite, then reverted).
+- **No CI exists at all** — no `.github/workflows`, no GitLab/Circle/Travis config anywhere in the repo.
+  CLAUDE.md states "No feature ships without passing CI" and relies on CI running `prisma migrate deploy`.
+  Nothing runs the suites or `tsc` automatically, which is why the frontend build could stay broken and
+  the compile-time `contracts-parity` guard could stay inert without anyone noticing.
+- **The migration history is never exercised by tests.** `globalSetup` builds the test DB with
+  `prisma db push --force-reset` straight from `schema.prisma`, so the files in `prisma/migrations/` are
+  never applied during `npm test`. A broken or missing migration would first surface in production at
+  `prisma migrate deploy`. Checked for current drift with
+  `prisma migrate diff --from-migrations --to-schema-datamodel` against a scratch shadow DB: **no
+  difference detected**, so this is latent risk rather than present breakage.
+- **(fixed) `npm run prisma:push` was a footgun** — `prisma db push --skip-generate` with no datasource
+  override applied schema changes straight to the dev database, bypassing migrations. CLAUDE.md explicitly
+  forbids this ("Never use `prisma db push` ... without creating a migration file first"). Script removed
+  from `backend/package.json`; it was invoked by nothing (`globalSetup` calls `npx prisma db push`
+  directly for the test DB, and the only other references are historical notes in `specs/001`/`002`).
+- Two specs (`test/e2e/boot.e2e.spec.ts`, `test/game/combat/mine-persistence.spec.ts`) already worked
+  around this class of bug locally by reassigning `process.env.DATABASE_URL = TEST_DATABASE_URL` at the top
+  of the file — ad-hoc patches in 2 files for a problem that needed a central fix. Verified safe (no
+  `boot-e2e-user` row exists in `ge`). Now redundant but harmless.
+- `npm run test:manual` still targets the **dev** DB by design (bare `new PrismaClient()`); its deletes are
+  scoped to their own fixture userids. Verified unaffected by the `PrismaService` change: 14/14 passing.
+
+**Known issues:**
+- (resolved) `frontend/tests/onboarding/ClassPickerPrompt.spec.tsx` was stale — spec 021 removed the class
+  picker and deleted `src/onboarding/ClassPickerPrompt.tsx`, leaving a spec that failed to collect. The
+  component was referenced by nothing but that spec, so the file was deleted; the frontend suite is now
+  fully green (18/18 files).
+- `frontend/tests/` (plural) is not in `tsconfig.json`'s `include`, so those specs are never typechecked.
+- No CI, and the migration history is unexercised by tests (see audit above). Deferred deliberately.
+- `src/game/commands/command.types.ts:9` uses `client?: any`, against the CLAUDE.md "no `any`" rule.
+- (resolved) The origin of the planet loss is confirmed. `src/prisma/prisma.service.ts` has a single
+  commit in its history (`36a1d33`, feature 002) and no commit across all 219 commits/branches ever added
+  a `datasources` override under `backend/src/`; `jest.config.ts` never had `setupFiles`. The bug has
+  existed since feature 002. Commit `109e27a` (2026-06-26) treated the *symptom*: it added
+  `neutral-zone.fixture.ts` and called `seedNeutralZonePlanets(prisma)` in 9 midnight specs — the same
+  specs that call `truncateAll(prisma)` on a `PrismaService` resolved from `PrismaModule`, i.e. the dev
+  database. That made the midnight tests pass while leaving the truncation of `ge` in place, removing the
+  only signal that anything was wrong. `GalaxyMeta.generatedAt` was `2026-06-26 21:08:21`, ~7 hours after
+  that commit — the galaxy was regenerated by hand rather than root-caused.
+
+---
+
 ## 2026-06-26 — 030-multi-ship
 
 **Completed:**
