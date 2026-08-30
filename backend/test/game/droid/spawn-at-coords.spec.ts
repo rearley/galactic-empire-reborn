@@ -19,7 +19,10 @@ function buildSpawner(seed: number) {
   const loaded: ShipState[] = [];
   const shipState = {
     loadShip: (s: ShipState) => { loaded.push(s); },
-    findAllShips: () => [],
+    // Name de-duplication consults findByName; without it the spawner cannot
+    // tell whether a generated name is already taken.
+    findByName: (n: string) => loaded.find((e) => e.shipname.toLowerCase() === n.toLowerCase()),
+    findAllShips: () => loaded,
     get: () => undefined,
     mutate: () => undefined,
     removeFromGame: () => {},
@@ -77,6 +80,42 @@ describe('DroidSpawner — coordinate override', () => {
     const { spawner } = buildSpawner(42);
     const state = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), { x: 1, y: 2 })!;
     expect(state.speed2b).toBeGreaterThan(0);
+  });
+
+  it('generates a name that does not collide with a live ship', () => {
+    // C builds the name as `shipclass.shipname + (usrn*usrn + gernd()%100)`
+    // (GEDROIDS.C:129). Across the low usrn values those ranges overlap
+    // heavily — usrn 1 spans 1..100, usrn 2 spans 4..103 — so duplicates are
+    // common. Name lookups (`loc`, `scan sh`) resolve by name and return the
+    // first match, so a duplicate makes the player address the wrong ship.
+    const existing: ShipState[] = [];
+    const shipState = {
+      loadShip: (st: ShipState) => { existing.push(st); },
+      findAllShips: () => existing,
+      get: () => undefined,
+      mutate: () => undefined,
+      removeFromGame: () => {},
+      size: () => existing.length,
+      findByUserid: () => [],
+    } as unknown as ShipStateService;
+
+    const entry = { maxWarp: 3, maxPhaser: 5, maxShields: 2, maxTons: 100 };
+    const classCache = {
+      get: () => entry,
+      getMaxPhaser: () => entry.maxPhaser,
+      getMaxTons: () => entry.maxTons,
+      getMaxShields: () => entry.maxShields,
+    } as unknown as ShipClassCacheService;
+
+    // Same seed for every spawn => the same generated name every time, unless
+    // the spawner actively de-duplicates.
+    const names = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      const spawner = new DroidSpawner(shipState, classCache, new Mulberry32Adapter(7));
+      const st = spawner.spawn(DROID_CLASS_TRANSPORT, new Map())!;
+      names.add(st.shipname);
+    }
+    expect(names.size).toBe(5);
   });
 
   it('accepts an explicit name so a test can address exactly one target', () => {

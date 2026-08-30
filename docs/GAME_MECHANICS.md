@@ -755,37 +755,70 @@ player classes (1-9); class 34 is the admin-only Sysopian Death Star. Pinned by
 `test/balance/ship-class-scaling.balance.spec.ts`.
 
 Every attribute matches canon exactly — shields, phaser, acceleration, warp, tons, price, points,
-damage factor, and every capability flag — **except `scanRange`**, which was deliberately compressed
-for the fixed 30x15 grid (commits `3bc1dff`, `11ade00`); canon values reach 500 000 raw units
-(50 sectors), which spans the whole playfield.
+damage factor, and every capability flag. `scanRange` is compressed, because canon values reach
+500 000 raw units (a 50-sector radius) on a 30x15 grid.
 
-| Class | canon scan | ours | ratio |
-|-------|-----------:|-----:|------:|
-| Interceptor | 100 000 | 15 000 | 0.150 |
-| Stealth Fighter | 200 000 | 18 000 | 0.090 |
-| Heavy Freighter | 50 000 | 15 000 | 0.300 |
-| Destroyer | 100 000 | 25 000 | 0.250 |
-| Star Cruiser | 200 000 | 28 000 | 0.140 |
-| Battle Cruiser | 250 000 | 35 000 | 0.140 |
-| Frigate | 250 000 | 30 000 | 0.120 |
-| Dreadnought | 500 000 | 40 000 | 0.080 |
-| Freight Barge | 200 000 | 15 000 | 0.075 |
+**The compression is a single proportional factor (x0.15)**, so every canonical relationship
+survives:
 
-**The compression is not proportional** — the factor spans 0.075 to 0.300, a 4x spread — so it does
-not merely shrink the scale, it reorders the classes:
+| Class | canon | ours | weapon gate | sca-lo radius |
+|-------|------:|-----:|------------:|--------------:|
+| Interceptor | 100 000 | 15 000 | 1.5 | 4.5 |
+| Stealth Fighter | 200 000 | 30 000 | 3.0 | 9.0 |
+| Heavy Freighter | 50 000 | 7 500 | 0.75 | 2.3 |
+| Destroyer | 100 000 | 15 000 | 1.5 | 4.5 |
+| Star Cruiser | 200 000 | 30 000 | 3.0 | 9.0 |
+| Battle Cruiser | 250 000 | 37 500 | 3.75 | 11.3 |
+| Frigate | 250 000 | 37 500 | 3.75 | 11.3 |
+| Dreadnought | 500 000 | 75 000 | 7.5 | 22.5 |
+| Freight Barge | 200 000 | 30 000 | 3.0 | 9.0 |
 
-- **Canonical ties are broken.** Battle Cruiser and Frigate are both 250 000 in canon (now 35 000 vs
-  30 000); Stealth Fighter, Star Cruiser and Freight Barge are all 200 000 (now 18 000 / 28 000 /
-  15 000).
-- **The Freight Barge loses its scanner entirely.** Canon gives it 200 000 — twice the Interceptor's
-  — which suits an unarmed hauler that needs to see trouble coming. Here it is 15 000, tied with the
-  Interceptor at the bottom.
-- **The Dreadnought's defining advantage is flattened.** Canon is 500 000, exactly double the next
-  best; here it is 40 000 against the Battle Cruiser's 35 000 — a 1.14x edge.
+Two radii derive from `scanRange` and differ by the sca-lo multiplier of 3:
 
-A proportional rescale at the Interceptor's own factor (0.15) would preserve every relationship and
-still fit the grid, topping out at 75 000 (7.5 sectors) for the Dreadnought. The tests pin the
-current values so any change is deliberate.
+```
+weapon / lock gate (sectors) = scanRange / 10_000
+sca-lo projection radius     = scanRange * 3 / 10_000
+```
+
+Rounds 1-2 compressed ad-hoc (factor 0.075..0.300, a 4x spread), which broke canonical ties and
+reordered the classes — the Freight Barge lost its 2:1 scanner advantage over the Interceptor, and
+the Dreadnought's canonical 2x lead became 1.14x. Round 3 fixes that. The earlier round's stated
+concern, "no single ship sees half the map", was really about the STARTER: verbatim canon gives the
+Interceptor a 30-sector projection radius. At x0.15 the Interceptor is unchanged at 4.5, so that
+concern is preserved.
+
+The Dreadnought does now project 22.5 sectors — most of the galaxy. That is canonical: its canon
+scanRange is a 50-sector radius, so out-ranging everything is the flagship's defining trait. A
+smaller anchor (0.10) would cap it at 15 sectors but drop the Interceptor to 1.0-sector detection
+while Cybertrons still detect at 2.5, which is worse for new pilots.
+
+#### AI classes — NOT rescaled
+
+The AI table is far more inconsistent than the player table ever was, and is left alone pending a
+decision. Ratios against canon (`reference/wiki/cpu-ships.md`):
+
+| Class | canon | ours | ratio |
+|-------|------:|-----:|------:|
+| Cybertron Scout | 50 000 | 25 000 | 0.50 |
+| Cybertron Battle Cruiser | 1 000 | 35 000 | **35.0** |
+| Cybertron Base Star | 200 000 | 40 000 | 0.20 |
+| Sarten Attack Drone | 20 000 | 20 000 | 1.00 |
+| Sarten Obliterator | 400 000 | 35 000 | 0.087 |
+| Lydorian Scow | 25 000 | 10 000 | 0.40 |
+| Murdonian Transport | 25 000 | 25 000 | 1.00 |
+| Vakory Survey Drone | 25 000 | 30 000 | 1.20 |
+| Sysopian Death Star | 1 000 000 | 50 000 | 0.05 |
+
+The ratio spans 0.05 to 35 — a **700x spread**. Two values are the raw canon figure (uncompressed),
+two are inflated above it. Because C-001 gates phaser reach on the firer's `scanRange`, an inflated
+scanner is also an inflated weapon envelope: a Cybertron Battle Cruiser engages from 3.5 sectors
+where canon implies 0.1.
+
+Not rescaled for two reasons. It materially changes AI difficulty, which is a balance decision; and
+the canon figure for the Cybertron Battle Cruiser (1 000, i.e. 0.1 sectors — 50x below the Scout and
+200x below the Base Star) reads more like a wiki transcription error than design intent, so
+rescaling from it would propagate a bad baseline. Engagement distances themselves (`tooclose` 3000,
+`hyperdist1` 25, `hyperdist2` 10) are uniform across Cybertron classes and match the wiki.
 
 ---
 

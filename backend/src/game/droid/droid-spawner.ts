@@ -73,7 +73,7 @@ export class DroidSpawner {
 
     // @see GEDROIDS.C:129 — shipname = shipclass.shipname + usrn*usrn + gernd()%100
     const usrn = this.nextSlotIndex;
-    const shipname = nameOverride ?? `${typename}${usrn * usrn + Math.floor(this.rng.next() * 100)}`;
+    const shipname = nameOverride ?? this.uniqueGeneratedName(typename, usrn);
 
     // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8; re-roll if neutral zone (0,0)
     let xcoord: number, ycoord: number;
@@ -173,6 +173,37 @@ export class DroidSpawner {
   }
 
   /** Allocate the next available @Droid-<n> userid. */
+  /**
+   * Build the canonical droid name, then ensure it does not collide with a ship
+   * already in play.
+   *
+   * C uses `shipclass.shipname + (usrn*usrn + gernd()%100)` (GEDROIDS.C:129).
+   * Across low `usrn` values those ranges overlap heavily — usrn 1 spans 1..100
+   * and usrn 2 spans 4..103 — so duplicates are common. That matters here
+   * because name lookups (`loc`, `scan sh`) resolve via
+   * ShipStateService.findByName, which returns the FIRST match: a duplicate
+   * makes the player address a different ship than the one they named. Observed
+   * in playtest as a lock landing on a same-named droid across the galaxy.
+   *
+   * The canonical formula is tried first and kept whenever it is already
+   * unique, so ordinary names are unchanged.
+   */
+  private uniqueGeneratedName(typename: string, usrn: number): string {
+    const base = usrn * usrn;
+    // findAllShips rather than findByName: the latter also does prefix and
+    // substring matching, which would reject far more names than are actually
+    // taken, and it is stubbed in fewer of the existing droid test harnesses.
+    const taken = new Set(
+      (this.shipState.findAllShips() ?? []).map((s) => s.shipname.toLowerCase()),
+    );
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const candidate = `${typename}${base + Math.floor(this.rng.next() * 100)}`;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+    // Exhausted the canonical space — fall back to something guaranteed unique.
+    return `${typename}${base}-${usrn}`;
+  }
+
   private allocateUserid(livePopulation: Map<number, Set<string>>): string {
     const allDroids = new Set<string>();
     for (const set of livePopulation.values()) {
