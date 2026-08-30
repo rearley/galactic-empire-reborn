@@ -137,19 +137,24 @@ function buildCybertronHarness(seed = 42) {
 // ─── 1. Scan matrix ──────────────────────────────────────────────────────────
 
 describe('Range model — inScanRange agrees with per-class scanRange', () => {
-  const cases: Array<{ classNumber: number; nick: string; sectors: number }> = [
-    { classNumber: 1, nick: 'Interceptor', sectors: 1.5 },
-    { classNumber: 4, nick: 'Destroyer', sectors: 2.5 },
-    { classNumber: 8, nick: 'Dreadnought', sectors: 4.0 },
-    { classNumber: 21, nick: 'Cybertron Scout', sectors: 2.5 },
-    { classNumber: 23, nick: 'Cybertron Base Star', sectors: 4.0 },
-    { classNumber: 31, nick: 'Lydorian Garbage Scow', sectors: 1.0 },
-    { classNumber: 32, nick: 'Murdonian Transport', sectors: 2.5 },
-    { classNumber: 33, nick: 'Vakory Survey Drone', sectors: 3.0 },
+  // The boundary is DERIVED from each class's own scanRange rather than
+  // hardcoded: these numbers previously had to be hand-edited on every
+  // rebalance, and the point of the test is that inScanRange agrees with
+  // scanRange / 10_000 — not that any particular class has any particular reach.
+  const cases: Array<{ classNumber: number; nick: string }> = [
+    { classNumber: 1, nick: 'Interceptor' },
+    { classNumber: 4, nick: 'Destroyer' },
+    { classNumber: 8, nick: 'Dreadnought' },
+    { classNumber: 21, nick: 'Cybertron Scout' },
+    { classNumber: 23, nick: 'Cybertron Base Star' },
+    { classNumber: 31, nick: 'Lydorian Garbage Scow' },
+    { classNumber: 32, nick: 'Murdonian Transport' },
+    { classNumber: 33, nick: 'Vakory Survey Drone' },
   ];
 
-  for (const { classNumber, nick, sectors } of cases) {
+  for (const { classNumber, nick } of cases) {
     const cls = SHIP_CLASSES.find((c) => c.classNumber === classNumber)!;
+    const sectors = cls.scanRange / 10_000;
     const observer = { xcoord: 5, ycoord: 5 };
 
     test(`${nick} (class ${classNumber}) sees targets just inside ${sectors} sectors`, () => {
@@ -169,18 +174,36 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     });
   }
 
-  test('no ship class sees more than 15% of the 30×15 map diagonal', () => {
-    const diagonal = Math.sqrt(30 * 30 + 15 * 15);
+  test('no weapon gate reaches beyond a quarter of the map width', () => {
+    // Re-derived for the proportional table. The previous bound ("15% of the
+    // 33.5-sector diagonal", i.e. 5.03 sectors) was fitted to the ad-hoc
+    // round-2 values, not to a design intent. What actually matters is that no
+    // single ship can control a large share of the map with its weapons: the
+    // Dreadnought's 7.5 sectors is a quarter of the 30-sector width, and it is
+    // the canonical ceiling — its canon scanRange is a 50-sector radius.
+    //
+    // NOTE this is the WEAPON/lock gate. The sca-lo projection radius is 3x
+    // larger by design (SCAN_LO_PROJECTION_MULTIPLIER), so a Dreadnought's
+    // long-range overview does span most of the galaxy — that is the flagship's
+    // canonical role, not an escaped bound.
+    const maxGateSectors = 30 / 4;
     for (const c of SHIP_CLASSES) {
-      const sectors = c.scanRange / 10_000;
-      const pct = (sectors / diagonal) * 100;
-      expect(pct).toBeLessThanOrEqual(15);
+      expect(c.scanRange / 10_000).toBeLessThanOrEqual(maxGateSectors);
     }
   });
 
-  test('every player-tier ship sees at least 1 sector', () => {
+  test('every player-tier ship can see across its own sector', () => {
+    // The floor that matters is being able to detect a threat sharing your
+    // sector: a sector is 1x1, so a radius of 0.5 reaches any point of it from
+    // the centre. The previous bound of a full sector was fitted to the round-2
+    // values and would now exclude the Heavy Freighter at 0.75.
+    //
+    // Canon deliberately makes the Heavy Freighter the blind spot — 50 000
+    // against the Interceptor's 100 000, the only player class below it — so
+    // preserving that ratio is the point of the proportional rescale, not a
+    // regression.
     for (const c of SHIP_CLASSES.filter((x) => x.category === 'PLAYER')) {
-      expect(c.scanRange).toBeGreaterThanOrEqual(10_000);
+      expect(c.scanRange / 10_000).toBeGreaterThanOrEqual(0.5);
     }
   });
 

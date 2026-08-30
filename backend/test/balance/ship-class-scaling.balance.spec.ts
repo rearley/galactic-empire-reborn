@@ -68,66 +68,138 @@ describe('ship class table matches the canonical GE 3.2e stats', () => {
   });
 });
 
-describe('scanRange compression — DOCUMENTED divergence from canon', () => {
+describe('scanRange compression is PROPORTIONAL to canon', () => {
   /**
-   * scanRange was compressed for the 30x15 grid (commits 3bc1dff, 11ade00):
-   * canon values reach 500 000 raw units (50 sectors), which spans the whole
-   * playfield. The compression is NOT proportional, and it reorders the classes.
+   * Canon values reach 500 000 raw units (50 sectors), which spans the whole
+   * 30x15 playfield, so they had to be compressed for this port. The original
+   * compression was ad-hoc — the factor ranged 0.075..0.300, a 4x spread — which
+   * broke canonical ties and reordered the classes: the Freight Barge lost its
+   * 2:1 scanner advantage over the Interceptor entirely, and the Dreadnought's
+   * canonical 2x lead over the next best became 1.14x.
    *
-   *   class          canon     ours   ratio
-   *   Interceptor   100 000   15 000   0.150
-   *   Stealth F.    200 000   18 000   0.090
-   *   Heavy Freig.   50 000   15 000   0.300
-   *   Destroyer     100 000   25 000   0.250
-   *   Star Cruiser  200 000   28 000   0.140
-   *   Battle Cr.    250 000   35 000   0.140
-   *   Frigate       250 000   30 000   0.120
-   *   Dreadnought   500 000   40 000   0.080
-   *   Freight Barge 200 000   15 000   0.075
-   *
-   * Compression factor spans 0.075..0.300 — a 4x spread — so canonical
-   * relationships are not preserved. These tests pin the CURRENT values and
-   * state the consequences, so a future rescale is a deliberate act.
+   * A single factor keeps every canonical relationship intact while still
+   * fitting the grid: the Dreadnought tops out at 75 000 (7.5 sectors).
    */
-  it('pins the current compressed values', () => {
-    expect(Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]))).toEqual({
-      1: 15_000, 2: 18_000, 3: 15_000, 4: 25_000, 5: 28_000,
-      6: 35_000, 7: 30_000, 8: 40_000, 9: 15_000,
-    });
-  });
+  const FACTOR = 0.15;
 
-  it('every compressed value is below canon (compression, not inflation)', () => {
+  it('applies one factor uniformly, so canonical ratios survive', () => {
     for (const c of PLAYER_CLASSES) {
-      expect(c.scanRange).toBeLessThan(CANON_SCAN[c.classNumber]);
+      expect(c.scanRange).toBe(CANON_SCAN[c.classNumber] * FACTOR);
     }
   });
 
-  it('DIVERGENCE: canonical ties are broken by the rescale', () => {
+  it('preserves canonical ties', () => {
     const scan = Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]));
-
-    // Canon: Battle Cruiser and Frigate both 250 000; Stealth Fighter, Star
-    // Cruiser and Freight Barge all 200 000; Interceptor and Destroyer 100 000.
+    // Battle Cruiser / Frigate, and Stealth Fighter / Star Cruiser / Freight Barge.
     expect(CANON_SCAN[6]).toBe(CANON_SCAN[7]);
-    expect(scan[6]).not.toBe(scan[7]);          // tie broken
+    expect(scan[6]).toBe(scan[7]);
     expect(CANON_SCAN[2]).toBe(CANON_SCAN[5]);
-    expect(scan[2]).not.toBe(scan[5]);          // tie broken
+    expect(scan[2]).toBe(scan[5]);
+    expect(scan[5]).toBe(scan[9]);
   });
 
-  it('DIVERGENCE: the Freight Barge drops from mid-tier to the bottom tier', () => {
+  it('preserves the class ordering', () => {
     const scan = Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]));
-
-    // Canon: the Barge (200 000) out-scans the Interceptor (100 000) 2:1.
-    expect(CANON_SCAN[9]).toBeGreaterThan(CANON_SCAN[1]);
-    // Ours: they are equal, so the Barge lost its scanner advantage entirely.
-    expect(scan[9]).toBe(scan[1]);
+    const rank = (o: Record<number, number>) =>
+      Object.keys(o).map(Number).sort((a, b) => o[a] - o[b] || a - b).join(',');
+    expect(rank(scan)).toBe(rank(CANON_SCAN));
   });
 
-  it("DIVERGENCE: the Dreadnought's 2x scanner advantage is flattened", () => {
+  it("restores the Freight Barge's 2:1 advantage over the Interceptor", () => {
     const scan = Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]));
+    expect(CANON_SCAN[9] / CANON_SCAN[1]).toBe(2);
+    expect(scan[9] / scan[1]).toBe(2);
+  });
 
-    // Canon: 500 000 vs the next best 250 000 — exactly double.
+  it("restores the Dreadnought's 2x lead over the next-best scanner", () => {
+    const scan = Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]));
     expect(CANON_SCAN[8] / CANON_SCAN[6]).toBe(2);
-    // Ours: 40 000 vs 35 000 — a marginal edge for the flagship.
-    expect(scan[8] / scan[6]).toBeLessThan(1.2);
+    expect(scan[8] / scan[6]).toBe(2);
+  });
+
+  it('still fits the 30x15 grid — the widest scanner is 7.5 sectors', () => {
+    const widest = Math.max(...PLAYER_CLASSES.map((c) => c.scanRange));
+    expect(widest).toBe(75_000);
+    expect(widest / 10_000).toBeLessThan(30); // grid width in sectors
+  });
+
+  it('the Heavy Freighter remains the weakest scanner, as in canon', () => {
+    const scan = Object.fromEntries(PLAYER_CLASSES.map((c) => [c.classNumber, c.scanRange]));
+    const weakest = Math.min(...Object.values(scan));
+    expect(scan[3]).toBe(weakest);
+    expect(scan[3]).toBe(7_500);
+  });
+});
+
+describe('AI class scanRange — UNRESOLVED divergence from canon', () => {
+  /**
+   * Canon (reference/wiki/cpu-ships.md, and class 34 from player-ships.md):
+   *
+   *   cls  name                    canon      ours    ratio
+   *   21   Cybertron Scout         50 000    25 000    0.50
+   *   22   Cyb Battle Cruiser       1 000    35 000   35.00   <-- inflated 35x
+   *   23   Cyb Base Star          200 000    40 000    0.20
+   *   24   Sarten Attack Drone     20 000    20 000    1.00   <-- uncompressed
+   *   25   Sarten Obliterator     400 000    35 000    0.087
+   *   31   Lydorian Scow           25 000    10 000    0.40
+   *   32   Murdonian Transport     25 000    25 000    1.00   <-- uncompressed
+   *   33   Vakory Survey Drone     25 000    30 000    1.20   <-- inflated
+   *   34   Sysopian Death Star  1 000 000    50 000    0.05
+   *
+   * The ratio spans 0.05..35 — a 700x spread, against 4x on the player table
+   * before it was made proportional. Some values are compressed, two are the
+   * raw canon figure, and two are inflated above it.
+   *
+   * This matters beyond detection: C-001 gates phaser reach on the firer's
+   * scanRange, so an inflated scanner is also an inflated weapon envelope. The
+   * Cybertron Battle Cruiser engaging from 3.5 sectors is a plausible cause of
+   * the brutal new-pilot experience seen in playtest (three starter ships lost
+   * in quick succession).
+   *
+   * NOT rescaled here, for two reasons:
+   *  1. It materially changes AI difficulty — a balance decision.
+   *  2. The canon figure for class 22 (1 000, i.e. 0.1 sectors) is suspect: it
+   *     is 50x below the Scout and 200x below the Base Star, which reads more
+   *     like a wiki transcription error than a design intent. Rescaling from a
+   *     bad baseline would be worse than leaving it.
+   *
+   * These tests pin the CURRENT values so any change is deliberate.
+   */
+  const AI_CANON_SCAN: Record<number, number> = {
+    21: 50_000, 22: 1_000, 23: 200_000, 24: 20_000, 25: 400_000,
+    31: 25_000, 32: 25_000, 33: 25_000, 34: 1_000_000,
+  };
+
+  const AI_CLASSES = SHIP_CLASSES.filter((c) => c.classNumber >= 21)
+    .slice()
+    .sort((a, b) => a.classNumber - b.classNumber);
+
+  it('pins the current AI scan ranges', () => {
+    expect(Object.fromEntries(AI_CLASSES.map((c) => [c.classNumber, c.scanRange]))).toEqual({
+      21: 25_000, 22: 35_000, 23: 40_000, 24: 20_000, 25: 35_000,
+      31: 10_000, 32: 25_000, 33: 30_000, 34: 50_000,
+    });
+  });
+
+  it('DIVERGENCE: the AI table is not proportional, unlike the player table', () => {
+    const ratios = AI_CLASSES.map((c) => c.scanRange / AI_CANON_SCAN[c.classNumber]);
+    const spread = Math.max(...ratios) / Math.min(...ratios);
+    expect(spread).toBeGreaterThan(100); // ~700x today
+  });
+
+  it('DIVERGENCE: some AI scanners exceed their canonical value', () => {
+    const inflated = AI_CLASSES
+      .filter((c) => c.scanRange > AI_CANON_SCAN[c.classNumber])
+      .map((c) => c.classNumber);
+    expect(inflated).toEqual([22, 33]);
+  });
+
+  it('no AI scanner out-ranges the widest player scanner by more than 1x', () => {
+    // A guard against AI out-seeing every player ship. The Dreadnought is the
+    // player ceiling at 75 000 after the proportional rescale.
+    const widestPlayer = Math.max(...PLAYER_CLASSES.map((c) => c.scanRange));
+    for (const c of AI_CLASSES) {
+      expect(c.scanRange).toBeLessThanOrEqual(widestPlayer);
+    }
   });
 });
