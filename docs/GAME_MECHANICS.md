@@ -792,33 +792,42 @@ scanRange is a 50-sector radius, so out-ranging everything is the flagship's def
 smaller anchor (0.10) would cap it at 15 sectors but drop the Interceptor to 1.0-sector detection
 while Cybertrons still detect at 2.5, which is worse for new pilots.
 
-#### AI classes — NOT rescaled
+#### AI classes — rescaled on the same factor
 
-The AI table is far more inconsistent than the player table ever was, and is left alone pending a
-decision. Ratios against canon (`reference/wiki/cpu-ships.md`):
+The AI table is compressed on the **same x0.15 factor** as the player classes, so player-vs-AI
+relationships are canonical too (the Dreadnought at 75 000 still out-scans the Sarten Obliterator at
+60 000, exactly as canon's 500 000 vs 400 000 does).
 
-| Class | canon | ours | ratio |
-|-------|------:|-----:|------:|
-| Cybertron Scout | 50 000 | 25 000 | 0.50 |
-| Cybertron Battle Cruiser | 1 000 | 35 000 | **35.0** |
-| Cybertron Base Star | 200 000 | 40 000 | 0.20 |
-| Sarten Attack Drone | 20 000 | 20 000 | 1.00 |
-| Sarten Obliterator | 400 000 | 35 000 | 0.087 |
-| Lydorian Scow | 25 000 | 10 000 | 0.40 |
-| Murdonian Transport | 25 000 | 25 000 | 1.00 |
-| Vakory Survey Drone | 25 000 | 30 000 | 1.20 |
-| Sysopian Death Star | 1 000 000 | 50 000 | 0.05 |
+| Class | canon | ours | gate (sectors) |
+|-------|------:|-----:|---------------:|
+| Cybertron Scout | 50 000 | 7 500 | 0.75 |
+| Cybertron Battle Cruiser | 100 000 * | 15 000 | 1.5 |
+| Cybertron Base Star | 200 000 | 30 000 | 3.0 |
+| Sarten Attack Drone | 20 000 | 3 000 | 0.3 |
+| Sarten Obliterator | 400 000 | 60 000 | 6.0 |
+| Lydorian Scow | 25 000 | 3 750 | 0.375 |
+| Murdonian Transport | 25 000 | 3 750 | 0.375 |
+| Vakory Survey Drone | 25 000 | 3 750 | 0.375 |
+| Sysopian Death Star | 1 000 000 | 150 000 | 15.0 (admin-only) |
 
-The ratio spans 0.05 to 35 — a **700x spread**. Two values are the raw canon figure (uncompressed),
-two are inflated above it. Because C-001 gates phaser reach on the firer's `scanRange`, an inflated
-scanner is also an inflated weapon envelope: a Cybertron Battle Cruiser engages from 3.5 sectors
-where canon implies 0.1.
+\* **One correction to canon.** `reference/wiki/cpu-ships.md` lists the Cybertron Battle Cruiser at
+1 000 — 0.1 sectors, 50x below the Scout and 200x below the Base Star. That reads as a dropped zero
+rather than design intent, so it is treated as 100 000, placing it between the two.
 
-Not rescaled for two reasons. It materially changes AI difficulty, which is a balance decision; and
-the canon figure for the Cybertron Battle Cruiser (1 000, i.e. 0.1 sectors — 50x below the Scout and
-200x below the Base Star) reads more like a wiki transcription error than design intent, so
-rescaling from it would propagate a bad baseline. Engagement distances themselves (`tooclose` 3000,
-`hyperdist1` 25, `hyperdist2` 10) are uniform across Cybertron classes and match the wiki.
+Before this rescale the AI table ranged 0.05..35x canon — a 700x spread, with two values left at raw
+canon and two inflated ABOVE it. Because C-001 gates phaser reach on the firer's `scanRange`, an
+inflated scanner was also an inflated weapon envelope.
+
+**Verified live after the rescale**: a player parked beside a Sarten Obliterator was engaged and
+destroyed (`ship destroyed: victim=... attacker=Cybrg-222`, hull -149% from a single phaser — the
+Obliterator's phasrtype is 16). The round-2 failure mode this guards against — "Cybertrons appeared
+inert in playtest" — has not returned.
+
+Note the elite AI one-shots a light hull: 149% against a 100% kill threshold. That is a consequence
+of canon phaser levels (Obliterator Pha=16 vs Interceptor Pha=10) rather than of the scan rescale.
+
+Engagement distances themselves (`tooclose` 3000, `hyperdist1` 25, `hyperdist2` 10) are uniform
+across Cybertron classes and match the wiki.
 
 ---
 

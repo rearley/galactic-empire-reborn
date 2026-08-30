@@ -131,75 +131,85 @@ describe('scanRange compression is PROPORTIONAL to canon', () => {
   });
 });
 
-describe('AI class scanRange — UNRESOLVED divergence from canon', () => {
+describe('AI class scanRange is proportional to canon, on the same factor', () => {
   /**
-   * Canon (reference/wiki/cpu-ships.md, and class 34 from player-ships.md):
+   * Canon: reference/wiki/cpu-ships.md, plus class 34 from player-ships.md.
    *
-   *   cls  name                    canon      ours    ratio
-   *   21   Cybertron Scout         50 000    25 000    0.50
-   *   22   Cyb Battle Cruiser       1 000    35 000   35.00   <-- inflated 35x
-   *   23   Cyb Base Star          200 000    40 000    0.20
-   *   24   Sarten Attack Drone     20 000    20 000    1.00   <-- uncompressed
-   *   25   Sarten Obliterator     400 000    35 000    0.087
-   *   31   Lydorian Scow           25 000    10 000    0.40
-   *   32   Murdonian Transport     25 000    25 000    1.00   <-- uncompressed
-   *   33   Vakory Survey Drone     25 000    30 000    1.20   <-- inflated
-   *   34   Sysopian Death Star  1 000 000    50 000    0.05
+   * ONE correction to canon: the wiki lists the Cybertron Battle Cruiser at
+   * 1 000 — 0.1 sectors, 50x below the Scout and 200x below the Base Star,
+   * which reads as a dropped zero rather than design intent. It is treated as
+   * 100 000, placing it between the Scout (50 000) and the Base Star (200 000).
    *
-   * The ratio spans 0.05..35 — a 700x spread, against 4x on the player table
-   * before it was made proportional. Some values are compressed, two are the
-   * raw canon figure, and two are inflated above it.
-   *
-   * This matters beyond detection: C-001 gates phaser reach on the firer's
-   * scanRange, so an inflated scanner is also an inflated weapon envelope. The
-   * Cybertron Battle Cruiser engaging from 3.5 sectors is a plausible cause of
-   * the brutal new-pilot experience seen in playtest (three starter ships lost
-   * in quick succession).
-   *
-   * NOT rescaled here, for two reasons:
-   *  1. It materially changes AI difficulty — a balance decision.
-   *  2. The canon figure for class 22 (1 000, i.e. 0.1 sectors) is suspect: it
-   *     is 50x below the Scout and 200x below the Base Star, which reads more
-   *     like a wiki transcription error than a design intent. Rescaling from a
-   *     bad baseline would be worse than leaving it.
-   *
-   * These tests pin the CURRENT values so any change is deliberate.
+   * Before this rescale the AI table ranged 0.05..35x canon — a 700x spread,
+   * with two values left uncompressed and two inflated ABOVE canon. Because
+   * C-001 gates phaser reach on the firer's scanRange, an inflated scanner was
+   * also an inflated weapon envelope.
    */
   const AI_CANON_SCAN: Record<number, number> = {
-    21: 50_000, 22: 1_000, 23: 200_000, 24: 20_000, 25: 400_000,
-    31: 25_000, 32: 25_000, 33: 25_000, 34: 1_000_000,
+    21: 50_000,
+    22: 100_000, // wiki says 1 000 — treated as a transcription error
+    23: 200_000,
+    24: 20_000,
+    25: 400_000,
+    31: 25_000,
+    32: 25_000,
+    33: 25_000,
+    34: 1_000_000,
   };
 
   const AI_CLASSES = SHIP_CLASSES.filter((c) => c.classNumber >= 21)
     .slice()
     .sort((a, b) => a.classNumber - b.classNumber);
 
-  it('pins the current AI scan ranges', () => {
-    expect(Object.fromEntries(AI_CLASSES.map((c) => [c.classNumber, c.scanRange]))).toEqual({
-      21: 25_000, 22: 35_000, 23: 40_000, 24: 20_000, 25: 35_000,
-      31: 10_000, 32: 25_000, 33: 30_000, 34: 50_000,
-    });
-  });
+  const FACTOR = 0.15;
 
-  it('DIVERGENCE: the AI table is not proportional, unlike the player table', () => {
-    const ratios = AI_CLASSES.map((c) => c.scanRange / AI_CANON_SCAN[c.classNumber]);
-    const spread = Math.max(...ratios) / Math.min(...ratios);
-    expect(spread).toBeGreaterThan(100); // ~700x today
-  });
-
-  it('DIVERGENCE: some AI scanners exceed their canonical value', () => {
-    const inflated = AI_CLASSES
-      .filter((c) => c.scanRange > AI_CANON_SCAN[c.classNumber])
-      .map((c) => c.classNumber);
-    expect(inflated).toEqual([22, 33]);
-  });
-
-  it('no AI scanner out-ranges the widest player scanner by more than 1x', () => {
-    // A guard against AI out-seeing every player ship. The Dreadnought is the
-    // player ceiling at 75 000 after the proportional rescale.
-    const widestPlayer = Math.max(...PLAYER_CLASSES.map((c) => c.scanRange));
+  it('applies the SAME factor as the player table', () => {
     for (const c of AI_CLASSES) {
+      expect(c.scanRange).toBe(AI_CANON_SCAN[c.classNumber] * FACTOR);
+    }
+  });
+
+  it('no AI scanner exceeds its canonical value any more', () => {
+    for (const c of AI_CLASSES) {
+      expect(c.scanRange).toBeLessThan(AI_CANON_SCAN[c.classNumber]);
+    }
+  });
+
+  it('preserves the canonical AI ordering', () => {
+    const scan = Object.fromEntries(AI_CLASSES.map((c) => [c.classNumber, c.scanRange]));
+    const rank = (o: Record<number, number>) =>
+      Object.keys(o).map(Number).sort((a, b) => o[a] - o[b] || a - b).join(',');
+    expect(rank(scan)).toBe(rank(AI_CANON_SCAN));
+  });
+
+  it('the three droid classes share one scan range, as in canon', () => {
+    const scan = Object.fromEntries(AI_CLASSES.map((c) => [c.classNumber, c.scanRange]));
+    expect(scan[31]).toBe(scan[32]);
+    expect(scan[32]).toBe(scan[33]);
+  });
+
+  it('the Cybertron Base Star still out-scans the Scout, as in canon', () => {
+    const scan = Object.fromEntries(AI_CLASSES.map((c) => [c.classNumber, c.scanRange]));
+    expect(scan[23]).toBeGreaterThan(scan[21]);
+    expect(AI_CANON_SCAN[23] / AI_CANON_SCAN[21]).toBe(scan[23] / scan[21]);
+  });
+
+  it('no COMBATIVE AI out-scans the best player ship', () => {
+    // The Sysopian Death Star (34) is admin-only and deliberately god-tier
+    // (100m tons, warp 255, canon scan 1m = a 100-sector radius), so it is
+    // exempt. Every Cybertron and droid must stay within player reach.
+    const widestPlayer = Math.max(...PLAYER_CLASSES.map((c) => c.scanRange));
+    for (const c of AI_CLASSES.filter((x) => x.classNumber !== 34)) {
       expect(c.scanRange).toBeLessThanOrEqual(widestPlayer);
+    }
+  });
+
+  it('every AI class can still see beyond its own sector, so none is inert', () => {
+    // Round 2 over-compressed and "Cybertrons appeared inert in playtest"
+    // (ship-class-scanrange-pin.spec.ts). The weakest AI scanner must still
+    // reach past the sector it occupies.
+    for (const c of AI_CLASSES) {
+      expect(c.scanRange / 10_000).toBeGreaterThanOrEqual(0.3);
     }
   });
 });

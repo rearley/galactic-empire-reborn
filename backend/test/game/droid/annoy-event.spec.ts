@@ -14,6 +14,7 @@
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { DroidTickService } from '../../../src/game/droid/droid-tick.service';
 import { DroidSpawner } from '../../../src/game/droid/droid-spawner';
+import { DROID_CLASS_DEFAULTS } from '../../../src/game/droid/droid.config';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { MineRegistry } from '../../../src/game/combat/mine.registry';
@@ -105,7 +106,10 @@ function buildHarness(seed = 12) {
     shpclass: 5,
     // Adjacent to the scow, out of the neutral zone so the runDroidActions
     // player-filter (skips floor(x)===0 && floor(y)===0) keeps this player.
-    xcoord: 10.5,
+    // The offset is a FRACTION of the scow's own scanRange — the annoy check is
+    // gated on it, so a hardcoded 0.5-sector gap silently stopped exercising
+    // this path when the droid classes were rescaled to canon x0.15.
+    xcoord: 10 + (DROID_CLASS_DEFAULTS[DROID_CLASS_SCOW]!.scanRange / 10_000) * 0.5,
     ycoord: 7,
     status: GESTAT_USER,
     isEphemeral: undefined,
