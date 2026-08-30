@@ -154,6 +154,32 @@ describe('POST /debug/ship/outfit', () => {
     ).toThrow(BadRequestException);
   });
 
+  it('sets shield charge, type and raised/lowered state', () => {
+    const ship = makeShip({ shield: 0, shieldtype: 1, shieldstat: 0 });
+    const { controller } = build(ship);
+
+    controller.outfit('Reliant', undefined, undefined, undefined, undefined, undefined, undefined, undefined, '500', '10', 'up');
+
+    expect(ship.shield).toBe(500);
+    expect(ship.shieldtype).toBe(10);
+    expect(ship.shieldstat).toBe(1);
+  });
+
+  it('lowers shields when shieldstat is down', () => {
+    const ship = makeShip({ shieldstat: 1 });
+    const { controller } = build(ship);
+    controller.outfit('Reliant', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'down');
+    expect(ship.shieldstat).toBe(0);
+  });
+
+  it('rejects an unrecognised shieldstat', () => {
+    const ship = makeShip();
+    const { controller } = build(ship);
+    expect(() =>
+      controller.outfit('Reliant', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'sideways'),
+    ).toThrow(BadRequestException);
+  });
+
   it('rejects an unknown ship rather than silently doing nothing', () => {
     const { controller } = build(undefined);
     expect(() => controller.outfit('Nonexistent', '1', undefined, undefined, undefined)).toThrow(BadRequestException);

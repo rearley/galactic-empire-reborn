@@ -45,6 +45,9 @@ export class ShipDebugController {
     @Query('x') xParam?: string,
     @Query('y') yParam?: string,
     @Query('shpclass') shpclassParam?: string,
+    @Query('shield') shieldParam?: string,
+    @Query('shieldtype') shieldtypeParam?: string,
+    @Query('shieldstat') shieldstatParam?: string,
   ): object {
     if (!shipname) throw new BadRequestException('shipname is required');
 
@@ -84,6 +87,19 @@ export class ShipDebugController {
       shpclass = n;
     }
 
+    const shield = optionalCount(shieldParam, 'shield');
+    const shieldtype = optionalCount(shieldtypeParam, 'shieldtype');
+
+    // shieldUp in the combat tick requires BOTH shieldstat===1 and shield>0,
+    // so charge and raised-state are set independently here.
+    let shieldstat: number | undefined;
+    if (shieldstatParam !== undefined) {
+      const v = shieldstatParam.toLowerCase();
+      if (v === 'up') shieldstat = 1;
+      else if (v === 'down' || v === 'dn') shieldstat = 0;
+      else throw new BadRequestException("shieldstat must be 'up' or 'down'");
+    }
+
     const target = this.shipState.findByName(shipname);
     if (!target) throw new BadRequestException(`no live ship named '${shipname}'`);
 
@@ -98,6 +114,9 @@ export class ShipDebugController {
         s.ycoord = at.y;
       }
       if (shpclass !== undefined) s.shpclass = shpclass;
+      if (shield !== undefined) s.shield = shield;
+      if (shieldtype !== undefined) s.shieldtype = shieldtype;
+      if (shieldstat !== undefined) s.shieldstat = shieldstat;
     });
     if (!updated) throw new BadRequestException(`ship '${shipname}' is no longer live`);
 
@@ -111,6 +130,9 @@ export class ShipDebugController {
       xcoord: updated.xcoord,
       ycoord: updated.ycoord,
       shpclass: updated.shpclass,
+      shield: updated.shield,
+      shieldtype: updated.shieldtype,
+      shieldstat: updated.shieldstat,
     };
   }
 }
