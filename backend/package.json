@@ -3,11 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "db:reset": "PGPASSWORD=ge psql -h localhost -U ge -d postgres -c 'DROP DATABASE IF EXISTS ge; CREATE DATABASE ge OWNER ge; DROP DATABASE IF EXISTS ge_test; CREATE DATABASE ge_test OWNER ge;' && npx prisma migrate deploy && npx prisma db seed",
+    "db:reset": "PGPASSWORD=ge psql -h localhost -U ge -d postgres -c 'DROP DATABASE IF EXISTS ge;' -c 'CREATE DATABASE ge OWNER ge;' -c 'DROP DATABASE IF EXISTS ge_test;' -c 'CREATE DATABASE ge_test OWNER ge;' && npx prisma migrate deploy && npx prisma db seed",
     "test": "jest",
     "test:manual": "jest --config jest.manual.config.ts",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push --skip-generate",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "build": "nest build"

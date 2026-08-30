@@ -32,18 +32,21 @@ describe('PrismaService lifecycle', () => {
     });
   });
 
-  // G3: bogus DATABASE_URL must cause app.init() to reject
+  // G3: a bogus connection string must cause app.init() to reject.
+  // Under Jest, PrismaService resolves TEST_DATABASE_URL (see
+  // src/prisma/database-url.ts), so that is the variable to poison here —
+  // overriding DATABASE_URL would be ignored and the app would connect fine.
   describe('fail-fast on bad connection (G3)', () => {
-    it('rejects app.init() with a recognizable error when DATABASE_URL is invalid', async () => {
-      const original = process.env.DATABASE_URL;
-      process.env.DATABASE_URL = 'postgresql://bad:bad@localhost:1/nonexistent';
+    it('rejects app.init() with a recognizable error when the connection string is invalid', async () => {
+      const original = process.env.TEST_DATABASE_URL;
+      process.env.TEST_DATABASE_URL = 'postgresql://bad:bad@localhost:1/nonexistent';
 
       let badApp: TestingModule | null = null;
       try {
         badApp = await Test.createTestingModule({ imports: [PrismaModule] }).compile();
         await expect(badApp.init()).rejects.toThrow();
       } finally {
-        process.env.DATABASE_URL = original;
+        process.env.TEST_DATABASE_URL = original;
         if (badApp) {
           try { await badApp.close(); } catch { /* already failed to init, ignore */ }
         }

@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { resolveDatabaseUrl } from './database-url';
 
 /**
  * Owns the Prisma lifecycle — connects on module init, disconnects on destroy.
@@ -8,6 +9,12 @@ import { PrismaClient } from '@prisma/client';
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  constructor() {
+    // Binds test runs to TEST_DATABASE_URL so specs that truncate tables can
+    // never reach the development database. @see ./database-url.ts
+    super({ datasources: { db: { url: resolveDatabaseUrl() } } });
+  }
+
   async onModuleInit(): Promise<void> {
     await this.$connect();
     console.log('[Nest] LOG [PrismaService]   Connected to PostgreSQL');
