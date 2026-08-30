@@ -236,8 +236,17 @@ export const TORPSPED = 500 as const;
 export const MISLSPED = 300 as const;
 /** @see GEGLOBAL.H misengfc — missile energy divisor for cost: cost = charge / MISENGFC */
 export const MISENGFC = 10 as const;
-/** @see GEGLOBAL.H jamtime — base jammer counter on deploy */
-export const JAMTIME = 20 as const;
+/**
+ * Base jammer counter on deploy.
+ *
+ * `numopt(JAMTIME,1,10)` CLAMPS this to 10 — the port previously used 20, so
+ * jammers lasted twice the maximum duration the original permits. Semantics
+ * match on both sides (`jammer = jamtime * ddist`, GECMDS.C:1644), which is what
+ * makes the values directly comparable. Env-overridable, clamped to the bound.
+ *
+ * @see GEMAIN.C:496 jamtime = numopt(JAMTIME,1,10)
+ */
+export const JAMTIME = Math.min(10, Math.max(1, Number(process.env.JAMTIME ?? 10))) as number;
 /**
  * Max normal-phaser damage base.
  *
