@@ -35,7 +35,10 @@ describe('combat balance regression', () => {
   it('TORPSPED === 500', () => expect(TORPSPED).toBe(500));
   it('MISLSPED === 300', () => expect(MISLSPED).toBe(300));
   it('MISENGFC === 10', () => expect(MISENGFC).toBe(10));
-  it('JAMTIME === 20', () => expect(JAMTIME).toBe(20));
+  // numopt CLAMPS jamtime to 1..10 (GEMAIN.C:496); the previous pin of 20
+  // encoded a value the original cannot produce.
+  // @see test/balance/jamtime.balance.spec.ts
+  it('JAMTIME === 10 (numopt ceiling)', () => expect(JAMTIME).toBe(10));
 
   describe('mine sweep cadence — `timer % 5 === 0`', () => {
     it('returns mines whose timer ∈ {0, 5, 10} but excludes {1, 2, 3, 4}', () => {
