@@ -123,8 +123,11 @@ export class ScanHandlerService implements OnModuleInit {
     return {
       keyword: 'scan',
       // 'sca' is the canonical verb in the original command table
-      // (GECMDS.C:158), which matched on the first 3 characters.
-      aliases: ['sca', 'sc'],
+      // (GECMDS.C:158). The router matches on the first 3 characters, so both
+      // 'sca' and 'scan' resolve. The 2-char 'sc' is deliberately NOT an alias:
+      // strncmp("sc","sca",3) compares '\0' against 'a', so the original
+      // rejected it.
+      aliases: ['sca'],
       minArgs: 0,
       argMissingMessage: formatMessage(MessageId.SCANFMT),
       handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>

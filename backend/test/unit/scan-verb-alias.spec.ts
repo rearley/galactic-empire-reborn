@@ -31,4 +31,10 @@ describe('scan command verbs', () => {
   it('still accepts the long form "scan"', () => {
     expect(registered).toContain('scan');
   });
+
+  it('does not register the 2-character "sc" — the original rejected it', () => {
+    // gesearch does strncmp(ptr, "sca", 3): for "sc" that compares '\0'
+    // against 'a' and returns non-zero, so `sc` was never a scan verb.
+    expect(registered).not.toContain('sc');
+  });
 });

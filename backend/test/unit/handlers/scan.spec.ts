@@ -199,11 +199,15 @@ describe('ScanHandlerService', () => {
   });
 
   describe('keyword and alias', () => {
-    it('keyword is "scan", alias includes "sc"', async () => {
+    it('keyword is "scan", alias includes the canonical "sca" but not "sc"', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       expect(service.command.keyword).toBe('scan');
-      expect(service.command.aliases).toContain('sc');
+      // GECMDS.C:158 registers {"sca", cmd_scan} and gesearch matches on the
+      // first 3 characters, so 'sca' and 'scan' both resolve while the 2-char
+      // 'sc' does not — strncmp("sc","sca",3) compares '\0' against 'a'.
+      expect(service.command.aliases).toContain('sca');
+      expect(service.command.aliases).not.toContain('sc');
     });
   });
 });
