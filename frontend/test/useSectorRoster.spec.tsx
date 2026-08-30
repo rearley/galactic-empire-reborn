@@ -12,12 +12,40 @@
  * @see frontend/src/features/sector-roster/useSectorRoster.ts
  */
 
+import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { EventEmitter } from 'events';
 import { useSectorRoster } from '../src/features/sector-roster/useSectorRoster';
 
+/**
+ * Minimal event emitter. The frontend has no @types/node, so Node's `events`
+ * module cannot be type-checked here; this keeps the test browser-only.
+ */
+class TestEmitter {
+  private handlers = new Map<string, Array<(...args: unknown[]) => void>>();
+
+  on(event: string, handler: (...args: unknown[]) => void): void {
+    const list = this.handlers.get(event) ?? [];
+    list.push(handler);
+    this.handlers.set(event, list);
+  }
+
+  off(event: string, handler: (...args: unknown[]) => void): void {
+    const list = this.handlers.get(event) ?? [];
+    const idx = list.indexOf(handler);
+    if (idx !== -1) list.splice(idx, 1);
+  }
+
+  emit(event: string, ...args: unknown[]): void {
+    for (const handler of [...(this.handlers.get(event) ?? [])]) handler(...args);
+  }
+
+  listenerCount(event: string): number {
+    return (this.handlers.get(event) ?? []).length;
+  }
+}
+
 function makeSocket() {
-  const emitter = new EventEmitter();
+  const emitter = new TestEmitter();
   return {
     on: (event: string, handler: (...args: unknown[]) => void) => emitter.on(event, handler),
     off: (event: string, handler: (...args: unknown[]) => void) => emitter.off(event, handler),

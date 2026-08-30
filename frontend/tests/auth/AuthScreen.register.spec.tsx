@@ -22,6 +22,19 @@ import { AuthScreen } from '../../src/auth/AuthScreen';
 describe('AuthScreen — register tab (T029)', () => {
   const onAuthenticated = vi.fn();
 
+  /**
+   * AuthScreen opens in login mode, so the first /register/i button is the
+   * mode switch. Click it, then return the submit button for register mode.
+   */
+  async function submitAsRegister(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(screen.getByRole('button', { name: /register/i }));
+    await user.type(screen.getByLabelText(/username/i), pendingUsername);
+    await user.type(screen.getByLabelText(/password/i), pendingPassword);
+    await user.click(screen.getByRole('button', { name: /^register$/i }));
+  }
+  let pendingUsername = '';
+  let pendingPassword = '';
+
   beforeEach(() => {
     vi.resetAllMocks();
     // Provide a default successful fetch mock.
@@ -48,9 +61,9 @@ describe('AuthScreen — register tab (T029)', () => {
     const user = userEvent.setup();
     render(<AuthScreen onAuthenticated={onAuthenticated} />);
 
-    await user.type(screen.getByLabelText(/username/i), 'TestPilot');
-    await user.type(screen.getByLabelText(/password/i), 'secret123');
-    await user.click(screen.getByRole('button', { name: /register/i }));
+    pendingUsername = 'TestPilot';
+    pendingPassword = 'secret123';
+    await submitAsRegister(user);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -68,9 +81,9 @@ describe('AuthScreen — register tab (T029)', () => {
     const user = userEvent.setup();
     render(<AuthScreen onAuthenticated={onAuthenticated} />);
 
-    await user.type(screen.getByLabelText(/username/i), 'TestPilot');
-    await user.type(screen.getByLabelText(/password/i), 'secret123');
-    await user.click(screen.getByRole('button', { name: /register/i }));
+    pendingUsername = 'TestPilot';
+    pendingPassword = 'secret123';
+    await submitAsRegister(user);
 
     await waitFor(() => {
       expect(onAuthenticated).toHaveBeenCalledWith('jwt-token-abc');
@@ -87,9 +100,9 @@ describe('AuthScreen — register tab (T029)', () => {
     const user = userEvent.setup();
     render(<AuthScreen onAuthenticated={onAuthenticated} />);
 
-    await user.type(screen.getByLabelText(/username/i), 'TakenName');
-    await user.type(screen.getByLabelText(/password/i), 'pass');
-    await user.click(screen.getByRole('button', { name: /register/i }));
+    pendingUsername = 'TakenName';
+    pendingPassword = 'pass';
+    await submitAsRegister(user);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeDefined();

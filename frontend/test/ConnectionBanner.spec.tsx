@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
-import type { ConnectionStatus } from '../src/socket/useSocket';
 
 /**
  * Verifies ConnectionBanner visibility and copy per connection status (FR-019).

@@ -101,10 +101,11 @@ describe('ScanPanel', () => {
     const cards = screen.getAllByTestId('scan-card');
     expect(cards).toHaveLength(3);
 
+    // Newest scan renders on top — see commit 6ae0f32 ("newest scan on top").
     const headers = screen.getAllByTestId('scan-card-header');
-    expect(headers[0].textContent).toBe('Scan 1');
+    expect(headers[0].textContent).toBe('Scan 3');
     expect(headers[1].textContent).toBe('Scan 2');
-    expect(headers[2].textContent).toBe('Scan 3');
+    expect(headers[2].textContent).toBe('Scan 1');
   });
 
   // T011: overwrite after append replaces all cards

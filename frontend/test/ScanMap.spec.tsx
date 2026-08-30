@@ -144,9 +144,11 @@ describe('ScanMap', () => {
     expect(screen.getByTestId('cell-ship-5-5')).toBeDefined();
 
     const payload: PhysicsSectorTransitionPayload = {
-      transitions: [
-        { shipId: 'ship-42', fromSector: { x: 0, y: 0 }, toSector: { x: 1, y: 0 } },
-      ],
+      shipId: 'ship-42',
+      fromSector: { x: 0, y: 0 },
+      toSector: { x: 1, y: 0 },
+      x: 1.5,
+      y: 0.5,
     };
     act(() => triggerSocket('physics.sector-transition', payload));
 
@@ -159,9 +161,11 @@ describe('ScanMap', () => {
     render(<ScanMap cells={cells} shipId="ship-42" />);
 
     const payload: PhysicsSectorTransitionPayload = {
-      transitions: [
-        { shipId: 'other-ship', fromSector: { x: 0, y: 0 }, toSector: { x: 1, y: 0 } },
-      ],
+      shipId: 'other-ship',
+      fromSector: { x: 0, y: 0 },
+      toSector: { x: 1, y: 0 },
+      x: 1.5,
+      y: 0.5,
     };
     act(() => triggerSocket('physics.sector-transition', payload));
 

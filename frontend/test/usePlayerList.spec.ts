@@ -82,9 +82,11 @@ describe('usePlayerList', () => {
     const { result } = renderHook(() => usePlayerList());
     act(() => result.current.dispatch({ type: 'SNAPSHOT', payload: { players: [player1] } }));
     const payload: PhysicsSectorTransitionPayload = {
-      transitions: [
-        { shipId: 'user1:1', fromSector: { x: 5, y: 3 }, toSector: { x: 6, y: 3 } },
-      ],
+      shipId: 'user1:1',
+      fromSector: { x: 5, y: 3 },
+      toSector: { x: 6, y: 3 },
+      x: 6.5,
+      y: 3.5,
     };
     act(() => result.current.dispatch({ type: 'TRANSITION', payload }));
     expect(result.current.players[0].sector).toEqual({ x: 6, y: 3 });
@@ -94,9 +96,11 @@ describe('usePlayerList', () => {
     const { result } = renderHook(() => usePlayerList());
     act(() => result.current.dispatch({ type: 'SNAPSHOT', payload: { players: [player1] } }));
     const payload: PhysicsSectorTransitionPayload = {
-      transitions: [
-        { shipId: 'ghost:1', fromSector: { x: 0, y: 0 }, toSector: { x: 1, y: 0 } },
-      ],
+      shipId: 'ghost:1',
+      fromSector: { x: 0, y: 0 },
+      toSector: { x: 1, y: 0 },
+      x: 1.5,
+      y: 0.5,
     };
     expect(() =>
       act(() => result.current.dispatch({ type: 'TRANSITION', payload })),

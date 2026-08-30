@@ -138,10 +138,10 @@ describe('player presence & sector-transition types', () => {
       fromSector: { x: 1, y: 2 },
       toSector: { x: 1, y: 3 },
     };
-    const payload: PhysicsSectorTransitionPayload = { transitions: [transition] };
-    expect(payload.transitions[0].shipId).toBe('ship1');
-    expect(payload.transitions[0].fromSector.y).toBe(2);
-    expect(payload.transitions[0].toSector.y).toBe(3);
+    const payload: PhysicsSectorTransitionPayload = { ...transition, x: 1.5, y: 3.5 };
+    expect(payload.shipId).toBe('ship1');
+    expect(payload.fromSector.y).toBe(2);
+    expect(payload.toSector.y).toBe(3);
   });
 });
 
@@ -159,7 +159,7 @@ type _SectorTransition = SectorTransition extends {
   shipId: string; fromSector: Sector; toSector: Sector;
 } ? true : never;
 type _PhysicsSectorTransitionPayload = PhysicsSectorTransitionPayload extends {
-  transitions: SectorTransition[];
+  shipId: string; fromSector: Sector; toSector: Sector; x: number; y: number;
 } ? true : never;
 
 const _newChecks: [_Sector, _ConnectedPlayer, _PlayerSnapshotPayload, _PlayerJoinedPayloadFwd, _PlayerJoinedPayloadBwd, _PlayerLeftPayload, _SectorTransition, _PhysicsSectorTransitionPayload] = [true, true, true, true, true, true, true, true];
