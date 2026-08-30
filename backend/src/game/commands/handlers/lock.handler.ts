@@ -77,6 +77,7 @@ export class LockHandlerService {
       if (result.clearedLock) {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.lock = NOLOCK_SENTINEL;
+          s.lockKey = null;
         });
       }
       return { lines: [{ text: result.message, category: 'system' }] };
@@ -91,6 +92,7 @@ export class LockHandlerService {
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.lock = target.shipno;
+      s.lockKey = `${target.userid}:${target.shipno}`;
     });
 
     // LOCK02: show full ship name so player knows which ship matched the partial name.

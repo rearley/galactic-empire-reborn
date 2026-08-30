@@ -85,6 +85,16 @@ export interface ShipState {
   emulate: number;
   minesnear: number;
   lock: number;
+  /**
+   * Composite key (`userid:shipno`) of the locked ship.
+   *
+   * `lock` alone is ambiguous: it holds the target's per-user `shipno`, and
+   * every droid plus every player's first ship is shipno 1. C's `lock` is a
+   * GLOBAL slot index (GECMDS.C:1443), so this restores the "exactly one ship"
+   * property without changing the persisted column. In-memory only; null when
+   * unlocked or when restored from a persisted `lock` with no key.
+   */
+  lockKey?: string | null;
   holdcourse: number;
   topspeed: number;
   /** Maximum cargo capacity in tons. Loaded from ShipClass.maxTons at hydration. @see GEMAIN.H WARSHP */
