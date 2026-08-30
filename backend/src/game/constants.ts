@@ -1,3 +1,8 @@
+import { resolveGameConfig } from './config/game-config';
+
+/** Resolved sysop tuning: config/game.config.json, overridden by the environment. */
+const GAME_CONFIG = resolveGameConfig();
+
 /**
  * Galaxy dimensions — fixed from original source.
  * @see GEMAIN.H MAXX, MAXY
@@ -121,13 +126,13 @@ export const PLTYPE_WORM = 3 as const;
  * Maximum number of planets that can be placed in the galaxy.
  * @see GEMAIN.H:123
  */
-export const MAXPLANETS = 9 as const;
+export const MAXPLANETS = GAME_CONFIG.MAXPLSE;
 
 /**
  * Max ships a player may own (env MAXSHIPS, 1–50).
  * @see GEMAIN.C:462 numopt(MAXSHIPS,1,50)
  */
-export const MAXSHIPS = Math.min(50, Math.max(1, Number(process.env.MAXSHIPS ?? 10))) as number;
+export const MAXSHIPS = GAME_CONFIG.MAXSHIPS;
 
 /** Planet lock-time in seconds. @see GEMAIN.C:469 (PLANTOCK; canonical default 30 minutes) */
 export const PLANTOCK_SECONDS = 1800 as const;
@@ -217,7 +222,7 @@ export const QUADMAXPERTICK = 5 as const;
  *
  * @see GEMAIN.C:508 tdammax = (double)numopt(TDAMMAX,1,100)
  */
-export const TDAMMAX = Math.min(100, Math.max(1, Number(process.env.TDAMMAX ?? 100))) as number;
+export const TDAMMAX = GAME_CONFIG.TDAMMAX;
 /**
  * Max missile damage roll.
  *
@@ -225,17 +230,17 @@ export const TDAMMAX = Math.min(100, Math.max(1, Number(process.env.TDAMMAX ?? 1
  *
  * @see GEMAIN.C:511 mdammax = (double)numopt(MDAMMAX,1,100)
  */
-export const MDAMMAX = Math.min(100, Math.max(1, Number(process.env.MDAMMAX ?? 100))) as number;
+export const MDAMMAX = GAME_CONFIG.MDAMMAX;
 /** @see GEGLOBAL.H minedammax — max mine damage */
-export const MINEDAMMAX = 150 as const;
+export const MINEDAMMAX = GAME_CONFIG.MNDAMMAX;
 /** @see GEGLOBAL.H decodds — decoy intercept probability (0-100 integer) */
-export const DECODDS = 50 as const;
+export const DECODDS = GAME_CONFIG.DECODDS;
 /** @see GEGLOBAL.H torpsped — torpedo travel distance per tick */
-export const TORPSPED = 500 as const;
+export const TORPSPED = GAME_CONFIG.TORPSPED;
 /** @see GEGLOBAL.H mislsped — missile travel distance per tick */
-export const MISLSPED = 300 as const;
+export const MISLSPED = GAME_CONFIG.MISLSPED;
 /** @see GEGLOBAL.H misengfc — missile energy divisor for cost: cost = charge / MISENGFC */
-export const MISENGFC = 10 as const;
+export const MISENGFC = GAME_CONFIG.MISENGFC;
 /**
  * Base jammer counter on deploy.
  *
@@ -246,7 +251,7 @@ export const MISENGFC = 10 as const;
  *
  * @see GEMAIN.C:496 jamtime = numopt(JAMTIME,1,10)
  */
-export const JAMTIME = Math.min(10, Math.max(1, Number(process.env.JAMTIME ?? 10))) as number;
+export const JAMTIME = GAME_CONFIG.JAMTIME;
 /**
  * Max normal-phaser damage base.
  *
@@ -262,21 +267,21 @@ export const JAMTIME = Math.min(10, Math.max(1, Number(process.env.JAMTIME ?? 10
  *
  * @see GEMAIN.C:494 numopt(PDAMMAX,1,200)
  */
-export const PDAMMAX = Math.min(200, Math.max(1, Number(process.env.PDAMMAX ?? 25))) as number;
+export const PDAMMAX = GAME_CONFIG.PDAMMAX;
 /** @see GEMAIN.C:493 numopt(PFIRDST,1,20) — normal-phaser distance falloff exponent. */
-export const PFIRDST = 1 as const;
+export const PFIRDST = GAME_CONFIG.PFIRDST;
 /** @see GEMAIN.C:492 numopt(HPDAMMAX,1,200) — max hyper-phaser damage base (warp branch). */
-export const HPDAMMAX = 200 as const;
+export const HPDAMMAX = GAME_CONFIG.HPDAMMAX;
 /** @see GEMAIN.C:491 numopt(HPFIRDST,1,20) — hyper-phaser distance falloff exponent. */
-export const HPFIRDST = 1 as const;
+export const HPFIRDST = GAME_CONFIG.HPFIRDST;
 /** @see GEMAIN.C:506-507 numopt(TORFACT,1,50)/10 — torpedo lock-quality divisor. */
-export const TORFACT = 0.1 as const;
+export const TORFACT = GAME_CONFIG.TORFACT / 10;
 /** @see GEMAIN.C:509-510 numopt(MISFACT,1,50)/10 — missile lock-quality divisor. */
-export const MISFACT = 0.1 as const;
+export const MISFACT = GAME_CONFIG.MISFACT / 10;
 /** @see GEMAIN.C:463 numopt(SE100DAM,1,101) — self-zap hull damage for firing in the neutral zone. */
-export const SE100DAM = 101 as const;
+export const SE100DAM = GAME_CONFIG.SE100DAM;
 /** @see GEMAIN.C:598 numopt(PHATOWRP,0,100) — min phasrtype to hit a warping victim with normal phaser. */
-export const PHATOWRP = 0 as const;
+export const PHATOWRP = GAME_CONFIG.PHATOWRP;
 
 /** Shield status: damaged (subsystem hit). @see GEMAIN.H:161 #define SHIELDDM 3 */
 export const SHIELDDM = 3 as const;
@@ -288,7 +293,7 @@ export const SHIELDDM = 3 as const;
 export const MAIL_CLASS_DISTRESS = 1 as const;
 
 /** Per-player live-mine deployment cap. @see GECMDS.C:1722 usermines */
-export const USERMINES = 200 as const;
+export const USERMINES = GAME_CONFIG.USRMINES;
 /** Minimum timer value for a deployed mine. @see GECMDS.C:1722 */
 export const MINE_TIMER_MIN = 1 as const;
 /** Maximum timer value for a deployed mine. @see GECMDS.C:1722 */
@@ -298,7 +303,7 @@ export const MINE_TIMER_MAX = 50 as const;
  * Universe half-extent — coordinates valid in [-UNIVMAX, +UNIVMAX].
  * @see GEGLOBAL.H:134 univmax
  */
-export const UNIVMAX = 15 as const;
+export const UNIVMAX = GAME_CONFIG.UNIVMAX;
 
 // ── Cybertron AI constants (GEMAIN.H) ────────────────────────────────────────
 

@@ -15,6 +15,47 @@ import { PDAMMAX } from '../../../src/game/constants';
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { MINEDAMMAX, MINERANGE, PHABIAS, SHIELD_FACTOR, SHMINCHG } from '../../../src/game/constants';
 
+describe('decoyIntercept uses the C 1-in-N form, not a percentage', () => {
+  /**
+   * GEFUNCS.C:1585 rolls `gernd() % decodds == 0`, i.e. a 1-in-N chance. The
+   * port originally reinterpreted decodds as a 0-100 percentage
+   * (`rand*100 < decodds`, feature 006b, 2026-05-03) — a different
+   * parameterisation of the same knob, which meant the value could not be
+   * checked against the C clamp bounds of 1..20 and had to be special-cased in
+   * the sysop config.
+   *
+   * Switching to the C form is behaviour-preserving: the old DECODDS=50
+   * (a 50% intercept) is exactly decodds=2 under 1-in-N.
+   */
+  it('intercepts when the roll lands on 0', () => {
+    expect(decoyIntercept({ next: () => 0.0 } as never, 2)).toBe(true);
+  });
+
+  it('does not intercept otherwise', () => {
+    expect(decoyIntercept({ next: () => 0.9 } as never, 2)).toBe(false);
+  });
+
+  it('decodds=2 is a 50% chance — identical to the old percentage default', () => {
+    let hits = 0;
+    const N = 10_000;
+    for (let i = 0; i < N; i++) {
+      const v = i / N;
+      if (decoyIntercept({ next: () => v } as never, 2)) hits++;
+    }
+    expect(hits / N).toBeCloseTo(0.5, 2);
+  });
+
+  it('decodds=1 always intercepts and decodds=20 is the 5% floor', () => {
+    expect(decoyIntercept({ next: () => 0.99 } as never, 1)).toBe(true);
+    let hits = 0;
+    const N = 10_000;
+    for (let i = 0; i < N; i++) {
+      if (decoyIntercept({ next: () => i / N } as never, 20)) hits++;
+    }
+    expect(hits / N).toBeCloseTo(0.05, 2);
+  });
+});
+
 describe('combat-math', () => {
   describe('cdistance — @see GEFUNCS.C:cdistance', () => {
     it('returns 0 for identical points', () => {
@@ -227,15 +268,17 @@ describe('combat-math', () => {
     });
   });
 
-  describe('decoyIntercept — @see GECMDS.C:cmd_decoy', () => {
-    it('returns true when roll falls below threshold', () => {
-      const stub = { next: () => 0.1 }; // 10 < 50
-      expect(decoyIntercept(stub, 50)).toBe(true);
+  describe('decoyIntercept — @see GEFUNCS.C:1585', () => {
+    // These previously used the port's 0-100 percentage form. decodds is now
+    // the C 1-in-N divisor, so the equivalent of the old 50% is decodds=2.
+    it('intercepts when the roll lands in the first 1/decodds of the range', () => {
+      const stub = { next: () => 0.1 }; // floor(0.1 * 2) === 0
+      expect(decoyIntercept(stub, 2)).toBe(true);
     });
 
-    it('returns false when roll is above threshold', () => {
-      const stub = { next: () => 0.9 }; // 90 > 50
-      expect(decoyIntercept(stub, 50)).toBe(false);
+    it('does not intercept outside it', () => {
+      const stub = { next: () => 0.9 }; // floor(0.9 * 2) === 1
+      expect(decoyIntercept(stub, 2)).toBe(false);
     });
 
     it('is deterministic with seeded PRNG', () => {

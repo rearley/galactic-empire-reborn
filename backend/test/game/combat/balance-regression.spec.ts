@@ -31,7 +31,9 @@ describe('combat balance regression', () => {
   it('TDAMMAX === 100 (numopt ceiling)', () => expect(TDAMMAX).toBe(100));
   it('MDAMMAX === 100 (numopt ceiling)', () => expect(MDAMMAX).toBe(100));
   it('MINEDAMMAX === 150', () => expect(MINEDAMMAX).toBe(150));
-  it('DECODDS === 50', () => expect(DECODDS).toBe(50));
+    // decoyIntercept now uses the C 1-in-N form (GEFUNCS.C:1585) instead of a
+  // 0-100 percentage, so decodds is a divisor: 2 reproduces the old 50%.
+  it('DECODDS === 2 (1-in-2 = the former 50%)', () => expect(DECODDS).toBe(2));
   it('TORPSPED === 500', () => expect(TORPSPED).toBe(500));
   it('MISLSPED === 300', () => expect(MISLSPED).toBe(300));
   it('MISENGFC === 10', () => expect(MISENGFC).toBe(10));

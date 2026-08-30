@@ -161,6 +161,40 @@ with more firepower and cargo but lower warp speed.
 
 ---
 
+## Game tuning (`backend/config/game.config.json`)
+
+The original exposed 51 options to the sysop via `numopt(NAME, min, max)`, read at boot from a
+`.cnf` file (`GEMAIN.C:459-524`). This port mirrors that in `backend/config/game.config.json`,
+grouped by domain:
+
+```json
+{
+  "weapons": { "PDAMMAX": 25, "TDAMMAX": 100 },
+  "world":   { "UNIVMAX": 15, "PLODDS": 4 },
+  "limits":  { "MAXPLRS": 256, "MAXSHIPS": 10 }
+}
+```
+
+Any option can be overridden by an environment variable of the same name, which takes precedence —
+handy for Docker and CI:
+
+```bash
+PDAMMAX=40 docker compose up
+```
+
+**Every value is clamped to the range the original enforced.** That distinction matters: the *value*
+was never canon (it was each sysop's taste, and the `.cnf` files are not part of the reference
+source), but the *bounds* are — a value outside them is one the original could never produce. Three
+such defects were found by hand before this existed (torpedoes at twice the permitted maximum,
+missiles at three times, jammers at twice), so the loader now clamps and warns rather than letting
+one through silently. An unknown option name or a non-numeric value is a hard error, so a typo fails
+loudly instead of looking like a setting that had no effect.
+
+21 of the 51 currently back a live gameplay constant; the rest are declared in
+`backend/src/game/config/game-config.ts` so their bounds are recorded and the gap is visible.
+
+---
+
 ## Running the tests
 
 ```bash
