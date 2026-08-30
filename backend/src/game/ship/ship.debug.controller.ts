@@ -42,6 +42,8 @@ export class ShipDebugController {
     @Query('missiles') missilesParam?: string,
     @Query('mines') minesParam?: string,
     @Query('damage') damageParam?: string,
+    @Query('x') xParam?: string,
+    @Query('y') yParam?: string,
   ): object {
     if (!shipname) throw new BadRequestException('shipname is required');
 
@@ -53,6 +55,23 @@ export class ShipDebugController {
       throw new BadRequestException('damage must be between 0 and 100');
     }
 
+    // Teleport. Clearing the neutral zone by flying takes several minutes of
+    // warp, during which a Cybertron will usually destroy a starter ship —
+    // which made hands-on weapon testing effectively impossible. Coordinates
+    // may be negative: ships legitimately occupy negative sectors.
+    let at: { x: number; y: number } | undefined;
+    if (xParam !== undefined || yParam !== undefined) {
+      if (xParam === undefined || yParam === undefined) {
+        throw new BadRequestException('x and y must be supplied together');
+      }
+      const x = Number(xParam);
+      const y = Number(yParam);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw new BadRequestException('x and y must be finite numbers');
+      }
+      at = { x, y };
+    }
+
     const target = this.shipState.findByName(shipname);
     if (!target) throw new BadRequestException(`no live ship named '${shipname}'`);
 
@@ -62,6 +81,10 @@ export class ShipDebugController {
       if (missiles !== undefined) s.items[I_MISSL] = BigInt(missiles);
       if (mines !== undefined) s.items[I_MINE] = BigInt(mines);
       if (damage !== undefined) s.damage = damage;
+      if (at) {
+        s.xcoord = at.x;
+        s.ycoord = at.y;
+      }
     });
     if (!updated) throw new BadRequestException(`ship '${shipname}' is no longer live`);
 
@@ -72,6 +95,8 @@ export class ShipDebugController {
       torps: Number(updated.items[I_TORP]),
       missiles: Number(updated.items[I_MISSL]),
       mines: Number(updated.items[I_MINE]),
+      xcoord: updated.xcoord,
+      ycoord: updated.ycoord,
     };
   }
 }

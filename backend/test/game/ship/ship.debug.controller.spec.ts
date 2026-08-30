@@ -21,7 +21,7 @@ import { NUMITEMS, I_TORP, I_MISSL, I_MINE } from '../../../src/game/constants/i
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Reliant', shpclass: 1,
-    damage: 72, energy: 1000, phasr: 0, phasrtype: 1,
+    damage: 72, energy: 1000, phasr: 0, phasrtype: 1, xcoord: 0, ycoord: 0,
     shieldtype: 1, shieldstat: 0, shield: 0,
     items: new Array(NUMITEMS).fill(0n),
     ...over,
@@ -82,6 +82,50 @@ describe('POST /debug/ship/outfit', () => {
     expect(res.ok).toBe(true);
     expect(res.shipname).toBe('Reliant');
     expect(res.damage).toBe(10);
+  });
+
+  it('teleports the ship when x and y are given', () => {
+    const ship = makeShip({ xcoord: 0, ycoord: 0 });
+    const { controller } = build(ship);
+
+    controller.outfit('Reliant', undefined, undefined, undefined, undefined, '4.5', '-2.25');
+
+    expect(ship.xcoord).toBe(4.5);
+    expect(ship.ycoord).toBe(-2.25);
+  });
+
+  it('leaves position alone when x and y are omitted', () => {
+    const ship = makeShip({ xcoord: 1.5, ycoord: 2.5 });
+    const { controller } = build(ship);
+
+    controller.outfit('Reliant', '3', undefined, undefined, undefined, undefined, undefined);
+
+    expect(ship.xcoord).toBe(1.5);
+    expect(ship.ycoord).toBe(2.5);
+  });
+
+  it('requires x and y together', () => {
+    const ship = makeShip();
+    const { controller } = build(ship);
+    expect(() =>
+      controller.outfit('Reliant', undefined, undefined, undefined, undefined, '4.5', undefined),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects a non-finite coordinate', () => {
+    const ship = makeShip();
+    const { controller } = build(ship);
+    expect(() =>
+      controller.outfit('Reliant', undefined, undefined, undefined, undefined, 'over-there', '0'),
+    ).toThrow(BadRequestException);
+  });
+
+  it('accepts negative coordinates — ships legitimately fly negative sectors', () => {
+    const ship = makeShip();
+    const { controller } = build(ship);
+    controller.outfit('Reliant', undefined, undefined, undefined, undefined, '-13.5', '-7.25');
+    expect(ship.xcoord).toBe(-13.5);
+    expect(ship.ycoord).toBe(-7.25);
   });
 
   it('rejects an unknown ship rather than silently doing nothing', () => {
