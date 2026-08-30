@@ -192,4 +192,36 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     await sendCommand(page, 'orb 9');
     await expect(page.locator(LOG)).not.toContainText(/Now in orbit/i);
   });
+
+  test('the neutral-zone trade hub cannot be claimed, and still trades', async ({ page }) => {
+    // Found in playtest: landing on Zygor-3 prompted for a name and the claim
+    // SUCCEEDED — the hub was renamed and player-owned. It is where
+    // `new ship <N>` is bought and most trade happens, so one player owning it
+    // distorts the whole early game. C creates neutral-zone planets already
+    // owned (GEPLANET.C:671/737) so its claim path never fires on them.
+    await startNewPilot(page, uniqueShipName('Hub'));
+
+    await sendCommand(page, 'orb 1');
+    await expect(page.locator(LOG)).toContainText(/Now in orbit around Zygor-3/i);
+
+    await sendCommand(page, 'lan Takeover');
+    await expect(page.locator(LOG)).toContainText(/Neutral zone planets cannot be claimed/i);
+    await expect(page.locator(LOG)).not.toContainText(/You have claimed/i);
+  });
+
+  test('trade loop: prices list and a purchase completes from orbit', async ({ page }) => {
+    // Buying requires ORBIT, not landing — the gate is `where < 10`, matching
+    // C's cmd_buy (GECMDS.C:4212). Three messages used to say "landed", which
+    // sent a playtester hunting for a landing step that does not gate trade.
+    await startNewPilot(page, uniqueShipName('Trade'));
+
+    await sendCommand(page, 'orb 1');
+    await expect(page.locator(LOG)).toContainText(/Now in orbit/i);
+
+    await sendCommand(page, 'pri');
+    await expect(page.locator(LOG)).toContainText(/Food Cases \(foo\)/i);
+
+    await sendCommand(page, 'buy 5 foo');
+    await expect(page.locator(LOG)).toContainText(/5 Food Cases purchased for \d+ credits?/i);
+  });
 });

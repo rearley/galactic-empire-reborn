@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { NEUTRAL_ZONE_SECTOR } from '../combat/neutral-zone';
 import { MAXPLNTS } from '../constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
@@ -118,9 +119,22 @@ export class PlanetStateService implements OnModuleInit {
     plnum: number,
     userid: string,
     name: string,
-  ): Promise<{ ok: true } | { ok: false; reason: 'OWNED' | 'INVALID_NAME' | 'NOT_FOUND' | 'PLANET_LIMIT' }> {
+  ): Promise<{ ok: true } | { ok: false; reason: 'OWNED' | 'INVALID_NAME' | 'NOT_FOUND' | 'PLANET_LIMIT' | 'NEUTRAL_ZONE' }> {
     const key = planetKey(xsect, ysect, plnum);
     return this.runSerialized(key, async () => {
+      // Nothing in the neutral zone (sector 0,0) is claimable. It holds the
+      // trade hub where `new ship <N>` is bought and most trade happens, so a
+      // player owning it distorts the whole early game.
+      //
+      // C creates these planets ALREADY OWNED — build_plan_1/build_plan_2 copy
+      // `s00[idx].owner` into `planet.userid` (GEPLANET.C:671, 737) — and the
+      // claim path only fires on an unowned planet (GECMDS.C:3486). Guarding on
+      // the sector states that rule directly and holds even if a neutral-zone
+      // planet is somehow released.
+      if (xsect === NEUTRAL_ZONE_SECTOR.x && ysect === NEUTRAL_ZONE_SECTOR.y) {
+        return { ok: false as const, reason: 'NEUTRAL_ZONE' as const };
+      }
+
       const state = this.map.get(key);
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
 
