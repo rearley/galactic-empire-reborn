@@ -513,7 +513,14 @@ export const MAXPLRS = GAME_CONFIG.MAXPLRS;
 export const MAXPLNTS = GAME_CONFIG.MAXPLNTS;
 
 /**
- * Maximum live droids across all droid classes.
+ * Maximum live droids across ALL droid classes.
+ *
+ * Defaults to 6 — the canonical total, being the three droid classes at their
+ * canon `Make` of 2 each (reference/wiki/cpu-ships.md). Left at the option's
+ * upper bound of 500 it never bound, since the per-class cap already held the
+ * population to 6; at the canonical total it is a real backstop, and raising
+ * DROID_MAX_PER_CLASS without also raising this is caught rather than silently
+ * doubling the droid population.
  *
  * @see GEMAIN.C:471 numopt(MAXDROID,0,500)
  */

@@ -1,3 +1,49 @@
+## 2026-08-30 (final) — cap follow-ups fixed; trade-loop playtest findings
+
+**Completed:**
+- **PLANET_LIMIT now reaches the player.** `land` awaits the claim and returns the refusal
+  (`LAND_PLANET_LIMIT`). My earlier note claimed this needed "a command-router contract change" —
+  that was **wrong**: `CommandHandler` already returns `CommandResult | Promise<CommandResult>` and
+  22 handlers were already async. No contract change was involved.
+- **MAXDROID default 500 -> 6**, the canonical total (3 droid classes at their canon `Make` of 2,
+  reference/wiki/cpu-ships.md). At 500 it never bound, since the per-class cap already held the
+  population to 6; at the canonical total it is a real backstop, and raising DROID_MAX_PER_CLASS
+  without raising this is now caught.
+- **Three "must be landed" messages corrected to "must be in orbit".** BUY1, ADM_NOT_LANDED and
+  WTHDR_NOT_LANDED all gate on `where < 10`, which is the ORBIT state
+  (`orb` sets `where = 10 + plnum`) — identical to C's `cmd_buy` (GECMDS.C:4212). Orbit is
+  sufficient; landing was never required. Confirmed live: `buy 10 foo` from orbit returned
+  "10 Food Cases purchased for 2 credits". The wording sent me hunting for a landing step that does
+  not exist.
+
+**Trade-loop playtest (Playwright, sector 0,0):** orbit -> `pri` -> `buy` all work. `pri` bare lists
+all 14 items with 3-letter codes and prices; `buy <qty> <item>` takes a quantity then an item code.
+
+**NEW FINDING — the neutral-zone trade hub is claimable.** Landing on Zygor-3 prompts for a planet
+name, and claiming succeeds: the hub was renamed to "MyZygor" and owned by a player mid-playtest
+(restored afterwards). Zygor-3 is where `new ship <N>` purchases and most trade happen, so a single
+player owning it distorts the whole early game.
+
+C creates neutral-zone planets ALREADY OWNED — `build_plan_1`/`build_plan_2` both do
+`strncpy(planet.userid, s00[idx].owner, UIDSIZ)` (GEPLANET.C:671, 737) — and the claim path only
+fires when `plptr->userid[0] == 0` (GECMDS.C:3486). Our `S00Entry` has the same `owner` field but
+Zygor-3's is `''`, so the planet is created unowned and therefore claimable.
+
+Not fixed here because the C `s00[]` table itself is not in the reference source, so the intended
+owner value is unknown — giving it a synthetic system owner is a design choice. Midnight refreshes
+the hub by COORDINATES (`xsect: 0, ysect: 0, plnum: 1`), not by name, so a rename does not break the
+nightly restock — the severity is gameplay, not corruption.
+
+**Smaller observations from the same session:**
+- `orb <n>` while already in orbit returns "You are already in orbit." — you must fire engines to
+  leave first, which then drifts you off the planet and needs a re-approach.
+- Buying from a planet you own is far cheaper (10 Food Cases for 2 credits against a 4 cr list
+  price) — owner pricing, plausible but unverified against C.
+
+**Tests:** 2990 passing across 311 suites; Playwright 17/17.
+
+---
+
 ## 2026-08-30 (later still) — sysop config file + population caps wired
 
 **Completed:**
@@ -25,7 +71,7 @@
 `population-caps.spec.ts` (5), `planet-cap.spec.ts` (3), plus MAXDROID cases in `spawn-cap`.
 
 **Known issues:**
-- **PLANET_LIMIT is enforced but not surfaced.** A claim beyond MAXPLNTS is correctly refused — the
+- ~~**PLANET_LIMIT is enforced but not surfaced.**~~ A claim beyond MAXPLNTS is correctly refused — the
   planet is not taken — but the player still sees the optimistic `LAND_CLAIMED` line, because
   `land.handler` is synchronous and the claim is fire-and-forget. Surfacing it requires making the
   handler async, which is a command-router contract change. Documented in the handler.

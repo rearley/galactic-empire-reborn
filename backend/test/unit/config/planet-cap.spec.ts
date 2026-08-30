@@ -53,3 +53,39 @@ describe('planet ownership cap', () => {
     expect(svc.countOwnedBy('bob')).toBe(0);
   });
 });
+
+describe('the refusal reaches the player', () => {
+  it('land reports the cap instead of the optimistic LAND_CLAIMED line', async () => {
+    // Previously the claim was fire-and-forget, so the cap was enforced but the
+    // player still saw "You have claimed X". CommandHandler already allowed a
+    // Promise result, so awaiting it needed no router change.
+    const { LandHandlerService } = await import('../../../src/game/commands/handlers/land.handler');
+    const { formatMessage, MessageId } = await import('../../../src/game/commands/messages');
+
+    const planetService = {
+      // The handler looks the planet up in live state before claiming.
+      get: () => ({ plnum: 1, userid: null, name: null }),
+      claim: jest.fn().mockResolvedValue({ ok: false, reason: 'PLANET_LIMIT' }),
+    };
+    const galaxyService = {
+      getSectorPlanets: () => [{ plnum: 1, userid: null, name: null }],
+    };
+    const scanHandler = { clearScantab: jest.fn() };
+
+    const svc = new LandHandlerService(
+      galaxyService as never,
+      {} as never, // shipService — unused on this path
+      planetService as never,
+      scanHandler as never,
+    );
+
+    const ship = { userid: 'alice', shipno: 1, where: 11, xcoord: 0.5, ycoord: 0.5 } as never;
+    const result = await (svc.command.handler(ship, ['NewWorld'], {} as never) as Promise<{
+      lines: Array<{ text: string }>;
+    }>);
+
+    const text = result.lines.map((l) => l.text).join(' ');
+    expect(text).toBe(formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS)));
+    expect(text).not.toMatch(/claimed/i);
+  });
+});

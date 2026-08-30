@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { MAXPLNTS } from '../../constants';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
@@ -27,12 +28,12 @@ export class LandHandlerService {
       aliases: ['lan'],
       minArgs: 0,
       argMissingMessage: '',
-      handler: (ship: ShipState, args: string[], ctx: CommandContext): CommandResult =>
+      handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
         this.handle(ship, args, ctx),
     };
   }
 
-  private handle(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     if (ship.where < 10) {
       return { lines: [{ text: formatMessage(MessageId.LAND_NOT_ORBIT), category: 'system' }] };
     }
@@ -66,18 +67,23 @@ export class LandHandlerService {
         };
       }
 
-      // Claim asynchronously — return a synchronous result and let the async claim happen
-      // The claim validates and persists; errors surface on next interaction
-      //
-      // KNOWN GAP: a PLANET_LIMIT refusal (per-player MAXPLNTS cap, enforced in
-      // PlanetStateService.claim per GECMDS.C:3487) is correctly ENFORCED — the
-      // planet is not claimed — but the player sees the optimistic LAND_CLAIMED
-      // line because this handler is synchronous and the claim is
-      // fire-and-forget. Surfacing it needs the handler to become async, which
-      // is a command-router contract change. @see docs/PROGRESS.md
-      void this.planetService
+      // Await the claim so its outcome reaches the player. CommandHandler
+      // already permits a Promise result, so this needs no router change.
+      // Previously fire-and-forget, which meant a PLANET_LIMIT refusal was
+      // enforced but invisible — the player still saw LAND_CLAIMED.
+      const claimed = await this.planetService
         .claim(xsect, ysect, plnum, ship.userid, arg)
-        .catch(() => undefined);
+        .catch(() => ({ ok: false as const, reason: 'NOT_FOUND' as const }));
+
+      if (!claimed.ok) {
+        const text =
+          claimed.reason === 'PLANET_LIMIT'
+            ? formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS))
+            : claimed.reason === 'OWNED'
+              ? formatMessage(MessageId.LAND_REFUSED)
+              : formatMessage(MessageId.LAND_INVALID_NAME);
+        return { lines: [{ text, category: 'system' }] };
+      }
 
       // Clear scantab on successful dock — stale letter assignments must not persist.
       this.scanHandler.clearScantab(ship.userid, ship.shipno);

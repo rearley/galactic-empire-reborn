@@ -255,7 +255,7 @@ describe('MAXDROID — total droid population cap', () => {
     expect(total).toBe(0); // nothing spawned while at the cap
   });
 
-  it('the shipped default does not bind — the per-class cap is the real limit', async () => {
+  it('the shipped default equals the canonical total, so it binds exactly', async () => {
     const { svc, fireTick } = buildHarness(11);
     await fireTick(DROID_SPAWN_TICK_CADENCE * 3);
 

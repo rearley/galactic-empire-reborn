@@ -33,7 +33,7 @@
     "MAXPLRS": 256,
     "MAXSHIPS": 10,
     "NUMSHIPS": 500,
-    "MAXDROID": 500,
+    "MAXDROID": 6,
     "MAXLIST": 20,
     "MAXPLREC": 32767,
     "FREEBIES": 0,
