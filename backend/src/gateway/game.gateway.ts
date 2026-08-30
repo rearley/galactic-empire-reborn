@@ -751,6 +751,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
 
+    // A destroyed player ship has its hull row deleted and noships decremented.
+    // Without this line that happens in complete silence, which made two ships
+    // lost during playtesting impossible to tell apart from a bug.
+    this.logger.log(
+      `ship destroyed: victim=${event.victimShipKey} attacker=${event.attackerShipKey ?? 'none'}`,
+    );
+
     // Delete the victim's hull row and decrement the fleet count atomically — but
     // ONLY for PLAYER ships. AI (status AUTO) hulls are managed by the AI layer
     // (Cybertron/Droid), never here:

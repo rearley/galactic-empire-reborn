@@ -159,6 +159,22 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     expect(removeFromGameMock).toHaveBeenCalledWith({ userid: 'user1', shipno: 1 });
   });
 
+  it('logs the destruction so a vanished player ship is diagnosable server-side', async () => {
+    // Two player ships were lost during playtesting and left no server-side
+    // trace at all: the hull row was deleted and noships decremented in
+    // silence, so there was no way to tell a legitimate combat death from a
+    // bug. The victim/attacker line is the record.
+    gateway = buildGateway(1);
+    const logSpy = jest.spyOn((gateway as unknown as { logger: { log: (m: string) => void } }).logger, 'log');
+
+    gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
+    await new Promise((r) => setImmediate(r));
+
+    const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toMatch(/destroy/i);
+    expect(logged).toContain('victim');
+  });
+
   it('broadcasts COMBAT_SHIP_DESTROYED galaxy-wide after delete', async () => {
     gateway = buildGateway(1);
     const event = makeDestroyedEvent('user1', 1);
