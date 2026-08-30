@@ -27,6 +27,9 @@ import {
   mineFalloff,
   phaserReloadAmount,
   rollHullDamage,
+  rollProjectileHullDamage,
+  SHIELD_DRAIN_MIN,
+  SHIELD_DRAIN_SPREAD,
   shieldhit,
 } from './combat-math';
 import {
@@ -369,7 +372,12 @@ export class CombatTickService implements OnModuleInit {
         continue;
       }
 
-      const dist = cdistance(ship, mine);
+      // cdistance is in SECTORS; MINERANGE is 10000 RAW units (one sector), so
+      // the comparison must be made in raw units. C does `ddist *= 10000`
+      // before testing against MINERANGE — without it the guard never fires and
+      // every ship in the galaxy sits inside the blast.
+      // @see GEFUNCS.C:1428-1432
+      const dist = cdistance(ship, mine) * 10_000;
       if (dist > MINERANGE) continue;
 
       if (mine.timer === 0) {
@@ -635,19 +643,23 @@ export class CombatTickService implements OnModuleInit {
     } catch {
       // fall back to default
     }
-    const damage = rollHullDamage(this.random, dmgMax, damageFactor);
     const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
-    let hullDamage = damage;
+    // GEFUNCS.C:1552-1576 — hull damage is applied in BOTH branches. Shields
+    // halve the roll and cost charge; they are not immunity.
+    const hullDamage = rollProjectileHullDamage(this.random, dmgMax, damageFactor, shieldUp);
     let shieldConsumed = 0;
     if (shieldUp) {
-      const r = shieldhit(carrier.shield, carrier.shieldtype, damage);
+      // Shield drain is an independent 10..29 roll in C, NOT the hull damage.
+      // @see GEFUNCS.C:1563 shieldhit(ptr, usrn, (gernd()%20)+10)
+      const drain = SHIELD_DRAIN_MIN + Math.floor(this.random.next() * SHIELD_DRAIN_SPREAD);
+      const r = shieldhit(carrier.shield, carrier.shieldtype, drain);
       this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
+        v.damage = v.damage + hullDamage;
         v.shield = r.newCharge;
         if (r.knockedDown) v.shieldstat = 0;
         v.lastfired = attackerChannel;
         v.cantexit = FIRETICKS;
       });
-      hullDamage = 0;
       shieldConsumed = r.shieldConsumed;
     } else {
       this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
