@@ -491,3 +491,30 @@ export const GEMAIN_GAMEPLAY_PINS: Readonly<Record<string, number>> = {
   CYBMAXPERTICK,
   QUADMAXPERTICK,
 } as const;
+
+/**
+ * Maximum players concurrently IN GAME.
+ *
+ * GEMAIN.C:2769 — `if (numwar < gemaxplrs)` board a ship, else refuse with
+ * NOSHPS. `numwar` counts players currently in the game, so this caps SEATS,
+ * not accounts: registration stays open, entry does not.
+ *
+ * @see GEMAIN.C:459 numopt(MAXPLRS,1,256)
+ */
+export const MAXPLRS = GAME_CONFIG.MAXPLRS;
+
+/**
+ * Maximum planets a SINGLE player may own — not a galaxy-wide total.
+ *
+ * GECMDS.C:3487 — `if (waruptr->planets >= max_plnts)` refuses a further claim.
+ *
+ * @see GEMAIN.C:468 numopt(MAXPLNTS,1,256)
+ */
+export const MAXPLNTS = GAME_CONFIG.MAXPLNTS;
+
+/**
+ * Maximum live droids across all droid classes.
+ *
+ * @see GEMAIN.C:471 numopt(MAXDROID,0,500)
+ */
+export const MAXDROID = GAME_CONFIG.MAXDROID;

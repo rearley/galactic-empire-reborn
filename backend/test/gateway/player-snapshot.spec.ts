@@ -38,6 +38,8 @@ describe('GameGateway player.snapshot', () => {
   beforeEach(() => {
     serverEmitMock = jest.fn();
     shipStateService = {
+      // Seat cap (MAXPLRS) counts live player ships on connect.
+      findAllShips: () => [],
       findByUserid: jest.fn().mockReturnValue([
         {
           userid: 'user1',

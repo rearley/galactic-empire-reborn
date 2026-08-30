@@ -26,6 +26,7 @@ import { shipKey } from '../ship/ship-state.types';
 import {
   DROID_SPAWN_TICK_CADENCE,
   DROID_MAX_PER_CLASS,
+  MAXDROID,
   DROID_CLASS_SCOW,
   DROID_CLASS_TRANSPORT,
   DROID_CLASS_VAKORY,
@@ -116,8 +117,20 @@ export class DroidTickService implements OnModuleInit {
     this.runDroidActions(ctx);
   }
 
+  /** Live droids across every class — the quantity MAXDROID caps. */
+  private totalDroidPopulation(): number {
+    let n = 0;
+    for (const set of this.livePopulation.values()) n += set.size;
+    return n;
+  }
+
   private runSpawnEvaluation(ctx: TickContext): void {
     for (const classNumber of DROID_CLASSES) {
+      // DROID_MAX_PER_CLASS caps each class independently, so without an
+      // overall limit the real ceiling was classes x per-class. MAXDROID is the
+      // total the sysop configured. @see GEMAIN.C:471 numopt(MAXDROID,0,500)
+      if (this.totalDroidPopulation() >= MAXDROID) return;
+
       const pop = this.livePopulation.get(classNumber) ?? new Set<string>();
       if (pop.size >= DROID_MAX_PER_CLASS) continue;
 

@@ -49,6 +49,8 @@ describe('GameGateway player.joined / player.left', () => {
   });
 
   const mockShipStateService = (): Partial<ShipStateService> => ({
+    // Seat cap (MAXPLRS) counts live player ships on connect.
+    findAllShips: jest.fn().mockReturnValue([]),
     findByUserid: jest.fn().mockReturnValue([shipState]),
     get: jest.fn().mockReturnValue(shipState),
     flushAndUnload: jest.fn().mockResolvedValue(undefined),

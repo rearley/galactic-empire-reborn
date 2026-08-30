@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { MAXPLNTS } from '../constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { AdminChange, PlanetState, planetKey } from './planet-state.types';
@@ -94,6 +95,20 @@ export class PlanetStateService implements OnModuleInit {
   }
 
   /**
+   * How many planets this player currently owns.
+   *
+   * MAXPLNTS is a PER-PLAYER cap in the original — GECMDS.C:3487 checks
+   * `waruptr->planets`, the claiming user's own count, not a world total.
+   */
+  countOwnedBy(userid: string): number {
+    let n = 0;
+    for (const state of this.map.values()) {
+      if (state.userid === userid) n++;
+    }
+    return n;
+  }
+
+  /**
    * Claim an unowned planet for `userid` with the given `name`.
    * Per-mutation flush. @see GECMDS.C:cmd_land — claim path
    */
@@ -103,11 +118,16 @@ export class PlanetStateService implements OnModuleInit {
     plnum: number,
     userid: string,
     name: string,
-  ): Promise<{ ok: true } | { ok: false; reason: 'OWNED' | 'INVALID_NAME' | 'NOT_FOUND' }> {
+  ): Promise<{ ok: true } | { ok: false; reason: 'OWNED' | 'INVALID_NAME' | 'NOT_FOUND' | 'PLANET_LIMIT' }> {
     const key = planetKey(xsect, ysect, plnum);
     return this.runSerialized(key, async () => {
       const state = this.map.get(key);
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
+
+      // Per-player planet cap. @see GECMDS.C:3487 waruptr->planets >= max_plnts
+      if (this.countOwnedBy(userid) >= MAXPLNTS) {
+        return { ok: false as const, reason: 'PLANET_LIMIT' as const };
+      }
 
       const trimmed = name.trim();
       if (

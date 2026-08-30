@@ -45,15 +45,16 @@ export interface SysopOption {
 }
 
 export const SYSOP_OPTIONS = {
-  MAXPLRS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:459', implemented: false },
+  MAXPLRS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:459', implemented: true },
   FREEBIES: { min: 0, max: 1, default: 0, cReference: 'GEMAIN.C:460', implemented: false },
   MAXLIST: { min: 3, max: 50, default: 20, cReference: 'GEMAIN.C:461', implemented: false },
   MAXSHIPS: { min: 1, max: 50, default: 10, cReference: 'GEMAIN.C:462', implemented: true },
   SE100DAM: { min: 1, max: 101, default: 101, cReference: 'GEMAIN.C:463', implemented: true },
   SHOWOPT: { min: 0, max: 5, default: 0, cReference: 'GEMAIN.C:464', implemented: false },
-  MAXPLNTS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:468', implemented: false },
-  NUMSHIPS: { min: 1, max: 500, default: 500, cReference: 'GEMAIN.C:470', implemented: false },
-  MAXDROID: { min: 0, max: 500, default: 500, cReference: 'GEMAIN.C:471', implemented: false },
+  MAXPLNTS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:468', implemented: true },
+  NUMSHIPS: { min: 1, max: 500, default: 500, cReference: 'GEMAIN.C:470', implemented: false,
+    note: 'Not enforced: in C this only SIZES the ship array (nships = nterms + numships, GEMAIN.C:697). There is no runtime gate on it, so adding one would be an invention rather than a port.' },
+  MAXDROID: { min: 0, max: 500, default: 500, cReference: 'GEMAIN.C:471', implemented: true },
   PLODDS: { min: 1, max: 20, default: 4, cReference: 'GEMAIN.C:472', implemented: false },
   WORMODDS: { min: 1, max: 100, default: 10, cReference: 'GEMAIN.C:473', implemented: false },
   UNIVMAX: { min: 10, max: 32767, default: 15, cReference: 'GEMAIN.C:474', implemented: true },

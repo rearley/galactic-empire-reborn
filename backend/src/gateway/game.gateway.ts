@@ -10,7 +10,7 @@ import {
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
-import { MAXX, MAXY, GESTAT_AUTO } from '../game/constants';
+import { MAXX, MAXY, GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
@@ -173,6 +173,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Step 2: Look up ALL ships for this user, ordered by shipno (deterministic).
     // Replaces the previous non-deterministic findFirst — selection is now explicit.
+    // Seat cap. GEMAIN.C:2769 gates ENTRY on `numwar < gemaxplrs`, where numwar
+    // counts players currently in the game — so this limits concurrent SEATS,
+    // not accounts. Registration stays open; boarding does not.
+    const seated = this.shipStateService
+      .findAllShips()
+      .filter((s) => s.status === GESTAT_USER && s.userid !== userid).length;
+    if (seated >= MAXPLRS) {
+      this.logger.log(`game full (${seated}/${MAXPLRS}) — refusing ${userid}`);
+      client.emit('event.log', {
+        text: `The game is full (${seated}/${MAXPLRS} pilots in flight). Try again shortly.`,
+        category: 'system',
+      });
+      client.disconnect(true);
+      return;
+    }
+
     const ships = await this.prisma.ship.findMany({
       where: { userid },
       orderBy: { shipno: 'asc' },

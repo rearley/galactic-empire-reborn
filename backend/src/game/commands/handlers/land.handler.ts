@@ -68,6 +68,13 @@ export class LandHandlerService {
 
       // Claim asynchronously — return a synchronous result and let the async claim happen
       // The claim validates and persists; errors surface on next interaction
+      //
+      // KNOWN GAP: a PLANET_LIMIT refusal (per-player MAXPLNTS cap, enforced in
+      // PlanetStateService.claim per GECMDS.C:3487) is correctly ENFORCED — the
+      // planet is not claimed — but the player sees the optimistic LAND_CLAIMED
+      // line because this handler is synchronous and the claim is
+      // fire-and-forget. Surfacing it needs the handler to become async, which
+      // is a command-router contract change. @see docs/PROGRESS.md
       void this.planetService
         .claim(xsect, ysect, plnum, ship.userid, arg)
         .catch(() => undefined);

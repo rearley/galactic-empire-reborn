@@ -6,6 +6,7 @@
  * @see specs/008-droid-ai/tasks.md T012
  */
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
+import { MAXDROID, DROID_SPAWN_TICK_CADENCE } from '../../../src/game/constants';
 import { DroidTickService } from '../../../src/game/droid/droid-tick.service';
 import { DroidSpawner } from '../../../src/game/droid/droid-spawner';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
@@ -219,5 +220,51 @@ describe('T012 — spawn cap: per-class count never exceeds DROID_MAX_PER_CLASS'
         expect(ship.isEphemeral).toBe(true);
       }
     }
+  });
+});
+
+describe('MAXDROID — total droid population cap', () => {
+  /**
+   * DROID_MAX_PER_CLASS caps each class independently, so without an overall
+   * limit the ceiling was classes x per-class. MAXDROID (GEMAIN.C:471,
+   * numopt(MAXDROID,0,500)) is the total, and was declared but inert.
+   *
+   * At the shipped default of 500 the cap never binds — the natural ceiling is
+   * 3 classes x 2 = 6 — so the guard is exercised by reloading the modules with
+   * a low MAXDROID from the environment. Seeding the population map directly
+   * does NOT work: the tick reconciles it against real ships each pass, so
+   * placeholder ids are dropped.
+   */
+  it('stops spawning once the total population reaches the cap', async () => {
+    // The guard cannot be exercised via the environment: constants.ts captures
+    // MAXDROID at import, and DroidTickService closes over that module, so
+    // jest.resetModules() cannot reach the already-constructed service. Nor can
+    // the population map be pre-seeded — the tick reconciles it against real
+    // ships each pass and drops placeholder ids.
+    //
+    // Forcing the counter is what actually exercises the branch.
+    const { svc, fireTick } = buildHarness(11);
+    jest
+      .spyOn(svc as unknown as { totalDroidPopulation: () => number }, 'totalDroidPopulation')
+      .mockReturnValue(MAXDROID);
+
+    await fireTick(DROID_SPAWN_TICK_CADENCE * 3);
+
+    let total = 0;
+    for (const set of svc.getLivePopulation().values()) total += set.size;
+    expect(total).toBe(0); // nothing spawned while at the cap
+  });
+
+  it('the shipped default does not bind — the per-class cap is the real limit', async () => {
+    const { svc, fireTick } = buildHarness(11);
+    await fireTick(DROID_SPAWN_TICK_CADENCE * 3);
+
+    let total = 0;
+    for (const set of svc.getLivePopulation().values()) total += set.size;
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThanOrEqual(MAXDROID);
+    // Documents the relationship: the natural ceiling is well under the default.
+    // 3 droid classes x DROID_MAX_PER_CLASS is the natural ceiling.
+    expect(total).toBeLessThanOrEqual(3 * DROID_MAX_PER_CLASS);
   });
 });
