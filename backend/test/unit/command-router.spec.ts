@@ -64,10 +64,12 @@ describe('CommandRouterService', () => {
     it('mixed-case keyword "ROT" matches "rotate"', () => {
       const handler = jest.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
+      // The original matches on the first 3 characters (GECMDS.C:249 gesearch),
+      // and its table entry is {"rot", cmd_rotate} — so ROT resolves, and so
+      // would ROTATE. This previously asserted UNKNOWN_CMD under the port's
+      // exact-match lookup, which is the behaviour the prefix match replaces.
       router.dispatch('ROT 45', ship, ctx);
-      // ROT is not an alias — should be unknown
-      const result = router.dispatch('ROT 45', ship, ctx) as CommandResult;
-      expect(result.lines[0].text).toBe(formatMessage(MessageId.UNKNOWN_CMD));
+      expect(handler).toHaveBeenCalledWith(ship, ['45'], ctx);
     });
 
     it('lower-cased keyword "rotate" matches', () => {

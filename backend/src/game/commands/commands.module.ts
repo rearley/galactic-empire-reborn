@@ -211,7 +211,12 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.teaHandler.command);
     // Ship management commands (013)
     this.commandRouter.register(this.cloakHandler.command);
-    this.commandRouter.register(this.maintHandler.command);
+    // NOT registered: 'maint' collides with 'mai' under the original's 3-char
+    // prefix match (GECMDS.C:249). The original table had only {"mai",
+    // cmd_maint}. MaiHandlerService owns the 'mai' prefix and delegates to
+    // MaintHandlerService whenever args are present, so maintenance stays
+    // reachable as `mai <password>` exactly as it was in the original.
+    // MaintHandlerService is still injected directly by the tick layer.
     this.commandRouter.register(this.transferHandler.command);
     this.commandRouter.register(this.jettisonHandler.command);
     this.commandRouter.register(this.setHandler.command);
