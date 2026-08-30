@@ -66,8 +66,10 @@ required a browser.
 **Next:**
 - Extend the no-mock layer: projectile flight across real distances, scan projection at sector
   boundaries and outside the grid, neutral-zone gating.
-- Add a browser-level (Playwright) smoke test for the terminal UI — register, onboard, `sca lo`,
-  assert the map renders glyphs and that a padded `who` table keeps its columns.
+- ~~Add a browser-level (Playwright) smoke test~~ — **done**: `frontend/e2e/gameplay.spec.ts`
+  (`npm run test:e2e`, ~4s for 3 tests). Covers register → onboard → command round-trip,
+  `sca lo` scan rendering, and a mutation-verified regression guard on the event-log whitespace
+  collapse. Requires a live backend; Vite is auto-started.
 - Audit remaining combat fixtures for zero-distance setups, the pattern that hid the mine bug.
 - Verify Cybertron spawn density (24 at boot) against the original; a class 1 starter dies within
   minutes of leaving Zygor.
