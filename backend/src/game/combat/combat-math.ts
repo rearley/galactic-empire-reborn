@@ -393,11 +393,23 @@ export function lockFact(
 }
 
 /**
- * Roll for decoy intercept. `decodds` is a 0-100 integer probability.
- * @see GECMDS.C:cmd_decoy
+ * Roll for decoy intercept: a 1-in-`decodds` chance, matching C exactly.
+ *
+ * GEFUNCS.C:1585 (and :1670 for missiles) rolls `gernd() % decodds == 0`. This
+ * port originally read `decodds` as a 0-100 percentage
+ * (`rand * 100 < decodds`) — a different parameterisation of the same knob,
+ * which meant the value could not be validated against the C clamp bounds of
+ * 1..20 and had to be special-cased.
+ *
+ * The switch is behaviour-preserving: the old percentage default of 50 is
+ * exactly `decodds = 2` here (1 in 2 = 50%).
+ *
+ * @see GEFUNCS.C:1585 torpedo decoy intercept
+ * @see GEFUNCS.C:1670 missile decoy intercept
  */
 export function decoyIntercept(rand: Random, decodds: number): boolean {
-  return rand.next() * 100 < decodds;
+  if (decodds <= 0) return false;
+  return Math.floor(rand.next() * decodds) === 0;
 }
 
 /**
