@@ -60,6 +60,28 @@ export class PlanetStateService implements OnModuleInit {
   }
 
   /** Number of planets currently in the in-memory map. */
+  /**
+   * Planets in a sector, ordered by plnum — the live view.
+   *
+   * GalaxyService keeps its own planet read-model, but it hydrates once at boot
+   * and is never updated, so ownership and names there go stale the moment
+   * anyone claims, renames or abandons a colony. Scans read this instead:
+   * otherwise a claimed planet still shows as unowned and unnamed, players fly
+   * to it, and only the landing refusal tells them it was taken.
+   */
+  bySector(xsect: number, ysect: number): PlanetState[] {
+    return this.all()
+      .filter((p) => p.xsect === xsect && p.ysect === ysect)
+      .sort((a, b) => a.plnum - b.plnum);
+  }
+
+  /** Case-insensitive lookup by planet name across the galaxy. */
+  byName(name: string): PlanetState | undefined {
+    const needle = name.trim().toLowerCase();
+    if (needle.length === 0) return undefined;
+    return this.all().find((p) => p.name.toLowerCase() === needle);
+  }
+
   size(): number {
     return this.map.size;
   }

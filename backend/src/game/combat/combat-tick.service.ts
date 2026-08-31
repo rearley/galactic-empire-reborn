@@ -298,14 +298,17 @@ export class CombatTickService implements OnModuleInit {
         // Clear cybmine on any Cybertron targeting the dead ship so they don't
         // immediately re-engage the player when they respawn. @see GEFUNCS.C:killem
         for (const s of this.shipState.findAllShips()) {
-          if (s.status === 2 && s.cybmine === victim.shipno) {
+          // cybmine holds the claimed player's CHANNEL (C: a usernumber,
+          // GECYBS.C:368) — matching on shipno released the wrong claims.
+          if (s.status === 2 && victim.channel !== undefined && s.cybmine === victim.channel) {
             s.cybmine = 255;
           }
         }
 
-        // In-flight cleanup — clear any other ship's incoming projectile
-        // slots that reference the dead ship's shipno as the firer (channel).
-        this.clearInFlightFromDeadFirer(victim.shipno);
+        // In-flight cleanup — clear any other ship's incoming projectile slots
+        // fired by the dead ship. Keyed on its channel: shipno is per-user, so
+        // it used to clear a live player's incoming fire as well.
+        if (victim.channel !== undefined) this.clearInFlightFromDeadFirer(victim.channel);
       } catch (err) {
         const id = shipKey(victim.userid, victim.shipno);
         const stack = err instanceof Error ? err.stack : String(err);
@@ -316,19 +319,18 @@ export class CombatTickService implements OnModuleInit {
 
   /**
    * After a firer dies, walk every other active ship's incoming torpedo /
-   * missile slots and clear (channel = 255) any whose `.channel` references
-   * the dead firer's `shipno`. Mirrors the firer-dies cleanup in
-   * GEFUNCS.C:1755-1778.
+   * missile slots and clear (channel = 255) any whose `.channel` references the
+   * dead firer. Mirrors the firer-dies cleanup in GEFUNCS.C:1755-1778.
    */
-  private clearInFlightFromDeadFirer(deadShipno: number): void {
+  private clearInFlightFromDeadFirer(deadChannel: number): void {
     for (const carrier of this.shipState.findAllShips()) {
       for (let i = 0; i < MAXTORPS; i++) {
-        if (carrier.ltorpsChannel[i] === deadShipno) {
+        if (carrier.ltorpsChannel[i] === deadChannel) {
           this.clearTorpSlot(carrier, i);
         }
       }
       for (let i = 0; i < MAXMISSL; i++) {
-        if (carrier.lmisslChannel[i] === deadShipno) {
+        if (carrier.lmisslChannel[i] === deadChannel) {
           this.clearMisslSlot(carrier, i);
         }
       }

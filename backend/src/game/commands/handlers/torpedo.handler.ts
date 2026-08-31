@@ -4,6 +4,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
@@ -30,7 +31,7 @@ import { I_TORP } from '../../constants/items';
  *   7. target has a free `ltorps` slot → else TOR_FULL
  *
  * Side effects on success:
- *   target.ltorpsChannel[slot]  = firer.shipno
+ *   target.ltorpsChannel[slot]  = firer.channel
  *   target.ltorpsDistance[slot] = floor(cdistance × 10000 + 20)
  *   firer.items[I_TORP]        -= 1n
  *   firer.shieldstat            = 0   (shields auto-lower)
@@ -147,14 +148,17 @@ export class TorpedoHandlerService {
     }
 
     const dist = Math.floor(cdistance(ship, target) * 10000 + 20);
-    const firerShipno = ship.shipno;
+    // The firer's unique channel (this port's usrnum), not its shipno: the
+    // read side resolves the slot back to a ship by channel, and shipno is 1
+    // for every player's first ship. @see GECMDS.C:1202, ShipChannelRegistry
+    const firerChannel = ship.channel ?? NO_CHANNEL;
 
     // Mutate target — allocate slot
     this.shipState.mutate(target.userid, target.shipno, (t) => {
       // Pad arrays if needed.
       while (t.ltorpsChannel.length <= slot) t.ltorpsChannel.push(255);
       while (t.ltorpsDistance.length <= slot) t.ltorpsDistance.push(0);
-      t.ltorpsChannel[slot] = firerShipno;
+      t.ltorpsChannel[slot] = firerChannel;
       t.ltorpsDistance[slot] = dist;
     });
 

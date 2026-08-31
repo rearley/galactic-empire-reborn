@@ -1493,3 +1493,30 @@ a unique int, which is what C uses.
 
 **Known follow-up:** `lock`/`lockKey` still carries the older twin-field shape.
 It is correct, but it should collapse onto `channel` for one convention.
+
+## 2026-08-31 — `sca pl` reads live planet state, not the boot-time read model
+
+**Context:** A browser test scanned a sector, picked a planet the scan reported
+as unowned and unnamed, flew to it, and had the landing refused because the
+planet was in fact owned. Scan and claim disagreed about the same planet.
+
+**Decision:** `sca pl` (listing, number lookup and name lookup) resolves planets
+through `PlanetStateService`, the live in-memory map. `GalaxyService` keeps its
+read model for static geometry — sector contents, wormholes, generation — but is
+no longer the source of ownership or names.
+
+**Reason:** `GalaxyService.hydrate()` runs once in `onModuleInit` and is never
+refreshed. `claim`, `abandonPlanet` and renames all mutate `PlanetStateService`,
+so from the first claim after boot the two diverged. Every planet claimed during
+the current uptime still scanned as "(unnamed)" with no owner — so a player
+could not see their own colony on a scan, and could not tell which planets were
+still free. The only feedback was the landing refusal after flying there.
+
+**Alternatives rejected:** Having `PlanetStateService` push updates into
+`GalaxyService`'s cache on every mutation — keeps two copies of the same mutable
+state and one more place to forget. Re-reading Postgres per scan — the in-memory
+map is already the source of truth for exactly this data.
+
+**Note:** planet `password` survives abandonment, so a planet released while
+closed stays unlandable. That matches C: `cmd_abandon` clears only
+`plptr->userid[0]` and the planet counter (GECMDS.C:3420-3445). Left as-is.

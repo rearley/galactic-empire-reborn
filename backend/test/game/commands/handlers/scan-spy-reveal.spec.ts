@@ -102,6 +102,10 @@ function makeService(opts: {
 
   const mockPlanetService = {
     get: jest.fn().mockReturnValue(planetState),
+    // scanPl resolves the planet from the LIVE state now — GalaxyService's
+    // read-model hydrates once at boot and goes stale on the first claim.
+    bySector: jest.fn().mockReturnValue([]),
+    byName: jest.fn().mockReturnValue(prismaPlane),
   } as unknown as PlanetStateService;
 
   // PrismaService — shipClass.findMany for onModuleInit, user.findUnique for scanPl owner resolution.
