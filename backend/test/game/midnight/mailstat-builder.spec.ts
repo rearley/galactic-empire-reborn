@@ -27,6 +27,16 @@ function makePlanet(overrides: Partial<ProductionPlanet> = {}): ProductionPlanet
 }
 
 describe('buildProductionMailStat — field mapping (GEMAIN.C:1138-1167)', () => {
+  /**
+   * This port repurposes MAILSTAT.dtime as the sender's userid (spec 017 R3:
+   * ShipStateService lookup → raw dtime → "(system)"). A production report has
+   * no sender ship, so the field must stay empty — writing a timestamp there
+   * made `mai` print "2026-08-31T00:04:19.166Z" in the From column.
+   */
+  it('leaves dtime empty so the inbox renders the sender as (system)', () => {
+    expect(buildProductionMailStat(makePlanet(), 1n).dtime).toBe('');
+  });
+
   it('sets userid to planet owner', () => {
     const row = buildProductionMailStat(makePlanet({ userid: 'alice' }), 1n);
     expect(row.userid).toBe('alice');

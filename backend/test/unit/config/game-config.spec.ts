@@ -95,10 +95,10 @@ describe('loadGameConfig', () => {
   });
 
   it('marks which options are actually wired into gameplay', () => {
-    // 24 of the 51 back a live constant today; the rest are declared so the
+    // 25 of the 51 back a live constant today; the rest are declared so the
     // bounds are recorded and the gap is visible.
     const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(24);
+    expect(wired.length).toBe(25);
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {

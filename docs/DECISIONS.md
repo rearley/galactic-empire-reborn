@@ -4,6 +4,49 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-31 — an open question from a handler owns the next line of input
+
+**Context**: A handler that asks the player a free-text question ("What would you like to name this
+planet?") had no way to receive the answer. The next line went to the command router like any other
+input, so answering "New Terra" matched the `new` verb under 3-char prefix routing. specs/005
+described a gateway re-dispatch for exactly this and it was never built; the ship-select and
+onboarding flows solved the same problem separately, each with its own `client.data` field and its
+own `prompt:reply` branch.
+
+**Decision**: `CommandResult.expectFollowup?: string` carries the verb that asked. The gateway parks
+it on the socket and re-dispatches the player's next line as `<verb> <answer>` through the normal
+router path, then clears it. One-shot; an empty answer cancels with "Never mind."
+
+**Reason**: The state lives on the socket, where the conversation lives, so handlers stay pure
+request/response and need no session object. Routing the redispatch back through the router (rather
+than calling the handler directly) means the answer still gets ordinary argument parsing, and the
+handler re-validates its preconditions — the player may have been shot out of orbit while typing.
+
+**Alternatives rejected**: A dedicated `prompt:*` socket event per question, like ship-select and
+onboarding use — that needs a matching frontend branch for every new prompt, whereas this reuses the
+existing command input the player is already typing into. Handler-owned session state — spreads
+conversation state across services and leaks on disconnect.
+
+## 2026-08-31 — sysop-tunable values belong in game.config.json, never pinned to a bound
+
+**Context**: `TEAMBONU` was hard-coded at `3_200_000n`. C computes it as
+`numopt(TEAMBONU,0,32000)*100L` (GEMAIN.C:478), so 3.2M is the *maximum* an operator could pick. The
+effect was visible in play: a one-member team scored 3.2M against a strong player's five-digit
+score, so `tea list` ranked teams by member count.
+
+**Decision**: Sysop `.cnf` options back live constants through `config/game.config.json` and default
+to the option's own default, not to either end of its range. Balance-regression tests for such
+options pin the *bounds* and any scaling factor, not the chosen value.
+
+**Reason**: Same reasoning as the 2026-08-30 numopt decision, applied to the value rather than the
+clamp. Pinning a constant to a bound and then writing a regression test against that literal makes
+the test defend the accident.
+
+**Alternatives rejected**: Leaving it hard-coded and simply lowering the number — that reintroduces
+the same class of defect the moment someone wants to tune it.
+
+---
+
 ## 2026-08-30 — numopt bounds are a fidelity contract; shield behaviour is per-weapon
 
 **Context**: Playtesting combat surfaced a cluster of defects that unit tests could not see, because

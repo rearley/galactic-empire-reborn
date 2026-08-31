@@ -158,6 +158,24 @@ describe('TeaHandlerService — tea password-gated join', () => {
 // ── T021: US3 — tea list ──────────────────────────────────────────────────────
 
 describe('TeaHandlerService — tea list', () => {
+  it('aligns numeric column right-edges with their headers', async () => {
+    const handler = makeHandler({
+      list: jest.fn().mockResolvedValue([
+        { rank: 1, teamcode: 1n, teamname: 'Raiders', members: 3, score: 100n },
+      ]),
+    });
+    const result = await handler.command.handler(makeShip(), ['list'], ctx);
+    const ends = (line: string): number[] =>
+      [...line.matchAll(/\S+/g)].map((m) => m.index! + m[0].length);
+    // Rank/Members/Score are right-aligned, so their end columns must match the
+    // header's. Team is left-aligned (padEnd) and is excluded.
+    const numeric = (line: string): number[] => {
+      const e = ends(line);
+      return [e[0], e[2], e[3]];
+    };
+    expect(numeric(result.lines[1].text)).toEqual(numeric(result.lines[0].text));
+  });
+
   it('returns header line', async () => {
     const handler = makeHandler({
       list: jest.fn().mockResolvedValue([
@@ -165,7 +183,7 @@ describe('TeaHandlerService — tea list', () => {
       ]),
     });
     const result = await handler.command.handler(makeShip(), ['list'], ctx);
-    expect(result.lines[0].text).toBe('  Rank  Team                            Members  Score');
+    expect(result.lines[0].text).toBe('  Rank  Team                            Members       Score');
     expect(result.lines[0].category).toBe('system');
   });
 

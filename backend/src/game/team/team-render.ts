@@ -1,7 +1,8 @@
 import { TeamListEntry } from './team.types';
 import { CommandResult } from '../commands/command.types';
 
-const HEADER = '  Rank  Team                            Members  Score';
+const HEADER =
+  `  ${'Rank'.padStart(4)}  ${'Team'.padEnd(30)}  ${'Members'.padStart(7)}  ${'Score'.padStart(10)}`;
 
 /** Renders `tea list` output. Returns a "No teams" line when empty. */
 export function renderTeamList(entries: TeamListEntry[]): CommandResult['lines'] {
@@ -13,7 +14,7 @@ export function renderTeamList(entries: TeamListEntry[]): CommandResult['lines']
   for (const e of entries) {
     const rank = e.rank.toString().padStart(4);
     const name = e.teamname.padEnd(30).slice(0, 30);
-    const members = e.members.toString().padStart(5);
+    const members = e.members.toString().padStart(7);
     const score = e.score.toString().padStart(10);
     lines.push({ text: `  ${rank}  ${name}  ${members}  ${score}`, category: 'info' });
   }

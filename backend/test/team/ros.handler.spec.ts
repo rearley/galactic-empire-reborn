@@ -116,3 +116,59 @@ describe('RosHandlerService — query budget (T028)', () => {
     expect(findTeamsByCodes).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('roster shows the player NAME, not the internal userid', () => {
+  /**
+   * C's roster prints `userid` (GECMDS.C:cmd_geroster via username(),
+   * GEFUNCS.C:2603) — but in MajorBBS the userid WAS the player's handle, e.g.
+   * "MADMAX". This port splits that into a synthetic `userid` (`usr_<hex>`) and
+   * a human `username`, so printing userid is literally faithful yet
+   * semantically wrong: the roster showed rows like
+   * `usr_a9070dc745a8688f`, which no player can identify.
+   *
+   * Found by reading the roster during a playtest.
+   */
+  it('renders username, never the usr_ identifier', async () => {
+    const rows = [
+      { userid: 'usr_a9070dc745a8688f9ed71a0c', username: 'RickTestPilot', score: 20500n, kills: 22, planets: 0, population: 0n, teamcode: null },
+    ];
+    const prisma = { user: { findMany: jest.fn().mockResolvedValue(rows) } };
+    const teamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) };
+    const svc = new RosHandlerService(prisma as never, teamRepo as never);
+
+    const result = await (svc.command.handler({} as never, [], {} as never) as Promise<{ lines: Array<{ text: string }> }>);
+    const body = result.lines.map((l) => l.text).join('\n');
+
+    expect(body).toContain('RickTestPilot');
+    expect(body).not.toContain('usr_');
+  });
+
+  it('right-aligns Score/Kills/Planets/Population under their headers', async () => {
+    const rows = [
+      { userid: 'u1', username: 'RickTestPilot', score: 20500n, kills: 22, planets: 3, population: 4500n, teamcode: null },
+    ];
+    const prisma = { user: { findMany: jest.fn().mockResolvedValue(rows) } };
+    const teamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) };
+    const svc = new RosHandlerService(prisma as never, teamRepo as never);
+    const result = await (svc.command.handler({} as never, [], {} as never) as Promise<{ lines: Array<{ text: string }> }>);
+
+    const ends = (line: string): number[] =>
+      [...line.matchAll(/\S+/g)].map((m) => m.index! + m[0].length);
+    // Rank + the four numeric columns are right-aligned; Name and Team use
+    // padEnd, so their end columns legitimately differ from the header's.
+    const rightAligned = (line: string): number[] => {
+      const e = ends(line);
+      return [e[0], e[3], e[4], e[5], e[6]];
+    };
+    expect(rightAligned(result.lines[1].text)).toEqual(rightAligned(result.lines[0].text));
+  });
+
+  it('labels the column Name rather than UserID', async () => {
+    const prisma = { user: { findMany: jest.fn().mockResolvedValue([]) } };
+    const teamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) };
+    const svc = new RosHandlerService(prisma as never, teamRepo as never);
+    const result = await (svc.command.handler({} as never, [], {} as never) as Promise<{ lines: Array<{ text: string }> }>);
+    expect(result.lines[0].text).toMatch(/Name/);
+    expect(result.lines[0].text).not.toMatch(/UserID/);
+  });
+});

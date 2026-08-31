@@ -28,6 +28,15 @@ export interface CommandResult {
   /** When true, the frontend should clear the event log AFTER appending lines.
    *  Used exclusively by the `cls` command. @see specs/016-navigation-spy/research.md D4 */
   clearLog?: boolean;
+  /**
+   * Set by a handler that asked the player an open question. The gateway holds
+   * the verb and re-dispatches the player's *next* input as `<verb> <input>`,
+   * so free-text answers never hit the command router. One-shot; an empty
+   * answer cancels it.
+   *
+   * @see specs/005-planet-system/contracts/commands.md §land
+   */
+  expectFollowup?: string;
 }
 
 export interface CommandResultLine {
