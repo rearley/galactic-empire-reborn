@@ -629,8 +629,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           y: Math.floor(state.ycoord),
         });
 
+        // First run: one welcome line and nothing else left a new pilot with no
+        // idea that `hel` exists, in a game that is entirely typed commands.
         client.emit('command:result', {
-          lines: [{ text: `Welcome aboard, ${state.shipname}.`, category: 'system' }],
+          lines: [
+            { text: `Welcome aboard, ${state.shipname}.`, category: 'system' },
+            {
+              text: 'You are in the neutral zone at sector (0,0) — no one may fire here.',
+              category: 'info',
+            },
+            {
+              text: "Type 'hel' for the command topics, 'rep nav' for your position, 'sca lo' to look around.",
+              category: 'info',
+            },
+          ],
         });
         client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
 

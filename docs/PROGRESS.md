@@ -1,3 +1,66 @@
+## 2026-08-31 — played a fresh pilot end to end (pre-playtest pass)
+
+Registered a new account and played it straight — no debug endpoints, no granted credits, no
+teleports. Register, kit out, scout, claim, settle. Eight defects, every one of them on the path a
+first-time player walks.
+
+**Fixed:**
+- **Every new pilot spawned on the same point, facing the same way.** C drops a new ship at a random
+  spot inside the neutral sector, re-rolling while it lands within 1000 raw units of a planet, and
+  gives it a random heading (GEFUNCS.C:195-217). The port used the sector's exact corner (0.0, 0.0)
+  facing 0. Heading 0 decreases y, so a pilot who set a course for the next sector and engaged warp
+  drifted off the bottom edge while still turning, wrapped to sector (0,14) and was shot by a
+  Cybertron seconds into their first session. It happened to me on the first attempt.
+- **`nav` printed a bearing the autopilot did not fly.** The handler used `atan2(dx, dy)` where the
+  physics tick uses `atan2(dx, -dy)`; heading 0 is y-decreasing, so the printed course was mirrored
+  about the east-west axis — a target due north was reported as bearing 180. Hidden for as long as
+  every ship spawned facing 0, because the two agree for due-east targets. The random spawn heading
+  above is what exposed it.
+- **`sca pl <n>` reported "Bearing: 0" for every planet** — a literal zero behind a `TODO(006)`,
+  beside a distance that was real. Three planets in one sector, no way to tell which direction any
+  of them lay. C uses the same `cbearing` call as the ship scan (GECMDS.C:2324).
+- **Purchases reported the unit price as the amount paid.** BUY2 had three placeholders for four
+  arguments, so the total was dropped: "100 Men purchased for 4 credits" while 400 left the account.
+  Now "100 Men purchased at 4 cr each — 400 credits."
+- **`hel trade` documented the wrong argument order** for `buy`, `sell`, `transfer` and `jett` — all
+  four take the quantity first. A new player typing exactly what the help says is refused.
+- **`rep acc` said "Planets: none." to a pilot who had just claimed one.** C's `wonplnt()` does
+  `++waruptr->planets` (GECMDS.C:4001); the port only decremented on abandon, so the counter was
+  wrong until midnight rebuilt it.
+- **`nav` called itself an autopilot but never set speed**, and said nothing about it — C's
+  `cmd_navigate` is only a calculator, so the port's steering is already a bonus. The reply now ends
+  "Set speed with war/imp." and the help no longer says "autopilot".
+- **Breaking orbit for a course parked the ship in the AT-WARP state** (`where = 1`), so a stopped
+  ship reported "In hyperspace" and was flagged as warping for the gates that care — the
+  hyper-phaser only reaches victims at `where === 1`. `imp` uses 0 for the same transition.
+- **First-run output was one line.** "Welcome aboard, <ship>." and nothing else, in a game that is
+  entirely typed commands. Now it also says where you are, that the neutral zone is safe, and which
+  three commands to try first.
+
+**Tests:** backend 3126 across 328 suites; Playwright **31 → 36**. New `e2e/first-run.spec.ts` walks
+the first ten minutes; `spawn-placement.spec.ts` covers the roll and its planet-avoidance; the nav
+bearing now has a table test asserting it matches the steering formula for five directions.
+
+Three existing browser tests had quietly depended on the fixed spawn heading (`imp 0 90` is a
+RELATIVE rotation). They now steer to an absolute heading via a new `steerTo` helper — which is
+what they meant all along.
+
+**Confirmed working, unchanged:** shields fit and charge on a starter Interceptor; `sca se` renders
+all five hub planets; the survey (`sca pl <n>`) reports environment and resources; trade, transfer,
+production, tax and `wit` all behave; the colony ticked over from 583 to 585 colonists while I
+watched.
+
+**Worth knowing before an open playtest:**
+- Claiming a previously-abandoned world silently inherits the last owner's tax rate, production
+  rates and population. Canonical (C's abandon clears only the owner), but surprising.
+- Turning is 20 degrees per 6-second tick, so pointing at a neighbouring sector is ~30s of real
+  time, and a ship keeps moving while it turns. Also canonical, and the main reason a new pilot can
+  end up somewhere unintended.
+- The dev database carries test litter — planets still named "hel planet" from an earlier session.
+  Regenerate the galaxy before opening it up.
+
+---
+
 ## 2026-08-31 — security pass on the debug endpoints
 
 Prompted by the question "could these get exposed to players?" — and they could.

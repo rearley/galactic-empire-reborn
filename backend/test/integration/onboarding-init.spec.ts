@@ -14,7 +14,7 @@ import { ENGYMAX } from '../../src/game/constants';
 
 describe('OnboardingService.finalize() — starting state (T004)', () => {
   let service: OnboardingService;
-  let prismaMock: jest.Mocked<Pick<PrismaService, 'sector' | 'shipClass' | 'ship' | 'user'>>;
+  let prismaMock: jest.Mocked<Pick<PrismaService, 'sector' | 'shipClass' | 'ship' | 'user' | 'planet'>>;
   let shipStateServiceMock: { loadShip: jest.Mock };
 
   const USERID = 'test-user-onboard-001';
@@ -104,6 +104,11 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
       sector: {
         findUnique: jest.fn().mockResolvedValue(mockSector),
       } as unknown as PrismaService['sector'],
+      // Spawn placement reads the neutral sector's planets so it can drop the
+      // new ship clear of them (GEFUNCS.C:205-213).
+      planet: {
+        findMany: jest.fn().mockResolvedValue([]),
+      } as unknown as PrismaService['planet'],
       shipClass: {
         // OnboardingService.finalize now calls findUnique (not findUniqueOrThrow).
         findUnique: jest.fn().mockResolvedValue(mockShipClass),

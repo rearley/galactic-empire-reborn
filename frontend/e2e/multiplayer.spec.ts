@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { LOG, startNewPilot, sendCommand, uniqueShipName, outfitShip } from './helpers';
+import { LOG, startNewPilot, sendCommand, uniqueShipName, outfitShip, steerTo } from './helpers';
 
 /**
  * Two real clients in one world.
@@ -127,7 +127,7 @@ test.describe('multiplayer — two concurrent clients', () => {
   });
 
   test('one pilot firing is visible to the other as an incoming hit', async ({ browser, request }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const ctxA = await browser.newContext();
     const ctxB = await browser.newContext();
     const pageA = await ctxA.newPage();
@@ -151,16 +151,9 @@ test.describe('multiplayer — two concurrent clients', () => {
         shield: 0,
       });
 
-      // Turn A to face B (due east) and wait for the heading to settle.
-      await sendCommand(pageA, 'imp 0 90');
-      await expect
-        .poll(async () => {
-          await sendCommand(pageA, 'rep nav');
-          const text = await pageA.locator(LOG).innerText();
-          const m = [...text.matchAll(/Heading: (\d+) degrees/g)];
-          return m.length ? Number(m[m.length - 1][1]) : -1;
-        }, { timeout: 45_000, intervals: [3_000] })
-        .toBe(90);
+      // Turn A to face B (due east). The course argument is relative and pilots
+      // spawn on a random heading, so steerTo works out the shortest delta.
+      await steerTo(pageA, 90);
 
       await sendCommand(pageA, 'pha 0 0');
 

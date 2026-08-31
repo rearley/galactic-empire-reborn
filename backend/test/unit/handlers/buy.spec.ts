@@ -82,6 +82,23 @@ describe('BuyHandlerService', () => {
     expect(buyMock).toHaveBeenCalled();
   });
 
+  /**
+   * BUY2 read '%d %s purchased for %d credits.' — three placeholders for four
+   * arguments, so the second %d consumed the UNIT price and the total was
+   * dropped. "100 Men purchased for 4 credits" while 400 credits left the
+   * account. Found by watching the balance during a new-pilot run.
+   */
+  it('reports what the purchase actually cost, not the unit price', async () => {
+    const { svc } = makeService(makePlanetState(), {
+      ok: true, transferred: 100, unitPrice: 4, totalCost: 400n,
+    });
+    const text = (await svc.command.handler(makeShip(), ['100', 'men'], {})).lines[0].text;
+
+    expect(text).toContain('400');
+    // The unit price stays visible, but must not be the only number shown.
+    expect(text).not.toMatch(/purchased for 4 credits/);
+  });
+
   it('returns BUY5 when SELL_FLAG_OFF', async () => {
     const { svc } = makeService(makePlanetState(), { ok: false, reason: 'SELL_FLAG_OFF' });
     const result = await svc.command.handler(makeShip(), ['10', 'food'], {});

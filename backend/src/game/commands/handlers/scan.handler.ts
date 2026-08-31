@@ -59,6 +59,22 @@ const RES_DISPLAY: Record<number, string> = {
  * @see GECMDS.C:2190 scan_sh
  * @see GECMDS.C:2295 scan_pl (deviation: named lookup — research.md Decision 8)
  */
+
+/**
+ * Relative bearing from a ship to a point, in whole degrees, 0 = dead ahead.
+ *
+ * @see GEFUNCS.C cbearing(from, to, heading)
+ */
+function relativeBearing(
+  ship: { xcoord: number; ycoord: number; heading: number },
+  target: { xcoord: number; ycoord: number },
+): number {
+  const dx = target.xcoord - ship.xcoord;
+  const dy = target.ycoord - ship.ycoord;
+  const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  return Math.round((absAngle - ship.heading + 360) % 360) % 360;
+}
+
 @Injectable()
 export class ScanHandlerService implements OnModuleInit {
   private readonly logger = new Logger(ScanHandlerService.name);
@@ -635,11 +651,7 @@ export class ScanHandlerService implements OnModuleInit {
         lines: [{ text: `${target.shipname} is out of scanner range.`, category: 'system' }],
       };
     }
-    // Relative bearing (0 = straight ahead) — matches cbearing(from, to, heading) in original.
-    const dx = target.xcoord - ship.xcoord;
-    const dy = target.ycoord - ship.ycoord;
-    const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-    const bearing = Math.round((absAngle - ship.heading + 360) % 360);
+    const bearing = relativeBearing(ship, target);
     const ltr = target.status === 1 ? '+' : '=';
     const briefLine: CommandResult['lines'][number] = {
       text: `${ltr} ${target.shipname} — class ${target.shpclass}, range ${dist.toFixed(1)}, bearing ${bearing}.`,
@@ -744,9 +756,12 @@ export class ScanHandlerService implements OnModuleInit {
         Math.pow(planet.xcoord - ship.xcoord, 2) +
         Math.pow(planet.ycoord - ship.ycoord, 2),
       );
-      // TODO(006): compute bearing from GEFUNCS.C cdistance
+      // C uses the same cbearing(from, to, heading) call here as for ships
+      // (GECMDS.C:2324 vs :2222). This was a literal 0 behind a TODO, so every
+      // planet in a sector reported bearing 0 and there was no way to steer to
+      // the one worth claiming.
       lines.push({
-        text: formatMessage(MessageId.SCAN10, 0, dist.toFixed(2)),
+        text: formatMessage(MessageId.SCAN10, relativeBearing(ship, planet), dist.toFixed(2)),
         category: 'info',
       });
     }

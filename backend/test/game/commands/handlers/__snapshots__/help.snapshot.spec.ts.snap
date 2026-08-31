@@ -37,7 +37,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
   "navigation": {
     "body": [
       "Navigation",
-      "  nav <x> <y>    — engage autopilot to sector",
+      "  nav <x> <y>    — course + range to a sector (then set speed)",
       "  rot <deg>      — set rotation delta (-180 to 180)",
       "  imp <pct>      — set impulse percentage (0-99)",
       "  war <warp>     — set warp factor",
@@ -83,12 +83,13 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
   },
   "trade": {
     "body": [
-      "Trade",
-      "  buy <item> <qty>       — purchase items",
-      "  sell <item> <qty>      — sell items",
-      "  transfer <item> <qty>  — transfer to planet",
-      "  jett <item> <qty>      — jettison items",
-      "  price                  — show item prices",
+      "Trade  (quantity first, then the item — e.g. "buy 100 men")",
+      "  buy <qty> <item>       — purchase items (from orbit)",
+      "  sell <qty> <item>      — sell items",
+      "  tra down <qty> <item>  — move cargo down to your planet",
+      "  tra up <qty> <item>    — load cargo from your planet",
+      "  jet <qty|ALL> <item>   — jettison items",
+      "  pri                    — show item prices",
       "  pln                    — show planet inventory",
     ],
     "title": "Trade",
@@ -99,7 +100,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
 exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
 [
   "Navigation",
-  "  nav <x> <y>    — engage autopilot to sector",
+  "  nav <x> <y>    — course + range to a sector (then set speed)",
   "  rot <deg>      — set rotation delta (-180 to 180)",
   "  imp <pct>      — set impulse percentage (0-99)",
   "  war <warp>     — set warp factor",
@@ -145,12 +146,13 @@ exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
 
 exports[`Help topic snapshots trade topic body matches snapshot 1`] = `
 [
-  "Trade",
-  "  buy <item> <qty>       — purchase items",
-  "  sell <item> <qty>      — sell items",
-  "  transfer <item> <qty>  — transfer to planet",
-  "  jett <item> <qty>      — jettison items",
-  "  price                  — show item prices",
+  "Trade  (quantity first, then the item — e.g. "buy 100 men")",
+  "  buy <qty> <item>       — purchase items (from orbit)",
+  "  sell <qty> <item>      — sell items",
+  "  tra down <qty> <item>  — move cargo down to your planet",
+  "  tra up <qty> <item>    — load cargo from your planet",
+  "  jet <qty|ALL> <item>   — jettison items",
+  "  pri                    — show item prices",
   "  pln                    — show planet inventory",
 ]
 `;

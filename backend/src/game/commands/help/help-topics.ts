@@ -16,7 +16,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
     title: 'Navigation',
     body: [
       'Navigation',
-      '  nav <x> <y>    — engage autopilot to sector',
+      '  nav <x> <y>    — course + range to a sector (then set speed)',
       '  rot <deg>      — set rotation delta (-180 to 180)',
       '  imp <pct>      — set impulse percentage (0-99)',
       '  war <warp>     — set warp factor',
@@ -45,12 +45,13 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
   trade: {
     title: 'Trade',
     body: [
-      'Trade',
-      '  buy <item> <qty>       — purchase items',
-      '  sell <item> <qty>      — sell items',
-      '  transfer <item> <qty>  — transfer to planet',
-      '  jett <item> <qty>      — jettison items',
-      '  price                  — show item prices',
+      'Trade  (quantity first, then the item — e.g. "buy 100 men")',
+      '  buy <qty> <item>       — purchase items (from orbit)',
+      '  sell <qty> <item>      — sell items',
+      '  tra down <qty> <item>  — move cargo down to your planet',
+      '  tra up <qty> <item>    — load cargo from your planet',
+      '  jet <qty|ALL> <item>   — jettison items',
+      '  pri                    — show item prices',
       '  pln                    — show planet inventory',
     ],
   },

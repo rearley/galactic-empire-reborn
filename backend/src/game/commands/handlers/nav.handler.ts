@@ -11,10 +11,20 @@ import { UNIVMAX } from '../../constants';
  * North = 0, East = 90, increasing clockwise.
  * @see scantab.ts calcBearing pattern
  */
+/**
+ * Absolute bearing to a point, in whole degrees, heading 0 = north.
+ *
+ * `-dy` matters: heading 0 is y-DECREASING, which is the convention the physics
+ * tick steers by. Without the negation this returned the mirror image about the
+ * east-west axis — a target due north was reported as bearing 180 — and the
+ * printed course disagreed with the one the autopilot actually flew. It stayed
+ * hidden while every ship spawned facing 0, because the two formulas happen to
+ * agree for due-east targets.
+ */
 function calcBearing(fromX: number, fromY: number, toX: number, toY: number): number {
   const dx = toX - fromX;
   const dy = toY - fromY;
-  return Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
+  return Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360);
 }
 
 /**
@@ -100,9 +110,13 @@ export class NavHandlerService {
         };
       }
 
-      // Auto-break orbit
+      // Auto-break orbit into normal flight. `where === 1` is the AT-WARP
+      // state — parking a stopped ship there reported "In hyperspace" and left
+      // it flagged as warping for the gates that care (the hyper-phaser only
+      // reaches victims at `where === 1`, GECMDS.C:1045). `imp` uses 0 for the
+      // same transition (GECMDS.C:512 LEAVEORB).
       if (ship.where >= 10) {
-        ship.where = 1;
+        ship.where = 0;
       }
 
       // Engage autopilot

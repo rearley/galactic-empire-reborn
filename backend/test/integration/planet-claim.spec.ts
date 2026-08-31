@@ -66,6 +66,7 @@ describe('T023 — PlanetStateService.claim()', () => {
       findMany: jest.Mock;
       update: jest.Mock;
     };
+    user: { updateMany: jest.Mock };
   };
 
   beforeEach(() => {
@@ -79,6 +80,8 @@ describe('T023 — PlanetStateService.claim()', () => {
           return Promise.resolve({});
         }),
       },
+      // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
+      user: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
   });
 

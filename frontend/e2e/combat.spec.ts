@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, spawnDroid } from './helpers';
+import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, spawnDroid, steerTo } from './helpers';
 
 /**
  * Combat through the real UI against the real backend.
@@ -42,6 +42,9 @@ async function waitForHeading(page: import('@playwright/test').Page, want: numbe
 
 test.describe('combat — real UI, real backend', () => {
   test('phaser fire produces a hit with hull damage in the event log', async ({ page, request }) => {
+    // Turning is 20 degrees a tick and pilots now spawn on a random heading,
+    // so pointing at the target can take most of a minute.
+    test.setTimeout(150_000);
     const ship = uniqueShipName('Gun');
     await startNewPilot(page, ship);
 
@@ -53,8 +56,7 @@ test.describe('combat — real UI, real backend', () => {
     await spawnDroid(request, { class: 31, x: arena.x + 0.03, y: arena.y, stationary: true, name: targetName });
 
     // The target sits due east; phasers fire along the ship's heading.
-    await sendCommand(page, 'imp 0 90');
-    await waitForHeading(page, 90);
+    await steerTo(page, 90);
 
     await sendCommand(page, 'pha 0 0');
 

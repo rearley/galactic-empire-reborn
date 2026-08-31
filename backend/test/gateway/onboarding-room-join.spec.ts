@@ -114,4 +114,23 @@ describe('GameGateway — a new pilot joins their rooms', () => {
     expect(welcomes).toHaveLength(1);
     expect(sock.data.activeShipNo).toBe(1);
   });
+
+  /**
+   * The entire first-run output was "Welcome aboard, <ship>." — nothing told a
+   * brand-new pilot that `hel` exists, let alone what to do with a starter
+   * Interceptor sitting in the neutral zone. Everything else in the game is
+   * discoverable from the help topics; finding the help was the hard part.
+   */
+  it('points a first-time pilot at the help', async () => {
+    const gateway = build();
+    const sock = makeSocket();
+
+    await gateway.handlePromptReply(sock as never, { value: 'Newcomer' });
+
+    const shown = sock.emit.mock.calls
+      .filter((c) => c[0] === 'command:result')
+      .map((c) => JSON.stringify(c[1]))
+      .join('\n');
+    expect(shown).toMatch(/hel/);
+  });
 });

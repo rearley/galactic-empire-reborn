@@ -188,3 +188,50 @@ describe('ScanHandlerService — scan pl spy reveal (T017)', () => {
     expect(hasItemLine).toBe(true);
   });
 });
+
+/**
+ * `scan pl <n>` reported "Bearing: 0" for every planet — the value was a
+ * literal 0 next to a `TODO(006)` that was never done, while the distance
+ * beside it was real. C computes it exactly like the ship scan does:
+ * `cbearing(&warsptr->coord, &plptr->coord, warsptr->heading)`
+ * (GECMDS.C:2324, the same call as :2222).
+ *
+ * Found while playing a new pilot: three planets in one sector, all reporting
+ * bearing 0, so there was no way to steer toward the one worth claiming.
+ */
+describe('scan pl — bearing to the planet', () => {
+  const bearingOf = (text: string): number =>
+    Number(/Bearing:\s*(-?\d+)/.exec(text)?.[1] ?? NaN);
+
+  async function scanFrom(shipOverrides: Partial<ShipState>): Promise<string> {
+    const { service, ctx } = makeService({ viewerUserId: 'alice' });
+    const ship = makeShip({ ...shipOverrides });
+    const texts = await lineTexts(service.command.handler(ship, ['pl', 'Recon Base'], ctx));
+    return texts.join('\n');
+  }
+
+  it('reports a real bearing, not a placeholder zero', async () => {
+    // Planet sits at (10.5, 7.5); ship approaches off-axis from the south-east,
+    // so the true bearing is not zero and a placeholder would show up.
+    const text = await scanFrom({ xcoord: 10.9, ycoord: 7.9, heading: 0 });
+    expect(text).toMatch(/Bearing:/);
+    expect(bearingOf(text)).not.toBe(0);
+  });
+
+  it('is relative to the ship heading — dead ahead reads 0', async () => {
+    // Ship south of the planet pointing north.
+    const ahead = await scanFrom({ xcoord: 10.5, ycoord: 7.9, heading: 0 });
+    // Same geometry, ship turned around: the planet is now behind it.
+    const behind = await scanFrom({ xcoord: 10.5, ycoord: 7.9, heading: 180 });
+    expect(bearingOf(ahead)).not.toBe(bearingOf(behind));
+    expect(bearingOf(behind)).toBe((bearingOf(ahead) + 180) % 360);
+  });
+
+  it('stays within 0..359', async () => {
+    for (const heading of [0, 45, 90, 200, 359]) {
+      const b = bearingOf(await scanFrom({ xcoord: 10.9, ycoord: 7.9, heading }));
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThan(360);
+    }
+  });
+});

@@ -48,6 +48,12 @@ test.describe('colony lifecycle through the terminal', () => {
     await sendCommand(page, 'pla');
     await expect(page.locator(LOG)).toContainText('New Terra');
 
+    // C's wonplnt() increments the owner's planet counter (GECMDS.C:4001). The
+    // port only decremented on abandon, so `rep acc` told a pilot who had just
+    // claimed their first world "Planets: none." while `pla` listed it.
+    await sendCommand(page, 'rep acc');
+    await expect(page.locator(LOG)).toContainText('Planets owned: 1.');
+
     // Release it so the spec can run again.
     await sendCommand(page, 'aba');
     await expect(page.locator(LOG)).toContainText('You have abandoned New Terra');
