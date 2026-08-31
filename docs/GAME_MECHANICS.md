@@ -575,6 +575,30 @@ Tick cadence: `interval = max(PLANTIME_MIN_SECONDS, floor(PLANTOCK_SECONDS / N))
 
 Zero-population planets produce nothing (`if men.qty == 0 → break` before production loop).
 
+### Claiming a planet (GEMAIN.C:2895-2942 `mnu_admenu1`)
+
+Claiming an unowned planet costs nothing — no credits, no colonists, no combat. C prompts
+"do you wish to claim this planet?" and on yes:
+
+```
+plptr->userid = warsptr->userid
+++waruptr->planets
+for each item: rate = 0
+items[I_MEN].rate  = 50
+items[I_FOOD].rate = 50
+```
+
+So the new owner is handed a **working colony**, already producing colonists and food. `wonplnt()`
+(GECMDS.C:3996) is the separate path for taking a planet by force, and it only sets the owner and
+the counter.
+
+The port claims through `land <name>` rather than C's `adm` + y/n + name prompt, and applies the
+same rate initialisation (`CLAIM_START_RATE`). Zeroing first matters: an abandoned planet keeps its
+stock and settings, so without the reset a re-claimed world silently inherited its last owner's
+production rates.
+
+---
+
 ### New-ship placement (GEFUNCS.C:195-217)
 
 A new ship is dropped at a random point inside the neutral sector, re-rolling while it lands within
@@ -618,6 +642,28 @@ This branch was missing until 2026-08-31, which made the entire planet economy i
 in the galaxy had rate 0 and no men, so a claimed colony produced nothing and production reports,
 tax and planet cash never moved. `tools/backfill-planet-inventory.ts` applies the roll to an
 already-generated galaxy.
+
+---
+
+## Dormant ships (`GESTAT_AVAIL`)
+
+A captain may own several hulls but flies one at a time. The others are **dormant, not destroyed**:
+
+| status | meaning | in the live world? |
+|--------|---------|--------------------|
+| 0 `GESTAT_AVAIL` | dormant — owned, parked, unloaded | no |
+| 1 `GESTAT_USER`  | active player ship | yes |
+| 2 `GESTAT_AUTO`  | AI (Cybertron / droid) | yes |
+
+`board()` sets `GESTAT_USER` and loads the ship into `ShipStateService`'s map; `unboard()` sets
+`GESTAT_AVAIL`, flushes, and evicts it. Everything that sees the world — the physics tick, combat,
+`who`, scans — reads that map, so a dormant hull cannot move, be scanned, or be attacked. Its row
+keeps position, cargo, damage and energy, and it resumes exactly where it was left when boarded
+again. This matches C, where `ingegame()` is false for anything not currently in play.
+
+The practical consequence: **a parked ship is a safe warehouse.** A loaded freighter left dormant
+cannot be intercepted. A ship you are still logged into is a different matter — it stays in the
+world and can be destroyed while you are idle.
 
 ---
 

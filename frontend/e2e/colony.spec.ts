@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, reconnect } from './helpers';
+import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, reconnect, findUnownedPlanet } from './helpers';
 
 /**
  * Claiming and releasing a colony, driven entirely through the terminal.
@@ -18,13 +18,15 @@ import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, rec
  * playtest state near the neutral zone. The pilot releases the planet at the
  * end, so the spec is re-runnable.
  */
-const OUTPOST = { plnum: 4, x: 29.3939, y: 14.1242 };
+const OUTPOST_SECTOR = { x: 25, y: 10 };
 
-async function orbitTheOutpost(page: Page, ship: string, request: APIRequestContext): Promise<void> {
-  await outfitShip(request, { shipname: ship, x: OUTPOST.x, y: OUTPOST.y });
-  await reconnect(page);
-  await expect(page.locator(INPUT)).toBeVisible();
-  await sendCommand(page, `orb ${OUTPOST.plnum}`);
+async function orbitAnUnownedWorld(
+  page: Page,
+  ship: string,
+  request: APIRequestContext,
+): Promise<void> {
+  const plnum = await findUnownedPlanet(page, request, ship, OUTPOST_SECTOR);
+  await sendCommand(page, `orb ${plnum}`);
   await expect(page.locator(LOG)).toContainText('in orbit');
 }
 
@@ -34,7 +36,7 @@ test.describe('colony lifecycle through the terminal', () => {
   test('the land prompt takes a free-text answer, even one that shadows a verb', async ({ page, request }) => {
     const ship = uniqueShipName('claim');
     await startNewPilot(page, ship);
-    await orbitTheOutpost(page, ship, request);
+    await orbitAnUnownedWorld(page, ship, request);
 
     await sendCommand(page, 'lan');
     await expect(page.locator(LOG)).toContainText('What would you like to name this planet?');
@@ -54,6 +56,15 @@ test.describe('colony lifecycle through the terminal', () => {
     await sendCommand(page, 'rep acc');
     await expect(page.locator(LOG)).toContainText('Planets owned: 1.');
 
+    // C hands the new owner a working colony rather than a dormant rock:
+    // mnu_admenu1 zeroes every rate and sets men and food to 50
+    // (GEMAIN.C:2908-2916). Without it a first world produced nothing until the
+    // pilot discovered `adm rate`, and nothing tells them to.
+    await sendCommand(page, 'adm');
+    const adm = await page.locator(LOG).innerText();
+    expect(adm).toMatch(/Men\.+\d+\s+rate:50/);
+    expect(adm).toMatch(/Food Cases\.+\d+\s+rate:50/);
+
     // Release it so the spec can run again.
     await sendCommand(page, 'aba');
     await expect(page.locator(LOG)).toContainText('You have abandoned New Terra');
@@ -62,7 +73,7 @@ test.describe('colony lifecycle through the terminal', () => {
   test('a released planet leaves the roster and can be claimed again', async ({ page, request }) => {
     const ship = uniqueShipName('rel');
     await startNewPilot(page, ship);
-    await orbitTheOutpost(page, ship, request);
+    await orbitAnUnownedWorld(page, ship, request);
 
     await sendCommand(page, 'lan');
     await sendCommand(page, 'Second Chance');

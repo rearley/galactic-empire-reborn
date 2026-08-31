@@ -1,3 +1,4 @@
+import { I_MEN, I_FOOD } from '../constants/items';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { NEUTRAL_ZONE_SECTOR } from '../combat/neutral-zone';
 import { MAXPLNTS } from '../constants';
@@ -15,6 +16,12 @@ import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
  * Per-planet async mutex prevents lost-update races (research Decision 2).
  * @see contracts/planet-state-service.md
  */
+/**
+ * Production rate a freshly claimed colony starts men and food at.
+ * @see GEMAIN.C:2914-2915 mnu_admenu1
+ */
+const CLAIM_START_RATE = 50;
+
 @Injectable()
 export class PlanetStateService implements OnModuleInit {
   private readonly logger = new Logger(PlanetStateService.name);
@@ -158,6 +165,16 @@ export class PlanetStateService implements OnModuleInit {
 
       state.userid = userid;
       state.name = trimmed;
+
+      // C hands the new owner a working colony: every production rate is zeroed
+      // and men/food are set to 50 (GEMAIN.C:2908-2916 mnu_admenu1). Without it
+      // a first world sat producing nothing until the pilot found `adm rate`,
+      // and a re-claimed planet silently kept its last owner's settings.
+      for (const item of state.items) {
+        item.rate = 0;
+      }
+      state.items[I_MEN].rate = CLAIM_START_RATE;
+      state.items[I_FOOD].rate = CLAIM_START_RATE;
 
       await this.prisma.planet.update({
         where: { xsect_ysect_plnum: { xsect, ysect, plnum } },
