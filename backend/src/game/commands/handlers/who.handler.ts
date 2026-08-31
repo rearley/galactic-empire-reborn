@@ -10,6 +10,13 @@ import { ShipState } from '../../ship/ship-state.types';
  * @see GECMDS.C:5162 cmd_who
  * @see specs/012-social-commands/research.md D1
  */
+/** Fixed column widths shared by the `who` header and its rows. */
+const NAME_W = 22;
+const CLASS_W = 20;
+/** Wide enough for "(-13,-14)". */
+const SECTOR_W = 9;
+const KILLS_W = 5;
+
 @Injectable()
 export class WhoHandlerService implements OnModuleInit {
   private readonly classNames = new Map<number, string>();
@@ -37,7 +44,11 @@ export class WhoHandlerService implements OnModuleInit {
   }
 
   private handle(_ship: ShipState): CommandResult {
-    const header = '  Shipname               Class                Sector  Kills';
+    // Header and rows share these widths so the columns cannot drift apart —
+    // they had, because coordinates were padded to two characters and a ship in
+    // a negative double-digit sector ("(-13, 1)") shifted everything after it.
+    const header =
+      ` ${'Shipname'.padEnd(NAME_W)} ${'Class'.padEnd(CLASS_W)} ${'Sector'.padEnd(SECTOR_W)}  ${'Kills'.padStart(KILLS_W)}`;
     const lines: CommandResult['lines'] = [{ text: header, category: 'system' }];
 
     const active = this.shipService
@@ -46,12 +57,13 @@ export class WhoHandlerService implements OnModuleInit {
       .sort((a, b) => a.shipname.toLowerCase().localeCompare(b.shipname.toLowerCase()));
 
     for (const s of active) {
-      const name = s.shipname.padEnd(22).slice(0, 22);
-      const cls = (this.classNames.get(s.shpclass) ?? `Class ${s.shpclass}`).padEnd(20).slice(0, 20);
-      const xs = Math.floor(s.xcoord).toString().padStart(2);
-      const ys = Math.floor(s.ycoord).toString().padStart(2);
-      const kills = s.kills.toString().padStart(5);
-      lines.push({ text: ` ${name} ${cls} (${xs},${ys})  ${kills}`, category: 'info' });
+      const name = s.shipname.padEnd(NAME_W).slice(0, NAME_W);
+      const cls = (this.classNames.get(s.shpclass) ?? `Class ${s.shpclass}`).padEnd(CLASS_W).slice(0, CLASS_W);
+      const xs = Math.floor(s.xcoord).toString().padStart(3);
+      const ys = Math.floor(s.ycoord).toString().padStart(3);
+      const sector = `(${xs},${ys})`.padEnd(SECTOR_W).slice(0, SECTOR_W);
+      const kills = s.kills.toString().padStart(KILLS_W);
+      lines.push({ text: ` ${name} ${cls} ${sector}  ${kills}`, category: 'info' });
     }
 
     return { lines };

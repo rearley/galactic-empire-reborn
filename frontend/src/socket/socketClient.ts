@@ -58,14 +58,35 @@ export function onSocketAuthFailed(cb: AuthFailedCallback): void {
   onAuthFailed = cb;
 }
 
-// Handle session-replaced and auth-required by clearing the local token.
-socket.on('error', (err: { code?: string; message?: string }) => {
-  if (err.code === 'SESSION_REPLACED' || err.code === 'AUTH_REQUIRED') {
+/**
+ * Routes server-side `error` events.
+ *
+ * `AUTH_REQUIRED` means the credential itself is bad — drop it and send the
+ * player back to the login screen.
+ *
+ * `SESSION_REPLACED` means a newer socket took the seat (latest-wins); the
+ * credential is still perfectly good, so the token stays. It used to be treated
+ * as an auth failure, and because the token lives in localStorage — shared
+ * across the whole tab — any moment where two sockets overlapped (a backend hot
+ * reload, a reconnect racing a fresh page) wiped it and dumped the player at the
+ * login screen mid-game, seemingly caused by whatever they had just typed. We
+ * only stop reconnecting, so this session stops fighting the one that won.
+ *
+ * Exported for tests; also wired to the socket below.
+ */
+export function handleServerError(err: { code?: string; message?: string }): void {
+  if (err.code === 'AUTH_REQUIRED') {
     clearToken();
     socket.disconnect();
     onAuthFailed?.();
+    return;
   }
-});
+  if (err.code === 'SESSION_REPLACED') {
+    socket.disconnect();
+  }
+}
+
+socket.on('error', handleServerError);
 
 // Server kicked us because the User row no longer exists (e.g. DB was reset).
 // Clear the stale token so the client lands on the register screen.

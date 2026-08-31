@@ -1,6 +1,17 @@
 ## 2026-08-31 (evening) — radio, abandon recovery, flux warning
 
 **Completed:**
+- **A displaced session wiped the player's credentials.** `SESSION_REPLACED` is sent to the *older*
+  socket when a newer one takes the seat, and the client treated it exactly like `AUTH_REQUIRED`:
+  `clearToken()`. The JWT lives in `localStorage`, shared across the tab, so any moment where two
+  sockets overlapped — a backend hot reload, a reconnect racing a page load — dropped the player at
+  the login screen mid-game, apparently caused by whatever command they had just typed. (It sent me
+  chasing `abandon` for a while.) The client now keeps the token and only stops reconnecting.
+  Verified with two real tabs: the displaced one shows "Disconnected" and stays authenticated.
+- **`who` columns drifted.** Coordinates were padded to two characters, so a ship in a negative
+  double-digit sector (`(-13, 1)`) pushed Sector and Kills right for the rest of the table; a
+  22-character shipname did the same. Header and rows now share fixed widths, with tests pinning
+  equal row length and the Kills right-edge.
 - **`aba` could permanently end an account.** Three faults stacked:
   1. The handler cleared `activeShipNo` and stopped, so the session answered
      "No active ship." to everything — FR-704's "route the captain back through onboarding" was
