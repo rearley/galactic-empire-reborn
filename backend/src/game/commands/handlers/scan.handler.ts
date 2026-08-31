@@ -6,7 +6,7 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY } from '../../constants';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
@@ -255,7 +255,10 @@ export class ScanHandlerService implements OnModuleInit {
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        if (sx < 0 || sx >= MAXX || sy < 0 || sy >= MAXY) continue;
+        // Universe bounds, not the display grid: sectors run -UNIVMAX..+UNIVMAX
+        // with the origin at the centre. The old 0..MAXX test skipped every
+        // western and southern sector and probed columns past the edge.
+        if (sx < -UNIVMAX || sx > UNIVMAX || sy < -UNIVMAX || sy > UNIVMAX) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
           const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
@@ -333,7 +336,10 @@ export class ScanHandlerService implements OnModuleInit {
 
     for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
       for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        if (sx < 0 || sx >= MAXX || sy < 0 || sy >= MAXY) continue;
+        // Universe bounds, not the display grid: sectors run -UNIVMAX..+UNIVMAX
+        // with the origin at the centre. The old 0..MAXX test skipped every
+        // western and southern sector and probed columns past the edge.
+        if (sx < -UNIVMAX || sx > UNIVMAX || sy < -UNIVMAX || sy > UNIVMAX) continue;
         for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
           const cell = projectRangeCell(ship, planet, projectionRange);
           if (!cell) continue;
@@ -526,13 +532,15 @@ export class ScanHandlerService implements OnModuleInit {
       cellMap.set(`${cell.x},${cell.y}`, cell);
     };
 
-    // Ships legitimately fly outside the generated sector grid — Cybertrons spawn
-    // across the whole universe (GECYBS.C:158 `rndm(univmax*2.0) - univmax`), so
-    // negative sectors are normal. The galaxy is only generated for
-    // 0..MAXX-1 x 0..MAXY-1 and getSectorPlanets/getSectorWormholes throw outside
-    // it, so skip the terrain lookups there rather than crashing the command.
-    // The long-range projection path applies the same guard.
-    const inGalaxy = xsect >= 0 && xsect < MAXX && ysect >= 0 && ysect < MAXY;
+    // The galaxy now covers the whole universe — sectors -UNIVMAX..+UNIVMAX on
+    // both axes, matching where Cybertrons spawn (GECYBS.C:158
+    // `rndm(univmax*2.0) - univmax`). It used to be generated only for
+    // 0..MAXX-1 x 0..MAXY-1, so negative sectors had no terrain and the lookups
+    // had to be skipped. The bound is the universe, and getSectorPlanets /
+    // getSectorWormholes throw outside it, so keep guarding — a ship that has
+    // wrapped mid-tick can momentarily sit on the boundary.
+    const inGalaxy =
+      xsect >= -UNIVMAX && xsect <= UNIVMAX && ysect >= -UNIVMAX && ysect <= UNIVMAX;
 
     // 1. Visible wormholes in this sector — lowest precedence
     if (inGalaxy) {

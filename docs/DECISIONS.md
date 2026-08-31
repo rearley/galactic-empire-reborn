@@ -4,6 +4,44 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid
+
+**Context**: C's universe is a square spanning `-univmax..+univmax` on both axes with the neutral
+zone at `NEUTRAL_X = NEUTRAL_Y = 0` (GEMAIN.H:70-71) — the origin is its CENTRE. Coordinates are
+seeded as `rndm(univmax*2) - univmax` (GEMAIN.C:2204) and wrapped by subtracting or adding
+`univmax*2` at the edges (GEFUNCS.C:653-700). Feature 004 instead pre-generated sectors
+`0..MAXX-1 x 0..MAXY-1` and wrapped on those bounds, which put the hub in a **corner**.
+
+The consequences only became visible by playing. Half of all spawn headings walked a new pilot
+straight off an edge and round to the far side of the galaxy — test pilots ended up in sectors
+(29,0) and (0,14) within a minute of their first command. The hub's neighbourhood was a quadrant
+rather than a disc, so the nearest inhabited planet was eight sectors away through patrolled space,
+and there was no early trade partner at all. `MAXX`/`MAXY` were also doing double duty as both the
+galaxy extent and the ASCII scan grid, which is what made the mistake easy to miss: they are the
+**display** grid (`xfactor = (univmax*2)/(MAXX-1)`, GECMDS.C:2746), never the universe.
+
+**Decision**: The galaxy spans `-UNIVMAX..+UNIVMAX` on both axes — `(2*UNIVMAX+1)^2` sectors with
+(0,0) at the centre. Ship coordinates wrap via `wrapUniverse` in C's form. `MAXX`/`MAXY` keep their
+one real job: the 30x15 scan projection. `UNIVMAX` defaults to 10 (441 sectors, close to the 450 the
+AI population was tuned against); raising it makes a larger, emptier galaxy.
+
+**Reason**: It is what the original does, and the early game depends on it. A new pilot now sees
+planets in every direction on their first `sca lo`, the nearest inhabited world is one sector out
+instead of eight, and no heading strands them. Nothing about the pre-generation approach had to
+change — only its extent.
+
+**Alternatives rejected**: Keeping the 0-based grid and moving the spawn to its middle — the hub
+would be central but the wrap seams would still sit at (0,0), so a pilot crossing them would jump
+across the galaxy for no reason a player could understand. Generating sectors lazily as C does
+(`getsector`) — a much larger change to no benefit here, since a fixed world is easier to reason
+about and to test.
+
+**Affected requirements**: supersedes the fixed 30x15 grid from feature 004. Scan sector-bounds
+guards, the beacon's flat sector id, `sector:join` validation and the physics wrap all move to
+universe bounds.
+
+---
+
 ## 2026-08-31 — the autopilot survives a speed order
 
 **Context**: `nav <x> <y>` sets a course and holds it (`holdcourse`), and the physics tick re-aims

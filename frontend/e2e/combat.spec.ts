@@ -21,9 +21,9 @@ import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, spa
  * accumulates targets and name-based targeting can pick a leftover.
  */
 const ARENAS = {
-  phaser: { x: 24.5, y: 11.5 },
-  torpedo: { x: 21.5, y: 6.5 },
-  clamp: { x: 27.5, y: 3.5 },
+  phaser: { x: -7.5, y: 8.5 },
+  torpedo: { x: 7.5, y: -6.5 },
+  clamp: { x: -8.5, y: -4.5 },
 };
 
 /** Poll `rep nav` until the reported heading settles on `want`. */

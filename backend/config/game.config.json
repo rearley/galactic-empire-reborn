@@ -22,7 +22,7 @@
     "CLENGUSE": 1000
   },
   "world": {
-    "UNIVMAX": 15,
+    "UNIVMAX": 10,
     "PLODDS": 4,
     "WORMODDS": 10,
     "MAXPLSE": 9,

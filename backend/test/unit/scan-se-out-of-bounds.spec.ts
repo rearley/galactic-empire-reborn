@@ -1,11 +1,14 @@
 /**
  * `scan se` must not throw when the ship is outside the generated sector grid.
  *
- * Ships legitimately occupy negative coordinates: GECYBS.C:158 spawns Cybertrons
- * with `rndm(univmax*2.0) - univmax`, and `who` reports live AI ships at sectors
- * such as (-13,-7). The galaxy, however, is only generated for 0..MAXX-1 x
- * 0..MAXY-1, and GalaxyService.getSectorPlanets/getSectorWormholes THROW for
- * out-of-range coords.
+ * The galaxy covers the universe square, -UNIVMAX..+UNIVMAX on both axes, and
+ * GalaxyService.getSectorPlanets/getSectorWormholes THROW outside it. A ship can
+ * still be handed coordinates beyond that edge — mid-wrap, or from a stale
+ * position — so the handler must guard rather than crash.
+ *
+ * (Before the universe was centred on the origin, the galaxy was generated only
+ * for 0..MAXX-1 x 0..MAXY-1 while ships flew freely into negative sectors, which
+ * is the mismatch this spec was originally written for.)
  *
  * ScanHandlerService.handleSectorScan calls both with the raw floor of the ship
  * coordinates and has no bounds guard — unlike the long-range projection path,
@@ -26,7 +29,7 @@ import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
-import { MAXX, MAXY } from '../../src/game/constants';
+import { UNIVMAX } from '../../src/game/constants';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -52,7 +55,8 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 /** Galaxy stub that enforces the SAME bounds contract as the real service. */
 function makeBoundedService(ships: ShipState[]) {
-  const inRange = (x: number, y: number) => x >= 0 && x < MAXX && y >= 0 && y < MAXY;
+  const inRange = (x: number, y: number) =>
+    x >= -UNIVMAX && x <= UNIVMAX && y >= -UNIVMAX && y <= UNIVMAX;
 
   const galaxyMock = {
     getSectorPlanets: jest.fn((x: number, y: number) => {
@@ -80,10 +84,11 @@ function makeBoundedService(ships: ShipState[]) {
 describe('scan se — ship outside the generated sector grid', () => {
   const outOfBounds: Array<[string, number, number]> = [
     ['negative x (west of the grid)', -13.5, 7.5],
-    ['negative y (south of the grid)', 5.5, -7.5],
-    ['both negative', -2.5, -11.5],
-    ['x beyond MAXX', MAXX + 0.5, 7.5],
-    ['y beyond MAXY', 5.5, MAXY + 0.5],
+    ['west of the universe', -(UNIVMAX + 1.5), 5.5],
+    ['south of the universe', 5.5, -(UNIVMAX + 1.5)],
+    ['both beyond the edge', -(UNIVMAX + 2.5), -(UNIVMAX + 1.5)],
+    ['east of the universe', UNIVMAX + 0.5, 7.5],
+    ['north of the universe', 5.5, UNIVMAX + 0.5],
   ];
 
   test.each(outOfBounds)('does not throw for %s', async (_label, xcoord, ycoord) => {

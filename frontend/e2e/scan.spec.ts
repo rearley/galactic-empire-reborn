@@ -14,7 +14,7 @@ import {
  * Nothing below the browser could see it: the backend was returning a valid
  * number and the unit tests only checked the field existed.
  */
-const RENDEZVOUS = { x: 24.5, y: 6.5 };
+const RENDEZVOUS = { x: 6.5, y: 7.5 };
 
 test.describe('scan panels', () => {
   test('the contact legend lists a nearby ship in whole numbers', async ({ page, request }) => {

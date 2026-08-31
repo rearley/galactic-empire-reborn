@@ -15,7 +15,7 @@ import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, rec
  */
 
 /** Clear of the neutral zone and of the Cybertron patrol lanes near the core. */
-const QUIET = { x: 26.5, y: 12.5 };
+const QUIET = { x: -8.5, y: 9.5 };
 
 test.describe('unsolicited server notices reach the pilot', () => {
   test('the self-destruct sequence is announced to the sector', async ({ page, request }) => {
@@ -42,9 +42,9 @@ test.describe('unsolicited server notices reach the pilot', () => {
     const ship = uniqueShipName('cross');
     await startNewPilot(page, ship);
 
-    // Parked just inside sector (22,5), a fraction from the (22,4) line.
+    // Parked just inside sector (6,5), a fraction from the (6,4) line.
     // Heading 0 decreases y, so impulse walks the ship across it.
-    await outfitShip(request, { shipname: ship, x: 22.5, y: 5.004 });
+    await outfitShip(request, { shipname: ship, x: 6.5, y: 5.004 });
     await reconnect(page);
     await expect(page.locator(INPUT)).toBeVisible();
 
@@ -53,7 +53,7 @@ test.describe('unsolicited server notices reach the pilot', () => {
     await steerTo(page, 0);
     await sendCommand(page, 'imp 9');
     // GEFUNCS.C:711 MOVE1 — the mover's own notice, naming both sectors.
-    await expect(page.locator(LOG)).toContainText('You have moved from sector (22, 5) to (22, 4).', {
+    await expect(page.locator(LOG)).toContainText('You have moved from sector (6, 5) to (6, 4).', {
       timeout: 40_000,
     });
     // GEFUNCS.C:717,722 exclude `usrn` from the sector notices: the pilot must

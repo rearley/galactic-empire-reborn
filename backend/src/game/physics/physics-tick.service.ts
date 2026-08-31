@@ -19,9 +19,9 @@ import {
   rotationStep,
   sectorOf,
   tryEnergyDebit,
-  wrapCoord,
+  wrapUniverse,
 } from './physics-math';
-import { MAXX, MAXY } from '../constants';
+import { UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 
 /**
@@ -230,8 +230,8 @@ export class PhysicsTickService implements OnModuleInit {
       let xWrapped = false;
       let yWrapped = false;
       if (ship.where <= 1) {
-        const wx = wrapCoord(next.x, MAXX);
-        const wy = wrapCoord(next.y, MAXY);
+        const wx = wrapUniverse(next.x, UNIVMAX);
+        const wy = wrapUniverse(next.y, UNIVMAX);
         xWrapped = wx !== next.x;
         yWrapped = wy !== next.y;
         wrappedX = wx;

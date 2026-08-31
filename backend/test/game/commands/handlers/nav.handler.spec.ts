@@ -212,9 +212,9 @@ describe('NavHandlerService — engagement happy path', () => {
       xcoord: 5.0, ycoord: 5.0,
       holdcourse: 1, navTargetX: 3, navTargetY: 3,
     });
-    const result = handler.command.handler(state, ['12', '9'], ctx) as { lines: { text: string }[] };
-    expect(state.navTargetX).toBe(12);
-    expect(state.navTargetY).toBe(9);
+    const result = handler.command.handler(state, ['9', '7'], ctx) as { lines: { text: string }[] };
+    expect(state.navTargetX).toBe(9);
+    expect(state.navTargetY).toBe(7);
     expect(state.holdcourse).toBe(1);
     // No error message — first line should be success
     expect(result.lines[0].text).toContain('Course set for');

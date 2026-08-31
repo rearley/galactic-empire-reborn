@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyModule } from '../../src/game/galaxy/galaxy.module';
 import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { UNIVMAX } from '../../src/game/constants';
 
 /**
  * G4 + G5 — Galaxy idempotency and rollback integration tests.
@@ -41,6 +42,9 @@ async function rowCounts(prisma: PrismaService) {
 
 // ── G4: Second boot performs zero writes ──────────────────────────────────────
 
+/** The universe is a square of side 2*UNIVMAX+1 centred on the origin. */
+const UNIVERSE_SECTORS = (UNIVMAX * 2 + 1) ** 2;
+
 describe('GalaxyService idempotency (G4)', () => {
   let app1: TestingModule;
   let prisma: PrismaService;
@@ -65,7 +69,7 @@ describe('GalaxyService idempotency (G4)', () => {
 
   it('G4.1 — second boot with the same seed does not insert additional Sector rows', async () => {
     const beforeCounts = await rowCounts(prisma);
-    expect(beforeCounts.sectorCount).toBe(450); // first boot must have populated
+    expect(beforeCounts.sectorCount).toBe(UNIVERSE_SECTORS); // first boot must have populated
 
     // Second boot — fresh TestingModule, same env seed, DB already populated.
     const app2 = await Test.createTestingModule({

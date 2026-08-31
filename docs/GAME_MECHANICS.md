@@ -413,6 +413,28 @@ read-only (scan, report) do not set dirty.
 
 ---
 
+## Universe shape
+
+The universe is a square spanning `-UNIVMAX..+UNIVMAX` on both axes — `(2*UNIVMAX+1)^2` sectors —
+with the neutral zone at its **centre**:
+
+| | |
+|---|---|
+| neutral zone | `NEUTRAL_X = NEUTRAL_Y = 0` (GEMAIN.H:70-71) |
+| extent | `-univmax..+univmax`, seeded as `rndm(univmax*2) - univmax` (GEMAIN.C:2204) |
+| wrap | `coord > univmax → coord -= univmax*2`, and the mirror below (GEFUNCS.C:653-700) |
+| `UNIVMAX` | sysop option, `numopt(UNIVMAX,10,32767)` — 10 here, giving 441 sectors |
+
+`MAXX = 30` and `MAXY = 15` are the **ASCII scan grid**, not the galaxy: the projection is
+`xfactor = (univmax*2)/(MAXX-1)` (GECMDS.C:2746). Treating them as the galaxy extent is what put the
+hub in a corner until 2026-08-31; see docs/DECISIONS.md.
+
+Ship coordinates are wrapped by `wrapUniverse` (`game/physics/physics-math.ts`), which shifts only
+when a coordinate is actually outside the square — a modular fold is equivalent in exact arithmetic
+but perturbs in-range values by an ulp, which registers as a spurious wrap.
+
+---
+
 ## Procedural galaxy generation (feature 004)
 
 **Source**: @see GEPLANET.C:455-650 xgetsector

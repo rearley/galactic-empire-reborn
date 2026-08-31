@@ -138,14 +138,44 @@ export function tryEnergyDebit(
 
 /**
  * Wraps a coordinate into `[0, max)` using modular arithmetic.
- * Applied after position integration when `ship.where <= 1` (in normal space).
- * Guards against NaN and Infinity by returning 0 for non-finite inputs.
  *
- * @see GEFUNCS.C:651-705 moveship — univwrap branch
+ * Retained for grid-relative maths (the scan projection). Ship positions use
+ * {@link wrapUniverse}, which is centred on the origin as C's universe is.
  */
 export function wrapCoord(value: number, max: number): number {
   if (!Number.isFinite(value)) return 0;
   return ((value % max) + max) % max;
+}
+
+/**
+ * Wraps a ship coordinate into the universe `[-univmax, +univmax]`.
+ *
+ * C's universe is a square centred on the origin — the neutral zone is at
+ * `NEUTRAL_X = NEUTRAL_Y = 0` (GEMAIN.H:70-71) — and crossing an edge subtracts
+ * or adds `univmax*2`:
+ *
+ * ```
+ * if (coord >  univmax) coord -= univmax*2;
+ * if (coord < -univmax) coord += univmax*2;
+ * ```
+ *
+ * Applied after position integration when `ship.where <= 1` (in normal space).
+ * Non-finite input returns 0.
+ *
+ * @see GEFUNCS.C:651-705 moveship — univwrap branch
+ */
+export function wrapUniverse(value: number, univmax: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const span = univmax * 2;
+  if (span <= 0) return 0;
+  // Shift only when the coordinate is actually outside, exactly as C does. A
+  // modular fold would be equivalent in exact arithmetic but not in floating
+  // point: it perturbs in-range values by an ulp, which registers as a wrap and
+  // made the boundary-wrapped event fire on both axes for a ship crossing one.
+  let wrapped = value;
+  while (wrapped > univmax) wrapped -= span;
+  while (wrapped < -univmax) wrapped += span;
+  return wrapped;
 }
 
 /**

@@ -18,7 +18,7 @@ import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, rec
  * playtest state near the neutral zone. The pilot releases the planet at the
  * end, so the spec is re-runnable.
  */
-const OUTPOST_SECTOR = { x: 25, y: 10 };
+const OUTPOST_SECTOR = { x: -6, y: 7 };
 
 async function orbitAnUnownedWorld(
   page: Page,

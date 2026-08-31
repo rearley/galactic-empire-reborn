@@ -2,19 +2,27 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyModule } from '../../src/game/galaxy/galaxy.module';
 import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { UNIVMAX } from '../../src/game/constants';
 
 /**
  * G1 — Galaxy bootstrap integration tests.
  *
  * Verifies that GalaxyService.onModuleInit() generates and persists
- * a complete 30×15 galaxy (450 Sector rows + 1 GalaxyMeta row) on first boot.
+ * a complete universe square (UNIVERSE_SECTORS Sector rows + 1 GalaxyMeta row) on first boot.
  *
  * These tests are intentionally RED until T019 implements onModuleInit().
  *
  * @see specs/004-galaxy-generator/contracts/galaxy-service.md — G1
  * @see GEPLANET.C:455-650 xgetsector — procedural sector generation
- * @see GEMAIN.H — MAXX=30, MAXY=15
+ * The universe runs -UNIVMAX..+UNIVMAX on both axes with the neutral zone at
+ * its CENTRE, as in C (GEMAIN.H:70 NEUTRAL_X=0, GEMAIN.C:2204 coordinates
+ * seeded as rndm(univmax*2)-univmax). It used to be a 0-based 30x15 grid, which
+ * put the hub in a corner. MAXX/MAXY remain the ASCII SCAN grid, not the galaxy.
+ *
+ * @see GEMAIN.C:474 univmax = numopt(UNIVMAX,10,32767)
  */
+const UNIVERSE_SECTORS = (UNIVMAX * 2 + 1) ** 2;
+
 describe('GalaxyService bootstrap (G1)', () => {
   let app: TestingModule;
   let prisma: PrismaService;
@@ -48,9 +56,9 @@ describe('GalaxyService bootstrap (G1)', () => {
 
   // ── Row-count assertions ─────────────────────────────────────────────────────
 
-  it('G1.1 — Sector table contains exactly 450 rows after init', async () => {
+  it('G1.1 — Sector table contains exactly one row per universe sector', async () => {
     const count = await prisma.sector.count();
-    expect(count).toBe(450); // MAXX(30) × MAXY(15) = 450
+    expect(count).toBe(UNIVERSE_SECTORS); // (2*UNIVMAX+1)^2
   });
 
   it('G1.2 — GalaxyMeta table contains exactly 1 row after init', async () => {
@@ -86,34 +94,34 @@ describe('GalaxyService bootstrap (G1)', () => {
 
   // ── Sector coordinate coverage assertions ────────────────────────────────────
 
-  it('G1.7 — every (x,y) in 0..29 × 0..14 exists exactly once', async () => {
+  it('G1.7 — every (x,y) in -UNIVMAX..+UNIVMAX exists exactly once', async () => {
     const sectors = await prisma.sector.findMany({
       select: { xsect: true, ysect: true },
     });
 
-    expect(sectors).toHaveLength(450);
+    expect(sectors).toHaveLength(UNIVERSE_SECTORS);
 
     // Build a set of "x,y" keys from the DB.
     const keys = new Set(sectors.map((s) => `${s.xsect},${s.ysect}`));
 
-    // Verify the set is exactly the full 30×15 grid — no gaps, no duplicates.
-    expect(keys.size).toBe(450); // no duplicates
+    // Exactly the full universe square — no gaps, no duplicates.
+    expect(keys.size).toBe(UNIVERSE_SECTORS); // no duplicates
 
-    for (let x = 0; x < 30; x++) {
-      for (let y = 0; y < 15; y++) {
+    for (let x = -UNIVMAX; x <= UNIVMAX; x++) {
+      for (let y = -UNIVMAX; y <= UNIVMAX; y++) {
         expect(keys.has(`${x},${y}`)).toBe(true); // no gaps
       }
     }
   });
 
-  it('G1.8 — no sector has coordinates outside the 30×15 grid', async () => {
+  it('G1.8 — no sector lies outside the universe square', async () => {
     const outOfBounds = await prisma.sector.findMany({
       where: {
         OR: [
-          { xsect: { lt: 0 } },
-          { xsect: { gte: 30 } },
-          { ysect: { lt: 0 } },
-          { ysect: { gte: 15 } },
+          { xsect: { lt: -UNIVMAX } },
+          { xsect: { gt: UNIVMAX } },
+          { ysect: { lt: -UNIVMAX } },
+          { ysect: { gt: UNIVMAX } },
         ],
       },
     });
@@ -139,7 +147,7 @@ describe('GalaxyService bootstrap (G1)', () => {
 
     await app2.close();
 
-    expect(sectorCount).toBe(450);
+    expect(sectorCount).toBe(UNIVERSE_SECTORS);
     expect(metaCount).toBe(1);
   });
 });
