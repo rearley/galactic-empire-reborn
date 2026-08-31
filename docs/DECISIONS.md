@@ -4,6 +4,31 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-31 — the autopilot survives a speed order
+
+**Context**: `nav <x> <y>` sets a course and holds it (`holdcourse`), and the physics tick re-aims
+the ship at the target each tick. It sets no speed — C's `cmd_navigate` is a pure calculator, so
+steering at all is already this port's addition. Meanwhile spec 016 §manual-cancel had `rot`, `imp`
+and `war` all cancel the autopilot on entry. Since the pilot MUST set a speed to travel, and doing so
+cancelled the autopilot, the feature could never fly anyone anywhere. Found by using it: `nav 1 0`
+then `war 4`, and the ship coasted off on its initial heading.
+
+**Decision**: A speed order is not a steering order. `war <n>` and `imp <pct>` leave the autopilot
+engaged; `imp <pct> <course>` and `rot <deg>` take the helm back, as does arrival.
+
+**Reason**: It makes the two commands coherent — nav points, the pilot throttles, the autopilot
+steers, and any explicit steering wins. The alternative (nav sets its own speed) is a bigger
+behavioural change and further from C, which does not steer at all.
+
+**Alternatives rejected**: Having `nav` engage a speed itself — a true autopilot, but it takes the
+throttle away from the pilot and diverges further from `cmd_navigate`. Leaving it as it was and
+documenting the interaction — the feature would stay dead.
+
+**Affected requirements**: supersedes specs/016-navigation-spy/contracts/nav-command.md
+§manual-cancel; `test/game/tick/nav-cancel.integration.spec.ts` now encodes the narrower rule.
+
+---
+
 ## 2026-08-31 — debug endpoints fail closed, and are never reachable from the web server
 
 **Context**: The `/debug/*` routes (`ship/outfit`, `ship/credits`, `droid/spawn`,

@@ -88,4 +88,25 @@ test.describe('a new pilot can find their feet', () => {
     expect(new Set(bearings).size).toBeGreaterThan(1);
   });
 
+
+  /**
+   * Cargo capacity is measured in tons, but the buy path compared the remaining
+   * tonnage against a UNIT count, so anything heavier than a ton loaded at a
+   * multiple of what fits. Stocking a colony ship left `rep inv` reporting
+   * "1060 tons in cargo (capacity: 1000 tons)".
+   */
+  test('the holds cannot be loaded past their capacity', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('hold'));
+    await sendCommand(page, 'orb 1');
+
+    // Food is 2 tons each; asking for far more than fits must be capped, not
+    // silently accepted.
+    await sendCommand(page, 'buy 900 foo');
+    await sendCommand(page, 'rep inv');
+
+    const inv = await page.locator(LOG).innerText();
+    const m = /Total: (\d+) tons in cargo \(capacity: (\d+) tons\)/.exec(inv);
+    expect(m, 'inventory should report tonnage against capacity').not.toBeNull();
+    expect(Number(m![1])).toBeLessThanOrEqual(Number(m![2]));
+  });
 });

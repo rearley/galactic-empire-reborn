@@ -1,13 +1,19 @@
 /**
- * T011 — Integration test: manual rot/imp/war silently cancels autopilot.
- * TDD red phase: the cancel preamble does not exist in rot/imp/war handlers yet.
+ * T011 — manual STEERING silently cancels the autopilot.
  *
- * Contract assertions (per parametrised case):
- *   - holdcourse=0, navTargetX=null, navTargetY=null after dispatching manual command
- *   - No cancel-event is emitted (silent cancel)
- *   - The manual command itself takes effect (rotation / impulse / warp applied)
+ * Originally every manual movement command cancelled it. Playing the game
+ * showed that made the feature unusable: `nav` sets a course but no speed and
+ * tells the pilot to set one, and doing so immediately cancelled the autopilot —
+ * so it could never actually fly anyone anywhere. A speed order is not a
+ * steering order.
  *
- * @see specs/016-navigation-spy/contracts/nav-command.md §manual-cancel
+ * Contract now:
+ *   - `rot <deg>` and `imp <pct> <course>` are steering orders and DO cancel
+ *   - `war <n>` and `imp <pct>` are speed orders and do NOT
+ *   - the cancel stays silent, and the command itself still takes effect
+ *
+ * @see docs/DECISIONS.md 2026-08-31 — autopilot survives a speed order
+ * @see specs/016-navigation-spy/contracts/nav-command.md §manual-cancel (superseded)
  * @see GECMDS.C:643 cmd_rotate, :482 cmd_impulse, :561 cmd_warp
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -100,13 +106,20 @@ describe('rot command — cancels autopilot silently', () => {
 // T011-B: imp command cancels autopilot
 // ---------------------------------------------------------------------------
 
-describe('imp command — cancels autopilot silently', () => {
-  it('clears holdcourse, navTargetX, navTargetY after imp', () => {
+describe('imp command — cancels autopilot only when it steers', () => {
+  it('imp with a COURSE clears holdcourse, navTargetX, navTargetY', () => {
     const ship = makeShip();
-    impulseCommand.handler(ship, ['50'], ctx);
+    impulseCommand.handler(ship, ['50', '30'], ctx);
     expect(ship.holdcourse).toBe(0);
     expect(ship.navTargetX).toBeNull();
     expect(ship.navTargetY).toBeNull();
+  });
+
+  it('imp WITHOUT a course leaves the autopilot engaged', () => {
+    const ship = makeShip();
+    impulseCommand.handler(ship, ['50'], ctx);
+    expect(ship.holdcourse).toBe(1);
+    expect(ship.navTargetX).not.toBeNull();
   });
 
   it('imp command itself takes effect (speed2b set)', () => {
@@ -132,14 +145,14 @@ describe('imp command — cancels autopilot silently', () => {
 // T011-C: war command cancels autopilot
 // ---------------------------------------------------------------------------
 
-describe('war command — cancels autopilot silently', () => {
-  it('clears holdcourse, navTargetX, navTargetY after war', () => {
+describe('war command — a speed order, so the autopilot stays engaged', () => {
+  it('leaves holdcourse and the nav target alone', () => {
     const ship = makeShip();
     const warpHandler = makeWarpHandler();
     warpHandler.command.handler(ship, ['3'], ctx);
-    expect(ship.holdcourse).toBe(0);
-    expect(ship.navTargetX).toBeNull();
-    expect(ship.navTargetY).toBeNull();
+    expect(ship.holdcourse).toBe(1);
+    expect(ship.navTargetX).not.toBeNull();
+    expect(ship.navTargetY).not.toBeNull();
   });
 
   it('war command itself takes effect (speed2b set to warp 3 = 3000 internal units)', () => {
@@ -176,16 +189,14 @@ describe('autopilot cancel — parametrised table', () => {
       expectEffect: (ship: ShipState) => expect(ship.degrees).toBe(30),
     },
     {
-      name: 'imp 50',
-      dispatch: (ship: ShipState) => impulseCommand.handler(ship, ['50'], ctx),
+      name: 'imp 50 30',
+      dispatch: (ship: ShipState) => impulseCommand.handler(ship, ['50', '30'], ctx),
       expectEffect: (ship: ShipState) => expect(ship.speed2b).toBe(500),
     },
-    {
-      name: 'war 3',
-      dispatch: (ship: ShipState) => warpHandler.command.handler(ship, ['3'], ctx),
-      expectEffect: (ship: ShipState) => expect(ship.speed2b).toBe(3000),
-    },
   ];
+
+  // Speed-only orders keep the autopilot; they are covered by their own cases
+  // above and in autopilot-persistence.spec.ts.
 
   it.each(cases)('$name → holdcourse cleared', ({ dispatch }) => {
     const ship = makeShip({ holdcourse: 1, navTargetX: 10, navTargetY: 8 });

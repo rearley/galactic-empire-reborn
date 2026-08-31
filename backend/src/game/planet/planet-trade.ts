@@ -7,7 +7,7 @@
  * @see GECMDS.C:4147 sell fee calculation
  */
 
-import { BASEPRICE } from '../constants/items';
+import { BASEPRICE, ITEM_TONS } from '../constants/items';
 import { PlanetState } from './planet-state.types';
 
 export interface BuyInput {
@@ -22,6 +22,20 @@ export interface BuyInput {
 export type BuyOutcome =
   | { ok: true; transferred: number; unitPrice: number; totalCost: bigint; mutatePlanet: boolean }
   | { ok: false; reason: 'SELL_FLAG_OFF' | 'AT_RESERVE' | 'CAPACITY_FULL' };
+
+
+/**
+ * How many units of an item fit in the tonnage still free in the holds.
+ *
+ * Capacity is measured in TONS; this used to compare it against a UNIT count,
+ * so anything heavier than a ton loaded at a multiple of what fits — 200 tons of
+ * free space accepted 200 food cases at 2 tons each, and `rep inv` then read
+ * "1060 tons in cargo (capacity: 1000 tons)".
+ */
+function unitsThatFit(remainingTons: number, itemIndex: number): number {
+  const tonsEach = ITEM_TONS[itemIndex] ?? 1;
+  return Math.floor(remainingTons / Math.max(1, tonsEach));
+}
 
 /**
  * Compute the outcome of a buy transaction.
@@ -47,7 +61,7 @@ export function computeBuyOutcome(input: BuyInput): BuyOutcome {
     }
 
     const maxByReserve = available;
-    const maxByCapacity = Math.floor(buyerCargoCapacityRemaining);
+    const maxByCapacity = unitsThatFit(buyerCargoCapacityRemaining, itemIndex);
     const transferred = Math.min(requestedQty, maxByReserve, maxByCapacity);
 
     if (transferred <= 0) {
@@ -65,7 +79,7 @@ export function computeBuyOutcome(input: BuyInput): BuyOutcome {
     return { ok: false, reason: 'CAPACITY_FULL' };
   }
 
-  const transferred = Math.min(requestedQty, Math.floor(buyerCargoCapacityRemaining));
+  const transferred = Math.min(requestedQty, unitsThatFit(buyerCargoCapacityRemaining, itemIndex));
   if (transferred <= 0) {
     return { ok: false, reason: 'CAPACITY_FULL' };
   }

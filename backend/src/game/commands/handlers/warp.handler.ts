@@ -30,11 +30,11 @@ export class WarpHandlerService {
     minArgs: 1,
     argMissingMessage: formatMessage(MessageId.WARPFMT),
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
-      if (ship.holdcourse > 0) {
-        ship.holdcourse = 0;
-        ship.navTargetX = null;
-        ship.navTargetY = null;
-      }
+      // Deliberately does NOT cancel the autopilot: `war` cannot change course,
+      // and `nav` sets no speed of its own, so cancelling here made the two
+      // mutually exclusive — the autopilot could never fly anyone anywhere.
+      // Only an explicit steering order (`imp <pct> <course>`, `rot`) or arrival
+      // takes the helm back.
 
       const arg = args[0] ?? '';
 

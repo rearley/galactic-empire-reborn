@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, reconnect } from './helpers';
+import { LOG, INPUT, startNewPilot, sendCommand, uniqueShipName, outfitShip, reconnect, steerTo } from './helpers';
 
 /**
  * Unsolicited server notices — the ones that arrive without the player typing
@@ -37,6 +37,8 @@ test.describe('unsolicited server notices reach the pilot', () => {
   });
 
   test('crossing a sector boundary tells the pilot, and not about themselves', async ({ page, request }) => {
+    // Turning is 20 degrees a tick, so squaring up before the run takes time.
+    test.setTimeout(180_000);
     const ship = uniqueShipName('cross');
     await startNewPilot(page, ship);
 
@@ -46,6 +48,9 @@ test.describe('unsolicited server notices reach the pilot', () => {
     await reconnect(page);
     await expect(page.locator(INPUT)).toBeVisible();
 
+    // Point north first — heading 0 is y-decreasing, and pilots now spawn on a
+    // random heading, so the direction of travel cannot be assumed.
+    await steerTo(page, 0);
     await sendCommand(page, 'imp 9');
     // GEFUNCS.C:711 MOVE1 — the mover's own notice, naming both sectors.
     await expect(page.locator(LOG)).toContainText('You have moved from sector (22, 5) to (22, 4).', {
