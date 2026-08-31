@@ -50,13 +50,20 @@ export class LandHandlerService {
       return { lines: [{ text: formatMessage(MessageId.ORBITNO), category: 'system' }] };
     }
 
-    const arg = args[0]?.trim() ?? '';
+    // Join, don't take args[0]: planet names may contain spaces ("New Terra"),
+    // and the followup redispatch delivers the whole answer as arguments.
+    const arg = args.join(' ').trim();
 
     // Unowned planet
     if (state.userid === null) {
       if (!arg) {
+        // `expectFollowup` makes the gateway feed the player's next line back
+        // here as `land <name>`. Without it the answer went through the command
+        // router, so "New Terra" matched the `new` verb and the planet stayed
+        // unclaimed with no hint that `land <name>` was the real syntax.
         return {
           lines: [{ text: formatMessage(MessageId.LAND_NAME_PROMPT), category: 'system' }],
+          expectFollowup: 'land',
         };
       }
 

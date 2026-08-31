@@ -1,3 +1,59 @@
+## 2026-08-31 — social/mail/economy playtest: teams, mail lifecycle, planet production
+
+**Completed:**
+- **Roster prints the player name, not the synthetic userid.** `ros` selected `userid`, which in
+  MajorBBS *was* the handle but here is a `usr_<hex>` surrogate, so every row read
+  `usr_a9070dc745a8688f`. Now selects and renders `username`, header column relabelled "Name".
+- **`ros` and `tea list` columns line up with their headers.** Both headers were hand-spaced string
+  literals that had drifted from the `padStart` widths of the rows beneath them. Both are now built
+  from the same width expressions as the rows, with a test per command asserting the right-aligned
+  columns share end-columns with the header.
+- **TEAMBONU is config-driven and no longer pinned to the top of its range.** C computes
+  `teambonus = numopt(TEAMBONU,0,32000)*100L` (GEMAIN.C:478) — a sysop `.cnf` option. The port
+  hard-coded 3_200_000n, the maximum. A one-member team therefore scored 3.2M against a strong
+  player's five-digit score, so `tea list` ranked by member count rather than skill. Now
+  `config/game.config.json` (default 0); the balance-regression test pins the *bounds* and the
+  x100 scaling instead of one operator's taste. Verified live: Vanguard's score went 3,220,500 -> 20,500,
+  exactly its single member's score.
+- **Free-text prompts are fed back to the handler that asked.** `land` on an unowned planet asks
+  "What would you like to name this planet?", but the answer went through the command router — so
+  naming a world "New Terra" matched the `new` verb under 3-char prefix routing and printed the
+  `new ship` usage line, leaving the planet unclaimed and no hint that `land <name>` was the real
+  syntax. `CommandResult.expectFollowup` now parks the verb on the socket and the gateway
+  re-dispatches the next line as `<verb> <answer>`; one-shot, and an empty answer cancels. This is
+  the mechanism specs/005 described but nobody built. `land` also joins its args, so multi-word
+  planet names survive.
+- **Production-report mail no longer shows a timestamp as its sender.** This port repurposes
+  `MAILSTAT.dtime` as the sender's userid (spec 017 R3); the midnight builder was writing
+  `now.toISOString()` there, which surfaced verbatim in the `mai` From column. Now empty -> "(system)".
+- **~25% of generated planets are inhabited again (GEPLANET.C:617-627).** The generator skipped C's
+  starting-population branch entirely, so *every* planet in the galaxy had rate 0 and 0 men: a
+  claimed colony produced nothing, forever, and production reports, tax and planet cash were dead
+  content. `rollPlanetInventory` now reproduces the roll (all items rate 0..5; men 0..50k at rate
+  5..29; food 0..3.2k at rate 15..29). `tools/backfill-planet-inventory.ts` brings an
+  already-generated galaxy in line without a reset — it skips sector 0,0, which is the hand-seeded
+  S00 hub and not a product of `getsector`'s random branch.
+- **`MIDNIGHT_ADMIN_TOKEN` documented and set for dev**, so `POST /admin/midnight/run` works locally
+  instead of 503-ing; `.env.example` also gained the now-mandatory `TEST_DATABASE_URL`.
+
+**Tests:** full backend suite 3007/3007 across 313 suites, `tsc` strict clean. New:
+`test/game/galaxy/planet-seed.spec.ts` (4), `test/gateway/command-followup.spec.ts` (3), column
+alignment tests for `ros`/`tea list`, land multi-word name, prodrpt `dtime` empty.
+
+**Verified live (Playwright, full loop):** team create -> list -> show -> leave -> wrong password ->
+case-insensitive rejoin; sell; claim a planet by name; midnight run -> production report arrives ->
+`rea 1` renders the full item block -> `del 2` -> `mai` renumbers. Planet production confirmed
+ticking on a colonised world (men 20000 -> 20041, food 2000 -> 2095, tax 0 -> 333 over ~4 min).
+
+**Fixed a non-hermetic test:** the admin-endpoint 503 case `delete`d `MIDNIGHT_ADMIN_TOKEN`, but
+constructing a `PrismaClient` re-loads `backend/.env` into `process.env` (filling absent keys only),
+so the key came back before the fresh guard was built. It now blanks the value instead.
+
+**Known issues / not yet exercised:** `sen` comm channels, spy/beacon planet functions, and the
+midnight production report's cash/tax columns on a long-running colony.
+
+---
+
 ## 2026-08-30 (final) — cap follow-ups fixed; trade-loop playtest findings
 
 **Completed:**

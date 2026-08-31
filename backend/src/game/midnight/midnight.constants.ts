@@ -1,3 +1,5 @@
+import { resolveGameConfig } from '../config/game-config';
+
 /**
  * Constants for the midnight maintenance pass — sourced verbatim from the original C source.
  * The balance-regression test (SC-006) imports each constant and asserts its exact value.
@@ -11,8 +13,19 @@
  * @see GEMAIN.H:222  — #define MAIL_CLASS_PRODRPT 3
  */
 
-/** Team bonus added once per member inside the per-user loop. @see GEMAIN.C:478 */
-export const TEAMBONU: bigint = 3_200_000n;
+/**
+ * Team bonus added once per member inside the per-user loop.
+ *
+ * C reads this from the sysop `.cnf`: `teambonus = numopt(TEAMBONU,0,32000)*100L`.
+ * The *bounds* (0..32000) and the ×100 scaling are canon; the value is sysop
+ * taste. It was previously hard-coded at 3_200_000n — the top of the range —
+ * which swamped real scores: a solo team outranked everything at 3.2M while a
+ * strong player's own score was five digits, so `tea list` ranked by member
+ * count rather than skill. Now sourced from config/game.config.json (default 0).
+ *
+ * @see GEMAIN.C:478 teambonus = numopt(TEAMBONU,0,32000)*100L
+ */
+export const TEAMBONU: bigint = BigInt(resolveGameConfig().TEAMBONU) * 100n;
 
 /** Default mail retention in days (env-overridable). @see GEMAIN.C:497 */
 export const MAILDAYS_DEFAULT: number = 7;

@@ -5,6 +5,7 @@ import { MAXX, MAXY, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constan
 import { BASEPRICE, NUMITEMS } from '../constants/items';
 import { loadGalaxyConfig } from './galaxy.config';
 import { Rng } from './rng';
+import { rollPlanetInventory } from './planet-seed';
 import { S00, S00_PLNUM } from './s00';
 import { GalaxyConfig, GalaxyWormholeView } from './galaxy.types';
 
@@ -345,6 +346,8 @@ export class GalaxyService implements OnModuleInit {
 
         const enviorn = Math.floor(rng.next() * 4);
         const resource = Math.floor(rng.next() * 4);
+        // GEPLANET.C:617-627 — ~25% of planets generate already inhabited.
+        const { itemsQty, itemsRate } = rollPlanetInventory(rng);
 
         await tx.planet.create({
           data: {
@@ -369,12 +372,12 @@ export class GalaxyService implements OnModuleInit {
             spyowner: '',
             technology: 0,
             teamcode: BigInt(0),
-            itemsQty: [],
-            itemsRate: [],
-            itemsSell: [],
-            itemsReserve: [],
-            itemsMarkup2a: [],
-            itemsSold2a: [],
+            itemsQty,
+            itemsRate,
+            itemsSell: new Array<number>(NUMITEMS).fill(0),
+            itemsReserve: new Array<number>(NUMITEMS).fill(0),
+            itemsMarkup2a: new Array<number>(NUMITEMS).fill(0),
+            itemsSold2a: new Array<bigint>(NUMITEMS).fill(0n),
           },
         });
       }

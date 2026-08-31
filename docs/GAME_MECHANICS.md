@@ -571,6 +571,30 @@ Tick cadence: `interval = max(PLANTIME_MIN_SECONDS, floor(PLANTOCK_SECONDS / N))
 
 Zero-population planets produce nothing (`if men.qty == 0 → break` before production loop).
 
+### Starting population (GEPLANET.C:617-627)
+
+Population is not something the galaxy is short of by design — C seeds it at generation. When
+`getsector` creates a planet it rolls `rndm(3.99) > 3` (≈24.8%); on a hit the planet is born
+inhabited:
+
+| Field | Value |
+|-------|-------|
+| every item's `rate` | `rndm(5.1)` → 0..5 |
+| `items[I_MEN].qty` | `rndm(50000)` |
+| `items[I_MEN].rate` | `5 + rndm(25)` → 5..29 |
+| `items[I_FOOD].qty` | `rndm(3200)` |
+| `items[I_FOOD].rate` | `15 + rndm(15)` → 15..29 |
+
+The other ~75% are barren and stay that way until an owner ships men in. `rollPlanetInventory`
+(`game/galaxy/planet-seed.ts`) reproduces this and the generator calls it per planet. Sector 0,0 is
+excluded: its five planets come from the hand-seeded `S00` table, not from `getsector`'s random
+branch.
+
+This branch was missing until 2026-08-31, which made the entire planet economy inert — every planet
+in the galaxy had rate 0 and no men, so a claimed colony produced nothing and production reports,
+tax and planet cash never moved. `tools/backfill-planet-inventory.ts` applies the roll to an
+already-generated galaxy.
+
 ---
 
 ## Planet administration (feature 005)

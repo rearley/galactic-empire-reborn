@@ -46,7 +46,7 @@ export class RosHandlerService {
       },
       orderBy: [{ score: 'desc' }, { kills: 'desc' }, { userid: 'asc' }],
       take: limit,
-      select: { userid: true, score: true, kills: true, planets: true, population: true, teamcode: true },
+      select: { userid: true, username: true, score: true, kills: true, planets: true, population: true, teamcode: true },
     });
     const rows = allRows.slice(0, limit);
 
@@ -59,19 +59,25 @@ export class RosHandlerService {
     const teamRows = await this.teamRepo.findTeamsByCodes(teamcodes);
     const teamMap = new Map(teamRows.map((t) => [t.teamcode.toString(), t.teamname]));
 
-    const header = '  Rank  UserID                Team         Score      Kills  Planets  Population';
+    // Show the player's NAME, not the internal identifier. C prints `userid`
+    // (GEFUNCS.C:2603 username()), but in MajorBBS the userid WAS the player's
+    // handle. This port splits it into a synthetic `usr_<hex>` userid and a
+    // human `username`, so printing userid is literally faithful yet useless —
+    // the roster read `usr_a9070dc745a8688f` for every row.
+    const header =
+      ` ${'Rank'.padStart(4)}  ${'Name'.padEnd(20)} ${'Team'.padEnd(12)} ${'Score'.padStart(10)}  ${'Kills'.padStart(5)}  ${'Planets'.padStart(7)}  ${'Population'.padStart(10)}`;
     const lines: CommandResult['lines'] = [{ text: header, category: 'system' }];
 
     rows.forEach((row, idx) => {
       const rank = (idx + 1).toString().padStart(4);
-      const userid = row.userid.padEnd(20).slice(0, 20);
+      const userid = (row.username ?? row.userid).padEnd(20).slice(0, 20);
       const teamname = (row.teamcode != null && row.teamcode !== 0n)
         ? (teamMap.get(row.teamcode.toString()) ?? null)
         : null;
       const team = renderTeamCell(teamname);
       const score = row.score.toString().padStart(10);
       const kills = row.kills.toString().padStart(5);
-      const planets = row.planets.toString().padStart(5);
+      const planets = row.planets.toString().padStart(7);
       const pop = row.population.toString().padStart(10);
       lines.push({ text: ` ${rank}  ${userid} ${team} ${score}  ${kills}  ${planets}  ${pop}`, category: 'info' });
     });

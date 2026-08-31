@@ -60,7 +60,7 @@ export const SYSOP_OPTIONS = {
   UNIVMAX: { min: 10, max: 32767, default: 15, cReference: 'GEMAIN.C:474', implemented: true },
   S00PLNUM: { min: 3, max: 9, default: 5, cReference: 'GEMAIN.C:476', implemented: false },
   MAXPLSE: { min: 1, max: 9, default: 9, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLANETS' },
-  TEAMBONU: { min: 0, max: 32000, default: 0, cReference: 'GEMAIN.C:478', implemented: false },
+  TEAMBONU: { min: 0, max: 32000, default: 0, cReference: 'GEMAIN.C:478', implemented: true },
   TEAMMAX: { min: 0, max: 32000, default: 32000, cReference: 'GEMAIN.C:479', implemented: false },
   HPFIRDST: { min: 1, max: 20, default: 1, cReference: 'GEMAIN.C:491', implemented: true },
   HPDAMMAX: { min: 1, max: 200, default: 200, cReference: 'GEMAIN.C:492', implemented: true },

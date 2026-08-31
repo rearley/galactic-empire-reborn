@@ -459,7 +459,25 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const input = typeof body.input === 'string' ? body.input : '';
+    const rawInput = typeof body.input === 'string' ? body.input : '';
+
+    // A handler that asked an open question (e.g. `land` on an unowned planet,
+    // "What would you like to name this planet?") set `expectFollowup`. Route
+    // this input straight back to that verb rather than through the command
+    // router — otherwise a planet named "New Terra" matches the `new` verb.
+    const pendingFollowup = client.data.pendingFollowup as string | undefined;
+    let input = rawInput;
+    if (pendingFollowup !== undefined) {
+      client.data.pendingFollowup = undefined;
+      const answer = rawInput.trim();
+      if (answer === '') {
+        client.emit('command:result', {
+          lines: [{ text: 'Never mind.', category: 'system' }],
+        });
+        return;
+      }
+      input = `${pendingFollowup} ${answer}`;
+    }
 
     try {
       const resultOrPromise = this.commandRouter.dispatch(input, ship, { client });
@@ -1011,6 +1029,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/015-scan-modes/contracts/scan-render.md §1 ("Event routing canonical")
    */
   emitCommandResult(client: Socket, result: import('../game/commands/command.types').CommandResult): void {
+    if (result.expectFollowup !== undefined) {
+      client.data.pendingFollowup = result.expectFollowup;
+    }
     if (result.scanRender) {
       client.emit('command:result', {
         lines: [{ text: result.scanRender.header, category: 'info' }],

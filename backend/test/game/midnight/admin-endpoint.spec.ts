@@ -110,7 +110,11 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
   });
 
   it('returns 503 when MIDNIGHT_ADMIN_TOKEN is not configured', async () => {
-    delete process.env['MIDNIGHT_ADMIN_TOKEN'];
+    // Blank rather than `delete`: constructing a PrismaClient re-loads backend/.env
+    // into process.env (it only fills keys that are absent), so a deleted key comes
+    // back before the fresh guard is constructed. An empty value is already present,
+    // so it survives — and loadMidnightConfig maps '' to undefined either way.
+    process.env['MIDNIGHT_ADMIN_TOKEN'] = '';
 
     const freshModule = await Test.createTestingModule({
       imports: [PrismaModule, ScheduleModule.forRoot()],

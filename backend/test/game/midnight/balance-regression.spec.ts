@@ -26,10 +26,21 @@ import {
   MESG20,
   ADVISORY_LOCK_KEY,
 } from '../../../src/game/midnight/midnight.constants';
+import { SYSOP_OPTIONS, resolveGameConfig } from '../../../src/game/config/game-config';
 
 describe('midnight balance regression (SC-006)', () => {
-  it('TEAMBONU = 3_200_000n (32000 * 100)', () => {
-    expect(TEAMBONU).toBe(3_200_000n);
+  // TEAMBONU is a sysop `.cnf` option, not a fixed #define: C computes
+  // `teambonus = numopt(TEAMBONU,0,32000)*100L`. Only the bounds and the ×100
+  // scaling are canon, so pin those rather than one operator's chosen value.
+  it('TEAMBONU stays within canon bounds and is a multiple of 100', () => {
+    expect(TEAMBONU).toBeGreaterThanOrEqual(0n);
+    expect(TEAMBONU).toBeLessThanOrEqual(3_200_000n); // 32000 * 100
+    expect(TEAMBONU % 100n).toBe(0n);
+  });
+
+  it('TEAMBONU scales the configured option by 100', () => {
+    expect(BigInt(SYSOP_OPTIONS.TEAMBONU.max) * 100n).toBe(3_200_000n);
+    expect(TEAMBONU).toBe(BigInt(resolveGameConfig().TEAMBONU) * 100n);
   });
 
   it('MAILDAYS_DEFAULT = 7', () => {

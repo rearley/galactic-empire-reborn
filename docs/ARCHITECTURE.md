@@ -194,6 +194,13 @@ client  →  [command event]  →  GameGateway.handleCommand()
 Error path: unhandled throw in handler → gateway `catch` → `{ lines: ['Internal error…'] }`.
 Empty input → `{ lines: [] }` (silent drop). Unknown keyword → `{ lines: [UNKNOWN_CMD] }`.
 
+Follow-up path: a handler that asked the player an open question returns
+`CommandResult.expectFollowup: '<verb>'`. `emitCommandResult` parks the verb on
+`client.data.pendingFollowup`; the next `command` event is re-dispatched as `<verb> <answer>`
+instead of being routed on its own, then the parked verb is cleared. One-shot; an empty answer
+cancels. Used by `land` on an unowned planet (name prompt) — without it the answer hits the command
+router and a planet called "New Terra" matches the `new` verb.
+
 ### ShipStateService in-memory Map
 
 `Map<string, ShipState>` keyed by `"userid:shipno"`. On SHIP_UPDATE tick (1s), iterates

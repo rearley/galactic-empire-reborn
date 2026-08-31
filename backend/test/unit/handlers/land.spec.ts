@@ -95,6 +95,15 @@ describe('LandHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_NAME_PROMPT));
   });
 
+  it('unowned with a multi-word name claims the whole name', async () => {
+    const { svc, claimMock } = makeService(makePlanetState({ userid: null }));
+    const result = (await svc.command.handler(makeShip(), ['New', 'Terra'], {})) as CommandResult;
+    expect(claimMock).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'New Terra',
+    );
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'New Terra'));
+  });
+
   it('unowned with name > 19 chars returns LAND_INVALID_NAME', async () => {
     const { svc } = makeService(makePlanetState({ userid: null }));
     const result = (await svc.command.handler(makeShip(), ['A'.repeat(20)], {})) as CommandResult;
