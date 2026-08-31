@@ -8,8 +8,9 @@ import { CombatModule } from '../combat/combat.module';
 import { DroidTickService } from './droid-tick.service';
 import { DroidSpawner } from './droid-spawner';
 import { DroidDebugController } from './droid.debug.controller';
+import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
 
-const devOnlyControllers = process.env.NODE_ENV !== 'production' ? [DroidDebugController] : [];
+const devOnlyControllers = debugEndpointsEnabled() ? [DroidDebugController] : [];
 
 /**
  * Droid AI module — drives ephemeral Droid ship behavior.

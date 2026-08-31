@@ -6,9 +6,11 @@ import { MaintenanceService } from './maintenance.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PlanetModule } from '../planet/planet.module';
 import { ShipDebugController } from './ship.debug.controller';
+import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
 
-// Same gating as the droid/cybertron debug controllers — never in production.
-const devOnlyControllers = process.env.NODE_ENV !== 'production' ? [ShipDebugController] : [];
+// Unauthenticated cheat endpoints — mounted only when explicitly enabled, and
+// never in production. @see src/debug/debug-endpoints.ts
+const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
 
 /**
  * ShipModule owns in-memory ship state and the 1-second ship-update tick.

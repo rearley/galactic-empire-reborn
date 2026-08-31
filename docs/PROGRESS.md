@@ -1,3 +1,36 @@
+## 2026-08-31 — security pass on the debug endpoints
+
+Prompted by the question "could these get exposed to players?" — and they could.
+
+**What was wrong:** the `/debug/*` routes have no authentication and act on a ship by *name*, so
+reaching them is enough to teleport another player's ship, swap its hull class, zero its damage,
+hand yourself ordnance, rewrite any captain's credit balance, or spawn droids. Three separate
+problems stacked:
+- the gate was `NODE_ENV !== 'production'`, which **fails open** — a bare `node dist/src/main`, a
+  systemd unit or any host that does not set NODE_ENV published all of them;
+- `GET /debug/tick-stats` was registered unconditionally, live in production;
+- **`frontend/nginx.conf` explicitly proxied `/debug/` to the backend**, so the public web server
+  was routing at them. `docker-compose.yml` does set `NODE_ENV: production` — that single variable
+  was the entire defence.
+
+**Now:** one `debugEndpointsEnabled()` gate used by all four registration sites, requiring an
+explicit `GE_DEBUG_ENDPOINTS` *and* a non-production `NODE_ENV`; the nginx `/debug/` proxy removed;
+a loud boot warning while they are mounted; `npm run start:dev` sets the flag and `npm start` does
+not. Verified live: with the flag unset all four routes 404 while `/health` still answers 200.
+
+**Also fixed:** the purchased-hull retry from earlier today only had five fixed candidate names, so
+it tolerated exactly five captains per class before purchases failed outright — every captain's
+second Stealth Fighter is shipno 2, so they all walked the same list. The e2e fleet spec caught it
+on the sixth run. Alternatives are now derived from a hash of the owner id, so they differ per
+captain.
+
+**Tests:** backend 3104 across 326 suites; Playwright 31. New: `debugEndpointsEnabled` behaviour (8),
+controller-mounting under each environment (13, including that the health check stays mounted), and
+a deployment-exposure spec that reads the shipped `nginx.conf` and `docker-compose.yml` — the layer a
+routine infrastructure edit could reopen without anyone noticing.
+
+---
+
 ## 2026-08-31 (cont.) — sector crossings and the scan legend
 
 **Completed:**

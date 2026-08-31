@@ -8,7 +8,7 @@
     "test:manual": "jest --config jest.manual.config.ts",
     "prisma:generate": "prisma generate",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "GE_DEBUG_ENDPOINTS=1 nest start --watch",
     "build": "nest build"
   },
   "dependencies": {

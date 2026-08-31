@@ -185,7 +185,7 @@ export class NewShipHandlerService {
     let shipName = '';
     let created = false;
     for (let attempt = 0; attempt < SHIPNAME_ATTEMPTS && !created; attempt++) {
-      shipName = buildPurchasedShipName(shipClass.typeName, newShipno, attempt);
+      shipName = buildPurchasedShipName(shipClass.typeName, newShipno, attempt, ship.userid);
       try {
         await this.createShipTransaction(
           ship.userid, newShipno, shipName, classNumber, shipClass, items,

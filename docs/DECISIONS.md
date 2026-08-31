@@ -4,6 +4,37 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-31 — debug endpoints fail closed, and are never reachable from the web server
+
+**Context**: The `/debug/*` routes (`ship/outfit`, `ship/credits`, `droid/spawn`,
+`cybertron-stats`, `tick-stats`) are cheat endpoints with no authentication of any kind, and they
+address a ship by *name* — so anyone able to reach them can teleport another player's ship, swap its
+hull class, zero its damage, hand themselves ordnance, rewrite any captain's credit balance, or
+spawn droids. Two things made that worse than it looked: the gate was
+`NODE_ENV !== 'production'`, which fails OPEN on any host that does not set NODE_ENV (a bare
+`node dist/src/main`, a systemd unit, most PaaS defaults); `/debug/tick-stats` was not gated at all;
+and `frontend/nginx.conf` explicitly proxied `/debug/` to the backend, so the public web server was
+routing straight at them. `docker-compose.yml` does set `NODE_ENV: production`, which means one
+environment variable was the entire defence.
+
+**Decision**: The endpoints mount only when `GE_DEBUG_ENDPOINTS` is explicitly affirmative AND
+`NODE_ENV` is not `production` — one shared `debugEndpointsEnabled()` used by every registration
+site. The production web server no longer proxies `/debug/` at all. Boot prints a loud warning
+whenever they are mounted. `npm run start:dev` sets the flag; `npm start` does not.
+
+**Reason**: Defence in depth for something whose failure mode is "any player rewrites the game
+state". Fail-closed means a forgotten variable disables the endpoints rather than publishing them;
+the production check means a stray variable cannot switch them on where it matters; and removing the
+proxy means even a misconfigured backend is not reachable from the public port. Any one of the three
+is enough on its own, which is the point.
+
+**Alternatives rejected**: Keeping `NODE_ENV !== 'production'` and simply documenting it — the
+failure is silent and total. Putting a shared-secret token on them like `/admin/midnight` — that
+protects the endpoint but leaves it mounted and reachable, and adds friction to every helper call in
+the browser suite; the three-layer gate is stronger and costs dev nothing.
+
+---
+
 ## 2026-08-31 — `aba` goes back to meaning colony abandonment; scuttling moves to `aba ship`
 
 **Context**: In the original, `aba` abandons the *planet you are orbiting* (GECMDS.C:3420 —
