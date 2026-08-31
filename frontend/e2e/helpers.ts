@@ -104,3 +104,31 @@ export async function grantCredits(
 export async function reconnect(page: Page): Promise<void> {
   await page.goto('/');
 }
+
+/**
+ * Turn the ship to an ABSOLUTE heading and wait for it to get there.
+ *
+ * `imp <pct> <course>` takes a RELATIVE rotation — `deg = normal(heading +
+ * course)` (GEFUNCS.C:1943) — and new pilots spawn on a random heading
+ * (GEFUNCS.C:216), so a test that wants to point due east has to work out the
+ * delta from wherever the ship happens to be facing.
+ */
+export async function steerTo(page: Page, absolute: number): Promise<void> {
+  const heading = async (): Promise<number> => {
+    await page.locator(INPUT).fill('rep nav');
+    await page.locator(INPUT).press('Enter');
+    await page.waitForTimeout(1_500);
+    const m = [...(await page.locator(LOG).innerText()).matchAll(/Heading: (\d+) degrees/g)];
+    return m.length ? Number(m[m.length - 1][1]) : -1;
+  };
+
+  // Shortest way round: the course argument is validated to -180..180
+  // (valdegree), and turning is 20 degrees per 6-second tick, so going the long
+  // way can take the better part of a minute.
+  const delta = ((((absolute - (await heading())) % 360) + 540) % 360) - 180;
+  await sendCommand(page, `imp 0 ${delta}`);
+
+  await expect
+    .poll(heading, { timeout: 90_000, intervals: [3_000] })
+    .toBe(absolute);
+}

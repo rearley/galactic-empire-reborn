@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
+import { rollSpawnPosition } from './spawn-placement';
 import { isValidShipName } from './name-validator';
 import { prismaShipToState } from '../ship/ship-state.mappers';
 import { ShipState } from '../ship/ship-state.types';
@@ -100,6 +101,16 @@ export class OnboardingService {
       throw new SpawnSectorMissingError(spawnX, spawnY);
     }
 
+    // C places a new ship at a random point inside the neutral sector, clear of
+    // its planets, facing a random heading (GEFUNCS.C:195-217). Spawning every
+    // pilot on the sector's exact corner facing 0 put them all on one point and
+    // one wrong turn from wrapping out of the neutral zone into Cybertron space.
+    const spawnPlanets = await this.prisma.planet.findMany({
+      where: { xsect: spawnX, ysect: spawnY },
+      select: { xcoord: true, ycoord: true },
+    });
+    const placement = rollSpawnPosition({ x: spawnX, y: spawnY }, spawnPlanets, Math.random);
+
     // items[I_FLUX=4] = START_FLUX_PODS; all 14 slots initialised to 0n per NUMITEMS=14
     const items: bigint[] = [0n, 0n, 0n, 0n, BigInt(START_FLUX_PODS), 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
@@ -123,8 +134,10 @@ export class OnboardingService {
         shipno: newShipno,
         shipname,
         shpclass: START_CLASS,
-        xcoord: spawnX,
-        ycoord: spawnY,
+        xcoord: placement.xcoord,
+        ycoord: placement.ycoord,
+        heading: placement.heading,
+        head2b: placement.heading,
         energy: ENGYMAX,
         status: GESTAT_USER, // active player ship @see GEMAIN.H:210
         topspeed,

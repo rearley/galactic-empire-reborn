@@ -164,6 +164,15 @@ export class PlanetStateService implements OnModuleInit {
         data: stateToPrismaUpdate(state),
       });
 
+      // C: `++waruptr->planets` in wonplnt() (GECMDS.C:4001). Without it a pilot
+      // who had just claimed their first world was told "Planets: none." by
+      // `rep acc` while `pla` listed it — the counter only came right at
+      // midnight, when it is rebuilt from actual ownership.
+      await this.prisma.user.updateMany({
+        where: { userid },
+        data: { planets: { increment: 1 } },
+      });
+
       return { ok: true as const };
     });
   }

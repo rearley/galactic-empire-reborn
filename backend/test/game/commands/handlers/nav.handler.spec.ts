@@ -226,12 +226,21 @@ describe('NavHandlerService — engagement happy path', () => {
 // ---------------------------------------------------------------------------
 
 describe('NavHandlerService — in-orbit auto-break', () => {
-  it('where >= 10 → sets ship.where = 1 before engaging autopilot', () => {
+  /**
+   * `where === 1` is the AT-WARP state. Breaking orbit into it left a stopped
+   * ship reporting "In hyperspace" and, worse, flagged as warping for the gates
+   * that care — the hyper-phaser only reaches victims at `where === 1`
+   * (GECMDS.C:1045). Breaking orbit means normal flight, which is `where === 0`,
+   * exactly what `imp` does (GECMDS.C:512 LEAVEORB). C's cmd_navigate does not
+   * touch `where` at all; breaking orbit is this port's convenience, so it
+   * should at least land in the same state as every other engine command.
+   */
+  it('where >= 10 → breaks orbit into normal flight, not the warp state', () => {
     const { handler, state, ctx } = makeService({
       where: 13, xcoord: 5.0, ycoord: 5.0,
     });
     handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.where).toBe(1);
+    expect(state.where).toBe(0);
     expect(state.holdcourse).toBe(1);
     expect(state.navTargetX).toBe(10);
     expect(state.navTargetY).toBe(8);
@@ -242,7 +251,7 @@ describe('NavHandlerService — in-orbit auto-break', () => {
       where: 10, xcoord: 5.0, ycoord: 5.0,
     });
     handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.where).toBe(1);
+    expect(state.where).toBe(0);
   });
 
   it('where < 10 → no orbit break (where unchanged)', () => {
@@ -267,5 +276,38 @@ describe('NavHandlerService — command metadata', () => {
   it('minArgs is 0 (status form allowed)', () => {
     const { handler } = makeService();
     expect(handler.command.minArgs).toBe(0);
+  });
+});
+
+/**
+ * The bearing `nav` prints and the bearing the autopilot steers by were
+ * computed with different formulas: the handler used `atan2(dx, dy)` while the
+ * physics tick uses `atan2(dx, -dy)`. Heading 0 is north (y-decreasing), so the
+ * handler's number was mirrored about the east-west axis — it told a pilot
+ * heading for a target due north to steer 180.
+ *
+ * Invisible until spawn headings became random, because a ship sitting at
+ * heading 0 happened to agree for due-east targets.
+ */
+describe('NavHandlerService — reported bearing matches the steering', () => {
+  /** Same expression the physics tick uses to point the ship at the target. */
+  const steeringBearing = (fromX: number, fromY: number, toX: number, toY: number): number =>
+    Math.round(((Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI + 360) % 360);
+
+  const reported = (text: string): number => Number(/bearing (\d+)/.exec(text)?.[1] ?? NaN);
+
+  it.each([
+    ['due north', 5, 9, 5, 2],
+    ['due south', 5, 2, 5, 9],
+    ['due east', 2, 5, 9, 5],
+    ['due west', 9, 5, 2, 5],
+    ['north-east', 2, 9, 8, 3],
+  ])('agrees with the autopilot for a target %s', (_label, sx, sy, tx, ty) => {
+    const { handler, state, ctx } = makeService({ xcoord: sx + 0.5, ycoord: sy + 0.5 });
+    const result = handler.command.handler(state, [String(tx), String(ty)], ctx) as {
+      lines: Array<{ text: string }>;
+    };
+    const expected = steeringBearing(sx + 0.5, sy + 0.5, tx + 0.5, ty + 0.5);
+    expect(reported(result.lines[0].text)).toBe(expected);
   });
 });

@@ -49,6 +49,8 @@ function makePrisma(planets: PlanetState[]) {
       ),
       update: jest.fn().mockResolvedValue({}),
     },
+    // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
+    user: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
   };
 }
 

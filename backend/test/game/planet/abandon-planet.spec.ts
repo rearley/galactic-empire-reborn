@@ -118,4 +118,30 @@ describe('PlanetStateService.abandonPlanet — GECMDS.C:3420', () => {
     expect(planet.userid).toBe('newowner');
     expect(planet.name).toBe('Second Chance');
   });
+
+  /**
+   * C's `wonplnt()` does `++waruptr->planets` when a planet changes hands
+   * (GECMDS.C:4001). The port decremented on abandon but never incremented on
+   * claim, so a pilot who had just claimed their first world was told
+   * "Planets: none." by `rep acc` while `pla` listed it — the counter only came
+   * right at midnight, when it is rebuilt from actual ownership.
+   */
+  it('claiming increments the owner\'s planet counter', async () => {
+    const { svc, userUpdate } = makeService(makePlanet({ userid: null, name: '' }));
+
+    await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { userid: 'newowner' },
+      data: { planets: { increment: 1 } },
+    });
+  });
+
+  it('a refused claim does not touch the counter', async () => {
+    const { svc, userUpdate } = makeService(makePlanet({ userid: 'someone_else' }));
+
+    await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
+
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
 });

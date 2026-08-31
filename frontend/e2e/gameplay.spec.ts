@@ -122,8 +122,19 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     // warsptr->degrees as a side effect (GEFUNCS.C:1943), so
     // `deg = normal(heading + degrees)` collapses to the current heading.
     // Supply the course with the impulse to turn and accelerate in one order.
+    // The course argument is a RELATIVE rotation, and new pilots spawn on a
+    // random heading (GEFUNCS.C:216), so the target is computed from where the
+    // ship is actually pointing rather than assumed to be 90.
+    await sendCommand(page, 'rep nav');
+    const startHeading = Number(
+      [...(await page.locator(LOG).innerText()).matchAll(/Heading: (\d+) degrees/g)].pop()?.[1] ?? '0',
+    );
+    const expectedHeading = (startHeading + 90) % 360;
+
     await sendCommand(page, 'imp 50 90');
-    await expect(page.locator(LOG)).toContainText(/Engines fired, new course 90 degrees/i);
+    await expect(page.locator(LOG)).toContainText(
+      new RegExp(`Engines fired, new course ${expectedHeading} degrees`, 'i'),
+    );
 
     // The world advances on a 6s physics tick; poll rep nav until the reported
     // heading has actually swung to 90 rather than asserting a fixed value.
@@ -136,7 +147,7 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
         const matches = [...text.matchAll(/Heading: (\d+) degrees/g)];
         return matches.length ? Number(matches[matches.length - 1][1]) : -1;
       }, { timeout: 45_000, intervals: [3_000] })
-      .toBe(90);
+      .toBe(expectedHeading);
 
     await expect(page.locator(LOG)).toContainText(/Speed: impulse/);
   });
@@ -222,6 +233,9 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     await expect(page.locator(LOG)).toContainText(/Food Cases \(foo\)/i);
 
     await sendCommand(page, 'buy 5 foo');
-    await expect(page.locator(LOG)).toContainText(/5 Food Cases purchased for \d+ credits?/i);
+    // The confirmation names the unit price AND what the purchase actually
+    // cost. It used to print only the unit price in the "for N credits" slot,
+    // so "100 Men purchased for 4 credits" while 400 left the account.
+    await expect(page.locator(LOG)).toContainText(/5 Food Cases purchased at \d+ cr each — \d+ credits\./i);
   });
 });
