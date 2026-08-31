@@ -1,3 +1,29 @@
+## 2026-08-31 — colony abandonment restored to `aba` (canonical)
+
+**Completed:**
+- **A player can give up a planet again.** `aba` is C's colony-abandonment command
+  (GECMDS.C:3420): in orbit over a planet you own it clears the owner and decrements your planet
+  counter, touching nothing else — name, stock, rates, cash, tax rate, beacon and password all
+  survive, so the next captain to land inherits the colony. Messages ABAN01 (not in orbit) /
+  ABAN02 (released) / ABAN03 (not yours) match C's three branches; C uses one rejection for both
+  "not yours" and a planet it cannot read, and so do we.
+- **The port's abandon-*ship* moved to `aba ship`.** Feature 013 research D2 had put ship-scuttling
+  on the canonical `aba` keyword and deferred colony abandonment to feature 005, where it was never
+  picked up. All of FR-701..FR-704 is unchanged behind the explicit second word — which also closes
+  the one-keystroke gap to `abo` (abort self-destruct) that scuttled hulls by typo. See
+  docs/DECISIONS.md.
+
+**Tests:** 3055/3055 across 320 suites. New: `test/game/planet/abandon-planet.spec.ts` (8) covering
+the service — release, colony left intact, counter floored at zero, not-owner and unowned refusals,
+and a re-claim after release — and `abandon-planet.handler.spec.ts` (9) covering both command forms.
+The four existing abandon suites now exercise `aba ship`.
+
+**Verified live:** claimed a planet, `pla` listed it, `aba` released it, `pla` went empty, the DB
+counter went to 0 and the released planet kept its stock; `aba` off-orbit gave ABAN01, over someone
+else's planet ABAN03; `aba ship` scuttled the hull and auto-boarded the one remaining ship.
+
+---
+
 ## 2026-08-31 (late) — multi-ship was unplayable from the browser
 
 **Completed:**

@@ -601,6 +601,32 @@ already-generated galaxy.
 
 ---
 
+## Colony abandonment (`aba`)
+
+**Source**: GECMDS.C:3420 `cmd_abandon`
+
+```
+if (warsptr->where < 10)              -> ABAN01  (must be in orbit)
+plnum = warsptr->where - 10
+if (planet.userid == warsptr->userid)
+    planet.userid[0] = 0
+    if (--waruptr->planets < 0) waruptr->planets = 0
+    write the planet record            -> ABAN02
+else                                   -> ABAN03
+```
+
+Orbit is the gate, not landing — the same `where < 10` test `buy` and `adm` use. Only the owner
+field changes: the name, stock, production rates, cash, tax rate, beacon and password all stay, so
+the next captain to `land` on it inherits the colony as it stands (and renames it).
+
+The planet counter on the user row is display state — the live per-player cap reads the real
+ownership count, and midnight rebuilds the counter from ownership — but C decrements it here and so
+do we, floored at zero, so the roster is right before the next midnight.
+
+`aba ship` is this port's addition and is documented under feature 013; it scuttles the hull instead.
+
+---
+
 ## Planet administration (feature 005)
 
 **Source**: GECMDS.C:4300 (`cmd_admin`), GECMDS.C:4350 (`cmd_withdraw`)

@@ -4,6 +4,33 @@ Format: decision, Context, Reason, Alternatives rejected.
 
 ---
 
+## 2026-08-31 — `aba` goes back to meaning colony abandonment; scuttling moves to `aba ship`
+
+**Context**: In the original, `aba` abandons the *planet you are orbiting* (GECMDS.C:3420 —
+`where < 10` gate, owner comparison, clear `plptr->userid`, decrement the owner's planet counter).
+Feature 013 research D2 reinterpreted the keyword as abandon-*ship* and deferred colony abandonment
+to "the planet system feature (005), where it belongs alongside other colony-management verbs" — it
+was never picked up there. The result: a player could claim planets but never give one up, and a
+mistyped `abo` (abort self-destruct) scuttled their hull instead.
+
+**Decision**: Bare `aba` is the canonical planet command. The port's ship-scuttle path keeps all of
+its behaviour (FR-701..FR-704) behind the explicit `aba ship`.
+
+**Reason**: The canonical keyword should do the canonical thing — that is the project's fidelity
+rule, and the missing verb was a real hole in colony play. Making the destructive, non-canonical
+action require a second word also removes the one-keystroke gap to `abo`. `mai` already sets the
+precedent in this codebase: bare is one command, with an argument it is another.
+
+**Alternatives rejected**: Leaving `aba` on the ship and adding a new verb for planets — puts the
+non-canonical meaning on the canonical keyword permanently. Making bare `aba` context-sensitive
+(planet when orbiting one you own, ship otherwise) — the same word would scuttle a hull or release a
+colony depending on state the player may have misread.
+
+**Affected requirements**: supersedes research D2 in specs/013-ship-management; FR-701..FR-704 now
+describe `aba ship`.
+
+---
+
 ## 2026-08-31 — an open question from a handler owns the next line of input
 
 **Context**: A handler that asks the player a free-text question ("What would you like to name this

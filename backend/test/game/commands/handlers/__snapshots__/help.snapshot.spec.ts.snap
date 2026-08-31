@@ -61,6 +61,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  tra down <qty> <item>  — transfer ship cargo to planet",
       "  tra up <qty> <item>    — transfer planet stock to ship",
       "  wthdr <qty>            — withdraw taxes to your account",
+      "  aba                    — give up the planet you are orbiting",
       "  attack <planet>        — attack enemy planet",
       "  dat <fragment>         — look up ship by name fragment",
     ],
@@ -76,7 +77,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  rename <name>      — rename ship",
       "  destruct           — initiate self-destruct",
       "  abort              — abort self-destruct",
-      "  abandon            — abandon ship",
+      "  abandon ship       — abandon ship",
     ],
     "title": "Ship",
   },
@@ -122,6 +123,7 @@ exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
   "  tra down <qty> <item>  — transfer ship cargo to planet",
   "  tra up <qty> <item>    — transfer planet stock to ship",
   "  wthdr <qty>            — withdraw taxes to your account",
+  "  aba                    — give up the planet you are orbiting",
   "  attack <planet>        — attack enemy planet",
   "  dat <fragment>         — look up ship by name fragment",
 ]
@@ -137,7 +139,7 @@ exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
   "  rename <name>      — rename ship",
   "  destruct           — initiate self-destruct",
   "  abort              — abort self-destruct",
-  "  abandon            — abandon ship",
+  "  abandon ship       — abandon ship",
 ]
 `;
 

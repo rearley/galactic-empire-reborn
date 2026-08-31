@@ -4,6 +4,7 @@
  * @see AbandonHandlerService — destruct cleared before marking abandoned
  */
 import { AbandonHandlerService } from '../../../../src/game/commands/handlers/abandon.handler';
+import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-management-constants';
@@ -41,14 +42,14 @@ function makeService(ship: ShipState) {
       return Promise.resolve();
     }),
   } as unknown as ShipStateService;
-  return { handler: new AbandonHandlerService(mockShipState) };
+  return { handler: new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService) };
 }
 
 describe('abandon destruct precedence edge case', () => {
   it('abandon while destruct=15 → destruct cleared to 0, status=ABANDONED', () => {
     const ship = makeShip({ destruct: 15, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, [], {});
+    handler.command.handler(ship, ['ship'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
@@ -56,7 +57,7 @@ describe('abandon destruct precedence edge case', () => {
   it('abandon while destruct=1 (final tick imminent) → destruct cleared before countdown expires', () => {
     const ship = makeShip({ destruct: 1, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, [], {});
+    handler.command.handler(ship, ['ship'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
@@ -64,7 +65,7 @@ describe('abandon destruct precedence edge case', () => {
   it('abandon with destruct=0 → status still set to ABANDONED (no-destruct path also works)', () => {
     const ship = makeShip({ destruct: 0, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, [], {});
+    handler.command.handler(ship, ['ship'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });

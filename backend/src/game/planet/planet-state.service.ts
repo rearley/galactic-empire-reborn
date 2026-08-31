@@ -169,6 +169,52 @@ export class PlanetStateService implements OnModuleInit {
   }
 
   /**
+   * Release a planet the caller owns — the canonical `aba`.
+   *
+   * C clears `plptr->userid` and decrements the owner's planet counter, and
+   * touches nothing else: the name, stock, production rates, cash, tax rate,
+   * beacon and password all stay, so whoever claims it next inherits the colony
+   * as it stands. Per-mutation flush, serialized per planet like `claim`.
+   *
+   * @see GECMDS.C:3420 cmd_abandon
+   */
+  async abandonPlanet(
+    xsect: number,
+    ysect: number,
+    plnum: number,
+    userid: string,
+  ): Promise<{ ok: true; name: string } | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' }> {
+    const key = planetKey(xsect, ysect, plnum);
+    return this.runSerialized(key, async () => {
+      const state = this.map.get(key);
+      if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
+
+      // C: `if (sameas(plptr->userid, warsptr->userid))` — anything else, ABAN03.
+      if (state.userid !== userid) {
+        return { ok: false as const, reason: 'NOT_OWNER' as const };
+      }
+
+      const name = state.name;
+      state.userid = null;
+
+      await this.prisma.planet.update({
+        where: { xsect_ysect_plnum: { xsect, ysect, plnum } },
+        data: stateToPrismaUpdate(state),
+      });
+
+      // C: `if (--waruptr->planets < 0) waruptr->planets = 0;`. The live cap
+      // reads countOwnedBy(), so this counter is only what the roster shows
+      // until midnight rebuilds it — but leaving it stale overstates the player.
+      await this.prisma.user.updateMany({
+        where: { userid, planets: { gt: 0 } },
+        data: { planets: { decrement: 1 } },
+      });
+
+      return { ok: true as const, name };
+    });
+  }
+
+  /**
    * Buy semantics — see GECMDS.C:cmd_buy.
    * Serialized per planet. Inside neutral zone, planet state is NOT mutated.
    */

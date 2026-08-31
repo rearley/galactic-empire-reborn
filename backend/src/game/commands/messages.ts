@@ -296,6 +296,10 @@ export enum MessageId {
   ABANDON_OK = 'ABANDON_OK',
   ABANDON_SECTOR = 'ABANDON_SECTOR',
   ABANDON_NO_SHIP = 'ABANDON_NO_SHIP',
+  // canonical `aba` — colony abandonment (GECMDS.C:3420)
+  ABAN01 = 'ABAN01',
+  ABAN02 = 'ABAN02',
+  ABAN03 = 'ABAN03',
 
   // nav (feature 016) — GECMDS.C:5120 cmd_navigate
   NAVFMT = 'NAVFMT',
@@ -678,6 +682,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABANDON_OK]: 'You have abandoned ship %s.',
   [MessageId.ABANDON_SECTOR]: '%s has been abandoned by its captain.',
   [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
+  // canonical `aba` — colony abandonment (GECMDS.C:3420)
+  [MessageId.ABAN01]: 'You must be in orbit around a planet to abandon it.',
+  [MessageId.ABAN02]: 'You have abandoned %s. It is no longer yours.',
+  [MessageId.ABAN03]: 'That planet is not yours to abandon.',
 
   // nav (feature 016) — GECMDS.C:5120 cmd_navigate
   [MessageId.NAVFMT]: 'Usage: nav <x> <y>',

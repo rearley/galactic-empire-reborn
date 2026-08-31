@@ -1,0 +1,122 @@
+import { AbandonHandlerService } from '../../../../src/game/commands/handlers/abandon.handler';
+import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
+import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
+import { ShipState } from '../../../../src/game/ship/ship-state.types';
+import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
+import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-management-constants';
+
+/**
+ * `aba` is C's colony-abandonment command (GECMDS.C:3420): in orbit over a
+ * planet you own, it releases the planet. This port had reinterpreted the
+ * keyword as abandon-*ship* (research D2), deferring colony abandonment to the
+ * planet feature where it was never picked up — so a player had no way to give
+ * up a planet at all, and a mistyped `abo` scuttled their hull instead.
+ *
+ * Bare `aba` is now the canonical planet command; the port's ship path moved
+ * behind the explicit `aba ship`.
+ */
+function makeShip(overrides: Partial<ShipState> = {}): ShipState {
+  return {
+    userid: 'owner1', shipno: 1, shipname: 'Ranger', shpclass: 1,
+    heading: 0, head2b: 0, speed: 0, speed2b: 0,
+    xcoord: 4.5, ycoord: 2.5, damage: 0, energy: 10000,
+    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
+    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+    where: 11, // orbiting planet 1 in sector (4,2)
+    ltorpsChannel: [], ltorpsDistance: [],
+    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
+    decout: [], jammer: 0, freq: [0, 0, 0],
+    items: Array(14).fill(0n) as bigint[],
+    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
+    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
+    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
+    navTargetX: null, navTargetY: null,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    dirty: false,
+    ...overrides,
+  };
+}
+
+function makeHandler(
+  abandonPlanetResult: unknown = { ok: true, name: 'Aurora' },
+): { handler: AbandonHandlerService; abandonPlanet: jest.Mock; abandonShip: jest.Mock; ship: ShipState } {
+  const ship = makeShip();
+  const abandonShip = jest.fn().mockImplementation(() => {
+    ship.status = SHIP_STATUS_ABANDONED;
+    return Promise.resolve();
+  });
+  const abandonPlanet = jest.fn().mockResolvedValue(abandonPlanetResult);
+  const handler = new AbandonHandlerService(
+    { abandon: abandonShip } as unknown as ShipStateService,
+    { abandonPlanet } as unknown as PlanetStateService,
+  );
+  return { handler, abandonPlanet, abandonShip, ship };
+}
+
+describe('AbandonHandlerService — canonical `aba` releases the planet', () => {
+  it('abandons the orbited planet and names it back', async () => {
+    const { handler, abandonPlanet, ship } = makeHandler();
+    const result = await handler.command.handler(ship, [], {});
+    expect(abandonPlanet).toHaveBeenCalledWith(4, 2, 1, 'owner1');
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN02, 'Aurora'));
+    expect(result.lines[0].category).toBe('success');
+  });
+
+  it('never touches the ship', async () => {
+    const { handler, abandonShip, ship } = makeHandler();
+    await handler.command.handler(ship, [], {});
+    expect(abandonShip).not.toHaveBeenCalled();
+    expect(ship.status).toBe(1);
+  });
+
+  it('refuses when not in orbit (ABAN01)', async () => {
+    const { handler, abandonPlanet } = makeHandler();
+    const result = await handler.command.handler(makeShip({ where: 0 }), [], {});
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN01));
+    expect(abandonPlanet).not.toHaveBeenCalled();
+  });
+
+  it("refuses a planet that is not the caller's (ABAN03)", async () => {
+    const { handler, ship } = makeHandler({ ok: false, reason: 'NOT_OWNER' });
+    const result = await handler.command.handler(ship, [], {});
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN03));
+  });
+
+  it('reports a missing planet as ABAN03 rather than claiming success', async () => {
+    const { handler, ship } = makeHandler({ ok: false, reason: 'NOT_FOUND' });
+    const result = await handler.command.handler(ship, [], {});
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN03));
+  });
+
+  it('does not ask the gateway for ship re-entry', async () => {
+    const { handler, ship } = makeHandler();
+    const result = await handler.command.handler(ship, [], {});
+    expect(result.reenterShipEntry).toBeUndefined();
+  });
+});
+
+describe('AbandonHandlerService — `aba ship` keeps the port\'s scuttle path', () => {
+  it('abandons the hull and asks for ship re-entry', async () => {
+    const { handler, abandonShip, abandonPlanet, ship } = makeHandler();
+    const result = await handler.command.handler(ship, ['ship'], {});
+    expect(abandonShip).toHaveBeenCalledWith('owner1', 1);
+    expect(abandonPlanet).not.toHaveBeenCalled();
+    expect(result.reenterShipEntry).toBe(true);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, 'Ranger'));
+  });
+
+  it('accepts the word in any case', async () => {
+    const { handler, abandonShip, ship } = makeHandler();
+    await handler.command.handler(ship, ['SHIP'], {});
+    expect(abandonShip).toHaveBeenCalled();
+  });
+
+  it('treats any other argument as the planet form', async () => {
+    const { handler, abandonPlanet, abandonShip, ship } = makeHandler();
+    await handler.command.handler(ship, ['planet'], {});
+    expect(abandonPlanet).toHaveBeenCalled();
+    expect(abandonShip).not.toHaveBeenCalled();
+  });
+});

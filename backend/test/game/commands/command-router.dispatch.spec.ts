@@ -101,7 +101,7 @@ function buildRouter() {
   router.register(new SetHandlerService(mockShipState, mockPrisma).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
-  router.register(new AbandonHandlerService(mockShipState).command);
+  router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);
 
   return { router, ship };
 }
@@ -157,7 +157,7 @@ describe('command router dispatch — new keywords reach their handlers', () => 
 
   it('abandon → ABANDON_OK (keyword)', async () => {
     const { router, ship } = buildRouter();
-    const result = await Promise.resolve(router.dispatch('abandon', ship, {})) as { lines: { text: string }[] };
+    const result = await Promise.resolve(router.dispatch('abandon ship', ship, {})) as { lines: { text: string }[] };
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, ship.shipname));
   });
 });
@@ -198,7 +198,7 @@ describe('command router dispatch — transfer and jettison (minArgs gate)', () 
   it('abandon alias "aba" → reaches abandon handler', async () => {
     const { router, ship } = buildRouter();
     ship.status = 1;
-    const result = await Promise.resolve(router.dispatch('aba', ship, {})) as { lines: { text: string }[] };
+    const result = await Promise.resolve(router.dispatch('aba ship', ship, {})) as { lines: { text: string }[] };
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, 'Test'));
   });
 });
