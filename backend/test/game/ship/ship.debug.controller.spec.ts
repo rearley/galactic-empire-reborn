@@ -38,7 +38,9 @@ function build(ship: ShipState | undefined) {
     findByName: (n: string) => (ship && ship.shipname.toLowerCase() === n.toLowerCase() ? ship : undefined),
     mutate,
   } as unknown as ShipStateService;
-  return { controller: new ShipDebugController(shipState), mutate };
+  const userUpdate = jest.fn().mockResolvedValue({});
+  const prisma = { user: { update: userUpdate } } as never;
+  return { controller: new ShipDebugController(shipState, prisma), mutate, userUpdate };
 }
 
 describe('POST /debug/ship/outfit', () => {
@@ -195,5 +197,42 @@ describe('POST /debug/ship/outfit', () => {
     const ship = makeShip();
     const { controller } = build(ship);
     expect(() => controller.outfit('Reliant', undefined, undefined, undefined, '150')).toThrow(BadRequestException);
+  });
+});
+
+/**
+ * Credits live on the User row, so `outfit` cannot reach them. A second hull
+ * costs 500,000 and a starter pilot has 5,000 — without this the multi-ship
+ * flow can only be staged by grinding trade runs, which is why it went
+ * untested from a browser until it was found broken.
+ */
+describe('POST /debug/ship/credits', () => {
+  it('sets the owning captain\'s balance', async () => {
+    const ship = makeShip();
+    const { controller, userUpdate } = build(ship);
+
+    const res = (await controller.credits('Reliant', '2000000')) as Record<string, unknown>;
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { userid: ship.userid },
+      data: { cash: 2000000n },
+    });
+    expect(res.credits).toBe(2000000);
+  });
+
+  it('rejects an unknown ship rather than writing to nobody', async () => {
+    const { controller, userUpdate } = build(makeShip());
+    await expect(controller.credits('Nobody', '10')).rejects.toThrow(/no live ship/);
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it('requires an amount', async () => {
+    const { controller } = build(makeShip());
+    await expect(controller.credits('Reliant', undefined as unknown as string)).rejects.toThrow(/amount/);
+  });
+
+  it('rejects a negative amount', async () => {
+    const { controller } = build(makeShip());
+    await expect(controller.credits('Reliant', '-5')).rejects.toThrow(/amount/);
   });
 });

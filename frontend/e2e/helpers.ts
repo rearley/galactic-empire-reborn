@@ -82,3 +82,25 @@ export async function spawnDroid(
   expect(res.ok(), `spawn failed: ${await res.text()}`).toBe(true);
   return (await res.json()) as { shipname: string; userid: string };
 }
+
+/** Dev-only: set the owning captain's credit balance. */
+export async function grantCredits(
+  request: APIRequestContext,
+  shipname: string,
+  amount: number,
+): Promise<void> {
+  const qs = new URLSearchParams({ shipname, amount: String(amount) }).toString();
+  const res = await request.post(`${BACKEND}/debug/ship/credits?${qs}`);
+  expect(res.ok(), `credits failed: ${await res.text()}`).toBe(true);
+}
+
+/**
+ * Reconnect so the socket re-boards and re-joins the sector room for the ship's
+ * CURRENT position. `outfitShip`'s teleport moves the ship in the state map but
+ * not the socket between Socket.io rooms, so sector-scoped broadcasts keep going
+ * to the sector the pilot boarded in until they reconnect or fly across a
+ * boundary under power.
+ */
+export async function reconnect(page: Page): Promise<void> {
+  await page.goto('/');
+}

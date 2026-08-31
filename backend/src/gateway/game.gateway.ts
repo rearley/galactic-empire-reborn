@@ -213,6 +213,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Puts a boarded captain into the two rooms every server-pushed notice uses.
+   *
+   * `sector:x:y` carries sector-scoped events — combat hits, phaser fire, radio
+   * on a sector frequency, ships entering and leaving, self-destruct warnings —
+   * without the client having to send a `sector:join`. `user:<userid>` carries
+   * per-captain alerts: the call-for-help when a planet of theirs is attacked,
+   * and cloak collapse from energy starvation.
+   *
+   * Every path that boards a ship must call this. The onboarding finalize path
+   * hand-rolled its own welcome sequence and omitted both, which left a
+   * first-session pilot deaf to all of it until they reloaded.
+   */
+  private joinPlayerRooms(client: Socket, userid: string, sector: { x: number; y: number }): void {
+    void client.join(`user:${userid}`);
+    void client.join(`sector:${sector.x}:${sector.y}`);
+  }
+
+  /**
    * Resolves the captain's usable fleet and puts them somewhere they can play:
    * onboarding when they have no ship, straight aboard when they have exactly
    * one, the selection menu when they have several.
@@ -333,8 +351,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.data.activeShipNo = ship.shipno;
 
-    // Join per-user room so handlers can broadcast directly to this captain.
-    void client.join(`user:${userid}`);
+
 
     // Latest-wins: displace prior socket if any
     const priorSocketId = this.registry.upsert(shipId, client.id);
@@ -360,11 +377,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
 
-    // Auto-join the player's current sector room so sector-scoped events (combat hits,
-    // phaser fire, etc.) are delivered without requiring a client-side sector:join message.
     const sectorX = Math.floor(activeShip.xcoord);
     const sectorY = Math.floor(activeShip.ycoord);
-    void client.join(`sector:${sectorX}:${sectorY}`);
+    this.joinPlayerRooms(client, userid, { x: sectorX, y: sectorY });
 
     const connectedPlayer: ConnectedPlayer = {
       shipId,
@@ -603,6 +618,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.data.activeShipNo = state.shipno;
         client.data.onboarding = undefined;
 
+        // This path duplicates the welcome sequence instead of going through
+        // boardShipAndWelcome, and the copy used to omit both joins — so a
+        // first-session pilot received no sector-scoped broadcast at all (radio,
+        // ships entering or leaving, someone's self-destruct countdown) and none
+        // of the per-captain alerts (planet under attack, cloak collapse) until
+        // they reloaded the page.
+        this.joinPlayerRooms(client, userid, {
+          x: Math.floor(state.xcoord),
+          y: Math.floor(state.ycoord),
+        });
+
         client.emit('command:result', {
           lines: [{ text: `Welcome aboard, ${state.shipname}.`, category: 'system' }],
         });
@@ -637,6 +663,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
               this.registry.upsert(shipId, client.id);
               client.data.activeShipNo = ship.shipno;
               client.data.onboarding = undefined;
+              this.joinPlayerRooms(client, userid, {
+                x: Math.floor(ship.xcoord),
+                y: Math.floor(ship.ycoord),
+              });
               client.emit('command:result', {
                 lines: [{ text: `Welcome aboard, ${ship.shipname}.`, category: 'system' }],
               });

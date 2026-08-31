@@ -1,3 +1,47 @@
+## 2026-08-31 — browser-first pass: everything the server pushed was being dropped
+
+Driven from Playwright rather than the unit suite, on the principle that the backend can be
+perfectly correct and the player still see nothing.
+
+**Completed:**
+- **A new pilot never joined any Socket.io room.** The onboarding finalize path duplicates the
+  welcome sequence inline instead of calling `boardShipAndWelcome`, and the copy omitted both
+  `client.join()` calls. A first-session pilot therefore received no sector-scoped broadcast at all
+  — radio, ships entering or leaving, someone's self-destruct countdown — and none of the
+  per-captain `user:` alerts (planet under attack, cloak collapse). It came right only after a
+  reload, which is why it survived so long. Both joins now go through one `joinPlayerRooms` helper
+  that every boarding path calls. Found because two freshly-registered pilots on the same radio
+  frequency in the same sector could not hear each other, and the sector room turned out empty.
+- **The client listened for neither `event.log` nor `message.send`.** `event.log` is the gateway's
+  catch-all for anything that is not a reply to a command: the self-destruct countdown and its
+  detonation, cloak collapse, subsystem damage warnings, the call-for-help alert when your planet is
+  attacked, the sector notice when a captain abandons ship. `message.send` carries radio traffic.
+  All of it was emitted correctly and dropped on the floor. Confirmed by watching `des` run for 20
+  seconds in a browser and produce nothing.
+- **The second captain to buy any ship class got "Internal error processing command."** Generated
+  hull names are `${typeName} #${shipno}` using the captain's OWN ship counter, while
+  `Ship_shipname_lower_idx` is global — two captains buying their second Stealth Fighter both
+  produced "Stealth Fighter #2" and the P2002 escaped uncaught, costing the player the purchase.
+  C names every purchased hull " <NO NAME> " (GEFUNCS.C:194) and has no unique-name index; this port
+  does, so the generated name now steps aside up to five times, mirroring how `TeamService.create`
+  already handles name collisions.
+- Dev-only `POST /debug/ship/credits` so the multi-ship flow can be staged without grinding trade
+  runs — a second hull costs 500,000 and a starter pilot has 5,000, which is why nobody had ever
+  driven that path from a browser.
+
+**Tests:** backend 3070 across 322 suites; frontend 152; **Playwright 19 → 28**. New browser specs:
+`e2e/notices.spec.ts` (self-destruct announcement, radio delivery, radio privacy across two real
+clients), `e2e/colony.spec.ts` (the land prompt answered with "New Terra" — the name that used to be
+swallowed by the `new` verb — plus claim/abandon/re-claim and both refusals), `e2e/fleet.spec.ts`
+(buy a second hull, get the menu, fly either one). The self-destruct spec was mutation-checked:
+removing the `event.log` listener makes it fail.
+
+**Note for future browser tests:** `outfitShip`'s teleport moves the ship in the state map but does
+not move the socket between Socket.io rooms, so sector-scoped events keep going to the sector the
+pilot boarded in. `reconnect(page)` after a teleport; the helper documents it.
+
+---
+
 ## 2026-08-31 — colony abandonment restored to `aba` (canonical)
 
 **Completed:**

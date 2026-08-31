@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPurchasedShipName } from './purchased-ship-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -34,6 +35,19 @@ function upgradeCost(priceTable: bigint[], currentType: number, newType: number)
  * Handles the `new` command — purchase a ship or upgrade phasers/shields at Zygor station.
  * @see GECMDS.C:cmd_new
  */
+
+/** Distinct generated names tried before giving up on a purchase. */
+const SHIPNAME_ATTEMPTS = 5;
+
+/** True for a Prisma unique-constraint violation on the ship name. */
+function isShipnameCollision(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null || !('code' in err)) return false;
+  if ((err as { code?: string }).code !== 'P2002') return false;
+  const target = (err as { meta?: { target?: string | string[] } }).meta?.target;
+  const fields = Array.isArray(target) ? target.join(',') : String(target ?? '');
+  return fields.toLowerCase().includes('shipname');
+}
+
 @Injectable()
 export class NewShipHandlerService {
   constructor(
@@ -156,44 +170,41 @@ export class NewShipHandlerService {
 
     // Allocate monotonic ship number — never reuse after deletion
     const newShipno = topshipno + 1;
-    const shipName = `${shipClass.typeName} #${newShipno}`;
 
     // items[I_FLUX=4] = START_FLUX_PODS; 14 slots per NUMITEMS=14
     const items: bigint[] = [0n, 0n, 0n, 0n, BigInt(START_FLUX_PODS), 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
-    // Atomic: create dormant ship + update user fleet counters and cash
-    await this.prisma.$transaction([
-      this.prisma.ship.create({
-        data: {
-          userid: ship.userid,
-          shipno: newShipno,
-          shipname: shipName,
-          shpclass: classNumber,
-          status: GESTAT_AVAIL,
-          xcoord: Math.floor(ship.xcoord),
-          ycoord: Math.floor(ship.ycoord),
-          energy: ENGYMAX,
-          phasr: 100,
-          shield: 0,
-          ltorpsChannel: [],
-          ltorpsDistance: [],
-          lmisslChannel: [],
-          lmisslDistance: [],
-          lmisslEnergy: [],
-          decout: [],
-          freq: [0, 0, 0],
-          items,
-        } as never,
-      }),
-      this.prisma.user.update({
-        where: { userid: ship.userid },
-        data: {
-          cash: { decrement: shipClass.maxPrice },
-          noships: { increment: 1 },
-          topshipno: newShipno,
-        },
-      }),
-    ]);
+    // Atomic: create dormant ship + update user fleet counters and cash.
+    //
+    // Retried on a shipname collision: the generated name carries the captain's
+    // OWN ship number while `Ship_shipname_lower_idx` is global, so two captains
+    // buying their second hull of a class produce the same name. The P2002 used
+    // to escape as "Internal error processing command." and cost the player the
+    // purchase. Mirrors TeamService.create, which retries name collisions the
+    // same way.
+    let shipName = '';
+    let created = false;
+    for (let attempt = 0; attempt < SHIPNAME_ATTEMPTS && !created; attempt++) {
+      shipName = buildPurchasedShipName(shipClass.typeName, newShipno, attempt);
+      try {
+        await this.createShipTransaction(
+          ship.userid, newShipno, shipName, classNumber, shipClass, items,
+          { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
+        );
+        created = true;
+      } catch (err: unknown) {
+        if (!isShipnameCollision(err)) throw err;
+      }
+    }
+
+    if (!created) {
+      return {
+        lines: [{
+          text: 'Could not find an unused name for the new ship. Try again.',
+          category: 'system',
+        }],
+      };
+    }
 
     // Dormant ship is NOT loaded into in-memory ShipStateService — reconnect to fly her (login-only switching)
 
@@ -278,5 +289,52 @@ export class NewShipHandlerService {
     return {
       lines: [{ text: `${kind === 'phaser' ? 'Phaser' : 'Shield'} upgraded to type ${newType}. ${action} Credits: ${newCash.toLocaleString()} cr.`, category: 'success' }],
     };
+  }
+
+  /**
+   * Creates the dormant hull and debits the captain in one transaction.
+   * Split out so the caller can retry it under a different name.
+   */
+  private async createShipTransaction(
+    userid: string,
+    shipno: number,
+    shipname: string,
+    classNumber: number,
+    shipClass: { maxPrice: bigint },
+    items: bigint[],
+    at: { x: number; y: number },
+  ): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.ship.create({
+        data: {
+          userid,
+          shipno,
+          shipname,
+          shpclass: classNumber,
+          status: GESTAT_AVAIL,
+          xcoord: at.x,
+          ycoord: at.y,
+          energy: ENGYMAX,
+          phasr: 100,
+          shield: 0,
+          ltorpsChannel: [],
+          ltorpsDistance: [],
+          lmisslChannel: [],
+          lmisslDistance: [],
+          lmisslEnergy: [],
+          decout: [],
+          freq: [0, 0, 0],
+          items,
+        } as never,
+      }),
+      this.prisma.user.update({
+        where: { userid },
+        data: {
+          cash: { decrement: shipClass.maxPrice },
+          noships: { increment: 1 },
+          topshipno: shipno,
+        },
+      }),
+    ]);
   }
 }

@@ -94,6 +94,41 @@ function Terminal(): React.JSX.Element {
     };
   }, []);
 
+  /**
+   * Unsolicited server notices.
+   *
+   * `event.log` is the catch-all the gateway uses for anything that is not a
+   * reply to a command: the self-destruct countdown and its detonation, cloak
+   * collapse from energy starvation, subsystem damage warnings, the
+   * call-for-help alert when someone attacks your planet, and the sector notice
+   * when a captain abandons ship. `message.send` carries radio traffic.
+   *
+   * Neither had a listener, so all of it was dropped: `des` started a countdown
+   * the pilot never saw, and `sen`/`fre` transmitted into a void.
+   */
+  useEffect(() => {
+    const append = (line: EventLogLine) =>
+      setLogLines((prev) => [...prev, line].slice(-MAX_LOG_ENTRIES));
+
+    const handleServerNotice = (payload: { text?: string; category?: EventLogLine['category'] }) => {
+      if (typeof payload?.text !== 'string') return;
+      append({ text: payload.text, category: payload.category ?? 'system' });
+    };
+
+    const handleTransmission = (payload: { from?: string; channel?: string; text?: string }) => {
+      if (typeof payload?.text !== 'string' || typeof payload.from !== 'string') return;
+      const channel = payload.channel ? `[${payload.channel}] ` : '';
+      append({ text: `${channel}${payload.from}: ${payload.text}`, category: 'chat' });
+    };
+
+    socket.on('event.log', handleServerNotice);
+    socket.on('message.send', handleTransmission);
+    return () => {
+      socket.off('event.log', handleServerNotice);
+      socket.off('message.send', handleTransmission);
+    };
+  }, []);
+
   useEffect(() => {
     const shipName = (shipId: string): string => {
       return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];

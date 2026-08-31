@@ -194,6 +194,16 @@ client  →  [command event]  →  GameGateway.handleCommand()
 Error path: unhandled throw in handler → gateway `catch` → `{ lines: ['Internal error…'] }`.
 Empty input → `{ lines: [] }` (silent drop). Unknown keyword → `{ lines: [UNKNOWN_CMD] }`.
 
+Room membership: every path that boards a ship calls `joinPlayerRooms`, which joins
+`sector:{x}:{y}` (sector-scoped events — combat, radio on a sector frequency, ships entering and
+leaving, self-destruct warnings) and `user:{userid}` (per-captain alerts — planet under attack,
+cloak collapse). The onboarding finalize path used to hand-roll its own welcome and skip both,
+leaving a first-session pilot deaf until they reloaded.
+
+Client listeners: `command:result` carries replies to typed commands; `event.log` is the catch-all
+for unsolicited notices and `message.send` carries radio traffic. All three must have listeners in
+`App.tsx` — the gateway emitting is not enough, and a missing listener is silent.
+
 Broadcast filtering: `broadcasts[]` entries may carry `freq` (deliver only to ships tuned to that
 frequency on one of their three channels — C's `outsect`/`outwar` frequency argument) and
 `excludeSelf` (drop the sender, C's `usrnum` exclude). A `hail` broadcast carries no frequency and

@@ -283,3 +283,50 @@ describe('NewShipHandlerService', () => {
     });
   });
 });
+
+/**
+ * Hull names are generated per-captain (`${typeName} #${shipno}`) while
+ * `Ship_shipname_lower_idx` is global, so the second captain to buy a given
+ * class collided on the unique index. The uncaught P2002 surfaced as
+ * "Internal error processing command." — found in a browser, when a second
+ * e2e pilot tried to buy a Stealth Fighter.
+ */
+describe('NewShipHandlerService — name collisions between captains', () => {
+  const p2002 = Object.assign(new Error('unique'), {
+    code: 'P2002',
+    meta: { target: ['shipname'] },
+  });
+
+  it('retries under a different name instead of failing the purchase', async () => {
+    let calls = 0;
+    const $transaction = jest.fn().mockImplementation(async (ops: Promise<unknown>[]) => {
+      calls += 1;
+      if (calls === 1) throw p2002;
+      return Promise.all(ops);
+    });
+    const { service } = makeService({ $transaction });
+
+    const result = await service.command.handler(makeShip(), ['ship', '4'], {});
+
+    expect(calls).toBe(2);
+    expect(result.lines[0].text).toMatch(/purchased/i);
+  });
+
+  it('gives up with a readable message rather than an internal error', async () => {
+    const $transaction = jest.fn().mockRejectedValue(p2002);
+    const { service } = makeService({ $transaction });
+
+    const result = await service.command.handler(makeShip(), ['ship', '4'], {});
+
+    const text = result.lines[0].text;
+    expect(text).not.toMatch(/internal/i);
+    expect(text).toMatch(/name/i);
+  });
+
+  it('lets an unrelated failure surface instead of swallowing it', async () => {
+    const $transaction = jest.fn().mockRejectedValue(new Error('db is on fire'));
+    const { service } = makeService({ $transaction });
+
+    await expect(service.command.handler(makeShip(), ['ship', '4'], {})).rejects.toThrow(/on fire/);
+  });
+});
