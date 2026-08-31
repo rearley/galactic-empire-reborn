@@ -13,6 +13,7 @@
 
 import { Controller, Post, Query, BadRequestException } from '@nestjs/common';
 import { ShipStateService } from './ship-state.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { I_TORP, I_MISSL, I_MINE } from '../constants/items';
 
 /** Parses an optional non-negative integer query param. */
@@ -27,7 +28,38 @@ function optionalCount(raw: string | undefined, name: string): number | undefine
 
 @Controller('debug/ship')
 export class ShipDebugController {
-  constructor(private readonly shipState: ShipStateService) {}
+  constructor(
+    private readonly shipState: ShipStateService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  /**
+   * POST /debug/ship/credits?shipname=Reliant&amount=2000000
+   *
+   * Sets the owning captain's balance. Credits live on the User row, not the
+   * ship, so `outfit` cannot reach them — and a second hull costs 500,000 while
+   * a starter pilot has 5,000, which makes the multi-ship flow untestable
+   * without grinding trade runs.
+   */
+  @Post('credits')
+  async credits(
+    @Query('shipname') shipname: string,
+    @Query('amount') amountParam: string,
+  ): Promise<object> {
+    if (!shipname) throw new BadRequestException('shipname is required');
+    const amount = optionalCount(amountParam, 'amount');
+    if (amount === undefined) throw new BadRequestException('amount is required');
+
+    const target = this.shipState.findByName(shipname);
+    if (!target) throw new BadRequestException(`no live ship named '${shipname}'`);
+
+    await this.prisma.user.update({
+      where: { userid: target.userid },
+      data: { cash: BigInt(amount) },
+    });
+
+    return { ok: true, shipname: target.shipname, credits: amount };
+  }
 
   /**
    * POST /debug/ship/outfit?shipname=Reliant&torps=10&missiles=10&mines=10&damage=0
