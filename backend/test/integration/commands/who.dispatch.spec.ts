@@ -52,9 +52,11 @@ describe('who dispatch integration', () => {
     expect(info).toHaveLength(2);
   });
 
-  it('who excludes cloaked ship from results', async () => {
+  // Full cloak only — C's listings gate on `cloak < 10` (GECMDS.C:1511), so a
+  // ship still spinning its cloak up (1, 2) remains visible.
+  it('who excludes fully-cloaked ship from results', async () => {
     const visible = makeShip({ userid: 'u1', shipno: 1, shipname: 'Visible', cloak: 0 });
-    const ghost = makeShip({ userid: 'u2', shipno: 2, shipname: 'Ghost', cloak: 1 });
+    const ghost = makeShip({ userid: 'u2', shipno: 2, shipname: 'Ghost', cloak: 10 });
     const router = buildRouter([visible, ghost]);
     const result = await router.dispatch('who', visible, ctx);
     expect(result.lines.some((l) => l.text.includes('Ghost'))).toBe(false);

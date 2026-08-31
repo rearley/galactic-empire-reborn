@@ -91,4 +91,16 @@ describe('help text matches the commands it documents', () => {
     expect(planet).not.toMatch(/wthdr/);
     expect(planet).toMatch(/wit(hdraw)? /);
   });
+
+  /**
+   * `sca sh` reports on ONE ship and needs a target; `sca pl` lists and then
+   * takes a number. Describing both as "ships/planets in sector" implied `sca sh`
+   * would list them, and it answers with the scan help instead — which is what
+   * happened mid-hunt during a playtest.
+   */
+  it('scan help distinguishes the modes that need a target', () => {
+    const nav = body('navigation');
+    expect(nav).toMatch(/sca sh <name>/);
+    expect(nav).not.toMatch(/sh=ships/);
+  });
 });

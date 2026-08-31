@@ -3,9 +3,10 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
+import { GESTAT_AUTO } from '../../constants';
 
 /**
- * Handles `who` — lists all active non-cloaked ships sorted by shipname ascending.
+ * Handles `who` — lists connected, non-cloaked PLAYER ships sorted by shipname.
  * Reinterpretation of cmd_who (GECMDS.C:5162) as a player-facing roster listing.
  * @see GECMDS.C:5162 cmd_who
  * @see specs/012-social-commands/research.md D1
@@ -53,7 +54,17 @@ export class WhoHandlerService implements OnModuleInit {
 
     const active = this.shipService
       .findAllShips()
-      .filter((s) => !s.cloak)
+      // Players only. C's cmd_who echoes the caller's own BBS id (GECMDS.C:5162);
+      // spec 012 D1 recasts it as the player-facing ConnectedShipsRegistry
+      // listing — "show me everyone". Listing every live ship instead printed all
+      // 24 Cybertrons with their exact sectors, so a pilot could route around
+      // every threat in the galaxy without scanning once. AI positions are what
+      // `sca` is for.
+      .filter((s) => s.status !== GESTAT_AUTO)
+      // C gates every ship listing on `cloak < 10` (GECMDS.C:1371, 1511, 2824):
+      // only a FULLY-engaged cloak hides you. Spinning up (1,2) and recovering
+      // (negative) still show. `!s.cloak` hid those states too.
+      .filter((s) => s.cloak < 10)
       .sort((a, b) => a.shipname.toLowerCase().localeCompare(b.shipname.toLowerCase()));
 
     for (const s of active) {

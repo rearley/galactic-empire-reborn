@@ -115,8 +115,11 @@ export class ScanHandlerService implements OnModuleInit {
     return {
       lines: [
         { text: 'Usage: scan <mode>', category: 'system' },
-        { text: '  sh      — ships in sector', category: 'system' },
-        { text: '  pl      — planets in sector', category: 'system' },
+        // `sh` needs a target — it reports one ship in detail. `pl` lists, then
+        // takes a number for detail. Saying "ships in sector" implied `sca sh`
+        // would list them, and it answers with this help instead.
+        { text: '  sh <name|letter> — detail on one ship', category: 'system' },
+        { text: '  pl [number]      — planets here, or detail on one', category: 'system' },
         { text: '  ra      — range scan (tactical grid)', category: 'system' },
         { text: '  se      — sector scan (wider view)', category: 'system' },
         { text: '  lo      — local scan', category: 'system' },
