@@ -10,6 +10,7 @@ import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
 import { AuthScreen } from './auth/AuthScreen';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
+import { ShipSelectPrompt, type FleetEntry } from './onboarding/ShipSelectPrompt';
 import { getToken, setToken } from './auth/tokenStore';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
@@ -21,8 +22,9 @@ const MAX_LOG_ENTRIES = 500;
 /**
  * Root application component — five-region terminal UI (FR-002).
  * Gates on JWT token: renders AuthScreen when absent, terminal otherwise.
- * During onboarding (prompt:ship-name active), renders ShipNamePrompt
- * instead of normal command input.
+ * During onboarding (prompt:ship-name active) renders ShipNamePrompt, and
+ * when a captain owns more than one hull (prompt:ship-select) renders the fleet
+ * menu, instead of normal command input.
  *
  * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/spec.md FR-002
@@ -162,6 +164,16 @@ function Terminal(): React.JSX.Element {
         <ShipNamePrompt
           onSubmit={(name) => emitPromptReply(name)}
           error={shipNameError}
+        />
+      );
+    }
+    if (onboardingPrompt?.type === 'ship-select') {
+      const payload = onboardingPrompt.payload as { ships?: FleetEntry[]; error?: string };
+      return (
+        <ShipSelectPrompt
+          ships={payload.ships ?? []}
+          onSelect={(index) => emitPromptReply(index)}
+          error={payload.error ?? null}
         />
       );
     }

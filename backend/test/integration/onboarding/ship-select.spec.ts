@@ -459,6 +459,32 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
     socket.disconnect();
   });
 
+  /**
+   * The browser client sends the chosen index as a NUMBER — `emitPromptReply`
+   * is typed `number | string` and App passes the parsed index. The gateway
+   * accepted strings only, coerced anything else to '', and re-emitted the menu:
+   * a captain who bought a second ship could never board either of them, and
+   * every backend test here had been sending strings so nothing caught it.
+   */
+  it('accepts a numeric index, as the browser client sends', async () => {
+    boardMock.mockClear();
+    const socket = makeClient(port);
+
+    await waitForEvent(socket, 'prompt:ship-select');
+
+    const [result] = await Promise.all([
+      waitForEvent<{ lines: Array<{ text: string }> }>(socket, 'command:result'),
+      Promise.resolve().then(() => { socket.emit('prompt:reply', { value: 2 }); }),
+    ]);
+
+    // Assert on the welcome rather than boardMock: by this point the preceding
+    // test has already warmed shipno 4 into the state map, so board() is
+    // legitimately not called again (see the warm-cache case above).
+    expect(result.lines[0].text).toMatch(/Welcome aboard, Hawk/i);
+
+    socket.disconnect();
+  });
+
   it('invalid reply "9" → re-emits prompt:ship-select, does not board', async () => {
     boardMock.mockClear();
     const socket = makeClient(port);

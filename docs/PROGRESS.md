@@ -1,3 +1,31 @@
+## 2026-08-31 (late) — multi-ship was unplayable from the browser
+
+**Completed:**
+- **Buying a second ship bricked the account in the UI.** The gateway emits `prompt:ship-select`
+  for a captain with more than one hull and boards nothing until it gets a reply — and *nothing on
+  the client listened for that event*. The player connected to an empty log, no active ship, and
+  "No active ship." as the answer to every command. Added `ShipSelectPrompt` and wired
+  `prompt:ship-select` through `useSocket` into `App`.
+- **…and the reply the client sends was rejected anyway.** `emitPromptReply` is typed
+  `number | string` and App passes the parsed index as a **number**; `handleShipSelectReply`
+  accepted strings only, coerced anything else to `''`, and re-emitted the menu forever. Every
+  backend test in `ship-select.spec.ts` sent strings, so the suite was green against a flow no real
+  client could complete. The gateway now takes either.
+
+Together these meant feature 030 (multi-ship) worked end-to-end in integration tests and not at all
+in a browser — the exact gap the Playwright layer exists to catch.
+
+**Tests:** backend 3038/318 suites, frontend 147/20 files. New: `ShipSelectPrompt.spec.tsx` (6), an
+App-level render test, and a `ship-select.spec.ts` case that replies with a number.
+
+**Verified live:** bought a Stealth Fighter at Zygor (after `new phaser 2` / `new shield 2`),
+reconnected, got the fleet menu, chose ship 2 and flew it.
+
+**Noted, not changed:** `new ship <class>` names the hull automatically ("Stealth Fighter #4")
+rather than prompting, unlike the first-ship onboarding flow.
+
+---
+
 ## 2026-08-31 (evening) — radio, abandon recovery, flux warning
 
 **Completed:**

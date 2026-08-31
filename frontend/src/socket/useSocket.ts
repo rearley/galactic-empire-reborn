@@ -13,7 +13,12 @@ import type { UsePlayerListReturn } from '../state/usePlayerList';
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 export interface OnboardingPrompt {
-  type: 'ship-name';
+  /**
+   * `ship-select` is the fleet menu a captain with more than one hull gets on
+   * connect. The gateway boards nothing until it receives the reply, so without
+   * a listener the session sits with no active ship.
+   */
+  type: 'ship-name' | 'ship-select';
   payload: Record<string, unknown>;
 }
 
@@ -64,7 +69,12 @@ export function useSocket(
       setOnboardingPrompt({ type: 'ship-name', payload });
     };
 
+    const handleShipSelect = (payload: Record<string, unknown>) => {
+      setOnboardingPrompt({ type: 'ship-select', payload });
+    };
+
     socket.on('prompt:ship-name', handleShipName);
+    socket.on('prompt:ship-select', handleShipSelect);
 
     return () => {
       socket.off('connect', handleConnect);
@@ -72,6 +82,7 @@ export function useSocket(
       socket.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('connect_error', handleConnectError);
       socket.off('prompt:ship-name', handleShipName);
+      socket.off('prompt:ship-select', handleShipSelect);
       unsubResult();
     };
   }, []);
