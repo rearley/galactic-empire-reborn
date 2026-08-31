@@ -15,12 +15,14 @@ import { LOG, startNewPilot, sendCommand, uniqueShipName, outfitShip, steerTo } 
  */
 
 /** A quiet corner well clear of the neutral zone. */
-const MEETING_POINT = { x: 18.5, y: 8.5 };
+const MEETING_POINT = { x: 5.5, y: -7.5 };
 
 async function pilotSector(page: Page): Promise<string> {
   await sendCommand(page, 'rep nav');
   const text = await page.locator(LOG).innerText();
-  const m = [...text.matchAll(/In sector \((\d+), (\d+)\)/g)];
+  // Sectors are signed: the universe runs -UNIVMAX..+UNIVMAX with the origin
+  // at its centre, so half of them are negative.
+  const m = [...text.matchAll(/In sector \((-?\d+), (-?\d+)\)/g)];
   return m.length ? `${m[m.length - 1][1]},${m[m.length - 1][2]}` : '';
 }
 
@@ -89,7 +91,7 @@ test.describe('multiplayer — two concurrent clients', () => {
 
       // Put both in the same non-neutral sector, a short distance apart.
       await outfitShip(request, { shipname: shipA, x: MEETING_POINT.x, y: MEETING_POINT.y });
-      // 0.4 sectors apart: same sector (18.5 and 18.9 both floor to 18),
+      // 0.4 sectors apart: same sector (5.5 and 5.9 both floor to 5),
       // inside the 1.5-sector scan range that builds the
       // scantab, but far enough to land on a DIFFERENT grid cell. `sca lo`
       // projects 4.5 sectors across 30 columns (~0.3 sectors per cell) and
@@ -98,10 +100,10 @@ test.describe('multiplayer — two concurrent clients', () => {
 
       await expect
         .poll(async () => pilotSector(pageA), { timeout: 30_000, intervals: [3_000] })
-        .toBe('18,8');
+        .toBe('5,-8');
       await expect
         .poll(async () => pilotSector(pageB), { timeout: 30_000, intervals: [3_000] })
-        .toBe('18,8');
+        .toBe('5,-8');
 
       // Each roster entry carries the other pilot's sector.
       await expect(pageA.locator('[data-testid="player-list-panel"]')).toContainText(shipB);

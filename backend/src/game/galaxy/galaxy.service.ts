@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Planet, Prisma, Wormhole, GalaxyMeta } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MAXX, MAXY, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constants';
+import { UNIVMAX, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constants';
 import { BASEPRICE, NUMITEMS } from '../constants/items';
 import { loadGalaxyConfig } from './galaxy.config';
 import { Rng } from './rng';
@@ -20,6 +20,15 @@ import { GalaxyConfig, GalaxyWormholeView } from './galaxy.types';
  * @see GEPLANET.C:455-650 xgetsector — procedural sector generation
  * @see specs/004-galaxy-generator/contracts/galaxy-service.md
  */
+
+/** Sectors per axis: -UNIVMAX..+UNIVMAX inclusive. */
+const UNIVERSE_SIDE = UNIVMAX * 2 + 1;
+
+/** True when a sector lies inside the universe square. */
+function inUniverse(xsect: number, ysect: number): boolean {
+  return xsect >= -UNIVMAX && xsect <= UNIVMAX && ysect >= -UNIVMAX && ysect <= UNIVMAX;
+}
+
 @Injectable()
 export class GalaxyService implements OnModuleInit {
   private readonly logger = new Logger(GalaxyService.name);
@@ -79,7 +88,7 @@ export class GalaxyService implements OnModuleInit {
     this.logger.log(
       `galaxy ready — seed=${meta?.seed ?? cfg.seed} plodds=${meta?.plodds ?? cfg.plodds} ` +
       `wormodds=${meta?.wormodds ?? cfg.wormodds} maxplanets=${meta?.maxplanets ?? cfg.maxplanets} ` +
-      `sectors=450 planets=${planetCount} wormholes=${wormholeCount} ` +
+      `sectors=${UNIVERSE_SIDE * UNIVERSE_SIDE} planets=${planetCount} wormholes=${wormholeCount} ` +
       `generated=${generated} ms=${ms}`,
     );
   }
@@ -91,7 +100,7 @@ export class GalaxyService implements OnModuleInit {
    * @throws if coords are out of range (programmer error)
    */
   getSectorPlanets(xsect: number, ysect: number): readonly Planet[] {
-    if (xsect < 0 || xsect >= MAXX || ysect < 0 || ysect >= MAXY) {
+    if (!inUniverse(xsect, ysect)) {
       throw new Error(`getSectorPlanets: out-of-range coords (${xsect}, ${ysect})`);
     }
     return this.planetsBySector.get(`${xsect},${ysect}`) ?? [];
@@ -107,7 +116,7 @@ export class GalaxyService implements OnModuleInit {
    * @see GEMAIN.H:473 — GALWORM.visible
    */
   getSectorWormholes(xsect: number, ysect: number): readonly GalaxyWormholeView[] {
-    if (xsect < 0 || xsect >= MAXX || ysect < 0 || ysect >= MAXY) {
+    if (!inUniverse(xsect, ysect)) {
       throw new Error(`getSectorWormholes: out-of-range coords (${xsect}, ${ysect})`);
     }
     const raw = this.wormholesBySector.get(`${xsect},${ysect}`) ?? [];
@@ -151,8 +160,11 @@ export class GalaxyService implements OnModuleInit {
 
     // All remaining sectors in row-major y,x order
     // @see specs/004-galaxy-generator/research.md Decision 6
-    for (let y = 0; y < MAXY; y++) {
-      for (let x = 0; x < MAXX; x++) {
+    // The universe is a square centred on the origin: sectors run -UNIVMAX..
+    // +UNIVMAX on both axes, so the neutral zone at (0,0) sits at its CENTRE
+    // with room in every direction. @see GEMAIN.H:70 NEUTRAL_X / GEMAIN.C:2204
+    for (let y = -UNIVMAX; y <= UNIVMAX; y++) {
+      for (let x = -UNIVMAX; x <= UNIVMAX; x++) {
         if (x === 0 && y === 0) continue; // already done
         await this.generateSector(tx, rng, x, y, cfg);
       }
@@ -321,8 +333,8 @@ export class GalaxyService implements OnModuleInit {
         // @see specs/004-galaxy-generator/research.md Decision 5
         let destX: number, destY: number;
         do {
-          destX = Math.floor(rng.next() * MAXX);
-          destY = Math.floor(rng.next() * MAXY);
+          destX = Math.floor(rng.next() * UNIVERSE_SIDE) - UNIVMAX;
+          destY = Math.floor(rng.next() * UNIVERSE_SIDE) - UNIVMAX;
         } while (destX === x && destY === y);
 
         await tx.wormhole.create({

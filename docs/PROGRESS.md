@@ -1,3 +1,41 @@
+## 2026-08-31 — the galaxy is centred on the origin
+
+The early-game research pointed at one structural cause, and this is the fix for it.
+
+**What changed:** the galaxy now spans `-UNIVMAX..+UNIVMAX` on both axes — 441 sectors with the
+neutral zone at the **centre** — matching C, where the universe is `-univmax..+univmax` and the hub
+is `NEUTRAL_X = NEUTRAL_Y = 0`. It was generated `0..29 x 0..14` and wrapped on those bounds, so the
+hub sat in a corner. `MAXX`/`MAXY` go back to their one real job, the 30x15 scan projection.
+Supersedes feature 004's fixed grid; reasoning in docs/DECISIONS.md.
+
+**What it does to the early game**, same seed, before → after:
+- planets within 2 sectors of the hub: **3 → 17**
+- planets within 4 sectors: 8 → 44
+- nearest *inhabited* planet: **8 sectors → 1** (29,664 colonists, Earth-like, at (-1,1))
+- a first `sca lo` from the hub now shows planets and wormholes in every direction rather than a
+  cluster to one side with empty space elsewhere
+- no spawn heading strands a pilot: previously half of them walked straight off an edge and wrapped
+  to the far side of the galaxy
+
+**Touched by the move:** the physics wrap (`wrapUniverse`, written in C's shift-only form because a
+modular fold perturbs in-range values by an ulp and registers as a spurious wrap), the scan's
+sector-bounds guards, `sector:join` validation, the beacon's flat sector id, and wormhole
+destinations. Fifteen specs encoded the old grid and now encode the new geometry.
+
+**A latent bug the move exposed:** the scan guards read `0..MAXX/0..MAXY`, so they skipped every
+western and southern sector and probed columns past the eastern edge — where `getSectorPlanets`
+throws. Local scans silently lost contacts. Caught by the browser suite, not the unit tests, because
+every scan spec stubs `GalaxyService` with a mock that never throws.
+
+**Also fixed:** `db:reset` silently did nothing when the backend held a connection — `psql` without
+`ON_ERROR_STOP=1` ignores the failed `DROP DATABASE` and the script reports success. It cost me two
+confused galaxy regenerations before I spotted the old sector rows still there. It now aborts with
+"database ge is being accessed by other users".
+
+**Tests:** backend 3148 across 331 suites; Playwright 37.
+
+---
+
 ## 2026-08-31 — early-game research: what the original actually intends
 
 Asked whether owning a planet should be an entry-level activity or something a player builds up to.

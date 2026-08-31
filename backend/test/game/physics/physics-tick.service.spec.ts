@@ -3,8 +3,7 @@ import {
   ACCENGAMT,
   COORD_SCALE,
   MOVENGMIN,
-  MOVENGUSE,
-} from '../../../src/game/constants';
+  MOVENGUSE, UNIVMAX } from '../../../src/game/constants';
 import {
   PHYSICS_BOUNDARY_WRAPPED,
   PHYSICS_HYPERSPACE,
@@ -124,16 +123,17 @@ describe('PhysicsTickService', () => {
     });
 
     it('crosses sector boundary and emits sector-transition with floor coords', () => {
+      // Well inside the universe: crossing at +UNIVMAX would wrap instead.
       const ship = makeShip({
-        xcoord: 9.95, ycoord: 5.0, heading: 90, speed: 21000, speed2b: 21000, status: 1,
+        xcoord: 5.95, ycoord: 5.0, heading: 90, speed: 21000, speed2b: 21000, status: 1,
       });
       const h = makeHarness([ship]);
       h.fire();
 
       expect(h.capturedSector).toHaveLength(1);
       const ev = h.capturedSector[0];
-      expect(ev.fromSector).toEqual({ x: 9, y: 5 });
-      expect(ev.toSector).toEqual({ x: 10, y: 5 });
+      expect(ev.fromSector).toEqual({ x: 5, y: 5 });
+      expect(ev.toSector).toEqual({ x: 6, y: 5 });
       expect(ev.x).toBeCloseTo(ship.xcoord, 10);
       expect(ev.shipId).toBe('u1:1');
     });
@@ -249,26 +249,28 @@ describe('PhysicsTickService', () => {
       return { ...h, capturedWrapped };
     }
 
-    it('ship near east boundary wraps x into [0, MAXX)', () => {
-      // Ship at x=29.8, heading east (90°), high speed so integration overshoots
-      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+    it('ship near the east edge wraps x into [-UNIVMAX, +UNIVMAX]', () => {
+      // The universe is centred on the origin, so the east edge is +UNIVMAX and
+      // crossing it puts the ship at the west edge. @see GEFUNCS.C:653-660
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(ship.xcoord).toBeGreaterThanOrEqual(0);
-      expect(ship.xcoord).toBeLessThan(MAXX);
+      expect(ship.xcoord).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(ship.xcoord).toBeLessThanOrEqual(UNIVMAX);
+      expect(ship.xcoord).toBeLessThan(0); // came out the far side
     });
 
-    it('ship near south boundary wraps y into [0, MAXY)', () => {
-      // Heading south (180° = y increases), near y boundary
-      const ship = makeShip({ xcoord: 15, ycoord: 14.8, heading: 180, speed: 5000, speed2b: 5000, where: 0 });
+    it('ship near the south edge wraps y into [-UNIVMAX, +UNIVMAX]', () => {
+      const ship = makeShip({ xcoord: 0, ycoord: UNIVMAX - 0.05, heading: 180, speed: 5000, speed2b: 5000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(ship.ycoord).toBeGreaterThanOrEqual(0);
-      expect(ship.ycoord).toBeLessThan(MAXY);
+      expect(ship.ycoord).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(ship.ycoord).toBeLessThanOrEqual(UNIVMAX);
+      expect(ship.ycoord).toBeLessThan(0);
     });
 
     it('wrap preserves heading and speed', () => {
-      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
       expect(ship.heading).toBe(90);
@@ -276,8 +278,9 @@ describe('PhysicsTickService', () => {
     });
 
     it('emits PHYSICS_BOUNDARY_WRAPPED when wrap fires', () => {
-      // At speed=9000, dx = 9000/65000 ≈ 0.138 per tick. Start at 29.9 so next.x ≈ 30.038 → wraps.
-      const ship = makeShip({ xcoord: 29.9, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      // At speed=9000, dx ≈ 0.138 per tick — starting just inside the east edge
+      // puts the next position past +UNIVMAX, which wraps.
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
       expect(h.capturedWrapped.length).toBeGreaterThanOrEqual(1);
@@ -285,16 +288,16 @@ describe('PhysicsTickService', () => {
     });
 
     it('sector-transition event fires exactly once with post-wrap sector', () => {
-      const ship = makeShip({ xcoord: 29.8, ycoord: 7.0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      // After wrap, x is near 0, so sector.x should be 0 (not 29)
+      // After wrap the ship is at the west edge, so the sector is negative.
       const trans = h.capturedSector.filter((e) => e.shipId === 'u1:1');
       if (trans.length > 0) {
         // If a sector transition fired, toSector should be in-range
         const to = trans[trans.length - 1].toSector;
-        expect(to.x).toBeGreaterThanOrEqual(0);
-        expect(to.x).toBeLessThan(MAXX);
+        expect(to.x).toBeGreaterThanOrEqual(-UNIVMAX);
+        expect(to.x).toBeLessThanOrEqual(UNIVMAX);
       }
     });
 

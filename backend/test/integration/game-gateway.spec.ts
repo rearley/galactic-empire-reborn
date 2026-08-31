@@ -17,6 +17,7 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { UNIVMAX } from '../../src/game/constants';
 
 function makeShipState(
   overrides: { userid: string; shipno: number; shipname: string },
@@ -186,11 +187,14 @@ describe('GameGateway integration', () => {
       socket.disconnect();
     });
 
+    // The universe runs -UNIVMAX..+UNIVMAX on both axes with the origin at its
+    // centre, so 0 and negative sectors are perfectly valid — only coordinates
+    // beyond the square are out of bounds.
     it.each([
-      [0, 5],
-      [31, 5],
-      [5, 0],
-      [5, 16],
+      [-(UNIVMAX + 1), 5],
+      [UNIVMAX + 1, 5],
+      [5, -(UNIVMAX + 1)],
+      [5, UNIVMAX + 1],
     ])('out-of-bounds join (%i,%i) → OUT_OF_BOUNDS error, no room joined', async (x, y) => {
       const socket = makeClient(port);
       await waitForEvent(socket, 'command:result'); // welcome message

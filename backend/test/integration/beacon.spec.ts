@@ -21,6 +21,7 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { BEACON_EVENT, BeaconEvent } from '../../src/gateway/events/beacon.event';
 import { PhysicsSectorTransitionEvent } from '../../src/game/physics/physics-events';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { UNIVMAX } from '../../src/game/constants';
 
 /** Minimal ShipState for observer checks. */
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
@@ -108,8 +109,13 @@ describe('S-005 — beacon event on sector transition', () => {
   const fromSector = { x: 2, y: 2 };
   const toSector = { x: 3, y: 2 };
   const MAXX = 30;
-  const fromFlat = fromSector.y * MAXX + fromSector.x;
-  const toFlat = toSector.y * MAXX + toSector.x;
+  // Flat sector id over the universe square, offset so -UNIVMAX..+UNIVMAX maps
+  // to 0..n. The galaxy is centred on the origin, so a 0-based row-major index
+  // over MAXX would go negative for western sectors.
+  const flat = (sec: { x: number; y: number }): number =>
+    (sec.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (sec.x + UNIVMAX);
+  const fromFlat = flat(fromSector);
+  const toFlat = flat(toSector);
 
   const mover = makeShip({
     userid: 'mover', shipno: 2, shipname: 'Warprunner',

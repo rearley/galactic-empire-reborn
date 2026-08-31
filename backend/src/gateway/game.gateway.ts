@@ -10,7 +10,7 @@ import {
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
-import { MAXX, MAXY, GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
+import { UNIVMAX, GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
@@ -1095,8 +1095,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const beaconPayload: BeaconEvent = {
       shipId,
       shipName: name,
-      fromSector: fromSector.y * MAXX + fromSector.x,
-      toSector: toSector.y * MAXX + toSector.x,
+      // Flat sector id, offset so the -UNIVMAX..+UNIVMAX square maps to 0..n.
+      fromSector: (fromSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (fromSector.x + UNIVMAX),
+      toSector: (toSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (toSector.x + UNIVMAX),
     };
     this.server.to(`sector:${toSector.x}:${toSector.y}`).emit(BEACON_EVENT, beaconPayload);
   }
@@ -1257,11 +1258,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message: 'x and y must be integers',
       };
     }
-    if (x < 1 || x > MAXX || y < 1 || y > MAXY) {
+    if (x < -UNIVMAX || x > UNIVMAX || y < -UNIVMAX || y > UNIVMAX) {
       return {
         ok: false,
         code: 'OUT_OF_BOUNDS',
-        message: `Sector (${x},${y}) is outside galaxy bounds [1..${MAXX}, 1..${MAXY}]`,
+        message: `Sector (${x},${y}) is outside galaxy bounds [${-UNIVMAX}..${UNIVMAX}]`,
       };
     }
     return { ok: true, x, y };

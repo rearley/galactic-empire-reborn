@@ -57,7 +57,11 @@ export const SYSOP_OPTIONS = {
   MAXDROID: { min: 0, max: 500, default: 6, cReference: 'GEMAIN.C:471', implemented: true },
   PLODDS: { min: 1, max: 20, default: 4, cReference: 'GEMAIN.C:472', implemented: false },
   WORMODDS: { min: 1, max: 100, default: 10, cReference: 'GEMAIN.C:473', implemented: false },
-  UNIVMAX: { min: 10, max: 32767, default: 15, cReference: 'GEMAIN.C:474', implemented: true },
+  // Half-extent of the universe square: sectors run -UNIVMAX..+UNIVMAX on
+  // both axes, so the galaxy is (2*UNIVMAX+1)^2 sectors with the neutral zone
+  // at its centre. 10 gives 441 sectors, matching the density the AI population
+  // was tuned against; raising it makes a larger, emptier galaxy.
+  UNIVMAX: { min: 10, max: 32767, default: 10, cReference: 'GEMAIN.C:474', implemented: true },
   S00PLNUM: { min: 3, max: 9, default: 5, cReference: 'GEMAIN.C:476', implemented: false },
   MAXPLSE: { min: 1, max: 9, default: 9, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLANETS' },
   TEAMBONU: { min: 0, max: 32000, default: 0, cReference: 'GEMAIN.C:478', implemented: true },

@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { GalaxyModule } from '../../src/game/galaxy/galaxy.module';
 import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { UNIVMAX } from '../../src/game/constants';
 
 /**
  * G-DIV: Galaxy config-divergence integration tests.
@@ -42,6 +43,9 @@ async function rowCounts(prisma: PrismaService) {
 }
 
 // ─── G-DIV-1: Persisted seed wins over env seed on re-boot ───────────────────
+
+/** The universe is a square of side 2*UNIVMAX+1 centred on the origin. */
+const UNIVERSE_SECTORS = (UNIVMAX * 2 + 1) ** 2;
 
 describe('GalaxyService config divergence (G-DIV-1)', () => {
   // Standalone Prisma used only for cleanup — independent of any test module.
@@ -116,7 +120,7 @@ describe('GalaxyService config divergence (G-DIV-1)', () => {
 
       const prisma1 = app1.get(PrismaService);
       const countsAfterFirstBoot = await rowCounts(prisma1);
-      expect(countsAfterFirstBoot.sectorCount).toBe(450);
+      expect(countsAfterFirstBoot.sectorCount).toBe(UNIVERSE_SECTORS);
       expect(countsAfterFirstBoot.metaCount).toBe(1);
 
       await app1.close();

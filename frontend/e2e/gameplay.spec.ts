@@ -31,7 +31,8 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     await sendCommand(page, 'rep nav');
     const log = page.locator(LOG);
     await expect(log).toContainText('Interceptor');   // onboarding grants class 1
-    await expect(log).toContainText(/In sector \(\d+, \d+\)/);
+    // Sectors are signed now that the universe is centred on the origin.
+    await expect(log).toContainText(/In sector \(-?\d+, -?\d+\)/);
     await expect(log).toContainText(/Heading:/);
 
     expect(consoleErrors).toEqual([]);

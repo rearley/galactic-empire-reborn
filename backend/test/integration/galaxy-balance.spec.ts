@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyModule } from '../../src/game/galaxy/galaxy.module';
 import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { UNIVMAX } from '../../src/game/constants';
 
 /**
  * G7, G8 — Galaxy balance + wormhole integrity integration tests.
@@ -60,8 +61,9 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
 
   it('G7.1 — planet count is within [100, 300] at default seed and tunables', async () => {
     const count = await prisma.planet.count();
-    // plodds=4, wormodds=10, maxplanets=5 over a 30×15=450 sector grid.
-    // Expected range derived from: 450 sectors × (1/plodds) odds per sector
+    // plodds=4, wormodds=10, maxplanets=5 over the universe square
+    // (-UNIVMAX..+UNIVMAX on both axes).
+    // Expected range derived from: sectors × (1/plodds) odds per sector
     // with up to maxplanets planets each → rough centre ~562, clamped by
     // actual placement logic; empirical range confirmed against C source.
     expect(count).toBeGreaterThanOrEqual(100);
@@ -78,7 +80,7 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
 
   // ── G8: Wormhole destination coordinate integrity ────────────────────────────
 
-  it('G8.1 — every wormhole destXcoord has Math.floor(destXcoord) ∈ [0, 29]', async () => {
+  it('G8.1 — every wormhole destXcoord has Math.floor(destXcoord) ∈ [-UNIVMAX, +UNIVMAX]', async () => {
     const wormholes = await prisma.wormhole.findMany({
       select: { destXcoord: true },
     });
@@ -87,20 +89,20 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
     // test above (G7.2) is the one that turns RED first.
     for (const wh of wormholes) {
       const destX = Math.floor(wh.destXcoord);
-      expect(destX).toBeGreaterThanOrEqual(0);
-      expect(destX).toBeLessThanOrEqual(29); // MAXX-1 = 29
+      expect(destX).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(destX).toBeLessThanOrEqual(UNIVMAX);
     }
   });
 
-  it('G8.2 — every wormhole destYcoord has Math.floor(destYcoord) ∈ [0, 14]', async () => {
+  it('G8.2 — every wormhole destYcoord has Math.floor(destYcoord) ∈ [-UNIVMAX, +UNIVMAX]', async () => {
     const wormholes = await prisma.wormhole.findMany({
       select: { destYcoord: true },
     });
 
     for (const wh of wormholes) {
       const destY = Math.floor(wh.destYcoord);
-      expect(destY).toBeGreaterThanOrEqual(0);
-      expect(destY).toBeLessThanOrEqual(14); // MAXY-1 = 14
+      expect(destY).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(destY).toBeLessThanOrEqual(UNIVMAX);
     }
   });
 
@@ -161,12 +163,12 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
       const fracY = wh.destYcoord - destY;
 
       // Valid grid column.
-      expect(destX).toBeGreaterThanOrEqual(0);
-      expect(destX).toBeLessThanOrEqual(29);
+      expect(destX).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(destX).toBeLessThanOrEqual(UNIVMAX);
 
       // Valid grid row.
-      expect(destY).toBeGreaterThanOrEqual(0);
-      expect(destY).toBeLessThanOrEqual(14);
+      expect(destY).toBeGreaterThanOrEqual(-UNIVMAX);
+      expect(destY).toBeLessThanOrEqual(UNIVMAX);
 
       // Coords are sector centres, not arbitrary floats.
       expect(fracX).toBeCloseTo(0.5, 9);
