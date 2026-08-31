@@ -5,6 +5,7 @@
  * @see contracts/commands.md §abandon
  */
 import { AbandonHandlerService } from '../../../../src/game/commands/handlers/abandon.handler';
+import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../../src/game/commands/command.types';
@@ -48,7 +49,7 @@ function makeService(ship: ShipState) {
       return Promise.resolve();
     }),
   } as unknown as ShipStateService;
-  return { handler: new AbandonHandlerService(mockShipState), mockShipState };
+  return { handler: new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService), mockShipState };
 }
 
 // ---------------------------------------------------------------------------
@@ -59,22 +60,22 @@ describe('AbandonHandlerService — happy path (SC-007)', () => {
   it('marks ship.status = SHIP_STATUS_ABANDONED (3)', () => {
     const ship = makeShip({ status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, [], {});
+    handler.command.handler(ship, ['ship'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
 
-  it('returns ABANDON_OK success line with shipname', () => {
+  it('returns ABANDON_OK success line with shipname', async () => {
     const ship = makeShip({ shipname: 'USS Freedom' });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, [], {}) as { lines: { text: string; category: string }[] };
+    const result = (await handler.command.handler(ship, ['ship'], {})) as { lines: { text: string; category: string }[] };
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, 'USS Freedom'));
     expect(result.lines[0].category).toBe('success');
   });
 
-  it('broadcasts ABANDON_SECTOR to the sector room', () => {
+  it('broadcasts ABANDON_SECTOR to the sector room', async () => {
     const ship = makeShip({ xcoord: 5.5, ycoord: 7.3, shipname: 'USS Freedom' });
     const { handler } = makeService(ship);
-    const result = handler.command.handler(ship, [], {}) as {
+    const result = (await handler.command.handler(ship, ['ship'], {})) as {
       lines: unknown[];
       broadcasts?: { room: string; event: string; payload: { text: string } }[];
     };
@@ -89,14 +90,14 @@ describe('AbandonHandlerService — happy path (SC-007)', () => {
     const { handler } = makeService(ship);
     const fakeClient = { data: { activeShipNo: ship.shipno } };
     const ctx: CommandContext = { client: fakeClient as unknown as CommandContext['client'] };
-    handler.command.handler(ship, [], ctx);
+    handler.command.handler(ship, ['ship'], ctx);
     expect(fakeClient.data.activeShipNo).toBeUndefined();
   });
 
   it('no error when ctx has no client (no-socket invocation)', () => {
     const ship = makeShip();
     const { handler } = makeService(ship);
-    expect(() => handler.command.handler(ship, [], {})).not.toThrow();
+    expect(() => handler.command.handler(ship, ['ship'], {})).not.toThrow();
   });
 });
 

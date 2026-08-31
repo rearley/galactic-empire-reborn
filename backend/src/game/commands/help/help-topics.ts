@@ -68,6 +68,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  tra down <qty> <item>  — transfer ship cargo to planet',
       '  tra up <qty> <item>    — transfer planet stock to ship',
       '  wthdr <qty>            — withdraw taxes to your account',
+      '  aba                    — give up the planet you are orbiting',
       '  attack <planet>        — attack enemy planet',
       '  dat <fragment>         — look up ship by name fragment',
     ],
@@ -83,7 +84,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  rename <name>      — rename ship',
       '  destruct           — initiate self-destruct',
       '  abort              — abort self-destruct',
-      '  abandon            — abandon ship',
+      '  abandon ship       — abandon ship',
     ],
   },
 });

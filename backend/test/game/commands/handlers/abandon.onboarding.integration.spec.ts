@@ -6,6 +6,7 @@
  */
 import { CommandRouterService } from '../../../../src/game/commands/command-router.service';
 import { AbandonHandlerService } from '../../../../src/game/commands/handlers/abandon.handler';
+import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
@@ -49,7 +50,7 @@ function buildHarness() {
   } as unknown as ShipStateService;
 
   const router = new CommandRouterService();
-  const abandonHandler = new AbandonHandlerService(mockShipState);
+  const abandonHandler = new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService);
 
   // Register only the abandon command + a test command to exercise the FR-803 gate
   router.register(abandonHandler.command);
@@ -89,7 +90,7 @@ describe('FR-803 — post-abandon router gate rejects all commands', () => {
     const { router, ship, abandonHandler } = buildHarness();
 
     // Execute abandon via the handler
-    abandonHandler.command.handler(ship, [], {});
+    abandonHandler.command.handler(ship, ['ship'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
 
     // Next command via router is blocked
