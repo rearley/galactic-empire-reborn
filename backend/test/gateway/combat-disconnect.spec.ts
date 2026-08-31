@@ -184,13 +184,14 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
   });
 
   it('attributes kill to attacker when lastfired matches an active ship', async () => {
-    // The victim's lastfired = 7 (attacker channel/shipno)
+    // The victim's lastfired = 7 — the attacker's CHANNEL, not its shipno.
     getSvcMock.mockReturnValue(makeShip(3, 7));
-    // findAllShips returns an active attacker ship with shipno === 7
+    // findAllShips returns an active attacker ship holding channel 7.
     findAllShipsMock.mockReturnValue([
       {
         userid: 'attacker-user',
         shipno: 7,
+        channel: 7,
         shipname: 'Raider',
         shpclass: 2,
         xcoord: 5.0,

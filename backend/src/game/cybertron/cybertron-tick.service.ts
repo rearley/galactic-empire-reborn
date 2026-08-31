@@ -4,6 +4,7 @@ import { Inject, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import { ShipStateService } from '../ship/ship-state.service';
+import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
 import { CybertronRepository } from './cybertron.repository';
@@ -437,7 +438,7 @@ export class CybertronTickService implements OnModuleInit {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.shield = result.newCharge;
           if (result.knockedDown) v.shieldstat = 0;
-          v.lastfired = ship.shipno;
+          v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
@@ -445,7 +446,7 @@ export class CybertronTickService implements OnModuleInit {
       } else {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.damage = v.damage + hullDamage;
-          v.lastfired = ship.shipno;
+          v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
       }

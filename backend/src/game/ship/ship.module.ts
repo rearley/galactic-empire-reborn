@@ -1,6 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ShipStateService } from './ship-state.service';
+import { ShipChannelRegistry } from './ship-channel.registry';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -24,7 +25,7 @@ const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
     forwardRef(() => PlanetModule),
   ],
   controllers: [...devOnlyControllers],
-  providers: [ShipStateService, MaintenanceService, ShipTickService],
-  exports: [ShipStateService, MaintenanceService, ShipTickService],
+  providers: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
+  exports: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
 })
 export class ShipModule {}

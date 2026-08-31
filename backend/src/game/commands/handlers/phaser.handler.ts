@@ -4,6 +4,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState, shipKey } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import {
@@ -215,7 +216,7 @@ export class PhaserHandlerService {
         this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
           v.shield = r.newCharge;
           if (r.knockedDown) v.shieldstat = 0;
-          v.lastfired = ship.shipno;
+          v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
@@ -223,7 +224,7 @@ export class PhaserHandlerService {
       } else {
         this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
           v.damage = v.damage + hullDamage;
-          v.lastfired = ship.shipno;
+          v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
       }
@@ -373,7 +374,7 @@ export class PhaserHandlerService {
       // GECMDS.C:1078) — no shieldhit call, shields are bypassed entirely.
       this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
         v.damage = v.damage + damage;
-        v.lastfired = ship.shipno;
+        v.lastfired = ship.channel ?? NO_CHANNEL;
         v.cantexit = FIRETICKS;
       });
 

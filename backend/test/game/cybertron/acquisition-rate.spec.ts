@@ -31,6 +31,10 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...overrides,
+    // A ship in the game holds a unique `channel` (this port's usrnum) and
+    // attribution reads it, not `shipno`. These fixtures stage firer and
+    // victim by giving each a distinct shipno, so mirror it into channel.
+    channel: overrides.channel ?? overrides.shipno ?? 1,
   };
 }
 

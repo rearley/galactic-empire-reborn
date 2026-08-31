@@ -1458,3 +1458,38 @@ blanked — invents a disclosure C never makes, and hands out the one bit
 (someone is cloaked and hunting) that cloaking is bought to conceal. Restricting
 `who` to the caller's own sector — that is `sca sh`'s job, and it would leave no
 way to see who is on at all.
+
+## 2026-08-31 — Ship channels: this port's `usrnum`
+
+**Context:** During a playtest the event log announced `FireBtgn8398 has been
+destroyed by Kestrel!` — Kestrel being my ship, two sectors away, zero kills,
+never having fired. The kill, the loot and the score all went to a bystander.
+
+**Decision:** Every ship in the world is assigned a unique integer `channel` on
+entry to the in-memory map and gives it up on exit (`ShipChannelRegistry`).
+`lastfired` and the torpedo, missile and mine records store a channel, and all
+attribution resolves by channel. Numbering starts at 1 so a stored `lastfired`
+of 0 keeps meaning "nobody".
+
+**Reason:** `lastfired` is documented in GEMAIN.H:340 as the *usernumber* of the
+last user to fire on you, and C resolves it by indexing the terminal table —
+`warshpoff(ptr->lastfired)` (GEDROIDS.C:343). A usernumber names exactly one
+ship. This port stored `shipno` instead, which is a PER-USER index: it is 1 for
+every player's first ship and for every droid. The reverse lookup was a scan for
+`s.shipno === channel`, which returned whichever ship happened to sit first in
+the state map. Consequences, all live: kill credit, loot and score to a
+bystander; the gateway's disconnect-kill path naming the wrong killer; and
+droid classes 11 and 12 fighting back against a player who never shot them.
+
+Channels are session-scoped and recycled, exactly as C's terminal slots are.
+Releasing one therefore scrubs it from every ship still naming it, which is what
+C does when a user drops (GEFUNCS.C:1224-1225).
+
+**Alternatives rejected:** A `*Key` twin for each numeric field (the shape used
+earlier for `lock`/`lockKey`) — five more fields, two migrations, and the
+ambiguity survives anywhere a `*Key` is missed. Making the channel a composite
+`userid:shipno` string — a wider change to Torpedo/Mine columns for no gain over
+a unique int, which is what C uses.
+
+**Known follow-up:** `lock`/`lockKey` still carries the older twin-field shape.
+It is correct, but it should collapse onto `channel` for one convention.

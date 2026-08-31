@@ -38,6 +38,19 @@ export interface ShipState {
   phasrtype: number;
   kills: number;
   lastfired: number;
+  /**
+   * Unique per-ship channel while in the game — this port's `usrnum`.
+   *
+   * Assigned by ShipStateService when the ship enters the map and cleared when
+   * it leaves, so it is never persisted. `lastfired` and the torpedo, missile
+   * and mine records all store a channel so a kill can be credited back to the
+   * ship that caused it. Undefined for a ship that is not in the game, which is
+   * why every comparison against it is a strict `===` against a number.
+   *
+   * @see ShipChannelRegistry
+   * @see GEMAIN.H:340 — lastfired is the *usernumber* of the last user to fire on you
+   */
+  channel?: number;
   shieldtype: number;
   shieldstat: number;
   shield: number;
