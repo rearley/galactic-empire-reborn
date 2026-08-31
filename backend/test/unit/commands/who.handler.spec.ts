@@ -102,3 +102,44 @@ describe('WhoHandlerService', () => {
     });
   });
 });
+
+/**
+ * Playtest: `who` in a live galaxy printed rows whose Sector and Kills columns
+ * wandered. Coordinates were padded to two characters, so any ship in a
+ * negative double-digit sector (`(-13, 1)`) pushed the rest of the row right;
+ * a 22-character shipname did the same.
+ */
+describe('WhoHandlerService — column alignment', () => {
+  const build = (ships: ShipState[]): string[] => {
+    const svc = new WhoHandlerService({ findAllShips: () => ships } as unknown as ShipStateService);
+    const result = svc.command.handler(ships[0] ?? makeShip(), [], ctx) as { lines: { text: string }[] };
+    return result.lines.map((l) => l.text);
+  };
+
+  it('keeps every row the same length regardless of coordinate width', () => {
+    const lines = build([
+      makeShip({ shipname: 'Alpha', xcoord: 5, ycoord: 3 }),
+      makeShip({ shipname: 'Beta', xcoord: -13, ycoord: -14 }),
+      makeShip({ shipname: 'Gamma', xcoord: 0, ycoord: 0 }),
+    ]);
+    const rowLengths = new Set(lines.slice(1).map((l) => l.length));
+    expect(rowLengths.size).toBe(1);
+  });
+
+  it('an over-long shipname does not push the later columns right', () => {
+    const lines = build([
+      makeShip({ shipname: 'Alpha' }),
+      makeShip({ shipname: 'Lydorian Garbage Scow9999' }),
+    ]);
+    expect(lines[1].length).toBe(lines[2].length);
+  });
+
+  it('the Kills header sits over the Kills values', () => {
+    const lines = build([makeShip({ shipname: 'Alpha', kills: 7, xcoord: -13, ycoord: -14 })]);
+    const end = (line: string): number => {
+      const m = [...line.matchAll(/\S+/g)];
+      return m[m.length - 1].index! + m[m.length - 1][0].length;
+    };
+    expect(end(lines[1])).toBe(end(lines[0]));
+  });
+});
