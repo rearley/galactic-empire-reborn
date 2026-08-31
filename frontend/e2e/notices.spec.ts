@@ -36,6 +36,29 @@ test.describe('unsolicited server notices reach the pilot', () => {
     await expect(page.locator(LOG)).toContainText('aborted');
   });
 
+  test('crossing a sector boundary tells the pilot, and not about themselves', async ({ page, request }) => {
+    const ship = uniqueShipName('cross');
+    await startNewPilot(page, ship);
+
+    // Parked just inside sector (22,5), a fraction from the (22,4) line.
+    // Heading 0 decreases y, so impulse walks the ship across it.
+    await outfitShip(request, { shipname: ship, x: 22.5, y: 5.004 });
+    await reconnect(page);
+    await expect(page.locator(INPUT)).toBeVisible();
+
+    await sendCommand(page, 'imp 9');
+    // GEFUNCS.C:711 MOVE1 — the mover's own notice, naming both sectors.
+    await expect(page.locator(LOG)).toContainText('You have moved from sector (22, 5) to (22, 4).', {
+      timeout: 40_000,
+    });
+    // GEFUNCS.C:717,722 exclude `usrn` from the sector notices: the pilot must
+    // not be told about their own arrival. Their socket joins the destination
+    // room just before the broadcast, so without the exclusion they were.
+    await expect(page.locator(LOG)).not.toContainText(`${ship} has entered the sector`);
+
+    await sendCommand(page, 'imp 0');
+  });
+
   test('radio: a transmission reaches a pilot tuned to the same frequency', async ({ browser }) => {
     const ctxA = await browser.newContext();
     const ctxB = await browser.newContext();

@@ -61,6 +61,13 @@ function buildGateway(options: {
       emit: (event: string, payload: unknown) => {
         roomEmits.push({ room, event, payload });
       },
+      // Sector arrival/departure notices exclude the mover, mirroring C's
+      // `outsect(FILTER, &sect, usrn, 0)` (GEFUNCS.C:717).
+      except: (_socketId: string) => ({
+        emit: (event: string, payload: unknown) => {
+          roomEmits.push({ room, event, payload });
+        },
+      }),
     }),
     emit: (event: string, payload: unknown) => {
       roomEmits.push({ room: 'global', event, payload });

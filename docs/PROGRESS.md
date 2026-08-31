@@ -1,3 +1,31 @@
+## 2026-08-31 (cont.) — sector crossings and the scan legend
+
+**Completed:**
+- **Crossing a sector boundary told you about yourself, and never told you you'd moved.** C sends
+  MOVE1 to the mover (`outprfge(FILTER, usrn)`) and MOVE2/MOVE3 to the two sectors *excluding* the
+  mover (`outsect(FILTER, &sect, usrn, 0)`, GEFUNCS.C:711-722). The port broadcast to both rooms
+  with no exclusion — and the mover's socket joins the destination room a few lines earlier — so a
+  pilot read "<their own ship> has entered the sector" on every crossing, while nothing told them
+  they had changed sector at all. Now `.except(socketId)` on both notices plus the mover's own
+  "You have moved from sector (x, y) to (x, y)." Confirmed live by flying across the (22,5)/(22,4)
+  line.
+- **The scan contact legend leaked an unrounded float.** `sca lo full` is how a pilot picks a lock
+  target; its heading came straight off the ship state, so a contact under way rendered as
+  "Hdg:69.83440234557376" and pushed the row out of alignment in a fixed-width terminal. Every other
+  field in the legend was already an integer.
+
+**Tests:** backend 3076 across 323 suites; frontend 152; **Playwright 28 → 31**. New:
+`test/gateway/sector-transition-notices.spec.ts` (5, covering the mover's notice, the exclusion,
+both sector notices still firing, and the high-warp silence gate), a scan-legend rounding case, and
+browser specs for the boundary crossing and the contact legend. The legend spec is
+mutation-checked: restoring the raw float makes it fail.
+
+**Checked and left alone:** `sca ra` prints its range in raw units while `sca lo` prints parsecs —
+that is C's own `SCAN24` format (`range = scanrange / (10 - level)²`, GECMDS.C:2510), and the code
+says so.
+
+---
+
 ## 2026-08-31 — browser-first pass: everything the server pushed was being dropped
 
 Driven from Playwright rather than the unit suite, on the principle that the backend can be
