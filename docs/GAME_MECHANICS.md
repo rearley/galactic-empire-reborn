@@ -575,6 +575,26 @@ Tick cadence: `interval = max(PLANTIME_MIN_SECONDS, floor(PLANTOCK_SECONDS / N))
 
 Zero-population planets produce nothing (`if men.qty == 0 → break` before production loop).
 
+### New-ship placement (GEFUNCS.C:195-217)
+
+A new ship is dropped at a random point inside the neutral sector, re-rolling while it lands within
+`SPAWN_MIN_PLANET_DISTANCE` (1000 raw units) of one of that sector's planets, and is given a random
+heading:
+
+```
+coord.x = NEUTRAL_X + rndm(.9999)
+coord.y = NEUTRAL_Y + rndm(.9999)
+while (any planet within 1000 raw units) re-roll
+heading = rndm(359.99)
+```
+
+`rollSpawnPosition` (`game/onboarding/spawn-placement.ts`) implements this, bounded to 50 attempts
+so a crowded sector cannot spin. Placing every pilot on the sector's exact corner facing 0 — as the
+port did until 2026-08-31 — stacked them on one point and put them one wrong turn from wrapping out
+of the neutral zone into Cybertron space.
+
+---
+
 ### Starting population (GEPLANET.C:617-627)
 
 Population is not something the galaxy is short of by design — C seeds it at generation. When

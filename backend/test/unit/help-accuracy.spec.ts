@@ -42,4 +42,53 @@ describe('help text matches the commands it documents', () => {
     const nav = body('navigation');
     expect(nav).not.toMatch(/autopilot/i);
   });
+
+  /**
+   * Every verb the help lists must be a verb the router answers to. Playing a
+   * fresh pilot turned up `wthdr <qty>` — the documented way to collect your
+   * planet's taxes — which is not a command at all ("Unknown command"); the
+   * verb is `wit`. The router matches on the first three characters
+   * (GECMDS.C:249 gesearch), so this compares prefixes.
+   */
+  it('every verb the help lists is one the router answers to', () => {
+    const KNOWN_VERBS = new Set(
+      [
+        'abandon', 'abort', 'admin', 'att', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
+        'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'land', 'loc',
+        'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
+        'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',
+        'sys', 'tea', 'tor', 'transfer', 'warp', 'who', 'withdraw', 'zip',
+      ].map((v) => v.slice(0, 3)),
+    );
+
+    const unknown: string[] = [];
+    for (const topic of Object.keys(HELP_TOPICS) as Array<keyof typeof HELP_TOPICS>) {
+      for (const line of HELP_TOPICS[topic].body) {
+        // Command lines are indented; the topic title is not.
+        if (!line.startsWith('  ')) continue;
+        const verb = line.trim().split(/[\s<]/)[0].toLowerCase();
+        if (!verb || !/^[a-z]+$/.test(verb)) continue;
+        if (!KNOWN_VERBS.has(verb.slice(0, 3))) unknown.push(`${topic}: ${verb}`);
+      }
+    }
+    expect(unknown).toEqual([]);
+  });
+
+  it('combat help describes the arguments the commands actually take', () => {
+    const combat = body('combat');
+    // `shi` is up/down, not a percentage; `fre` needs a channel letter first;
+    // `tor`/`mis` take a target name, not a slot number.
+    expect(combat).not.toMatch(/shi <pct>/);
+    expect(combat).not.toMatch(/freq <n>/);
+    expect(combat).not.toMatch(/tor <slot>/);
+    expect(combat).not.toMatch(/mis <slot>/);
+    expect(combat).toMatch(/shi up\|dn/);
+    expect(combat).toMatch(/fre <A\|B\|C>/);
+  });
+
+  it('planet help names the withdraw verb that exists', () => {
+    const planet = body('planet');
+    expect(planet).not.toMatch(/wthdr/);
+    expect(planet).toMatch(/wit(hdraw)? /);
+  });
 });

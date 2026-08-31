@@ -1,3 +1,48 @@
+## 2026-08-31 — clean galaxy, second playthrough, help audit
+
+Regenerated the world (`db:reset` — 212 planets, ~21% born inhabited, no player litter) and played a
+second pilot through registration, trade, scouting and a Cybertron encounter.
+
+**Fixed:**
+- **The autopilot could never fly anyone anywhere.** `nav` sets a course but no speed and tells the
+  pilot to set one — and `war`/`imp` cancelled the autopilot on entry, so the two were mutually
+  exclusive. A speed order is not a steering order: `war <n>` and `imp <pct>` now keep it, while
+  `imp <pct> <course>` and `rot` take the helm back. Supersedes spec 016 §manual-cancel; see
+  docs/DECISIONS.md.
+- **Arrival was never announced.** `physics.nav-arrived` was emitted on the internal bus and
+  forwarded nowhere, so the autopilot silently stopped steering with the engines still running. Now
+  a per-captain notice naming the sector and reminding the pilot to cut speed.
+- **Cargo capacity treated tonnage as a unit count.** `maxByCapacity = floor(remainingTons)` ignored
+  tons-per-item, so anything heavier than a ton loaded at a multiple of what fits. Stocking a colony
+  ship gave "Total: 1060 tons in cargo (capacity: 1000 tons)".
+- **The help was wrong in most of its topics.** `wthdr <qty>` — the documented way to collect your
+  planet's taxes — is not a command at all (it is `wit`). `shi <pct>` is `shi up|dn`; `freq <n>`
+  needs a channel letter; `tor <slot>`/`mis <slot>` take a target name. Combat, ship and planet
+  topics rewritten against the real handlers, and a test now asserts that **every verb the help
+  prints resolves in the router**.
+- **The ship-name prompt reported every error as "already taken"**, including a name rejected for
+  containing a space — so naming a ship "Ravenspur II" sent the pilot off to invent a different
+  name. It now distinguishes the two and states the rule up front.
+
+**Tests:** backend 3138 across 330 suites; frontend 156; Playwright 36. New: autopilot persistence,
+nav-arrival forwarding, tonnage-aware capacity (unit + browser), help-verb resolution, ship-name
+prompt errors.
+
+**Played through, working:** register → random spawn inside the hub → `hel` topics → orbit Zygor →
+prices → buy (totals correct) → sell (the hub's spread means profit must come from production) →
+`sca lo` contact detection → `set scannames on` naming a Cybertron → autopilot out to (1,0) →
+survey (Earth-like/Abundant) → claim → `adm` rates, markup, sellflag, tax → attacked by Cybrg-212,
+shields absorbed it (hull 0%) → autopilot home to the neutral zone.
+
+**Balance notes for an open playtest:**
+- The nearest *inhabited* planet to the hub is 8 sectors out, so a new player's only real option is
+  to claim a barren world and ship colonists to it. There is no early trade partner.
+- Sector (1,0), the nearest claimable sector, is actively patrolled: a loaded ship parked there was
+  destroyed by a Cybertron while unattended. Shields up, it survived a hit with no hull damage.
+- Both of those are canonical, but together they make the first hour unforgiving.
+
+---
+
 ## 2026-08-31 — played a fresh pilot end to end (pre-playtest pass)
 
 Registered a new account and played it straight — no debug endpoints, no granted credits, no

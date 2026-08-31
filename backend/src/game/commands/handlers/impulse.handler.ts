@@ -21,7 +21,11 @@ export const impulseCommand: Command = {
   minArgs: 1,
   argMissingMessage: formatMessage(MessageId.IMPFMT),
   handler(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
-    if (ship.holdcourse > 0) {
+    // A speed order alone is not a steering order: `nav` sets no speed, so
+    // cancelling the autopilot here made the two mutually exclusive. Supplying a
+    // COURSE is an explicit steering order and does take the helm back.
+    const courseGiven = args.length > 1;
+    if (ship.holdcourse > 0 && courseGiven) {
       ship.holdcourse = 0;
       ship.navTargetX = null;
       ship.navTargetY = null;

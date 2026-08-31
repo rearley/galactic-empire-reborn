@@ -136,3 +136,74 @@ describe('computeSellOutcome', () => {
     }
   });
 });
+
+/**
+ * Cargo capacity is measured in TONS, but the buy path compared the remaining
+ * tonnage against a UNIT count: `maxByCapacity = floor(remainingTons)`. Anything
+ * heavier than a ton therefore loaded at a multiple of what fits.
+ *
+ * Found while stocking a colony ship: 300 men (1t), 200 food (2t) and 150 troops
+ * (2t) on top of 3 flux pods (20t each) left `rep inv` reporting
+ * "1060 tons in cargo (capacity: 1000 tons)".
+ */
+describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () => {
+  const I_FOOD = 5;   // 2 tons each
+  const I_MEN = 0;    // 1 ton each
+
+  function planetWith(itemIndex: number): PlanetState {
+    const p = makePlanet();
+    p.items[itemIndex] = { ...p.items[itemIndex], qty: 100_000n, sell: true, reserve: 0, markup2a: 5 };
+    return p;
+  }
+
+  it('caps a 2-ton item by the tonnage it occupies', () => {
+    const out = computeBuyOutcome({
+      planet: planetWith(I_FOOD),
+      buyerIsOwner: false,
+      itemIndex: I_FOOD,
+      requestedQty: 500,
+      buyerCargoCapacityRemaining: 200, // tons
+      isNeutralZone: false,
+    });
+    expect(out.ok).toBe(true);
+    // 200 tons of a 2-ton item is 100 units, not 200.
+    expect((out as { transferred: number }).transferred).toBe(100);
+  });
+
+  it('still fills a 1-ton item to the full tonnage', () => {
+    const out = computeBuyOutcome({
+      planet: planetWith(I_MEN),
+      buyerIsOwner: false,
+      itemIndex: I_MEN,
+      requestedQty: 500,
+      buyerCargoCapacityRemaining: 200,
+      isNeutralZone: false,
+    });
+    expect((out as { transferred: number }).transferred).toBe(200);
+  });
+
+  it('applies the same tonnage cap at the neutral-zone hub', () => {
+    // The hub does not decrement its stock, but the buyer's holds are finite.
+    const out = computeBuyOutcome({
+      planet: planetWith(I_FOOD),
+      buyerIsOwner: false,
+      itemIndex: I_FOOD,
+      requestedQty: 500,
+      buyerCargoCapacityRemaining: 200,
+      isNeutralZone: true,
+    });
+    expect((out as { transferred: number }).transferred).toBe(100);
+  });
+
+  it('refuses when the remaining tonnage cannot hold even one unit', () => {
+    const out = computeBuyOutcome({
+      planet: planetWith(I_FOOD),
+      buyerIsOwner: false,
+      itemIndex: I_FOOD,
+      requestedQty: 10,
+      buyerCargoCapacityRemaining: 1, // one ton; food needs two
+      isNeutralZone: false,
+    });
+    expect(out.ok).toBe(false);
+  });
+});
