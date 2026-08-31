@@ -1422,3 +1422,39 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 **Alternatives rejected**: Inline the triple at every hit site (7× duplication, hard to test); a single `randamageAndEmit` function taking every field as args (long signature, harder to mock the emit); making `rollRandamage` stateful by accepting `ShipState` directly (breaks purity, prevents golden-vector tests).
 
 **Alternatives rejected**: Two independent draws for strict C fidelity — deferred; revisit if Cybertron fire cadence feels off in playtest.
+
+## 2026-08-31 — `who` lists players, not the whole galaxy
+
+**Context:** Flying a fresh pilot, a bare `who` printed every live ship —
+including all 24 Cybertrons and the droids — with each one's exact sector. That
+is a free galaxy-wide threat map: a pilot could route around every hostile
+without ever running a scan, and could find the Murdonian Transport (the
+designed new-player PvE target) without hunting for it. Scanning is the mechanic
+that is supposed to cost you something.
+
+**Decision:** `who` lists ships whose `status !== GESTAT_AUTO` — human pilots
+only. AI positions are what `sca` is for. Cloak gating moved from "any non-zero
+`cloak`" to C's `cloak < 10`.
+
+**Reason:** C's `cmd_who` (GECMDS.C:5162) only echoes the caller's own BBS id:
+`prf("ID:%s,%s,%s\r", usaptr->userid, usaptr->usrnam, "NULL")`. There is no
+canon roster, so spec 012 D1 reinterpreted the verb as a player-facing listing
+built on `ConnectedShipsRegistry` — "show me who else is online". Enumerating
+the AI fleet is drift from that spec's own rationale, not fidelity to anything.
+
+On cloak, C gates every ship listing on `cloak < 10` (GECMDS.C:1371, 1511,
+2824). Cloak is not a boolean there: it spins up 1 → 2 → 10
+(GEFUNCS.C:1717-1724) and counts back up from a negative value while recovering
+(GEFUNCS.C:1388-1391). Only the fully-engaged state hides you, and even then it
+leaks — a cloaked ship moving fast broadcasts a bearing to nearby ships,
+deliberately slopped by ±10 degrees (GECMDS.C:525-543). So the canon answer to
+"does a cloaked player show as online?" is no: full cloak erases you from
+listings entirely, and the game gives you a fuzzed bearing instead, not a
+name-without-a-position. `ScanHandler` already used `>= 10`; `who` did not, so a
+ship that had merely *started* cloaking vanished a tick early.
+
+**Alternatives rejected:** Listing cloaked players as online with the position
+blanked — invents a disclosure C never makes, and hands out the one bit
+(someone is cloaked and hunting) that cloaking is bought to conceal. Restricting
+`who` to the caller's own sector — that is `sca sh`'s job, and it would leave no
+way to see who is on at all.

@@ -68,13 +68,33 @@ describe('WhoHandlerService', () => {
     });
   });
 
-  describe('FR-003: excludes cloaked ships', () => {
-    it('omits cloaked ships from listing', () => {
+  /**
+   * C gates every ship listing on `cloak < 10` — a fully-engaged cloak erases
+   * you, and nothing less does. Cloak spins up through 1 then 2 before reaching
+   * 10 (GEFUNCS.C:1717-1724) and counts back up from a negative value while it
+   * recovers (GEFUNCS.C:1388-1391); in both of those states C still lists you.
+   * ScanHandler already gates on `>= 10` (GECMDS.C:1511); `who` was hiding on
+   * any non-zero value, which made a ship that had merely STARTED cloaking
+   * vanish a full tick before the cloak actually took hold.
+   *
+   * @see GECMDS.C:1371, 1511, 2824
+   */
+  describe('FR-003: excludes fully-cloaked ships', () => {
+    it('omits ships at full cloak from the listing', () => {
       const visible = makeShip({ userid: 'u1', shipno: 1, shipname: 'Visible', cloak: 0 });
-      const cloaked = makeShip({ userid: 'u2', shipno: 2, shipname: 'Shadow', cloak: 1 });
+      const cloaked = makeShip({ userid: 'u2', shipno: 2, shipname: 'Shadow', cloak: 10 });
       const svc = new WhoHandlerService({ findAllShips: () => [visible, cloaked] } as unknown as ShipStateService);
       const result = svc.command.handler(visible, [], ctx) as import('../../../src/game/commands/command.types').CommandResult;
       expect(result.lines.some((l) => l.text.includes('Shadow'))).toBe(false);
+      expect(result.lines.some((l) => l.text.includes('Visible'))).toBe(true);
+    });
+
+    it.each([1, 2, -3])('still lists a ship whose cloak is only at %d', (cloak) => {
+      const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Visible', cloak: 0 });
+      const partial = makeShip({ userid: 'u2', shipno: 2, shipname: 'Spinup', cloak });
+      const svc = new WhoHandlerService({ findAllShips: () => [me, partial] } as unknown as ShipStateService);
+      const result = svc.command.handler(me, [], ctx) as import('../../../src/game/commands/command.types').CommandResult;
+      expect(result.lines.some((l) => l.text.includes('Spinup'))).toBe(true);
     });
   });
 
@@ -141,5 +161,58 @@ describe('WhoHandlerService — column alignment', () => {
       return m[m.length - 1].index! + m[m.length - 1][0].length;
     };
     expect(end(lines[1])).toBe(end(lines[0]));
+  });
+});
+
+/**
+ * `who` is a deliberate reinterpretation of C's `cmd_who`, which only echoes the
+ * caller's own BBS id (GECMDS.C:5162). Spec 012 D1 recasts it as the
+ * player-facing form of the ConnectedShipsRegistry listing — "show me everyone".
+ *
+ * The implementation drifted from that: it listed `findAllShips()`, which
+ * includes every AI, so one command printed all 24 Cybertrons with their exact
+ * sectors. A pilot could route around every threat in the galaxy without
+ * scanning once, which makes scanning — and exploration — pointless. A
+ * playtester asked the obvious question: "how can you see across the galaxy?"
+ *
+ * AI positions are what `sca` is for.
+ */
+describe('WhoHandlerService — players only, not the whole galaxy', () => {
+  const GESTAT_USER = 1;
+  const GESTAT_AUTO = 2;
+
+  const build = (ships: ShipState[]) =>
+    new WhoHandlerService({ findAllShips: () => ships } as unknown as ShipStateService);
+
+  const rows = (svc: WhoHandlerService, self: ShipState): string[] => {
+    const result = svc.command.handler(self, [], ctx) as { lines: { text: string }[] };
+    return result.lines.slice(1).map((l) => l.text); // drop the header
+  };
+
+  it('does not list Cybertrons or droids', () => {
+    const me = makeShip({ shipname: 'Kestrel', status: GESTAT_USER });
+    const cyb = makeShip({ userid: 'Cybrg-200', shipno: 200, shipname: 'Cybrg-40082', status: GESTAT_AUTO });
+    const droid = makeShip({ userid: '@Droid-1', shipno: 1, shipname: 'Murdonian Transport49', status: GESTAT_AUTO });
+
+    const listed = rows(build([me, cyb, droid]), me).join('\n');
+    expect(listed).toContain('Kestrel');
+    expect(listed).not.toContain('Cybrg-40082');
+    expect(listed).not.toContain('Murdonian');
+  });
+
+  it('still lists other players', () => {
+    const me = makeShip({ shipname: 'Kestrel', status: GESTAT_USER });
+    const other = makeShip({ userid: 'u2', shipno: 1, shipname: 'Wayfarer', status: GESTAT_USER });
+
+    const listed = rows(build([me, other]), me).join('\n');
+    expect(listed).toContain('Kestrel');
+    expect(listed).toContain('Wayfarer');
+  });
+
+  it('still hides cloaked players', () => {
+    const me = makeShip({ shipname: 'Kestrel', status: GESTAT_USER });
+    const hidden = makeShip({ userid: 'u3', shipno: 1, shipname: 'Phantom', status: GESTAT_USER, cloak: 10 });
+
+    expect(rows(build([me, hidden]), me).join('\n')).not.toContain('Phantom');
   });
 });
