@@ -93,6 +93,12 @@ export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
     recentlyWarpedExit,
     recentlySelfFiredTorp,
     maxTons,
+    // channel: assigned on entry to the world and released on exit, so it has
+    // no DB column. This function returns `...rest` straight to Prisma, so any
+    // in-memory-only field left in scope makes EVERY flush throw — and the
+    // caller logs and swallows it, so the only symptom is that nothing is ever
+    // persisted again. @see ship-channel.registry.ts
+    channel,
     ...rest
   } = state;
   return rest;
