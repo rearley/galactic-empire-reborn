@@ -997,8 +997,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * GEFUNCS.C:714 which gates on `ptr->speed < 21000.0`.
    *
    * @see GEFUNCS.C:709-723 moveship sector-change branch
-   * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector)
-   * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector)
+   * @see GEFUNCS.C:711 MOVE1 prfmsg (the mover's own "you have moved" line)
+   * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector, mover excluded)
+   * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector, mover excluded)
    */
   @OnEvent(PHYSICS_SECTOR_TRANSITION)
   handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
@@ -1026,12 +1027,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const name = movingShip.shipname;
 
+    // C tells the mover they moved, and tells the two sectors about them while
+    // EXCLUDING the mover: `outsect(FILTER, &sect, usrn, 0)` (GEFUNCS.C:717,722).
+    // Without the exclusion a pilot was told "<their own ship> has entered the
+    // sector" on every boundary crossing, because their socket joins the
+    // destination room just above; and without MOVE1 nothing told them they had
+    // changed sector at all.
+    if (socketId) {
+      this.server.sockets.sockets.get(socketId)?.emit('event.log', {
+        category: 'nav',
+        text: `You have moved from sector (${fromSector.x}, ${fromSector.y}) to (${toSector.x}, ${toSector.y}).`,
+      });
+    }
+
     this.server
       .to(`sector:${fromSector.x}:${fromSector.y}`)
+      .except(socketId ?? '')
       .emit('sector:ship-left', { shipId, shipName: name });
 
     this.server
       .to(`sector:${toSector.x}:${toSector.y}`)
+      .except(socketId ?? '')
       .emit('sector:ship-entered', { shipId, shipName: name });
 
     // S-005: beacon-on-move (GEFUNCS.C:808-816). Re-emit BEACON_EVENT when:

@@ -168,6 +168,28 @@ describe('T027 — sca lo full: kind and sidePanel', () => {
     expect(Array.isArray(result.scanRender!.sidePanel)).toBe(true);
   });
 
+  /**
+   * Every other field in the legend is an integer — `bearing` is rounded where
+   * it is computed, and `rep nav` rounds heading for display. This one came
+   * straight off the ship state, so a contact under way rendered as
+   * "Hdg:69.83440234557376" and blew the column layout apart in a terminal
+   * whose whole identity is fixed-width text. Seen in the browser.
+   */
+  it('rounds heading, like every other number in the legend', async () => {
+    const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
+    const other = makeOther(
+      { userid: 'u2', shipno: 1 },
+      { xcoord: 5.1, ycoord: 5 },
+      { shipname: 'Drifter', speed: 0, heading: 69.83440234557376 },
+    );
+    const { service } = makeService([player, other]);
+    await service.onModuleInit();
+    const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
+    const row = result.scanRender!.sidePanel![0];
+    expect(Number.isInteger(row.heading)).toBe(true);
+    expect(row.heading).toBe(70);
+  });
+
   it('sca lo full with no other ships produces empty sidePanel', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1 });
     const { service } = makeService([player]);

@@ -347,7 +347,9 @@ export class ScanHandlerService implements OnModuleInit {
         letter: entry.letter,
         distance: Math.round(entry.dist / 10000),
         bearing: entry.bearing,
-        heading: entry.heading,
+        // Rounded like bearing and like `rep nav`: an unrounded float rendered
+        // as "Hdg:69.83440234557376" and broke the legend's column alignment.
+        heading: Math.round(entry.heading) % 360,
         speedDisplay: showarpDisplay(entry.speed),
       };
       if (ship.scanNames && other) {
