@@ -132,3 +132,35 @@ export async function steerTo(page: Page, absolute: number): Promise<void> {
     .poll(heading, { timeout: 90_000, intervals: [3_000] })
     .toBe(absolute);
 }
+
+/**
+ * Move to a sector and return the number of a planet there that nobody owns.
+ *
+ * Hard-coding a planet is brittle: the galaxy is regenerated from time to time
+ * and both the numbering and the coordinates change, and a spec run that dies
+ * before releasing its claim leaves the planet owned for the next one. Scanning
+ * for an unowned planet survives both.
+ */
+export async function findUnownedPlanet(
+  page: Page,
+  request: APIRequestContext,
+  shipname: string,
+  sector: { x: number; y: number },
+): Promise<number> {
+  await outfitShip(request, { shipname, x: sector.x + 0.5, y: sector.y + 0.5 });
+  await page.goto('/');
+  await expect(page.locator(INPUT)).toBeVisible();
+
+  await sendCommand(page, 'sca pl');
+  const listing = await page.locator(LOG).innerText();
+  const numbers = [...listing.matchAll(/^\s*(\d+)\. /gm)].map((m) => Number(m[1]));
+  expect(numbers.length, `no planets in sector (${sector.x},${sector.y})`).toBeGreaterThan(0);
+
+  for (const plnum of numbers) {
+    await sendCommand(page, `sca pl ${plnum}`);
+    const detail = await page.locator(LOG).innerText();
+    const block = detail.slice(detail.lastIndexOf(`Planet #${plnum}`));
+    if (!/Owned by:/.test(block)) return plnum;
+  }
+  throw new Error(`every planet in sector (${sector.x},${sector.y}) is owned`);
+}

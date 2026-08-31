@@ -1,6 +1,6 @@
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { PlanetState } from '../../../src/game/planet/planet-state.types';
-import { NUMITEMS } from '../../../src/game/constants/items';
+import { NUMITEMS, I_MEN, I_FOOD } from '../../../src/game/constants/items';
 
 /**
  * GECMDS.C:3420 cmd_abandon — the canonical `aba`. In orbit over a planet you
@@ -143,5 +143,35 @@ describe('PlanetStateService.abandonPlanet — GECMDS.C:3420', () => {
     await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
 
     expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * C configures a freshly claimed colony for you: `mnu_admenu1` zeroes every
+   * production rate and then sets men and food to 50 (GEMAIN.C:2908-2916). The
+   * port claimed the planet and left every rate at zero, so a new pilot's first
+   * world sat there producing nothing until they discovered `adm rate` — and
+   * nothing tells them to. It also meant a planet claimed after being abandoned
+   * silently kept the previous owner's production settings.
+   */
+  it('sets up a fresh colony: men and food at rate 50, everything else zero', async () => {
+    const planet = makePlanet({ userid: null, name: '' });
+    // Leftovers from a previous owner must not carry over.
+    planet.items[2] = { ...planet.items[2], rate: 44 };
+    const { svc } = makeService(planet);
+
+    await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
+
+    expect(planet.items[I_MEN].rate).toBe(50);
+    expect(planet.items[I_FOOD].rate).toBe(50);
+    expect(planet.items[2].rate).toBe(0);
+  });
+
+  it('leaves stock alone — only the rates are reset', async () => {
+    const planet = makePlanet({ userid: null, name: '' });
+    const { svc } = makeService(planet);
+
+    await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
+
+    expect(planet.items[I_MEN].qty).toBe(700n);
   });
 });

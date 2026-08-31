@@ -1,3 +1,53 @@
+## 2026-08-31 — early-game research: what the original actually intends
+
+Asked whether owning a planet should be an entry-level activity or something a player builds up to.
+Went to the source rather than guessing.
+
+**What C does:**
+- Claiming an unowned planet is **free** — no credits, no colonists, no combat. `mnu_admenu1`
+  (GEMAIN.C:2895-2942) prompts y/n and on yes sets the owner, increments the counter, zeroes every
+  production rate and sets **men and food to rate 50**. The new owner is handed a working colony.
+- `wonplnt()` (GECMDS.C:4001) — the "planet changes hands" path — is only reached from the two
+  *attack* branches. Conquest is a separate, later activity.
+- `MAXPLNTS` defaults to **256** per player: you are expected to accumulate planets, not guard one.
+- Cybertrons already go easy on newcomers: `gebemean()` (GECYBS.C:432) only fires on a 1-in-`CYBSLO`
+  (3) roll until a player passes `CYB_BE_NICE` (30) kills, and holds torpedo salvos to 0-1 instead
+  of 0-5 below `CYB_BE_EASY` (60). We implement this faithfully.
+- The ship ladder starts at the **Heavy Freighter, 40,000 cr** — cheaper than the starter
+  Interceptor's own 65,000 value, with 60,000 tons of hold. Warships are 500k-800k.
+- The wiki calls pre-inhabited planets "easier to start with" — the intended on-ramp.
+
+**Conclusion:** planets are the *engine* of progression, not a reward for it. A player claims early,
+grows population, sells produce, buys a freighter, and only then fights. Nothing gates a first claim.
+
+**Fixed (pure fidelity, directly improves the first hour):**
+- **A freshly claimed planet now starts at men rate 50 / food rate 50**, with all other rates zeroed
+  (`CLAIM_START_RATE`). The port left every rate at 0, so a new pilot's first world produced nothing
+  until they discovered `adm rate` — and nothing tells them to. Zeroing first also stops a re-claimed
+  planet silently inheriting its previous owner's production settings.
+
+**Also fixed:** `e2e/colony.spec.ts` hard-coded a planet number and coordinates from the pre-regeneration
+galaxy, so it broke when the world was rebuilt and stayed broken if a run died before releasing its
+claim. It now scans for an unowned planet at runtime (`findUnownedPlanet`).
+
+**Answered from the code — dormant ships:** a captain's other hulls are parked, not despawned.
+`unboard()` sets `GESTAT_AVAIL` and evicts the ship from the in-memory map that the physics tick,
+combat, `who` and scans all read from, so a dormant hull cannot move, be scanned or be attacked; its
+row keeps position, cargo, damage and energy. Verified live: after switching hulls, `who` listed only
+the active one and the DB showed the other at status 0, parked at its last coordinates. Documented in
+docs/GAME_MECHANICS.md, including the consequence that a parked ship is a risk-free warehouse.
+
+**Still open for a decision — the galaxy's shape.** C puts the neutral zone at `NEUTRAL_X/Y = (0,0)`
+in a universe spanning **−univmax..+univmax**, so the hub sits at the CENTRE with space in every
+direction. This port generates sectors `0..29 x 0..14` and wraps on those bounds, so the hub sits in
+a **corner**: half of all headings immediately wrap a new pilot to the far edge of the galaxy (which
+is how a test pilot ended up in sector (29,0) and (0,14)), and the hub's neighbourhood is a quadrant
+rather than a disc — which is why the nearest inhabited planet was 8 sectors away. Moving the origin
+to the centre of the grid would restore the intended early game, but it changes the galaxy's
+coordinate space, so it is a call to make deliberately rather than in passing.
+
+---
+
 ## 2026-08-31 — clean galaxy, second playthrough, help audit
 
 Regenerated the world (`db:reset` — 212 planets, ~21% born inhabited, no player litter) and played a
