@@ -87,6 +87,10 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     expect(arg.data.class).toBe(MAIL_CLASS_DISTRESS);
     expect(arg.data.int1).toBe(5);
     expect(arg.data.int2).toBe(7);
+    // MESG30 — C's revolt notice type (GEPLANET.C:368). It rendered as
+    // "Attacker: REVOLT" while it shared the attack payload shape.
+    expect(arg.data.type).toBe(30);
+    expect(arg.data.cash).toBe(500n); // troops remaining
 
     // No combat events emitted.
     const combatEvents = emitted.filter((e) => e.startsWith('combat.'));

@@ -6,6 +6,7 @@ import { MailInboxRepository } from './mail-inbox.repository';
 import {
   DistressSignalPayload,
   StarvationPayload,
+  RevoltPayload,
   GenericPayload,
   MailListEntry,
   MailListing,
@@ -83,7 +84,12 @@ export class MailInboxService {
 
   private buildPayload(
     row: MailStat,
-  ): ProductionReportPayload | DistressSignalPayload | StarvationPayload | GenericPayload {
+  ):
+    | ProductionReportPayload
+    | DistressSignalPayload
+    | StarvationPayload
+    | RevoltPayload
+    | GenericPayload {
     if (row.class === MAIL_CLASS_PRODRPT) {
       return {
         kind: 'production_report',
@@ -92,6 +98,16 @@ export class MailInboxService {
         debt: row.debt,
         tax: row.tax,
         itemqty: [...row.itemqty],
+      };
+    }
+    if (row.class === MAIL_CLASS_DISTRESS && row.type === 30) {
+      // Revolt (MESG30) — MailStat.cash carries the surviving garrison.
+      return {
+        kind: 'revolt',
+        planetName: row.name1,
+        sectorX: row.int1,
+        sectorY: row.int2,
+        troopsRemaining: row.cash,
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS && (row.type === 6 || row.type === 7)) {

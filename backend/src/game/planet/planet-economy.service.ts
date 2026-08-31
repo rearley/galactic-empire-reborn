@@ -7,6 +7,8 @@ import { MAIL_CLASS_DISTRESS } from '../constants';
 /** MailStat.type for the two starvation notices. @see GEPLANET.C:211, :246 */
 const MESG06 = 6 as const;
 const MESG07 = 7 as const;
+/** MailStat.type for the revolt notice. @see GEPLANET.C:368 */
+const MESG30 = 30 as const;
 import { applyEconomyTickWithLosses } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
@@ -115,7 +117,7 @@ export class PlanetEconomyService {
     ysect: number,
     remainingTroops: number,
   ): Promise<void> {
-    await this.insertDistressMail(userid, 'REVOLT', 0, planetName, xsect, ysect, remainingTroops);
+    await this.insertDistressMail(userid, 'REVOLT', MESG30, planetName, xsect, ysect, remainingTroops);
   }
 
   /** Fire-and-forget starvation notice; a failed insert must not stall the tick. */

@@ -195,6 +195,7 @@ export enum MessageId {
   FLUX_NOPODS = 'FLUX_NOPODS',
   FLUX_USED = 'FLUX_USED',
   FLUX_FMT = 'FLUX_FMT',
+  FLUX_LAST = 'FLUX_LAST',
 
   // who (feature 012) — GECMDS.C:5162 cmd_who reinterpreted
   WHO_HEADER = 'WHO_HEADER',
@@ -575,6 +576,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
   [MessageId.FLUX_USED]: 'Flux pod used — energy restored.',
   [MessageId.FLUX_FMT]: 'Format: flux',
+  /** @see GECMDS.C:748 LASTFLUX — warn when the pod just used was the last one. */
+  [MessageId.FLUX_LAST]: 'That was your last flux pod.',
 
   // who (feature 012) — GECMDS.C:5162 cmd_who reinterpreted
   [MessageId.WHO_HEADER]: '  Shipname               Class                Sector  Kills',

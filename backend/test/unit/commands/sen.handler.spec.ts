@@ -136,3 +136,48 @@ describe('SenHandlerService', () => {
     });
   });
 });
+
+/**
+ * GEMAIN.C:2583 outsect / outwar take a `freq` argument, and when it is non-zero
+ * they deliver ONLY to ships carrying that frequency on one of their three
+ * channels. The port broadcast to the whole sector (or the whole galaxy)
+ * regardless of what the recipient was tuned to, so a "private" channel was
+ * audible to everyone and `fre` bought the player nothing.
+ *
+ * C also excludes the sender (`usrnum`) and gives them a separate confirmation
+ * (MSGSNT4 / MSGSNT6) carrying the frequency.
+ */
+describe('SenHandlerService — frequency-scoped delivery (GECMDS.C:1853)', () => {
+  it('tags a sector transmission with the frequency to filter on', () => {
+    const ship = makeShip({ freq: [1234, 0, 0] });
+    const result = handler.command.handler(ship, ['a', 'hello'], ctx) as CommandResult;
+    const b = result.broadcasts![0];
+    expect(b.room).toBe('sector:5:3');
+    expect(b.freq).toBe(1234);
+    expect(b.excludeSelf).toBe(true);
+  });
+
+  it('tags a galaxy transmission with the frequency too', () => {
+    const ship = makeShip({ freq: [0, 25000, 0] });
+    const result = handler.command.handler(ship, ['b', 'hello'], ctx) as CommandResult;
+    const b = result.broadcasts![0];
+    expect(b.room).toBe('galaxy');
+    expect(b.freq).toBe(25000);
+    expect(b.excludeSelf).toBe(true);
+  });
+
+  it('an open hail carries no frequency — everyone in range hears it', () => {
+    const ship = makeShip({ freq: [0, 0, 0] });
+    const result = handler.command.handler(ship, ['a', 'hello'], ctx) as CommandResult;
+    const b = result.broadcasts![0];
+    expect(b.room).toBe('hail');
+    expect(b.freq).toBeUndefined();
+    expect(b.excludeSelf).toBe(true);
+  });
+
+  it('the confirmation names the frequency the sender transmitted on', () => {
+    const ship = makeShip({ freq: [1234, 0, 0] });
+    const result = handler.command.handler(ship, ['a', 'hello'], ctx) as CommandResult;
+    expect(result.lines[0].text).toContain('1234');
+  });
+});

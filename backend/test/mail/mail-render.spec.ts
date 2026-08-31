@@ -9,6 +9,7 @@ import {
   DistressSignalPayload,
   ProductionReportPayload,
   GenericPayload,
+  RevoltPayload,
 } from '../../src/game/mail/mail.types';
 import { ITEM_NAMES } from '../../src/game/constants/items';
 
@@ -193,5 +194,28 @@ describe('formatDetail — generic fallback', () => {
   it('renders Topic line with raw topic', () => {
     const lines = formatDetail(makeGenericEntry());
     expect(lines.some((l) => l.includes('Topic:') && l.includes('Hello there'))).toBe(true);
+  });
+});
+
+/**
+ * A revolt is not an attack. While it shared the attack payload shape, `rea`
+ * printed "Attacker: REVOLT" — the topic string in the slot meant for a ship
+ * name. @see GEPLANET.C:368 MESG30
+ */
+describe('formatDetail — revolt notice', () => {
+  it('reports the uprising and the surviving garrison, with no attacker line', () => {
+    const payload: RevoltPayload = {
+      kind: 'revolt',
+      planetName: 'New Terra',
+      sectorX: 1,
+      sectorY: 0,
+      troopsRemaining: 42n,
+    };
+    const lines = formatDetail(makeDistressEntry({ payload, topic: 'REVOLT' }));
+    const body = lines.join('\n');
+    expect(body).not.toContain('Attacker');
+    expect(body).toContain('New Terra');
+    expect(body).toContain('(1, 0)');
+    expect(body).toContain('42');
   });
 });

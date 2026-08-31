@@ -1,3 +1,54 @@
+## 2026-08-31 (evening) — radio, abandon recovery, flux warning
+
+**Completed:**
+- **`aba` could permanently end an account.** Three faults stacked:
+  1. The handler cleared `activeShipNo` and stopped, so the session answered
+     "No active ship." to everything — FR-704's "route the captain back through onboarding" was
+     never built.
+  2. The connect path selected ships with no status filter, so reconnecting boarded the abandoned
+     hull and the router's abandoned-ship gate then rejected every command. No path to a new ship
+     existed from either state.
+  3. `status` is stripped from the per-tick flush (board/unboard are its only persisters), so the
+     abandoned mark never reached Postgres at all — a restart handed the hull back as flyable, and
+     a clean disconnect actively overwrote the mark with `GESTAT_AVAIL`.
+
+  Now: `ShipStateService.abandon()` persists the status and `unboard` leaves an abandoned hull
+  alone; `presentShipEntry` (extracted from `handleConnection`) filters abandoned hulls and is
+  re-run after abandon via `CommandResult.reenterShipEntry`. `aba` is one keystroke from `abo`
+  (abort self-destruct), which is how it got found.
+- **Radio channels were not private.** `outsect`/`outwar` take a frequency and deliver only to ships
+  carrying it on one of their three channels (GEMAIN.C:2583-2600); the port broadcast to the whole
+  sector room regardless, so `fre` bought the player nothing and every "private" channel was public.
+  Broadcasts now carry `freq` and `excludeSelf`, and the gateway filters recipients by tuned
+  frequency and drops the sender, as C does with its `usrnum` exclude argument. The confirmation
+  names the frequency (MSGSNT4/MSGSNT6) instead of just the channel letter.
+- **The revolt notice rendered as an attack.** It shared `DistressSignalPayload`, so `rea` printed
+  "Attacker: REVOLT". It now carries C's MESG30 type and its own payload/rendering.
+- **`flux` never warned about the last pod** (GECMDS.C:748 LASTFLUX) — a pilot only found the locker
+  empty the next time they were out of energy.
+
+**Tests:** 3034/3034 across 318 suites, tsc strict clean. New: `test/gateway/broadcast-frequency.spec.ts`
+(5), `test/gateway/abandon-reentry.spec.ts` (5), `test/game/ship/abandon-persistence.spec.ts` (3),
+`sen` frequency-tagging (4), flux last-pod (2), revolt render/type (2).
+
+**Verified live:** registered a fresh pilot end-to-end (register → ship-name prompt → flying),
+abandoned mid-session and got the ship-name prompt immediately, named a new ship and kept playing;
+confirmed the abandoned hull is skipped on reconnect. Also read the revolt and starvation notices
+that arrived from the colony playtest — New Terra revolted for real (0 troops, 20% tax), and the
+notice reached the player only because of the earlier MailStat fix.
+
+**Checked against C, no change needed:** `report` with no argument printing a usage line
+(GECMDS.C:1950 `margc != 2` → REPFMT); `fre a 0` being rejected (GECMDS.C:1917 `freq == 0` →
+FREQFMT — `fre a hail` is the way back to open hail); `flux` burning a pod even at full energy;
+`sen` not echoing the sender their own transmission.
+
+**Known gap (not fixed — needs a decision):** C's `aba` abandons the *orbited planet*, not the ship
+(GECMDS.C:3420). Research D2 deliberately reinterpreted it and deferred colony abandonment to
+"the planet system feature (005)", where it was never picked up — so there is currently no way for
+a player to give up a planet.
+
+---
+
 ## 2026-08-31 (later) — colony lifecycle playtest: starvation notices, adm usage
 
 **Completed:**
