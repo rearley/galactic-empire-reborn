@@ -16,10 +16,11 @@ import { DroidModule } from './game/droid/droid.module';
 import { MidnightModule } from './game/midnight/midnight.module';
 import { InvariantsModule } from './game/invariants/invariants.module';
 import { DebugController } from './debug/debug.controller';
+import { debugEndpointsEnabled } from './debug/debug-endpoints';
 import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), ScheduleModule.forRoot(), PrismaModule, AuthModule, InvariantsModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule, MidnightModule],
-  controllers: [DebugController, HealthController],
+  controllers: [...(debugEndpointsEnabled() ? [DebugController] : []), HealthController],
 })
 export class AppModule {}

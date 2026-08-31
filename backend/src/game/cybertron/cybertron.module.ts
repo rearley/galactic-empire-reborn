@@ -7,9 +7,10 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { CybertronTickService } from './cybertron-tick.service';
 import { CybertronRepository } from './cybertron.repository';
 import { CybertronDebugController } from './cybertron.debug.controller';
+import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
-const devOnlyControllers = process.env.NODE_ENV !== 'production' ? [CybertronDebugController] : [];
+const devOnlyControllers = debugEndpointsEnabled() ? [CybertronDebugController] : [];
 
 /**
  * Cybertron AI module — drives persistent Cybertron and Sartern ship behavior.

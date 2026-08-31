@@ -18,14 +18,31 @@ describe('buildPurchasedShipName', () => {
   });
 
   it('produces a different name on each retry', () => {
-    const names = [0, 1, 2, 3].map((n) => buildPurchasedShipName('Stealth Fighter', 2, n));
+    const names = [0, 1, 2, 3].map((n) => buildPurchasedShipName('Stealth Fighter', 2, n, 'usr_a'));
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  /**
+   * A fixed ladder of suffixes would only tolerate as many captains as it has
+   * rungs: every captain's second Stealth Fighter is shipno 2, so they would all
+   * walk the same short list and the sixth purchase would fail outright. The
+   * alternatives have to differ per captain.
+   */
+  it('offers different alternatives to different captains', () => {
+    const a = buildPurchasedShipName('Stealth Fighter', 2, 1, 'usr_alice');
+    const b = buildPurchasedShipName('Stealth Fighter', 2, 1, 'usr_bob');
+    expect(a).not.toBe(b);
+  });
+
+  it('is stable for the same captain and hull', () => {
+    expect(buildPurchasedShipName('Interceptor', 3, 1, 'usr_alice'))
+      .toBe(buildPurchasedShipName('Interceptor', 3, 1, 'usr_alice'));
   });
 
   it('never exceeds the 19-character limit that applies to player-chosen names', () => {
     // "Heavy Battle Cruiser" is already over on its own.
     for (let attempt = 0; attempt < 6; attempt++) {
-      const name = buildPurchasedShipName('Heavy Battle Cruiser', 123, attempt);
+      const name = buildPurchasedShipName('Heavy Battle Cruiser', 123, attempt, 'usr_someone');
       expect(name.length).toBeLessThanOrEqual(19);
     }
   });
@@ -37,7 +54,7 @@ describe('buildPurchasedShipName', () => {
 
   it('stays printable ASCII, like every other ship name', () => {
     for (let attempt = 0; attempt < 6; attempt++) {
-      expect(buildPurchasedShipName('Interceptor', 7, attempt)).toMatch(/^[\x21-\x7E ]+$/);
+      expect(buildPurchasedShipName('Interceptor', 7, attempt, 'usr_x')).toMatch(/^[\x21-\x7E ]+$/);
     }
   });
 });
