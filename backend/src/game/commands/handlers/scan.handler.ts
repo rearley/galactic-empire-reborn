@@ -27,15 +27,15 @@ function showarpDisplay(speed: number): string {
 
 /** Environment string table indexed by `enviorn` (0..3). @see GECMDS.C:2338-2349 */
 const ENV_STRINGS = [
-  MessageId.SCAN12, // 0 — Earth-like
-  MessageId.SCAN13, // 1 — Hostile
-  MessageId.SCAN14, // 2 — Toxic
-  MessageId.SCAN15, // 3 — Inferno-like
+  MessageId.SCAN12, // 0 — Inferno-like (worst)
+  MessageId.SCAN13, // 1 — Toxic
+  MessageId.SCAN14, // 2 — Hostile
+  MessageId.SCAN15, // 3 — Earth-like (best)
 ] as const;
 
 /** Resource string table indexed by `resource` (0..3). @see GECMDS.C:2351-2356 */
 const RES_STRINGS = [
-  MessageId.SCAN12, // 0 — Barren (reuse Earth-like slot per original table-driven approach)
+  MessageId.SCAN12, // 0 — Barren (C reuses one table for both axes)
   MessageId.SCAN13, // 1 — Sparse
   MessageId.SCAN14, // 2 — Rich
   MessageId.SCAN15, // 3 — Abundant
@@ -777,10 +777,10 @@ export class ScanHandlerService implements OnModuleInit {
     // GECMDS.C:2337-2349 — environment
     const envIdx = Math.max(0, Math.min(3, planet.enviorn));
     const envStr = [
-      formatMessage(MessageId.SCAN12), // 0 Earth-like
-      formatMessage(MessageId.SCAN13), // 1 Hostile
-      formatMessage(MessageId.SCAN14), // 2 Toxic
-      formatMessage(MessageId.SCAN15), // 3 Inferno-like
+      formatMessage(MessageId.SCAN12), // 0 Inferno-like (worst)
+      formatMessage(MessageId.SCAN13), // 1 Toxic
+      formatMessage(MessageId.SCAN14), // 2 Hostile
+      formatMessage(MessageId.SCAN15), // 3 Earth-like (best)
     ][envIdx];
     lines.push({
       text: formatMessage(MessageId.SCAN11) + envStr,

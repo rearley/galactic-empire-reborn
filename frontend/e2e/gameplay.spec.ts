@@ -217,7 +217,10 @@ test.describe('gameplay smoke — frontend against a live backend', () => {
     await expect(page.locator(LOG)).toContainText(/Now in orbit around Zygor-3/i);
 
     await sendCommand(page, 'lan Takeover');
-    await expect(page.locator(LOG)).toContainText(/Neutral zone planets cannot be claimed/i);
+    // The hub is now refused for the reason C refuses it — the planet is owned
+    // (by the system) — rather than by the sector special-case that was the
+    // first fix. That guard is still in place behind this as defence in depth.
+    await expect(page.locator(LOG)).toContainText(/refused|cannot be claimed/i);
     await expect(page.locator(LOG)).not.toContainText(/You have claimed/i);
   });
 

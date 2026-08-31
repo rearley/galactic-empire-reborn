@@ -22,4 +22,18 @@ export function isInNeutralZone(coord: { xcoord: number; ycoord: number }): bool
  * Use this for rules about the sector (for example, nothing here is
  * claimable); use isInNeutralZone for rules about the protected bubble.
  */
+/**
+ * Owner recorded on the five neutral-zone trading posts.
+ *
+ * C creates them already owned (GEPLANET.C:671, 737 copy `s00[idx].owner`), so
+ * every ownership rule protects them without a special case. Leaving them
+ * unowned meant `trans_up` — faithful to C's "you must own this planet or
+ * NOBODY must own it" (GECMDS.C:3374) — let any pilot haul away stock the
+ * midnight job restocks to 1,032,000 of every item.
+ *
+ * The `**...**` form is C's own convention for system-held records ("**Free**"
+ * marks an abandoned planet) and cannot collide with a `usr_<hex>` player id.
+ */
+export const NEUTRAL_ZONE_OWNER = '**neutral**';
+
 export const NEUTRAL_ZONE_SECTOR = Object.freeze({ x: 0, y: 0 });

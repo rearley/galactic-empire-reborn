@@ -12,6 +12,7 @@
  */
 
 import { S00Entry } from './galaxy.types';
+import { NEUTRAL_ZONE_OWNER } from '../combat/neutral-zone';
 
 /**
  * Number of planets in the neutral-zone fixture.
@@ -45,9 +46,9 @@ export const S00: S00Entry[] = Object.freeze([
     name: 'Zygor-3',
     xcoord: 0.5,
     ycoord: 0.5,
-    env: 0,   // Earth-like
+    env: 0,   // Inferno-like (grade 0 = least productive)
     res: 2,   // Rich
-    owner: '',
+    owner: NEUTRAL_ZONE_OWNER,
   },
   {
     type: 2,
@@ -56,16 +57,16 @@ export const S00: S00Entry[] = Object.freeze([
     ycoord: 0.3,
     env: 1,   // Arid
     res: 3,   // Abundant
-    owner: '',
+    owner: NEUTRAL_ZONE_OWNER,
   },
   {
     type: 2,
     name: 'Caldor IV',
     xcoord: 0.7,
     ycoord: 0.2,
-    env: 0,   // Earth-like
+    env: 0,   // Inferno-like (grade 0 = least productive)
     res: 1,   // Adequate
-    owner: '',
+    owner: NEUTRAL_ZONE_OWNER,
   },
   {
     type: 2,
@@ -74,7 +75,7 @@ export const S00: S00Entry[] = Object.freeze([
     ycoord: 0.7,
     env: 2,   // Toxic
     res: 3,   // Abundant
-    owner: '',
+    owner: NEUTRAL_ZONE_OWNER,
   },
   {
     type: 2,
@@ -83,6 +84,6 @@ export const S00: S00Entry[] = Object.freeze([
     ycoord: 0.8,
     env: 3,   // Frozen
     res: 0,   // Poor
-    owner: '',
+    owner: NEUTRAL_ZONE_OWNER,
   },
 ]) as S00Entry[];

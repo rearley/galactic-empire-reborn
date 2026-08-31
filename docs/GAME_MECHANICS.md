@@ -413,6 +413,29 @@ read-only (scan, report) do not set dirty.
 
 ---
 
+## The neutral-zone trading posts
+
+The five planets in sector (0,0) are created **already owned**, by the reserved id
+`NEUTRAL_ZONE_OWNER` (`**neutral**`) — C does the same, copying `s00[idx].owner` into
+`planet.userid` (GEPLANET.C:671, 737). Ownership is what protects them; every rule that keys on it
+then works without a special case:
+
+| command | why it refuses |
+|---------|----------------|
+| `lan` (claim) | the planet is owned |
+| `tra up` | "you must own this planet or NOBODY must own it" (GECMDS.C:3374) |
+| `adm`, `wit` | not the owner |
+| `buy`, `pri` | **allowed** — trading is the point |
+
+Leaving them unowned is not a small divergence: `trans_up` is faithful to C's rule, so applying the
+correct rule to the wrong data let any pilot orbit Nexus Prime and haul away stock that the midnight
+job restocks to 1,032,000 of every item — free cargo, sold at Zygor, indefinitely.
+
+Phase 2 of the midnight job skips planets held by this owner: they have no `User` row, and no score
+or production report is owed. Phase 0 refreshes their inventories.
+
+---
+
 ## Universe shape
 
 The universe is a square spanning `-UNIVMAX..+UNIVMAX` on both axes — `(2*UNIVMAX+1)^2` sectors —
