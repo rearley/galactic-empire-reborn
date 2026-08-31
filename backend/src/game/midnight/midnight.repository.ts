@@ -16,6 +16,7 @@ import { buildProductionMailStat } from './mailstat-builder';
 import { PLTVCASH, PLTVDIV, TEAMBONU } from './midnight.constants';
 import { PLTYPE_PLNT } from '../constants';
 import { BASEPRICE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
+import { NEUTRAL_ZONE_OWNER } from '../combat/neutral-zone';
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
@@ -95,6 +96,12 @@ export class MidnightRepository {
       const planet = planets[i];
       const uid = planet.userid;
       if (!uid) continue;
+
+      if (uid === NEUTRAL_ZONE_OWNER) {
+        // The trading posts are held by the system and refreshed in phase 0.
+        // They have no User row, and no score or production report is owed.
+        continue;
+      }
 
       if (!validUserids.has(uid)) {
         this.logger.warn(`midnight phase-2: planet at (${planet.xsect},${planet.ysect}) has unknown owner ${uid} — skipping`);

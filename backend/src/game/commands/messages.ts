@@ -449,10 +449,14 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN09]: 'Owned by: %s',
   [MessageId.SCAN10]: 'Bearing: %d   Distance: %s',
   [MessageId.SCAN11]: 'Environment: ',
-  [MessageId.SCAN12]: 'Earth-like',
-  [MessageId.SCAN13]: 'Hostile',
-  [MessageId.SCAN14]: 'Toxic',
-  [MessageId.SCAN15]: 'Inferno-like',
+  // Worst to best, matching the index they are looked up by: production scales
+  // with (enviorn + resource + 2) * 0.25 (GEPLANET.C:281), so grade 3 is the
+  // best world. These read the other way round until 2026-08-31, which had
+  // pilots picking the least productive planet on the board.
+  [MessageId.SCAN12]: 'Inferno-like',
+  [MessageId.SCAN13]: 'Toxic',
+  [MessageId.SCAN14]: 'Hostile',
+  [MessageId.SCAN15]: 'Earth-like',
   [MessageId.SCAN16]: 'Resources: ',
   [MessageId.SCAN_LOCATED_IN]: 'Located in sector (%d,%d).',
 

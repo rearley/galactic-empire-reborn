@@ -109,4 +109,30 @@ test.describe('a new pilot can find their feet', () => {
     expect(m, 'inventory should report tonnage against capacity').not.toBeNull();
     expect(Number(m![1])).toBeLessThanOrEqual(Number(m![2]));
   });
+
+  /**
+   * C creates the neutral-zone trading posts already owned (GEPLANET.C:671,
+   * 737), which is what keeps them safe. This port left them unowned, and
+   * `trans_up` is faithful to C's rule — "you must own this planet or NOBODY
+   * must own it" (GECMDS.C:3374) — so any pilot could orbit Nexus Prime and
+   * haul away stock the midnight job restocks to 1,032,000 of every item. Free
+   * cargo, sold at Zygor, for ever. Found by orbiting the wrong planet by
+   * accident during a playtest and being handed 460 food cases.
+   */
+  test('the trade hub cannot be looted, but still trades', async ({ page }) => {
+    await startNewPilot(page, uniqueShipName('loot'));
+    await sendCommand(page, 'orb 2'); // Nexus Prime
+    await expect(page.locator(LOG)).toContainText('Nexus Prime');
+
+    await sendCommand(page, 'tra up 400 foo');
+    await expect(page.locator(LOG)).toContainText(/do not own this planet/i);
+
+    // Buying is the legitimate way to get its goods, and still works.
+    await sendCommand(page, 'buy 20 foo');
+    await expect(page.locator(LOG)).toContainText(/20 Food Cases purchased/i);
+
+    // And it cannot be claimed out from under everyone.
+    await sendCommand(page, 'lan');
+    await expect(page.locator(LOG)).toContainText(/closed/i);
+  });
 });

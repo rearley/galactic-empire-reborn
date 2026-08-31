@@ -1,3 +1,43 @@
+## 2026-08-31 — free play in the new galaxy: two economy bugs
+
+Played the centred galaxy as a fresh pilot with no debug endpoints: claimed a populated world one
+sector from the hub, garrisoned it, set a tax, and ran a trade route.
+
+**Fixed:**
+- **The planet survey's environment labels were inverted.** Production scales with
+  `(enviorn + resource + 2) * 0.25` (GEPLANET.C:281) so grade 3 is the best world, but the table read
+  Earth-like(0) → Inferno-like(3). Resources were already the right way round, which is what made it
+  hard to spot. A pilot comparing planets took the worse one every time — I did exactly that in the
+  previous session, calling an "Earth-like / Abundant" world the best draw of its sector when its
+  environment was the worst grade there is. The new test ties the label order to the production
+  formula rather than to a fixed string, so it cannot drift back.
+- **The trade hub could be looted.** `trans_up` is faithful to C — "you must own this planet or
+  NOBODY must own it" (GECMDS.C:3374) — but this port left the five neutral-zone planets *unowned*,
+  so the correct rule applied to the wrong data let any pilot orbit Nexus Prime and haul away stock
+  the midnight job restocks to 1,032,000 of every item. Free cargo, sold at Zygor, indefinitely. They
+  are now created owned by `**neutral**`, exactly as C does (GEPLANET.C:671, 737); claiming, `tra up`,
+  `adm` and `wit` all refuse for the ordinary ownership reason while `buy`/`pri` still work. Found by
+  orbiting the wrong planet by accident and being handed 460 food cases.
+
+**The playthrough itself** — the early game the geometry fix was meant to produce:
+- `sca lo` from the hub showed planets and wormholes in every direction
+- a populated world (29,664 colonists, Earth-like/Rich) sat one sector out at (-1,1)
+- claimed it, dropped 450 troops against revolt, set tax to 5%, watched it grow to 30,400 and pay out
+- `wit` collected 124 credits; `rep acc` showed "Planets owned: 1"
+- the tonnage cap refused an over-full hold on both `buy` and `tra up`
+
+**Noted, not changed:**
+- `buy` fills partially when the hold is nearly full; `tra up` refuses outright. Both are defensible,
+  but the inconsistency is a small wart.
+- Score stays 0 until the midnight job runs, so a new player sees no progress on `ros` all day. That
+  is canonical (`score = plscore + klscore`, rebuilt at midnight, GEMAIN.C:1259).
+- `ros` is full of `e2e_*` accounts from the browser suite, which shares the dev database. Reset
+  before opening the game up, or point the e2e suite at its own database.
+
+**Tests:** backend 3155 across 333 suites; Playwright 38.
+
+---
+
 ## 2026-08-31 — the galaxy is centred on the origin
 
 The early-game research pointed at one structural cause, and this is the fix for it.
