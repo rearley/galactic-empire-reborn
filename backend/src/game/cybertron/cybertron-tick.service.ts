@@ -4,7 +4,7 @@ import { Inject, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import { ShipStateService } from '../ship/ship-state.service';
-import { NO_CHANNEL } from '../ship/ship-channel.registry';
+import { NO_CHANNEL, CYBMINE_NONE } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
 import { CybertronRepository } from './cybertron.repository';
@@ -547,7 +547,7 @@ export class CybertronTickService implements OnModuleInit {
     this.shipState.mutate(target.userid, target.shipno, (v) => {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
       while (v.ltorpsDistance.length <= emptySlot) v.ltorpsDistance.push(0);
-      v.ltorpsChannel[emptySlot] = ship.shipno;
+      v.ltorpsChannel[emptySlot] = ship.channel ?? NO_CHANNEL;
       v.ltorpsDistance[emptySlot] = ddist;
     });
   }
@@ -568,7 +568,7 @@ export class CybertronTickService implements OnModuleInit {
 
     // 2. Validate current target (@see GECYBS.C:678-706)
     if (ship.cybmine !== 255) {
-      const current = this.findPlayerByShipno(ship.cybmine);
+      const current = this.findPlayerByChannel(ship.cybmine);
       if (!current) {
         // Target left the game
         ship.cybmine = 255;
@@ -590,7 +590,7 @@ export class CybertronTickService implements OnModuleInit {
     if (ship.cybmine === 255) {
       const lowestToAttack = (cls?.cybLowestClassAttacks ?? 0) - 1;
       let lowDist = 999_999_999.0;
-      let lowShipno = -1;
+      let lowChannel = -1;
 
       for (const candidate of this.shipState.findAllShips()) {
         if (candidate.status !== 1) continue; // must be active player
@@ -602,16 +602,16 @@ export class CybertronTickService implements OnModuleInit {
         if (this.isInNeutralZone(candidate)) continue;
 
         // noClaim check: at most noClaim Cybertrons may claim this player
-        if (!this.notClaimed(candidate.shipno, cls?.noClaim ?? 3)) continue;
+        if (!this.notClaimed(candidate.channel ?? CYBMINE_NONE, cls?.noClaim ?? 3)) continue;
 
         const dist = cdistance(ship, candidate);
         if (dist < lowDist) {
           lowDist = dist;
-          lowShipno = candidate.shipno;
+          lowChannel = candidate.channel ?? CYBMINE_NONE;
         }
       }
 
-      if (lowShipno === -1) {
+      if (lowChannel === -1) {
         // No eligible target — wander at random speed and rest for a while (@see GECYBS.C:733-737)
         ship.speed2b = this.random.next() * topSpeed;
         ship.head2b = this.random.next() * 359.9;
@@ -621,10 +621,10 @@ export class CybertronTickService implements OnModuleInit {
       }
 
       const wasAcquired = ship.cybmine === 255;
-      ship.cybmine = lowShipno;
+      ship.cybmine = lowChannel;
 
       if (wasAcquired) {
-        const target = this.findPlayerByShipno(lowShipno);
+        const target = this.findPlayerByChannel(lowChannel);
         if (target) {
           const payload: CybertronTargetAcquiredPayload = {
             attackerShipKey: shipKey(ship.userid, ship.shipno),
@@ -641,7 +641,7 @@ export class CybertronTickService implements OnModuleInit {
     }
 
     // 4. Apply pursuit band based on distance to current target (@see GECYBS.C:738-804)
-    const target = this.findPlayerByShipno(ship.cybmine);
+    const target = this.findPlayerByChannel(ship.cybmine);
     if (!target) {
       ship.cybmine = 255;
       return;
@@ -699,9 +699,17 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /** Find an active player ship by shipno. */
-  private findPlayerByShipno(shipno: number): ShipState | undefined {
+  /**
+   * The claimed player, by channel. `cybmine` is a *usernumber* in C — it is
+   * compared against `usrn` and used as a terminal index (GECYBS.C:368, 670) —
+   * so it names one ship. Matching on `shipno` meant a Cybertron that had
+   * claimed one player would hunt, and count its claim against, whichever
+   * player's first ship came up first.
+   */
+  private findPlayerByChannel(channel: number): ShipState | undefined {
+    if (channel === CYBMINE_NONE) return undefined;
     return this.shipState.findAllShips().find(
-      (s) => s.shipno === shipno && s.status === 1,
+      (s) => s.channel === channel && s.status === 1,
     );
   }
 

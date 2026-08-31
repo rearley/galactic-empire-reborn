@@ -1,4 +1,4 @@
-import { ShipChannelRegistry, NO_CHANNEL } from '../../../src/game/ship/ship-channel.registry';
+import { ShipChannelRegistry, NO_CHANNEL, CYBMINE_NONE } from '../../../src/game/ship/ship-channel.registry';
 
 /**
  * Channels are this port's `usrnum` (GEMAIN.H:340). The property that matters is
@@ -71,5 +71,14 @@ describe('ShipChannelRegistry', () => {
 
   it('treats a negative channel as unresolvable', () => {
     expect(reg.resolve(NO_CHANNEL)).toBeUndefined();
+  });
+
+  it('never issues 255 — C reserves it as the cybmine "claimed nobody" sentinel', () => {
+    // GECYBS.C:133, 471, 709. A ship holding 255 would read as unclaimed.
+    const reg2 = new ShipChannelRegistry();
+    const issued = new Set<number>();
+    for (let i = 0; i < 300; i++) issued.add(reg2.acquire(`p${i}`, 1));
+    expect(issued.has(CYBMINE_NONE)).toBe(false);
+    expect(issued.size).toBe(300);
   });
 });

@@ -51,6 +51,9 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...overrides,
+    // Firer identity is the unique `channel` (this port's usrnum), not
+    // `shipno`. These fixtures give each ship a distinct shipno, so mirror it.
+    channel: overrides.channel ?? overrides.shipno ?? 1,
   };
 }
 

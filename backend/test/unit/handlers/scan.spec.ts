@@ -49,7 +49,11 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
       findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
     },
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  // scanPl reads the LIVE planet state now, not GalaxyService's boot-time
+  // read-model, so mirror whatever this galaxy mock is serving.
+  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined),
+    bySector: jest.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
+    byName: jest.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
@@ -246,7 +250,9 @@ function makeServiceWithGalaxy(
     findPlanetByName: jest.fn().mockReturnValue(null),
     ...galaxyMock,
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined),
+    bySector: jest.fn((x: number, y: number) => fullGalaxyMock.getSectorPlanets(x, y)),
+    byName: jest.fn((n: string) => fullGalaxyMock.findPlanetByName(n) ?? undefined) };
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
@@ -375,7 +381,9 @@ describe('T049 — scan pl: beacon line', () => {
       getSectorWormholes: jest.fn().mockReturnValue([]),
       findPlanetByName: jest.fn().mockReturnValue(planet),
     };
-    const planetServiceMock = { get: jest.fn().mockReturnValue(beaconState) };
+    const planetServiceMock = { get: jest.fn().mockReturnValue(beaconState),
+      bySector: jest.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
+      byName: jest.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
     const service = new ScanHandlerService(
       shipServiceMock as unknown as ShipStateService,
       prismaMock as unknown as PrismaService,

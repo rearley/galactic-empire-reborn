@@ -10,6 +10,13 @@ import { shipKey } from './ship-state.types';
 export const NO_CHANNEL = -1;
 
 /**
+ * Reserved: C keeps `cybmine` in a byte and uses 255 to mean "this Cybertron has
+ * claimed nobody" (GECYBS.C:133, 471, 709). A real ship holding channel 255
+ * would read as unclaimed, so the registry skips it.
+ */
+export const CYBMINE_NONE = 255;
+
+/**
  * Assigns each in-game ship a unique small integer — this port's equivalent of
  * C's `usrnum`.
  *
@@ -52,7 +59,7 @@ export class ShipChannelRegistry {
     if (existing !== undefined) return existing;
 
     let channel = 1;
-    while (this.byChannel.has(channel)) channel++;
+    while (this.byChannel.has(channel) || channel === CYBMINE_NONE) channel++;
     this.byKey.set(key, channel);
     this.byChannel.set(channel, key);
     return channel;

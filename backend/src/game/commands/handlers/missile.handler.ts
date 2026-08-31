@@ -4,6 +4,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
@@ -30,7 +31,7 @@ const MISSILE_CHARGE_MAX = 50000;
  *   6. target has a free `lmissl` slot  → else MIS_FULL
  *
  * Side effects on success:
- *   target.lmisslChannel[slot]  = firer.shipno
+ *   target.lmisslChannel[slot]  = firer.channel
  *   target.lmisslDistance[slot] = floor(cdistance × 10000 + 20)
  *   target.lmisslEnergy[slot]   = charge
  *   firer.energy               -= charge / MISENGFC
@@ -158,14 +159,17 @@ export class MissileHandlerService {
     }
 
     const dist = Math.floor(cdistance(ship, target) * 10000 + 20);
-    const firerShipno = ship.shipno;
+    // The firer's unique channel (this port's usrnum), not its shipno: the
+    // read side resolves the slot back to a ship by channel, and shipno is 1
+    // for every player's first ship. @see GECMDS.C:1202, ShipChannelRegistry
+    const firerChannel = ship.channel ?? NO_CHANNEL;
 
     // Mutate target — allocate slot.
     this.shipState.mutate(target.userid, target.shipno, (t) => {
       while (t.lmisslChannel.length <= slot) t.lmisslChannel.push(255);
       while (t.lmisslDistance.length <= slot) t.lmisslDistance.push(0);
       while (t.lmisslEnergy.length <= slot) t.lmisslEnergy.push(0);
-      t.lmisslChannel[slot] = firerShipno;
+      t.lmisslChannel[slot] = firerChannel;
       t.lmisslDistance[slot] = dist;
       t.lmisslEnergy[slot] = charge;
     });

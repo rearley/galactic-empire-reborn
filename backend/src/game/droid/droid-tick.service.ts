@@ -533,7 +533,7 @@ export class DroidTickService implements OnModuleInit {
     this.shipState.mutate(target.userid, target.shipno, (v) => {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
       while (v.ltorpsDistance.length <= emptySlot) v.ltorpsDistance.push(0);
-      v.ltorpsChannel[emptySlot] = droid.shipno;
+      v.ltorpsChannel[emptySlot] = droid.channel ?? NO_CHANNEL;
       v.ltorpsDistance[emptySlot] = ddist;
     });
   }

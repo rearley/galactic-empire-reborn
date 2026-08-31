@@ -701,8 +701,14 @@ export class ScanHandlerService implements OnModuleInit {
     const ysect = Math.floor(ship.ycoord);
 
     // No arg → list planets in current sector (@see GECMDS.C:2295 plnum loop)
+    //
+    // Read the LIVE planet state, not GalaxyService's read-model: that one
+    // hydrates once at boot and is never updated, so a planet claimed since
+    // startup still listed as "(unnamed)" with no owner. Players scanned a
+    // sector, picked what looked like a free planet, flew to it and only found
+    // out it was taken when the landing was refused.
     if (args.length === 0) {
-      const sectorPlanets = this.galaxyService.getSectorPlanets(xsect, ysect);
+      const sectorPlanets = this.planetService.bySector(xsect, ysect);
       if (sectorPlanets.length === 0) {
         return { lines: [{ text: 'No planets in this sector.', category: 'system' }] };
       }
@@ -721,13 +727,12 @@ export class ScanHandlerService implements OnModuleInit {
     // Numeric arg → plnum lookup in current sector (original GECMDS.C:2295)
     const num = parseInt(args[0], 10);
     let planet = !isNaN(num) && String(num) === args[0]
-      ? this.galaxyService.getSectorPlanets(xsect, ysect).find((p) => p.plnum === num) ?? null
+      ? this.planetService.bySector(xsect, ysect).find((p) => p.plnum === num) ?? null
       : null;
 
     // Name arg → cross-sector lookup (deviation D8)
     if (!planet) {
-      const name = args.join(' ');
-      planet = this.galaxyService.findPlanetByName(name);
+      planet = this.planetService.byName(args.join(' ')) ?? null;
     }
 
     if (!planet) {
