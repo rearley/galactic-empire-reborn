@@ -1,3 +1,42 @@
+## 2026-08-31 (later) — colony lifecycle playtest: starvation notices, adm usage
+
+**Completed:**
+- **Starvation is no longer silent.** C mails the owner a distress notice each time a colony runs
+  out of food and loses an eighth of its troops (MESG06) or men (MESG07) — GEPLANET.C:211/246. The
+  port did the killing and said nothing, so a colony could dwindle to nothing with no notice ever
+  reaching the player. `applyEconomyTickWithLosses` now reports the body count and
+  `PlanetEconomyService` mails it. `mai`/`rea` render a starvation payload rather than reusing the
+  attack shape, which would have printed "Attacker: COLONISTS STARVED".
+- **The revolt notice was being written to a table nobody reads.** `PlanetEconomyService` wrote
+  distress mail to `Mail`; the inbox reads `MailStat` (as `PlanetAttackService` already did). A
+  player whose planet revolted was never told. Both distress paths now share one insert into
+  `MailStat`, with a monotonic msgno — `Date.now()` alone collided when a single tick sent both the
+  troop and the men notice.
+- **`adm` sub-commands document their arguments.** The footer listed names only, so there was no way
+  to learn that `rate`/`markup`/`reserve`/`sellflag` take `<item>` before their value; getting the
+  order wrong printed a bare "Invalid value." with no correction. The footer now shows each
+  signature and every malformed sub-command prints it.
+
+**Tests:** 3014/3014 across 315 suites. New: `test/game/planet/starvation-mail.spec.ts` (4),
+`test/integration/planet-economy-wiring.spec.ts` (1), two `adm` usage tests.
+
+The wiring test closes a real hole: `PlanetStateService` takes `PlanetEconomyService` as an
+*optional* constructor parameter and silently falls back to the pure formula when it is absent, so
+the revolt branch and the starvation mail could both vanish in production without a single test
+failing — every existing test constructed the service with two arguments. It now drives a tick
+through DI and asserts the owner is mailed.
+
+**Corrected in docs/GAME_MECHANICS.md:** the starvation section claimed men are reduced *to zero*.
+C kills `men/8`. It also had troops starving by killing men, and men eating the food; in C troops
+eat first (`food -= troops/100`) and each population starves by the same eighth.
+
+**Verified live:** colonised New Terra (930 men bought at Zygor, flown out, `tra down`), set
+production rates, watched it feed itself, then starved it deliberately — `mai` showed
+"Distress Signal / COLONISTS STARVED" and `rea 1` rendered "79 colonists starved to death — the
+colony is out of food."
+
+---
+
 ## 2026-08-31 — social/mail/economy playtest: teams, mail lifecycle, planet production
 
 **Completed:**

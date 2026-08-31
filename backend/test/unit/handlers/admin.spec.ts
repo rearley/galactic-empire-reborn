@@ -80,6 +80,32 @@ describe('AdminHandlerService', () => {
     expect(result.lines[0].category).toBe('system');
   });
 
+  /**
+   * Playtest: the footer listed sub-command *names* only, so there was no way
+   * to learn that rate/markup/reserve take `<item> <value>` in that order.
+   * `adm rate 20 men` just said "Invalid value." with no correction.
+   */
+  it('the bare-adm footer spells out each sub-command\'s arguments', async () => {
+    const { svc } = makeService();
+    const result = await svc.command.handler(makeShip(), [], {});
+    const footer = result.lines.map((l) => l.text).join('\n');
+    expect(footer).toContain('adm rate <item> <0-100>');
+    expect(footer).toContain('adm markup <item> <value>');
+    expect(footer).toContain('adm sellflag <item> on|off');
+    expect(footer).toContain('adm reserve <item> <value>');
+    expect(footer).toContain('adm tax <0-119>');
+    expect(footer).toContain('adm beacon <message>');
+    expect(footer).toContain('adm password <word|none|team>');
+  });
+
+  it('a malformed sub-command shows the usage rather than only "Invalid value."', async () => {
+    const { svc } = makeService();
+    // Arguments the wrong way round — the common mistake the old message hid.
+    const result = await svc.command.handler(makeShip(), ['rate', '20', 'men'], {});
+    const text = result.lines.map((l) => l.text).join('\n');
+    expect(text).toContain('adm rate <item> <0-100>');
+  });
+
   it('unknown sub-command returns ADM_INVALID', async () => {
     const { svc } = makeService();
     const result = await svc.command.handler(makeShip(), ['bogus'], {});

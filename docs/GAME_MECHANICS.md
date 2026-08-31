@@ -557,9 +557,13 @@ Tick cadence: `interval = max(PLANTIME_MIN_SECONDS, floor(PLANTOCK_SECONDS / N))
 
 ### multiply() formula (pure function in `planet-economy.ts`)
 
-1. **Troop starvation** — if `troops/100 > food.qty`, reduce men by starving troops.
-2. **Food consumption** — `food.qty -= ceil(men.qty / 100)`.
-3. **Men starvation** — if food exhausted after consumption, reduce men to zero; break production loop.
+1. **Troop starvation** — if `troops/100 > food.qty`, kill `troops/8` (troops eat first).
+2. **Food consumption** — `food.qty -= floor(troops.qty / 100)`, floored at 0 (GEPLANET.C:221-230 —
+   it is troops, not men, that eat).
+3. **Men starvation** — if `men/100 > food`, kill `men/8` (an eighth), not all of them
+   (GEPLANET.C:233-247). Troops starve first, by the same fraction. Each starvation mails the owner
+   a `MAIL_CLASS_DISTRESS` notice (MESG06 troops / MESG07 men) — into `MailStat`, the table `mai`
+   reads, since a row in `Mail` never reaches the player.
 4. **Gold-to-cash** — `planet.cash += gold.qty × BASEPRICE[I_GOLD]; gold.qty = 0`.
 5. **Per-item production** (14 items) — for each item `i`:
    - `tfact = 1 - taxrate / 120`

@@ -11,6 +11,34 @@ import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
  * Handles the `admin` / `adm` command — planet owner configuration.
  * @see GECMDS.C:3462 cmd_admin
  */
+/**
+ * Sub-command usage, shown by bare `adm` and by any malformed sub-command.
+ *
+ * Listing the names alone was not enough to use the command: `rate`, `markup`,
+ * `reserve` and `sellflag` all take `<item>` before their value, and getting
+ * the order wrong produced a bare "Invalid value." with no correction.
+ */
+const ADMIN_USAGE: readonly string[] = [
+  'Commands:',
+  '  adm rate <item> <0-100>        production rate',
+  '  adm markup <item> <value>      sale price',
+  '  adm sellflag <item> on|off     offer item to visitors',
+  '  adm reserve <item> <value>     hold back from sale',
+  '  adm tax <0-119>                tax rate',
+  '  adm beacon <message>           message shown to visitors',
+  '  adm password <word|none|team>  who may land',
+];
+
+/** Invalid-value message followed by the full sub-command usage. */
+function usageError(): CommandResult {
+  return {
+    lines: [
+      { text: formatMessage(MessageId.ADM_INVALID), category: 'system' },
+      ...ADMIN_USAGE.map((text) => ({ text, category: 'system' as const })),
+    ],
+  };
+}
+
 @Injectable()
 export class AdminHandlerService {
   constructor(private readonly planetService: PlanetStateService) {}
@@ -64,7 +92,7 @@ export class AdminHandlerService {
         lines.push({ text: '(no items in stock, no rates set)', category: 'info' });
       }
       lines.push({ text: `Tax rate: ${state.taxrate}%  Cash: ${Number(state.tax).toLocaleString()} cr`, category: 'info' });
-      lines.push({ text: `Commands: adm rate/markup/sellflag/reserve/tax/beacon/password`, category: 'system' });
+      lines.push(...ADMIN_USAGE.map((text) => ({ text, category: 'system' as const })));
       return { lines };
     }
 
@@ -74,12 +102,9 @@ export class AdminHandlerService {
     switch (sub) {
       case 'rate': {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
-        if (itemIndex === -1) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
-        }
         const value = parseUint32(args[2] ?? '');
-        if (value === undefined || value > 100) {
-          return { lines: [{ text: 'Rate must be 0–100.', category: 'system' }] };
+        if (itemIndex === -1 || value === undefined || value > 100) {
+          return usageError();
         }
         change = { type: 'rate', itemIndex, value };
         break;
@@ -88,7 +113,7 @@ export class AdminHandlerService {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
         const value = parseUint32(args[2] ?? '');
         if (itemIndex === -1 || value === undefined) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+          return usageError();
         }
         change = { type: 'markup', itemIndex, value };
         break;
@@ -97,7 +122,7 @@ export class AdminHandlerService {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
         const onOff = args[2]?.toLowerCase();
         if (itemIndex === -1 || (onOff !== 'on' && onOff !== 'off')) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+          return usageError();
         }
         change = { type: 'sellflag', itemIndex, value: onOff === 'on' };
         break;
@@ -106,7 +131,7 @@ export class AdminHandlerService {
         const itemIndex = resolveItemKeyword(args[1] ?? '');
         const value = parseUint32(args[2] ?? '');
         if (itemIndex === -1 || value === undefined) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+          return usageError();
         }
         change = { type: 'reserve', itemIndex, value };
         break;
@@ -114,7 +139,7 @@ export class AdminHandlerService {
       case 'tax': {
         const value = parseUint32(args[1] ?? '');
         if (value === undefined) {
-          return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+          return usageError();
         }
         change = { type: 'taxrate', value: Math.min(119, value) };
         break;
@@ -130,7 +155,7 @@ export class AdminHandlerService {
         break;
       }
       default:
-        return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
+        return usageError();
     }
 
     const result = await this.planetService.applyAdminChange(key, ship.userid, change);

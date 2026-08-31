@@ -7,12 +7,30 @@
 import { BASEPRICE, I_FOOD, I_GOLD, I_MEN, I_TROOPS, MANHOURS, MAXPL, NUMITEMS } from '../constants/items';
 import { PlanetState } from './planet-state.types';
 
+/** How many troops and men a tick starved to death. Zero when the colony ate. */
+export interface StarvationLosses {
+  troops: number;
+  men: number;
+}
+
 /**
  * Apply one economy tick to a planet state snapshot.
  * Ports GEPLANET.C:multiply lines 195–340 (stops before revolt — research Decision 6).
  * @see GEPLANET.C:195 multiply()
  */
 export function applyEconomyTick(state: PlanetState): PlanetState {
+  return applyEconomyTickWithLosses(state).state;
+}
+
+/**
+ * As {@link applyEconomyTick}, but also reports what starved.
+ *
+ * C mails the owner a distress message on each starvation (MESG06 troops,
+ * MESG07 men, GEPLANET.C:211/246). The caller needs the counts to do that, and
+ * they cannot be recovered from the returned state alone once production has
+ * added stock back on top.
+ */
+export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetState; starved: StarvationLosses } {
   // Deep-copy items to avoid mutating the original snapshot
   const items = state.items.map((it) => ({ ...it }));
   let cash = state.cash;
@@ -27,8 +45,12 @@ export function applyEconomyTick(state: PlanetState): PlanetState {
   let updatedFood = food;
   let updatedMen = men;
 
+  const starved: StarvationLosses = { troops: 0, men: 0 };
+
   if (updatedTroops / 100 > updatedFood) {
-    updatedTroops = Math.floor(updatedTroops - updatedTroops / 8);
+    const survivors = Math.floor(updatedTroops - updatedTroops / 8);
+    starved.troops = updatedTroops - survivors;
+    updatedTroops = survivors;
   }
 
   // Food eating — GEPLANET.C:~222
@@ -37,7 +59,9 @@ export function applyEconomyTick(state: PlanetState): PlanetState {
 
   // Men starvation — GEPLANET.C:~228
   if (updatedMen / 100 > updatedFood) {
-    updatedMen = Math.floor(updatedMen - updatedMen / 8);
+    const survivors = Math.floor(updatedMen - updatedMen / 8);
+    starved.men = updatedMen - survivors;
+    updatedMen = survivors;
   }
 
   items[I_TROOPS].qty = BigInt(updatedTroops);
@@ -83,9 +107,12 @@ export function applyEconomyTick(state: PlanetState): PlanetState {
   // Revolt and check_spy deferred to feature 006 (research Decision 6)
 
   return {
-    ...state,
-    items,
-    cash,
-    tax,
+    state: {
+      ...state,
+      items,
+      cash,
+      tax,
+    },
+    starved,
   };
 }
