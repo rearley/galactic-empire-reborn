@@ -17,6 +17,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import { ShipStateService } from '../ship/ship-state.service';
+import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { MineRegistry } from '../combat/mine.registry';
 import { MineRepository } from '../combat/mine.repository';
@@ -413,7 +414,7 @@ export class DroidTickService implements OnModuleInit {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.shield = r.newCharge;
           if (r.knockedDown) v.shieldstat = 0;
-          v.lastfired = droid.shipno;
+          v.lastfired = droid.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
@@ -421,7 +422,7 @@ export class DroidTickService implements OnModuleInit {
       } else {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.damage = v.damage + hullDamage;
-          v.lastfired = droid.shipno;
+          v.lastfired = droid.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
       }
@@ -502,7 +503,7 @@ export class DroidTickService implements OnModuleInit {
       if (damage >= 1) {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.damage = v.damage + damage;
-          v.lastfired = droid.shipno;
+          v.lastfired = droid.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
 

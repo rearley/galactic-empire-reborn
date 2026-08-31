@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TickKind } from '../tick/tick.types';
@@ -8,6 +8,7 @@ import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 import { GESTAT_AUTO, GESTAT_USER, GESTAT_AVAIL } from '../constants';
 import { SHIP_STATUS_ABANDONED } from '../commands/_ship-management-constants';
+import { ShipChannelRegistry, NO_CHANNEL } from './ship-channel.registry';
 
 /**
  * In-memory source of truth for all active ship state.
@@ -29,7 +30,38 @@ export class ShipStateService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tickService: TickService,
+    // @Optional + default so the many direct `new ShipStateService(...)` calls
+    // and the ad-hoc test modules that provide ShipStateService on its own keep
+    // working; Nest injects the shared singleton when ShipModule is in play.
+    @Optional()
+    private readonly channels: ShipChannelRegistry = new ShipChannelRegistry(),
   ) {}
+
+  /** Put a ship in the map and give it a channel. */
+  private enter(state: ShipState): void {
+    this.map.set(shipKey(state.userid, state.shipno), state);
+    state.channel = this.channels.acquire(state.userid, state.shipno);
+  }
+
+  /**
+   * Take a ship out of the map, free its channel, and scrub every reference to
+   * that channel.
+   *
+   * Channels are recycled, so a stale `lastfired` left pointing at a freed one
+   * would silently transfer an old grudge — and its kill credit — to whoever
+   * came in next. C clears it the same way when a user drops
+   * (GEFUNCS.C:1224-1225).
+   */
+  private leave(userid: string, shipno: number): void {
+    const departing = this.map.get(shipKey(userid, shipno));
+    if (departing) departing.channel = undefined;
+    this.map.delete(shipKey(userid, shipno));
+    const freed = this.channels.release(userid, shipno);
+    if (freed === NO_CHANNEL) return;
+    for (const s of this.map.values()) {
+      if (s.lastfired === freed) s.lastfired = NO_CHANNEL;
+    }
+  }
 
   /**
    * Hydrates the in-memory map from Postgres and registers the SHIP_UPDATE flush subscriber.
@@ -62,7 +94,7 @@ export class ShipStateService implements OnModuleInit {
       // Self-heal: phasrtype/shieldtype=0 means they were never set at creation — @see GEFUNCS.C:233-234
       if (state.phasrtype === 0) { state.phasrtype = 1; state.dirty = true; }
       if (state.shieldtype === 0) { state.shieldtype = 1; state.dirty = true; }
-      this.map.set(shipKey(state.userid, state.shipno), state);
+      this.enter(state);
     }
     this.logger.log(`Hydrated ${this.map.size} ships from Postgres`);
 
@@ -187,7 +219,7 @@ export class ShipStateService implements OnModuleInit {
    * @see specs/007-cybertron-ai/plan.md T023 — boot-time hydrate for Cybrg-* rows
    */
   loadShip(state: ShipState): void {
-    this.map.set(shipKey(state.userid, state.shipno), state);
+    this.enter(state);
   }
 
   /**
@@ -199,7 +231,7 @@ export class ShipStateService implements OnModuleInit {
   loadIfAbsent(state: ShipState): void {
     const key = shipKey(state.userid, state.shipno);
     if (!this.map.has(key)) {
-      this.map.set(key, state);
+      this.enter(state);
     }
   }
 
@@ -216,7 +248,7 @@ export class ShipStateService implements OnModuleInit {
   board(state: ShipState): void {
     state.status = GESTAT_USER;
     state.dirty = true;
-    this.map.set(shipKey(state.userid, state.shipno), state);
+    this.enter(state);
     // board/unboard are the sole persisters of ship.status.
     // The tick flush (stateToPrismaUpdate) intentionally strips status — see ship-state.mappers.ts:88.
     // Fire-and-forget: updateMany is a no-op if the row is somehow absent; mirrors unboard's explicit persist.
@@ -296,7 +328,7 @@ export class ShipStateService implements OnModuleInit {
    * @see GEFUNCS.C:killem
    */
   removeFromGame(ship: { userid: string; shipno: number }): void {
-    this.map.delete(shipKey(ship.userid, ship.shipno));
+    this.leave(ship.userid, ship.shipno);
   }
 
   /**
@@ -316,7 +348,7 @@ export class ShipStateService implements OnModuleInit {
     } catch (err: unknown) {
       this.logger.error(`flushAndUnload failed for ${shipKey(userid, shipno)}:`, err);
     }
-    this.map.delete(shipKey(userid, shipno));
+    this.leave(userid, shipno);
     this.lastFlushedAt.delete(shipKey(userid, shipno));
   }
 

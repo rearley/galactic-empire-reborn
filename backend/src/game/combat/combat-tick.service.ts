@@ -341,14 +341,17 @@ export class CombatTickService implements OnModuleInit {
    * dead victim).
    */
   private findActiveAttackerByChannel(channel: number, victim: ShipState): ShipState | undefined {
-    const victimKey = shipKey(victim.userid, victim.shipno);
-    for (const s of this.shipState.findAllShips()) {
-      if (s.shipno !== channel) continue;
-      if (shipKey(s.userid, s.shipno) === victimKey) continue;
-      if (s.status !== 1 && s.status !== 2) continue;
-      return s;
-    }
-    return undefined;
+    // Channels are unique per in-game ship (this port's `usrnum`), so the
+    // attacker is a direct lookup. This used to scan for `s.shipno === channel`,
+    // which matched the first ship in the map with that per-user index — i.e.
+    // essentially any player's first ship — and handed them the kill, the loot
+    // and the score. @see ShipChannelRegistry, GEMAIN.H:340
+    if (channel < 0) return undefined;
+    const attacker = this.shipState.findAllShips().find((s) => s.channel === channel);
+    if (attacker === undefined) return undefined;
+    if (shipKey(attacker.userid, attacker.shipno) === shipKey(victim.userid, victim.shipno)) return undefined;
+    if (attacker.status !== 1 && attacker.status !== 2) return undefined;
+    return attacker;
   }
 
   /** @see GEFUNCS.C:minesweep */
@@ -701,18 +704,17 @@ export class CombatTickService implements OnModuleInit {
   }
 
   /**
-   * Look up the attacker ship by channel (= shipno in this port). Skips the
-   * carrier itself. Returns undefined if not found (firer left game).
+   * Look up the ship holding a channel. Skips the carrier itself. Returns
+   * undefined if the firer has left the game — C nulls the reference the same
+   * way (GEFUNCS.C:1224).
    */
   private findShipByChannel(channel: number, carrier: ShipState): ShipState | undefined {
-    const carrierKey = shipKey(carrier.userid, carrier.shipno);
-    for (const s of this.shipState.findAllShips()) {
-      if (s.shipno !== channel) continue;
-      if (shipKey(s.userid, s.shipno) === carrierKey) continue;
-      if (s.status !== 1 && s.status !== 2) continue;
-      return s;
-    }
-    return undefined;
+    if (channel < 0) return undefined;
+    const found = this.shipState.findAllShips().find((s) => s.channel === channel);
+    if (found === undefined) return undefined;
+    if (shipKey(found.userid, found.shipno) === shipKey(carrier.userid, carrier.shipno)) return undefined;
+    if (found.status !== 1 && found.status !== 2) return undefined;
+    return found;
   }
 
   /** Reference the random port so DI-injected adapter is reachable in subclass tests. */

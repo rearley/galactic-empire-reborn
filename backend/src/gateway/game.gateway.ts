@@ -421,12 +421,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // Resolve attacker by lastfired channel (same logic as
           // CombatTickService.findActiveAttackerByChannel).
           const victimKey = shipKey(userid, activeShipNo);
-          const attackerShip = this.shipStateService.findAllShips().find(
-            (s) =>
-              s.shipno === ship.lastfired &&
-              shipKey(s.userid, s.shipno) !== victimKey &&
-              (s.status === 1 || s.status === 2),
-          );
+          // Channel lookup, not a shipno scan: `lastfired` holds the firer's
+          // unique channel (this port's `usrnum`, GEMAIN.H:340). Matching on
+          // `s.shipno` instead credited the kill to the first ship in the map
+          // with that per-user index — every player's first ship is shipno 1,
+          // so a pilot sectors away who had never fired got named as the killer.
+          const byChannel = this.shipStateService
+            .findAllShips()
+            .find((s) => s.channel === ship.lastfired);
+          const attackerShip =
+            byChannel &&
+            shipKey(byChannel.userid, byChannel.shipno) !== victimKey &&
+            (byChannel.status === 1 || byChannel.status === 2)
+              ? byChannel
+              : undefined;
 
           // Look up kill-score points for the victim's ship class via Prisma.
           // PlayerScoreService no-ops when scoreAwarded=0 or attackerUserid=null.

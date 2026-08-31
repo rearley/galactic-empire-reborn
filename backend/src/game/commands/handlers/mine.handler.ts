@@ -3,6 +3,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { MineRegistry } from '../../combat/mine.registry';
 import { MineRepository } from '../../combat/mine.repository';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
@@ -84,7 +85,7 @@ export class MineHandlerService {
     }
 
     const mine = await this.mineRepo.create({
-      channel: ship.shipno,
+      channel: ship.channel ?? NO_CHANNEL,
       timer,
       xcoord: ship.xcoord,
       ycoord: ship.ycoord,

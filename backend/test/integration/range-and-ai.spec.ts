@@ -57,6 +57,10 @@ function makeShip(o: Partial<ShipState> & { userid: string; shipno: number; shpc
     navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false, dirty: false,
     ...o,
+    // A ship in the game holds a unique `channel` (this port's usrnum) and
+    // attribution reads it, not `shipno`. These fixtures stage firer and
+    // victim by giving each a distinct shipno, so mirror it into channel.
+    channel: o.channel ?? o.shipno ?? 1,
   };
 }
 
@@ -392,6 +396,9 @@ describe('Murdonian (class 32) reactive fightback fires after a player hit', () 
     h.shipMap.set('player1:7', {
       ...emptyShip(),
       userid: 'player1', shipno: 7, shpclass: 1, shipname: 'Player',
+      // `channel` is what attribution matches on — the harness writes straight
+      // into shipMap, so nothing assigns one for us.
+      channel: 7,
       xcoord: 10, ycoord: 7, status: GESTAT_USER,
     });
 
@@ -413,7 +420,10 @@ describe('Murdonian (class 32) reactive fightback fires after a player hit', () 
     droid!.xcoord = 10 + murdonianSectors * 0.5;
     droid!.ycoord = 7;
     droid!.cantexit = 5;
-    droid!.lastfired = 7; // player shipno
+    // lastfired holds the firer's unique CHANNEL (this port's usrnum), not its
+    // shipno — every player's first ship is shipno 1, so a shipno here would
+    // point the droid at an arbitrary bystander. @see ShipChannelRegistry
+    droid!.lastfired = 7;
     droid!.phasr = 100; // ensure above PMINFIRE
     droid!.where = 0;
 

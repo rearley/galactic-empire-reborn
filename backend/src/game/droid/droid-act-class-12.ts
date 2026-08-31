@@ -75,7 +75,11 @@ export function droidActClass12(
   // Fight-back: cantexit > 0 && lastfired > 0 (strictly >, not >=)
   // @see GEDROIDS.C:443 — ptr->lastfired > 0
   if (droid.cantexit > 0 && droid.lastfired > 0) {
-    const attackerState = players.find((p) => p.shipno === droid.lastfired);
+    // Match on the unique channel, not `shipno`: every player's first ship is
+    // shipno 1, so the droid used to fight back against whichever player
+    // happened to sit first in the list rather than the one that shot it.
+    // @see GEMAIN.H:340, ShipChannelRegistry
+    const attackerState = players.find((p) => p.channel === droid.lastfired);
     if (attackerState) {
       const ddist = cdistance(droid, attackerState) * 10_000;
       const helpMessage = pickHelpMsg(droid.shipname, rng);

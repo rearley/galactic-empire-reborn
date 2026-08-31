@@ -40,6 +40,10 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false, ...over,
+    // A ship in the game holds a unique `channel` (this port's usrnum) and
+    // attribution reads it, not `shipno`. These fixtures stage firer and victim
+    // by giving each a distinct shipno, so mirror it into channel.
+    channel: over.channel ?? over.shipno ?? 1,
   };
 }
 
@@ -139,5 +143,43 @@ describe('CombatTickService — kill attribution (T053, FR-026)', () => {
     expect(alice.kills).toBe(0);
     // Bob is removed from the active map.
     expect(h.shipMap.has(shipKey('b', 2))).toBe(false);
+  });
+
+  /**
+   * The bug this guards against, seen live: a pilot two sectors away who had
+   * never fired a shot was named as the killer of a ship they never saw, and
+   * was handed the kill, the loot and the score.
+   *
+   * Attribution used to resolve `lastfired` by scanning for `s.shipno ===
+   * channel`. `shipno` is a PER-USER index, so it is 1 for every player's first
+   * ship — the scan returned whichever ship sat first in the state map. C stores
+   * the firer's globally unique `usrnum` (GEMAIN.H:340) and indexes the terminal
+   * table with it, so it can only ever name the ship that actually fired.
+   */
+  it('credits the ship that actually fired, not another pilot who shares its shipno', async () => {
+    // Both pilots are flying their first ship — shipno 1, as almost everyone is.
+    // Bystander is listed FIRST so a shipno-based scan would return them.
+    const bystander = makeShip({ userid: 'bystander', shipno: 1, channel: 4, xcoord: 0, ycoord: 0, kills: 0 });
+    const shooter = makeShip({ userid: 'shooter', shipno: 1, channel: 5, xcoord: 0, ycoord: 0, kills: 0 });
+    const victim = makeShip({
+      userid: 'victim', shipno: 1, channel: 6, xcoord: 0, ycoord: 0,
+      shield: 0, shieldstat: 0,
+      damage: 95,
+      lmisslChannel: [5, 255, 255],   // shooter's CHANNEL, not their shipno
+      lmisslDistance: [10, 0, 0],
+      lmisslEnergy: [3000, 0, 0],
+    });
+
+    const h = await makeHarness([bystander, shooter, victim]);
+    const destroyed: CombatShipDestroyedEvent[] = [];
+    h.events.on(COMBAT_SHIP_DESTROYED, (e: CombatShipDestroyedEvent) => destroyed.push(e));
+
+    h.fire();
+
+    expect(destroyed).toHaveLength(1);
+    expect(destroyed[0].attackerId).toBe(shipKey('shooter', 1));
+    expect(destroyed[0].attackerUserid).toBe('shooter');
+    expect(shooter.kills).toBe(1);
+    expect(bystander.kills).toBe(0);
   });
 });
