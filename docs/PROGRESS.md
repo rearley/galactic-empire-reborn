@@ -2069,3 +2069,43 @@ jammed invariants, and Cybertron spawn-visibility regression (T038 backfill).
 - Optional C-011 lockwarn feedback (LOCK1/LOCK3 messages) unported (minor).
 - Optional S-008 scanned-back feedback (SCAN1/2/3 messages) unported (minor).
 - No other combat/AI fidelity gaps open.
+
+## 2026-08-31 — fidelity audit + attribution fixes
+
+**Completed:**
+- `who` lists players only. It had been printing every live ship with its exact
+  sector — all 24 Cybertrons and the droids — which handed out a galaxy-wide
+  threat map for free. Cloak gating moved to C's `cloak < 10` threshold.
+- Ship channels (`ShipChannelRegistry`): a unique per-ship integer, this port's
+  `usrnum`. `lastfired`, torpedo/missile slots, mine records and `cybmine` all
+  store one, and every attribution lookup resolves by it. Previously these held
+  `shipno`, which is 1 for nearly every ship, so kill credit, loot, score and
+  droid retaliation could land on a bystander.
+- `sca pl` reads live planet state instead of GalaxyService's boot-time read
+  model, which never refreshes — a claimed planet still scanned as unowned.
+- Ran a ten-subsystem fidelity audit against the C source; results in
+  `docs/FIDELITY_AUDIT.md`.
+
+**Tests:** backend 3196 passing (338 suites), browser 38 passing. New coverage:
+`ShipChannelRegistry` unit tests incl. the reserved-255 rule; channel lifecycle
+on `ShipStateService` (assign, reuse, and the scrub of stale `lastfired` on
+release); a kill-attribution regression staging two pilots who share a `shipno`;
+`stateToPrismaUpdate` checked against Prisma's DMMF; the live planet views.
+
+**Decisions made:** see DECISIONS.md for the `who` narrowing, ship channels, and
+the `sca pl` source change.
+
+**Next:** work `docs/FIDELITY_AUDIT.md` in the order its closing section gives —
+the three free-win exploits (missile damage normalisation, jammer and zipper
+distance scaling), then `buy` affordability, then the midnight teamcode PK
+collision, then the shield cluster.
+
+**Known issues:**
+- Adding an in-memory-only field to `ShipState` silently broke every DB flush:
+  `stateToPrismaUpdate` returns `...rest` to Prisma and `flush` logs-and-swallows.
+  Now guarded by a test, but the swallow is still there — a flush that fails
+  repeatedly should escalate.
+- The browser suite shares the dev database, so `ros` fills with `e2e_*` accounts
+  and abandoned test planets keep their names.
+- Midnight integration tests contend on the advisory lock when Jest runs them in
+  parallel workers; they pass on re-run.
