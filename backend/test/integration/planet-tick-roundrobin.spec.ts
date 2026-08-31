@@ -1,6 +1,11 @@
 /**
- * T044 — PlanetTickService ticks every owned planet on each PLANET_UPDATE firing,
- * at a fixed PLANTIME cadence (GEMAIN.H:136 PLANTIME 55).
+ * T044 — PlanetTickService sweeps owned planets on the PLANET_UPDATE firing.
+ *
+ * Each planet is updated once per PLANTOCK (GEMAIN.C:469, 30 minutes), not on
+ * every firing: C walks the planet file with a cursor, doing up to MAXTIC
+ * records per kick and pacing the kicks so a full pass takes `plantock`
+ * (GEMAIN.C:656). Ticking the whole set every PLANTIME made the economy ~33x
+ * too fast.
  */
 
 import { PlanetTickService } from '../../src/game/planet/planet-tick.service';
@@ -63,7 +68,7 @@ describe('T044 — PlanetTickService all-planets-per-tick', () => {
     }
   });
 
-  it('each firing ticks the full set in the same order', async () => {
+  it('a second firing in the same period does no work', async () => {
     const { planetServiceMock, tickServiceMock, tickedKeys, getHandler } =
       buildMocks(fakePlanets);
 
@@ -73,16 +78,10 @@ describe('T044 — PlanetTickService all-planets-per-tick', () => {
     const handler = getHandler()!;
     const N = fakePlanets.length;
 
-    // Fire 2 ticks — each ticks the whole set
     await handler();
-    await handler();
+    await handler(); // no time has passed — nothing is due again
 
-    expect(tickedKeys).toHaveLength(N * 2);
-
-    // Both firings must visit the same keys in the same order
-    const firstCycle = tickedKeys.slice(0, N);
-    const secondCycle = tickedKeys.slice(N, N * 2);
-    expect(secondCycle).toEqual(firstCycle);
+    expect(tickedKeys).toHaveLength(N);
   });
 
   it('empty planet list: no runEconomicTickFor calls', async () => {

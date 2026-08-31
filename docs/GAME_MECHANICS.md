@@ -600,6 +600,28 @@ Refusals: `SELL1` (not landed or not neutral zone), `SELLFMT` (not plnum=1), `SE
 
 Tick cadence: `interval = max(PLANTIME_MIN_SECONDS, floor(PLANTOCK_SECONDS / N))` where `N = planet count`. At 450 planets: `floor(1800/450) = 4s` (the floor). At 3 planets: `floor(1800/3) = 600s`.
 
+### Cadence — one `multiply()` per planet per PLANTOCK
+
+C paces planet updates with a cursor over the planet file. `plarti` processes at most `MAXTIC` (20)
+records per kick and reschedules itself `plantime` seconds later, where
+
+```
+plantock = lngopt(PLANTOCK,1,32760) * 60      GEMAIN.C:469   (default 30 minutes)
+numrecs  = ((planets + 25) / plodds) * 4      GEMAIN.C:655
+plantime = plantock / numrecs                 GEMAIN.C:656   (min 4)
+```
+
+so a full pass over every planet takes `plantock`. **`PLANTIME` (55) in GEMAIN.H is only the initial
+value of that variable before it is recomputed at boot** — it is the sweep interval, not the update
+period. The economy's numbers are balanced around one `multiply()` per planet per 30 minutes.
+
+`PlanetTickService` keeps the 55-second sweep and updates a planet only when `PLANTOCK_SECONDS` has
+elapsed since its own last update, at most `MAXTIC` per sweep. Running the whole owned-planet list on
+every sweep — as the port did until 2026-08-31 — made the economy about 33x too fast: a colony of
+29,664 grew by roughly 200 people a minute.
+
+---
+
 ### multiply() formula (pure function in `planet-economy.ts`)
 
 1. **Troop starvation** — if `troops/100 > food.qty`, kill `troops/8` (troops eat first).

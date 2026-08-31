@@ -1,3 +1,30 @@
+## 2026-08-31 — planet economy was running ~33x too fast
+
+Prompted by a playtester's eyebrow: a colony of 29,664 was growing by ~200 people a minute — "at
+that rate they would be able to populate earth soon".
+
+The growth per update was **correct**: the formula predicts ~207 for that colony
+(men 29,664, rate 50, manhours 3500, env 3 + res 2, tax 5%) and that is what it produced. The
+**cadence** was wrong. C paces planet updates with a cursor: `plarti` handles at most MAXTIC (20)
+records per kick and reschedules `plantime` seconds later, where `plantime = plantock / numrecs`
+(GEMAIN.C:656) — so a full pass takes `plantock`, which is
+`lngopt(PLANTOCK,1,32760)*60`, 30 minutes by default (GEMAIN.C:469).
+
+`PLANTIME` (55) in GEMAIN.H is only the initial value of that variable before it is recomputed at
+boot. The port read it as the update period and ran **every** owned planet on **every** 55-second
+sweep — 32.7x more often than the economy is balanced for.
+
+`PlanetTickService` now updates a planet only when PLANTOCK has elapsed since its own last update,
+at most MAXTIC per sweep, keeping the 55s sweep for load-spreading. Verified live: a freshly claimed
+29,664-colonist world grew 216 on its claim tick and then held steady for three minutes, next update
+due at the half hour. Roughly 35% growth per day instead of 10x.
+
+**Tests:** backend 3162 across 334 suites; Playwright 38. New `planet-tick-cadence-plantock.spec.ts`
+pins the period, the MAXTIC cap and the backlog behaviour against an injected clock; the T044 spec
+that encoded "every planet on every firing" now encodes the real contract.
+
+---
+
 ## 2026-08-31 — free play in the new galaxy: two economy bugs
 
 Played the centred galaxy as a fresh pilot with no debug endpoints: claimed a populated world one
