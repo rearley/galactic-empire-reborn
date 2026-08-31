@@ -672,9 +672,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     pending: PendingShipSelectEntry[],
     rawValue: unknown,
   ): Promise<void> {
-    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
-    const indexNum = parseInt(value, 10);
-    const isValidIndex = !Number.isNaN(indexNum) && indexNum >= 1 && indexNum <= pending.length;
+    // The browser client sends the index as a NUMBER (`emitPromptReply` is typed
+    // `number | string`); string-only parsing coerced it to '' and re-emitted the
+    // menu forever, so a captain with two ships could never board either.
+    const indexNum =
+      typeof rawValue === 'number'
+        ? rawValue
+        : parseInt(typeof rawValue === 'string' ? rawValue.trim() : '', 10);
+    const isValidIndex =
+      Number.isInteger(indexNum) && indexNum >= 1 && indexNum <= pending.length;
 
     if (isValidIndex) {
       const chosen = pending[indexNum - 1];
