@@ -17,7 +17,7 @@ export interface MailListEntry {
   /** Stamp formatted as "YYYY-MM-DD". */
   date: string;
   stamp: number;
-  payload: ProductionReportPayload | DistressSignalPayload | GenericPayload;
+  payload: ProductionReportPayload | DistressSignalPayload | StarvationPayload | GenericPayload;
 }
 
 export interface ProductionReportPayload {
@@ -37,6 +37,22 @@ export interface DistressSignalPayload {
   planetName: string;
   sectorX: number;
   sectorY: number;
+}
+
+/**
+ * A colony that ran out of food. Distinct from an attack: nobody fired on it,
+ * so rendering `topic` as an attacker name would be a lie.
+ *
+ * @see GEPLANET.C:211 MESG06 (troops) / :246 MESG07 (men)
+ */
+export interface StarvationPayload {
+  kind: 'starvation';
+  /** 'troops' | 'men' — which population died. */
+  who: 'troops' | 'men';
+  planetName: string;
+  sectorX: number;
+  sectorY: number;
+  lost: bigint;
 }
 
 export interface GenericPayload {

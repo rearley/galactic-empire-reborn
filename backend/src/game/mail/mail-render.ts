@@ -10,6 +10,7 @@ import {
   MailListEntry,
   DistressSignalPayload,
   ProductionReportPayload,
+  StarvationPayload,
 } from './mail.types';
 
 /** Returns the display label for a MailStat class value. */
@@ -39,7 +40,12 @@ export function formatDetail(entry: MailListEntry): string[] {
     `Date:   ${entry.date}`,
   ];
 
-  if (entry.payload.kind === 'distress_signal') {
+  if (entry.payload.kind === 'starvation') {
+    const p = entry.payload as StarvationPayload;
+    const who = p.who === 'troops' ? 'troops' : 'colonists';
+    lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
+    lines.push(`${p.lost.toLocaleString()} ${who} starved to death — the colony is out of food.`);
+  } else if (entry.payload.kind === 'distress_signal') {
     const p = entry.payload as DistressSignalPayload;
     lines.push(`Attacker: ${p.attackerShipName}`);
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);

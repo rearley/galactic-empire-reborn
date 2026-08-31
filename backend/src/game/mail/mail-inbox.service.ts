@@ -5,6 +5,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { MailInboxRepository } from './mail-inbox.repository';
 import {
   DistressSignalPayload,
+  StarvationPayload,
   GenericPayload,
   MailListEntry,
   MailListing,
@@ -82,7 +83,7 @@ export class MailInboxService {
 
   private buildPayload(
     row: MailStat,
-  ): ProductionReportPayload | DistressSignalPayload | GenericPayload {
+  ): ProductionReportPayload | DistressSignalPayload | StarvationPayload | GenericPayload {
     if (row.class === MAIL_CLASS_PRODRPT) {
       return {
         kind: 'production_report',
@@ -91,6 +92,18 @@ export class MailInboxService {
         debt: row.debt,
         tax: row.tax,
         itemqty: [...row.itemqty],
+      };
+    }
+    if (row.class === MAIL_CLASS_DISTRESS && (row.type === 6 || row.type === 7)) {
+      // Starvation, not an attack — MailStat.topic holds a label, not a ship
+      // name, and MailStat.cash holds the body count.
+      return {
+        kind: 'starvation',
+        who: row.type === 6 ? 'troops' : 'men',
+        planetName: row.name1,
+        sectorX: row.int1,
+        sectorY: row.int2,
+        lost: row.cash,
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS) {

@@ -58,7 +58,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_TROOPS].qty = 1000n;
 
     const mailCreate = jest.fn().mockResolvedValue({});
-    const prisma = { mail: { create: mailCreate } } as never;
+    const prisma = { mailStat: { create: mailCreate } } as never;
     const events = new EventEmitter2();
     const emitted: string[] = [];
     events.onAny((ev: string | string[]) => {
@@ -77,7 +77,8 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     // remain 1000 going into the revolt branch, then get divided by 2.
     expect(Number(next.items[I_TROOPS].qty)).toBe(500);
 
-    // Distress mail queued for the deposed owner.
+    // Distress mail queued for the deposed owner — into MailStat, which is the
+    // table `mai` reads; a row in Mail would never reach the player.
     // queueDistressMail is fire-and-forget; await one microtask to let it run.
     await new Promise((r) => setImmediate(r));
     expect(mailCreate).toHaveBeenCalledTimes(1);
@@ -98,7 +99,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_TROOPS].qty = 1000n;
 
     const mailCreate = jest.fn().mockResolvedValue({});
-    const prisma = { mail: { create: mailCreate } } as never;
+    const prisma = { mailStat: { create: mailCreate } } as never;
     // 0.07 → randVal = 7 → 7 % 10 != 0 → no revolt.
     const random = new FixedRandom([0.07]);
     const svc = new PlanetEconomyService(random, prisma);
@@ -116,7 +117,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_TROOPS].qty = 1000n;
 
     const mailCreate = jest.fn().mockResolvedValue({});
-    const prisma = { mail: { create: mailCreate } } as never;
+    const prisma = { mailStat: { create: mailCreate } } as never;
     const random = new FixedRandom([0]);
     const svc = new PlanetEconomyService(random, prisma);
 
@@ -133,7 +134,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_TROOPS].qty = 1000n;
 
     const mailCreate = jest.fn().mockResolvedValue({});
-    const prisma = { mail: { create: mailCreate } } as never;
+    const prisma = { mailStat: { create: mailCreate } } as never;
     const random = new FixedRandom([0]);
     const svc = new PlanetEconomyService(random, prisma);
 

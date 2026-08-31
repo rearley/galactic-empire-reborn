@@ -3,7 +3,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RANDOM, Random } from '../combat/random.port';
 import { I_MEN, I_TROOPS } from '../constants/items';
 import { MAIL_CLASS_DISTRESS } from '../constants';
-import { applyEconomyTick } from './planet-economy';
+
+/** MailStat.type for the two starvation notices. @see GEPLANET.C:211, :246 */
+const MESG06 = 6 as const;
+const MESG07 = 7 as const;
+import { applyEconomyTickWithLosses } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
 /**
@@ -29,6 +33,7 @@ import { PlanetState } from './planet-state.types';
 @Injectable()
 export class PlanetEconomyService {
   private readonly logger = new Logger(PlanetEconomyService.name);
+  private lastMsgno = 0n;
 
   constructor(
     @Inject(RANDOM) private readonly random: Random,
@@ -44,7 +49,18 @@ export class PlanetEconomyService {
    * never block the tick.
    */
   async applyTick(state: PlanetState): Promise<{ state: PlanetState; revolted: boolean }> {
-    const next = applyEconomyTick(state);
+    const { state: next, starved } = applyEconomyTickWithLosses(state);
+
+    // GEPLANET.C:211/246 — starvation mails the owner. Silent starvation meant a
+    // colony could dwindle away with no notice reaching the player at all.
+    if (next.userid !== null) {
+      if (starved.troops > 0) {
+        this.mailStarvation(next, 'TROOPS STARVED', MESG06, starved.troops);
+      }
+      if (starved.men > 0) {
+        this.mailStarvation(next, 'COLONISTS STARVED', MESG07, starved.men);
+      }
+    }
 
     // Revolt only against an owned planet.
     if (next.userid === null) return { state: next, revolted: false };
@@ -99,19 +115,61 @@ export class PlanetEconomyService {
     ysect: number,
     remainingTroops: number,
   ): Promise<void> {
-    await this.prisma.mail.create({
+    await this.insertDistressMail(userid, 'REVOLT', 0, planetName, xsect, ysect, remainingTroops);
+  }
+
+  /** Fire-and-forget starvation notice; a failed insert must not stall the tick. */
+  private mailStarvation(planet: PlanetState, topic: string, type: number, lost: number): void {
+    const owner = planet.userid;
+    if (owner === null) return;
+    void this
+      .insertDistressMail(owner, topic, type, planet.name, planet.xsect, planet.ysect, lost)
+      .catch((err: unknown) => {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Starvation mail failed for ${owner} re ${planet.name}: ${stack}`);
+      });
+  }
+
+  /**
+   * Writes to MailStat, not Mail: MailStat is the table `mai` reads, so a row in
+   * Mail is invisible to the player. The revolt notice used to land there.
+   *
+   * @see GEFUNCS.C:2290 sendit — C has one delivery path for both structs
+   */
+  private async insertDistressMail(
+    userid: string,
+    topic: string,
+    type: number,
+    planetName: string,
+    xsect: number,
+    ysect: number,
+    count: number,
+  ): Promise<void> {
+    await this.prisma.mailStat.create({
       data: {
         userid,
         class: MAIL_CLASS_DISTRESS,
-        msgno: BigInt(Date.now()),
-        type: 0,
+        msgno: this.nextMsgno(),
+        type,
         stamp: Math.floor(Date.now() / 1000),
-        topic: 'REVOLT',
+        topic,
         name1: planetName.slice(0, 25),
         int1: xsect,
         int2: ysect,
-        long1: BigInt(remainingTroops),
+        cash: BigInt(count),
+        itemqty: [],
       },
     });
+  }
+
+  /**
+   * Monotonic message number. `Date.now()` alone collides on the
+   * (userid, class, msgno) key when a tick sends two notices — troops and men
+   * starve in the same millisecond.
+   */
+  private nextMsgno(): bigint {
+    const now = BigInt(Date.now());
+    this.lastMsgno = now > this.lastMsgno ? now : this.lastMsgno + 1n;
+    return this.lastMsgno;
   }
 }
