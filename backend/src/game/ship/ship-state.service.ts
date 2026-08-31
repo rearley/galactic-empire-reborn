@@ -7,6 +7,7 @@ import { ShipState, shipKey } from './ship-state.types';
 import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 import { GESTAT_AUTO, GESTAT_USER, GESTAT_AVAIL } from '../constants';
+import { SHIP_STATUS_ABANDONED } from '../commands/_ship-management-constants';
 
 /**
  * In-memory source of truth for all active ship state.
@@ -226,6 +227,31 @@ export class ShipStateService implements OnModuleInit {
   }
 
   /**
+   * Abandon a player ship: mark it abandoned in memory AND in Postgres.
+   *
+   * `status` is stripped from the per-tick flush (see stateToPrismaUpdate), so
+   * setting the field on the live state alone was invisible to the database —
+   * a restart re-hydrated the hull as flyable and handed it straight back, and
+   * `unboard` overwrote the mark with GESTAT_AVAIL on the way out. Boarding an
+   * abandoned hull puts the captain behind the router's abandoned-ship gate
+   * with no way to acquire another, so the mark has to be durable.
+   *
+   * @see specs/013-ship-management/spec.md FR-701, FR-702
+   */
+  async abandon(userid: string, shipno: number): Promise<void> {
+    const state = this.map.get(shipKey(userid, shipno));
+    if (state) {
+      state.status = SHIP_STATUS_ABANDONED;
+      state.destruct = 0;
+      state.dirty = true;
+    }
+    await this.prisma.ship.updateMany({
+      where: { userid, shipno },
+      data: { status: SHIP_STATUS_ABANDONED },
+    });
+  }
+
+  /**
    * Unboard a player ship: persist as dormant (GESTAT_AVAIL) and remove from
    * the live world. Called by GameGateway.handleDisconnect on clean (non-kill)
    * disconnect.
@@ -242,6 +268,12 @@ export class ShipStateService implements OnModuleInit {
    */
   async unboard(userid: string, shipno: number): Promise<void> {
     const state = this.map.get(shipKey(userid, shipno));
+    // An abandoned hull stays abandoned — dormant means "logged out and
+    // flyable again", which is exactly what abandon is meant to prevent.
+    if (state?.status === SHIP_STATUS_ABANDONED) {
+      await this.flushAndUnload(userid, shipno);
+      return;
+    }
     if (state) {
       state.status = GESTAT_AVAIL;
       state.dirty = true;

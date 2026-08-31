@@ -50,7 +50,8 @@ import {
   PHYSICS_SECTOR_TRANSITION,
   PhysicsSectorTransitionEvent,
 } from '../game/physics/physics-events';
-import { shipKey } from '../game/ship/ship-state.types';
+import { shipKey, ShipState } from '../game/ship/ship-state.types';
+import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
@@ -189,10 +190,48 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const ships = await this.prisma.ship.findMany({
-      where: { userid },
-      orderBy: { shipno: 'asc' },
-    });
+    await this.presentShipEntry(client, userid);
+  }
+
+  /**
+   * Runs fleet re-entry when a handler reports the captain is now shipless.
+   * Failures are logged rather than thrown — the command itself already
+   * succeeded and its reply has been sent.
+   */
+  private async maybeReenterShipEntry(
+    client: Socket,
+    result: import('../game/commands/command.types').CommandResult,
+  ): Promise<void> {
+    if (!result.reenterShipEntry) return;
+    const userid = client.data.userid as string | undefined;
+    if (!userid) return;
+    try {
+      await this.presentShipEntry(client, userid);
+    } catch (err: unknown) {
+      this.logger.error('Ship re-entry after abandon failed:', err);
+    }
+  }
+
+  /**
+   * Resolves the captain's usable fleet and puts them somewhere they can play:
+   * onboarding when they have no ship, straight aboard when they have exactly
+   * one, the selection menu when they have several.
+   *
+   * Called on connect and again after `abandon`, which is the second half of
+   * FR-704 — without it an abandoned captain sat at a session that answered
+   * "No active ship." to everything.
+   *
+   * @see specs/013-ship-management/spec.md FR-704
+   */
+  private async presentShipEntry(client: Socket, userid: string): Promise<void> {
+    // Abandoned hulls are not ships the captain can fly (FR-702). Boarding one
+    // put the player behind the router's abandoned-ship gate with no way out.
+    const ships = (
+      await this.prisma.ship.findMany({
+        where: { userid },
+        orderBy: { shipno: 'asc' },
+      })
+    ).filter((s) => s.status !== SHIP_STATUS_ABANDONED);
 
     if (ships.length === 0) {
       // No ships — new player onboarding path.
@@ -485,7 +524,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         resultOrPromise
           .then((result) => {
             this.emitCommandResult(client, result);
-            this.processBroadcasts(result);
+            this.processBroadcasts(result, client);
+            void this.maybeReenterShipEntry(client, result);
           })
           .catch((err: unknown) => {
             this.logger.error('Async command handler threw:', err);
@@ -495,7 +535,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
       } else {
         this.emitCommandResult(client, resultOrPromise);
-        this.processBroadcasts(resultOrPromise);
+        this.processBroadcasts(resultOrPromise, client);
+        void this.maybeReenterShipEntry(client, resultOrPromise);
       }
     } catch (err: unknown) {
       this.logger.error('Command handler threw:', err);
@@ -1055,29 +1096,72 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/012-social-commands/contracts/commands.md §sen
    * @see specs/011-onboarding/plan.md §rename-broadcasts
    */
-  private processBroadcasts(result: import('../game/commands/command.types').CommandResult): void {
+  private processBroadcasts(
+    result: import('../game/commands/command.types').CommandResult,
+    sender?: Socket,
+  ): void {
     if (!result.broadcasts) return;
     for (const broadcast of result.broadcasts) {
+      const excludeId = broadcast.excludeSelf ? sender?.id : undefined;
+
       if (broadcast.event === 'player.snapshot') {
         this.server.emit('player.snapshot', { players: this.registry.list() });
+      } else if (broadcast.freq !== undefined) {
+        // Tuned transmission — only ships carrying this frequency on one of
+        // their three channels hear it. @see GEMAIN.C:2583 outsect / outwar
+        const members =
+          broadcast.room === 'galaxy' ? undefined : this.roomMembers(broadcast.room);
+        this.emitToSockets(broadcast.event, broadcast.payload, members, excludeId, (ship) =>
+          ship.freq.includes(broadcast.freq as number),
+        );
       } else if (broadcast.room === 'galaxy') {
         // Galaxy-wide: all connected sockets, no filtering
         this.server.emit(broadcast.event, broadcast.payload);
       } else if (broadcast.room === 'hail') {
         // Hail: all connected sockets, exclude cloaked recipients
-        for (const [socketId] of this.server.sockets.sockets) {
-          const sock = this.server.sockets.sockets.get(socketId);
-          if (!sock) continue;
-          const uid = sock.data.userid as string | undefined;
-          const shipno = sock.data.activeShipNo as number | undefined;
-          if (uid == null || shipno == null) continue;
-          const ship = this.shipStateService.get(uid, shipno);
-          if (ship?.cloak) continue;
-          sock.emit(broadcast.event, broadcast.payload);
-        }
+        this.emitToSockets(
+          broadcast.event,
+          broadcast.payload,
+          undefined,
+          excludeId,
+          (ship) => !ship.cloak,
+        );
       } else {
         this.server.to(broadcast.room).emit(broadcast.event, broadcast.payload);
       }
+    }
+  }
+
+  /** Socket ids currently in `room`, or an empty set when the room is gone. */
+  private roomMembers(room: string): Set<string> {
+    return this.server.sockets.adapter.rooms.get(room) ?? new Set<string>();
+  }
+
+  /**
+   * Emits to every socket whose active ship satisfies `accept`.
+   *
+   * `members` limits the sweep to one room's socket ids; omit it to consider
+   * every connected socket. `excludeId` drops the sender, which C does by
+   * passing `usrnum` to outsect/outwar.
+   */
+  private emitToSockets(
+    event: string,
+    payload: unknown,
+    members: Set<string> | undefined,
+    excludeId: string | undefined,
+    accept: (ship: ShipState) => boolean,
+  ): void {
+    const ids = members ?? this.server.sockets.sockets.keys();
+    for (const socketId of ids) {
+      if (socketId === excludeId) continue;
+      const sock = this.server.sockets.sockets.get(socketId);
+      if (!sock) continue;
+      const uid = sock.data.userid as string | undefined;
+      const shipno = sock.data.activeShipNo as number | undefined;
+      if (uid == null || shipno == null) continue;
+      const ship = this.shipStateService.get(uid, shipno);
+      if (!ship || !accept(ship)) continue;
+      sock.emit(event, payload);
     }
   }
 

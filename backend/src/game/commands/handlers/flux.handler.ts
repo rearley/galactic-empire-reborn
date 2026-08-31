@@ -7,7 +7,8 @@ import { I_FLUX } from '../../constants/items';
 /**
  * Handles `flux` — consumes one flux pod from cargo and restores energy
  * to ENGYMAX. Always consumes the pod, even if energy is already at max
- * (matches original game's no-short-circuit behaviour).
+ * (matches original game's no-short-circuit behaviour), and warns when the pod
+ * spent was the last one (LASTFLUX).
  *
  * Pure command (no DI required) — operates on `ship.items` and `ship.energy`
  * directly, in-place.
@@ -24,9 +25,18 @@ export const fluxCommand: Command = {
     if (pods <= 0n) {
       return { lines: [{ text: formatMessage(MessageId.FLUX_NOPODS), category: 'system' }] };
     }
-    ship.items[I_FLUX] = pods - 1n;
+    const remaining = pods - 1n;
+    ship.items[I_FLUX] = remaining;
     ship.energy = ENGYMAX;
     ship.dirty = true;
-    return { lines: [{ text: formatMessage(MessageId.FLUX_USED), category: 'success' }] };
+    const lines: CommandResult['lines'] = [
+      { text: formatMessage(MessageId.FLUX_USED), category: 'success' },
+    ];
+    // GECMDS.C:748 LASTFLUX — say so while the pilot can still do something
+    // about it, rather than letting them find out when the tank is empty.
+    if (remaining === 0n) {
+      lines.push({ text: formatMessage(MessageId.FLUX_LAST), category: 'system' });
+    }
+    return { lines };
   },
 };

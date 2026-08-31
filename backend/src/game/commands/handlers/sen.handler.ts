@@ -52,13 +52,24 @@ export class SenHandlerService {
       room = 'galaxy';
     }
 
+    // C confirms back to the sender with the frequency it went out on
+    // (MSGSNT4 / MSGSNT6) and excludes them from the transmission itself.
+    const confirmation =
+      freq > 0
+        ? `Message sent on channel ${channelLabel}, frequency ${freq}.`
+        : `Message sent on channel ${channelLabel} (open hail).`;
+
     return {
-      lines: [{ text: `Message sent on channel ${channelLabel}.`, category: 'system' }],
+      lines: [{ text: confirmation, category: 'system' }],
       broadcasts: [
         {
           room,
           event: 'message.send',
           payload: { from: ship.shipname, channel: channelLabel, text: messageText },
+          // A tuned channel reaches only ships carrying the same frequency;
+          // an open hail (freq 0) carries none and reaches everyone in range.
+          ...(freq > 0 ? { freq } : {}),
+          excludeSelf: true,
         },
       ],
     };

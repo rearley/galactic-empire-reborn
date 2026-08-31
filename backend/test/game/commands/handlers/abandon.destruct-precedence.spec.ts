@@ -33,12 +33,13 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(ship: ShipState) {
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
-      (_uid: string, _no: number, fn: (s: ShipState) => void) => {
-        fn(ship);
-        return ship;
-      },
-    ),
+    // abandon() persists status as well as setting it — the tick flush strips
+    // `status`, so the handler cannot go through mutate().
+    abandon: jest.fn().mockImplementation((_uid: string, _no: number) => {
+      ship.status = SHIP_STATUS_ABANDONED;
+      ship.destruct = 0;
+      return Promise.resolve();
+    }),
   } as unknown as ShipStateService;
   return { handler: new AbandonHandlerService(mockShipState) };
 }

@@ -54,6 +54,27 @@ describe('fluxCommand — `flux`', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.FLUX_NOPODS));
   });
 
+  /**
+   * GECMDS.C:748 — C prints LASTFLUX after FLUXLOAD when the pod just spent was
+   * the last one. Without it a pilot only discovers the locker is empty the next
+   * time they are out of energy and need it.
+   */
+  it('warns when the pod just used was the last one', () => {
+    const s = makeShip({ energy: 100, items: itemsWith({ [I_FLUX]: 1n }) });
+    const result = fluxCommand.handler(s, [], ctx) as CommandResult;
+    expect(s.items[I_FLUX]).toBe(0n);
+    expect(result.lines.map((l) => l.text)).toEqual([
+      formatMessage(MessageId.FLUX_USED),
+      formatMessage(MessageId.FLUX_LAST),
+    ]);
+  });
+
+  it('does not warn while pods remain', () => {
+    const s = makeShip({ energy: 100, items: itemsWith({ [I_FLUX]: 2n }) });
+    const result = fluxCommand.handler(s, [], ctx) as CommandResult;
+    expect(result.lines).toHaveLength(1);
+  });
+
   it('still consumes pod even if energy already at max (no short-circuit)', () => {
     const s = makeShip({ energy: ENGYMAX, items: itemsWith({ [I_FLUX]: 3n }) });
     fluxCommand.handler(s, [], ctx);

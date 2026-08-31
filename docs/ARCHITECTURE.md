@@ -194,6 +194,16 @@ client  →  [command event]  →  GameGateway.handleCommand()
 Error path: unhandled throw in handler → gateway `catch` → `{ lines: ['Internal error…'] }`.
 Empty input → `{ lines: [] }` (silent drop). Unknown keyword → `{ lines: [UNKNOWN_CMD] }`.
 
+Broadcast filtering: `broadcasts[]` entries may carry `freq` (deliver only to ships tuned to that
+frequency on one of their three channels — C's `outsect`/`outwar` frequency argument) and
+`excludeSelf` (drop the sender, C's `usrnum` exclude). A `hail` broadcast carries no frequency and
+reaches every uncloaked socket.
+
+Re-entry path: a handler that leaves the captain shipless returns
+`CommandResult.reenterShipEntry: true`. The gateway then re-runs `presentShipEntry`, which resolves
+the usable fleet (abandoned hulls excluded) and lands the captain in onboarding, straight aboard, or
+at the ship-selection menu. Used by `abandon`.
+
 Follow-up path: a handler that asked the player an open question returns
 `CommandResult.expectFollowup: '<verb>'`. `emitCommandResult` parks the verb on
 `client.data.pendingFollowup`; the next `command` event is re-dispatched as `<verb> <answer>`

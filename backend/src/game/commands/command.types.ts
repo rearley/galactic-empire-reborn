@@ -24,10 +24,31 @@ export interface CommandResult {
    */
   scanRender?: ScanRenderEvent;
   /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
-  broadcasts?: Array<{ room: string; event: string; payload: unknown }>;
+  broadcasts?: Array<{
+    room: string;
+    event: string;
+    payload: unknown;
+    /**
+     * Radio frequency this transmission is on. When set, the gateway delivers
+     * only to ships carrying it on one of their three channels — C's
+     * `outsect`/`outwar` take the same argument and filter the same way
+     * (GEMAIN.C:2583-2600). Omit for an open hail everyone can hear.
+     */
+    freq?: number;
+    /** Skip the socket that issued the command — C excludes `usrnum`. */
+    excludeSelf?: boolean;
+  }>;
   /** When true, the frontend should clear the event log AFTER appending lines.
    *  Used exclusively by the `cls` command. @see specs/016-navigation-spy/research.md D4 */
   clearLog?: boolean;
+  /**
+   * Set by a handler that left the captain without a flyable ship. The gateway
+   * re-runs fleet resolution afterwards, dropping them into onboarding or the
+   * ship-selection menu rather than a session that answers "No active ship."
+   *
+   * @see specs/013-ship-management/spec.md FR-704
+   */
+  reenterShipEntry?: boolean;
   /**
    * Set by a handler that asked the player an open question. The gateway holds
    * the verb and re-dispatches the player's *next* input as `<verb> <input>`,

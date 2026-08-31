@@ -17,7 +17,12 @@ export interface MailListEntry {
   /** Stamp formatted as "YYYY-MM-DD". */
   date: string;
   stamp: number;
-  payload: ProductionReportPayload | DistressSignalPayload | StarvationPayload | GenericPayload;
+  payload:
+    | ProductionReportPayload
+    | DistressSignalPayload
+    | StarvationPayload
+    | RevoltPayload
+    | GenericPayload;
 }
 
 export interface ProductionReportPayload {
@@ -53,6 +58,21 @@ export interface StarvationPayload {
   sectorX: number;
   sectorY: number;
   lost: bigint;
+}
+
+/**
+ * The colony threw its owner out. Not an attack — no ship was involved — so it
+ * needs its own shape rather than borrowing the attacker field.
+ *
+ * @see GEPLANET.C:368 MESG30
+ */
+export interface RevoltPayload {
+  kind: 'revolt';
+  planetName: string;
+  sectorX: number;
+  sectorY: number;
+  /** Garrison left after the uprising. */
+  troopsRemaining: bigint;
 }
 
 export interface GenericPayload {

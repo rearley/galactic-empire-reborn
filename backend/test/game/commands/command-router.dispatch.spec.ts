@@ -70,6 +70,7 @@ function buildRouter() {
       },
     ),
     removeFromGame: jest.fn(),
+    abandon: jest.fn().mockResolvedValue(undefined),
   } as unknown as ShipStateService;
 
   const mockPlanet = {

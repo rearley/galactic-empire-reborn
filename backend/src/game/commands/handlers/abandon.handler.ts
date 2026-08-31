@@ -3,7 +3,6 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
-import { SHIP_STATUS_ABANDONED } from '../_ship-management-constants';
 
 /**
  * Handles `abandon` — detaches the captain from their current ship.
@@ -36,11 +35,11 @@ export class AbandonHandlerService {
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
 
-    // Mark ship as abandoned and clear any active destruct countdown.
-    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      s.status = SHIP_STATUS_ABANDONED;
-      s.destruct = 0;
-    });
+    // Mark ship as abandoned and clear any active destruct countdown. This goes
+    // through ShipStateService.abandon rather than mutate() because `status` is
+    // stripped from the per-tick flush — set in memory alone, the mark vanished
+    // on the next restart and the hull came back flyable.
+    void this.shipState.abandon(ship.userid, ship.shipno);
 
     // Detach captain from gateway session (clear activeShipNo so next command goes to onboarding).
     if (ctx.client) {
@@ -50,6 +49,10 @@ export class AbandonHandlerService {
 
     return {
       lines: [{ text: formatMessage(MessageId.ABANDON_OK, shipname), category: 'success' }],
+      // FR-704 — hand the captain straight back to ship entry. Clearing
+      // activeShipNo alone left the session answering "No active ship." to
+      // every command, with no way to acquire a new hull.
+      reenterShipEntry: true,
       broadcasts: [
         {
           room: `sector:${xsect}:${ysect}`,
