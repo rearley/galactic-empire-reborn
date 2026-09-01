@@ -12,6 +12,7 @@ import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 
+
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
@@ -107,11 +108,10 @@ describe('ShipTickService — auto-shield (US4, FR-006)', () => {
     const { svc, mockShipState, fireTick } = makeHarness(ship);
     svc.onModuleInit();
 
-    const callsBefore = (mockShipState.mutate as jest.Mock).mock.calls.length;
     fireTick();
-    const callsAfter = (mockShipState.mutate as jest.Mock).mock.calls.length;
-    // No auto-shield mutate (only overspeed mutate possibly, which would be 0 for this ship)
-    expect(callsAfter - callsBefore).toBe(0);
+    // Assert the outcome, not the mutate count — the restorative tick also
+    // mutates for the passive recharge (GEFUNCS.C:1290-1300).
+    expect(ship.shieldstat).toBe(0);
   });
 
   it('does NOT raise shields when autoShield=true but shieldstat already 1', () => {

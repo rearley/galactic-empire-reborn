@@ -1,4 +1,5 @@
 import { ShipState } from './ship-state.types';
+import { GESTAT_USER } from '../constants';
 
 /**
  * Injected RNG interface — allows deterministic injection in tests.
@@ -36,6 +37,12 @@ export type OverspeedDecision =
  * @see GEFUNCS.C:733 overspeed check
  */
 export function decideOverspeed(ship: ShipState, rng: OverspeedRng): OverspeedDecision {
+  // C wraps the ENTIRE block — warn, break and the warncntr recovery — in
+  // `if (ptr->speed > 1000.0 && ptr->status == GESTAT_USER)`. AI ships never
+  // blow their own engines, and a sublight ship is never even considered.
+  // @see GEFUNCS.C:733
+  if (ship.speed <= 1000 || ship.status !== GESTAT_USER) return { kind: 'noop' };
+
   const intspeed = Math.floor(ship.speed / 1000);
 
   // Overspeed condition: going faster than rated topspeed and still accelerating

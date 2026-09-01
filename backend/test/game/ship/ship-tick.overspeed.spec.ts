@@ -11,6 +11,7 @@ import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 
+
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
@@ -149,5 +150,74 @@ describe('ShipTickService overspeed — break path', () => {
     const breakOccurred = mutatedState.topspeed === 0;
     const warnOccurred = mutatedState.warncntr > 0;
     expect(breakOccurred || warnOccurred).toBe(true);
+  });
+});
+
+/**
+ * C wraps the entire overspeed block in
+ *
+ *   if (ptr->speed > 1000.0 && ptr->status == GESTAT_USER)
+ *
+ * inside `moveship` (GEFUNCS.C:733), and `warrti2a` visits each ship only
+ * every third 1-second firing (`zothusn += 3; clicker = (clicker+1)%3`,
+ * GEMAIN.C:2472-2488).
+ *
+ * The port evaluated every ship in the map — Cybertrons and droids included —
+ * once per second with no speed gate, so engine-break rolls came up three
+ * times too often and AI ships could blow their own engines.
+ */
+describe('overspeed is player-only, sublight-exempt, and rolls every third second', () => {
+  function harness(ship: ShipState) {
+    let handler: ((ctx: TickContext) => void) | null = null;
+    const tick = {
+      subscribe: jest.fn((kind: TickKind, h: (ctx: TickContext) => void) => {
+        if (kind === TickKind.SHIP_UPDATE) handler = h;
+        return jest.fn();
+      }),
+    } as unknown as TickService;
+    const state = {
+      findAllShips: () => [ship],
+      mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => {
+        fn(ship);
+        return ship;
+      },
+    } as unknown as ShipStateService;
+    const maint = { runAutoRepair: jest.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
+    const svc = new ShipTickService(tick, state, maint);
+    svc.onModuleInit();
+    // Always-fires RNG so any roll that happens is visible.
+    (svc as unknown as { rng: { intBelow(n: number): number } }).rng = { intBelow: () => 0 };
+    let n = 0;
+    return {
+      fire: () => handler?.({ kind: TickKind.SHIP_UPDATE, tickNumber: ++n, firedAt: new Date() }),
+    };
+  }
+
+  it('never rolls for an AI ship', () => {
+    const ship = makeShip({ status: 2, speed: 9000, speed2b: 9000, topspeed: 5, warncntr: 0 });
+    const h = harness(ship);
+    for (let i = 0; i < 9; i++) h.fire();
+    expect(ship.warncntr).toBe(0);
+    expect(ship.topspeed).toBe(5);
+  });
+
+  it('never rolls at or below 1000 speed', () => {
+    const ship = makeShip({ status: 1, speed: 1000, speed2b: 5000, topspeed: 0, warncntr: 0 });
+    const h = harness(ship);
+    for (let i = 0; i < 9; i++) h.fire();
+    expect(ship.warncntr).toBe(0);
+  });
+
+  it('rolls once every three 1-second ticks, not every one', () => {
+    const ship = makeShip({ status: 1, speed: 9000, speed2b: 9000, topspeed: 5, warncntr: 0 });
+    const h = harness(ship);
+    h.fire();
+    h.fire();
+    h.fire();
+    expect(ship.warncntr).toBe(1);
+    h.fire();
+    h.fire();
+    h.fire();
+    expect(ship.warncntr).toBe(2);
   });
 });

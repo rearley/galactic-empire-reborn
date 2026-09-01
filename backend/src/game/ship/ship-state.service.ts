@@ -85,6 +85,7 @@ export class ShipStateService implements OnModuleInit {
       state.scanFull = (row.user?.options?.[2] ?? 0) === 1;
       state.msgFilter = (row.user?.options?.[3] ?? 0) === 1;
       state.maxTons = maxTonsByClass.get(state.shpclass) ?? 1000;
+      state.maxWarp = maxWarpByClass.get(state.shpclass);
       // Self-heal: topspeed=0 on a warp-capable class means it was never set at creation.
       const classMaxWarp = maxWarpByClass.get(state.shpclass) ?? 0;
       if (state.topspeed === 0 && classMaxWarp > 0) {

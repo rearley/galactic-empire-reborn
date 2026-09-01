@@ -12,6 +12,7 @@ import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 
+
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
