@@ -2333,3 +2333,81 @@ navigation. Three ships lost in the process.
   scan-range asymmetry already recorded.
 
 **Tests:** backend 3459 (372 suites), frontend 157, browser 38.
+
+## 2026-09-01 — third playtest: two pilots, a colony, a freighter and a siege
+
+**How it was played:** two simultaneous accounts (Aurelia on :5175, Bastian on
+:5176 — separate origins give separate localStorage). Every in-world action
+went through the real command input. Postgres and the debug routes were used
+only to observe, to grant time, and to stake the second pilot.
+
+**The run:** founded team Vanguard and confirmed radio between two live pilots;
+claimed a planet one sector out; populated it; watched it revolt at 60% tax;
+retook it; garrisoned it; funded a Heavy Freighter from tax revenue; armed the
+colony with 200 ion cannons; then had Bastian leave the team, buy a warship,
+plant a spy and besiege it. He lost 2,000 troops and then his ship.
+
+**Defects found and fixed:**
+- *A hull bought at Zygor could never warp.* `createShipTransaction` never set
+  `topspeed`, so every purchased ship took the column default of 0 — which is
+  what `war` reads as blown engines. Nothing raises topspeed afterwards. The
+  entire ship-progression loop was dead on arrival. (`15f4155`)
+- *`orb` had no proximity check.* C refuses orbit beyond 250 units, and that
+  number interlocks with `checkdist` clearing `hostile` past 1000 and `fireion`
+  firing only while `hostile > 1`. Without the gate an attacker orbited from
+  5,800 units out, `hostile` was cleared on the next tick, and a colony holding
+  200 ion cannons could not fire a shot. Restoring the gate restored planetary
+  defence. (`0b8ef32`)
+- *Midnight restocked a copy nobody reads.* `refreshNeutralZone` writes
+  Postgres; the game reads PlanetStateService. Its comment argued this was
+  cosmetic because purchases never deplete neutral-zone stock — true, but the
+  economy tick does: the posts hold 1,032,000 men, so `shouldRunEconomy` is
+  true for them and each PLANTOCK starves their food and troops. Over days of
+  uptime the hub shop drained and stayed drained until restart. (`0753e7a`)
+- *`war`/`imp` reported a course the ship was not flying,* and `war <n> <deg>`
+  set a heading the autopilot overwrote a tick later. Both now share one rule.
+  C has no autopilot at all — `holdcourse` there is a Cybertron field. (`5f4f467`)
+- *Eight commands appeared in no help topic* — `tea`, `ros`, `mai`, `rea`,
+  `del`, `spy`, `sys`, `hel`. Teams were unreachable without knowing
+  `tea create <name> <password>` already. Added a `comms` topic and a test that
+  asserts coverage in the direction that was missing. `att` was also documented
+  without the amount it requires. (`72ed6a1`, `0b8ef32`)
+- *`sca pl` labelled the five trading posts "— owned"*, indistinguishable from
+  a rival's colony, and `sca pl <n>` printed the internal `**neutral**`
+  sentinel at the pilot. (`3b5771b`)
+- *A displaced session claimed a network fault* it had no evidence for and
+  offered no way back. (`3b5771b`)
+- *Intra-sector position could be negative* — sector from floor, offset from
+  `coord % 1`. C's `coord2` adds 1 before taking the fraction precisely to
+  avoid this. Also restored C's SSMAX scale. (`29ee26e`)
+
+**Confirmed working end-to-end:** colony production and starvation; revolt at
+`(taxrate/120)*0.35*men > troops` with distress mail; tax accrual and `wit`;
+midnight scoring, planet recount, production report; roster and teams; radio
+between two live pilots; beacons; spy planting and the intel it adds to a scan;
+gravity-well warnings; ion cannons destroying a besieging ship; ship purchase,
+fleet select, phaser/shield upgrades with trade-in; death → hull deletion →
+new-ship onboarding.
+
+**Not defects, verified against C:**
+- The owner's planet counter drifts upward on revolt — C never decrements it
+  either, and both midnights zero and recount (GEMAIN.C:1109-1139).
+- A fresh colony scores ~0. `PLTVDIV=10000` is calibrated for endgame worlds
+  (MAXPL for men is 1e9); the same colony scored 184 once it passed 400,000.
+  No scoring change needed.
+- An unboarded owner gets no call-for-help. `user:<userid>` is joined on
+  boarding, matching C's `instat(...) && substt >= FIGHTSUB`.
+- Re-claiming a planet re-prompts for its name and overwrites it — C's
+  `mnu_admenu1a` does exactly this.
+
+**Known issues (not fixed):**
+- A ship killed by ion cannons is announced to onlookers as "destroyed by
+  unknown". `fireion` sets `lastfired = -1` (as C does) so no attacking ship
+  resolves, and `CombatShipDestroyedEvent.weapon` has no `'ion'` variant — so
+  the kill is indistinguishable from a self-destruct. Display only; the defender
+  still sees the raider die, but is not told their own colony did it.
+- 300 fighters attacking a colony reported "You lost 0; defenders lost 0" and
+  all 300 survived. Worth checking `attack_fig` against GECMDS.C.
+- `aba` gives up a planet with no confirmation prompt.
+
+**Tests:** backend 3,489 (375 suites), frontend 161, browser 38.
