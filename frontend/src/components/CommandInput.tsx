@@ -29,15 +29,19 @@ export function CommandInput({ onSubmit }: CommandInputProps): React.JSX.Element
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const trimmed = value.trim();
+      // A bare Enter is a real input: C answers it with FORHELP
+      // (GECMDS.C:282-284 `if (margc == 0) warnop();`) and the command router
+      // does the same. Dropping it here made that server behaviour
+      // unreachable. It is still kept out of the recall history.
+      onSubmit(trimmed);
       if (trimmed) {
-        onSubmit(trimmed);
         setHistory((prev) => ({
           entries: [trimmed, ...prev.entries].slice(0, MAX_HISTORY),
           cursor: -1,
           draft: '',
         }));
-        setValue('');
       }
+      setValue('');
       return;
     }
 

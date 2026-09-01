@@ -20,20 +20,36 @@ describe('CommandInput', () => {
     expect(input.value).toBe('');
   });
 
-  it('empty input Enter does not call onSubmit', async () => {
+  /**
+   * A bare Enter is a real input in the original: `if (margc == 0) warnop();`
+   * prints FORHELP (GECMDS.C:282-284). The router answers it, so the client
+   * must actually send it rather than dropping it here — otherwise the server
+   * behaviour is unreachable, which is what it was.
+   */
+  it('empty input Enter still submits, so the server can answer FORHELP', async () => {
     const onSubmit = vi.fn();
     render(<CommandInput onSubmit={onSubmit} />);
     const input = screen.getByTestId('command-input');
     await userEvent.type(input, '{Enter}');
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalledWith('');
   });
 
-  it('whitespace-only input does not call onSubmit', async () => {
+  it('whitespace-only input submits as empty', async () => {
     const onSubmit = vi.fn();
     render(<CommandInput onSubmit={onSubmit} />);
     const input = screen.getByTestId('command-input');
     await userEvent.type(input, '   {Enter}');
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalledWith('');
+  });
+
+  it('does not put a blank line into the recall history', async () => {
+    const onSubmit = vi.fn();
+    render(<CommandInput onSubmit={onSubmit} />);
+    const input = screen.getByTestId('command-input');
+    await userEvent.type(input, 'rep nav{Enter}');
+    await userEvent.type(input, '{Enter}');
+    await userEvent.type(input, '{ArrowUp}');
+    expect(input).toHaveValue('rep nav');
   });
 
   // T010a: accent color applied (FR-001)

@@ -7,7 +7,7 @@
  * @see GECMDS.C:4147 sell fee calculation
  */
 
-import { BASEPRICE, ITEM_TONS } from '../constants/items';
+import { BASEPRICE, ITEM_TONS, I_GOLD } from '../constants/items';
 import { PlanetState } from './planet-state.types';
 
 export interface BuyInput {
@@ -97,7 +97,19 @@ export function computeBuyOutcome(input: BuyInput): BuyOutcome {
 
   // 3. availability. `amt4sale` gives the owner the full stock and everyone
   //    else the stock above the reserve. Runs in the neutral zone too.
-  const available = buyerIsOwner ? Number(item.qty) : Number(item.qty) - item.reserve;
+  //
+  //    Gold at Zygor-3 is the exception, and it OVERRIDES whatever the planet
+  //    holds: `if (item == I_GOLD && neutral && plnum == 1) forsale =
+  //    waruptr->cash;`. That is the game's cash-to-gold bank and the only
+  //    reason to carry gold — the hub keeps no stock of it, so applying the
+  //    ordinary check there refused every transaction.
+  //    @see GECMDS.C:4406-4426 amt4sale
+  const isGoldBank = itemIndex === I_GOLD && isNeutralZone && planet.plnum === 1;
+  const available = isGoldBank
+    ? Number(buyerCash)
+    : buyerIsOwner
+      ? Number(item.qty)
+      : Number(item.qty) - item.reserve;
   if (available <= 0 || available < requestedQty) {
     return { ok: false, reason: 'AT_RESERVE' };
   }

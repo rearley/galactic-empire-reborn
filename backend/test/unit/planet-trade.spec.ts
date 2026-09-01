@@ -5,7 +5,7 @@
  */
 import { computeBuyOutcome, computeSellOutcome } from '../../src/game/planet/planet-trade';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
-import { BASEPRICE, NUMITEMS, I_FOOD, I_MEN } from '../../src/game/constants/items';
+import { BASEPRICE, NUMITEMS, I_FOOD, I_MEN, I_GOLD } from '../../src/game/constants/items';
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
   const items = Array.from({ length: NUMITEMS }, () => ({
@@ -194,6 +194,83 @@ describe('computeBuyOutcome', () => {
     if (outcome.ok) {
       expect(outcome.totalCost).toBe(BigInt(outcome.transferred) * BigInt(outcome.unitPrice));
     }
+  });
+});
+
+/**
+ * Zygor-3 sells gold against your wallet, not against a stockpile.
+ *
+ * `amt4sale` (GECMDS.C:4417-4423) ends with:
+ *
+ *   if (item == I_GOLD) {
+ *     plnum = warsptr->where - 10; getplanetdat(usrnum);
+ *     if (neutral(&warsptr->coord) && plnum == 1) forsale = waruptr->cash;
+ *   }
+ *
+ * — overriding whatever the planet holds. That is the game's cash-to-gold
+ * bank, and it is the only reason to carry gold at all. The port applied the
+ * ordinary stock check there, and since the neutral-zone hub carries no gold
+ * the bank refused every transaction with "that would deplete the planet's
+ * reserve".
+ */
+describe('computeBuyOutcome — the Zygor-3 gold bank (GECMDS.C:4417-4423)', () => {
+  const zygor = (over: Partial<PlanetState> = {}) =>
+    makePlanet({ xsect: 0, ysect: 0, plnum: 1, ...over });
+
+  it('sells gold up to the buyer\'s cash even with an empty vault', () => {
+    const planet = zygor();
+    planet.items[I_GOLD].qty = 0n;
+    const price = BigInt(planet.items[I_GOLD].markup2a);
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 50, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
+      buyerCash: price * 50n,
+    });
+    expect(outcome).toMatchObject({ ok: true, transferred: 50 });
+  });
+
+  it('will not sell more gold than the buyer has cash', () => {
+    const planet = zygor();
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 500, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
+      buyerCash: 100n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+  });
+
+  it('does not apply the rule to other items at Zygor-3', () => {
+    const planet = zygor();
+    planet.items[I_FOOD].qty = 0n;
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
+      buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+  });
+
+  it('does not apply the rule at the other neutral-zone planets', () => {
+    // `plnum == 1` — only Zygor-3 is the bank.
+    const planet = zygor({ plnum: 2 });
+    planet.items[I_GOLD].qty = 0n;
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
+      buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+  });
+
+  it('does not apply the rule outside the neutral zone', () => {
+    const planet = makePlanet({ xsect: 4, ysect: 4, plnum: 1 });
+    planet.items[I_GOLD].qty = 0n;
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: false,
+      buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
   });
 });
 
