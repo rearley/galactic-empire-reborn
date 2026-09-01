@@ -13,6 +13,7 @@ import { CybertronTickService } from '../../../src/game/cybertron/cybertron-tick
 import { CybertronRepository } from '../../../src/game/cybertron/cybertron.repository';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
+import { TickKind } from '../../../src/game/tick/tick.types';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CYBERTRON_EVENT, CybertronTargetAcquiredPayload } from '../../../src/game/cybertron/cybertron-events';
@@ -123,9 +124,11 @@ async function buildHarness(seed = 42) {
   } as unknown as CybertronRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];
+  const byKind = new Map<unknown, (ctx: unknown) => void>();
   const tickService = {
-    subscribe: (_kind: unknown, fn: (ctx: unknown) => void) => {
+    subscribe: (kind: unknown, fn: (ctx: unknown) => void) => {
       subscribed.push(fn);
+      byKind.set(kind, fn);
       return () => {};
     },
   } as unknown as TickService;
@@ -151,6 +154,18 @@ async function buildHarness(seed = 42) {
     }
   }
 
+  /** Fire only the 6-second physics tick (spawn evaluation). */
+  function firePhysicsOnly(n = 1): void {
+    const fn = byKind.get(TickKind.PHYSICS);
+    for (let i = 0; i < n; i++) fn?.({ kind: TickKind.PHYSICS, tickNumber: i + 1, firedAt: new Date() });
+  }
+
+  /** Fire only the 1-second AI tick — C's `autortia`, rtkick(1, autorti). */
+  function fireAiTick(n = 1): void {
+    const fn = byKind.get(TickKind.SHIP_UPDATE);
+    for (let i = 0; i < n; i++) fn?.({ kind: TickKind.SHIP_UPDATE, tickNumber: i + 1, firedAt: new Date() });
+  }
+
   // Set up class cache entries for common classes
   (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(21, {
     maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2,
@@ -168,7 +183,7 @@ async function buildHarness(seed = 42) {
     hasJammer: false, hasMine: false, hasZipper: false, noClaim: 3, tough: 0, cybLowestClassAttacks: 0,
   });
 
-  return { svc, shipStateService, shipClassCache, repository, events, shipMap, createdSpawns, fireTick };
+  return { svc, fireAiTick, firePhysicsOnly, shipStateService, shipClassCache, repository, events, shipMap, createdSpawns, fireTick };
 }
 
 // ─── T015: spawn cadence (modulo-30) ──────────────────────────────────────
@@ -416,31 +431,73 @@ describe('T038 — breakoff roll: non-quad fires cybertron.broke-off at 1/CYB_BR
 
 // ─── T039: Zipper branch (US2) ────────────────────────────────────────────
 
-describe('T039 — Zipper branch: Cybertron deploys zipper when mines are near', () => {
-  it('class with hasZipper=true and minesnear>0 deploys zipper, clears cybmine, and reverses course', async () => {
-    const { shipMap, fireTick } = await buildHarness(55);
+describe('T039 — Zipper branch lives in cyb_attack (GECYBS.C:541-557)', () => {
+  /**
+   * C gates the zipper behind three rolls — `gernd()%10 == 1 && has_zip`, then
+   * `minesnear`, then `gernd()%3 == 1` for the sweep itself — and the retreat
+   * is a RANDOM heading held for 3..22 ticks. It also does not spend a zipper
+   * from the hold (`ptr->items[I_ZIPPERS] = 1` right before firing) and does
+   * not drop the target.
+   *
+   * The port had a simplified copy hoisted into the engagement scan that fired
+   * on any `minesnear`, turned exactly 180 degrees and returned out of the
+   * scan entirely — predictable, and it skipped the rest of the engagement.
+   */
+  it('eventually sweeps and flees on a random heading when mines are near', async () => {
+    const { shipMap, fireAiTick } = await buildHarness(55);
 
-    // Class 21 has hasZipper: true; give it zipper inventory
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
       xcoord: 5, ycoord: 5, cybmine: 1, tick: 1, cybupdate: 100, holdcourse: 0,
-      where: 0, phasr: 100, minesnear: 1,
-      items: [0n, 0n, 5n, 0n, 0n, 0n, 10n, 10n, 0n, 3n, 0n, 10n, 0n, 5n, 0n, 0n], // items[9]=3 (I_ZIPPER=9)
+      where: 0, phasr: 100, minesnear: 1, head2b: 0,
     });
     shipMap.set('Cybrg-200:200', cyb);
 
     const player = makeShip({
       userid: 'player1', shipno: 1, shpclass: 3, status: 1,
-      xcoord: 6, ycoord: 5, // 1 unit away — within scan range
+      xcoord: 6, ycoord: 5, cantexit: 1,
     });
     shipMap.set('player1:1', player);
 
-    fireTick(1);
+    // 1-in-10 then 1-in-3; run enough activations for it to land.
+    for (let i = 0; i < 400 && cyb.minesnear !== 0; i++) {
+      cyb.tick = 0;
+      fireAiTick(1);
+    }
     await new Promise((r) => setImmediate(r));
 
-    // Zipper deployed: cybmine cleared, zipper inventory decreased
-    expect(cyb.cybmine).toBe(255);
-    expect(Number(cyb.items[9])).toBeLessThan(3); // I_ZIPPER inventory depleted
+    expect(cyb.minesnear).toBe(0);
+    expect(cyb.holdcourse).toBeGreaterThan(0);
+  });
+
+  it('a class with no zipper never clears its minesnear flag', async () => {
+    // Class 23 in this harness carries no zipper.
+    const { shipMap, fireAiTick, shipClassCache } = await buildHarness(55);
+    (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(99, {
+      maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2,
+      scanRange: 50_000, maxTons: 900, hasTorpedo: false, hasMissile: false,
+      hasJammer: false, hasMine: false, hasZipper: false, noClaim: 3, tough: 0,
+      cybLowestClassAttacks: 1,
+    });
+
+    const cyb = makeShip({
+      userid: 'Cybrg-201', shipno: 201, shpclass: 99, status: 2,
+      xcoord: 5, ycoord: 5, cybmine: 1, tick: 1, cybupdate: 100, holdcourse: 0,
+      where: 0, phasr: 100, minesnear: 1,
+    });
+    shipMap.set('Cybrg-201:201', cyb);
+    shipMap.set('player1:1', makeShip({
+      userid: 'player1', shipno: 1, shpclass: 3, status: 1,
+      xcoord: 6, ycoord: 5, cantexit: 1,
+    }));
+
+    for (let i = 0; i < 200; i++) {
+      cyb.tick = 0;
+      fireAiTick(1);
+    }
+    await new Promise((r) => setImmediate(r));
+
+    expect(cyb.minesnear).toBe(1);
   });
 });
 
@@ -578,5 +635,55 @@ describe('T064 — Sartern class 24: spawns via same code path with Cybrg- prefi
     }
     // The spawn creates via single Cybrg- prefix per GECYBS.C:104-105
     expect(true).toBe(true);
+  });
+});
+
+/**
+ * `wptr->tick` counts SECONDS.
+ *
+ * C drives the whole automaton loop from `autortia`, which re-arms itself with
+ * `rtkick(1, autorti)` (GEMAIN.C:2438) — one second. Each pass either
+ * decrements a Cybertron's `tick` or, at zero, calls its `tick_func`
+ * (GEMAIN.C:2401-2426).
+ *
+ * The port decremented on the 6-second physics tick, so with C's tick values a
+ * Cybertron re-evaluated every 36-66 seconds in combat instead of 6-11, and
+ * every 180-330 seconds idle. The CYBMAXPERTICK cap made it worse by
+ * `break`ing BEFORE the decrement, so a capped ship did not even count down.
+ */
+describe('Cybertron cadence — tick counts seconds (GEMAIN.C:2401-2438)', () => {
+  it('counts down on the 1-second tick', async () => {
+    const h = await buildHarness();
+    const cyb = makeShip({ userid: '@cyb1', shipno: 1, shpclass: 21, status: 2, tick: 5 });
+    h.shipMap.set('@cyb1:1', cyb);
+
+    h.fireAiTick();
+    expect(cyb.tick).toBe(4);
+    h.fireAiTick(3);
+    expect(cyb.tick).toBe(1);
+  });
+
+  it('does not count down on the 6-second physics tick', async () => {
+    const h = await buildHarness();
+    const cyb = makeShip({ userid: '@cyb1', shipno: 1, shpclass: 21, status: 2, tick: 5 });
+    h.shipMap.set('@cyb1:1', cyb);
+
+    h.firePhysicsOnly();
+    expect(cyb.tick).toBe(5);
+  });
+
+  it('counts every Cybertron down even when the activation cap is reached', async () => {
+    // The cap limits how many run cyb_lives in one pass; it must not freeze the
+    // countdown of the ships it skipped, or they never act at all.
+    const h = await buildHarness();
+    const ships: ShipState[] = [];
+    for (let i = 1; i <= 6; i++) {
+      const c = makeShip({ userid: `@cyb${i}`, shipno: i, shpclass: 21, status: 2, tick: 4 });
+      h.shipMap.set(`@cyb${i}:${i}`, c);
+      ships.push(c);
+    }
+
+    h.fireAiTick();
+    expect(ships.map((c) => c.tick)).toEqual([3, 3, 3, 3, 3, 3]);
   });
 });

@@ -7,8 +7,17 @@
  *   - "5k" / "1m" / "1.25m" → integer (e.g. 5000, 1_000_000, 1_250_000)
  *   - Y/N → boolean
  *   - "###" in shipNameTemplate preserved literally (runtime fill-in suffix)
- *   - Player ships: make=0, tough=0, noClaim=0
- *   - CPU ships: maxPrice=0n; player columns cybCanAttack/cybLowestClassAttacks set to false/0
+ *   - Player ships: make=0, tough=0, cybLowestClassAttacks=0 (they hunt nobody)
+ *   - CPU ships: maxPrice=0n; cybCanAttack=false and noClaim=0 (nothing hunts them)
+ *
+ * COLUMN MEANINGS (they are easy to transpose, and were, until 2026-09-01):
+ *   noClaim               = wiki PLAYER column "Cyb#" — how many combative CPU
+ *                           ships may pursue this ship at once. 0 = never
+ *                           pursued unprovoked. C: shipclass[victim].noclaim.
+ *   cybLowestClassAttacks = wiki CPU column "User" — the lowest player class
+ *                           this CPU pursues unprovoked. C:
+ *                           shipclass[hunter].lowest_to_attk.
+ *   @see GECYBS.C:711, 719 and GECYBS.C:357-376
  */
 
 export interface ShipClassSeed {
@@ -65,8 +74,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 750,
     damageFactor: 90,
     cybCanAttack: true,
-    cybLowestClassAttacks: 1,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 1,
     make: 0,
     tough: 0,
   },
@@ -93,8 +102,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 1_500,
     damageFactor: 90,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -149,8 +158,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 2_000,
     damageFactor: 90,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -177,8 +186,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 5_000,
     damageFactor: 100,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -205,8 +214,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 5_000,
     damageFactor: 125,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -233,8 +242,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 5_000,
     damageFactor: 125,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -261,8 +270,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 10_000,
     damageFactor: 125,
     cybCanAttack: true,
-    cybLowestClassAttacks: 2,
-    noClaim: 0,
+    cybLowestClassAttacks: 0,
+    noClaim: 2,
     make: 0,
     tough: 0,
   },
@@ -403,8 +412,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 10_000,
     damageFactor: 2_000,
     cybCanAttack: false,
-    cybLowestClassAttacks: 0,
-    noClaim: 20,
+    cybLowestClassAttacks: 20,
+    noClaim: 0,
     make: 1,
     tough: 1,
   },
@@ -459,8 +468,8 @@ export const SHIP_CLASSES: readonly ShipClassSeed[] = [
     points: 500,
     damageFactor: 500,
     cybCanAttack: false,
-    cybLowestClassAttacks: 0,
-    noClaim: 3,
+    cybLowestClassAttacks: 3,
+    noClaim: 0,
     make: 2,
     tough: 1,
   },

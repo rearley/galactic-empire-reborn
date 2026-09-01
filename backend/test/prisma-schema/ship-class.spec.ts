@@ -75,7 +75,12 @@ describe("ShipClass entity", () => {
     expect(found.scanRange).toBe(15_000);
     expect(found.points).toBe(750);
     expect(found.cybCanAttack).toBe(true);
-    expect(found.cybLowestClassAttacks).toBe(1);
+    // The Interceptor's wiki "Cyb#" of 1 is the GANG-UP LIMIT — how many
+    // Cybertrons may pursue it at once — so it belongs in `noClaim`. Player
+    // rows hunt nobody, hence cybLowestClassAttacks 0.
+    // @see GECYBS.C:357-376  @see reference/wiki/player-ships.md
+    expect(found.noClaim).toBe(1);
+    expect(found.cybLowestClassAttacks).toBe(0);
     expect(found.damageFactor).toBe(90);
   });
 

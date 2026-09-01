@@ -459,9 +459,16 @@ model ShipClass {
   damageFactor           Int
   /// Wiki Cyb — Cybertrons will attack this ship class (player table); false for CPU ships
   cybCanAttack           Boolean
-  /// Wiki Cyb# — lowest class Cybertron that will attack (player table); 0 for CPU
+  /// Wiki CPU-table "User" — the lowest player ship class this CPU pursues
+  /// unprovoked; 0 pursues all. C compares `lowest_to_attk - 1 <= victim.shpclass`,
+  /// so a 6 here reaches class 5. 0 on player rows — they hunt nobody.
+  /// @see GECYBS.C:711, 719  @see reference/wiki/cpu-ships.md
   cybLowestClassAttacks  Int
-  /// Wiki User — CPU "no-claim" count (combat kill attribution threshold); 0 for player ships
+  /// Wiki PLAYER-table "Cyb#" — how many combative CPU ships may pursue this
+  /// ship at once. 0 means never pursued unprovoked (Heavy Freighter, Freight
+  /// Barge). Read from the ship being HUNTED, never from the hunter. 0 on CPU
+  /// rows — nothing hunts them.
+  /// @see GECYBS.C:357-376  @see reference/wiki/player-ships.md
   noClaim                Int
   /// Wiki Make — max simultaneous instances (CPU only); 0 for player ships
   make                   Int

@@ -121,17 +121,14 @@ function buildHarness(seed: number) {
 
 // ─── PRNG seed analysis (Mulberry32) ─────────────────────────────────────────
 //
-// Before cybAttack is reached, the engagement-scan loop consumes two PRNG values:
-//   call 1: breakoff roll — Math.floor(r1 * 500) === 0 (only 0.2% of seeds trigger this)
-//   call 2: rangeFactor  — cantexit=1 overrides the condition, so this doesn't block attack
-//
-// Inside cybAttack (new code, kills=0, tough=0 for class 21):
-//   call 3: gebemean     — Math.floor(r3 * CYBSLO) === 0; CYBSLO=3 → true if r3 < 1/3
-//   call 4: cybwhoops    — Math.floor(r4 * cybskill) === 1; only reached if mean=true
-//
-// Verified seeds (using Mulberry32 from random.port.ts):
-//   seed=1 → r1=0.627 (breakoff=false), r3=0.527 (gebemean=false) → NO phaser
-//   seed=2 → r1=0.734 (breakoff=false), r3=0.285 (gebemean=true), r4=0.538 (whoops=false) → fire
+// These two tests pin the gebemean gate by choosing a seed whose draw sequence
+// lands on either side of it. The draw ORDER through the engagement scan is not
+// stable across fidelity fixes — the break-off roll is now short-circuited away
+// for non-quad classes (GECYBS.C:255 `isquad`), and cyb_attack consumes further
+// draws for the evasion block (GECYBS.C:541-585) — so the seeds below were
+// re-derived by search rather than by hand-tracing, and will need re-deriving
+// again if the order changes. What is asserted is the behaviour, not the seed:
+// with gebemean false the phaser must not fire and phasr must not drain.
 
 const COMBAT_PHASER_FIRED = 'combat.phaser-fired';
 
@@ -146,7 +143,7 @@ describe('A-003 — gebemean gate: GECYBS.C:514 phaser blocked when gebemean ret
      *   - gebemean (r3=0.527): floor(0.527*3)=1 ≠ 0 → false
      * Result: mean=false → phaser gate blocks fire even though phasr=100 >= PMINFIRE=60
      */
-    const { shipMap, events, fireTick } = buildHarness(1);
+    const { shipMap, events, fireTick } = buildHarness(5);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,

@@ -71,10 +71,12 @@ describe('T026 — Murdonian Transport (class 32) behavior matrix', () => {
 
   describe('passive annoy (not jammed, player in range)', () => {
     it('may push a passiveAnnoy when player is in scan range (roll-based)', () => {
-      // seed 12: first rng.next() ≈ 0.2882 → floor(0.2882 * 4) = 1 → rollAnnoy succeeds
+      // With holdcourse 0 the detection speed drop (GEDROIDS.C:330) consumes
+      // the first draw, so the rollAnnoy draw is the second. seed 13: second
+      // next() ≈ 0.3601 → floor(0.3601 * 4) = 1 → rollAnnoy succeeds.
       const droid = makeShip({ jammer: 0, holdcourse: 0, xcoord: 0 });
       const player = makeShip({ userid: 'player-1', shipno: 2, status: GESTAT_USER, xcoord: 0.5 });
-      const rng = new Mulberry32Adapter(12);
+      const rng = new Mulberry32Adapter(13);
       const action = droidActClass11(droid, [player], SCAN_RANGE, CONFUSE_DENOM, noop, noop, rng);
 
       expect(action.passiveAnnoys).toHaveLength(1);
@@ -161,13 +163,16 @@ describe('T026 — Murdonian Transport (class 32) behavior matrix', () => {
 
   describe('confuse heading (1-in-10 roll)', () => {
     it('sets fightback.confuse with holdcourse ∈ [3, 12] when roll triggers', () => {
-      // seed 1 trace: v0 (helpMsg) ≈ 0.6271, v1 (confuse check) ≈ 0.0027 → floor(0.0027*10)=0 ✓
+      // The scan loop runs first and consumes draws (detection speed drop plus
+      // the 1-in-4 chatter roll, GEDROIDS.C:330-336), so the confuse check is
+      // not the second draw any more. Seed re-derived by search; what is
+      // asserted is the behaviour, not the trace.
       const attacker = makeShip({ userid: 'player-1', shipno: 2, status: GESTAT_USER, where: 0, cloak: 0 });
       const droid = makeShip({
         jammer: 0, cantexit: 1, lastfired: 2,
         phasr: PMINFIRE, where: 0, holdcourse: 0,
       });
-      const rng = new Mulberry32Adapter(1);
+      const rng = new Mulberry32Adapter(13);
       const action = droidActClass11(droid, [attacker], SCAN_RANGE, CONFUSE_DENOM, noop, noop, rng);
 
       expect(action.fightback!.confuse).toBeDefined();

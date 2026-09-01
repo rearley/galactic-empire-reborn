@@ -11,6 +11,7 @@
  * @see GEDROIDS.C:droid_lives, droid_won, droid_died
  */
 
+import { nextDroidTick } from './droid-cadence';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Inject, Optional } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -98,8 +99,12 @@ export class DroidTickService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // Spawn evaluation is the port's own slot mechanic and stays on the 6s
+    // tick; droid ACTIONS are C's `autortia`, once a second, gated by each
+    // droid's own countdown. @see GEMAIN.C:2406-2438, GEDROIDS.C:216-227
     this.tickService.subscribe(TickKind.PHYSICS, (ctx) => this.onPhysicsTick(ctx));
-    this.logger.log('DroidTickService subscribed to PHYSICS tick');
+    this.tickService.subscribe(TickKind.SHIP_UPDATE, (ctx) => this.onAiTick(ctx));
+    this.logger.log('DroidTickService subscribed to PHYSICS and SHIP_UPDATE ticks');
   }
 
   /** Returns the live population map — exposed for tests. */
@@ -116,6 +121,15 @@ export class DroidTickService implements OnModuleInit {
     if (!hasPlayer) return;
 
     this.runSpawnEvaluation(ctx);
+  }
+
+  /**
+   * C's `autortia` for droids: once a second, every droid either counts down
+   * or acts. @see GEMAIN.C:2406-2424
+   */
+  private onAiTick(ctx: TickContext): void {
+    const hasPlayer = this.shipState.findAllShips().some((s) => s.status === GESTAT_USER);
+    if (!hasPlayer) return;
     this.runDroidActions(ctx);
   }
 
@@ -163,6 +177,11 @@ export class DroidTickService implements OnModuleInit {
 
       for (const userid of pop) {
         try {
+          const droid = this.shipState.get(userid, 1);
+          if (droid && droid.tick > 0) {
+            droid.tick -= 1;
+            if (droid.tick > 0) continue;
+          }
           this.actOnDroid(userid, classNumber, players, ctx);
         } catch (err: unknown) {
           this.logger.error(`Droid action fault ${userid}:`, err);
@@ -183,16 +202,21 @@ export class DroidTickService implements OnModuleInit {
     const scanRange = clsConfig?.scanRange ?? 25_000;
     const tickAt = ctx.tickNumber;
 
+    let detected = false;
     if (classNumber === DROID_CLASS_SCOW) {
       this.actClass10(droid, players, scanRange, tickAt);
     } else if (classNumber === DROID_CLASS_TRANSPORT) {
-      this.actClass11(droid, players, scanRange, tickAt);
+      detected = this.actClass11(droid, players, scanRange, tickAt);
     } else if (classNumber === DROID_CLASS_VAKORY) {
-      this.actClass12(droid, players, scanRange, tickAt);
+      detected = this.actClass12(droid, players, scanRange, tickAt);
     }
 
     // @see GEDROIDS.C:214 — energy reset after droid_lives
     droid.energy = 50_000;
+    // Re-arm the countdown. A droid that has been shot at — or that has just
+    // spotted someone — reacts about three times as often as one that is
+    // cruising. @see GEDROIDS.C:216-227, 335, 442
+    droid.tick = nextDroidTick(detected || droid.cantexit > 0 ? 1 : 0, this.random);
     droid.dirty = true;
   }
 
@@ -221,7 +245,7 @@ export class DroidTickService implements OnModuleInit {
 
   // ── Class 11: Murdonian Transport ─────────────────────────────────────────
 
-  private actClass11(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): void {
+  private actClass11(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): boolean {
     const { confuseDenom_class11: confuseDenom } = this.config.global;
 
     const action = droidActClass11(
@@ -237,12 +261,15 @@ export class DroidTickService implements OnModuleInit {
     if (action.jammedFlee) {
       droid.speed2b = action.jammedFlee.speed2b;
       droid.holdcourse = action.jammedFlee.holdcourse;
-      return;
+      return false;
     }
 
-    // Scan-range speed adjustment when not on hold course
-    if (action.passiveAnnoys.length > 0 && droid.holdcourse === 0) {
-      droid.speed2b = this.random.next() * 999.9;
+    // `if (ptr->holdcourse == 0) ptr->speed2b = rndm(999.9);` — the drop
+    // happens on DETECTION, not on the 1-in-4 chatter roll that follows it.
+    // Gating it behind `passiveAnnoys.length > 0` meant three spotted players
+    // in four were sailed straight past. @see GEDROIDS.C:330-331
+    if (action.scanSpeed !== undefined) {
+      droid.speed2b = action.scanSpeed;
     }
 
     if (action.shieldCommand !== undefined) {
@@ -276,11 +303,13 @@ export class DroidTickService implements OnModuleInit {
         this.applyShieldCommand(droid, 1);
       }
     }
+
+    return action.detected === true;
   }
 
   // ── Class 12: Vakory Survey Drone ─────────────────────────────────────────
 
-  private actClass12(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): void {
+  private actClass12(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): boolean {
     const { alterVectorDenom_class12: alterVectorDenom, vakoryDamageThreshold } = this.config.global;
 
     const action = droidActClass12(
@@ -297,7 +326,7 @@ export class DroidTickService implements OnModuleInit {
     if (action.jammedFlee) {
       droid.speed2b = action.jammedFlee.speed2b;
       droid.holdcourse = action.jammedFlee.holdcourse;
-      return;
+      return false;
     }
 
     if (action.shieldCommand !== undefined) {
@@ -316,14 +345,17 @@ export class DroidTickService implements OnModuleInit {
         this.fireHyperPhaser(droid, fb.target, fb.ddist);
       } else if (fb.fireMode === 'normal') {
         this.firePhaser(droid, fb.target);
+      }
 
-        // @see GEDROIDS.C:472 — torpedo volley j=gernd()%2
-        for (let i = 0; i < fb.torpCount; i++) {
-          // Replenish before fire @see GEDROIDS.C:480
-          droid.items = [...droid.items] as typeof droid.items;
-          droid.items[I_TORP] = BigInt(Math.floor(this.random.next() * 5) + 1);
-          this.launchTorpedo(droid, fb.target, fb.ddist);
-        }
+      // The torpedo volley sits OUTSIDE the phaser guard in C — a Vakory with
+      // its phaser below PMINFIRE still shoots back. Nesting it inside the
+      // 'normal' branch let a player suppress torpedoes by draining the phaser.
+      // @see GEDROIDS.C:476-483
+      for (let i = 0; i < fb.torpCount; i++) {
+        // Replenish before fire @see GEDROIDS.C:480
+        droid.items = [...droid.items] as typeof droid.items;
+        droid.items[I_TORP] = BigInt(Math.floor(this.random.next() * 5) + 1);
+        this.launchTorpedo(droid, fb.target, fb.ddist);
       }
 
       if (fb.alterVector) {
@@ -348,6 +380,8 @@ export class DroidTickService implements OnModuleInit {
         droid.holdcourse = fb.damageFlee.holdcourse;
       }
     }
+
+    return action.detected === true;
   }
 
   // ── Combat helpers ─────────────────────────────────────────────────────────
