@@ -73,6 +73,8 @@ import {
   decideCybEvasion,
   canPursue,
   notClaimed,
+  shouldTaunt,
+  CYB_ANNOY_ODDS,
 } from './cyb-decisions';
 import { pickTaunt } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
@@ -625,6 +627,10 @@ export class CybertronTickService implements OnModuleInit {
    * @see GECYBS.C:379 cyb_annoy
    */
   private cybAnnoy(ship: ShipState, target: ShipState, ctx: TickContext): void {
+    // `if ((gernd()%rnd) == 1)`, rnd = 20 at both call sites. The port had no
+    // gate and taunted every pass. @see GECYBS.C:295, 300, 391
+    if (!shouldTaunt(this.random, CYB_ANNOY_ODDS)) return;
+
     const message = pickTaunt(this.random);
     const tickAt = typeof ctx === 'object' && ctx !== null && 'tickNumber' in ctx
       ? (ctx as { tickNumber: number }).tickNumber : 0;

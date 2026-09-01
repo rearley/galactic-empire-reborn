@@ -84,7 +84,9 @@ describe('GameGateway combat broadcasts', () => {
     };
     gateway.handleCombatHit(event);
     expect(toMock).toHaveBeenCalledWith('sector:12:3');
-    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, event);
+    // The gateway adds `attackerName` — the identifier `sca sh` accepts — so
+    // the client need not fall back to the userid for AI ships.
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, { ...event, attackerName: undefined });
   });
 
   it('broadcasts COMBAT_DECOY_INTERCEPT to sector room', () => {

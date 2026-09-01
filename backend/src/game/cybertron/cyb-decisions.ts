@@ -345,3 +345,26 @@ export function creditAllowance(cash: bigint): bigint {
   const cap = BigInt(CYB_MAXCASH);
   return next > cap ? cap : next;
 }
+
+
+/**
+ * `cyb_annoy`'s `rnd` argument. Both call sites pass 20 — the engaging branch
+ * (GECYBS.C:295) and the shadowing branch (GECYBS.C:300).
+ */
+export const CYB_ANNOY_ODDS = 20;
+
+/**
+ * Does the Cybertron say something this pass?
+ *
+ *   if ((gernd()%rnd) == 1) { ... prfmsg(sel, ptr->shipname); }
+ *
+ * Note it is `== 1`, not `== 0` — one specific bucket of the twenty. The port
+ * had no gate at all and taunted on every pass; with the taunt now reaching
+ * the targeted pilot rather than the attacker's sector room, that would bury
+ * the game's only early warning in noise.
+ *
+ * @see GECYBS.C:391
+ */
+export function shouldTaunt(rand: Random, odds: number): boolean {
+  return Math.floor(rand.next() * odds) === 1;
+}

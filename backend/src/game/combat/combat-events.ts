@@ -19,6 +19,16 @@ export interface CombatPhaserFiredEvent {
 export const COMBAT_HIT = 'combat.hit' as const;
 export interface CombatHitEvent {
   attackerId: string;
+  /**
+   * The attacking SHIP's name — the identifier `sca sh` accepts.
+   *
+   * The client used to fall back to the userid half of `attackerId` for any
+   * ship missing from the player roster, and the roster deliberately excludes
+   * AI. So a Cybertron hit read "from Cybrg-222" while every command needed
+   * "Cybrg-49340". Filled in by the gateway, which has the ship state; absent
+   * if the attacker has since left the world.
+   */
+  attackerName?: string;
   victimId: string;
   weapon: 'phaser' | 'torpedo' | 'missile' | 'mine';
   damageHull: number;

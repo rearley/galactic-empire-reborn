@@ -113,6 +113,12 @@ interface PendingShipSelectEntry {
  * @see specs/003-ship-commands/contracts/websocket-events.md
  * @see specs/011-onboarding/contracts/websocket-events.md
  */
+/** `usr_x:2` -> `usr_x`. A userid may itself contain colons, so drop only the last segment. */
+function useridOf(shipKey: string): string {
+  const parts = shipKey.split(':');
+  return parts.slice(0, -1).join(':');
+}
+
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -815,6 +821,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('sector:left', { x, y, room });
   }
 
+  /**
+   * The ship name behind a `userid:shipno` key, or undefined if it has left.
+   *
+   * Guarded: this only decorates a combat notice, and a thrown lookup inside
+   * an @OnEvent handler would drop the broadcast for everyone in the sector.
+   * A missing name costs a nicer label; a thrown one costs the whole event.
+   */
+  private shipNameOf(shipKey: string): string | undefined {
+    try {
+      const parts = shipKey.split(':');
+      const shipno = Number(parts[parts.length - 1]);
+      if (!Number.isFinite(shipno)) return undefined;
+      return this.shipStateService.get(parts.slice(0, -1).join(':'), shipno)?.shipname;
+    } catch {
+      return undefined;
+    }
+  }
+
   /** @see specs/006b-combat/contracts/combat-events.md */
   @OnEvent(COMBAT_PHASER_FIRED)
   handleCombatPhaserFired(event: CombatPhaserFiredEvent): void {
@@ -824,13 +848,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @OnEvent(COMBAT_HIT)
   handleCombatHit(event: CombatHitEvent): void {
+    // Name the attacking SHIP, not its userid — `sca sh` takes the ship name,
+    // and AI ships are absent from the roster the client resolves names from.
+    const enriched: CombatHitEvent = { ...event, attackerName: this.shipNameOf(event.attackerId) };
     const room = `sector:${event.sector.x}:${event.sector.y}`;
-    this.server.to(room).emit(COMBAT_HIT, event);
+    this.server.to(room).emit(COMBAT_HIT, enriched);
     // Victim may be in a different sector room (cross-sector phaser range) — deliver directly.
     const victimSocketId = this.registry.getSocketId(event.victimId);
     if (victimSocketId) {
       const victimSocket = this.server.sockets.sockets.get(victimSocketId);
-      victimSocket?.emit(COMBAT_HIT, event);
+      victimSocket?.emit(COMBAT_HIT, enriched);
     }
   }
 
@@ -1044,8 +1071,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(CYBERTRON_EVENT.TAUNT)
   handleCybertronTaunt(event: CybertronTauntPayload): void {
-    const room = `sector:${event.sector.x}:${event.sector.y}`;
-    this.server.to(room).emit(CYBERTRON_EVENT.TAUNT, event);
+    // C addresses the taunt to the TARGET's terminal — `outprfge(FILTER, usrn)`
+    // where usrn is the player being taunted (GECYBS.C:398-401) — not to
+    // whoever happens to share a sector with the Cybertron.
+    //
+    // This is load-bearing. Scan ranges are asymmetric: an Obliterator sees
+    // six sectors and an Interceptor one and a half, so the thing hunting you
+    // is routinely outside your own scanners and opens fire from there. The
+    // taunt is the only warning the game gives, and sending it to the
+    // attacker's sector room meant the target never received it.
+    this.server.to(`user:${useridOf(event.targetShipKey)}`).emit(CYBERTRON_EVENT.TAUNT, event);
+    // Bystanders in the Cybertron's own sector still see the exchange.
+    this.server.to(`sector:${event.sector.x}:${event.sector.y}`).emit(CYBERTRON_EVENT.TAUNT, event);
   }
 
   /** @see GECYBS.C:255 CYB_BREAKOFF roll */
@@ -1058,8 +1095,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const sector = targetShip
       ? { x: Math.floor(targetShip.xcoord), y: Math.floor(targetShip.ycoord) }
       : event.sector;
-    const room = `sector:${sector.x}:${sector.y}`;
-    this.server.to(room).emit(CYBERTRON_EVENT.BROKE_OFF, event);
+    // CYBLUCK goes to the pilot being let off the hook — `outprfge(FILTER,
+    // zothusn)` (GECYBS.C:258-260) — with the sector seeing it too.
+    this.server.to(`user:${targetUserid}`).emit(CYBERTRON_EVENT.BROKE_OFF, event);
+    this.server.to(`sector:${sector.x}:${sector.y}`).emit(CYBERTRON_EVENT.BROKE_OFF, event);
   }
 
   /**
