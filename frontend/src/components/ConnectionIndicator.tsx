@@ -6,6 +6,8 @@ const STATUS_CONFIG: Record<ConnectionStatus, { color: string; label: string }> 
   connecting: { color: 'bg-yellow-500', label: 'Connecting…' },
   reconnecting: { color: 'bg-yellow-500', label: 'Reconnecting…' },
   disconnected: { color: 'bg-red-500', label: 'Disconnected' },
+  // Seat handed to a newer login, not a network fault. @see useSocket.ts
+  displaced: { color: 'bg-blue-500', label: 'Session moved' },
 };
 
 interface ConnectionIndicatorProps {

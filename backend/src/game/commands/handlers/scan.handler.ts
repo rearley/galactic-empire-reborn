@@ -12,6 +12,7 @@ import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
+import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
 
 /**
  * Convert raw speed units to a display string for the side panel.
@@ -728,7 +729,7 @@ export class ScanHandlerService implements OnModuleInit {
       ];
       for (const p of sectorPlanets) {
         const label = p.name ? `${p.plnum}. ${p.name}` : `${p.plnum}. (unnamed)`;
-        const owner = p.userid ? ` — owned` : '';
+        const owner = planetOwnerLabel(p.userid);
         lines.push({ text: `  ${label}${owner}`, category: 'info' });
       }
       lines.push({ text: 'Use "sca pl <number>" to scan a planet.', category: 'system' });
@@ -765,11 +766,17 @@ export class ScanHandlerService implements OnModuleInit {
 
     // GECMDS.C:2330 — ownership (optional)
     if (planet.userid) {
-      const ownerRow = await this.prisma.user.findUnique({
-        where: { userid: planet.userid },
-        select: { username: true },
-      });
-      const ownerName = ownerRow?.username ?? planet.userid;
+      // The neutral sentinel has no User row; resolving it through Prisma is
+      // both a wasted query and how `**neutral**` reached the player's screen.
+      const ownerRow = isNeutralZoneOwner(planet.userid)
+        ? null
+        : await this.prisma.user.findUnique({
+            where: { userid: planet.userid },
+            select: { username: true },
+          });
+      const ownerName = isNeutralZoneOwner(planet.userid)
+        ? NEUTRAL_ZONE_OWNER_DISPLAY
+        : ownerRow?.username ?? planet.userid;
       lines.push({
         text: formatMessage(MessageId.SCAN09, ownerName),
         category: 'info',

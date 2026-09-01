@@ -37,3 +37,30 @@ export function isInNeutralZone(coord: { xcoord: number; ycoord: number }): bool
 export const NEUTRAL_ZONE_OWNER = '**neutral**';
 
 export const NEUTRAL_ZONE_SECTOR = Object.freeze({ x: 0, y: 0 });
+
+/**
+ * Player-facing name for the holder of the neutral-zone trading posts.
+ *
+ * `NEUTRAL_ZONE_OWNER` is an internal sentinel and has no `User` row, so any
+ * screen that resolved it through the user table fell back to printing the
+ * raw `**neutral**` at the pilot. C had no such problem: its neutral owner was
+ * a sysop-configured display string (`s00[i].owner`, GEMAIN.C:919) that was
+ * always meant to be read by a human.
+ */
+export const NEUTRAL_ZONE_OWNER_DISPLAY = 'Neutral Zone Authority';
+
+/** True when a planet's `userid` is the neutral-zone sentinel. */
+export function isNeutralZoneOwner(userid: string | null | undefined): boolean {
+  return userid === NEUTRAL_ZONE_OWNER;
+}
+
+/**
+ * Suffix for a planet in a sector listing.
+ *
+ * A trading post and a rival's colony are not the same thing to a pilot
+ * choosing where to fly, so they must not share a label.
+ */
+export function planetOwnerLabel(userid: string | null | undefined): string {
+  if (!userid) return '';
+  return isNeutralZoneOwner(userid) ? ' — trading post' : ' — owned';
+}
