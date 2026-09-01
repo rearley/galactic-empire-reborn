@@ -4,7 +4,7 @@
  * @see GECMDS.C cmd_help
  */
 
-export type HelpTopicId = 'navigation' | 'combat' | 'trade' | 'planet' | 'ship';
+export type HelpTopicId = 'navigation' | 'combat' | 'trade' | 'planet' | 'ship' | 'comms';
 
 export interface HelpTopic {
   readonly title: string;
@@ -26,6 +26,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  who            — who is in the galaxy',
       '  orb            — orbit nearest planet',
       '  land <name>    — land on planet',
+      '  (imp or war breaks orbit and puts you back in flight)',
     ],
   },
   combat: {
@@ -76,6 +77,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  wit [qty]              — withdraw taxes to your account',
       '  aba                    — give up the planet you are orbiting',
       '  attack <planet>        — attack enemy planet',
+      '  spy                    — land a spy on the planet you orbit',
       '  dat <fragment>         — look up ship by name fragment',
     ],
   },
@@ -94,6 +96,28 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  des                — initiate self-destruct',
       '  abo                — abort self-destruct',
       '  aba ship           — abandon ship (aba alone gives up a planet)',
+      '  sys unjam          — clear a jammer stuck on your ship',
+    ],
+  },
+  comms: {
+    title: 'Comms & Fleet',
+    body: [
+      'Comms & Fleet',
+      '  hel [topic]            — this help; bare "hel" lists every topic',
+      '  who                    — who is in the galaxy',
+      '  dat <fragment>         — look up ship by name fragment',
+      '  ros [all]              — score roster (only pilots who have scored)',
+      '  fre <A|B|C> <n|hail>   — tune a radio channel',
+      '  sen <A|B|C> <message>  — transmit on a channel',
+      '  mai                    — list your mail (reports, attack notices)',
+      '  rea <n>                — read message n',
+      '  del <n>                — delete message n',
+      '  tea                    — show the team you are on',
+      '  tea list               — list all teams',
+      '  tea create <name> <password> — found a team',
+      '  tea <name> <password>  — join an existing team',
+      '  tea leave              — leave your team',
+      '  cls                    — clear the event log',
     ],
   },
 });

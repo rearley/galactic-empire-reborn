@@ -744,8 +744,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SPYM1]: 'Spy successfully planted on %s.',
 
   // hel (feature 016) — GECMDS.C cmd_help
-  [MessageId.HELFMT]: "Available help topics: navigation, combat, trade, planet, ship. Try 'hel <topic>'.",
-  [MessageId.HEL_UNKNOWN]: "Unknown help topic '%s'. Valid topics: navigation, combat, trade, planet, ship.",
+  // Topic list is passed in from HELP_TOPIC_IDS — hardcoding it here meant a
+  // new topic was reachable but never advertised.
+  [MessageId.HELFMT]: "Available help topics: %s. Try 'hel <topic>'.",
+  [MessageId.HEL_UNKNOWN]: "Unknown help topic '%s'. Valid topics: %s.",
 
   // att (feature 014) — GECMDS.C:3515 cmd_attack
   [MessageId.ATT_NOT_ORBIT]: 'You must be orbiting a planet to attack.',

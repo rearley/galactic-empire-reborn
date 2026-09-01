@@ -8,12 +8,16 @@
 import { HELP_TOPICS, HELP_TOPIC_IDS } from '../../../../src/game/commands/help/help-topics';
 
 describe('Help topic snapshots', () => {
-  it('HELP_TOPIC_IDS contains exactly the five expected topics in order', () => {
-    expect(HELP_TOPIC_IDS).toEqual(['navigation', 'combat', 'trade', 'planet', 'ship']);
+  it('HELP_TOPIC_IDS contains exactly the expected topics in order', () => {
+    expect(HELP_TOPIC_IDS).toEqual(['navigation', 'combat', 'trade', 'planet', 'ship', 'comms']);
   });
 
   it('navigation topic body matches snapshot', () => {
     expect(HELP_TOPICS.navigation.body).toMatchSnapshot();
+  });
+
+  it('comms topic body matches snapshot', () => {
+    expect(HELP_TOPICS.comms.body).toMatchSnapshot();
   });
 
   it('combat topic body matches snapshot', () => {

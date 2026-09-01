@@ -65,7 +65,7 @@ describe.each([
     it('emits the HELFMT catalog message', () => {
       const result = invoke(handler, ship,[], ctx);
       expect(result.lines).toHaveLength(1);
-      expect(result.lines[0].text).toBe(formatMessage(MessageId.HELFMT));
+      expect(result.lines[0].text).toBe(formatMessage(MessageId.HELFMT, HELP_TOPIC_IDS.join(', ')));
     });
 
     it('catalog message mentions all five topic IDs', () => {
@@ -143,7 +143,7 @@ describe.each([
     it('returns HEL_UNKNOWN with the offending input echoed', () => {
       const result = invoke(handler, ship,['quokka'], ctx);
       expect(result.lines).toHaveLength(1);
-      expect(result.lines[0].text).toBe(formatMessage(MessageId.HEL_UNKNOWN, 'quokka'));
+      expect(result.lines[0].text).toBe(formatMessage(MessageId.HEL_UNKNOWN, 'quokka', HELP_TOPIC_IDS.join(', ')));
     });
 
     it('unknown topic line has category "system"', () => {
