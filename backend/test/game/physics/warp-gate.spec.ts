@@ -92,3 +92,71 @@ describe('warp gate sequence (FR-012)', () => {
     expect(ship.speed2b).toBe(5000);
   });
 });
+
+/**
+ * `war <speed> [degrees]` — the course argument.
+ *
+ * GECMDS.C:cmd_warp reads a second argument through `valdegree`, defaulting to
+ * "0", then turns to `normal(heading + degrees)` and prints ENGFIRE with the
+ * resulting course:
+ *
+ *   if (margc == 3) strcpy(gechrbuf, margv[2]); else strcpy(gechrbuf, "0");
+ *   if (warsptr->helm == 0 && valdegree(gechrbuf)) {
+ *     deg = (unsigned)normal(warsptr->heading + (double)warsptr->degrees);
+ *     warsptr->speed2b = 1000.0 * speed;
+ *     warsptr->head2b  = (double)deg;
+ *   }
+ *
+ * The port read only the speed and hard-set `head2b = heading`, so firing
+ * engines always meant "straight ahead" — `war 6 45` silently flew the old
+ * course. That is the natural way to fly in the original, and it also means a
+ * pending `rot` is discarded by a bare `war`, which IS correct (degrees
+ * defaults to 0), but only because C makes the same choice deliberately.
+ *
+ * `imp` already handled this (impulse.handler.ts:44); warp did not.
+ */
+describe('warp course argument — GECMDS.C:cmd_warp', () => {
+  it('turns to a relative course given alongside the speed', () => {
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 100, head2b: 100 });
+    h.command.handler(ship, ['6', '45'], {});
+    expect(ship.head2b).toBe(145);
+  });
+
+  it('wraps past 360', () => {
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 350, head2b: 350 });
+    h.command.handler(ship, ['6', '30'], {});
+    expect(ship.head2b).toBe(20);
+  });
+
+  it('accepts a negative relative course', () => {
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 10, head2b: 10 });
+    h.command.handler(ship, ['6', '-30'], {});
+    expect(ship.head2b).toBe(340);
+  });
+
+  it('holds the current heading when no course is given', () => {
+    // C defaults the argument to "0", so a bare `war` means straight ahead.
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 174, head2b: 45 });
+    h.command.handler(ship, ['6'], {});
+    expect(ship.head2b).toBe(174);
+  });
+
+  it('refuses a course outside -180..180 and does not fire the engines', () => {
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 0, head2b: 0, speed2b: 0 });
+    const r = h.command.handler(ship, ['6', '400'], {}) as CommandResult;
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, -180, 180));
+    expect(ship.speed2b).toBe(0);
+  });
+
+  it('names the resulting course in the confirmation', () => {
+    const h = build({ 1: 10 });
+    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 100, head2b: 100 });
+    const r = h.command.handler(ship, ['6', '45'], {}) as CommandResult;
+    expect(r.lines.some((l) => l.text.includes('145'))).toBe(true);
+  });
+});
