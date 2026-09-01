@@ -105,14 +105,58 @@ describe('US4 — team reconciliation (T027)', () => {
     expect(user.teamcode).toBe(0n);
   });
 
-  it('marks empty teams removed with teamcode = -1', async () => {
+  it('marks an empty team removed', async () => {
     // Team 7 exists but has no members
     await prisma.team.create({ data: { teamcode: 7n, teamname: 'Empty' } });
 
     await service.run();
 
     const team = await prisma.team.findFirst({ where: { teamname: 'Empty' } });
-    expect(team?.teamcode).toBe(-1n);
+    expect(team?.removed).toBe(true);
+    // The teamcode is the primary key — it stays put. C could overwrite it with
+    // -1 because teamtab is a fixed array and -1 just means "slot free".
+    expect(team?.teamcode).toBe(7n);
+  });
+
+  /**
+   * The removal marker used to be written INTO the primary key (`teamcode =
+   * -1n`). Two empty teams in one pass collided on that key, the unique-
+   * constraint error escaped `$transaction`, and the whole nightly job rolled
+   * back — no scores, no production reports, no MidnightRun ledger row. The
+   * boot self-heal then retried and failed the same way, so the scoreboard
+   * froze permanently after the second team emptied out.
+   *
+   * @see GEMAIN.C:1293-1301  @see prisma/schema.prisma Team.teamcode @id
+   */
+  it('removes two empty teams in the same pass without aborting the job', async () => {
+    await prisma.team.create({ data: { teamcode: 7n, teamname: 'EmptyOne' } });
+    await prisma.team.create({ data: { teamcode: 8n, teamname: 'EmptyTwo' } });
+    await prisma.user.create({
+      data: { userid: 'solo', username: 'solo', teamcode: 0n, klscore: 500n },
+    });
+
+    await service.run();
+
+    const teams = await prisma.team.findMany({ orderBy: { teamcode: 'asc' } });
+    expect(teams.map((t) => t.removed)).toEqual([true, true]);
+
+    // and the rest of the pass actually committed
+    const scored = await prisma.user.findUnique({ where: { userid: 'solo' } });
+    expect(scored?.score).toBeGreaterThan(0n);
+    expect(await prisma.midnightRun.count()).toBe(1);
+  });
+
+  it('is idempotent — a second pass over already-removed teams still commits', async () => {
+    await prisma.team.create({ data: { teamcode: 7n, teamname: 'EmptyOne' } });
+    await prisma.team.create({ data: { teamcode: 8n, teamname: 'EmptyTwo' } });
+
+    await service.run();
+    await prisma.midnightRun.deleteMany();
+    await service.run();
+
+    expect(await prisma.midnightRun.count()).toBe(1);
+    const teams = await prisma.team.findMany();
+    expect(teams.every((t) => t.removed)).toBe(true);
   });
 
   it('non-empty teams keep positive teamcode', async () => {

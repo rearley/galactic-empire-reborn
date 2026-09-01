@@ -5,10 +5,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TeamRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** @see GECMDS.C:5277 cmd_team */
+  /**
+   * A team midnight disbanded for having no members is gone as far as C is
+   * concerned — its `teamtab` slot was freed — so its name must not resolve
+   * here, or it stays joinable with its old password.
+   * @see GECMDS.C:5277 cmd_team  @see GEMAIN.C:1293
+   */
   async findByNameLower(name: string): Promise<{ teamcode: bigint; teamname: string; password: string } | null> {
     return this.prisma.team.findFirst({
-      where: { teamname: { equals: name, mode: 'insensitive' } },
+      where: { teamname: { equals: name, mode: 'insensitive' }, removed: false },
       select: { teamcode: true, teamname: true, password: true },
     });
   }

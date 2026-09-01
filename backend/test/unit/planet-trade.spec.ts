@@ -34,7 +34,7 @@ describe('computeBuyOutcome', () => {
     const planet = makePlanet();
     const outcome = computeBuyOutcome({
       planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toMatchObject({ ok: true, unitPrice: BASEPRICE[I_FOOD], transferred: 10 });
   });
@@ -44,7 +44,7 @@ describe('computeBuyOutcome', () => {
     planet.items[I_FOOD].markup2a = 8;
     const outcome = computeBuyOutcome({
       planet, buyerIsOwner: false, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toMatchObject({ ok: true, unitPrice: 8 });
   });
@@ -52,9 +52,10 @@ describe('computeBuyOutcome', () => {
   it('returns SELL_FLAG_OFF when sell=false', () => {
     const planet = makePlanet();
     planet.items[I_FOOD].sell = false;
+    // The owner bypasses the sell flag in C — `sameas(userid) || sell == 'Y'`.
     const outcome = computeBuyOutcome({
-      planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toEqual({ ok: false, reason: 'SELL_FLAG_OFF' });
   });
@@ -63,29 +64,114 @@ describe('computeBuyOutcome', () => {
     const planet = makePlanet();
     planet.items[I_FOOD].qty = 100n;
     planet.items[I_FOOD].reserve = 100;
+    // amt4sale gives the OWNER the whole stock; the reserve binds everyone else.
     const outcome = computeBuyOutcome({
-      planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
   });
 
-  it('caps transferred by reserve', () => {
+  /**
+   * C is all-or-nothing: `avail = amt4sale(item); if (avail > 0 && avail >= amt)`
+   * — asking for more than is for sale prints BUY3 and transfers nothing. The
+   * port used to silently clamp the order down, which is why `buy` part-filled
+   * while `tra up` refused outright for the same shortfall.
+   * @see GECMDS.C:4330-4331, 4378-4381
+   */
+  it('refuses rather than part-filling when the reserve leaves too little', () => {
     const planet = makePlanet();
     planet.items[I_FOOD].qty = 110n;
     planet.items[I_FOOD].reserve = 100;
     const outcome = computeBuyOutcome({
-      planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 50, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 50, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+  });
+
+  it('sells exactly the amount available when the order matches it', () => {
+    const planet = makePlanet();
+    planet.items[I_FOOD].qty = 110n;
+    planet.items[I_FOOD].reserve = 100;
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toMatchObject({ ok: true, transferred: 10 });
+  });
+
+  /**
+   * `if ((tot = price(item,amt)) <= waruptr->cash)` gates the whole transfer;
+   * the port never read the buyer's balance at all, so every weapon, troop and
+   * bar of gold in the galaxy was free and cash ran arbitrarily negative.
+   * @see GECMDS.C:4333
+   */
+  it('refuses when the buyer cannot afford the order', () => {
+    const planet = makePlanet();
+    const price = BigInt(planet.items[I_FOOD].markup2a);
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 1000, isNeutralZone: false,
+      buyerCash: price * 10n - 1n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'INSUFFICIENT_FUNDS' });
+  });
+
+  it('allows an order costing exactly the buyer\'s balance', () => {
+    const planet = makePlanet();
+    const price = BigInt(planet.items[I_FOOD].markup2a);
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 1000, isNeutralZone: false,
+      buyerCash: price * 10n,
+    });
+    expect(outcome).toMatchObject({ ok: true, transferred: 10 });
+  });
+
+  it('checks affordability in the neutral zone too', () => {
+    const planet = makePlanet({ xsect: 0, ysect: 0 });
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 10, buyerCargoCapacityRemaining: 1000, isNeutralZone: true,
+      buyerCash: 0n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'INSUFFICIENT_FUNDS' });
+  });
+
+  /**
+   * `avail = amt4sale(item)` runs for EVERY purchase — only the inventory
+   * decrement is skipped inside the neutral zone. The port skipped the whole
+   * gate, so Zygor-3 sold stock it did not have.
+   * @see GECMDS.C:4330-4331 vs 4336-4344
+   */
+  it('neutral zone still honours the planet stock and reserve', () => {
+    const planet = makePlanet({ xsect: 0, ysect: 0 });
+    planet.items[I_FOOD].qty = 5n;
+    planet.items[I_FOOD].reserve = 0;
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 500, buyerCargoCapacityRemaining: 10000, isNeutralZone: true,
+      buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+  });
+
+  it('neutral zone refuses an order that will not fit, rather than part-filling', () => {
+    const planet = makePlanet({ xsect: 0, ysect: 0 });
+    const outcome = computeBuyOutcome({
+      planet, buyerIsOwner: false, itemIndex: I_FOOD,
+      requestedQty: 500, buyerCargoCapacityRemaining: 10, isNeutralZone: true,
+      buyerCash: 1_000_000n,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'WONT_FIT' });
   });
 
   it('returns CAPACITY_FULL when buyerCargoCapacityRemaining <= 0', () => {
     const planet = makePlanet();
     const outcome = computeBuyOutcome({
       planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 0, isNeutralZone: false,
+      requestedQty: 10, buyerCargoCapacityRemaining: 0, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(outcome).toEqual({ ok: false, reason: 'CAPACITY_FULL' });
   });
@@ -94,7 +180,7 @@ describe('computeBuyOutcome', () => {
     const planet = makePlanet({ xsect: 0, ysect: 0 });
     const outcome = computeBuyOutcome({
       planet, buyerIsOwner: false, itemIndex: I_FOOD,
-      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: true,
+      requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: true, buyerCash: 1_000_000n,
     });
     expect(outcome).toMatchObject({ ok: true, transferred: 10, mutatePlanet: false });
   });
@@ -103,7 +189,7 @@ describe('computeBuyOutcome', () => {
     const planet = makePlanet();
     const outcome = computeBuyOutcome({
       planet, buyerIsOwner: true, itemIndex: I_FOOD,
-      requestedQty: 30, buyerCargoCapacityRemaining: 100, isNeutralZone: false,
+      requestedQty: 30, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
     if (outcome.ok) {
       expect(outcome.totalCost).toBe(BigInt(outcome.transferred) * BigInt(outcome.unitPrice));
@@ -163,11 +249,23 @@ describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () =
       itemIndex: I_FOOD,
       requestedQty: 500,
       buyerCargoCapacityRemaining: 200, // tons
-      isNeutralZone: false,
+      isNeutralZone: false, buyerCash: 1_000_000n,
     });
-    expect(out.ok).toBe(true);
-    // 200 tons of a 2-ton item is 100 units, not 200.
-    expect((out as { transferred: number }).transferred).toBe(100);
+    // 200 tons of a 2-ton item is 100 units, not 200 — and C refuses the
+    // over-large order outright (BUY8) rather than shrinking it.
+    expect(out).toEqual({ ok: false, reason: 'WONT_FIT' });
+  });
+
+  it('fills a 2-ton item right up to the tonnage that fits', () => {
+    const out = computeBuyOutcome({
+      planet: planetWith(I_FOOD),
+      buyerIsOwner: false,
+      itemIndex: I_FOOD,
+      requestedQty: 100,
+      buyerCargoCapacityRemaining: 200,
+      isNeutralZone: false, buyerCash: 1_000_000n,
+    });
+    expect(out).toMatchObject({ ok: true, transferred: 100 });
   });
 
   it('still fills a 1-ton item to the full tonnage', () => {
@@ -175,9 +273,9 @@ describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () =
       planet: planetWith(I_MEN),
       buyerIsOwner: false,
       itemIndex: I_MEN,
-      requestedQty: 500,
+      requestedQty: 200,
       buyerCargoCapacityRemaining: 200,
-      isNeutralZone: false,
+      isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect((out as { transferred: number }).transferred).toBe(200);
   });
@@ -188,9 +286,9 @@ describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () =
       planet: planetWith(I_FOOD),
       buyerIsOwner: false,
       itemIndex: I_FOOD,
-      requestedQty: 500,
+      requestedQty: 100,
       buyerCargoCapacityRemaining: 200,
-      isNeutralZone: true,
+      isNeutralZone: true, buyerCash: 1_000_000n,
     });
     expect((out as { transferred: number }).transferred).toBe(100);
   });
@@ -202,7 +300,7 @@ describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () =
       itemIndex: I_FOOD,
       requestedQty: 10,
       buyerCargoCapacityRemaining: 1, // one ton; food needs two
-      isNeutralZone: false,
+      isNeutralZone: false, buyerCash: 1_000_000n,
     });
     expect(out.ok).toBe(false);
   });

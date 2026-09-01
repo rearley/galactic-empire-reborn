@@ -17,11 +17,25 @@ export interface BuyInput {
   requestedQty: number;
   buyerCargoCapacityRemaining: number;
   isNeutralZone: boolean;
+  /** The buyer's credit balance. C gates the whole transfer on `tot <= waruptr->cash`. */
+  buyerCash: bigint;
 }
 
 export type BuyOutcome =
   | { ok: true; transferred: number; unitPrice: number; totalCost: bigint; mutatePlanet: boolean }
-  | { ok: false; reason: 'SELL_FLAG_OFF' | 'AT_RESERVE' | 'CAPACITY_FULL' };
+  | {
+      ok: false;
+      reason:
+        | 'SELL_FLAG_OFF'
+        /** Planet has none, or not enough, for sale above its reserve (C: BUY3). */
+        | 'AT_RESERVE'
+        /** No free tonnage at all (C: chkweight with an empty hold). */
+        | 'CAPACITY_FULL'
+        /** Some room, but not enough for the whole order (C: BUY8). */
+        | 'WONT_FIT'
+        /** Order costs more than the buyer has (C: BUY2). */
+        | 'INSUFFICIENT_FUNDS';
+    };
 
 
 /**
@@ -39,55 +53,71 @@ function unitsThatFit(remainingTons: number, itemIndex: number): number {
 
 /**
  * Compute the outcome of a buy transaction.
- * @see GECMDS.C:4201 cmd_buy — owner pays baseprice, non-owner pays markup2a
+ *
+ * C runs four gates in order, and every one of them is ALL-OR-NOTHING — an
+ * order that cannot be filled completely is refused with a message rather than
+ * quietly shrunk (GECMDS.C:4324-4380):
+ *
+ *   1. `plptr->items[item].sell == 'Y'`, unless you own the planet   -> BUY4
+ *   2. `chkweight(warsptr,item,amt)`      — does the whole order fit -> BUY8
+ *   3. `avail = amt4sale(item); avail > 0 && avail >= amt`           -> BUY3
+ *   4. `(tot = price(item,amt)) <= waruptr->cash`                    -> BUY2
+ *
+ * Only the *inventory decrement* is skipped in the neutral zone
+ * (GECMDS.C:4336-4344); `amt4sale` and the cash check still run there. The port
+ * previously skipped the availability gate entirely inside the neutral zone and
+ * never read the buyer's balance anywhere, which made goods free.
+ *
+ * @see GECMDS.C:4201 cmd_buy  @see GECMDS.C:4406 amt4sale  @see GECMDS.C:4425 price
  */
 export function computeBuyOutcome(input: BuyInput): BuyOutcome {
-  const { planet, buyerIsOwner, itemIndex, requestedQty, buyerCargoCapacityRemaining, isNeutralZone } = input;
+  const {
+    planet,
+    buyerIsOwner,
+    itemIndex,
+    requestedQty,
+    buyerCargoCapacityRemaining,
+    isNeutralZone,
+    buyerCash,
+  } = input;
   const item = planet.items[itemIndex];
 
-  if (!item.sell) {
+  // 1. sell flag — the owner may always buy from their own planet
+  if (!buyerIsOwner && !item.sell) {
     return { ok: false, reason: 'SELL_FLAG_OFF' };
   }
 
-  // In neutral zone, planet inventory is not decremented but transfer still happens
-  if (!isNeutralZone) {
-    const available = Number(item.qty) - item.reserve;
-    if (available <= 0) {
-      return { ok: false, reason: 'AT_RESERVE' };
-    }
-
-    if (buyerCargoCapacityRemaining <= 0) {
-      return { ok: false, reason: 'CAPACITY_FULL' };
-    }
-
-    const maxByReserve = available;
-    const maxByCapacity = unitsThatFit(buyerCargoCapacityRemaining, itemIndex);
-    const transferred = Math.min(requestedQty, maxByReserve, maxByCapacity);
-
-    if (transferred <= 0) {
-      return { ok: false, reason: 'AT_RESERVE' };
-    }
-
-    const unitPrice = buyerIsOwner ? BASEPRICE[itemIndex] : item.markup2a;
-    const totalCost = BigInt(transferred) * BigInt(unitPrice);
-
-    return { ok: true, transferred, unitPrice, totalCost, mutatePlanet: true };
-  }
-
-  // Neutral zone: no planet-side cap check; cargo cap still applies
+  // 2. weight
   if (buyerCargoCapacityRemaining <= 0) {
     return { ok: false, reason: 'CAPACITY_FULL' };
   }
-
-  const transferred = Math.min(requestedQty, unitsThatFit(buyerCargoCapacityRemaining, itemIndex));
-  if (transferred <= 0) {
-    return { ok: false, reason: 'CAPACITY_FULL' };
+  if (requestedQty > unitsThatFit(buyerCargoCapacityRemaining, itemIndex)) {
+    return { ok: false, reason: 'WONT_FIT' };
   }
 
-  const unitPrice = buyerIsOwner ? BASEPRICE[itemIndex] : item.markup2a;
-  const totalCost = BigInt(transferred) * BigInt(unitPrice);
+  // 3. availability. `amt4sale` gives the owner the full stock and everyone
+  //    else the stock above the reserve. Runs in the neutral zone too.
+  const available = buyerIsOwner ? Number(item.qty) : Number(item.qty) - item.reserve;
+  if (available <= 0 || available < requestedQty) {
+    return { ok: false, reason: 'AT_RESERVE' };
+  }
 
-  return { ok: true, transferred, unitPrice, totalCost, mutatePlanet: false };
+  // 4. price
+  const unitPrice = buyerIsOwner ? BASEPRICE[itemIndex] : item.markup2a;
+  const totalCost = BigInt(requestedQty) * BigInt(unitPrice);
+  if (totalCost > buyerCash) {
+    return { ok: false, reason: 'INSUFFICIENT_FUNDS' };
+  }
+
+  return {
+    ok: true,
+    transferred: requestedQty,
+    unitPrice,
+    totalCost,
+    // The neutral-zone market is bottomless stock-wise: the transfer happens
+    // but the planet's inventory and takings are left alone.
+    mutatePlanet: !isNeutralZone,
+  };
 }
 
 export interface SellInput {

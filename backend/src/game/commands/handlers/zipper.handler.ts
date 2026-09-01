@@ -56,7 +56,12 @@ export class ZipperHandlerService {
       // fall back to default
     }
 
-    const inRange = this.mineRegistry.getAll().filter((m) => cdistance(ship, m) <= scanRange);
+    // cdistance() is sector-units, scanRange is raw units — C scales the
+    // distance by 10_000 before the comparison. Without it the filter matched
+    // every mine in the galaxy. @see GECMDS.C:1703-1707
+    const inRange = this.mineRegistry
+      .getAll()
+      .filter((m) => cdistance(ship, m) * 10_000 < scanRange);
 
     for (const mine of inRange) {
       await this.mineRepo.delete(mine.id);

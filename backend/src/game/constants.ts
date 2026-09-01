@@ -231,6 +231,14 @@ export const TDAMMAX = GAME_CONFIG.TDAMMAX;
  * @see GEMAIN.C:511 mdammax = (double)numopt(MDAMMAX,1,100)
  */
 export const MDAMMAX = GAME_CONFIG.MDAMMAX;
+
+/**
+ * Maximum energy a missile can be loaded with, and the divisor C normalises a
+ * missile's stored charge against before scaling by MDAMMAX.
+ *
+ * @see GECMDS.C:cmd_missile charge validation  @see GEFUNCS.C:1641 `damfact/50000.0`
+ */
+export const MISSILE_CHARGE_MAX = 50_000;
 /** @see GEGLOBAL.H minedammax — max mine damage */
 export const MINEDAMMAX = GAME_CONFIG.MNDAMMAX;
 /** @see GEGLOBAL.H decodds — decoy intercept probability (0-100 integer) */

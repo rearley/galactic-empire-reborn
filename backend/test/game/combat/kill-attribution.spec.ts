@@ -121,7 +121,9 @@ describe('CombatTickService — kill attribution (T053, FR-026)', () => {
       ltorpsDistance: [10, 0, 0],   // resolves to hit
       lmisslChannel: [9, 255, 255],
       lmisslDistance: [10, 0, 0],   // resolves to hit
-      lmisslEnergy: [3000, 0, 0],   // big charge → guaranteed >= 5 hull damage
+      // Full charge: a missile's damage is now normalised against
+      // MISSILE_CHARGE_MAX, so a 3000-charge missile does ~6 hull damage.
+      lmisslEnergy: [50000, 0, 0],   // big charge → guaranteed >= 5 hull damage
     });
 
     const h = await makeHarness([alice, carol, bob]);
@@ -167,7 +169,9 @@ describe('CombatTickService — kill attribution (T053, FR-026)', () => {
       damage: 95,
       lmisslChannel: [5, 255, 255],   // shooter's CHANNEL, not their shipno
       lmisslDistance: [10, 0, 0],
-      lmisslEnergy: [3000, 0, 0],
+      // Full charge: a missile's damage is now normalised against
+      // MISSILE_CHARGE_MAX, so a 3000-charge missile does ~6 hull damage.
+      lmisslEnergy: [50000, 0, 0],
     });
 
     const h = await makeHarness([bystander, shooter, victim]);

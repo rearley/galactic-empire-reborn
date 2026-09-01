@@ -11,7 +11,7 @@ import {
   FIRETICKS,
   MAXMISSL,
   MAXTORPS,
-  MDAMMAX,
+  MISSILE_CHARGE_MAX,
   MINERANGE,
   MISLSPED,
   TDAMMAX,
@@ -28,6 +28,8 @@ import {
   phaserReloadAmount,
   rollHullDamage,
   rollProjectileHullDamage,
+  rollMissileHullDamage,
+  missileShieldDrain,
   mineShieldedDamage,
   MINE_SHIELD_DRAIN_BONUS,
   SHIELD_DRAIN_MIN,
@@ -594,8 +596,10 @@ export class CombatTickService implements OnModuleInit {
         continue;
       }
 
-      // Damage cap is the stored charge.
-      const charge = carrier.lmisslEnergy[i] ?? MDAMMAX;
+      // The stored charge is an energy value, NOT a damage cap — it is
+      // normalised against MISSILE_CHARGE_MAX inside rollMissileHullDamage.
+      // @see GEFUNCS.C:1620-1660
+      const charge = carrier.lmisslEnergy[i] ?? MISSILE_CHARGE_MAX;
       this.resolveProjectileHit(carrier, ch, 'missile', charge, ctx);
       this.clearMisslSlot(carrier, i);
     }
@@ -659,12 +663,24 @@ export class CombatTickService implements OnModuleInit {
     const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
     // GEFUNCS.C:1552-1576 — hull damage is applied in BOTH branches. Shields
     // halve the roll and cost charge; they are not immunity.
-    const hullDamage = rollProjectileHullDamage(this.random, dmgMax, damageFactor, shieldUp);
+    //
+    // Torpedoes and missiles differ on both rolls: a torpedo's `dmgMax` is
+    // already TDAMMAX, while a missile's is a 1..50000 charge that has to be
+    // normalised first, and a missile through raised shields rolls rndm(.1)
+    // rather than rndm(.5). @see GEFUNCS.C:1641-1659
+    const hullDamage =
+      weapon === 'missile'
+        ? rollMissileHullDamage(this.random, dmgMax, damageFactor, shieldUp)
+        : rollProjectileHullDamage(this.random, dmgMax, damageFactor, shieldUp);
     let shieldConsumed = 0;
     if (shieldUp) {
-      // Shield drain is an independent 10..29 roll in C, NOT the hull damage.
-      // @see GEFUNCS.C:1563 shieldhit(ptr, usrn, (gernd()%20)+10)
-      const drain = SHIELD_DRAIN_MIN + Math.floor(this.random.next() * SHIELD_DRAIN_SPREAD);
+      // Torpedo drain is an independent 10..29 roll in C, NOT the hull damage;
+      // a missile instead drains in proportion to the charge it carried.
+      // @see GEFUNCS.C:1563 (torp) and GEFUNCS.C:1649-1651 (missile)
+      const drain =
+        weapon === 'missile'
+          ? missileShieldDrain(this.random, dmgMax, damageFactor)
+          : SHIELD_DRAIN_MIN + Math.floor(this.random.next() * SHIELD_DRAIN_SPREAD);
       const r = shieldhit(carrier.shield, carrier.shieldtype, drain);
       this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
         v.damage = v.damage + hullDamage;

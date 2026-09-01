@@ -222,7 +222,7 @@ describe('PlanetStateService — buy()', () => {
   it('happy path returns ok, decrements planet qty, calls prisma.planet.update', async () => {
     const { svc, prisma } = await setup();
     const key = planetKey(1, 1, 1);
-    const result = await svc.buy(key, 'owner', I_FOOD, 10, 100);
+    const result = await svc.buy(key, 'owner', I_FOOD, 10, 100, 10_000_000n);
     expect(result).toMatchObject({ ok: true, transferred: 10 });
     expect(svc.get(1, 1, 1)?.items[I_FOOD].qty).toBe(990n);
     expect(prisma.planet.update).toHaveBeenCalledTimes(1);
@@ -234,7 +234,7 @@ describe('PlanetStateService — buy()', () => {
     const prisma = makePrisma([planet]);
     const svc = new PlanetStateService(prisma as any, makeShips() as any);
     await svc.onModuleInit();
-    const result = await svc.buy(planetKey(1, 1, 1), 'buyer', I_FOOD, 10, 100);
+    const result = await svc.buy(planetKey(1, 1, 1), 'buyer', I_FOOD, 10, 100, 10_000_000n);
     expect(result).toEqual({ ok: false, reason: 'SELL_FLAG_OFF' });
   });
 
@@ -245,7 +245,7 @@ describe('PlanetStateService — buy()', () => {
     const prisma = makePrisma([planet]);
     const svc = new PlanetStateService(prisma as any, makeShips() as any);
     await svc.onModuleInit();
-    const result = await svc.buy(planetKey(1, 1, 1), 'buyer', I_FOOD, 10, 100);
+    const result = await svc.buy(planetKey(1, 1, 1), 'buyer', I_FOOD, 10, 100, 10_000_000n);
     expect(result).toEqual({ ok: false, reason: 'AT_RESERVE' });
   });
 
@@ -254,7 +254,7 @@ describe('PlanetStateService — buy()', () => {
     const prisma = makePrisma([planet]);
     const svc = new PlanetStateService(prisma as any, makeShips() as any);
     await svc.onModuleInit();
-    const result = await svc.buy(planetKey(0, 0, 1), 'buyer', I_FOOD, 10, 100);
+    const result = await svc.buy(planetKey(0, 0, 1), 'buyer', I_FOOD, 10, 100, 10_000_000n);
     expect(result).toMatchObject({ ok: true, transferred: 10 });
     // Planet qty unchanged
     expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1000n);
@@ -264,7 +264,7 @@ describe('PlanetStateService — buy()', () => {
 
   it('NOT_FOUND for unknown key', async () => {
     const { svc } = await setup();
-    const result = await svc.buy('99:99:9', 'owner', I_FOOD, 10, 100);
+    const result = await svc.buy('99:99:9', 'owner', I_FOOD, 10, 100, 10_000_000n);
     expect(result).toEqual({ ok: false, reason: 'NOT_FOUND' });
   });
 });

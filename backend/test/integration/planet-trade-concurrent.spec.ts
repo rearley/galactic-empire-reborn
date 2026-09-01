@@ -1,5 +1,5 @@
 /**
- * T036 — Concurrent PlanetStateService.buy() calls are serialized (no lost-update race).
+ * T036 — Concurrent PlanetStateService.buy(, 10_000_000n) calls are serialized (no lost-update race).
  */
 
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
@@ -68,26 +68,31 @@ describe('T036 — PlanetStateService concurrent buy()', () => {
   const key = planetKey(5, 3, 1);
 
   describe('concurrent buys serialize correctly', () => {
-    it('one buyer gets 10, the other gets 5 (15 total taken, none double-spent)', async () => {
+    /**
+     * C's buy is all-or-nothing (`avail >= amt`, GECMDS.C:4331), so with 15 in
+     * stock two racing orders for 10 cannot both be served — the loser is
+     * refused outright rather than handed the 5 that are left.
+     */
+    it('one buyer gets all 10, the other is refused — no double-spend', async () => {
       const { prismaMock, shipsMock } = buildMocks(15n);
       const svc = new PlanetStateService(prismaMock, shipsMock);
       await svc.onModuleInit();
 
       const [r1, r2] = await Promise.all([
-        svc.buy(key, 'u1', I_FOOD, 10, 100),
-        svc.buy(key, 'u2', I_FOOD, 10, 100),
+        svc.buy(key, 'u1', I_FOOD, 10, 100, 10_000_000n),
+        svc.buy(key, 'u2', I_FOOD, 10, 100, 10_000_000n),
       ]);
 
-      expect(r1.ok).toBe(true);
-      expect(r2.ok).toBe(true);
+      const winners = [r1, r2].filter((r) => r.ok);
+      expect(winners).toHaveLength(1);
       const total = (r1.ok ? r1.transferred : 0) + (r2.ok ? r2.transferred : 0);
-      expect(total).toBe(15);
+      expect(total).toBe(10);
 
       const state = svc.get(5, 3, 1);
       expect(state).toBeDefined();
-      expect(state!.items[I_FOOD].qty).toBe(0n);
+      expect(state!.items[I_FOOD].qty).toBe(5n);
 
-      expect(prismaMock.planet.update).toHaveBeenCalledTimes(2);
+      expect(prismaMock.planet.update).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -98,7 +103,7 @@ describe('T036 — PlanetStateService concurrent buy()', () => {
       await svc.onModuleInit();
 
       const results = await Promise.all(
-        Array.from({ length: 5 }, (_, i) => svc.buy(key, `u${i}`, I_FOOD, 10, 100)),
+        Array.from({ length: 5 }, (_, i) => svc.buy(key, `u${i}`, I_FOOD, 10, 100, 10_000_000n)),
       );
 
       const totalTransferred = results.reduce((sum, r) => sum + (r.ok ? r.transferred : 0), 0);
