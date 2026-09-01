@@ -15,7 +15,7 @@ exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
   "  shi up|dn              — raise or lower shields",
   "  fre <A|B|C> <n|hail>   — tune a radio channel",
   "  sen <A|B|C> <message>  — transmit on a channel",
-  "  att <troops|fighters>  — attack the planet you orbit",
+  "  att <amount> <troops|fighters> — attack the planet you orbit",
 ]
 `;
 
@@ -57,7 +57,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  shi up|dn              — raise or lower shields",
       "  fre <A|B|C> <n|hail>   — tune a radio channel",
       "  sen <A|B|C> <message>  — transmit on a channel",
-      "  att <troops|fighters>  — attack the planet you orbit",
+      "  att <amount> <troops|fighters> — attack the planet you orbit",
     ],
     "title": "Combat",
   },
@@ -113,7 +113,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  tra up <qty> <item>    — transfer planet stock to ship",
       "  wit [qty]              — withdraw taxes to your account",
       "  aba                    — give up the planet you are orbiting",
-      "  attack <planet>        — attack enemy planet",
+      "  att <amount> <troops|fighters> — attack the planet you orbit",
       "  spy                    — land a spy on the planet you orbit",
       "  dat <fragment>         — look up ship by name fragment",
     ],
@@ -184,7 +184,7 @@ exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
   "  tra up <qty> <item>    — transfer planet stock to ship",
   "  wit [qty]              — withdraw taxes to your account",
   "  aba                    — give up the planet you are orbiting",
-  "  attack <planet>        — attack enemy planet",
+  "  att <amount> <troops|fighters> — attack the planet you orbit",
   "  spy                    — land a spy on the planet you orbit",
   "  dat <fragment>         — look up ship by name fragment",
 ]

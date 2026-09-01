@@ -45,7 +45,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  shi up|dn              — raise or lower shields',
       '  fre <A|B|C> <n|hail>   — tune a radio channel',
       '  sen <A|B|C> <message>  — transmit on a channel',
-      '  att <troops|fighters>  — attack the planet you orbit',
+      '  att <amount> <troops|fighters> — attack the planet you orbit',
     ],
   },
   trade: {
@@ -76,7 +76,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  tra up <qty> <item>    — transfer planet stock to ship',
       '  wit [qty]              — withdraw taxes to your account',
       '  aba                    — give up the planet you are orbiting',
-      '  attack <planet>        — attack enemy planet',
+      '  att <amount> <troops|fighters> — attack the planet you orbit',
       '  spy                    — land a spy on the planet you orbit',
       '  dat <fragment>         — look up ship by name fragment',
     ],

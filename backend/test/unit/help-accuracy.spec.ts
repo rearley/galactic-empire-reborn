@@ -149,4 +149,18 @@ describe('help text matches the commands it documents', () => {
       expect(formatMessage(MessageId.HELFMT, list)).toContain(id);
     }
   });
+
+  /**
+   * `att troops` answers "Usage: att <amount> <troops|fighters>" — the count
+   * comes first, exactly as it does for buy/sell/transfer. Combat help said
+   * `att <troops|fighters>` and planet help invented `attack <planet>`, which
+   * takes a planet name the command never reads.
+   */
+  it('attack documents the amount it requires, in both topics', () => {
+    for (const topic of ['combat', 'planet'] as const) {
+      expect(body(topic)).toContain('att <amount> <troops|fighters>');
+      expect(body(topic)).not.toMatch(/att(ack)? <planet>/);
+      expect(body(topic)).not.toMatch(/att <troops\|fighters>/);
+    }
+  });
 });

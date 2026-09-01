@@ -4,6 +4,7 @@ import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { canEnterOrbit } from './helpers/orbit-range';
 
 /**
  * Handles the `orbit` / `orb` command — enter orbit around a planet in the current sector.
@@ -64,6 +65,15 @@ export class OrbitHandlerService {
     }
 
     const planet = planets.find((p) => p.plnum === targetPlnum)!;
+
+    // C refuses beyond 250 units (GECMDS.C cmd_orbit). Without this a ship
+    // orbited from anywhere in the sector, which silently disabled planetary
+    // defence: `checkdist` clears `hostile` past 1000 units, so the colony's
+    // ion cannons never fired on an attacker sitting half a sector away.
+    if (!canEnterOrbit(ship, planet)) {
+      return { lines: [{ text: formatMessage(MessageId.ORBIT_TOO_FAR), category: 'system' }] };
+    }
+
     this.shipService.mutate(ship.userid, ship.shipno, (s) => {
       s.where = 10 + targetPlnum!;
       s.speed = 0;
