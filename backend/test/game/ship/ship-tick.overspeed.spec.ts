@@ -4,6 +4,7 @@
  * @see backend/src/game/ship/ship-tick.service.ts ShipTickService
  * @see specs/019-physics-polish/spec.md US2, FR-003/FR-004
  */
+import { decideOverspeed } from '../../../src/game/ship/ship-overspeed';
 import { ShipTickService } from '../../../src/game/ship/ship-tick.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
@@ -219,5 +220,41 @@ describe('overspeed is player-only, sublight-exempt, and rolls every third secon
     h.fire();
     h.fire();
     expect(ship.warncntr).toBe(2);
+  });
+});
+
+/**
+ * C computes the overspeed odds in `int` arithmetic, so the division truncates
+ * before the subtraction:
+ *
+ *   diff = intspeed - ptr->topspeed;
+ *   diff = (diff*100)/intspeed;      // int/int — truncates HERE
+ *   diff = 60 - diff;
+ *
+ * intspeed 9 against topspeed 6 gives (3*100)/9 = 33, then 60-33 = 27. The
+ * port carried the float through and floored once at the end, reaching 26 —
+ * a slightly higher break chance on every overspeed roll.
+ *
+ * @see GEFUNCS.C:742-747
+ */
+describe('overspeed odds truncate as C\'s int arithmetic does', () => {
+  it('gives 27, not 26, at intspeed 9 against topspeed 6', () => {
+    // Force the roll by recording the modulus the RNG is asked for.
+    let asked = -1;
+    const ship = makeShip({ status: 1, speed: 9000, speed2b: 9000, topspeed: 6, warncntr: 0 });
+    decideOverspeed(ship, { intBelow: (n: number) => { if (asked < 0) asked = n; return 1; } });
+    expect(asked).toBe(27);
+  });
+
+  it('matches C across a range of speeds', () => {
+    for (const [speed, topspeed] of [[9000, 6], [7000, 3], [15000, 10], [4000, 1]]) {
+      const intspeed = Math.floor(speed / 1000);
+      let expected = 60 - Math.trunc(((intspeed - topspeed) * 100) / intspeed);
+      if (expected < 0) expected = 5; // C: `if (diff < 0) diff = 5;`
+      let asked = -1;
+      const ship = makeShip({ status: 1, speed, speed2b: speed, topspeed, warncntr: 0 });
+      decideOverspeed(ship, { intBelow: (n: number) => { if (asked < 0) asked = n; return 1; } });
+      expect(asked).toBe(expected);
+    }
   });
 });

@@ -59,3 +59,35 @@ export interface PhysicsHyperspaceEvent {
   /** TickContext.firedAt. */
   tickAt: Date;
 }
+
+/** @see GEFUNCS.C:836-905 gravity */
+export const PHYSICS_GRAVITY = 'physics.gravity';
+
+/**
+ * Emitted when a ship strays inside a planet's or wormhole's gravity well.
+ *
+ * The three bands are C's GRAVITY1/2/3 (planets) and GRAVWRM1/2/3 (wormholes):
+ * a tug, a strong pull, and arrival. Band 3 is acted on by the physics tick —
+ * a planet writes the hull off, a wormhole moves the ship and clears its locks.
+ *
+ * @see GEFUNCS.C:855-900
+ */
+export interface PhysicsGravityEvent {
+  /** Composite key — `${userid}:${shipno}`. */
+  shipId: string;
+  /** 1-based body number within the sector. */
+  plnum: number;
+  isWormhole: boolean;
+  /** 1 = distant tug, 2 = strong pull, 3 = contact. */
+  band: 1 | 2 | 3;
+  tickAt: Date;
+}
+
+/** @see GEFUNCS.C:725-730 — SELFD4, the self-destruct cancelled by reaching neutral space */
+export const PHYSICS_DESTRUCT_CANCELLED = 'physics.destruct-cancelled';
+
+export interface PhysicsDestructCancelledEvent {
+  /** Composite key — `${userid}:${shipno}`. */
+  shipId: string;
+  tickAt: Date;
+}
