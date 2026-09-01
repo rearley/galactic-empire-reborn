@@ -9,6 +9,7 @@ import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers
 import { applyEconomyTick } from './planet-economy';
 import { PlanetEconomyService } from './planet-economy.service';
 import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
+import { TAXRATE_MAX } from '../commands/handlers/helpers/tax-rate';
 import { OnEvent } from '@nestjs/event-emitter';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 
@@ -470,7 +471,8 @@ export class PlanetStateService implements OnModuleInit {
           state.items[change.itemIndex].reserve = change.value;
           break;
         case 'taxrate':
-          if (change.value < 0 || change.value > 119) {
+          // C's ceiling is 100 (GEMAIN.C:3224). @see handlers/helpers/tax-rate.ts
+          if (change.value < 0 || change.value > TAXRATE_MAX) {
             return { ok: false as const, reason: 'INVALID' as const };
           }
           state.taxrate = change.value;
@@ -509,6 +511,8 @@ export class PlanetStateService implements OnModuleInit {
   async withdrawTax(
     key: string,
     requesterUserid: string,
+    /** Amount to move; omit to take the whole pool. @see helpers/withdraw-amount.ts */
+    requested?: bigint,
   ): Promise<
     | { ok: true; amount: bigint }
     | { ok: false; reason: 'NOT_OWNER' | 'NOT_FOUND' }
@@ -518,8 +522,10 @@ export class PlanetStateService implements OnModuleInit {
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
       if (state.userid !== requesterUserid) return { ok: false as const, reason: 'NOT_OWNER' as const };
 
-      const amount = state.tax;
-      state.tax = 0n;
+      // C moves the amount asked for and leaves the rest (GEMAIN.C:3098).
+      const amount = requested === undefined ? state.tax : requested;
+      if (amount > state.tax) return { ok: false as const, reason: 'NOT_FOUND' as const };
+      state.tax = state.tax - amount;
 
       await this.prisma.planet.update({
         where: { xsect_ysect_plnum: { xsect: state.xsect, ysect: state.ysect, plnum: state.plnum } },

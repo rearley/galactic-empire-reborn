@@ -230,7 +230,7 @@ For each planet processed by PLANET_UPDATE:
 | Planet name 1-19 printable ASCII, trimmed | `land.handler.ts` before `applyMutation` |
 | Trade password ≤10 chars | `admin.handler.ts` |
 | Beacon message ≤75 chars | `admin.handler.ts` |
-| Tax rate ∈ [0, 119] (integer) | `admin.handler.ts` (preserves `taxfact > 0`) |
+| Tax rate ∈ [0, 100] (integer) | `admin.handler.ts` — C's ceiling, `if (amt <= 100)` GEMAIN.C:3224. **Superseded 2026-09-01**: was [0,119], derived from the revolt formula's /120 divisor rather than from C's setter. |
 | Per-item rate, markup, reserve are non-negative integers | `admin.handler.ts` |
 | Buy amount ≤ available cargo capacity | `buy.handler.ts` (uses `ITEM_TONS` × qty vs. ship `maxTons`) |
 | Buy amount ≤ planet qty − reserve | `buy.handler.ts` |

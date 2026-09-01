@@ -93,7 +93,7 @@ describe('AdminHandlerService', () => {
     expect(footer).toContain('adm markup <item> <value>');
     expect(footer).toContain('adm sellflag <item> on|off');
     expect(footer).toContain('adm reserve <item> <value>');
-    expect(footer).toContain('adm tax <0-119>');
+    expect(footer).toContain('adm tax <0-100>');
     expect(footer).toContain('adm beacon <message>');
     expect(footer).toContain('adm password <word|none|team>');
   });
@@ -168,14 +168,20 @@ describe('AdminHandlerService', () => {
     );
   });
 
-  it('tax with valid value dispatches taxrate change (capped at 119)', async () => {
+  /**
+   * Out-of-range tax is REFUSED, not clamped. Clamping let the command answer
+   * "Setting saved." for a value it had not saved — and every sibling setter
+   * refuses. C's ceiling is 100 and it re-prompts above that
+   * (GEMAIN.C:3224). This previously asserted the clamp to 119.
+   */
+  it('tax above the ceiling is refused, not silently clamped', async () => {
     const { svc, applyAdminChangeMock } = makeService();
-    await svc.command.handler(makeShip(), ['tax', '200'], {});
-    const call = applyAdminChangeMock.mock.calls[0];
-    expect(call[2]).toEqual({ type: 'taxrate', value: 119 });
+    const result = await svc.command.handler(makeShip(), ['tax', '200'], {});
+    expect(applyAdminChangeMock).not.toHaveBeenCalled();
+    expect(result.lines.map((l) => l.text).join('\n')).toContain('adm tax <0-100>');
   });
 
-  it('tax with value <=119 keeps the value', async () => {
+  it('tax with value <=100 keeps the value', async () => {
     const { svc, applyAdminChangeMock } = makeService();
     await svc.command.handler(makeShip(), ['tax', '50'], {});
     expect(applyAdminChangeMock).toHaveBeenCalledWith(

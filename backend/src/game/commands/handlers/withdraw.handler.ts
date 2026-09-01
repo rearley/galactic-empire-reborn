@@ -5,6 +5,7 @@ import { planetKey } from '../../planet/planet-state.types';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { parseWithdrawAmount } from './helpers/withdraw-amount';
 
 /**
  * Handles the `withdraw` / `with` command — transfer accumulated planet tax to ship owner's cash.
@@ -28,7 +29,7 @@ export class WithdrawHandlerService {
     };
   }
 
-  private async handle(ship: ShipState, _args: string[], _ctx: CommandContext): Promise<CommandResult> {
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     if (ship.where < 10) {
       return { lines: [{ text: formatMessage(MessageId.WTHDR_NOT_LANDED), category: 'system' }] };
     }
@@ -42,8 +43,18 @@ export class WithdrawHandlerService {
       return { lines: [{ text: formatMessage(MessageId.WTHDR_NOT_OWNER), category: 'system' }] };
     }
 
+    // The argument was ignored and the whole pool always moved, while the help
+    // documents `wit [qty]`. C honours it. @see helpers/withdraw-amount.ts
+    const requested = parseWithdrawAmount(args[0], state.tax);
+    if (!requested.ok) {
+      const msg = requested.reason === 'TOO_MUCH'
+        ? formatMessage(MessageId.WTHDR_TOO_MUCH, Number(state.tax))
+        : formatMessage(MessageId.WTHDR_FMT);
+      return { lines: [{ text: msg, category: 'system' }] };
+    }
+
     const key = planetKey(xsect, ysect, plnum);
-    const result = await this.planetService.withdrawTax(key, ship.userid);
+    const result = await this.planetService.withdrawTax(key, ship.userid, requested.amount);
 
     if (!result.ok) {
       return { lines: [{ text: formatMessage(MessageId.WTHDR_NOT_OWNER), category: 'system' }] };

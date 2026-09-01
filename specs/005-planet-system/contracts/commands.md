@@ -136,7 +136,7 @@ mutations) expect. Reviewers verifying contract conformance: any
    - `admin markup <itemKeyword> <int>`
    - `admin sellflag <itemKeyword> <on|off>`
    - `admin reserve <itemKeyword> <int>`
-   - `admin tax <int>` — value clamped to [0, 119]
+   - `admin tax <int>` — value must be in [0, 100]; out of range is REFUSED, not clamped. **Superseded 2026-09-01**: clamping made the command confirm a value it had not stored.
    - `admin beacon <free text up to 75 chars>`
    - `admin password <text up to 10 chars or "none">`
 
