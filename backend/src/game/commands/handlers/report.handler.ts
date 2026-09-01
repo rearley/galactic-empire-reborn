@@ -6,6 +6,7 @@ import { Command, CommandContext, CommandResult, CommandResultLine } from '../co
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
+import { coord1, coord2 } from '../../physics/coord';
 
 
 /**
@@ -144,10 +145,10 @@ export class ReportHandlerService implements OnModuleInit {
 
     // Compute approximate sector coords from float universe coords.
     // setsect() in C source maps float coords to integer sector grid.
-    const xsect = Math.floor(ship.xcoord);
-    const ysect = Math.floor(ship.ycoord);
-    const xcord = Math.floor((ship.xcoord % 1) * 100);
-    const ycord = Math.floor((ship.ycoord % 1) * 100);
+    const xsect = coord1(ship.xcoord);
+    const ysect = coord1(ship.ycoord);
+    const xcord = coord2(ship.xcoord);
+    const ycord = coord2(ship.ycoord);
     const heading = Math.round(ship.heading);
     const displaySpeed = ship.speed;
     const speedStr = displaySpeed === 0 ? 'stopped' : displaySpeed < 1000 ? 'impulse' : `warp ${(displaySpeed / 1000).toFixed(1)}`;
