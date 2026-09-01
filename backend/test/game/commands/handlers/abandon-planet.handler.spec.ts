@@ -192,4 +192,32 @@ describe('AbandonHandlerService — confirmation', () => {
     expect(result.lines[0].text).toContain('Ranger');
     expect(result.expectFollowup).toBe('aba ship');
   });
+
+  /**
+   * Answering the scuttle prompt with anything but YES must END it.
+   *
+   * The first cut re-prompted on any non-confirmation, and because the prompt
+   * re-arms `expectFollowup`, the gateway fed the NEXT command back in as
+   * another answer. Saying "no" therefore trapped the session: every command
+   * the captain typed came back as the same question. Found by answering "no"
+   * in a live game — the unit tests only ever covered `ship` and `ship yes`.
+   */
+  it('ends the scuttle prompt when the answer is not yes', async () => {
+    const { handler, ship } = withPlanet();
+    const abandonShip = jest.fn();
+    const h = new AbandonHandlerService(
+      { abandon: abandonShip } as unknown as ShipStateService,
+      { abandonPlanet: jest.fn(), get: jest.fn() } as unknown as PlanetStateService,
+    );
+    void handler;
+
+    const result = await h.command.handler(ship, ['ship', 'no'], {}) as {
+      lines: { text: string }[]; expectFollowup?: string;
+    };
+
+    expect(abandonShip).not.toHaveBeenCalled();
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN_CANCELLED));
+    // Critically: does NOT re-arm the followup, or the next command is eaten.
+    expect(result.expectFollowup).toBeUndefined();
+  });
 });

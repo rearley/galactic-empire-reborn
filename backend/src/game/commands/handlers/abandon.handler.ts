@@ -53,11 +53,17 @@ export class AbandonHandlerService {
     const arg0 = args[0]?.toLowerCase();
 
     if (arg0 === 'ship') {
+      if (args[1] === undefined) {
+        return {
+          lines: [{ text: formatMessage(MessageId.ABAN_CONFIRM_SHIP, ship.shipname), category: 'system' }],
+          expectFollowup: 'aba ship',
+        };
+      }
       if (isConfirmation(args[1])) return this.abandonShip(ship, ctx);
-      return {
-        lines: [{ text: formatMessage(MessageId.ABAN_CONFIRM_SHIP, ship.shipname), category: 'system' }],
-        expectFollowup: 'aba ship',
-      };
+      // Any other answer ends it. Re-prompting here re-arms `expectFollowup`,
+      // and the gateway then feeds the captain's NEXT command back in as
+      // another answer — saying "no" trapped the session in the question.
+      return { lines: [{ text: formatMessage(MessageId.ABAN_CANCELLED), category: 'system' }] };
     }
 
     if (arg0 === undefined) return this.confirmAbandonPlanet(ship);
