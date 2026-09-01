@@ -77,7 +77,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     const target = makeShip({
       userid: 'enemy', shipno: 2, shipname: 'EnemyShip',
       xcoord: 0.01, ycoord: 0, where: 0,
-      damage: 30,      // → 'Moderate'
+      damage: 30,      // → 'moderate'
       shieldstat: 1,   // shields up
       kills: 7,
     });
@@ -93,7 +93,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     expect(text).toContain('bearing');
 
     // Intel lines: damage, shields, kills
-    expect(text).toContain('Moderate');
+    expect(text).toContain('moderate');
     expect(text).toContain('Shields: up');
     expect(text).toContain('Kills: 7');
   });
@@ -147,7 +147,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     expect(text).toContain('bearing');
 
     // NO intel when target at warp
-    expect(text).not.toContain('Moderate');
+    expect(text).not.toContain('moderate');
     expect(text).not.toContain('Shields:');
     expect(text).not.toContain('Kills:');
   });
@@ -169,7 +169,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     expect(text).toContain('bearing');
 
     // NO intel when scanner at warp
-    expect(text).not.toContain('Light');
+    expect(text).not.toContain('light');
     expect(text).not.toContain('Shields:');
     expect(text).not.toContain('Kills:');
   });
@@ -188,7 +188,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     const text = result.lines.map((l) => l.text).join('\n');
 
     // Intel SHOULD appear for orbiting ships
-    expect(text).toContain('Heavy');
+    expect(text).toContain('heavy');
     expect(text).toContain('Shields: down');
     expect(text).toContain('Kills: 1');
   });

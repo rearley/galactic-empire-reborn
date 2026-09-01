@@ -8,7 +8,8 @@ import { ITEM_NAMES } from '../constants/items';
 
 /** Short keyword aliases matching genearas() in the original game. */
 export const ITEM_SHORT_KEYWORDS = [
-  'men', 'mis', 'tor', 'ion', 'fla', 'foo', 'fig', 'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy',
+  // 'flu', not 'fla' — C's kwrd[4]. @see GECMDS.C:81
+  'men', 'mis', 'tor', 'ion', 'flu', 'foo', 'fig', 'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy',
 ];
 
 /**

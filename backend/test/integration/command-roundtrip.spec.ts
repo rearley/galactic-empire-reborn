@@ -238,7 +238,7 @@ describe('command round-trip integration (US1)', () => {
   it('scan → scan:render event carries cells (US2)', async () => {
     const client = makeClient();
     await waitForEvent(client, 'command:result'); // welcome
-    client.emit('command', { input: 'scan' });
+    client.emit('command', { input: 'scan lo' });
     const scanEvent = await waitForEvent<{ cells?: unknown[] }>(
       client,
       'scan:render',
@@ -251,7 +251,7 @@ describe('command round-trip integration (US1)', () => {
   it('scan emits zero Ship writes (read-only, SC-003)', async () => {
     const client = makeClient();
     await waitForEvent(client, 'command:result'); // welcome
-    client.emit('command', { input: 'scan' });
+    client.emit('command', { input: 'scan lo' });
     await waitForEvent(client, 'command:result');
     await flushTick!();
     expect(prismaMock.ship.update).not.toHaveBeenCalled();

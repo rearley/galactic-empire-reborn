@@ -1,3 +1,4 @@
+import { formatPopulation } from './ros-format';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { TeamRepository } from '../../team/team.repository';
@@ -38,10 +39,16 @@ export class RosHandlerService {
     const limit = showAll ? ROSTER_ALL_CAP : (Number.isFinite(rosterMax) ? rosterMax : ROSTER_MAX_DEFAULT);
 
     const allRows = await this.prisma.user.findMany({
+      // C lists only players who have actually scored — `tmpusr.score > 0`
+      // (GECMDS.C:4038). Without it every dormant and never-flown account
+      // padded the board, which is what filled the roster with e2e_* rows on
+      // the shared development database.
       where: {
+        score: { gt: 0n },
         AND: [
           { NOT: { userid: { startsWith: 'Cybrg-' } } },
           { NOT: { userid: { startsWith: '@Droid-' } } },
+          { NOT: { userid: { startsWith: '@' } } },
         ],
       },
       orderBy: [{ score: 'desc' }, { kills: 'desc' }, { userid: 'asc' }],
@@ -78,7 +85,9 @@ export class RosHandlerService {
       const score = row.score.toString().padStart(10);
       const kills = row.kills.toString().padStart(5);
       const planets = row.planets.toString().padStart(7);
-      const pop = row.population.toString().padStart(10);
+      // `" %8.3fm"` of population/100 — the counter is hundredths of a
+      // million, not a headcount. @see GECMDS.C:4043
+      const pop = formatPopulation(row.population);
       lines.push({ text: ` ${rank}  ${userid} ${team} ${score}  ${kills}  ${planets}  ${pop}`, category: 'info' });
     });
 

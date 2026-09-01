@@ -122,13 +122,21 @@ describe('GameGateway — frequency-filtered broadcasts', () => {
     expect(emitted(other)).toHaveLength(1);
   });
 
-  it('an untagged hail still reaches everyone uncloaked', () => {
+  /**
+   * `outwar` (GEMAIN.C:1518-1540) delivers to every `ingegame` ship and never
+   * examines cloak — running silent hides you from scanners, not from your own
+   * radio. The port dropped hails for cloaked recipients, which made cloaking
+   * deafen you; specs/012-social-commands recorded that as matching outwar,
+   * which misreads it.
+   * @see GECMDS.C:1845
+   */
+  it('an untagged hail reaches everyone, cloaked or not', () => {
     const a = addSocket('a', [0, 0, 0], { inRoom: false });
     const cloaked = addSocket('cloaked', [0, 0, 0], { inRoom: false, cloak: 1 });
 
     send({ room: 'hail', event: 'message.send', payload: { text: 'hi' } });
 
     expect(emitted(a)).toHaveLength(1);
-    expect(emitted(cloaked)).toHaveLength(0);
+    expect(emitted(cloaked)).toHaveLength(1);
   });
 });
