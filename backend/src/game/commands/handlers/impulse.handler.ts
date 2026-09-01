@@ -40,8 +40,12 @@ export const impulseCommand: Command = {
     const courseArg = args[1] ?? '0';
     const courseResult = valdegree(courseArg);
     if (!courseResult.ok) {
+      // valdegree's own range, which is what C prints on this failure
+      // (GEFUNCS.C:1933). Quoting 0-359 here rejected a course of 208 — a
+      // number inside the range the message named — with no hint why.
+      // C's 0-359 belongs to `rot @`, a different form. @see GECMDS.C:672
       return {
-        lines: [{ text: formatMessage(MessageId.NUMOOR, 0, 359), category: 'system' }],
+        lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }],
       };
     }
 

@@ -17,7 +17,8 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
     body: [
       'Navigation',
       '  nav <x> <y>    — course + range to a sector (then set speed)',
-      '  rot <deg>      — set rotation delta (-180 to 180)',
+      '  rot <deg>      — turn, relative to your heading (-180 to 180)',
+      '  rot @<deg>     — turn to a compass heading (0-359), as scans report',
       '  imp <pct> [deg] — impulse 0-99, optional relative course',
       '  war <warp> [deg] — warp factor, optional relative course',
       '  sca pl [n]     — planets here, or detail on one',

@@ -1,6 +1,6 @@
 import { Command, CommandResult, CommandContext } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { valdegree } from '../validators';
+import { parseRotation, resultingHeading } from './helpers/rotation';
 import { ShipState } from '../../ship/ship-state.types';
 
 /**
@@ -21,21 +21,21 @@ export const rotateCommand: Command = {
       ship.navTargetY = null;
     }
 
-    const arg = args[0] ?? '';
-    const result = valdegree(arg);
+    // C takes `rot @<deg>` as an ABSOLUTE compass heading and a bare `rot <deg>`
+    // as a relative turn, quoting a different range for each on failure.
+    // @see GECMDS.C:643, helpers/rotation.ts
+    const result = parseRotation(args[0] ?? '');
 
     if (!result.ok) {
       return {
         lines: [
           {
-            text: formatMessage(MessageId.NUMOOR, -180, 180),
+            text: formatMessage(MessageId.NUMOOR, result.lo, result.hi),
             category: 'system',
           },
         ],
       };
     }
-
-    const value = result.value;
 
     // @see GECMDS.C:723 — helm gate (HLBROKE, normal branch)
     if (ship.helm !== 0) {
@@ -50,16 +50,19 @@ export const rotateCommand: Command = {
     // TODO(006): see GECMDS.C:711 — useenergy gate (NOROTPW, normal branch)
     // TODO(006): see GECMDS.C:679 — useenergy gate (NOROTPW, hyperspace branch)
 
-    // Compute absolute target heading: current heading + relative rotation, normalised 0-359
-    // @see GECMDS.C:668 — head2b = (double)deg where deg = normal(heading + degrees)
-    ship.head2b = Math.round((ship.heading + value + 360) % 360);
-    ship.degrees = value;
+    // C reports the heading you END UP on, not the delta you asked for:
+    // `deg = normal(heading + degrees); prfmsg(NOWTURN, deg)`. Printing the
+    // delta told a pilot turning from 101 by 90 they were "turning to 90".
+    // @see GECMDS.C:668, GECMDS.C:705
+    const target = resultingHeading(ship.heading, result);
+    ship.head2b = target;
+    ship.degrees = result.absolute ? 0 : result.deg;
     ship.dirty = true;
 
     return {
       lines: [
         {
-          text: formatMessage(MessageId.NOWTURN, value),
+          text: formatMessage(MessageId.NOWTURN, target),
           category: 'success',
         },
       ],

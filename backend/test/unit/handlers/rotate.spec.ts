@@ -48,7 +48,25 @@ describe('rotateCommand', () => {
     const ship = makeShip();
     const result = rotateCommand.handler(ship, ['-90'], ctx) as CommandResult;
     expect(ship.degrees).toBe(-90);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, -90));
+    // C reports the heading you end up on, not the delta:
+    // `deg = normal(heading + degrees)` (GECMDS.C:705). From heading 0 that is
+    // 270. This previously asserted "-90", pinning the delta the port printed.
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, 270));
+  });
+
+  it('turns to an absolute compass heading with C\'s @ form', () => {
+    const ship = makeShip();
+    ship.heading = 101;
+    const result = rotateCommand.handler(ship, ['@208'], ctx) as CommandResult;
+    expect(ship.head2b).toBe(208);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.NOWTURN, 208));
+  });
+
+  it('rejects an absolute heading off the compass, quoting 0-359', () => {
+    const ship = makeShip();
+    const result = rotateCommand.handler(ship, ['@360'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.NUMOOR, 0, 359));
+    expect(ship.dirty).toBe(false);
   });
 
   it('out-of-range (181) returns NUMOOR', () => {
