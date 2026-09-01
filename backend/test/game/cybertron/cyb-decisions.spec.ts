@@ -136,10 +136,13 @@ describe('pickPursuitBand (T014)', () => {
     expect(result.desiredSpeed).toBe(topSpeed);
   });
 
-  it('brake band: dropping from hyperwarp (currentWhere=1) → raiseShields=true, shield=classMax', () => {
+  it('brake band: dropping from hyperwarp restores the shield charge but does not raise them', () => {
+    // C's brake band (GECYBS.C:756-769) has no shieldup call at all — only the
+    // two close bands do. The charge restore on hyperwarp exit is the port's
+    // own R-9 decision and stays.
     const dist = 15;
     const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 1, classMaxShields, topSpeed, rand);
-    expect(result.raiseShields).toBe(true);
+    expect(result.raiseShields).toBe(false);
     expect(result.shield).toBe(classMaxShields);
   });
 

@@ -21,6 +21,8 @@ export interface Class12Action {
   jammedFlee?: { speed2b: number; holdcourse: number };
   shieldCommand?: 1 | 0;
   passiveAnnoys: Array<{ target: ShipState; message: string }>;
+  /** A player came into scan range — shortens the droid's countdown. @see GEDROIDS.C:442 */
+  detected?: boolean;
   fightback?: {
     target: ShipState;
     helpMessage: string;
@@ -61,10 +63,14 @@ export function droidActClass12(
 
   const passiveAnnoys: Array<{ target: ShipState; message: string }> = [];
   let shieldCommand: 1 | 0 | undefined;
+  let detected = false;
 
   for (const player of players) {
     if (player.status !== 1) continue;
     if (inScanRange(droid, player, scanRange)) {
+      // `ptr->tick = CYBTICKTIME + gernd()%CYBTICKTIME` — spotting a player
+      // sharpens the droid's reaction time. @see GEDROIDS.C:442
+      detected = true;
       shieldCommand = droid.speed < 1000.0 ? 1 : 0;
       if (rollAnnoy(DROID_ANNOY_DENOM, rng)) {
         passiveAnnoys.push({ target: player, message: pickPassiveMsg(droid.shipname, rng) });
@@ -146,5 +152,5 @@ export function droidActClass12(
     }
   }
 
-  return { passiveAnnoys, shieldCommand };
+  return { passiveAnnoys, shieldCommand, detected };
 }

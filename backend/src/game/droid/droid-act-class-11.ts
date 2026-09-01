@@ -26,6 +26,8 @@ export interface Class11Action {
   shieldCommand?: 1 | 0;
   /** Passive annoys from scan range */
   passiveAnnoys: Array<{ target: ShipState; message: string }>;
+  /** A player came into scan range — shortens the droid's countdown. @see GEDROIDS.C:335 */
+  detected?: boolean;
   /** Fight-back branch (cantexit > 0 && lastfired >= 0) */
   fightback?: {
     target: ShipState;
@@ -67,13 +69,24 @@ export function droidActClass11(
 
   const passiveAnnoys: Array<{ target: ShipState; message: string }> = [];
   let shieldCommand: 1 | 0 | undefined;
+  let detected = false;
+  let scanSpeed: number | undefined;
 
   for (const player of players) {
     if (player.status !== 1) continue;
     if (inScanRange(droid, player, scanRange)) {
+      // `if (ptr->holdcourse == 0) ptr->speed2b = rndm(999.9);` — the droid
+      // drops to sub-warp the moment it sees a player, unconditionally and
+      // BEFORE the separate 1-in-4 chatter roll. The port left this branch
+      // empty and applied the drop only when the chatter roll landed, so three
+      // times in four a spotted droid kept sailing past at warp.
+      // @see GEDROIDS.C:330-331
       if (droid.holdcourse === 0) {
-        // @see GEDROIDS.C:330 — if holdcourse==0, sub-warp drift
+        scanSpeed = rng.next() * 999.9;
       }
+      // `ptr->tick = CYBTICKTIME + gernd()%CYBTICKTIME` — spotting a player
+      // sharpens the droid's reaction time. @see GEDROIDS.C:335
+      detected = true;
       shieldCommand = droid.speed < 1000.0 ? 1 : 0;
       if (rollAnnoy(DROID_ANNOY_DENOM, rng)) {
         passiveAnnoys.push({ target: player, message: pickPassiveMsg(droid.shipname, rng) });
@@ -149,5 +162,5 @@ export function droidActClass11(
     }
   }
 
-  return { passiveAnnoys, shieldCommand };
+  return { passiveAnnoys, shieldCommand, scanSpeed, detected };
 }

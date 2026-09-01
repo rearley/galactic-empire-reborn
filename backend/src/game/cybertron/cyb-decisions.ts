@@ -1,3 +1,7 @@
+import { DECOYTIME, MAXDECOY,
+  CYB_ALLOW,
+  CYB_MAXCASH,
+} from '../constants';
 import type { Random } from '../combat/random.port';
 import type { CybertronClassConfig } from './cybertron.config';
 
@@ -18,6 +22,10 @@ export interface PursuitBand {
   shield: number | undefined;
   /** True when Cybertron is dropping from hyperwarp back to normal space */
   raiseShields: boolean;
+  /** Instantaneous `ptr->speed = ptr->speed2b` (hyperwarp band only). */
+  speed?: number;
+  /** Instantaneous `if (ptr->speed > X) ptr->speed = X` ceiling for this band. */
+  speedClamp?: number;
 }
 
 /** Loadout assigned at Cybertron spawn. @see GECYBS.C:164-172 cyb_init */
@@ -96,38 +104,50 @@ export function pickPursuitBand(
   rand: Random,
 ): PursuitBand {
   if (distance >= hyperdist1) {
-    // Hyperwarp band — 20× speed, shields down
+    // Hyperwarp band — 20x speed, shields down. C snaps `ptr->speed` straight
+    // to speed2b here rather than accelerating into it. @see GECYBS.C:745-746
+    const desiredSpeed = distance * 2000.0;
     return {
-      desiredSpeed: distance * 2000.0,
+      desiredSpeed,
+      speed: desiredSpeed,
       where: 1,
       shield: 0,
       raiseShields: false,
     };
   }
   if (distance >= hyperdist2) {
-    // Brake band — cap speed, head toward target at top speed
+    // Brake band — `if (ptr->speed > 20000.0) ptr->speed = 20000.0`, then head
+    // toward the target at top speed. C raises no shields in this band.
+    // @see GECYBS.C:756-769
     return {
       desiredSpeed: topSpeed,
+      speedClamp: 20000,
       where: 0,
       shield: currentWhere === 1 ? classMaxShields : undefined,
-      raiseShields: currentWhere === 1,
+      raiseShields: false,
     };
   }
   if (distance > 3.0) {
-    // Close band — top speed toward target, raise shields
+    // Close band — top speed toward target, shields up. C gates the shieldup on
+    // `ptr->where == 0`: a Cybertron closing in NORMAL space puts them up. The
+    // port had `currentWhere === 1`, so they only went up on the single tick it
+    // dropped out of hyperwarp and the Cybertron fought bare-hulled.
+    // @see GECYBS.C:774-784
     return {
       desiredSpeed: topSpeed,
+      speedClamp: topSpeed,
       where: 0,
       shield: currentWhere === 1 ? classMaxShields : undefined,
-      raiseShields: currentWhere === 1,
+      raiseShields: currentWhere === 0,
     };
   }
-  // Combat band — distance ≤ 3.0; @see GECYBS.C:797 speed2b = (low_dist > .5) ? 990.0 : rndm(500.0)
+  // Combat band — distance <= 3.0; @see GECYBS.C:789-803
   return {
     desiredSpeed: distance > 0.5 ? 990.0 : rand.next() * 500.0,
+    speedClamp: topSpeed,
     where: 0,
     shield: currentWhere === 1 ? classMaxShields : undefined,
-    raiseShields: currentWhere === 1,
+    raiseShields: currentWhere === 0,
   };
 }
 
@@ -174,4 +194,154 @@ export function randomInitLoadout(cybGold: number, rand: Random): CybertronLoado
  */
 export function randomCybSkill(rand: Random): number {
   return Math.floor(rand.next() * 15) + 3;
+}
+
+
+/**
+ * `cyb_lay_decoys` — fill every empty decoy slot, up to the first five.
+ *
+ * C: `for (i=0; i<5; ++i) if (ptr->decout[i] == 0) ptr->decout[i] = DECOYTIME;`
+ * All five, not one, and at no inventory cost — a Cybertron's decoys are part
+ * of the class, not cargo. The port filled a single slot and decremented
+ * I_DECOY, and since `decout` was `[]` at spawn the `findIndex` returned -1 and
+ * it bailed out for the ship's entire life.
+ *
+ * @see GECYBS.C:606-612
+ */
+/** C fills only the first five decoy slots. @see GECYBS.C:609 `for (i=0; i<5; ++i)` */
+const CYB_DECOY_SLOTS = 5;
+
+export function layDecoys(decout: readonly number[]): number[] {
+  const next = [...decout];
+  while (next.length < MAXDECOY) next.push(0);
+  for (let i = 0; i < CYB_DECOY_SLOTS; i++) {
+    if (next[i] === 0) next[i] = DECOYTIME;
+  }
+  return next;
+}
+
+/** What a Cybertron does after its weapon volleys. @see GECYBS.C:541-585 */
+export interface CybEvasion {
+  /** Sweep the minefield — `ptr->items[I_ZIPPERS] = 1; zip(ptr,usrn);` */
+  fireZipper: boolean;
+  /** `ptr->minesnear = FALSE` after a successful sweep. */
+  clearMinesnear: boolean;
+  /** New `speed2b`, if this pass changed it. */
+  speed2b?: number;
+  /** New `head2b` in degrees, if this pass scrambled the course. */
+  head2b?: number;
+  /** New `holdcourse` counter, if set. */
+  holdcourse?: number;
+  /** `shieldup(ptr,usrn)` — only when fighting in normal space. */
+  raiseShields: boolean;
+}
+
+export interface CybEvasionInput {
+  hasZipper: boolean;
+  minesnear: boolean;
+  where: number;
+  hasIncomingMissile: boolean;
+  topSpeed: number;
+}
+
+/**
+ * The tail of `cyb_attack`: mine evasion, attack-vector scrambling, hyperspace
+ * missile evasion, and the shield raise.
+ *
+ * Three things the port lost by hoisting a simplified zipper branch up into the
+ * engagement scan: the 1-in-10 and 1-in-3 gates (it swept on any `minesnear`),
+ * the random flight heading (it reversed by exactly 180 degrees, which is
+ * predictable), and the fact that C keeps evaluating afterwards rather than
+ * returning out of the scan.
+ *
+ * @see GECYBS.C:541-585
+ */
+export function decideCybEvasion(input: CybEvasionInput, rand: Random): CybEvasion {
+  const { hasZipper, minesnear, where, hasIncomingMissile, topSpeed } = input;
+  const out: CybEvasion = { fireZipper: false, clearMinesnear: false, raiseShields: false };
+
+  // Zippers — `if (gernd()%10 == 1 && has_zip)`
+  if (Math.floor(rand.next() * 10) === 1 && hasZipper) {
+    if (minesnear) {
+      if (Math.floor(rand.next() * 3) === 1) {
+        out.fireZipper = true;
+        out.clearMinesnear = true;
+      }
+      // The retreat happens whether or not the sweep roll landed.
+      out.speed2b = topSpeed;
+      out.head2b = rand.next() * 359.9;
+      out.holdcourse = Math.floor(rand.next() * 20) + 3;
+    }
+  }
+
+  // `if (gernd()%20 == 1)` — scramble the attack vector to stay unpredictable.
+  if (Math.floor(rand.next() * 20) === 1) {
+    out.speed2b = topSpeed;
+    out.head2b = rand.next() * 359.9;
+    out.holdcourse = Math.floor(rand.next() * 10) + 3;
+  }
+
+  if (where === 1) {
+    // Fighting in hyperspace with a missile inbound: break speed and hold.
+    if (hasIncomingMissile) {
+      out.speed2b = rand.next() * 5000 + 4500;
+      out.holdcourse = Math.floor(rand.next() * 5) + 5;
+    }
+  } else {
+    out.raiseShields = true;
+  }
+
+  return out;
+}
+
+
+/**
+ * May a Cybertron of this class pursue a player of that class unprovoked?
+ *
+ *   lta = shipclass[hunter].lowest_to_attk - 1;
+ *   if (lta <= wptr->shpclass) ...
+ *
+ * Note the `- 1`: a CPU whose "User" column reads 6 pursues class 5 and up,
+ * not class 6 and up. The port compared against the raw column and was one
+ * class too strict — on top of reading the column off the wrong table.
+ *
+ * @see GECYBS.C:711, 719  @see reference/wiki/cpu-ships.md "User"
+ */
+export function canPursue(hunterLowestToAttack: number, victimClass: number): boolean {
+  return hunterLowestToAttack - 1 <= victimClass;
+}
+
+/**
+ * May another Cybertron claim this victim, given how many already have?
+ *
+ *   return (nc < shipclass[victim].noclaim);
+ *
+ * The limit belongs to the PREY — the wiki's "Cyb#" column, "how many
+ * combative CPU ships will pursue this ship simultaneously". A Cyb# of 0
+ * therefore means never claimable unprovoked, which is how the Heavy Freighter
+ * and Freight Barge are protected; the port treated 0 as "no limit" and read
+ * the column off the attacking Cybertron.
+ *
+ * @see GECYBS.C:357-376  @see reference/wiki/player-ships.md "Cyb#"
+ */
+export function notClaimed(existingClaims: number, victimNoClaim: number): boolean {
+  return existingClaims < victimNoClaim;
+}
+
+
+/**
+ * Credit one tick's allowance to a Cybertron's purse.
+ *
+ * `warusroff(usrn)->cash += CYB_ALLOW;` on every `cyb_lives` pass, with the
+ * balance clamped to CYB_MAXCASH. This is what makes a long-lived Cybertron a
+ * worthwhile target — the port credited `energy` instead, and then overwrote
+ * energy with a flat value, so the allowance vanished and every Cybertron was
+ * worth the same as a fresh spawn.
+ *
+ * @see GECYBS.C:228-229  @see GECYBS.C:121-122 the CYB_MAXCASH clamp
+ */
+export function creditAllowance(cash: bigint): bigint {
+  const next = cash + BigInt(CYB_ALLOW);
+  const cap = BigInt(CYB_MAXCASH);
+  return next > cap ? cap : next;
 }

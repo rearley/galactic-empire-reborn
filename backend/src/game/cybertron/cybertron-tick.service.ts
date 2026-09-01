@@ -7,6 +7,8 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { NO_CHANNEL, CYBMINE_NONE } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
+import { MineRegistry } from '../combat/mine.registry';
+import { MineRepository } from '../combat/mine.repository';
 import { CybertronRepository } from './cybertron.repository';
 import { buildCybertronClassConfigs, bootSeedEnabled } from './cybertron.config';
 import type { CybertronClassConfig } from './cybertron.config';
@@ -67,6 +69,10 @@ import {
   cybwhoops,
   gebemean,
   rollTorpedoCount,
+  layDecoys,
+  decideCybEvasion,
+  canPursue,
+  notClaimed,
 } from './cyb-decisions';
 import { pickTaunt } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
@@ -85,11 +91,14 @@ export class CybertronTickService implements OnModuleInit {
 
   /** Modulo-30 counter that gates spawn-slot execution. @see GEMAIN.C outer loop (R-2) */
   private spawnTickCounter = 0;
+  /** Allowance owed per Cybertron user since the last flush. @see GECYBS.C:229 */
+  private readonly pendingAllowance = new Map<string, bigint>();
 
   /** Maps classNumber → CybertronClassConfig (merged from env overrides + defaults). */
   private readonly classConfigs: Record<number, CybertronClassConfig> = buildCybertronClassConfigs();
 
   private unsubscribe: (() => void) | null = null;
+  private unsubscribeAi: (() => void) | null = null;
 
   constructor(
     private readonly tickService: TickService,
@@ -99,6 +108,10 @@ export class CybertronTickService implements OnModuleInit {
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
     @Optional() private readonly combatTick?: CombatTickService,
+    // Optional so the many hand-built test harnesses keep working; a Cybertron
+    // with no registry simply never sweeps, which is the pre-existing behaviour.
+    @Optional() private readonly mineRegistry?: MineRegistry,
+    @Optional() private readonly mineRepo?: MineRepository,
   ) {}
 
   /**
@@ -112,9 +125,17 @@ export class CybertronTickService implements OnModuleInit {
    * @see specs/024-ai-presence/plan.md Task 3
    */
   async onModuleInit(): Promise<void> {
+    // C runs the whole automaton loop from `autortia`, re-armed with
+    // `rtkick(1, autorti)` — one second (GEMAIN.C:2438). `wptr->tick` counts
+    // SECONDS, so the countdown and the tick_func call belong on the 1s tick.
+    // Spawn evaluation is the port's own 30-tick slot and stays on physics.
     this.unsubscribe = this.tickService.subscribe(
       TickKind.PHYSICS,
       (ctx) => this.onPhysicsTick(ctx),
+    );
+    this.unsubscribeAi = this.tickService.subscribe(
+      TickKind.SHIP_UPDATE,
+      (ctx) => this.onAiTick(ctx),
     );
     this.events.on('combat.ship-destroyed', (payload: unknown) =>
       this.onShipDestroyed(payload),
@@ -122,7 +143,7 @@ export class CybertronTickService implements OnModuleInit {
     this.events.on(CYBERTRON_SCORED_KILL, (e: CybertronScoredKillEvent) =>
       this.onCybertronScoredKill(e),
     );
-    this.logger.log('CybertronTickService subscribed to PHYSICS tick');
+    this.logger.log('CybertronTickService subscribed to PHYSICS and SHIP_UPDATE ticks');
 
     await this.repository.hydrateAll();
 
@@ -147,22 +168,50 @@ export class CybertronTickService implements OnModuleInit {
     this.spawnTickCounter++;
     if (this.spawnTickCounter % 30 === 0) {
       void this.runSpawnSlot(_ctx);
+      void this.flushAllowances();
+    }
+  }
+
+  /** Hand the accumulated allowance over to the purses. @see GECYBS.C:229 */
+  private async flushAllowances(): Promise<void> {
+    if (this.pendingAllowance.size === 0) return;
+    const batch = new Map(this.pendingAllowance);
+    this.pendingAllowance.clear();
+    // Optional-chained: the many hand-built test harnesses stub the
+    // repository with only the methods they exercise.
+    await this.repository.creditAllowances?.(batch);
+  }
+
+  /**
+   * C's `autortia` (GEMAIN.C:2401-2426), once a second: every Cybertron either
+   * counts down or, at zero, runs its `tick_func`.
+   *
+   * The countdown is applied to EVERY ship before the activation cap is
+   * consulted — capping the decrement as well as the activation, as the port
+   * used to, meant a Cybertron behind a busy queue never acted at all.
+   */
+  private onAiTick(ctx: TickContext): void {
+    const ships = this.shipState.findAllShips().filter((s) => s.status === 2);
+
+    const due: ShipState[] = [];
+    for (const ship of ships) {
+      if (ship.tick > 0) {
+        ship.tick = ship.tick - 1;
+        if (ship.tick > 0) continue;
+      }
+      due.push(ship);
     }
 
-    const ships = this.shipState.findAllShips().filter((s) => s.status === 2);
-    let activationsThisTick = 0;
-    for (const ship of ships) {
-      if (activationsThisTick >= CYBMAXPERTICK) break;
-      ship.tick = Math.max(0, ship.tick - 1);
-      if (ship.tick === 0) {
-        try {
-          this.cybLives(ship, _ctx);
-          activationsThisTick++;
-        } catch (err: unknown) {
-          const id = shipKey(ship.userid, ship.shipno);
-          const stack = err instanceof Error ? err.stack : String(err);
-          this.logger.error(`cybLives fault for ${id}: ${stack}`);
-        }
+    let activations = 0;
+    for (const ship of due) {
+      if (activations >= CYBMAXPERTICK) break;
+      try {
+        this.cybLives(ship, ctx);
+        activations++;
+      } catch (err: unknown) {
+        const id = shipKey(ship.userid, ship.shipno);
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`cybLives fault for ${id}: ${stack}`);
       }
     }
   }
@@ -177,8 +226,16 @@ export class CybertronTickService implements OnModuleInit {
 
     const topSpeed = (ship.topspeed ?? 0) * 1000.0;
 
-    // Allowance credit (@see GECYBS.C:229)
-    ship.energy = Math.min(ship.energy + CYB_ALLOW, 999_999);
+    // Allowance is MONEY, not energy: `warusroff(usrn)->cash += CYB_ALLOW`.
+    // The port credited `ship.energy`, which is overwritten with a flat 50000
+    // a few lines below, so the allowance did nothing and a veteran Cybertron
+    // carried no purse worth taking. Accumulated here and flushed on the
+    // spawn-slot cadence rather than writing to Postgres every activation.
+    // @see GECYBS.C:228-229
+    this.pendingAllowance.set(
+      ship.userid,
+      (this.pendingAllowance.get(ship.userid) ?? 0n) + BigInt(CYB_ALLOW),
+    );
 
     // cybupdate decrement + direction wander (@see GECYBS.C:455 db_update)
     this.cybUpdateDb(ship, topSpeed);
@@ -305,20 +362,13 @@ export class CybertronTickService implements OnModuleInit {
       const ddist = dist * 10_000;
       if (ddist > scanRange) continue;
 
-      // Zipper: class detects mines nearby, deploys zipper and retreats (@see GECYBS.C:280-290)
-      if (cls?.hasZipper && ship.minesnear > 0 && Number(ship.items[I_ZIPPER]) > 0) {
-        ship.items = [...ship.items] as typeof ship.items;
-        ship.items[I_ZIPPER] = BigInt(Number(ship.items[I_ZIPPER]) - 1);
-        ship.cybmine = 255;
-        ship.speed2b = topSpeed;
-        ship.head2b = (ship.head2b + 180) % 360;
-        // Prevent immediate re-acquisition so Cybertron actually retreats
-        ship.holdcourse = Math.floor(this.random.next() * 10) + 5;
-        return;
-      }
-
-      // Breakoff: non-quad, 1-in-CYB_BREAKOFF per visible target (@see GECYBS.C:255)
-      if (tough !== CYB_TOUGH_1 && Math.floor(this.random.next() * CYB_BREAKOFF) === 0) {
+      // Break-off: it is the CYBERQUADS that take a breather, not the light
+      // classes. `isquad(ptr)` is `tough_factor == CYB_TOUGH_1`
+      // (GECYBS.C:834-838) and the port had the test inverted, so Base Stars
+      // pursued relentlessly while Scouts and Drones wandered off. C also
+      // falls through and still evaluates fire on this pass.
+      // @see GECYBS.C:255
+      if (tough === CYB_TOUGH_1 && Math.floor(this.random.next() * CYB_BREAKOFF) === 0) {
         ship.cybmine = 255;
         ship.speed2b = topSpeed;
         const brokeOff: CybertronBrokeOffPayload = {
@@ -328,14 +378,20 @@ export class CybertronTickService implements OnModuleInit {
           tickAt,
         };
         this.events.emit(CYBERTRON_EVENT.BROKE_OFF, brokeOff);
-        return;
       }
 
       // Warp-fire path: both ships in hyperwarp, gebemean, range < 30000 (@see GECYBS.C:263-272)
       if (ship.where === 1 && target.where === 1) {
         const targetCls = this.shipClassCache.get(target.shpclass);
         const mean = gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random);
-        const canHit = ddist < tooclose || (targetCls?.cybCanAttack ?? false) || target.cantexit > 0;
+        // `ddist < (tooclose+rndm(tooclose)) || cybs_can_att || wptr->cantexit > 0
+        //  || ptr->cantexit > 0` — the random widening and the attacker's own
+        // battle-lock were both missing. @see GECYBS.C:270-273
+        const canHit =
+          ddist < tooclose + this.random.next() * tooclose
+          || (targetCls?.cybCanAttack ?? false)
+          || target.cantexit > 0
+          || ship.cantexit > 0;
         if (mean && ddist < 30_000 && canHit && !this.isInNeutralZone(target)) {
           this.cybFirePhaser(ship, target, ctx);
         }
@@ -358,11 +414,13 @@ export class CybertronTickService implements OnModuleInit {
 
         if (canAttack) {
           this.cybAttack(ship, target, tough, ddist, ctx);
+          this.cybAnnoy(ship, target, ctx);
+          this.cybLayDecoys(ship);
         } else {
+          // C taunts in both branches, but only lays decoys when it engages.
+          // @see GECYBS.C:294-303
           this.cybAnnoy(ship, target, ctx);
         }
-
-        this.cybLayDecoys(ship);
       }
     }
   }
@@ -508,6 +566,58 @@ export class CybertronTickService implements OnModuleInit {
         this.cybLaunchTorpedo(ship, target, ddist);
       }
     }
+
+    this.applyEvasion(ship, cls?.hasZipper ?? false);
+  }
+
+  /**
+   * `zip()` from the Cybertron's seat: destroy every mine inside the class's
+   * scan range. @see GECMDS.C:1690-1712 cmd_zipper
+   */
+  private sweepMines(ship: ShipState): void {
+    if (!this.mineRegistry) return;
+    const scanRange = this.shipClassCache.get(ship.shpclass)?.scanRange ?? 0;
+    for (const mine of this.mineRegistry.getAll()) {
+      if (cdistance(ship, mine) * 10_000 >= scanRange) continue;
+      void this.mineRepo?.delete(mine.id).catch((err: unknown) => {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Cybertron zipper mine delete failed: ${stack}`);
+      });
+      this.mineRegistry.remove(mine.id);
+    }
+  }
+
+  /**
+   * The tail of `cyb_attack` — mine evasion, attack-vector scrambling,
+   * hyperspace missile evasion and the shield raise. @see GECYBS.C:541-585
+   */
+  private applyEvasion(ship: ShipState, hasZipper: boolean): void {
+    const topSpeed = this.shipClassCache.get(ship.shpclass)?.maxWarp ?? 0;
+    const hasIncomingMissile = ship.lmisslDistance.some((d) => (d ?? 0) > 0);
+
+    const d = decideCybEvasion(
+      {
+        hasZipper,
+        minesnear: ship.minesnear > 0,
+        where: ship.where,
+        hasIncomingMissile,
+        topSpeed: topSpeed * 1000,
+      },
+      this.random,
+    );
+
+    if (d.fireZipper) {
+      // `ptr->items[I_ZIPPERS] = 1; zip(ptr,usrn);` — C hands the Cybertron the
+      // round it is about to fire rather than checking its hold, so the sweep
+      // always happens. The port's old branch decremented an item and turned
+      // around without ever clearing a mine.
+      this.sweepMines(ship);
+    }
+    if (d.clearMinesnear) ship.minesnear = 0;
+    if (d.speed2b !== undefined) ship.speed2b = d.speed2b;
+    if (d.head2b !== undefined) ship.head2b = d.head2b;
+    if (d.holdcourse !== undefined) ship.holdcourse = d.holdcourse;
+    if (d.raiseShields) ship.shieldstat = 1;
   }
 
   /**
@@ -534,15 +644,11 @@ export class CybertronTickService implements OnModuleInit {
    */
   private cybLayDecoys(ship: ShipState): void {
     if (cybwhoops(ship.cybskill, this.random)) return;
-    if (Number(ship.items[I_DECOY]) === 0) return;
-    // Find an empty decout slot
-    const emptySlot = ship.decout.findIndex((t) => t === 0);
-    if (emptySlot === -1) return;
-    ship.items = [...ship.items] as typeof ship.items;
-    ship.items[I_DECOY] = BigInt(Number(ship.items[I_DECOY]) - 1);
-    ship.decout = [...ship.decout] as typeof ship.decout;
-    ship.decout[emptySlot] = DECOYTIME;
+    // C fills all five slots at no inventory cost — a Cybertron's decoys are
+    // part of the class, not cargo. @see GECYBS.C:606-612
+    ship.decout = layDecoys(ship.decout);
   }
+
 
   /**
    * Queue a torpedo into the target's incoming torpedo array.
@@ -595,21 +701,27 @@ export class CybertronTickService implements OnModuleInit {
 
     // 3. If no target, scan for closest eligible player (@see GECYBS.C:709-731)
     if (ship.cybmine === 255) {
-      const lowestToAttack = (cls?.cybLowestClassAttacks ?? 0) - 1;
+      // `lowest_to_attk` is the HUNTER's column and `noclaim` is the PREY's —
+      // two different tables, read from opposite sides of the engagement.
+      // @see GECYBS.C:711, 719 and GECYBS.C:357-376
+      const hunterLowestToAttack = cls?.cybLowestClassAttacks ?? 0;
       let lowDist = 999_999_999.0;
       let lowChannel = -1;
 
       for (const candidate of this.shipState.findAllShips()) {
         if (candidate.status !== 1) continue; // must be active player
         if (candidate.cloak === 10) continue;
-        if (candidate.shpclass < lowestToAttack + 1) continue;
+        if (!canPursue(hunterLowestToAttack, candidate.shpclass)) continue;
 
         // Neutral zone exclusion: Cybertron must not be in NZ, target must not be in NZ
         if (this.isInNeutralZone(ship)) continue;
         if (this.isInNeutralZone(candidate)) continue;
 
-        // noClaim check: at most noClaim Cybertrons may claim this player
-        if (!this.notClaimed(candidate.channel ?? CYBMINE_NONE, cls?.noClaim ?? 3)) continue;
+        // Gang-up limit belongs to the ship being hunted, not the hunter. A
+        // Cyb# of 0 (Heavy Freighter, Freight Barge) is never claimable.
+        const victimNoClaim = this.shipClassCache.get(candidate.shpclass)?.noClaim ?? 0;
+        const claims = this.countClaims(candidate.channel ?? CYBMINE_NONE);
+        if (!notClaimed(claims, victimNoClaim)) continue;
 
         const dist = cdistance(ship, candidate);
         if (dist < lowDist) {
@@ -665,12 +777,22 @@ export class CybertronTickService implements OnModuleInit {
     const band = pickPursuitBand(dist, hyperdist1, hyperdist2, prevWhere, classMaxShields, topSpeed, this.random);
 
     ship.speed2b = band.desiredSpeed;
+    // C also touches `ptr->speed` directly in every band — a snap on hyperwarp
+    // entry, a ceiling everywhere else — so a Cybertron actually brakes rather
+    // than drifting toward the new speed over several ticks.
+    // @see GECYBS.C:745-746, 760-761, 774-775, 789-790
+    if (band.speed !== undefined) ship.speed = band.speed;
+    if (band.speedClamp !== undefined && ship.speed > band.speedClamp) {
+      ship.speed = band.speedClamp;
+    }
     ship.where = band.where;
     if (band.shield !== undefined) {
       ship.shield = band.shield;
     }
     if (band.raiseShields) {
-      ship.shieldstat = 1; // raise shields
+      ship.shieldstat = 1; // shieldup(ptr,usrn)
+    } else if (band.where === 1) {
+      ship.shieldstat = 0; // SHIELDDN on hyperwarp entry
     }
 
     // Point heading toward target
@@ -691,18 +813,15 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
-   * Returns true if fewer than noClaim other Cybertrons already claim this player.
-   * @see GECYBS.C:357 notclaimed
+   * How many Cybertrons currently hold this channel as their target — C's
+   * `nc` loop. @see GECYBS.C:365-370
    */
-  private notClaimed(targetShipno: number, noClaim: number): boolean {
+  private countClaims(targetChannel: number): number {
     let count = 0;
     for (const s of this.shipState.findAllShips()) {
-      if (s.status === 2 && s.cybmine === targetShipno) {
-        count++;
-        if (count >= noClaim) return false;
-      }
+      if (s.status === 2 && s.cybmine === targetChannel) count++;
     }
-    return true;
+    return count;
   }
 
   /** Find an active player ship by shipno. */

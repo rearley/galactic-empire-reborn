@@ -163,6 +163,16 @@ function buildCybertronHarness() {
   };
   classMap.set(21, cybClass);
 
+  // The gang-up limit is read from the ship being HUNTED (GECYBS.C:357-376),
+  // so the player's own class row has to be present or nothing is claimable.
+  classMap.set(1, {
+    maxAcceleration: 5000, maxWarp: 10, maxPhaser: 10, maxShields: 10,
+    scanRange: 15_000, maxTons: 1000, hasTorpedo: true, hasMissile: false,
+    hasJammer: true, hasMine: true, hasZipper: true,
+    noClaim: 1, tough: 0, cybLowestClassAttacks: 0,
+    cybCanAttack: true, tooclose: 3000,
+  });
+
   const repository = {
     hydrateAll: jest.fn().mockResolvedValue(undefined),
     createSpawn: jest.fn(),

@@ -197,6 +197,37 @@ export class CybertronRepository {
    * Applies CYB_MAXCASH clamp to any /^Cybrg-/ userid.
    * @see specs/007-cybertron-ai/plan.md FR-019, R-11
    */
+  /**
+   * Credit accumulated allowance to Cybertron purses, clamped to CYB_MAXCASH.
+   *
+   * C credits `CYB_ALLOW` on every `cyb_lives` pass (GECYBS.C:229). Writing to
+   * Postgres that often would be pointless chatter, so the tick service
+   * accumulates in memory and hands the totals over on the spawn-slot cadence.
+   * The increment is atomic and the clamp follows, so a concurrent kill
+   * transfer cannot be lost.
+   *
+   * @see GECYBS.C:228-229  @see GECYBS.C:121-122
+   */
+  async creditAllowances(pending: ReadonlyMap<string, bigint>): Promise<void> {
+    for (const [userid, amount] of pending) {
+      if (amount <= 0n) continue;
+      try {
+        const updated = await this.prisma.user.update({
+          where: { userid },
+          data: { cash: { increment: amount } },
+          select: { cash: true },
+        });
+        const clamped = this.clampCybertronCash(updated.cash);
+        if (clamped !== updated.cash) {
+          await this.prisma.user.update({ where: { userid }, data: { cash: clamped } });
+        }
+      } catch (err: unknown) {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`allowance credit failed for ${userid}: ${stack}`);
+      }
+    }
+  }
+
   async flushUsersImmediate(userids: string[]): Promise<void> {
     for (const userid of userids) {
       try {
