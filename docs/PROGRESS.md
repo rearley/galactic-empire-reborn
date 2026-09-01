@@ -2224,3 +2224,57 @@ implemented. The 26 sysop options marked `implemented: false` in
 `game-config.ts` are mostly values hard-coded elsewhere (TOOCLOSE, CLENGUSE,
 MAILDAYS, PLODDS, CHGLOSER…) rather than missing mechanics; the genuine gaps
 there are IDAMMAX and SCRBONUS.
+
+## 2026-09-01 — ion cannons, counter-espionage, flush escalation
+
+**Completed:** the outstanding items from the doc sweep.
+
+- **Ion cannons (`fireion`)** — planetary defence, previously absent entirely.
+  A planet you have attacked fires back once per 6-second tick while you stay
+  within 1000 raw units of it: a scratch plus a 40-89 shield knock through
+  raised shields, `idammax * (rndm(.50)+.50)` against a bare hull. Kill credit
+  is cleared (`lastfired = -1`) — a planet kill belongs to nobody. This also
+  gives `hostile` its purpose; it was written by `att` and read by nothing, and
+  `checkdist` (clear beyond 1000 raw units) went in alongside.
+  GEFUNCS.C:1785-1812, 907-930; GEMAIN.C:2265
+- **Counter-espionage (`check_spy` removal half)** — a spy is sent home when
+  its master takes the planet, and a garrison of `I_SPY` catches it on
+  `(50/spycnt)+1` odds, mailing an Official Protest to both sides. Nothing
+  removed a spy before, so stocking spies defensively did nothing.
+  GEPLANET.C:93-145
+- **Flush failure escalation** — the per-ship catch is right for a transient
+  fault and wrong for a persistent one. Ten consecutive sweeps in which every
+  dirty ship failed now raises one loud line naming the risk. This is the
+  shape of the `channel` incident, where the world ran on memory and the only
+  trace was a log line among thousands.
+
+**Tests:** backend 3448 (371 suites), frontend 157, browser 38. All test-first.
+New pure modules with specs: `planet/ion-cannon`, `planet/spy`.
+
+**Verified live:** attacking a planet sets `hostile = 12` (10 + plnum), which
+was the one link in the ion-cannon chain not previously exercised end to end.
+The firing itself is covered by service-level tests rather than in play — the
+live check was abandoned after the in-memory planet cache overwrote a
+SQL-stocked planet twice, and the neutral-zone hub does not sell ion cannons.
+
+**Doc sweep result:** most "deferred" text in GAME_MECHANICS was stale (mine
+cloak and neutral-zone gates, `rep cargo`/`rep wpns`, revolt, autoRepair and
+autoShield wiring are all implemented — checked against the code). The 26
+sysop options marked `implemented: false` in `game-config.ts` are mostly values
+hard-coded elsewhere rather than missing mechanics; IDAMMAX is now genuinely
+wired, leaving SCRBONUS as the only gameplay-relevant one, and it is latent at
+its default of 0.
+
+**Next:** nothing outstanding. The remaining known gaps are all recorded below.
+
+**Known issues:**
+- The **intel half of `check_spy`** (GEPLANET.C:147-200) is not implemented: a
+  surviving spy has a 1-in-10 chance per tick of mailing its master a report on
+  a random stocked item at `50 + rndm(48)` accuracy. The port reveals spy intel
+  through `sca pl` instead — a deliberate deviation — but the periodic mailed
+  report does not exist.
+- `msgFilter` is written in four places and read by none (DECISIONS D4).
+- The browser suite shares the dev database, so `ros` and the ship table fill
+  with `e2e_*` rows.
+- Several seeded-PRNG AI tests are brittle by construction; worth converting to
+  injected draw sequences when one next needs touching.

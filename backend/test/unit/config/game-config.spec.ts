@@ -97,8 +97,10 @@ describe('loadGameConfig', () => {
   it('marks which options are actually wired into gameplay', () => {
     // 25 of the 51 back a live constant today; the rest are declared so the
     // bounds are recorded and the gap is visible.
+    // 26 since IDAMMAX joined them — ion cannons are implemented
+    // (GEFUNCS.C:1785-1812 fireion).
     const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(25);
+    expect(wired.length).toBe(26);
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {

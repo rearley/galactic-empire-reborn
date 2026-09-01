@@ -84,6 +84,36 @@ describe('GameGateway — gravity and destruct notices reach the pilot', () => {
     expect(new Set(texts).size).toBe(3);
   });
 
+  it('tells the captain which planet is shooting at them', () => {
+    const { gateway, roomEmits } = build();
+    (gateway as unknown as { handlePlanetIonFired: (e: unknown) => void }).handlePlanetIonFired({
+      shipId: `${USERID}:1`, plnum: 2, planetName: 'Wayfarer',
+      hullDamage: 70, shieldKnock: 0, shieldsUp: false,
+    });
+    const notice = roomEmits.find((e) => e.event === 'event.log');
+    expect(notice!.room).toBe(`user:${USERID}`);
+    expect((notice!.payload as { text: string }).text).toContain('Wayfarer');
+    expect((notice!.payload as { text: string }).text).toContain('ION CANNON');
+  });
+
+  it('says the shields held when they did', () => {
+    const { gateway, roomEmits } = build();
+    (gateway as unknown as { handlePlanetIonFired: (e: unknown) => void }).handlePlanetIonFired({
+      shipId: `${USERID}:1`, plnum: 2, planetName: 'Wayfarer',
+      hullDamage: 3, shieldKnock: 60, shieldsUp: true,
+    });
+    expect((roomEmits[0].payload as { text: string }).text).toMatch(/Shields absorb/i);
+  });
+
+  it('falls back to the planet number when it has no name', () => {
+    const { gateway, roomEmits } = build();
+    (gateway as unknown as { handlePlanetIonFired: (e: unknown) => void }).handlePlanetIonFired({
+      shipId: `${USERID}:1`, plnum: 4, planetName: '',
+      hullDamage: 70, shieldKnock: 0, shieldsUp: false,
+    });
+    expect((roomEmits[0].payload as { text: string }).text).toContain('planet 4');
+  });
+
   it('tells the captain their self-destruct was cancelled by neutral space', () => {
     const { gateway, roomEmits } = build();
     (gateway as unknown as { handleDestructCancelled: (e: unknown) => void }).handleDestructCancelled({

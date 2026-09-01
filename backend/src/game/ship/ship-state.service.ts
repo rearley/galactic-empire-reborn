@@ -16,9 +16,20 @@ import { ShipChannelRegistry, NO_CHANNEL } from './ship-channel.registry';
  * @see GEMAIN.H WARSHP struct — one entry per ship
  * @see GEMAIN.C main loop (TICKTIME2=1s flush cadence)
  */
+/**
+ * Marker in the escalated log line, so an operator (or a log alert) can match
+ * on one string rather than on prose.
+ */
+export const FLUSH_FAILURE_ALARM = 'SHIP FLUSH FAILING';
+
+/** Consecutive all-failed sweeps before the alarm is raised once. */
+export const FLUSH_FAILURE_THRESHOLD = 10;
+
 @Injectable()
 export class ShipStateService implements OnModuleInit {
   private readonly logger = new Logger(ShipStateService.name);
+  /** Consecutive sweeps in which every dirty ship failed to flush. */
+  private consecutiveFlushFailures = 0;
   private readonly map = new Map<string, ShipState>();
   /**
    * Timestamp (ms) of the most recent successful flush per ship. Used by the
@@ -418,9 +429,12 @@ export class ShipStateService implements OnModuleInit {
    * @see GEMAIN.C main loop — tick-driven persistence
    */
   private async flush(): Promise<void> {
+    let attempted = 0;
+    let failed = 0;
     for (const state of this.map.values()) {
       if (state.isEphemeral) continue; // FR-002: Droid ships have no DB row
       if (!state.dirty) continue;
+      attempted++;
       try {
         await this.prisma.ship.update({
           where: { userid_shipno: { userid: state.userid, shipno: state.shipno } },
@@ -429,11 +443,30 @@ export class ShipStateService implements OnModuleInit {
         state.dirty = false;
         this.lastFlushedAt.set(shipKey(state.userid, state.shipno), Date.now());
       } catch (err: unknown) {
+        failed++;
         this.logger.error(
           `Flush failed for ${shipKey(state.userid, state.shipno)}:`,
           err,
         );
       }
+    }
+
+    // Per-ship catch is right for a transient fault — a locked row is picked
+    // up next sweep. It is exactly wrong for a persistent one: when `channel`
+    // was added to ShipState every flush threw, the world ran on memory, and
+    // the only trace was one log line among thousands. A run of consecutive
+    // all-failed sweeps means the durable store has stopped keeping up, which
+    // deserves saying once, loudly, rather than another line of noise.
+    if (attempted > 0 && failed === attempted) {
+      this.consecutiveFlushFailures++;
+      if (this.consecutiveFlushFailures === FLUSH_FAILURE_THRESHOLD) {
+        this.logger.error(
+          `${FLUSH_FAILURE_ALARM}: ${FLUSH_FAILURE_THRESHOLD} consecutive flush sweeps have failed for every dirty ship — ` +
+            'ship state is NOT being persisted and will be lost on restart.',
+        );
+      }
+    } else if (attempted > 0) {
+      this.consecutiveFlushFailures = 0;
     }
   }
 }

@@ -7,6 +7,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { PLANET_ION_FIRED, PlanetIonFiredEvent } from '../game/planet/ion-cannon';
 import {
   PHYSICS_GRAVITY,
   PhysicsGravityEvent,
@@ -1036,6 +1037,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${userid}`).emit('event.log', {
       category: 'system',
       text: 'Entering neutral space — the self-destruct sequence has been cancelled.',
+    });
+  }
+
+  /**
+   * IHIT1 / IHIT2 — a planet you attacked has fired its ion cannons at you.
+   * @see GEFUNCS.C:1799, 1805
+   */
+  @OnEvent(PLANET_ION_FIRED)
+  handlePlanetIonFired(event: PlanetIonFiredEvent): void {
+    const name = event.planetName || `planet ${event.plnum}`;
+    const text = event.shieldsUp
+      ? `** ION CANNON from ${name}! Shields absorb it — hull -${event.hullDamage}%, shields knocked ${event.shieldKnock}% **`
+      : `** ION CANNON from ${name}! Hull -${event.hullDamage}% — raise shields! **`;
+
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'combat',
+      text,
     });
   }
 

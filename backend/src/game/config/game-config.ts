@@ -81,7 +81,7 @@ export const SYSOP_OPTIONS = {
   TDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:508', implemented: true },
   MISFACT: { min: 1, max: 50, default: 1, cReference: 'GEMAIN.C:509', implemented: true },
   MDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:511', implemented: true },
-  IDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:512', implemented: false },
+  IDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:512', implemented: true },
   MNDAMMAX: { min: 1, max: 200, default: 150, cReference: 'GEMAIN.C:513', implemented: true, constant: 'MINEDAMMAX' },
   REPAIRRT: { min: 1, max: 50, default: 1, cReference: 'GEMAIN.C:514', implemented: false },
   TOOCLOSE: { min: 1, max: 32000, default: 3000, cReference: 'GEMAIN.C:517', implemented: false },

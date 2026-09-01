@@ -2251,3 +2251,67 @@ Every weapon range gate, scan visibility check, and AI fire decision goes throug
 - Class 33 (Vakory Survey Drone) — reactive fightback + mine-laying + jammer deployment when damaged.
 
 **Test fixture**: `backend/test/integration/range-and-ai.spec.ts` is the canonical regression net for range + AI behavior. Scan matrix across every class at varied distances; end-to-end Cybertron lock → pursuit → phaser fire; neutral-zone immunity; far-distance closure proof.
+
+---
+
+## Ion cannons — planetary defence (2026-09-01)
+
+**Source**: `GEFUNCS.C:1785-1812 fireion`, called for every ship on each
+6-second `warrtia` pass (`GEMAIN.C:2265`); `GEFUNCS.C:907-930 checkdist`.
+
+A pilot who attacks a planet is marked hostile toward it —
+`warsptr->hostile = warsptr->where` (10 + plnum), set by `att` at
+`GECMDS.C:3568` and `:3594`. While that mark stands and the planet holds
+`I_IONCANNON`, the planet fires back once per tick:
+
+| pilot's shields | hull damage | shield knock |
+|-----------------|-------------|--------------|
+| up | `idammax * rndm(.15)` | `(gernd()%50)+40` |
+| down | `idammax * (rndm(.50)+.50)` | — |
+
+At the default IDAMMAX of 100 that is a scratch through shields and roughly
+two volleys to kill a bare hull, so the tactical answer to a defended world is
+to raise shields before you commit troops.
+
+`ptr->lastfired = -1` on every hit: a pilot killed by a planet's guns hands the
+kill to nobody.
+
+The mark is cleared two ways — `checkdist` drops it once the ship is more than
+1000 raw units (0.1 sectors) from the planet, and a sector change clears
+`hostile` outright (`GEFUNCS.C:724`). Pulling away ends the engagement.
+
+**Port**: `src/game/planet/ion-cannon.ts` (`resolveIonCannonHit`), fired from
+`ShipTickService` on the 6s tick, announced to the pilot via
+`planet.ion-fired` → `GameGateway.handlePlanetIonFired`.
+
+**Previously absent.** Ion cannons were a tradeable item with no effect, there
+was no reason to garrison a colony, and `hostile` — of which `fireion` is the
+sole consumer — was written by `att` and read by nothing.
+
+---
+
+## Counter-espionage — catching a spy (2026-09-01)
+
+**Source**: `GEPLANET.C:93-145 check_spy`, run on the planet economy tick.
+
+A spy is removed two ways:
+
+1. **Your own planet.** `if (sameas(spyowner, userid)) spyowner[0] = 0;` — take
+   the planet you had infiltrated and your spy comes home.
+2. **Counter-espionage.** The planet's own `I_SPY` stock hunts the infiltrator:
+   `odds = (50/spycnt)+1; if (gernd()%odds == 0)` → caught. Integer division,
+   so the odds sharpen in steps — one counter-spy is 1-in-51 per tick, ten is
+   1-in-6, fifty or more is 1-in-2. Both sides receive an
+   `** Official Protest **` (SPYC1 to the spy's master, SPYC2 to the owner).
+
+**Port**: `src/game/planet/spy.ts` (`checkSpy`), called from
+`PlanetEconomyService.applyTick`.
+
+**Previously absent** — `spyowner` cleared only by being overwritten or by the
+planet changing hands, so stocking spies on your own colony did nothing.
+
+**Still missing**: the *intel* half of `check_spy` (`GEPLANET.C:147-200`) — a
+surviving spy has a 1-in-10 chance per tick of mailing its master a report on a
+random stocked item, with accuracy `50 + rndm(48)`. The port reveals spy intel
+through `sca pl` instead, which is a deliberate deviation; the periodic mailed
+report is not implemented.
