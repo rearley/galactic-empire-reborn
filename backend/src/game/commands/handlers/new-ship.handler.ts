@@ -300,7 +300,7 @@ export class NewShipHandlerService {
     shipno: number,
     shipname: string,
     classNumber: number,
-    shipClass: { maxPrice: bigint },
+    shipClass: { maxPrice: bigint; maxWarp: number },
     items: bigint[],
     at: { x: number; y: number },
   ): Promise<void> {
@@ -315,6 +315,12 @@ export class NewShipHandlerService {
           xcoord: at.x,
           ycoord: at.y,
           energy: ENGYMAX,
+          // Engine ceiling for the class. Only ever ratcheted DOWN afterwards,
+          // by engine damage — so leaving it at the column default of 0 was
+          // indistinguishable from blown engines and `war` refused with
+          // WARPSPD2 forever. Onboarding has always set this; this second
+          // creation path did not. @see onboarding.service.ts
+          topspeed: shipClass.maxWarp,
           phasr: 100,
           shield: 0,
           ltorpsChannel: [],
