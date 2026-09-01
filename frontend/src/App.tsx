@@ -141,8 +141,11 @@ function Terminal(): React.JSX.Element {
       );
     };
 
-    const handleCombatHit = (event: { attackerId: string; victimId: string; weapon: string; damageHull: number; damageShield: number }) => {
-      const attacker = shipName(event.attackerId);
+    const handleCombatHit = (event: { attackerId: string; attackerName?: string; victimId: string; weapon: string; damageHull: number; damageShield: number }) => {
+      // Prefer the ship name the server resolved: the roster excludes AI, so
+      // falling back to the key would print a userid ("Cybrg-222") that no
+      // command accepts — `sca sh` wants the ship name ("Cybrg-49340").
+      const attacker = event.attackerName ?? shipName(event.attackerId);
       if (event.victimId === localShipId) {
         setLogLines(prev =>
           [...prev, {

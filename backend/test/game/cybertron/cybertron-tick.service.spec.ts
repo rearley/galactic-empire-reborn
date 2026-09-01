@@ -343,7 +343,7 @@ describe('T035 — phaser engagement: Cybertron fires phasers in engagement scan
 describe('T036 — cyb_annoy: Cybertron taunts when attack conditions not met', () => {
   it('emits cybertron.taunt and NOT combat.phaser-fired for far player with cybCanAttack=false', async () => {
     const COMBAT_PHASER_FIRED = 'combat.phaser-fired';
-    const { shipMap, events, fireTick } = await buildHarness(42);
+    const { shipMap, events, fireAiTick } = await buildHarness(42);
 
     // Cybertron in normal space, far from player
     const cyb = makeShip({
@@ -365,8 +365,13 @@ describe('T036 — cyb_annoy: Cybertron taunts when attack conditions not met', 
     events.on(COMBAT_PHASER_FIRED, (e: unknown) => phaserFired.push(e));
     events.on('cybertron.taunt', (e: unknown) => taunts.push(e));
 
-    // Many ticks to accumulate probabilistic taunts (1-in-20 or 1-in-30)
-    fireTick(100);
+    // Taunting is a 1-in-20 roll per ACTIVATION (GECYBS.C:391), and a
+    // Cybertron re-arms its countdown to 255 after acting — so drive the
+    // activations directly rather than waiting out the countdown.
+    for (let i = 0; i < 200; i++) {
+      cyb.tick = 0;
+      fireAiTick(1);
+    }
     await new Promise((r) => setImmediate(r));
 
     expect(phaserFired).toHaveLength(0);
