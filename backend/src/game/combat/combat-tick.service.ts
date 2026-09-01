@@ -1,3 +1,4 @@
+import { tryEnergyDebit } from '../physics/physics-math';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -16,6 +17,9 @@ import {
   MISLSPED,
   TDAMMAX,
   TORPSPED,
+  SHIELDDM,
+  PENGUSE,
+  USEENERGY_RESERVE,
 } from '../constants';
 import { I_TROOPS, ITEM_TONS, NUMITEMS } from '../constants/items';
 import { MineRegistry, MineState } from './mine.registry';
@@ -23,7 +27,7 @@ import { MineRepository } from './mine.repository';
 import { RANDOM, Random } from './random.port';
 import {
   cdistance,
-  decoyIntercept,
+  tryDecoyIntercept,
   mineFalloff,
   phaserReloadAmount,
   rollHullDamage,
@@ -398,7 +402,12 @@ export class CombatTickService implements OnModuleInit {
           // fall back
         }
         const damage = mineFalloff(dist, damageFactor);
-        const shieldUp = ship.shieldstat === 1 && ship.shield > 0;
+        // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
+    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
+    // raised on an empty capacitor still absorbs the next hit in full —
+    // and blows on it. Requiring charge > 0 here handed full hull damage
+    // to anyone who had just raised shields.
+    const shieldUp = ship.shieldstat === 1;
         const channel = mine.channel;
         let hullDamage = damage;
         let shieldConsumed = 0;
@@ -413,7 +422,10 @@ export class CombatTickService implements OnModuleInit {
           this.shipState.mutate(ship.userid, ship.shipno, (v) => {
             v.damage = v.damage + applied;
             v.shield = r.newCharge;
-            if (r.knockedDown) v.shieldstat = 0;
+            // Only a BLOWN shield goes out of action, and it goes into SHIELDDM
+          // — not plain "down" — so `shi up` refuses until it is repaired.
+          // @see GEFUNCS.C:2459-2462
+          if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
             v.lastfired = channel;
           });
           shieldConsumed = r.shieldConsumed;
@@ -485,11 +497,19 @@ export class CombatTickService implements OnModuleInit {
     // Negative phasr is handled only by the 1s ship-update tick (GEFUNCS.C:1015-1018 checkdam).
     // The 6s reload must not lift negative phasr — gate requires phasr >= 0.
     if (ship.phasrtype > 0 && ship.phasr >= 0 && ship.phasr < 100) {
-      const reloadAmt = phaserReloadAmount(ship.phasrtype);
-      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        s.phasr = Math.min(100, s.phasr + reloadAmt);
-        s.energy = Math.max(0, s.energy - 57); // PENGUSE=57 per tick
-      });
+      // C wraps the whole preload in `if (useenergy(ptr,usrn,PENGUSE) == 1)`,
+      // and useenergy refuses unless `energy >= amount + 500` — spending
+      // nothing and charging nothing when it refuses. Charging unconditionally
+      // and clamping energy at zero let a flat ship keep its phasers topped up
+      // for free. @see GEFUNCS.C:1028 checkdam, GEFUNCS.C:1500-1514 useenergy
+      const debit = tryEnergyDebit(ship.energy, PENGUSE, USEENERGY_RESERVE);
+      if (debit.ok) {
+        const reloadAmt = phaserReloadAmount(ship.phasrtype);
+        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          s.phasr = Math.min(100, s.phasr + reloadAmt);
+          s.energy = debit.newEnergy;
+        });
+      }
     }
 
     // Decoy slot expiry — each active decoy decrements toward 0 each tick.
@@ -540,9 +560,12 @@ export class CombatTickService implements OnModuleInit {
       const oldDist = carrier.ltorpsDistance[i] ?? 0;
       const newDist = oldDist - TORPSPED;
 
-      // Decoy intercept threshold check.
-      if (newDist < TORP_DECOY_THRESHOLD && this.hasActiveDecoy(carrier)) {
-        if (decoyIntercept(this.random, DECODDS)) {
+      // Decoy intercept: one roll per LIVE decoy, and the slot that wins is
+      // spent. @see GEFUNCS.C:1581-1592
+      if (newDist < TORP_DECOY_THRESHOLD) {
+        const slot = tryDecoyIntercept(this.random, carrier.decout, DECODDS);
+        if (slot >= 0) {
+          this.consumeDecoy(carrier, slot);
           this.emitDecoyIntercept(carrier, ch, 'torpedo', ctx);
           this.clearTorpSlot(carrier, i);
           continue;
@@ -581,8 +604,11 @@ export class CombatTickService implements OnModuleInit {
       const oldDist = carrier.lmisslDistance[i] ?? 0;
       const newDist = oldDist - MISLSPED;
 
-      if (newDist < MISSILE_DECOY_THRESHOLD && this.hasActiveDecoy(carrier)) {
-        if (decoyIntercept(this.random, DECODDS)) {
+      // @see GEFUNCS.C:1666-1677 — same per-slot loop as torpedoes.
+      if (newDist < MISSILE_DECOY_THRESHOLD) {
+        const slot = tryDecoyIntercept(this.random, carrier.decout, DECODDS);
+        if (slot >= 0) {
+          this.consumeDecoy(carrier, slot);
           this.emitDecoyIntercept(carrier, ch, 'missile', ctx);
           this.clearMisslSlot(carrier, i);
           continue;
@@ -605,9 +631,11 @@ export class CombatTickService implements OnModuleInit {
     }
   }
 
-  private hasActiveDecoy(carrier: ShipState): boolean {
-    for (const t of carrier.decout) if (t > 0) return true;
-    return false;
+  /** Burn out the decoy that just did its job: `dptr[j] = 0`. @see GEFUNCS.C:1588 */
+  private consumeDecoy(carrier: ShipState, slot: number): void {
+    this.shipState.mutate(carrier.userid, carrier.shipno, (s) => {
+      s.decout[slot] = 0;
+    });
   }
 
   private clearTorpSlot(carrier: ShipState, i: number): void {
@@ -660,7 +688,12 @@ export class CombatTickService implements OnModuleInit {
     } catch {
       // fall back to default
     }
-    const shieldUp = carrier.shieldstat === 1 && carrier.shield > 0;
+    // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
+    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
+    // raised on an empty capacitor still absorbs the next hit in full —
+    // and blows on it. Requiring charge > 0 here handed full hull damage
+    // to anyone who had just raised shields.
+    const shieldUp = carrier.shieldstat === 1;
     // GEFUNCS.C:1552-1576 — hull damage is applied in BOTH branches. Shields
     // halve the roll and cost charge; they are not immunity.
     //
@@ -685,7 +718,10 @@ export class CombatTickService implements OnModuleInit {
       this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
         v.damage = v.damage + hullDamage;
         v.shield = r.newCharge;
-        if (r.knockedDown) v.shieldstat = 0;
+        // Only a BLOWN shield goes out of action, and it goes into SHIELDDM
+          // — not plain "down" — so `shi up` refuses until it is repaired.
+          // @see GEFUNCS.C:2459-2462
+          if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
         v.lastfired = attackerChannel;
         v.cantexit = FIRETICKS;
       });

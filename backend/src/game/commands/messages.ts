@@ -190,6 +190,11 @@ export enum MessageId {
   SHI_UP = 'SHI_UP',
   SHI_DN = 'SHI_DN',
   SHI_FMT = 'SHI_FMT',
+  SHIELD0 = 'SHIELD0',
+  SHLD1 = 'SHLD1',
+  SHLD2 = 'SHLD2',
+  SHNOPWR = 'SHNOPWR',
+  SHNORPR = 'SHNORPR',
 
   // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
   FLUX_NOPODS = 'FLUX_NOPODS',
@@ -582,6 +587,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SHI_UP]: 'Shields up.',
   [MessageId.SHI_DN]: 'Shields down.',
   [MessageId.SHI_FMT]: 'Format: shi up|dn',
+  // cmd_shields gates, GECMDS.C:3114-3170
+  [MessageId.SHIELD0]: 'This ship carries no shield generator.',
+  [MessageId.SHLD1]: 'Shields cannot be operated in hyperspace.',
+  [MessageId.SHLD2]: 'You have no shields installed.',
+  [MessageId.SHNOPWR]: 'Insufficient power to raise shields.',
+  [MessageId.SHNORPR]: 'Your shields are damaged and must be repaired first.',
 
   // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
   [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',

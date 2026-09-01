@@ -2,7 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { CommandRouterService } from './command-router.service';
 import { rotateCommand } from './handlers/rotate.handler';
 import { impulseCommand } from './handlers/impulse.handler';
-import { shieldCommand } from './handlers/shield.handler';
+import { ShieldHandlerService } from './handlers/shield.handler';
 import { fluxCommand } from './handlers/flux.handler';
 import { LockHandlerService } from './handlers/lock.handler';
 import { WarpHandlerService } from './handlers/warp.handler';
@@ -89,6 +89,7 @@ import { MailModule } from '../mail/mail.module';
     JammerHandlerService,
     SysHandlerService,
     LockHandlerService,
+    ShieldHandlerService,
     RenameHandlerService,
     WhoHandlerService,
     DatHandlerService,
@@ -147,6 +148,7 @@ export class CommandsModule implements OnModuleInit {
     private readonly jammerHandler: JammerHandlerService,
     private readonly sysHandler: SysHandlerService,
     private readonly lockHandler: LockHandlerService,
+    private readonly shieldHandler: ShieldHandlerService,
     private readonly renameHandler: RenameHandlerService,
     private readonly whoHandler: WhoHandlerService,
     private readonly datHandler: DatHandlerService,
@@ -201,7 +203,7 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.sysHandler.command);
     this.commandRouter.register(this.lockHandler.command);
     this.commandRouter.register(this.renameHandler.command);
-    this.commandRouter.register(shieldCommand);
+    this.commandRouter.register(this.shieldHandler.command);
     this.commandRouter.register(fluxCommand);
     this.commandRouter.register(this.whoHandler.command);
     this.commandRouter.register(this.datHandler.command);

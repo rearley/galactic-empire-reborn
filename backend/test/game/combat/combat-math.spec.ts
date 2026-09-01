@@ -177,7 +177,8 @@ describe('combat-math', () => {
 
   describe('shieldhit — @see GEFUNCS.C:2430 shieldhit', () => {
     // dmax = 80 - shieldtype * SHIELD_FACTOR; knock = floor(dmax * damage/100)
-    // Hull always 0 (shields absorb everything); knockedDown when newCharge < SHMINCHG.
+    // Hull always 0 (shields absorb everything). See shield-knockdown-fidelity.spec.ts
+    // for the three-way outcome ('none' / 'warned' / 'damaged').
 
     it('type-1 shield absorbs 76% of incoming damage', () => {
       // dmax = 80 - 1*4 = 76; knock = floor(76*100/100) = 76; newCharge = 200-76 = 124
@@ -185,7 +186,7 @@ describe('combat-math', () => {
       expect(r.hullDamage).toBe(0);
       expect(r.shieldConsumed).toBe(76);
       expect(r.newCharge).toBe(124);
-      expect(r.knockedDown).toBe(false);
+      expect(r.outcome).toBe('none');
       expect(SHIELD_FACTOR).toBe(4);
     });
 
@@ -195,7 +196,7 @@ describe('combat-math', () => {
       expect(r.hullDamage).toBe(0);
       expect(r.shieldConsumed).toBe(30);
       expect(r.newCharge).toBe(170);
-      expect(r.knockedDown).toBe(false);
+      expect(r.outcome).toBe('none');
     });
 
     it('type-20 shield is impenetrable — no charge drain', () => {
@@ -204,13 +205,13 @@ describe('combat-math', () => {
       expect(r.hullDamage).toBe(0);
       expect(r.shieldConsumed).toBe(0);
       expect(r.newCharge).toBe(100);
-      expect(r.knockedDown).toBe(false);
+      expect(r.outcome).toBe('none');
     });
 
-    it('knocks shield down when newCharge falls below SHMINCHG', () => {
+    it('blows the shield when the knock takes charge to 2 or below', () => {
       // Type 1, dmax=76; with charge=10 and damage=100: knock=76, newCharge=10-76=-66
       const r = shieldhit(10, 1, 100);
-      expect(r.knockedDown).toBe(true);
+      expect(r.outcome).toBe('damaged');
       expect(SHMINCHG).toBe(5);
     });
   });

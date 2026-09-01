@@ -1,4 +1,4 @@
-import { TDAMMAX } from '../../../src/game/constants';
+import { TDAMMAX, PENGUSE } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { CombatTickService } from '../../../src/game/combat/combat-tick.service';
@@ -426,6 +426,9 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(bob.ltorpsChannel[0]).toBe(255);
     // No hit emitted
     expect(emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
+    // The decoy that did the work is SPENT — `dptr[j] = 0`, GEFUNCS.C:1588.
+    // It used to survive and intercept everything for its full 15-tick life.
+    expect(bob.decout[0]).toBe(0);
   });
 
   // C-010: applyRandamage wired after every projectile hit.
@@ -760,6 +763,51 @@ describe('CombatTickService — negative phasr reload gate (Fix 2)', () => {
     await h.fire();
     // phasr=0 is not negative, so normal reload applies
     expect(ship.phasr).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The whole preload is wrapped in `if (useenergy(ptr,usrn,PENGUSE) == 1)`
+ * (GEFUNCS.C:1028), and useenergy (GEFUNCS.C:1500-1514) refuses unless
+ * `energy >= amount + 500` — spending nothing and charging nothing when it
+ * refuses. The port applied the charge unconditionally and clamped energy at
+ * zero, so a ship with a flat battery kept topping its phasers up for free and
+ * could sit at 0 energy firing indefinitely.
+ */
+describe('CombatTickService — phasers charge only when there is power to spare', () => {
+  it('charges the phaser and debits PENGUSE when there is headroom', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: 0, energy: 50000 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.phasr).toBeGreaterThan(0);
+    expect(ship.energy).toBe(50000 - PENGUSE);
+  });
+
+  it('refuses below the 500-unit reserve, leaving BOTH phasr and energy alone', async () => {
+    // useenergy needs energy >= PENGUSE + 500.
+    const energy = PENGUSE + 499;
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: 0, energy });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.phasr).toBe(0);
+    expect(ship.energy).toBe(energy);
+  });
+
+  it('a flat battery never recharges the phaser', async () => {
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: 10, energy: 0 });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.phasr).toBe(10);
+    expect(ship.energy).toBe(0);
+  });
+
+  it('charges at exactly the reserve boundary', async () => {
+    const energy = PENGUSE + 500;
+    const ship = makeShip({ userid: 'a', shipno: 1, phasrtype: 1, phasr: 0, energy });
+    const h = await makeHarness([ship]);
+    await h.fire();
+    expect(ship.phasr).toBeGreaterThan(0);
+    expect(ship.energy).toBe(500);
   });
 });
 

@@ -613,3 +613,55 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     expect(h.emitted.find((e) => e.event === COMBAT_SUBSYSTEM_DAMAGED)).toBeUndefined();
   });
 });
+
+/**
+ * Shooting a Cybertron makes it YOUR problem.
+ *
+ * GECMDS.C:980-981 (firep) and GECMDS.C:1071-1072 (firehp), both inside the
+ * `damage >= 1` block:
+ *
+ *   if (wptr->status == GESTAT_AUTO)     // if cyborg -sickum
+ *       wptr->cybmine = usrn;
+ *
+ * It overrides whatever the Cybertron was chasing and the noClaim rules. The
+ * port only ever wrote `cybmine` from the Cybertron's own proximity
+ * acquisition, so PvE was pure proximity: you could not pull a Cybertron off a
+ * teammate, and one you shot in the back simply ignored you.
+ */
+describe('a phaser hit claims a Cybertron for the firer', () => {
+  it('sets the AI ship\'s cybmine to the firer\'s channel', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
+    const cyb = makeShip({
+      userid: 'cyb', shipno: 1, channel: 12, shipname: 'Cybrg-1',
+      xcoord: 5, ycoord: 4, status: 2, cybmine: 99, shieldstat: 0, damage: 0,
+    });
+    const h = makeHarness([alice, cyb]);
+
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+
+    expect(cyb.damage).toBeGreaterThan(0);
+    expect(cyb.cybmine).toBe(7);
+  });
+
+  it('overrides a claim the Cybertron already held on someone else', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
+    const cyb = makeShip({
+      userid: 'cyb', shipno: 1, channel: 12,
+      xcoord: 5, ycoord: 4, status: 2, cybmine: 3, shieldstat: 0,
+    });
+    const h = makeHarness([alice, cyb]);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+    expect(cyb.cybmine).toBe(7);
+  });
+
+  it('leaves a human victim\'s cybmine alone', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
+    const bob = makeShip({
+      userid: 'b', shipno: 1, channel: 12,
+      xcoord: 5, ycoord: 4, status: 1, cybmine: 42, shieldstat: 0,
+    });
+    const h = makeHarness([alice, bob]);
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+    expect(bob.cybmine).toBe(42);
+  });
+});
