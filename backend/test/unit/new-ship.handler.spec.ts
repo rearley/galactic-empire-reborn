@@ -329,4 +329,28 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 
     await expect(service.command.handler(makeShip(), ['ship', '4'], {})).rejects.toThrow(/on fire/);
   });
+
+  /**
+   * A hull bought at Zygor came out with topspeed 0, and `war` refuses at
+   * `topspeed === 0` with "Your warp drive is offline" (WARPSPD2). Nothing
+   * raises topspeed afterwards — it is only ever ratcheted DOWN by engine
+   * damage — so every purchased ship was permanently stuck on impulse.
+   *
+   * Onboarding had always set it from the class (`topspeed = maxWarp`); this
+   * second creation path simply never copied that line, and the column default
+   * of 0 is indistinguishable from blown engines.
+   *
+   * Found in play: bought a Heavy Freighter, boarded it, and it would not warp.
+   */
+  it('gives a purchased hull the warp drive its class comes with', async () => {
+    const { service, prismaMock } = makeService();
+
+    await service.command.handler(makeShip(), ['ship', '4'], {});
+
+    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(created.data['topspeed']).toBe(PLAYER_CLASS_4.maxWarp);
+    expect(created.data['topspeed']).not.toBe(0);
+  });
 });
