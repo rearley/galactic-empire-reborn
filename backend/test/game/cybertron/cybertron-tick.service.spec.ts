@@ -687,3 +687,35 @@ describe('Cybertron cadence — tick counts seconds (GEMAIN.C:2401-2438)', () =>
     expect(ships.map((c) => c.tick)).toEqual([3, 3, 3, 3, 3, 3]);
   });
 });
+
+/**
+ * `cyb_lay_decoys` is called from the attack branch of the engagement scan
+ * (GECYBS.C:296) and fills all five slots. The port's version filled a single
+ * slot from a `decout` array that was empty at spawn, so `findIndex` returned
+ * -1 and it bailed out for the ship's entire life — Cybertrons never deployed
+ * a decoy at all.
+ */
+describe('a Cybertron engaging a player deploys decoys', () => {
+  it('fills its decoy slots during an engagement', async () => {
+    const h = await buildHarness(7);
+    const cyb = makeShip({
+      userid: '@cyb1', shipno: 1, channel: 60, shpclass: 21, status: 2,
+      xcoord: 5, ycoord: 5, cybmine: 255, tick: 0, cybupdate: 100,
+      where: 0, phasr: 100, decout: [], cybskill: 17,
+    });
+    h.shipMap.set('@cyb1:1', cyb);
+    h.shipMap.set('player1:1', makeShip({
+      userid: 'player1', shipno: 1, channel: 61, shpclass: 1, status: 1,
+      xcoord: 5.1, ycoord: 5, where: 0, cantexit: 1,
+    }));
+
+    // Run activations until it engages; cybwhoops can skip an individual pass.
+    for (let i = 0; i < 40 && !cyb.decout.some((t) => t > 0); i++) {
+      cyb.tick = 0;
+      h.fireAiTick(1);
+    }
+    await new Promise((r) => setImmediate(r));
+
+    expect(cyb.decout.filter((t) => t > 0).length).toBeGreaterThan(0);
+  });
+});

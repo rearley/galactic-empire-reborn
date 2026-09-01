@@ -25,7 +25,7 @@ function makeMocks() {
 
   // Prisma mock: advisory lock succeeds, $transaction executes callback, unlock succeeds
   const mockPrisma = {
-    $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_lock: true }]),
+    $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_xact_lock: true }]),
     $transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
       // Pass a no-op tx object; repo methods are mocked at the MidnightRepository level
       return cb({});
@@ -58,7 +58,10 @@ function makeMocks() {
           upsert: jest.fn().mockResolvedValue({}),
         },
         $executeRaw: jest.fn().mockResolvedValue(undefined),
-        $queryRaw: jest.fn().mockResolvedValue([]),
+        // The advisory lock is now taken as the transaction's FIRST statement
+        // (pg_try_advisory_xact_lock) so a connection pool cannot lose it, so
+        // the fake tx has to grant it. @see midnight.service.ts run()
+        $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_xact_lock: true }]),
       };
       return cb(fakeTx);
     },
@@ -89,7 +92,15 @@ describe('T-P016b — MidnightService emits MIDNIGHT_COMPLETED after successful 
     const { mockEmitter, emitMock, mockPrisma, mockRepo } = makeMocks();
 
     // Override: advisory lock fails
-    (mockPrisma.$queryRaw as jest.Mock).mockResolvedValueOnce([{ pg_try_advisory_lock: false }]);
+    // Refuse the lock inside the transaction — that is where it is taken now.
+    (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({
+          midnightRun: { create: jest.fn(), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
+          $executeRaw: jest.fn(),
+          $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_xact_lock: false }]),
+        }),
+    );
 
     const svc = new MidnightService(mockPrisma, mockRepo, mockEmitter);
     const { MidnightLockHeldError } = await import('../../../src/game/midnight/midnight.service');

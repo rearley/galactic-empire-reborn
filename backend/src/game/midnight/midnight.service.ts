@@ -7,7 +7,10 @@
  *   - run() — public; called by all paths and by the admin HTTP endpoint
  *
  * All four phases execute inside a single Prisma $transaction gated by a
- * Postgres advisory lock. Concurrent invocations are rejected immediately.
+ * TRANSACTION-scoped Postgres advisory lock, taken as the transaction's first
+ * statement. Concurrent invocations are rejected immediately, and Postgres
+ * releases the lock on commit or rollback — a session-scoped lock cannot be
+ * released reliably from a connection pool.
  *
  * @see GEMAIN.C:gemidnighta (1084-1335)
  * @see specs/009-midnight-job/plan.md
@@ -96,19 +99,27 @@ export class MidnightService implements OnApplicationBootstrap {
     const startMs = Date.now();
     const today = todayLocal();
 
-    // Acquire session-level advisory lock BEFORE opening the transaction
-    // so the lock survives transaction rollback (released in finally).
-    const lockResult = await this.prisma.$queryRaw<[{ pg_try_advisory_lock: boolean }]>`
-      SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}::bigint)
-    `;
-    const acquired = lockResult[0]?.pg_try_advisory_lock ?? false;
-
-    if (!acquired) {
-      throw new MidnightLockHeldError();
-    }
-
-    try {
+    {
       const counters = await this.prisma.$transaction(async (tx) => {
+        // Transaction-scoped advisory lock, taken as the first statement so it
+        // lives on the connection this transaction has pinned.
+        //
+        // The session-level `pg_try_advisory_lock` this replaced was acquired
+        // on one pooled connection and released on whichever the pool handed
+        // back, so `pg_advisory_unlock` returned false against a session that
+        // never held it and the lock leaked. Midnight then succeeded exactly
+        // once per backend process and every later run — the nightly cron
+        // included — was rejected with MIDNIGHT_LOCK_HELD until restart.
+        // Postgres releases an xact lock on commit or rollback, so a pool
+        // cannot lose track of it. Duplicate same-day runs are prevented by
+        // the MidnightRun ledger, not by this lock.
+        const lockResult = await tx.$queryRaw<[{ pg_try_advisory_xact_lock: boolean }]>`
+          SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_KEY}::bigint)
+        `;
+        if (!(lockResult[0]?.pg_try_advisory_xact_lock ?? false)) {
+          throw new MidnightLockHeldError();
+        }
+
         this.logger.log('midnight: phase 0 — refresh neutral zone planets');
         await this.repo.refreshNeutralZone(tx);
 
@@ -164,8 +175,6 @@ export class MidnightService implements OnApplicationBootstrap {
       this.events.emit(MIDNIGHT_COMPLETED, payload);
 
       return counters;
-    } finally {
-      await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY}::bigint)`;
     }
   }
 }

@@ -7,6 +7,12 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import {
+  PHYSICS_GRAVITY,
+  PhysicsGravityEvent,
+  PHYSICS_DESTRUCT_CANCELLED,
+  PhysicsDestructCancelledEvent,
+} from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
@@ -968,6 +974,41 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${event.userid}`).emit('event.log', {
       category: 'nav',
       text: `Arrived at sector (${event.x}, ${event.y}) — autopilot disengaged. Cut speed with war 0 / imp 0.`,
+    });
+  }
+
+  /**
+   * Gravity-well proximity. C prints GRAVITY1/2/3 for a planet and
+   * GRAVWRM1/2/3 for a wormhole as you close on it (GEFUNCS.C:855-885); the
+   * innermost band is where the physics tick writes the hull off or throws you
+   * through. Without this the effect happened silently.
+   */
+  @OnEvent(PHYSICS_GRAVITY)
+  handleGravity(event: PhysicsGravityEvent): void {
+    const userid = event.shipId.split(':')[0];
+    const body = event.isWormhole ? `wormhole ${event.plnum}` : `planet ${event.plnum}`;
+    const text =
+      event.band === 1
+        ? `You feel the pull of ${body}.`
+        : event.band === 2
+          ? `WARNING: ${body} is dragging you in — break away now.`
+          : event.isWormhole
+            ? `The wormhole takes you.`
+            : `You have flown into ${body}.`;
+
+    this.server.to(`user:${userid}`).emit('event.log', {
+      category: event.band === 3 ? 'combat' : 'system',
+      text,
+    });
+  }
+
+  /** SELFD4 — reaching neutral space cancels an armed countdown. @see GEFUNCS.C:725-730 */
+  @OnEvent(PHYSICS_DESTRUCT_CANCELLED)
+  handleDestructCancelled(event: PhysicsDestructCancelledEvent): void {
+    const userid = event.shipId.split(':')[0];
+    this.server.to(`user:${userid}`).emit('event.log', {
+      category: 'system',
+      text: 'Entering neutral space — the self-destruct sequence has been cancelled.',
     });
   }
 
