@@ -1,3 +1,4 @@
+import { killScoreAward, killScoreDeduction } from './kill-score';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { scoreF2 } from './score.config';
@@ -23,8 +24,8 @@ export class PlayerScoreRepository {
    * (isAiAttacker=true) receive 1/10 of the normal transfer per the original
    * GEFUNCS.C:1161 branch ("ai can't earn that much").
    *
-   * transfer (PvP)        = floor((scr / 100) * scoreF2)
-   * transfer (AI attack)  = floor((scr / 100) * scoreF2 / 10)
+   * attacker award  = amt                              (never scaled)
+   * victim deduction = (amt/100)*scoreF2, /10 if AI      (C truncates first)
    *
    * @see GEFUNCS.C:1157-1185
    * @see GEFUNCS.C:1161  AI 1/10 branch
@@ -36,18 +37,22 @@ export class PlayerScoreRepository {
     isAiVictim: boolean,
     isAiAttacker: boolean,
   ): Promise<void> {
-    const base = (scr / 100) * scoreF2;
-    const rawTransfer = isAiAttacker ? base / 10 : base;
-    const transfer = Math.max(0, Math.floor(rawTransfer));
-    const transferBig = BigInt(transfer);
+    // The attacker's award and the victim's deduction are DIFFERENT numbers:
+    // only `ded_amt` is scaled by score_f2 and only `ded_amt` is divided by ten
+    // for an AI kill. Using one figure for both meant that at any score_f2
+    // other than the shipped 100 the attacker's award shrank along with the
+    // victim's loss, and an AI kill paid a tenth of what it should.
+    // @see GEFUNCS.C:1155-1184  @see src/game/player/kill-score.ts
+    const award = BigInt(killScoreAward(scr));
+    const deduction = BigInt(killScoreDeduction(scr, scoreF2, isAiAttacker));
 
     try {
       await this.prisma.$transaction(async (tx) => {
         if (!isAiVictim) {
           const victim = await tx.user.findUnique({ where: { userid: victimUserid } });
           if (victim) {
-            const newScore = victim.score > transferBig ? victim.score - transferBig : 0n;
-            const newKlscore = victim.klscore > transferBig ? victim.klscore - transferBig : 0n;
+            const newScore = victim.score > deduction ? victim.score - deduction : 0n;
+            const newKlscore = victim.klscore > deduction ? victim.klscore - deduction : 0n;
             await tx.user.update({
               where: { userid: victimUserid },
               data: { score: newScore, klscore: newKlscore },
@@ -62,8 +67,8 @@ export class PlayerScoreRepository {
           // on Ship.kills via CybertronRepository.incrementKills.
           // @see GEFUNCS.C:1118 acctm — WARUSR.kills per-user kill counter
           const userIncrement: { score: { increment: bigint }; klscore: { increment: bigint }; kills?: { increment: number } } = {
-            score: { increment: transferBig },
-            klscore: { increment: transferBig },
+            score: { increment: award },
+            klscore: { increment: award },
           };
           if (!isAiAttacker) {
             userIncrement.kills = { increment: 1 };

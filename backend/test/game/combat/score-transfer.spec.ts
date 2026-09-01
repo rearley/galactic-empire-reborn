@@ -120,7 +120,14 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
     expect(data.klscore).toBe(0n);
   });
 
-  it('victim score decrements normally when scr is smaller than current score', async () => {
+  /**
+   * `ded_amt = (amt/100L)*score_f2` is long arithmetic, so `amt/100` truncates
+   * BEFORE the multiply. A kill worth under 100 points therefore costs the
+   * victim nothing at all, and 750 points costs 700 rather than 750. The port
+   * carried a float through and lost that.
+   * @see GEFUNCS.C:1157
+   */
+  it('a sub-100-point kill costs the victim nothing (amt/100 truncates to 0)', async () => {
     const updateMock = jest.fn().mockResolvedValue(undefined);
     const prisma = {
       $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
@@ -139,8 +146,32 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'victim',
     );
     const data = (victimCall![0] as { data: { score: bigint; klscore: bigint } }).data;
-    expect(data.score).toBe(950n);
-    expect(data.klscore).toBe(750n);
+    expect(data.score).toBe(1000n);
+    expect(data.klscore).toBe(800n);
+  });
+
+  it('deducts (amt/100)*score_f2 for a kill worth more than 100', async () => {
+    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const prisma = {
+      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+        fn({
+          user: {
+            findUnique: jest.fn().mockResolvedValue({ score: 5000n, klscore: 5000n }),
+            update: updateMock,
+          },
+        }),
+      ),
+    };
+    const repo = buildRepo(prisma);
+    // 750/100 = 7, * scoreF2 100 = 700.
+    await repo.transferKillScore('attacker', 'victim', 750, false, false);
+
+    const victimCall = updateMock.mock.calls.find(
+      (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'victim',
+    );
+    const data = (victimCall![0] as { data: { score: bigint; klscore: bigint } }).data;
+    expect(data.score).toBe(4300n);
+    expect(data.klscore).toBe(4300n);
   });
 
   it('skips victim deduction when isAiVictim=true', async () => {

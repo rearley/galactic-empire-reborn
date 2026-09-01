@@ -15,7 +15,9 @@ import { TickKind } from '../../src/game/tick/tick.types';
 import { planetKey } from '../../src/game/planet/planet-state.types';
 import { PLANTIME } from '../../src/game/constants';
 
-function buildMocks(fakePlanets: Array<{ xsect: number; ysect: number; plnum: number }>) {
+function buildMocks(
+  fakePlanets: Array<{ xsect: number; ysect: number; plnum: number; userid?: string | null }>,
+) {
   const tickedKeys: string[] = [];
 
   const planetServiceMock = {
@@ -44,10 +46,13 @@ function buildMocks(fakePlanets: Array<{ xsect: number; ysect: number; plnum: nu
 }
 
 describe('T044 — PlanetTickService all-planets-per-tick', () => {
+  // Owned AND populated: the sweep skips zero-population worlds outright
+  // (GEMAIN.C:2132), so slot 0 (I_MEN) has to be non-zero here.
+  const populated = () => Array.from({ length: 14 }, () => ({ qty: 1000n }));
   const fakePlanets = [
-    { xsect: 1, ysect: 0, plnum: 1 },
-    { xsect: 1, ysect: 0, plnum: 2 },
-    { xsect: 2, ysect: 1, plnum: 1 },
+    { xsect: 1, ysect: 0, plnum: 1, userid: 'owner', items: populated() },
+    { xsect: 1, ysect: 0, plnum: 2, userid: 'owner', items: populated() },
+    { xsect: 2, ysect: 1, plnum: 1, userid: 'owner', items: populated() },
   ];
 
   it('ticks every owned planet exactly once per firing (N=3)', async () => {

@@ -1,3 +1,4 @@
+import { shouldRunEconomy } from './planet-economy';
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickKind } from '../tick/tick.types';
@@ -55,7 +56,9 @@ export class PlanetTickService implements OnModuleInit {
 
     const due = this.planets
       .all()
-      .filter((p) => p.userid !== null)
+      // C skips a planet with no population outright — no starvation, no gold
+      // conversion, no tax. @see GEMAIN.C:2132
+      .filter((p) => shouldRunEconomy(p))
       .filter((p) => {
         const key = planetKey(p.xsect, p.ysect, p.plnum);
         const last = this.lastTickMs.get(key);

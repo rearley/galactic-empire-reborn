@@ -47,12 +47,18 @@ class FixedRandom implements Random {
 
 describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
   it('triggers revolt when conditions met: troops cut, owner cleared, distress mail queued', async () => {
-    // taxrate=120 → taxrate/120 = 1.0 → revoltPressure = 0.35 * men.
-    // men=10000 → pressure 3500 > troops 1000 → revolt eligible.
-    // random.next() = 0.0 → randVal = 0 → 0 % 10 == 0 → revolt fires.
-    // divisor = (0 % 8) + 2 = 2; newTroops = floor(1000 / 2) = 500.
+    // taxrate=60 → taxrate/120 = 0.5 → revoltPressure = 0.175 * men.
+    // men=10000 → pressure 1750 > troops 1000 → revolt eligible.
+    // First draw 0.0 → floor(0*10) = 0 → revolt fires.
+    // Second draw 0.0 → divisor = floor(0*8)+2 = 2; newTroops = 1000/2 = 500.
+    //
+    // NOTE: taxrate must stay under 120 here. `taxfact = 1 - taxrate/120`
+    // (GEPLANET.C:257) and the storage ceiling is `maxpl[i] * fact`
+    // (GEPLANET.C:294-296), so a 120% rate makes every ceiling zero and wipes
+    // the planet's stockpiles outright — including the population the revolt
+    // pressure is computed from.
     const planet = makePlanet({
-      userid: 'owner1', taxrate: 120,
+      userid: 'owner1', taxrate: 60,
     });
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 1000n;
@@ -65,7 +71,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
       emitted.push(Array.isArray(ev) ? ev.join('.') : ev);
     });
 
-    const random = new FixedRandom([0]);
+    const random = new FixedRandom([0, 0]);
     const svc = new PlanetEconomyService(random, prisma);
 
     const { state: next, revolted } = await svc.applyTick(planet);
@@ -122,7 +128,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
 
     const mailCreate = jest.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
-    const random = new FixedRandom([0]);
+    const random = new FixedRandom([0, 0]);
     const svc = new PlanetEconomyService(random, prisma);
 
     const { state: next, revolted } = await svc.applyTick(planet);
@@ -139,12 +145,54 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
 
     const mailCreate = jest.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
-    const random = new FixedRandom([0]);
+    const random = new FixedRandom([0, 0]);
     const svc = new PlanetEconomyService(random, prisma);
 
     const { state: next, revolted } = await svc.applyTick(planet);
     expect(revolted).toBe(false);
     expect(next.userid).toBe('owner1');
     expect(mailCreate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * C makes two independent `gernd()` calls in the revolt branch:
+ *
+ *   if (gernd()%10 == 0)
+ *     cnt = plptr->items[I_TROOPS].qty / ((gernd()%8)+2);
+ *
+ * The port drew ONCE and derived both from it — gating on `randVal % 10` and
+ * then taking `(randVal % 8) + 2` as the divisor. The survivors of the first
+ * test are {0,10,...,90}, whose residues mod 8 are only {0,2,4,6}, so the
+ * divisor could only ever be 2, 4, 6 or 8 — and unevenly: 3/10, 3/10, 2/10,
+ * 2/10. C's divisor is uniform over 2..9.
+ *
+ * @see GEPLANET.C:359-361
+ */
+describe('revolt severity is an independent roll (GEPLANET.C:359-361)', () => {
+  async function revoltWith(draws: number[]): Promise<bigint> {
+    const planet = makePlanet({ userid: 'owner1', taxrate: 60 });
+    planet.items[I_MEN].qty = 10000n;
+    planet.items[I_TROOPS].qty = 720n; // divisible by 2..9, so no flooring noise
+    const prisma = { mailStat: { create: jest.fn().mockResolvedValue({}) } } as never;
+    const svc = new PlanetEconomyService(new FixedRandom(draws), prisma);
+    const { state } = await svc.applyTick(planet);
+    return state.items[I_TROOPS].qty;
+  }
+
+  it('reaches divisors the single-draw version could never produce', async () => {
+    // Second draw picks the divisor: floor(0.4 * 8) = 3 -> divisor 5.
+    expect(await revoltWith([0, 0.4])).toBe(144n); // 720 / 5
+  });
+
+  it('spans the full 2..9 range', async () => {
+    // floor(r * 8) + 2 for r at the bottom and top of the range.
+    expect(await revoltWith([0, 0])).toBe(360n);      // divisor 2
+    expect(await revoltWith([0, 0.999])).toBe(80n);   // divisor 9
+  });
+
+  it('still gates the revolt itself on the first draw', async () => {
+    // floor(0.55 * 10) = 5, not 0 -> no revolt, garrison intact.
+    expect(await revoltWith([0.55, 0])).toBe(720n);
   });
 });

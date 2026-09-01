@@ -236,9 +236,12 @@ describe('US1 — score recalculation and rospos ranking', () => {
     expect(alice.planets).toBe(2);
     expect(bob.planets).toBe(1);
 
+    // The seeded rows carry 50,000 colonists each (makePlanetRow default), and
+    // stockpiles now contribute to net worth — with the old PLTVDIV every item
+    // term truncated to zero, so this mismatch was invisible.
     const expectedAlicePlscore =
-      valuePlanet(100_000n, 10_000n, makeItemsQty(), BASEPRICE, PLTVCASH, PLTVDIV) +
-      valuePlanet(200_000n, 20_000n, makeItemsQty(), BASEPRICE, PLTVCASH, PLTVDIV);
+      valuePlanet(100_000n, 10_000n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV) +
+      valuePlanet(200_000n, 20_000n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV);
     expect(alice.plscore).toBe(expectedAlicePlscore);
     expect(alice.score).toBe(expectedAlicePlscore + 1_000n);
 
