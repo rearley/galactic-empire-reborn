@@ -140,7 +140,10 @@ describe('warp course argument — GECMDS.C:cmd_warp', () => {
   it('holds the current heading when no course is given', () => {
     // C defaults the argument to "0", so a bare `war` means straight ahead.
     const h = build({ 1: 10 });
-    const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 174, head2b: 45 });
+    // head2b == heading: this ship is flying straight, not mid-turn. A bare
+  // `war` holds a turn already ordered (head2b != heading), so a fixture that
+  // disagreed with itself would exercise that path instead of this one.
+  const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 174, head2b: 174 });
     h.command.handler(ship, ['6'], {});
     expect(ship.head2b).toBe(174);
   });

@@ -128,7 +128,7 @@ describe('warpCommand (full gate sequence)', () => {
 
   it('ENGFIRE message announces acceleration to the requested warp', () => {
     const h = makeHandler();
-    const ship = makeShip({ topspeed: 6, heading: 180 });
+    const ship = makeShip({ topspeed: 6, heading: 180, head2b: 180 });
     const result = h.command.handler(ship, ['4'], ctx) as CommandResult;
     // C's ENGFIRE names the resulting course — `prfmsg(ENGFIRE, deg)` — because
     // `war <speed> [degrees]` can turn you. @see GECMDS.C:cmd_warp
