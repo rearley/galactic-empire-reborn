@@ -52,7 +52,7 @@ export function App(): React.JSX.Element {
 
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
-  const { status, lastResult, send, localShipId, onboardingPrompt, emitPromptReply } =
+  const { status, lastResult, send, reconnect, localShipId, onboardingPrompt, emitPromptReply } =
     useSocket(playerDispatch);
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
@@ -221,7 +221,7 @@ function Terminal(): React.JSX.Element {
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
       {/* Top: connection status banner (FR-019) — hidden when connected */}
-      <ConnectionBanner status={status} />
+      <ConnectionBanner status={status} onReconnect={reconnect} />
 
       {/* Top bar: title + connection indicator (FR-002, FR-022) */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-1">

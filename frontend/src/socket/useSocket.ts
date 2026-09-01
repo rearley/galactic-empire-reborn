@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { socket, sendCommand, onCommandResult } from './socketClient';
+import { socket, sendCommand, onCommandResult, connectSocket } from './socketClient';
 import type {
   CommandResultPayload,
   PlayerSnapshotPayload,
@@ -10,7 +10,17 @@ import type {
 } from '../types/contracts';
 import type { UsePlayerListReturn } from '../state/usePlayerList';
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+export type ConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  /**
+   * The server gave the seat to a newer login (SESSION_REPLACED) and this
+   * client stopped reconnecting on purpose. Distinct from `disconnected`
+   * because the network is fine and the player can take the seat back.
+   */
+  | 'displaced';
 
 export interface OnboardingPrompt {
   /**
@@ -26,6 +36,8 @@ export interface UseSocketReturn {
   status: ConnectionStatus;
   lastResult: CommandResultPayload | null;
   send: (input: string) => void;
+  /** Re-open the socket after this session was displaced by a newer login. */
+  reconnect: () => void;
   /** Local ship's canonical shipId (set from player.snapshot; null until then) */
   localShipId: string | null;
   /** Active onboarding prompt from server, or null when in normal play */
@@ -54,7 +66,12 @@ export function useSocket(
 
   useEffect(() => {
     const handleConnect = () => setStatus('connected');
-    const handleDisconnect = () => setStatus('disconnected');
+    const handleDisconnect = () => setStatus((prev) => (prev === 'displaced' ? prev : 'disconnected'));
+    // The server explains itself; don't overwrite that with a network story.
+    const handleServerErr = (err: { code?: string }) => {
+      if (err?.code === 'SESSION_REPLACED') setStatus('displaced');
+    };
+    socket.on('error', handleServerErr);
     const handleReconnectAttempt = () => setStatus('reconnecting');
     const handleConnectError = () => setStatus('disconnected');
 
@@ -77,6 +94,7 @@ export function useSocket(
     socket.on('prompt:ship-select', handleShipSelect);
 
     return () => {
+      socket.off('error', handleServerErr);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('reconnect_attempt', handleReconnectAttempt);
@@ -134,5 +152,11 @@ export function useSocket(
     socket.emit('prompt:reply', { value });
   }, []);
 
-  return { status, lastResult, send, localShipId, onboardingPrompt, emitPromptReply };
+  /** Take the seat back after being displaced. */
+  const reconnect = () => {
+    setStatus('connecting');
+    connectSocket();
+  };
+
+  return { status, lastResult, send, reconnect, localShipId, onboardingPrompt, emitPromptReply };
 }

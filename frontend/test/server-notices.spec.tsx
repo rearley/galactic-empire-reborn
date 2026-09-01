@@ -31,6 +31,7 @@ vi.mock('../src/socket/useSocket', () => ({
     send: vi.fn(),
     localShipId: null,
     onboardingPrompt: null,
+    reconnect: vi.fn(),
     emitPromptReply: vi.fn(),
   })),
 }));
