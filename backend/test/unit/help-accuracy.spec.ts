@@ -163,4 +163,16 @@ describe('help text matches the commands it documents', () => {
       expect(body(topic)).not.toMatch(/att <troops\|fighters>/);
     }
   });
+
+  /**
+   * Every scan reports bearings in 0..359, and only `rot @<deg>` accepts a
+   * number in that range — a bare `rot 208` is out of valdegree's -180..180.
+   * Help documented only the relative form, so the bearing the game handed you
+   * had no command that would take it.
+   */
+  it('navigation documents both rotate forms, since scans report 0-359', () => {
+    const nav = body('navigation');
+    expect(nav).toContain('rot @<deg>');
+    expect(nav).toMatch(/rot <deg>/);
+  });
 });

@@ -1,0 +1,103 @@
+#!/usr/bin/env node
+/**
+ * Playtest client — drives a real player session over the real socket.
+ *
+ * Same pipeline a browser client uses: HTTP register/login for a JWT, a
+ * socket.io connection carrying it, `command` in and `command:result` out.
+ * Nothing here reaches into the database or the debug routes, so anything it
+ * does, a player could do.
+ *
+ * Usage:
+ *   node tools/play.mjs <username> <password> <<'CMDS'
+ *   rep nav
+ *   wait 6
+ *   sca lo
+ *   CMDS
+ *
+ * Lines are commands, one per line. Special directives:
+ *   wait <seconds>   pause (the world keeps moving)
+ *   #  ...           comment
+ *
+ * Any prompt the server raises (ship name, fleet select) is answered from the
+ * PERSONA_SHIP env var / the first fleet entry unless a `reply <text>` line
+ * supplies something else.
+ */
+import { createRequire } from 'node:module';
+const require_ = createRequire(import.meta.url);
+// socket.io-client lives in the backend workspace; resolve from there so the
+// harness needs no install of its own.
+const { io } = require_('/home/rick/dev/galactic-empire-reborn/backend/node_modules/socket.io-client');
+
+const API = process.env.GE_API ?? 'http://localhost:3000';
+const [username, password] = process.argv.slice(2);
+if (!username || !password) {
+  console.error('usage: play.mjs <username> <password>  (commands on stdin)');
+  process.exit(2);
+}
+
+const shipName = process.env.PERSONA_SHIP ?? `${username}-1`.slice(0, 19);
+
+async function auth() {
+  for (const path of ['/auth/login', '/auth/register']) {
+    const res = await fetch(API + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (res.ok) return (await res.json()).token;
+  }
+  throw new Error(`auth failed for ${username}`);
+}
+
+const script = await new Promise((resolve) => {
+  let buf = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (d) => (buf += d));
+  process.stdin.on('end', () => resolve(buf));
+});
+
+const token = await auth();
+const socket = io(API, { transports: ['websocket'], auth: { token }, reconnection: true });
+
+const out = (tag, text) => console.log(`${tag} ${text}`);
+
+socket.on('connect', () => out('..', 'connected'));
+socket.on('disconnect', (r) => out('..', `disconnected (${r})`));
+socket.on('error', (e) => out('!!', `server error: ${JSON.stringify(e)}`));
+socket.on('command:result', (p) => {
+  for (const l of p.lines ?? []) out('<<', l.text);
+});
+socket.on('event.log', (p) => out('**', p.text));
+socket.on('message.send', (p) => out('[]', `[${p.channel}] ${p.from}: ${p.text}`));
+socket.on('combat.ship-destroyed', (p) =>
+  out('##', `DESTROYED victim=${p.victimUserid} attacker=${p.attackerName ?? p.attackerId ?? 'none'} weapon=${p.weapon ?? 'none'}`));
+
+socket.on('prompt:ship-name', () => {
+  out('..', `naming ship ${shipName}`);
+  socket.emit('prompt:reply', { value: shipName });
+});
+socket.on('prompt:ship-select', (p) => {
+  const pick = Number(process.env.PERSONA_SHIP_INDEX ?? 1);
+  out('..', `fleet: ${(p.ships ?? []).map((s) => `${s.index}:${s.shipname}`).join(' ')} -> ${pick}`);
+  socket.emit('prompt:reply', { value: pick });
+});
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+await new Promise((r) => socket.once('connect', r));
+await sleep(2500); // let onboarding settle
+
+for (const raw of script.split('\n')) {
+  const line = raw.trim();
+  if (!line || line.startsWith('#')) continue;
+  const m = /^wait\s+(\d+(?:\.\d+)?)$/i.exec(line);
+  if (m) { out('..', `wait ${m[1]}s`); await sleep(Number(m[1]) * 1000); continue; }
+  const r = /^reply\s+(.*)$/i.exec(line);
+  if (r) { socket.emit('prompt:reply', { value: r[1] }); await sleep(1500); continue; }
+  out('>>', line);
+  socket.emit('command', { input: line });
+  await sleep(Number(process.env.GE_CMD_DELAY ?? 1600));
+}
+
+await sleep(2500);
+socket.close();
+process.exit(0);
