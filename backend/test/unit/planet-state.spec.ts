@@ -48,6 +48,7 @@ function makePrisma(planets: PlanetState[]) {
         })),
       ),
       update: jest.fn().mockResolvedValue({}),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
     user: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -456,5 +457,60 @@ describe('PlanetStateService — withdrawTax()', () => {
     const { svc } = await setup(0n);
     const result = await svc.withdrawTax(planetKey(1, 1, 1), 'owner');
     expect(result).toEqual({ ok: true, amount: 0n });
+  });
+});
+
+// ── Reload after an out-of-band DB write ─────────────────────────────────────
+
+/**
+ * Midnight's `refreshNeutralZone` restocks Zygor-3 and Nexus Prime by writing
+ * Postgres directly. Its comment claimed that was "cosmetic but faithful"
+ * because purchases never deplete neutral-zone stock — true, but the ECONOMY
+ * tick does: the posts hold 1,032,000 men, so `shouldRunEconomy` is true for
+ * them and every PLANTOCK consumes their food and starves their troops like
+ * any other colony's.
+ *
+ * The live game reads PlanetStateService, never the row. So the hub shop drained
+ * over days of uptime while midnight dutifully refilled a copy nobody reads,
+ * and only a server restart re-hydrated it. Found in play: Zygor refused to
+ * sell 100 troops while its row held 1,032,000.
+ */
+describe('PlanetStateService — reloadPlanet', () => {
+  it('picks up a row rewritten outside the service', async () => {
+    const planets = [makePlanet({ xsect: 0, ysect: 0, plnum: 1, name: 'Zygor-3' })];
+    const prisma = makePrisma(planets);
+    const svc = new PlanetStateService(prisma as never, makeShips() as never);
+    await svc.onModuleInit();
+
+    expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1000n);
+
+    // Midnight restocks the row behind the service's back.
+    prisma.planet.findFirst = jest.fn().mockResolvedValue({
+      ...planets[0],
+      name: 'Zygor-3',
+      itemsQty: planets[0].items.map(() => 1_032_000n),
+      itemsRate: planets[0].items.map((it) => it.rate),
+      itemsSell: planets[0].items.map(() => 1),
+      itemsReserve: planets[0].items.map(() => 0),
+      itemsMarkup2a: planets[0].items.map((it) => it.markup2a),
+      itemsSold2a: planets[0].items.map((it) => it.sold2a),
+    });
+
+    await svc.reloadPlanet(0, 0, 1);
+
+    expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1_032_000n);
+    expect(svc.get(0, 0, 1)?.items[I_MEN].qty).toBe(1_032_000n);
+  });
+
+  it('leaves the map alone when the row is gone', async () => {
+    const planets = [makePlanet({ xsect: 0, ysect: 0, plnum: 1 })];
+    const prisma = makePrisma(planets);
+    const svc = new PlanetStateService(prisma as never, makeShips() as never);
+    await svc.onModuleInit();
+
+    prisma.planet.findFirst = jest.fn().mockResolvedValue(null);
+    await svc.reloadPlanet(0, 0, 1);
+
+    expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1000n);
   });
 });
