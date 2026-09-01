@@ -2,6 +2,7 @@ import { Command, CommandResult, CommandContext } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { valpcnt, valdegree } from '../validators';
 import { ShipState } from '../../ship/ship-state.types';
+import { resolveEngineCourse } from './helpers/engine-course';
 
 /**
  * Handles the `impulse` / `imp` command — sets the ship's impulse speed percentage
@@ -25,11 +26,6 @@ export const impulseCommand: Command = {
     // cancelling the autopilot here made the two mutually exclusive. Supplying a
     // COURSE is an explicit steering order and does take the helm back.
     const courseGiven = args.length > 1;
-    if (ship.holdcourse > 0 && courseGiven) {
-      ship.holdcourse = 0;
-      ship.navTargetX = null;
-      ship.navTargetY = null;
-    }
 
     const speedArg = args[0] ?? '';
     const speedResult = valpcnt(speedArg, 0, 99);
@@ -53,15 +49,21 @@ export const impulseCommand: Command = {
     // TODO(006): see GECMDS.C:550 — helm gate (HLBROKE)
 
     const value = speedResult.value;
-    // Compute new heading: current heading + relative rotation, normalised 0-359
-    const deg = Math.round((ship.heading + courseResult.value) % 360);
+    const course = resolveEngineCourse(ship, courseGiven, courseResult.value);
+    const deg = course.deg;
+
+    if (course.releaseAutopilot && ship.holdcourse > 0) {
+      ship.holdcourse = 0;
+      ship.navTargetX = null;
+      ship.navTargetY = null;
+    }
 
     // Leave orbit on engine fire — GECMDS.C:512 LEAVEORB
     if (ship.where >= 10) ship.where = 0;
 
     ship.percent = value;
     ship.speed2b = 1000.0 * (value / 100.0);
-    ship.head2b = deg;
+    if (course.setHeading) ship.head2b = deg;
     ship.dirty = true;
 
     return {

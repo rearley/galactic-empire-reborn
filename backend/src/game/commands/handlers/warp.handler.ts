@@ -4,6 +4,7 @@ import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { resolveEngineCourse } from './helpers/engine-course';
 
 /**
  * Handles `warp` / `war` — sets the ship's warp speed target with the full
@@ -52,6 +53,7 @@ export class WarpHandlerService {
       // `normal(heading + degrees)`. The port read only the speed and hard-set
       // `head2b = heading`, so firing engines always meant "straight ahead"
       // and `war 6 45` silently flew the old course. @see GECMDS.C:cmd_warp
+      const courseGiven = args.length > 1;
       const courseResult = valdegree(args[1] ?? '0');
       if (!courseResult.ok) {
         return {
@@ -96,11 +98,19 @@ export class WarpHandlerService {
 
       const currentWarp = Math.round(ship.speed / 1000);
 
-      // `deg = normal(heading + degrees)` — a RELATIVE turn, as impulse does.
-      const deg = Math.round((ship.heading + courseResult.value + 360) % 360) % 360;
+      // `deg = normal(heading + degrees)` — a RELATIVE turn, as impulse does,
+      // except while `nav`'s autopilot has the helm. @see helpers/engine-course
+      const course = resolveEngineCourse(ship, courseGiven, courseResult.value);
+      const deg = course.deg;
+
+      if (course.releaseAutopilot && ship.holdcourse > 0) {
+        ship.holdcourse = 0;
+        ship.navTargetX = null;
+        ship.navTargetY = null;
+      }
 
       ship.speed2b = 1000.0 * speed;
-      ship.head2b = deg;
+      if (course.setHeading) ship.head2b = deg;
       ship.dirty = true;
 
       let engMsg: string;
