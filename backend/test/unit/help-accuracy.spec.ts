@@ -165,14 +165,21 @@ describe('help text matches the commands it documents', () => {
   });
 
   /**
-   * Every scan reports bearings in 0..359, and only `rot @<deg>` accepts a
-   * number in that range — a bare `rot 208` is out of valdegree's -180..180.
-   * Help documented only the relative form, so the bearing the game handed you
-   * had no command that would take it.
+   * C's `rot` takes both an absolute heading (`rot @<deg>`, GECMDS.C:653) and a
+   * relative turn; only the relative one was documented or implemented.
+   *
+   * The help must also say which kind of number a scan gives you.
+   * `cbearing(from, to, heading)` is always called with the observer's heading,
+   * so every reported bearing is RELATIVE — a first draft of this help claimed
+   * scans report compass headings, which sent a pilot who typed
+   * `rot @<bearing>` off on their own former heading.
    */
-  it('navigation documents both rotate forms, since scans report 0-359', () => {
+  it('navigation documents both rotate forms and which one a bearing feeds', () => {
     const nav = body('navigation');
     expect(nav).toContain('rot @<deg>');
     expect(nav).toMatch(/rot <deg>/);
+    expect(nav).toMatch(/RELATIVE/);
+    // Must not claim a scan bearing is a compass heading.
+    expect(nav).not.toMatch(/compass heading.*as scans report/);
   });
 });
