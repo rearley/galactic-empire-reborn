@@ -1,3 +1,4 @@
+import { valdegree } from '../validators';
 import { Injectable } from '@nestjs/common';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -45,6 +46,18 @@ export class WarpHandlerService {
       }
 
       const speed = parseInt(arg, 10);
+
+      // `war <speed> [degrees]` — C reads a second argument through
+      // `valdegree`, defaulting to "0", and turns to
+      // `normal(heading + degrees)`. The port read only the speed and hard-set
+      // `head2b = heading`, so firing engines always meant "straight ahead"
+      // and `war 6 45` silently flew the old course. @see GECMDS.C:cmd_warp
+      const courseResult = valdegree(args[1] ?? '0');
+      if (!courseResult.ok) {
+        return {
+          lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }],
+        };
+      }
       const maxWarp = this.shipClassCache.getMaxWarp(ship.shpclass);
       const topspeed = ship.topspeed;
 
@@ -83,19 +96,22 @@ export class WarpHandlerService {
 
       const currentWarp = Math.round(ship.speed / 1000);
 
+      // `deg = normal(heading + degrees)` — a RELATIVE turn, as impulse does.
+      const deg = Math.round((ship.heading + courseResult.value + 360) % 360) % 360;
+
       ship.speed2b = 1000.0 * speed;
-      ship.head2b = ship.heading;
+      ship.head2b = deg;
       ship.dirty = true;
 
       let engMsg: string;
       if (speed === 0) {
         engMsg = formatMessage(MessageId.ENGSTOP);
       } else if (speed > currentWarp) {
-        engMsg = `Engines fired. Accelerating to warp ${speed}.`;
+        engMsg = `Engines fired, new course ${deg}. Accelerating to warp ${speed}.`;
       } else if (speed < currentWarp) {
-        engMsg = `Engines fired. Decelerating to warp ${speed}.`;
+        engMsg = `Engines fired, new course ${deg}. Decelerating to warp ${speed}.`;
       } else {
-        engMsg = `Engines fired. Maintaining warp ${speed}.`;
+        engMsg = `Engines fired, new course ${deg}. Maintaining warp ${speed}.`;
       }
       lines.push({ text: engMsg, category: 'success' });
 

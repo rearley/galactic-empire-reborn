@@ -130,7 +130,9 @@ describe('warpCommand (full gate sequence)', () => {
     const h = makeHandler();
     const ship = makeShip({ topspeed: 6, heading: 180 });
     const result = h.command.handler(ship, ['4'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe('Engines fired. Accelerating to warp 4.');
+    // C's ENGFIRE names the resulting course — `prfmsg(ENGFIRE, deg)` — because
+    // `war <speed> [degrees]` can turn you. @see GECMDS.C:cmd_warp
+    expect(result.lines[0].text).toBe('Engines fired, new course 180. Accelerating to warp 4.');
   });
 
   it('dirty is false when validation fails (WARP03)', () => {
