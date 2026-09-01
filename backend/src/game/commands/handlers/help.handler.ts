@@ -20,16 +20,17 @@ export class HelpHandlerService {
     minArgs: 0,
     argMissingMessage: '',
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
+      const topicList = HELP_TOPIC_IDS.join(', ');
       if (args.length === 0) {
         return {
-          lines: [{ text: formatMessage(MessageId.HELFMT), category: 'info' }],
+          lines: [{ text: formatMessage(MessageId.HELFMT, topicList), category: 'info' }],
         };
       }
       const topicKey = args[0].toLowerCase() as HelpTopicId;
       const topic = HELP_TOPICS[topicKey];
       if (!topic) {
         return {
-          lines: [{ text: formatMessage(MessageId.HEL_UNKNOWN, args[0]), category: 'system' }],
+          lines: [{ text: formatMessage(MessageId.HEL_UNKNOWN, args[0], topicList), category: 'system' }],
         };
       }
       return {

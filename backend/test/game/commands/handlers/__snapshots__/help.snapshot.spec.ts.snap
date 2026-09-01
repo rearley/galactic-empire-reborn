@@ -19,6 +19,27 @@ exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
 ]
 `;
 
+exports[`Help topic snapshots comms topic body matches snapshot 1`] = `
+[
+  "Comms & Fleet",
+  "  hel [topic]            — this help; bare "hel" lists every topic",
+  "  who                    — who is in the galaxy",
+  "  dat <fragment>         — look up ship by name fragment",
+  "  ros [all]              — score roster (only pilots who have scored)",
+  "  fre <A|B|C> <n|hail>   — tune a radio channel",
+  "  sen <A|B|C> <message>  — transmit on a channel",
+  "  mai                    — list your mail (reports, attack notices)",
+  "  rea <n>                — read message n",
+  "  del <n>                — delete message n",
+  "  tea                    — show the team you are on",
+  "  tea list               — list all teams",
+  "  tea create <name> <password> — found a team",
+  "  tea <name> <password>  — join an existing team",
+  "  tea leave              — leave your team",
+  "  cls                    — clear the event log",
+]
+`;
+
 exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
 {
   "combat": {
@@ -40,6 +61,27 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
     ],
     "title": "Combat",
   },
+  "comms": {
+    "body": [
+      "Comms & Fleet",
+      "  hel [topic]            — this help; bare "hel" lists every topic",
+      "  who                    — who is in the galaxy",
+      "  dat <fragment>         — look up ship by name fragment",
+      "  ros [all]              — score roster (only pilots who have scored)",
+      "  fre <A|B|C> <n|hail>   — tune a radio channel",
+      "  sen <A|B|C> <message>  — transmit on a channel",
+      "  mai                    — list your mail (reports, attack notices)",
+      "  rea <n>                — read message n",
+      "  del <n>                — delete message n",
+      "  tea                    — show the team you are on",
+      "  tea list               — list all teams",
+      "  tea create <name> <password> — found a team",
+      "  tea <name> <password>  — join an existing team",
+      "  tea leave              — leave your team",
+      "  cls                    — clear the event log",
+    ],
+    "title": "Comms & Fleet",
+  },
   "navigation": {
     "body": [
       "Navigation",
@@ -53,6 +95,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  who            — who is in the galaxy",
       "  orb            — orbit nearest planet",
       "  land <name>    — land on planet",
+      "  (imp or war breaks orbit and puts you back in flight)",
     ],
     "title": "Navigation",
   },
@@ -71,6 +114,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  wit [qty]              — withdraw taxes to your account",
       "  aba                    — give up the planet you are orbiting",
       "  attack <planet>        — attack enemy planet",
+      "  spy                    — land a spy on the planet you orbit",
       "  dat <fragment>         — look up ship by name fragment",
     ],
     "title": "Planet",
@@ -89,6 +133,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  des                — initiate self-destruct",
       "  abo                — abort self-destruct",
       "  aba ship           — abandon ship (aba alone gives up a planet)",
+      "  sys unjam          — clear a jammer stuck on your ship",
     ],
     "title": "Ship",
   },
@@ -121,6 +166,7 @@ exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
   "  who            — who is in the galaxy",
   "  orb            — orbit nearest planet",
   "  land <name>    — land on planet",
+  "  (imp or war breaks orbit and puts you back in flight)",
 ]
 `;
 
@@ -139,6 +185,7 @@ exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
   "  wit [qty]              — withdraw taxes to your account",
   "  aba                    — give up the planet you are orbiting",
   "  attack <planet>        — attack enemy planet",
+  "  spy                    — land a spy on the planet you orbit",
   "  dat <fragment>         — look up ship by name fragment",
 ]
 `;
@@ -157,6 +204,7 @@ exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
   "  des                — initiate self-destruct",
   "  abo                — abort self-destruct",
   "  aba ship           — abandon ship (aba alone gives up a planet)",
+  "  sys unjam          — clear a jammer stuck on your ship",
 ]
 `;
 

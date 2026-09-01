@@ -1,4 +1,5 @@
-import { HELP_TOPICS } from '../../src/game/commands/help/help-topics';
+import { HELP_TOPICS, HELP_TOPIC_IDS } from '../../src/game/commands/help/help-topics';
+import { formatMessage, MessageId } from '../../src/game/commands/messages';
 
 /**
  * Help that documents the wrong argument order is worse than no help: a new
@@ -102,5 +103,50 @@ describe('help text matches the commands it documents', () => {
     const nav = body('navigation');
     expect(nav).toMatch(/sca sh <name>/);
     expect(nav).not.toMatch(/sh=ships/);
+  });
+
+  /**
+   * The reverse of the check above: a command nobody documents is a command
+   * nobody finds. Teams, the roster and the mail the midnight job sends you
+   * were all reachable and all invisible — a pilot had no way to learn that
+   * `tea create <name> <password>` existed, or that the production report for
+   * their own colony was sitting in `mai`.
+   */
+  it('every command a pilot can type appears in some help topic', () => {
+    const DOCUMENTED = new Set<string>();
+    for (const topic of Object.keys(HELP_TOPICS) as Array<keyof typeof HELP_TOPICS>) {
+      for (const line of HELP_TOPICS[topic].body) {
+        if (!line.startsWith('  ')) continue;
+        const verb = line.trim().split(/[\s<]/)[0].toLowerCase();
+        if (/^[a-z]+$/.test(verb)) DOCUMENTED.add(verb.slice(0, 3));
+      }
+    }
+
+    // Every keyword the command router registers. `adm` is the alias the help
+    // uses for `admin`; prefixes make the two identical here.
+    const REGISTERED = [
+      'abandon', 'abort', 'admin', 'att', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
+      'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'land', 'loc',
+      'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
+      'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',
+      'sys', 'tea', 'tor', 'transfer', 'warp', 'who', 'withdraw', 'zip',
+    ];
+
+    const undocumented = REGISTERED.filter((v) => !DOCUMENTED.has(v.slice(0, 3)));
+    expect(undocumented).toEqual([]);
+  });
+
+  /**
+   * The topic index was a hardcoded sentence listing five topics. Adding a
+   * sixth left `hel` advertising five and `hel <sixth>` working anyway —
+   * discoverable only by guessing. Both strings now come from the catalog.
+   */
+  it('the topic index lists exactly the topics that exist', () => {
+    const list = HELP_TOPIC_IDS.join(', ');
+    expect(formatMessage(MessageId.HELFMT, list)).toContain(list);
+    expect(formatMessage(MessageId.HEL_UNKNOWN, 'bogus', list)).toContain(list);
+    for (const id of HELP_TOPIC_IDS) {
+      expect(formatMessage(MessageId.HELFMT, list)).toContain(id);
+    }
   });
 });
