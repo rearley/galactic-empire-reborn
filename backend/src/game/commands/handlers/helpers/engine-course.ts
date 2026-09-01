@@ -8,8 +8,9 @@
  * directions:
  *
  *  - A bare `war 4` recomputed `heading + 0` and reported it. With the
- *    autopilot mid-turn that is a course the ship is not flying and will not
- *    fly, directly contradicting the bearing `nav` had just printed.
+ *    autopilot mid-turn, or with a `rot` turn still swinging round, that is a
+ *    course the ship is not flying and will not fly — and writing it back
+ *    cancelled the turn, so "point at the planet, then engage" did nothing.
  *  - `war 4 90` wrote head2b but left `holdcourse` engaged, so the physics
  *    tick steered straight back to the autopilot's course and the pilot's
  *    explicit turn vanished.
@@ -29,6 +30,8 @@ export interface EngineCourse {
 
 export interface EngineCourseShip {
   readonly heading: number;
+  /** Heading the ship is turning TOWARD — differs from `heading` mid-turn. */
+  readonly head2b: number;
   readonly holdcourse: number;
   readonly navTargetX: number | null;
   readonly navTargetY: number | null;
@@ -58,6 +61,18 @@ export function resolveEngineCourse(
 
   const flying =
     ship.holdcourse > 0 && ship.navTargetX !== null && ship.navTargetY !== null;
+
+  // A turn already ordered by `rot` is a steering order in progress. Writing
+  // `heading + 0` over it froze the ship part-way round, so "point at the
+  // planet, then engage" silently did not work. Same rule as the autopilot
+  // below: only a NAMED course takes the helm.
+  if (!flying && Math.round(ship.head2b) !== Math.round(ship.heading)) {
+    return {
+      deg: Math.round((ship.head2b + 360) % 360) % 360,
+      setHeading: false,
+      releaseAutopilot: false,
+    };
+  }
 
   if (flying) {
     // Sector centre, matching what `nav` steers toward.

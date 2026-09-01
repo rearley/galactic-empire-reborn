@@ -7,7 +7,7 @@ import { CommandContext } from '../../../src/game/commands/command.types';
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 270, head2b: 0, speed: 0, speed2b: 0,
+    heading: 270, head2b: 270, speed: 0, speed2b: 0,
     xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
     phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
     shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
@@ -38,7 +38,7 @@ describe('impulseCommand', () => {
   });
 
   it('success path emits ENGFIRE with current heading', () => {
-    const ship = makeShip({ heading: 270 });
+    const ship = makeShip({ heading: 270, head2b: 270 });
     const result = impulseCommand.handler(ship, ['50'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ENGFIRE, 270));
   });

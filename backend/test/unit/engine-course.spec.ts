@@ -15,6 +15,7 @@ import { resolveEngineCourse } from '../../src/game/commands/handlers/helpers/en
  */
 const AT_ORIGIN = {
   heading: 132,
+  head2b: 132,
   holdcourse: 0,
   navTargetX: null as number | null,
   navTargetY: null as number | null,
@@ -64,5 +65,41 @@ describe('resolveEngineCourse', () => {
     expect(r.deg).toBe(177);
     expect(r.setHeading).toBe(true);
     expect(r.releaseAutopilot).toBe(true);
+  });
+
+  /**
+   * A bare speed order must not cancel a turn already under way.
+   *
+   * `rot @0` sets head2b and the ship swings round over several ticks at
+   * ROTAMT degrees each. Issuing `imp 70` during that swing recomputed
+   * `heading + 0` and wrote it back to head2b, freezing the ship on whatever
+   * heading it had reached — so "point at the planet, then engage" silently
+   * did not work, and the engine order reported a course the pilot had just
+   * steered away from.
+   *
+   * C does the same thing (`valdegree("0")` sets degrees to 0, then
+   * `head2b = normal(heading + 0)`), but it contradicts the rule this helper
+   * already applies to the autopilot: naming a course is a steering order, a
+   * bare speed order is not. @see docs/DECISIONS.md
+   */
+  it('keeps a turn already ordered when only speed is given', () => {
+    const midTurn = { ...AT_ORIGIN, heading: 306, head2b: 0 };
+    const r = resolveEngineCourse(midTurn, false, 0);
+    expect(r.deg).toBe(0);          // report where the ship is going
+    expect(r.setHeading).toBe(false); // and do not overwrite it
+    expect(r.releaseAutopilot).toBe(false);
+  });
+
+  it('an explicit course still overrides a turn in progress', () => {
+    const midTurn = { ...AT_ORIGIN, heading: 306, head2b: 0 };
+    const r = resolveEngineCourse(midTurn, true, 20);
+    expect(r.deg).toBe(326);
+    expect(r.setHeading).toBe(true);
+  });
+
+  it('still steers straight when no turn is pending', () => {
+    const r = resolveEngineCourse({ ...AT_ORIGIN, heading: 90, head2b: 90 }, false, 0);
+    expect(r.deg).toBe(90);
+    expect(r.setHeading).toBe(true);
   });
 });
