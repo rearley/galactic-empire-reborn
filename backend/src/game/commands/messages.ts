@@ -99,6 +99,7 @@ export enum MessageId {
   ABAN_CONFIRM_PLANET = 'ABAN_CONFIRM_PLANET',
   ABAN_CONFIRM_SHIP = 'ABAN_CONFIRM_SHIP',
   ABAN_CANCELLED = 'ABAN_CANCELLED',
+  TRAN_NO_ROOM = 'TRAN_NO_ROOM',
 
   // land (feature 005)
   LAND_NOT_ORBIT = 'LAND_NOT_ORBIT',
@@ -502,6 +503,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABAN_CONFIRM_PLANET]: 'Give up %s? Everything on it stays behind and anyone may claim it. Type YES to confirm.',
   [MessageId.ABAN_CONFIRM_SHIP]: 'Abandon %s? The hull is scuttled and you will need a new one. Type YES to confirm.',
   [MessageId.ABAN_CANCELLED]: 'Left as it is.',
+  [MessageId.TRAN_NO_ROOM]: "%s does not have room for that.",
   [MessageId.ORBITNO]: 'There is nothing to orbit here.',
   [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
 

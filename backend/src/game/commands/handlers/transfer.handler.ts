@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { resolveTransferTarget, receiverFreeTons } from './helpers/transfer-target';
 import { ShipState, shipKey } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
@@ -169,31 +170,30 @@ export class TransferHandlerService {
       return { lines: [{ text: formatMessage(MessageId.TRAN_UNKNOWN_ITEM), category: 'system' }] };
     }
 
-    const targetShipno = parseInt(targetArg, 10);
-    if (isNaN(targetShipno)) {
-      return { lines: [{ text: formatMessage(MessageId.TRAN_FMT), category: 'system' }] };
+    // A NAME addresses any captain; a bare number means a hull in YOUR fleet.
+    // Matching `s.shipno` across every ship could not name another captain at
+    // all — shipno is a per-user index — and returned whichever ship sat first
+    // in the map. @see helpers/transfer-target.ts
+    const resolved = resolveTransferTarget(targetArg, ship, this.shipState.findAllShips());
+    if (!resolved.ok) {
+      const msg =
+        resolved.reason === 'SELF' ? MessageId.TRAN_SELF
+        : resolved.reason === 'SECTOR' ? MessageId.TRAN_SECTOR
+        : MessageId.TRAN_OFFLINE;
+      return { lines: [{ text: formatMessage(msg), category: 'system' }] };
     }
-
-    if (targetShipno === ship.shipno) {
-      return { lines: [{ text: formatMessage(MessageId.TRAN_SELF), category: 'system' }] };
-    }
-
-    const allShips = this.shipState.findAllShips();
-    const target = allShips.find((s) => s.shipno === targetShipno && s.status === 1);
-    if (!target) {
-      return { lines: [{ text: formatMessage(MessageId.TRAN_OFFLINE), category: 'system' }] };
-    }
-
-    const srcX = Math.floor(ship.xcoord);
-    const srcY = Math.floor(ship.ycoord);
-    const tgtX = Math.floor(target.xcoord);
-    const tgtY = Math.floor(target.ycoord);
-    if (srcX !== tgtX || srcY !== tgtY) {
-      return { lines: [{ text: formatMessage(MessageId.TRAN_SECTOR), category: 'system' }] };
-    }
+    const target = resolved.ship;
 
     const amtBig = BigInt(amt);
     const sourceQty = ship.items[itemIndex] ?? 0n;
+
+    // The receiving hold was never checked, so a trader pushed a 1,000-ton
+    // Interceptor to 1,018.5 tons. The planet path has always checked the
+    // sender's hold; this checks the other side of the same transfer.
+    const freeTons = receiverFreeTons(target);
+    if (amt * ITEM_TONS[itemIndex] > freeTons) {
+      return { lines: [{ text: formatMessage(MessageId.TRAN_NO_ROOM, target.shipname), category: 'system' }] };
+    }
 
     if (sourceQty < amtBig) {
       const msg = itemIndex === I_GOLD
