@@ -278,38 +278,45 @@ describe('PlanetAttackService.attackFighter — win condition (FR-014-024)', () 
 // ---------------------------------------------------------------------------
 
 describe('PlanetAttackService.attackFighter — ratio bug preservation (FR-014-019, SC-008)', () => {
-  it('when left2 == 0 initially, ratio == 0 so no ground-fire, no return-fire, no counter-kill, no item-destruction', async () => {
-    // Planet with 0 fighters → left2 = 0 → ratio = 0
-    // All gates guarded by ratio > N are skipped
+  it('with no defending fighters there is no return-fire and no counter-kill', async () => {
+    // Both of those are gated on left2 > 0 in C and remain so. What is NOT
+    // gated on left2 is ground anti-air (it keys off TROOPS) or the raid's
+    // effect on the planet — see the unopposed-ratio test below.
     const { service } = makeService(42);
     const planet = makePlanet(0, 0); // 0 fighters, 0 troops
-    planet.items[5].qty = 1000n; // food present for potential destruction
+    const ship = makeShip(10000);
+
+    const result = await service.attackFighter(10000, ship, planet);
+
+    expect(result.kill2).toBe(0);
+    // No defending fighters and no garrison → nothing shoots at the attackers.
+    expect(result.kill1).toBe(0);
+  });
+
+  /**
+   * An unopposed raid must count as a maximal one, not a nil one.
+   *
+   * C computes `ratio = (left1/left2)*100` guarding only the divide, so a
+   * planet with no fighters yields ratio 0 — the one case where the attack
+   * meets no air defence at all. C's own source marks the spot "there is a
+   * bug here". Every consequence of a fighter raid hangs off this number
+   * (item destruction >5, owner alert >1, distress mail >2), so 10,000
+   * fighters hitting an undefended world destroyed nothing and told nobody.
+   */
+  it('treats a raid on a planet with no fighters as unopposed, not as nil', async () => {
+    const { service } = makeService(7);
+    const planet = makePlanet(0, 0); // no fighters, no garrison
+    planet.items[5].qty = 1000n;     // food to lose
 
     const ship = makeShip(10000);
     const result = await service.attackFighter(10000, ship, planet);
 
-    // ratio = 0 → NO counter-kill (kill2 == 0)
-    expect(result.kill2).toBe(0);
-    // ratio = 0 → NO item destruction (ratio > 5 fails)
-    expect(result.itemsDestroyed).toHaveLength(0);
-    // kill1 == 0 (no defender fighters = 0, no troops = 0)
-    expect(result.kill1).toBe(0);
+    expect(result.itemsDestroyed.length).toBeGreaterThan(0);
+    expect(Number(planet.items[5].qty)).toBeLessThan(1000);
   });
 
-  it('MUST FAIL if someone adds a zero-guard to ratio calculation', () => {
-    // This test documents the intentional bug: left2==0 yields ratio=0, not Infinity.
-    // The C source does NOT zero-guard. If it were guarded:
-    //   ratio = left2 > 0 ? (left1/left2)*100 : SOME_HIGH_VALUE
-    // then item-destruction would fire and this test would fail.
-    // The assertion: with 10000 attackers vs 0 defenders, no items should be destroyed.
-    // If the "bug fix" is applied, itemsDestroyed.length > 0 for a seeded attack.
-    // We document this explicitly so future readers understand the intent.
-    expect(true).toBe(true); // placeholder — see tests above for actual verification
-  });
-
-  it('won remains possible even with ratio==0 if left2 eventually becomes 0 and troops < 5', async () => {
-    // Even with ratio=0 (no direct kills), won can be 1 if left2 becomes 0 naturally
-    // (which it starts at 0 here) and troops < 5.
+  it('wins an undefended planet: no fighters left and fewer than 5 troops', async () => {
+    // The win condition keys off left2 and troops, not off ratio.
     const { service } = makeService(42);
     const planet = makePlanet(0, 0); // starts with 0 fighters
     planet.items[I_TROOPS].qty = 0n;  // 0 troops < 5 threshold
@@ -319,5 +326,39 @@ describe('PlanetAttackService.attackFighter — ratio bug preservation (FR-014-0
 
     // left2 == 0 (was already 0) and troops < 5 → won should be 1
     expect(result.won).toBe(1);
+  });
+
+  /**
+   * A garrison shoots down attacking fighters even when the planet has no
+   * fighters of its own.
+   *
+   * C computes that shootdown from the planet's TROOPS, announces it with
+   * ATTACKF8 — and then throws it away: the caps and both subtractions live
+   * inside `if (left2 > 0L)`, so with no defending wing `left1 -= kill1` never
+   * runs and every attacker flies home. C narrates a defence it declines to
+   * apply. Found in a playtest against a colony holding 20,948 troops and no
+   * fighters.
+   */
+  it('lets a garrison shoot down attackers when the planet has no fighters', async () => {
+    let sawGroundFire = false;
+
+    for (let seed = 1; seed <= 40; seed++) {
+      const { service } = makeService(seed);
+      const planet = makePlanet(0, 20_948); // no fighters, real garrison
+      const ship = makeShip(300);
+
+      const result = await service.attackFighter(300, ship, planet);
+
+      expect(result.kill2).toBe(0);              // no defending wing to kill
+      expect(result.left1).toBe(300 - result.kill1);
+      if (result.kill1 > 0) {
+        sawGroundFire = true;
+        expect(result.left1).toBeLessThan(300);  // the garrison actually bit
+      }
+    }
+
+    // Guards the test itself: if the 60% ground-fire gate never fired across
+    // 40 seeds the assertion above would be vacuous.
+    expect(sawGroundFire).toBe(true);
   });
 });

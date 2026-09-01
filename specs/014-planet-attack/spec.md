@@ -138,12 +138,14 @@ ownership transfer.
 4. **Given** the attack ratio exceeds 5%, **When** the engagement
    resolves, **Then** each non-fighter item on the planet has a random
    quantity (0–14, capped) destroyed.
-5. **Given** the bug in `attack_fig()` where ratio computation yields 0
-   when `left2 == 0` (defenders had no fighters), **When** the engagement
-   resolves, **Then** the system preserves this exact behavior (no
-   ground-fire shootdown, no defender-fighter return fire, no item
-   destruction unless triggered by other paths). This is intentional
-   behavior preservation, not a bug to fix.
+5. **Given** a fighter attack on a planet with no fighters of its own,
+   **When** the engagement resolves, **Then** defender return-fire and the
+   counter-kill do not occur (both are gated on `left2 > 0` in C and remain
+   so), but ground anti-air from the planet's TROOPS is applied to the
+   attacking wing, and the raid counts as unopposed for item destruction,
+   the owner alert and distress mail. **Superseded 2026-09-01** — this
+   previously required preserving two defects in `attack_fig()`. See
+   docs/DECISIONS.md.
 6. **Given** the attacker has zero fighters in cargo or specifies an
    amount exceeding their holdings, **When** the command is parsed,
    **Then** the insufficient-fighters error message is returned and no
@@ -392,10 +394,16 @@ maintenance proceeds without an argument.
   `plptr->items[I_TROOPS].qty = left2`.
 - **FR-014-019**: For fighter attacks, the system MUST compute
   `ratio = (left1 / left2) * 100` as floating-point math when
-  `left2 > 0`, otherwise `ratio = 0`. This preserves the
-  `/* there is a bug here */` behavior in `attack_fig()` where the
-  zero-defender path skips the ground-fire and item-destruction gates
-  entirely.
+  `left2 > 0`. When `left2 == 0` and the attacker brought fighters, the
+  raid is unopposed in the air and `ratio` MUST be treated as maximal;
+  `ratio` is 0 only when there is no attack.
+
+  **Superseded 2026-09-01.** This requirement previously mandated
+  `ratio = 0` when `left2 == 0`, preserving the spot C's own source marks
+  `/* there is a bug here */`. Every consequence of a fighter raid is
+  gated on this number, so the strongest possible raid on a planet with
+  no fighters destroyed nothing, alerted nobody and sent no mail. See
+  docs/DECISIONS.md.
 - **FR-014-020**: For fighter attacks, when `left1 > 0 &&
   plptr->items[I_TROOPS].qty > 500 && (gernd() % 5 - 1) > 0`, the
   system MUST add `(unsigned long)(left1 * (rndm(plattrf1) + 0.05))`

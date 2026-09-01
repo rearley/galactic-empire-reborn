@@ -2406,8 +2406,9 @@ new-ship onboarding.
   resolves, and `CombatShipDestroyedEvent.weapon` has no `'ion'` variant — so
   the kill is indistinguishable from a self-destruct. Display only; the defender
   still sees the raider die, but is not told their own colony did it.
-- 300 fighters attacking a colony reported "You lost 0; defenders lost 0" and
-  all 300 survived. Worth checking `attack_fig` against GECMDS.C.
+- ~~300 fighters attacking a colony reported "You lost 0; defenders lost 0".~~
+  Traced to two defects in the original's `attack_fig` and fixed — see
+  docs/DECISIONS.md, 2026-09-01.
 - `aba` gives up a planet with no confirmation prompt.
 
 **Tests:** backend 3,489 (375 suites), frontend 161, browser 38.
