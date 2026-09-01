@@ -90,7 +90,7 @@ describe('FR-803 — post-abandon router gate rejects all commands', () => {
     const { router, ship, abandonHandler } = buildHarness();
 
     // Execute abandon via the handler
-    abandonHandler.command.handler(ship, ['ship'], {});
+    abandonHandler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
 
     // Next command via router is blocked

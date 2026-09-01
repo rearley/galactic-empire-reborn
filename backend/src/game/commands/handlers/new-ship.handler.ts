@@ -315,6 +315,14 @@ export class NewShipHandlerService {
           xcoord: at.x,
           ycoord: at.y,
           energy: ENGYMAX,
+          // C's `new ship` runs the same initshp as a first-time pilot's hull
+          // (GECMDS.C:4572), which fits basic phasers and shields:
+          // `shieldtype = 1; phasrtype = 1` (GEFUNCS.C:233-234). Leaving these
+          // at the column default of 0 shipped a hull with no weapons and no
+          // shields — `shi up` answered "You have no shields installed" — while
+          // `rep wpns` and the upgrade screens made "type 0" look intentional.
+          phasrtype: 1,
+          shieldtype: 1,
           // Engine ceiling for the class. Only ever ratcheted DOWN afterwards,
           // by engine damage — so leaving it at the column default of 0 was
           // indistinguishable from blown engines and `war` refused with

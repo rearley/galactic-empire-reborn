@@ -49,7 +49,7 @@ describe('abandon destruct precedence edge case', () => {
   it('abandon while destruct=15 → destruct cleared to 0, status=ABANDONED', () => {
     const ship = makeShip({ destruct: 15, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship'], {});
+    handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
@@ -57,7 +57,7 @@ describe('abandon destruct precedence edge case', () => {
   it('abandon while destruct=1 (final tick imminent) → destruct cleared before countdown expires', () => {
     const ship = makeShip({ destruct: 1, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship'], {});
+    handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
@@ -65,7 +65,7 @@ describe('abandon destruct precedence edge case', () => {
   it('abandon with destruct=0 → status still set to ABANDONED (no-destruct path also works)', () => {
     const ship = makeShip({ destruct: 0, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship'], {});
+    handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });

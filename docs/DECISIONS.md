@@ -1598,3 +1598,48 @@ mechanic, and an unopposed raid scoring zero inverts what the ratio means.
 (the planet counter drifting until midnight recounts it, `PLTVDIV` truncating a
 young colony's score to zero, re-claiming a planet overwriting its name) it
 stays. This decision covers defects, not quirks.
+
+## 2026-09-01 — Confirm before abandoning a colony or a hull
+
+**Context:** `aba` releases the planet you are orbiting the instant you press
+Enter. During a playtest a batched command was swallowed as the answer to an
+unrelated prompt and a colony was renamed; the same three keystrokes would have
+given it away outright. `abo` (abort self-destruct) sits one letter away in the
+same command set, and the port's own `aba ship` scuttles the hull.
+
+**Decision:** Both forms now confirm. `aba` names the planet it is about to
+release and waits for YES; `aba ship` names the hull and does the same. An
+unrecognised answer is treated as a refusal, never as consent.
+
+**Reason:** This one is NOT a defect in the original — `cmd_abandon`
+(GECMDS.C:3420) deliberately releases the colony on the spot, and the previous
+entry in this file draws the line at defects rather than quirks. It is being
+changed anyway because the action is irreversible, the colony may represent
+days of play, and the port already has a confirmation mechanism (`land` asks
+for a planet name through `expectFollowup`) so the interaction is one players
+have already met. Naming the planet in the prompt is the actual safeguard: it
+is how a captain sees which colony they are about to lose.
+
+**Alternatives rejected:**
+- *Leave it, as C has it.* MajorBBS play was a paid, deliberate session on a
+  dial-up terminal; a browser tab invites the fat-fingered Enter this guards.
+- *Confirm only the planet form.* Scuttling a hull is equally irreversible and
+  shares the keyword; guarding one and not the other is the more surprising
+  outcome.
+
+## 2026-09-01 — A purchased hull is not a bare hull
+
+**Context:** A Heavy Freighter bought at Zygor came out with `phasrtype` and
+`shieldtype` 0. `rep wpns` reported "type 0", and the upgrade screens priced
+from 0 with no trade-in, so this read as an intentional "buy the hull, fit it
+yourself" design — right up until `shi up` in a fight answered "You have no
+shields installed."
+
+**Decision:** Purchased hulls are created with `phasrtype = 1` and
+`shieldtype = 1`, shields down.
+
+**Reason:** Not a design choice, a missed line. C's `new ship` path calls the
+same `initshp` as a first-time pilot's ship (GECMDS.C:4572), and initshp sets
+`shieldtype = 1; phasrtype = 1` (GEFUNCS.C:233-234). The port's onboarding path
+copied those lines; the purchase path did not — the same omission that left
+`topspeed` at 0 and made every bought ship unable to warp.

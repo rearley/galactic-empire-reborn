@@ -157,7 +157,8 @@ describe('command router dispatch — new keywords reach their handlers', () => 
 
   it('abandon → ABANDON_OK (keyword)', async () => {
     const { router, ship } = buildRouter();
-    const result = await Promise.resolve(router.dispatch('abandon ship', ship, {})) as { lines: { text: string }[] };
+    // Scuttling now takes a confirmation — see abandon-planet.handler.spec.ts.
+    const result = await Promise.resolve(router.dispatch('abandon ship yes', ship, {})) as { lines: { text: string }[] };
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, ship.shipname));
   });
 });
@@ -198,7 +199,7 @@ describe('command router dispatch — transfer and jettison (minArgs gate)', () 
   it('abandon alias "aba" → reaches abandon handler', async () => {
     const { router, ship } = buildRouter();
     ship.status = 1;
-    const result = await Promise.resolve(router.dispatch('aba ship', ship, {})) as { lines: { text: string }[] };
+    const result = await Promise.resolve(router.dispatch('aba ship yes', ship, {})) as { lines: { text: string }[] };
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABANDON_OK, 'Test'));
   });
 });
