@@ -1,3 +1,5 @@
+import { damstr } from '../../combat/combat-math';
+import { SHIELDDM } from '../../constants';
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
@@ -215,8 +217,30 @@ export class ReportHandlerService implements OnModuleInit {
       }
     }
 
-    const damageStr = ship.damage > 0 ? `${Math.round(ship.damage)}% hull damage` : 'none';
-    lines.push({ text: formatMessage(MessageId.REP14, damageStr), category: 'info' });
+    // C passes the damstr WORD, not a number: `damage = (unsigned)(damage+.5);
+    // damstr(damage); prfmsg(REP14, gechrbuf);` @see GECMDS.C:2037-2040
+    lines.push({
+      text: formatMessage(MessageId.REP14, damstr(Math.round(ship.damage))),
+      category: 'info',
+    });
+
+    // The pilot is told what is broken. The port tracked all of these and
+    // acted on them but never mentioned them. @see GECMDS.C:2041-2050
+    if (ship.shieldstat === SHIELDDM) {
+      lines.push({ text: formatMessage(MessageId.REP15), category: 'info' });
+    }
+    if (ship.helm < 0) {
+      lines.push({ text: formatMessage(MessageId.REP16), category: 'info' });
+    }
+    if (ship.cloak < 0) {
+      lines.push({ text: formatMessage(MessageId.REP17), category: 'info' });
+    }
+    if (ship.tactical < 0) {
+      lines.push({ text: formatMessage(MessageId.REP18), category: 'info' });
+    }
+    if (ship.repair > 0) {
+      lines.push({ text: formatMessage(MessageId.REP18A, ship.repair), category: 'info' });
+    }
 
     return lines;
   }

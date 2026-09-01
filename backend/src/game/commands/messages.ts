@@ -45,6 +45,11 @@ export enum MessageId {
   REP11 = 'REP11',
   REP11B = 'REP11B',
   REP14 = 'REP14',
+  REP15 = 'REP15',
+  REP16 = 'REP16',
+  REP17 = 'REP17',
+  REP18 = 'REP18',
+  REP18A = 'REP18A',
   REP24A = 'REP24A',
   REP23 = 'REP23',
   REP24 = 'REP24',
@@ -70,6 +75,9 @@ export enum MessageId {
   SCAN08 = 'SCAN08',
   SCAN_DASHES = 'SCAN_DASHES',
   SCAN09 = 'SCAN09',
+  SCAN1 = 'SCAN1',
+  SCAN2 = 'SCAN2',
+  SCAN3 = 'SCAN3',
   SCAN10 = 'SCAN10',
   SCAN11 = 'SCAN11',
   SCAN12 = 'SCAN12',
@@ -379,6 +387,7 @@ export enum MessageId {
   HLBROKE = 'HLBROKE',
   NUMOOR = 'NUMOOR',
   UNKNOWN_CMD = 'UNKNOWN_CMD',
+  FORHELP = 'FORHELP',
   SHIP_ABANDONED = 'SHIP_ABANDONED',
 }
 
@@ -426,6 +435,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP11]: 'Shields: down.',
   [MessageId.REP11B]: 'Shields: destroyed.',
   [MessageId.REP14]: 'Damage: %s',
+  // rep sys subsystem lines — GECMDS.C:2041-2050
+  [MessageId.REP15]: 'Shields are damaged and cannot be raised.',
+  [MessageId.REP16]: 'Helm control is damaged.',
+  [MessageId.REP17]: 'Cloaking device is damaged.',
+  [MessageId.REP18]: 'Tactical systems are damaged.',
+  [MessageId.REP18A]: 'Repairs in progress — %d ticks remaining.',
   [MessageId.REP24A]: 'Frequencies: %d / %d / %d.',
   [MessageId.REP23]: 'Phasors: %s.',
   [MessageId.REP24]: 'Phasors: none.',
@@ -452,6 +467,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN08]: 'Planet #%d: %s',
   [MessageId.SCAN_DASHES]: '-----------------',
   [MessageId.SCAN09]: 'Owned by: %s',
+  // Sent to the ship that was just scanned. @see GECMDS.C:2261-2280
+  [MessageId.SCAN1]: 'You are being scanned by %s.',
+  [MessageId.SCAN2]: 'Your ship is being scanned from bearing %d, beyond your own scanners.',
+  [MessageId.SCAN3]: 'An unidentified vessel is scanning you from bearing %d.',
   [MessageId.SCAN10]: 'Bearing: %d   Distance: %s',
   [MessageId.SCAN11]: 'Environment: ',
   // Worst to best, matching the index they are looked up by: production scales
@@ -781,6 +800,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
   [MessageId.NUMOOR]: 'Number out of range (%d-%d).',
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
+  // Blank line — GECMDS.C:282-284 warnop()
+  [MessageId.FORHELP]: "Type 'help' for a list of commands.",
   [MessageId.SHIP_ABANDONED]: 'Your ship has been abandoned. Please create a new ship.',
 };
 

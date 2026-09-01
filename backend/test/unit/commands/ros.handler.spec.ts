@@ -54,6 +54,14 @@ describe('RosHandlerService', () => {
       expect(makeHandler([]).command.keyword).toBe('ros');
     });
 
+  it('lists only players who have actually scored (GECMDS.C:4038)', async () => {
+    const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+    const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
+    await handler.command.handler(makeShip(), [], ctx);
+    const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
+    expect(query.where.score).toEqual({ gt: 0n });
+  });
+
     it('minArgs is 0', () => {
       expect(makeHandler([]).command.minArgs).toBe(0);
     });
@@ -99,7 +107,9 @@ describe('RosHandlerService', () => {
       const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), [], ctx);
       const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
-      expect(JSON.stringify(query.where)).toContain('Cybrg-');
+      // Inspect the clause rather than stringifying it — the score gate holds
+      // a BigInt and JSON.stringify throws on those.
+      expect(query.where.AND).toContainEqual({ NOT: { userid: { startsWith: 'Cybrg-' } } });
     });
 
     it('excludes @Droid- rows from the query', async () => {
@@ -107,7 +117,7 @@ describe('RosHandlerService', () => {
       const handler = new RosHandlerService(prismaMock, { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository);
       await handler.command.handler(makeShip(), [], ctx);
       const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
-      expect(JSON.stringify(query.where)).toContain('@Droid-');
+      expect(query.where.AND).toContainEqual({ NOT: { userid: { startsWith: '@Droid-' } } });
     });
   });
 

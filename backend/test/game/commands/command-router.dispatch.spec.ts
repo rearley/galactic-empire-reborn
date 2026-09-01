@@ -210,9 +210,12 @@ describe('command router dispatch — unknown command', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.UNKNOWN_CMD));
   });
 
-  it('empty input → empty lines array', async () => {
+  it('empty input → FORHELP, as warnop() prints', async () => {
     const { router, ship } = buildRouter();
-    const result = await Promise.resolve(router.dispatch('', ship, {})) as { lines: unknown[] };
-    expect(result.lines).toHaveLength(0);
+    // `if (margc == 0) warnop();` and warnop prints FORHELP — a blank line is
+    // answered, not swallowed. @see GECMDS.C:282-284, 346-352
+    const result = await Promise.resolve(router.dispatch('', ship, {})) as { lines: { text: string }[] };
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.FORHELP));
   });
 });

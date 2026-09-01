@@ -8,6 +8,8 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
+import { resolveScanSubcommand } from './helpers/scan-subcommand';
+import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
 
@@ -164,7 +166,11 @@ export class ScanHandlerService implements OnModuleInit {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }
 
-    const sub = args[0]?.toLowerCase() ?? 'lo';
+    // C matches sub-commands with `genearas`, so `sca ship` and `sca planets`
+    // work, and prints SCANFMT for a bare `sca` rather than defaulting to a
+    // full local scan. @see GECMDS.C:2154, 2157-2172
+    const sub = resolveScanSubcommand(args[0]);
+    if (sub === null) return this.scanHelp();
 
     // Not-in-flight guard for the grid scan modes (ra / se / lo / lo full).
     // Docked, in-orbit, or dead (where >= 10) → a single system-category line and
@@ -664,6 +670,10 @@ export class ScanHandlerService implements OnModuleInit {
     }
     const bearing = relativeBearing(ship, target);
     const ltr = target.status === 1 ? '+' : '=';
+
+    // C tells the scanned ship it was looked at, every time — reconnaissance
+    // is never silent. @see GECMDS.C:2261-2280
+    const announcement = this.buildScanAnnouncement(ship, target);
     const briefLine: CommandResult['lines'][number] = {
       text: `${ltr} ${target.shipname} — class ${target.shpclass}, range ${dist.toFixed(1)}, bearing ${bearing}.`,
       category: 'info',
@@ -684,10 +694,11 @@ export class ScanHandlerService implements OnModuleInit {
           briefLine,
           { text: `${dmgLabel}  ${shieldLabel}  ${killsLabel}`, category: 'info' },
         ],
+        broadcasts: announcement,
       };
     }
 
-    return { lines: [briefLine] };
+    return { lines: [briefLine], broadcasts: announcement };
   }
 
   /**
@@ -839,4 +850,47 @@ export class ScanHandlerService implements OnModuleInit {
 
     return { lines };
   }
+  /**
+   * The message the scanned ship receives. C always sends one of SCAN1/2/3 via
+   * `outprfge(FILTER, shpnum)`, so being looked at is information the other
+   * pilot gets. The port sent nothing and the three messages existed nowhere.
+   *
+   * Delivered to a `ship:<userid>:<shipno>` room so it reaches exactly that
+   * pilot, the way C addresses a single terminal.
+   *
+   * @see GECMDS.C:2261-2280
+   */
+  private buildScanAnnouncement(
+    scanner: ShipState,
+    target: ShipState,
+  ): CommandResult['broadcasts'] {
+    const targetRange = this.classCache.get(target.shpclass)?.scanRange ?? 0;
+    // `ltr == '?'` — has the scanned ship ever scanned the scanner?
+    const targetTab = this.getScantab(target.userid, target.shipno);
+    const scannerKey = `${scanner.userid}#${scanner.shipno}`;
+    const knows =
+      targetTab?.some((e) => e.shipKey === scannerKey && e.letter !== '?') ?? false;
+
+    const a = decideScanAnnouncement(
+      { shipname: scanner.shipname, xcoord: scanner.xcoord, ycoord: scanner.ycoord },
+      { xcoord: target.xcoord, ycoord: target.ycoord, heading: target.heading, scanRange: targetRange },
+      knows,
+    );
+
+    const text =
+      a.kind === 'SCAN1'
+        ? formatMessage(MessageId.SCAN1, a.scannerName ?? '?')
+        : a.kind === 'SCAN2'
+          ? formatMessage(MessageId.SCAN2, a.bearing)
+          : formatMessage(MessageId.SCAN3, a.bearing);
+
+    return [
+      {
+        room: `ship:${target.userid}:${target.shipno}`,
+        event: 'command.notice',
+        payload: { lines: [{ text, category: 'combat' }] },
+      },
+    ];
+  }
+
 }

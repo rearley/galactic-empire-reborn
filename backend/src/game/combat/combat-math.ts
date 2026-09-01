@@ -522,14 +522,24 @@ export function jammerCounter(distance: number, scanrange: number, jamtime: numb
 }
 
 /**
- * Human-readable damage description for status displays.
- * @see GEFUNCS.C:damstr
+ * Human-readable damage description for status displays. Six bands, C's
+ * wording:
+ *
+ *   < 2 "no" / < 12 "very light" / < 25 "light" / < 50 "moderate"
+ *   / < 75 "heavy" / else "severe"
+ *
+ * The port had invented its own set, which called a ship at 95% hull damage
+ * "Destroyed" while it was still flying and fighting, and had no band for a
+ * scratch — anything under 10% read as undamaged, so you could not tell a
+ * miss from a hit.
+ *
+ * @see GECMDS.C:2110-2131 damstr
  */
 export function damstr(damagePct: number): string {
-  if (damagePct < 10) return 'Undamaged';
-  if (damagePct < 25) return 'Light';
-  if (damagePct < 50) return 'Moderate';
-  if (damagePct < 75) return 'Heavy';
-  if (damagePct < 90) return 'Critical';
-  return 'Destroyed';
+  if (damagePct < 2) return 'no';
+  if (damagePct < 12) return 'very light';
+  if (damagePct < 25) return 'light';
+  if (damagePct < 50) return 'moderate';
+  if (damagePct < 75) return 'heavy';
+  return 'severe';
 }

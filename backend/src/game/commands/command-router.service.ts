@@ -58,7 +58,7 @@ export class CommandRouterService {
    * Dispatches raw player text input to the appropriate command handler.
    *
    * Rules (mirror original BBS game behaviour):
-   * - Empty / whitespace-only input → `{ lines: [] }` (silent drop, no event emitted)
+   * - Empty / whitespace-only input → FORHELP (GECMDS.C:282-284 `warnop()`)
    * - Unknown keyword → single `system` line with `UNKNOWN_CMD`
    * - Insufficient args → single `system` line with the command's `argMissingMessage`
    * - Otherwise → delegates to `cmd.handler`
@@ -68,7 +68,10 @@ export class CommandRouterService {
   dispatch(rawInput: string, ship: ShipState, ctx: CommandContext): CommandResult | Promise<CommandResult> {
     const trimmed = rawInput.trim();
     if (trimmed === '') {
-      return { lines: [] };
+      // `if (margc == 0) warnop();`, and warnop prints FORHELP. The port
+      // swallowed blank input with a comment claiming that mirrored C.
+      // @see GECMDS.C:282-284, 346-352
+      return { lines: [{ text: formatMessage(MessageId.FORHELP), category: 'system' }] };
     }
 
     const tokens = trimmed.split(/\s+/);

@@ -1204,15 +1204,25 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } else if (broadcast.room === 'galaxy') {
         // Galaxy-wide: all connected sockets, no filtering
         this.server.emit(broadcast.event, broadcast.payload);
-      } else if (broadcast.room === 'hail') {
-        // Hail: all connected sockets, exclude cloaked recipients
+      } else if (broadcast.room.startsWith('ship:')) {
+        // A message addressed to ONE pilot, the way C writes to a single
+        // terminal with `outprfge(FILTER, shpnum)`. Used by `sca sh` to tell
+        // a ship it has been scanned. @see GECMDS.C:2280
+        const [, uid, shipnoRaw] = broadcast.room.split(':');
+        const shipno = Number(shipnoRaw);
         this.emitToSockets(
           broadcast.event,
           broadcast.payload,
           undefined,
           excludeId,
-          (ship) => !ship.cloak,
+          (ship) => ship.userid === uid && ship.shipno === shipno,
         );
+      } else if (broadcast.room === 'hail') {
+        // Hail: every ship in the game hears it. `outwar` (GEMAIN.C:1518-1540)
+        // delivers to every `ingegame` ship and never examines cloak —
+        // running silent hides you from scanners, not from your own radio.
+        // @see GECMDS.C:1845
+        this.emitToSockets(broadcast.event, broadcast.payload, undefined, excludeId, () => true);
       } else {
         this.server.to(broadcast.room).emit(broadcast.event, broadcast.payload);
       }

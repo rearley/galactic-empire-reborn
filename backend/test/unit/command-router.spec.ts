@@ -97,14 +97,19 @@ describe('CommandRouterService', () => {
   });
 
   describe('empty input', () => {
-    it('empty string returns no lines (silent drop)', () => {
+    it('empty string prints FORHELP', () => {
+      // @see GECMDS.C:282-284 warnop()
       const result = router.dispatch('', ship, ctx) as CommandResult;
-      expect(result.lines).toEqual([]);
+      expect(result.lines).toEqual([
+        { text: formatMessage(MessageId.FORHELP), category: 'system' },
+      ]);
     });
 
-    it('whitespace-only returns no lines', () => {
+    it('whitespace-only prints FORHELP', () => {
       const result = router.dispatch('   ', ship, ctx) as CommandResult;
-      expect(result.lines).toEqual([]);
+      expect(result.lines).toEqual([
+        { text: formatMessage(MessageId.FORHELP), category: 'system' },
+      ]);
     });
   });
 

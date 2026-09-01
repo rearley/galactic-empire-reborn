@@ -303,32 +303,17 @@ describe('combat-math', () => {
     });
   });
 
-  describe('damstr — @see GEFUNCS.C:damstr', () => {
-    it('returns "Undamaged" below 10%', () => {
-      expect(damstr(0)).toBe('Undamaged');
-      expect(damstr(9)).toBe('Undamaged');
+  describe('damstr — six C bands (GECMDS.C:2110-2131)', () => {
+    // The port previously invented its own set of labels; see
+    // test/game/combat/damstr-bands.spec.ts for the full band table and why
+    // the old "Destroyed" at 90% was wrong.
+    it('uses C\'s wording and thresholds', () => {
+      expect(damstr(1)).toBe('no');
+      expect(damstr(5)).toBe('very light');
+      expect(damstr(20)).toBe('light');
+      expect(damstr(30)).toBe('moderate');
+      expect(damstr(60)).toBe('heavy');
+      expect(damstr(95)).toBe('severe');
     });
-
-    it('returns "Light" at 10-24%', () => {
-      expect(damstr(10)).toBe('Light');
-      expect(damstr(24)).toBe('Light');
-    });
-
-    it('returns "Moderate" at 25-49%', () => {
-      expect(damstr(25)).toBe('Moderate');
-    });
-
-    it('returns "Heavy" at 50-74%', () => {
-      expect(damstr(50)).toBe('Heavy');
-    });
-
-    it('returns "Critical" at 75-89%', () => {
-      expect(damstr(75)).toBe('Critical');
-    });
-
-    it('returns "Destroyed" at 90%+', () => {
-      expect(damstr(90)).toBe('Destroyed');
-      expect(damstr(100)).toBe('Destroyed');
-    });
-  });
+  })
 });

@@ -1520,3 +1520,38 @@ map is already the source of truth for exactly this data.
 **Note:** planet `password` survives abandonment, so a planet released while
 closed stays unlandable. That matches C: `cmd_abandon` clears only
 `plptr->userid[0]` and the planet counter (GECMDS.C:3420-3445). Left as-is.
+
+## 2026-09-01 — Droids stay out of the neutral zone
+**Context:** The fidelity audit found that C has no neutral-zone filter for
+droids anywhere — `grep -n neutral GEDROIDS.C` returns nothing, all three scan
+loops gate only on `ingegame && status == GESTAT_USER` (GEDROIDS.C:268-272,
+318-322, 426-430), and `droid_init` (:131-140) places them anywhere in the
+galaxy. The port excludes them, and the existing A-004 record covered only
+Cybertrons.
+**Decision:** Keep the exclusion, and extend it to droids explicitly.
+**Reason:** The neutral zone is where a new player spawns, docks, buys their
+first ship and learns the command set. A Murdonian Transport wandering into
+Zygor and opening fire on someone who has not yet worked out `shi up` is a
+worse first ten minutes than the original delivered on a BBS where a sysop was
+usually watching. This is the same reasoning already recorded for Cybertrons.
+**Alternatives rejected:** Matching C exactly — rejected on the grounds above.
+Spawning droids anywhere but making them passive inside the zone — more moving
+parts for the same outcome.
+
+## 2026-09-01 — PLTVCASH and PLTVDIV are chosen sysop values
+**Context:** Both were pinned to 201,228,378, which is the `lngopt` MAX BOUND
+shared by seven sysop options (GEMAIN.C:557-596), not a value. C's own
+expression proves it: `(cash+tax)/(1000000L/pltvcash)` divides by zero at that
+magnitude. As values they made PLTVCASH a ~201x multiplier on banked cash and
+PLTVDIV large enough to truncate every stockpile to zero.
+**Decision:** PLTVCASH = 1000 (one point per 1000 credits banked), PLTVDIV =
+10000. Both env-overridable and clamped to 1..1,000,000, the range where C's
+expressions remain divisions.
+**Reason:** The original's shipped values are not in the source — they came
+from the sysop's option file, which we do not have. These keep a developed
+planet worth a few hundred to a few thousand points, the same order as the
+750-10000 a kill pays, so `score = plscore + klscore` reflects both halves of
+the game. The old values made planet cash the only thing that counted.
+**Alternatives rejected:** Leaving them and documenting the distortion —
+scoring is the game's only long-run objective. Picking 1 for both — cash would
+have become invisible instead of dominant.

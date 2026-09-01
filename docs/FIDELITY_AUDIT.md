@@ -5,14 +5,29 @@ and the corresponding port code independently, each followed by an adversarial
 reviewer instructed to refute its findings by re-reading both sides. 76 findings
 survived refutation; the synthesis below merges duplicates down to 65.
 
-**Status:** this is a work list, not a defect log — nothing here is scheduled.
-Items fixed since the run are marked ✅ inline. Everything else is open.
+**Status: WORKED THROUGH.** All 65 findings were addressed between
+2026-08-31 and 2026-09-01 across seven commits. The report is kept as the
+record of what was wrong and why, and as the source for the mistake-class
+sweeps in the Patterns section below, which remain the durable value.
 
-Already fixed:
+| Tier | Commit | What it covered |
+|------|--------|-----------------|
+| 2.3 (early) | `cbfc87d` | kill credit by channel, `cybmine`, dead-firer cleanup |
+| 1 | `740cc2a` | missile damage, jammer/zipper range, `buy` affordability, midnight teamcode PK, mail purge |
+| 2 | `d7deb46` | shield knockdown cluster, decoys, phaser power, Cybertron provocation, pdamage truncation |
+| 4 (energy) | `4260b28` | deceleration, recharge/auto-flux, repair restore, tick cadence, shield power, overspeed gating |
+| 3 | `8e57b0f` | Cybertron cadence, targeting columns, break-off, shields, pursuit, evasion, allowance; droid cadence and behaviours |
+| 4 (rest) | `9bd81b3` | hyperspace consequences, gravity wells, wormholes, `hostile`, overspeed truncation |
+| 5-7 | `aa3e5c4` | planet economy loop, starvation integers, zero-pop skip, revolt draws, trade gates, PLTVCASH/PLTVDIV, kill-score split, TEAMBONU |
+| 8 | this commit | `sca sh` announcement, damstr bands, `rep sys` subsystems, roster filter, scan prefix matching, cloak deafness, blank input, `flu` keyword |
 
-- **2.3 torpedo/missile kill credit** — fixed in `cbfc87d`, along with `cybmine`
-  and the dead-firer in-flight cleanup, which had the same defect.
-  See DECISIONS.md, "Ship channels: this port's `usrnum`".
+Two findings were closed as deliberate deviations rather than changes:
+
+- **Droid neutral-zone blindness (3.10).** C places droids anywhere and its
+  three scan loops have no neutral-zone filter. The port keeps the exclusion:
+  the neutral zone is where new players start and dock, and the A-004 record
+  for Cybertrons is extended to cover droids for the same reason.
+- **`msgFilter` (Tier 8).** Still decorative; covered by DECISIONS.md D4.
 
 Not a finding, recorded so it is not re-raised: a planet abandoned while closed
 stays unlandable. That is C's behaviour — `cmd_abandon` clears only the owner and

@@ -148,16 +148,23 @@ describe('ScanHandlerService', () => {
     });
   });
 
-  describe('bare scan (no sub-keyword) dispatches as scan lo', () => {
-    it('bare scan returns scanGrid', async () => {
+  describe('bare scan asks for the format (GECMDS.C:2154)', () => {
+    it('does not silently run a full local scan', async () => {
+      const { service } = makeService([]);
+      await service.onModuleInit();
+      const resultBare = await (service.command.handler(makeShip(), [], {}) as Promise<CommandResult>);
+      // C prints SCANFMT; it does not pick a mode for you.
+      expect(resultBare.scanRender).toBeUndefined();
+      expect(resultBare.lines.length).toBeGreaterThan(0);
+    });
+
+    it('accepts the spelled-out sub-command', async () => {
       const { service } = makeService([]);
       await service.onModuleInit();
       const ship = makeShip();
-      const resultLo = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
-      const resultBare = await (service.command.handler(ship, [], {}) as Promise<CommandResult>);
-      // Both should return a scanRender with just the self-cell
-      expect(resultBare.scanRender).toBeDefined();
-      expect(resultBare.scanRender!.cells.length).toBe(resultLo.scanRender!.cells.length);
+      const short = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+      const long = await (service.command.handler(ship, ['local'], {}) as Promise<CommandResult>);
+      expect(long.scanRender!.cells.length).toBe(short.scanRender!.cells.length);
     });
   });
 

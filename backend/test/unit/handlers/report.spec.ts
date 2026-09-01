@@ -1,5 +1,6 @@
 import { CommandResult } from '../../../src/game/commands/command.types';
 import { ReportHandlerService } from '../../../src/game/commands/handlers/report.handler';
+import { SHIELDDM } from '../../../src/game/constants';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
@@ -170,5 +171,73 @@ describe('ReportHandlerService', () => {
       const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
       expect(result.lines.some(l => l.category === 'info')).toBe(true);
     });
+  });
+});
+
+/**
+ * `rep sys` should tell the pilot what is broken.
+ *
+ * GECMDS.C:2037-2050:
+ *
+ *   damage = (unsigned)(warsptr->damage+.5);
+ *   damstr(damage);  prfmsg(REP14, gechrbuf);   // the WORD, not a number
+ *   if (shieldstat == SHIELDDM) prfmsg(REP15);
+ *   if (helm     < 0)           prfmsg(REP16);
+ *   if (cloak    < 0)           prfmsg(REP17);
+ *   if (tactical < 0)           prfmsg(REP18);
+ *   if (repair   > 0)           prfmsg(REP18A, repair);
+ *
+ * The port printed a raw percentage into REP14 and never mentioned helm,
+ * tactical, cloak damage or the repair countdown at all — it tracks all four
+ * and acts on them, but the pilot was never told. REP15-18A were defined
+ * nowhere.
+ */
+describe('rep sys — subsystem status (GECMDS.C:2037-2050)', () => {
+  async function sysLines(over: Partial<ShipState>) {
+    const { service } = makeService('Interceptor', true);
+    await service.onModuleInit();
+    const result = await (service.command.handler(
+      makeShip(over), ['sys'], {},
+    ) as Promise<CommandResult>);
+    return result.lines.map((l) => l.text);
+  }
+
+  it('describes hull damage in words, not as a percentage', async () => {
+    const lines = await sysLines({ damage: 30 });
+    expect(lines).toContain(formatMessage(MessageId.REP14, 'moderate'));
+    expect(lines.join('\n')).not.toMatch(/30%/);
+  });
+
+  it('rounds to the nearest whole point, as C does with +.5', async () => {
+    // 11.6 rounds to 12, which is the "light" band, not "very light".
+    expect(await sysLines({ damage: 11.6 })).toContain(formatMessage(MessageId.REP14, 'light'));
+  });
+
+  it('reports blown shields', async () => {
+    const lines = await sysLines({ shieldstat: SHIELDDM });
+    expect(lines).toContain(formatMessage(MessageId.REP15));
+  });
+
+  it('reports a damaged helm', async () => {
+    expect(await sysLines({ helm: -4 })).toContain(formatMessage(MessageId.REP16));
+  });
+
+  it('reports a damaged cloak', async () => {
+    expect(await sysLines({ cloak: -4 })).toContain(formatMessage(MessageId.REP17));
+  });
+
+  it('reports damaged tactical', async () => {
+    expect(await sysLines({ tactical: -4 })).toContain(formatMessage(MessageId.REP18));
+  });
+
+  it('reports the repair countdown', async () => {
+    expect(await sysLines({ repair: 7 })).toContain(formatMessage(MessageId.REP18A, 7));
+  });
+
+  it('says nothing about systems that are fine', async () => {
+    const lines = await sysLines({});
+    for (const id of [MessageId.REP15, MessageId.REP16, MessageId.REP17, MessageId.REP18]) {
+      expect(lines).not.toContain(formatMessage(id));
+    }
   });
 });
