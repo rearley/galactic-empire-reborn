@@ -272,9 +272,19 @@ export class PlanetStateService implements OnModuleInit {
     itemIndex: number,
     requestedQty: number,
     buyerCargoCapacityRemaining: number,
+    buyerCash: bigint,
   ): Promise<
     | { ok: true; transferred: number; unitPrice: number; totalCost: bigint }
-    | { ok: false; reason: 'SELL_FLAG_OFF' | 'AT_RESERVE' | 'CAPACITY_FULL' | 'NOT_FOUND' }
+    | {
+        ok: false;
+        reason:
+          | 'SELL_FLAG_OFF'
+          | 'AT_RESERVE'
+          | 'CAPACITY_FULL'
+          | 'WONT_FIT'
+          | 'INSUFFICIENT_FUNDS'
+          | 'NOT_FOUND';
+      }
   > {
     return this.runSerialized(key, async () => {
       const state = this.map.get(key);
@@ -288,6 +298,7 @@ export class PlanetStateService implements OnModuleInit {
         requestedQty,
         buyerCargoCapacityRemaining,
         isNeutralZone,
+        buyerCash,
       });
 
       if (!outcome.ok) return outcome;

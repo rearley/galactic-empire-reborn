@@ -52,20 +52,21 @@ function makeService(planetState: PlanetState | null, buyResult: Awaited<ReturnT
   const buyMock = jest.fn().mockResolvedValue(buyResult);
   const mutateMock = jest.fn();
   const prismaUpdateMock = jest.fn().mockResolvedValue({});
+  const prismaFindMock = jest.fn().mockResolvedValue({ cash: 1_000_000n });
 
   const planetMock = {
     get: jest.fn().mockReturnValue(planetState),
     buy: buyMock,
   };
   const shipMock = { mutate: mutateMock };
-  const prismaMock = { user: { update: prismaUpdateMock } };
+  const prismaMock = { user: { update: prismaUpdateMock, findUnique: prismaFindMock } };
 
   const svc = new BuyHandlerService(
     planetMock as unknown as PlanetStateService,
     shipMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
   );
-  return { svc, buyMock, mutateMock, prismaUpdateMock };
+  return { svc, buyMock, mutateMock, prismaUpdateMock, prismaFindMock };
 }
 
 describe('BuyHandlerService', () => {
@@ -133,5 +134,45 @@ describe('BuyHandlerService', () => {
     const { svc } = makeService(null);
     expect(svc.command.keyword).toBe('buy');
     expect(svc.command.aliases).toHaveLength(0);
+  });
+
+  /**
+   * `if ((long)waruptr->cash < 0) waruptr->cash = 0;` is the first thing
+   * cmd_buy does — a player who went negative (planet debt, taxes) is zeroed
+   * rather than being able to dig deeper by shopping. @see GECMDS.C:4207-4209
+   */
+  it('clamps a negative balance to zero before quoting', async () => {
+    const { svc, buyMock, prismaUpdateMock, prismaFindMock } = makeService(makePlanetState());
+    prismaFindMock.mockResolvedValue({ cash: -500n });
+
+    await svc.command.handler(makeShip(), ['10', 'food'], {});
+
+    expect(prismaUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { cash: 0n } }),
+    );
+    // and the buy is priced against 0, not -500
+    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 0n);
+  });
+
+  it('passes the buyer balance through to the trade calculation', async () => {
+    const { svc, buyMock, prismaFindMock } = makeService(makePlanetState());
+    prismaFindMock.mockResolvedValue({ cash: 4_321n });
+
+    await svc.command.handler(makeShip(), ['10', 'food'], {});
+
+    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 4_321n);
+  });
+
+  it('reports insufficient credits rather than completing the purchase', async () => {
+    const { svc, mutateMock, prismaUpdateMock } = makeService(makePlanetState(), {
+      ok: false,
+      reason: 'INSUFFICIENT_FUNDS',
+    });
+
+    const res = await svc.command.handler(makeShip(), ['10', 'food'], {});
+
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.PRICE_NO_CASH));
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(prismaUpdateMock).not.toHaveBeenCalled();
   });
 });

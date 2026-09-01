@@ -1,5 +1,5 @@
 /**
- * T035 — PlanetStateService.buy() flushes correct ledger to DB and restores on restart.
+ * T035 — PlanetStateService.buy(, 10_000_000n) flushes correct ledger to DB and restores on restart.
  *
  * Sub-tests:
  *   1. Happy-path: buy() decrements inventory, flushes to DB once.
@@ -109,7 +109,7 @@ function makeShipsMock() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('T035 — PlanetStateService.buy() persistence and re-hydration', () => {
+describe('T035 — PlanetStateService.buy(, 10_000_000n) persistence and re-hydration', () => {
   describe('non-neutral-zone planet (xsect=5, ysect=3)', () => {
     let storedRow: ReturnType<typeof makeNonNeutralRow>;
     let prismaMock: {
@@ -141,7 +141,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(5, 3, 1);
-      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -161,7 +161,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(5, 3, 1);
-      await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(prismaMock.planet.update).toHaveBeenCalledTimes(1);
     });
@@ -175,7 +175,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await firstService.onModuleInit();
 
       const key = planetKey(5, 3, 1);
-      await firstService.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      await firstService.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       // storedRow has been mutated by the mock's update handler.
       // A new service instance hydrates from the same mock (updated row).
@@ -198,7 +198,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(5, 3, 1);
-      const result = await service.buy(key, 'non-owner', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'non-owner', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -216,7 +216,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
 
       const key = planetKey(5, 3, 1);
       // 'planet-owner' matches the row's userid
-      const result = await service.buy(key, 'planet-owner', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'planet-owner', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -237,7 +237,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(5, 3, 1);
-      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -253,7 +253,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       );
       await service.onModuleInit();
 
-      const result = await service.buy(planetKey(99, 99, 9), 'buyer-01', I_FOOD, 10, 100);
+      const result = await service.buy(planetKey(99, 99, 9), 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -293,7 +293,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(0, 0, 1);
-      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(true);
       expect(prismaMock.planet.update).not.toHaveBeenCalled();
@@ -307,7 +307,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
       await service.onModuleInit();
 
       const key = planetKey(0, 0, 1);
-      await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       const state = service.get(0, 0, 1);
       expect(state!.items[I_FOOD].qty).toBe(9_999_999n); // unchanged
@@ -322,7 +322,7 @@ describe('T035 — PlanetStateService.buy() persistence and re-hydration', () =>
 
       const key = planetKey(0, 0, 1);
       // userid is null, so buyer cannot be owner; uses markup2a=5
-      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100);
+      const result = await service.buy(key, 'buyer-01', I_FOOD, 10, 100, 10_000_000n);
 
       expect(result.ok).toBe(true);
       if (result.ok) {

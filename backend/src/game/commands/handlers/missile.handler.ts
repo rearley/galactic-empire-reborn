@@ -10,11 +10,11 @@ import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
-import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, SE100DAM } from '../../constants';
+import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 
 const MISSILE_CHARGE_MIN = 1;
-const MISSILE_CHARGE_MAX = 50000;
+
 
 /**
  * Handles `mis <target> <charge>` — launches a charged missile at a target.

@@ -83,8 +83,27 @@ export class BuyHandlerService {
     }
     const capacityRemaining = (ship.maxTons ?? 1000) - usedTons;
 
+    // C clamps a negative balance to zero on entry to cmd_buy, then gates the
+    // transfer on `price(item,amt) <= waruptr->cash`. @see GECMDS.C:4207-4209, 4333
+    const buyer = await this.prisma.user.findUnique({
+      where: { userid: ship.userid },
+      select: { cash: true },
+    });
+    let buyerCash = buyer?.cash ?? 0n;
+    if (buyerCash < 0n) {
+      buyerCash = 0n;
+      await this.prisma.user.update({ where: { userid: ship.userid }, data: { cash: 0n } });
+    }
+
     const key = planetKey(xsect, ysect, plnum);
-    const result = await this.planetService.buy(key, ship.userid, itemIndex, qty, capacityRemaining);
+    const result = await this.planetService.buy(
+      key,
+      ship.userid,
+      itemIndex,
+      qty,
+      capacityRemaining,
+      buyerCash,
+    );
 
     if (!result.ok) {
       switch (result.reason) {
@@ -94,6 +113,10 @@ export class BuyHandlerService {
           return { lines: [{ text: formatMessage(MessageId.BUY3), category: 'system' }] };
         case 'CAPACITY_FULL':
           return { lines: [{ text: formatMessage(MessageId.BUY4), category: 'system' }] };
+        case 'WONT_FIT':
+          return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
+        case 'INSUFFICIENT_FUNDS':
+          return { lines: [{ text: formatMessage(MessageId.PRICE_NO_CASH), category: 'system' }] };
         default:
           return { lines: [{ text: formatMessage(MessageId.BUY1), category: 'system' }] };
       }

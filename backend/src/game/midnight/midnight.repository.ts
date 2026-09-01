@@ -164,17 +164,29 @@ export class MidnightRepository {
   /**
    * Delete mail older than `mailDays` days and mail to `*`-prefixed recipients.
    *
+   * C has a single mail file (`gebb4`) that `mailit()` writes everything into,
+   * production reports included, so one walk purges the lot. The port splits
+   * mail across two tables and this only ever swept `Mail` — which nothing in
+   * the game writes to. Every real message lands in `MailStat` (production
+   * reports, attack notices, economy notices) and the inbox reads only
+   * `MailStat`, so nothing ever expired. Both are swept now; `Mail` is
+   * currently unwritten but is the schema-faithful shape and costs one
+   * statement a night.
+   *
    * @see GEMAIN.C:1175-1195 — phase-3 mail purge
+   * @see GEMAIN.C:1160-1161 — MAILSTAT production records go through mailit()
    */
   async purgeMail(tx: TxClient, mailDays: number): Promise<number> {
     const cutoff = Math.floor(Date.now() / 1000) - mailDays * 86_400;
 
-    const [byAge, byRecipient] = await Promise.all([
+    const results = await Promise.all([
+      tx.mailStat.deleteMany({ where: { stamp: { lt: cutoff } } }),
+      tx.mailStat.deleteMany({ where: { userid: { startsWith: '*' } } }),
       tx.mail.deleteMany({ where: { stamp: { lt: cutoff } } }),
       tx.mail.deleteMany({ where: { userid: { startsWith: '*' } } }),
     ]);
 
-    return byAge.count + byRecipient.count;
+    return results.reduce((n, r) => n + r.count, 0);
   }
 
   // ─── Phase 4 helpers ──────────────────────────────────────────────────────
@@ -348,23 +360,31 @@ export class MidnightRepository {
   }
 
   /**
-   * Mark teams with no members as removed (teamcode = -1).
+   * Mark teams with no members as removed.
+   *
+   * C frees the team's slot in the fixed `teamtab` array by overwriting its
+   * code with -1. That does not translate to a table whose primary key IS the
+   * teamcode: the port used to write -1n into it, so the second empty team in
+   * any pass hit a unique-constraint error that escaped the enclosing
+   * `$transaction` and rolled the entire nightly job back — permanently, since
+   * the -1 row survived to collide again on every retry. The marker lives in
+   * its own column instead.
    *
    * @see GEMAIN.C:1287-1294 — remove empty teams
    */
   async markEmptyTeamsRemoved(tx: TxClient): Promise<{ teamsReconciled: number; teamsRemoved: number }> {
     const teams = await tx.team.findMany({
-      where: { teamcode: { gt: 0n } },
+      where: { teamcode: { gt: 0n }, removed: false },
       select: { teamcode: true, teamcount: true },
     });
 
     const reconciled = teams.filter((t) => t.teamcount > 0).length;
 
     const emptyTeams = teams.filter((t) => t.teamcount === 0);
-    for (const team of emptyTeams) {
-      await tx.team.update({
-        where: { teamcode: team.teamcode },
-        data: { teamcode: -1n },
+    if (emptyTeams.length > 0) {
+      await tx.team.updateMany({
+        where: { teamcode: { in: emptyTeams.map((t) => t.teamcode) } },
+        data: { removed: true },
       });
     }
 

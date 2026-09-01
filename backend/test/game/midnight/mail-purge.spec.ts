@@ -4,6 +4,14 @@
  * Asserts mail older than MAILDAYS and mail to *-prefixed recipients is deleted.
  * Configurable retention window verified by overriding MIDNIGHT_MAILDAYS.
  *
+ * The purge used to target the `Mail` table, which nothing in the game writes
+ * to — every real message (production reports, attack notices, economy notices)
+ * goes to `MailStat`, and the inbox reads only `MailStat`. So mail never
+ * expired: ten planets produced 3,650 undeletable rows a year. C has one mail
+ * file, `gebb4`, and `mailit()` writes everything into it including the
+ * MAILSTAT production records (GEMAIN.C:1160-1161), so the single purge covers
+ * the lot.
+ *
  * @see GEMAIN.C:1175-1195 — phase-3 mail purge
  * @see specs/009-midnight-job/tasks.md T024
  */
@@ -63,14 +71,15 @@ function mailRow(ageInDays: number, recipient = 'alice', classNum = 1, msgnoOffs
     class: classNum,
     msgno: BigInt(Date.now()) + BigInt(msgnoOffset),
     stamp: daysAgoStamp(ageInDays),
-    type: 0, dtime: '', topic: '', string1: '', name1: '', name2: '',
-    int1: 0, int2: 0, int3: 0, long1: 0n, long2: 0n, long3: 0n,
+    type: 0, dtime: '', topic: '', name1: '',
+    int1: 0, int2: 0, cash: 0n, debt: 0n, tax: 0n,
+    itemqty: Array.from({ length: NUMITEMS }, () => 0n),
   };
 }
 
 describe('US3 — mail purge (T024)', () => {
   it('deletes mail older than 7 days (default MAILDAYS)', async () => {
-    await prisma.mail.createMany({
+    await prisma.mailStat.createMany({
       data: [
         mailRow(8, 'alice', 1, 0),   // 8 days old — should be deleted
         mailRow(10, 'alice', 1, 1),  // 10 days old — should be deleted
@@ -81,7 +90,7 @@ describe('US3 — mail purge (T024)', () => {
 
     await service.run();
 
-    const remaining = await prisma.mail.findMany({ where: { userid: 'alice' } });
+    const remaining = await prisma.mailStat.findMany({ where: { userid: 'alice' } });
     expect(remaining).toHaveLength(2);
     expect(remaining.every((m) => m.stamp >= daysAgoStamp(7))).toBe(true);
   });
@@ -91,13 +100,13 @@ describe('US3 — mail purge (T024)', () => {
     // Actually: threshold = now - maildays * 86400. Mail with stamp < threshold is deleted.
     // 7 days old stamp = now - 7*86400 = threshold → NOT deleted (not strictly less).
     const exactlySevenDays = daysAgoStamp(7);
-    await prisma.mail.create({
+    await prisma.mailStat.create({
       data: { ...mailRow(0, 'alice', 1, 10), stamp: exactlySevenDays },
     });
 
     await service.run();
 
-    const remaining = await prisma.mail.findMany({ where: { userid: 'alice' } });
+    const remaining = await prisma.mailStat.findMany({ where: { userid: 'alice' } });
     expect(remaining).toHaveLength(1);
   });
 
@@ -106,24 +115,24 @@ describe('US3 — mail purge (T024)', () => {
     // The *-prefix deletion uses userid LIKE '*%', but Mail has a FK to User.
     // We need a User with * prefix.
     await prisma.user.create({ data: { userid: '*ghost', username: '*ghost' } });
-    await prisma.mail.create({
+    await prisma.mailStat.create({
       data: mailRow(1, '*ghost', 1, 20), // 1 day old but *-prefixed recipient
     });
-    await prisma.mail.create({
+    await prisma.mailStat.create({
       data: mailRow(1, 'alice', 1, 21), // 1 day old alice — should be kept
     });
 
     await service.run();
 
-    const ghostMail = await prisma.mail.findMany({ where: { userid: '*ghost' } });
+    const ghostMail = await prisma.mailStat.findMany({ where: { userid: '*ghost' } });
     expect(ghostMail).toHaveLength(0);
 
-    const aliceMail = await prisma.mail.findMany({ where: { userid: 'alice' } });
+    const aliceMail = await prisma.mailStat.findMany({ where: { userid: 'alice' } });
     expect(aliceMail).toHaveLength(1);
   });
 
   it('preserves mail within retention window', async () => {
-    await prisma.mail.createMany({
+    await prisma.mailStat.createMany({
       data: [
         mailRow(1, 'alice', 1, 30),
         mailRow(3, 'alice', 1, 31),
@@ -133,7 +142,7 @@ describe('US3 — mail purge (T024)', () => {
 
     await service.run();
 
-    const remaining = await prisma.mail.findMany();
+    const remaining = await prisma.mailStat.findMany();
     expect(remaining).toHaveLength(3);
   });
 
@@ -151,7 +160,7 @@ describe('US3 — mail purge (T024)', () => {
     await testApp.init();
 
     try {
-      await testPrisma.mail.createMany({
+      await testPrisma.mailStat.createMany({
         data: [
           mailRow(15, 'alice', 1, 40), // 15 days — deleted
           mailRow(13, 'alice', 1, 41), // 13 days — kept (< 14)
@@ -162,7 +171,7 @@ describe('US3 — mail purge (T024)', () => {
 
       await testService.run();
 
-      const remaining = await testPrisma.mail.findMany({ where: { userid: 'alice' } });
+      const remaining = await testPrisma.mailStat.findMany({ where: { userid: 'alice' } });
       expect(remaining).toHaveLength(3);
     } finally {
       if (originalMaildays === undefined) {

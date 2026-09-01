@@ -305,6 +305,11 @@ model Wormhole {
 model Team {
   /// TEAM.teamcode — long; primary key; BigInt for 32-bit signed range
   teamcode  BigInt @id
+  /// Team disbanded at midnight for having no members.
+  /// C sets `teamtab[i].teamcode = -1` to free the array slot (GEMAIN.C:1293);
+  /// teamcode is the primary key here, so the marker needs its own column —
+  /// writing -1 into it collided as soon as a second team emptied out.
+  removed   Boolean @default(false)
   /// TEAM.teamname[31]
   teamname  String @default("")
   /// TEAM.teamcount

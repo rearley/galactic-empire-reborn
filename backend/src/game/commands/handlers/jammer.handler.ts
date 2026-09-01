@@ -53,7 +53,12 @@ export class JammerHandlerService {
     }
 
     for (const candidate of this.shipState.findAllShips()) {
-      const dist = cdistance(ship, candidate);
+      // cdistance() is in sector-units; scanRange is raw units. C scales the
+      // distance up before both the gate and the falloff — without the
+      // `* 10_000` every ship in the galaxy reads as point-blank.
+      // @see GECMDS.C:1636-1648 `ddist *= 10000;`
+      const dist = cdistance(ship, candidate) * 10_000;
+      if (dist >= scanRange) continue; // C only writes jammer inside the range branch
       const value = jammerCounter(dist, scanRange, JAMTIME);
       this.shipState.mutate(candidate.userid, candidate.shipno, (s) => {
         s.jammer = value;

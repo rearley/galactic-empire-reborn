@@ -62,13 +62,15 @@ function makeHarness(ships: ShipState[], scanRange = 10000) {
 const ctx: CommandContext = {};
 
 describe('JammerHandlerService — `jam`', () => {
+  // Coordinates are sector-units (1 sector = 1.0); scanRange is raw units
+  // (1 sector = 10_000). @see GECMDS.C:1636-1648 `ddist *= 10000`.
   it('happy path — applies jammer to all ships in scan range, including self', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 0, ycoord: 5000 });
+    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 0, ycoord: 0.5 });
     const handler = makeHarness([alice, bob], 10000);
     const result = handler.command.handler(alice, [], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.JAM_FIRED));
-    // bob distance 5000, scanRange 10000 → JAMTIME * 0.5 = 10
+    // bob is 0.5 sectors = 5000 raw units out of a 10000 range → JAMTIME * 0.5
     expect(bob.jammer).toBe(Math.floor(JAMTIME * 0.5));
     // alice (self, distance 0) → JAMTIME
     expect(alice.jammer).toBe(JAMTIME);
@@ -84,12 +86,31 @@ describe('JammerHandlerService — `jam`', () => {
 
   it('distance scaling — ship at scanrange/2 gets floor(JAMTIME * 0.5); self gets JAMTIME', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
-    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 5000, ycoord: 0 });
-    const carol = makeShip({ userid: 'c', shipno: 3, xcoord: 20000, ycoord: 0 }); // outside
+    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 0.5, ycoord: 0 });
+    const carol = makeShip({ userid: 'c', shipno: 3, xcoord: 2, ycoord: 0 }); // outside
     const handler = makeHarness([alice, bob, carol], 10000);
     handler.command.handler(alice, [], ctx);
     expect(alice.jammer).toBe(JAMTIME);
     expect(bob.jammer).toBe(Math.floor(JAMTIME * 0.5));
     expect(carol.jammer).toBe(0); // out of range
+  });
+
+  it('does not jam a ship on the far side of the galaxy', () => {
+    // scanRange 15_000 = 1.5 sectors. Bob is 10 sectors away.
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 2, ycoord: 3 });
+    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 12, ycoord: 3 });
+    const handler = makeHarness([alice, bob], 15000);
+    handler.command.handler(alice, [], ctx);
+    expect(bob.jammer).toBe(0);
+  });
+
+  it('leaves an out-of-range ship\'s existing jammer counter alone', () => {
+    // C only writes wptr->jammer inside the in-range branch, so a jammer
+    // already running on a distant ship must not be reset to 0.
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
+    const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 9, ycoord: 0, jammer: 7 });
+    const handler = makeHarness([alice, bob], 15000);
+    handler.command.handler(alice, [], ctx);
+    expect(bob.jammer).toBe(7);
   });
 });

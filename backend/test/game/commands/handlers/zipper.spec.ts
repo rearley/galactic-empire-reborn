@@ -75,8 +75,8 @@ describe('ZipperHandlerService — `zip`', () => {
   it('happy path — sweeps mines in range, calls delete + remove, firer takes no damage', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0, damage: 0, shield: 0 });
     const mines: MineState[] = [
-      { id: 1, channel: 99, timer: 20, xcoord: 0, ycoord: 100, deployedBy: 'x' },
-      { id: 2, channel: 99, timer: 20, xcoord: 1000, ycoord: 0, deployedBy: 'x' },
+      { id: 1, channel: 99, timer: 20, xcoord: 0, ycoord: 0.01, deployedBy: 'x' },
+      { id: 2, channel: 99, timer: 20, xcoord: 0.1, ycoord: 0, deployedBy: 'x' },
     ];
     const h = makeHarness([alice], mines, 50000);
 
@@ -94,8 +94,8 @@ describe('ZipperHandlerService — `zip`', () => {
   it('mines outside range untouched', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const mines: MineState[] = [
-      { id: 1, channel: 99, timer: 20, xcoord: 0, ycoord: 100, deployedBy: 'x' },     // in range
-      { id: 2, channel: 99, timer: 20, xcoord: 100000, ycoord: 0, deployedBy: 'x' }, // out
+      { id: 1, channel: 99, timer: 20, xcoord: 0, ycoord: 0.01, deployedBy: 'x' }, // in range
+      { id: 2, channel: 99, timer: 20, xcoord: 10, ycoord: 0, deployedBy: 'x' },   // out
     ];
     const h = makeHarness([alice], mines, 50000);
 
@@ -111,5 +111,17 @@ describe('ZipperHandlerService — `zip`', () => {
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ZIP_NOAMMO));
     expect(h.repo.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not sweep a minefield on the far side of the galaxy', async () => {
+    // scanRange 50_000 = 5 sectors. C scales cdistance by 10_000 before the
+    // gate (GECMDS.C:1703-1707); without it every mine in the galaxy matched.
+    const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 2, ycoord: 3 });
+    const mines: MineState[] = [
+      { id: 1, channel: 99, timer: 20, xcoord: 22, ycoord: 3, deployedBy: 'x' },
+    ];
+    const { handler, repo } = makeHarness([alice], mines, 50000);
+    await handler.command.handler(alice, [], ctx);
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { HPDAMMAX, HPFIRDST, MINEDAMMAX, MINERANGE, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
+import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -264,6 +264,56 @@ export function rollProjectileHullDamage(
 ): number {
   const factor = shieldsUp ? rand.next() * 0.5 : rand.next() * 0.5 + 0.5;
   return Math.floor(dmgMax * factor * damageScale(victimDamageFactor));
+}
+
+/**
+ * Missile hull damage.
+ *
+ * A missile carries a stored *charge* in the range 1..50000, which is an energy
+ * value, not a damage cap. C normalises it against the 50000 ceiling and scales
+ * the result by `mdammax` (clamped 1..100), so no missile can ever do more than
+ * MDAMMAX hull damage no matter how much energy it was loaded with:
+ *
+ *   damfact = ton_fact(ptr, energy);
+ *   damfact = damfact / 50000.0;
+ *   damfact = damfact * (shields ? rndm(.1) : rndm(.5)+.5);
+ *   ptr->damage += mdammax * damfact;
+ *
+ * Note the shields-up roll is `rndm(.1)` — a tenth of the torpedo's `rndm(.5)`.
+ * Missiles are the weapon shields are best against.
+ *
+ * @see GEFUNCS.C:1620-1660
+ */
+export function rollMissileHullDamage(
+  rand: Random,
+  charge: number,
+  victimDamageFactor: number,
+  shieldsUp: boolean,
+): number {
+  const adjusted = charge * damageScale(victimDamageFactor);
+  const factor = shieldsUp ? rand.next() * 0.1 : rand.next() * 0.5 + 0.5;
+  return Math.floor(MDAMMAX * (adjusted / MISSILE_CHARGE_MAX) * factor);
+}
+
+/**
+ * Shield charge drained by a missile hit. Unlike a torpedo — which uses a flat
+ * 10..29 roll — a missile's drain is proportional to the charge it carried.
+ *
+ *   power = mptr->energy/999;        // unsigned division, truncates
+ *   power = power * (rndm(.5)+.5);
+ *   shieldhit(ptr,usrn,power);
+ *
+ * `mptr->energy` at this point has already been through ton_fact.
+ *
+ * @see GEFUNCS.C:1649-1651
+ */
+export function missileShieldDrain(
+  rand: Random,
+  charge: number,
+  victimDamageFactor: number,
+): number {
+  const adjusted = Math.floor(charge * damageScale(victimDamageFactor));
+  return Math.floor(Math.floor(adjusted / 999) * (rand.next() * 0.5 + 0.5));
 }
 
 /**
