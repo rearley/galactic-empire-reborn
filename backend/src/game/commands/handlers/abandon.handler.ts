@@ -23,6 +23,12 @@ import { PlanetStateService } from '../../planet/planet-state.service';
  * @see GECMDS.C:3420 cmd_abandon
  * @see specs/013-ship-management/research.md D2
  */
+/** Words that mean "yes, do it" in answer to an abandon prompt. */
+function isConfirmation(word: string | undefined): boolean {
+  const w = word?.toLowerCase();
+  return w === 'yes' || w === 'y';
+}
+
 @Injectable()
 export class AbandonHandlerService {
   constructor(
@@ -44,10 +50,55 @@ export class AbandonHandlerService {
     args: string[],
     ctx: CommandContext,
   ): Promise<CommandResult> {
-    if (args[0]?.toLowerCase() === 'ship') {
-      return this.abandonShip(ship, ctx);
+    const arg0 = args[0]?.toLowerCase();
+
+    if (arg0 === 'ship') {
+      if (isConfirmation(args[1])) return this.abandonShip(ship, ctx);
+      return {
+        lines: [{ text: formatMessage(MessageId.ABAN_CONFIRM_SHIP, ship.shipname), category: 'system' }],
+        expectFollowup: 'aba ship',
+      };
     }
-    return this.abandonPlanet(ship);
+
+    if (arg0 === undefined) return this.confirmAbandonPlanet(ship);
+    if (isConfirmation(arg0)) return this.abandonPlanet(ship);
+
+    // Anything else answering the prompt is a refusal, not a command.
+    return { lines: [{ text: formatMessage(MessageId.ABAN_CANCELLED), category: 'system' }] };
+  }
+
+  /**
+   * Ask before releasing a colony.
+   *
+   * DEVIATION FROM C (deliberate — see docs/DECISIONS.md). `cmd_abandon`
+   * releases the planet on the spot with no confirmation. Three keystrokes
+   * separated a colony built over days from oblivion, and the command set puts
+   * `aba` one letter from `abo` (abort self-destruct). Naming the planet in
+   * the prompt is the check: it is how the captain sees which one they are
+   * about to lose.
+   */
+  private async confirmAbandonPlanet(ship: ShipState): Promise<CommandResult> {
+    if (ship.where < 10) {
+      return { lines: [{ text: formatMessage(MessageId.ABAN01), category: 'system' }] };
+    }
+
+    const planet = this.planetState.get(
+      Math.floor(ship.xcoord),
+      Math.floor(ship.ycoord),
+      ship.where - 10,
+    );
+    // Same single rejection C uses for "not yours" and "cannot read it".
+    if (!planet || planet.userid?.toLowerCase() !== ship.userid.toLowerCase()) {
+      return { lines: [{ text: formatMessage(MessageId.ABAN03), category: 'system' }] };
+    }
+
+    return {
+      lines: [{
+        text: formatMessage(MessageId.ABAN_CONFIRM_PLANET, planet.name || `planet ${ship.where - 10}`),
+        category: 'system',
+      }],
+      expectFollowup: 'aba',
+    };
   }
 
   /**

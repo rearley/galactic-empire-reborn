@@ -353,4 +353,30 @@ describe('NewShipHandlerService — name collisions between captains', () => {
     expect(created.data['topspeed']).toBe(PLAYER_CLASS_4.maxWarp);
     expect(created.data['topspeed']).not.toBe(0);
   });
+
+  /**
+   * A hull bought at Zygor came out with `phasrtype` and `shieldtype` 0 — no
+   * phasers and no shields at all. `rep wpns` reporting "type 0" and the
+   * upgrade screens pricing from 0 with no trade-in made this look like a
+   * deliberate bare-hull design, but C's `new ship` path calls the same
+   * `initshp` as a new pilot's first ship (GECMDS.C:4572), and initshp sets
+   * `shieldtype = 1; phasrtype = 1` (GEFUNCS.C:233-234).
+   *
+   * Found by buying a Heavy Freighter, raising shields in a fight, and being
+   * told "You have no shields installed."
+   */
+  it('fits the basic phasers and shields every hull leaves the yard with', async () => {
+    const { service, prismaMock } = makeService();
+
+    await service.command.handler(makeShip(), ['ship', '4'], {});
+
+    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(created.data['phasrtype']).toBe(1);
+    expect(created.data['shieldtype']).toBe(1);
+    // Shields fitted but DOWN, as initshp leaves them (SHIELDDN).
+    expect(created.data['shield']).toBe(0);
+    expect(created.data['phasr']).toBe(100);
+  });
 });

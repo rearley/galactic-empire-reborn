@@ -58,7 +58,7 @@ function makeHandler(
 describe('AbandonHandlerService — canonical `aba` releases the planet', () => {
   it('abandons the orbited planet and names it back', async () => {
     const { handler, abandonPlanet, ship } = makeHandler();
-    const result = await handler.command.handler(ship, [], {});
+    const result = await handler.command.handler(ship, ['yes'], {});
     expect(abandonPlanet).toHaveBeenCalledWith(4, 2, 1, 'owner1');
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN02, 'Aurora'));
     expect(result.lines[0].category).toBe('success');
@@ -66,33 +66,33 @@ describe('AbandonHandlerService — canonical `aba` releases the planet', () => 
 
   it('never touches the ship', async () => {
     const { handler, abandonShip, ship } = makeHandler();
-    await handler.command.handler(ship, [], {});
+    await handler.command.handler(ship, ['yes'], {});
     expect(abandonShip).not.toHaveBeenCalled();
     expect(ship.status).toBe(1);
   });
 
   it('refuses when not in orbit (ABAN01)', async () => {
     const { handler, abandonPlanet } = makeHandler();
-    const result = await handler.command.handler(makeShip({ where: 0 }), [], {});
+    const result = await handler.command.handler(makeShip({ where: 0 }), ['yes'], {});
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN01));
     expect(abandonPlanet).not.toHaveBeenCalled();
   });
 
   it("refuses a planet that is not the caller's (ABAN03)", async () => {
     const { handler, ship } = makeHandler({ ok: false, reason: 'NOT_OWNER' });
-    const result = await handler.command.handler(ship, [], {});
+    const result = await handler.command.handler(ship, ['yes'], {});
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN03));
   });
 
   it('reports a missing planet as ABAN03 rather than claiming success', async () => {
     const { handler, ship } = makeHandler({ ok: false, reason: 'NOT_FOUND' });
-    const result = await handler.command.handler(ship, [], {});
+    const result = await handler.command.handler(ship, ['yes'], {});
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN03));
   });
 
   it('does not ask the gateway for ship re-entry', async () => {
     const { handler, ship } = makeHandler();
-    const result = await handler.command.handler(ship, [], {});
+    const result = await handler.command.handler(ship, ['yes'], {});
     expect(result.reenterShipEntry).toBeUndefined();
   });
 });
@@ -100,7 +100,7 @@ describe('AbandonHandlerService — canonical `aba` releases the planet', () => 
 describe('AbandonHandlerService — `aba ship` keeps the port\'s scuttle path', () => {
   it('abandons the hull and asks for ship re-entry', async () => {
     const { handler, abandonShip, abandonPlanet, ship } = makeHandler();
-    const result = await handler.command.handler(ship, ['ship'], {});
+    const result = await handler.command.handler(ship, ['ship', 'yes'], {});
     expect(abandonShip).toHaveBeenCalledWith('owner1', 1);
     expect(abandonPlanet).not.toHaveBeenCalled();
     expect(result.reenterShipEntry).toBe(true);
@@ -109,14 +109,87 @@ describe('AbandonHandlerService — `aba ship` keeps the port\'s scuttle path', 
 
   it('accepts the word in any case', async () => {
     const { handler, abandonShip, ship } = makeHandler();
-    await handler.command.handler(ship, ['SHIP'], {});
+    await handler.command.handler(ship, ['SHIP', 'yes'], {});
     expect(abandonShip).toHaveBeenCalled();
   });
 
-  it('treats any other argument as the planet form', async () => {
+  /**
+   * Anything that is not `ship` and not a confirmation is a refusal. The word
+   * arrives as the answer to "Type YES to confirm", routed back through the
+   * gateway's followup as `aba <whatever they typed>` — so treating an
+   * unrecognised word as "go ahead" would defeat the prompt entirely.
+   */
+  it('treats an unrecognised answer as a refusal, not as consent', async () => {
     const { handler, abandonPlanet, abandonShip, ship } = makeHandler();
-    await handler.command.handler(ship, ['planet'], {});
-    expect(abandonPlanet).toHaveBeenCalled();
+    const result = await handler.command.handler(ship, ['planet'], {}) as { lines: { text: string }[] };
+    expect(abandonPlanet).not.toHaveBeenCalled();
     expect(abandonShip).not.toHaveBeenCalled();
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN_CANCELLED));
+  });
+});
+
+/**
+ * Losing a colony built over days should take more than three keystrokes,
+ * especially with `abo` (abort self-destruct) one letter away in the same
+ * command set. C's cmd_abandon releases it on the spot; this is a deliberate
+ * deviation. @see docs/DECISIONS.md
+ */
+describe('AbandonHandlerService — confirmation', () => {
+  function withPlanet(name = 'Aurelia-Landing', owner = 'owner1') {
+    const ship = makeShip();
+    const abandonPlanet = jest.fn().mockResolvedValue({ ok: true, name });
+    const handler = new AbandonHandlerService(
+      { abandon: jest.fn() } as unknown as ShipStateService,
+      {
+        abandonPlanet,
+        get: jest.fn().mockReturnValue({ name, userid: owner }),
+      } as unknown as PlanetStateService,
+    );
+    return { handler, abandonPlanet, ship };
+  }
+
+  it('names the planet it is about to give up, and gives it up to nobody yet', async () => {
+    const { handler, abandonPlanet, ship } = withPlanet();
+    const result = await handler.command.handler(ship, [], {}) as {
+      lines: { text: string }[]; expectFollowup?: string;
+    };
+    expect(abandonPlanet).not.toHaveBeenCalled();
+    expect(result.lines[0].text).toContain('Aurelia-Landing');
+    expect(result.expectFollowup).toBe('aba');
+  });
+
+  it('releases the planet once confirmed', async () => {
+    const { handler, abandonPlanet, ship } = withPlanet();
+    await handler.command.handler(ship, ['yes'], {});
+    expect(abandonPlanet).toHaveBeenCalled();
+  });
+
+  it('does not prompt for a planet the captain does not own', async () => {
+    const { handler, abandonPlanet, ship } = withPlanet('Someone Elses', 'other-captain');
+    const result = await handler.command.handler(ship, [], {}) as {
+      lines: { text: string }[]; expectFollowup?: string;
+    };
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN03));
+    expect(result.expectFollowup).toBeUndefined();
+    expect(abandonPlanet).not.toHaveBeenCalled();
+  });
+
+  it('does not prompt when not in orbit', async () => {
+    const { handler, ship } = withPlanet();
+    const result = await handler.command.handler(makeShip({ where: 0 }), [], {}) as {
+      lines: { text: string }[]; expectFollowup?: string;
+    };
+    void ship;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ABAN01));
+    expect(result.expectFollowup).toBeUndefined();
+  });
+
+  it('asks before scuttling the hull too', async () => {
+    const { handler, ship } = withPlanet();
+    const result = await handler.command.handler(ship, ['ship'], {}) as {
+      lines: { text: string }[]; expectFollowup?: string;
+    };
+    expect(result.lines[0].text).toContain('Ranger');
+    expect(result.expectFollowup).toBe('aba ship');
   });
 });
