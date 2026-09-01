@@ -79,11 +79,27 @@ export class PlanetTickService implements OnModuleInit {
    * PLANTOCK is 30 minutes, so watching a colony actually grow otherwise
    * costs hours of wall-clock per in-game day.
    *
+   * Pass `only` to age a single planet. Without it this also ages the
+   * neutral-zone trading posts — they hold 1,032,000 men, so they are
+   * "populated" and their economy runs like any other planet's. Aging them by
+   * hundreds of ticks starves their food and troops, and midnight's restock
+   * writes to Postgres without touching the live in-memory state, so the hub
+   * shop stays empty until the server restarts.
+   *
    * Reached only through the GE_DEBUG_ENDPOINTS cheat routes; nothing in the
    * game loop calls it.
    */
-  async forceTick(times: number): Promise<{ planets: number; ticks: number }> {
-    const populated = this.planets.all().filter((p) => shouldRunEconomy(p));
+  async forceTick(
+    times: number,
+    only?: { xsect: number; ysect: number; plnum: number },
+  ): Promise<{ planets: number; ticks: number }> {
+    const populated = this.planets
+      .all()
+      .filter((p) => shouldRunEconomy(p))
+      .filter((p) =>
+        only === undefined ||
+        (p.xsect === only.xsect && p.ysect === only.ysect && p.plnum === only.plnum),
+      );
     for (let i = 0; i < times; i++) {
       for (const p of populated) {
         await this.planets.runEconomicTickFor(planetKey(p.xsect, p.ysect, p.plnum));

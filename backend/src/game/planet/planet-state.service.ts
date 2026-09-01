@@ -9,6 +9,14 @@ import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers
 import { applyEconomyTick } from './planet-economy';
 import { PlanetEconomyService } from './planet-economy.service';
 import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
+import { OnEvent } from '@nestjs/event-emitter';
+import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
+
+/**
+ * The neutral-zone planets midnight restocks: Zygor-3 (all items) and
+ * Nexus Prime (men, food, troops). @see midnight.repository.ts
+ */
+const NEUTRAL_ZONE_POSTS = [1, 2] as const;
 
 /**
  * In-memory authoritative source of truth for planet economic state.
@@ -47,6 +55,51 @@ export class PlanetStateService implements OnModuleInit {
       this.map.set(planetKey(state.xsect, state.ysect, state.plnum), state);
     }
     this.logger.log(`hydrated ${this.map.size} planets from Postgres`);
+  }
+
+  /**
+   * Re-read one planet's row into the in-memory map, discarding the live copy.
+   *
+   * For writers that bypass this service and update Postgres directly — the
+   * only one today is midnight's `refreshNeutralZone`, which restocks the two
+   * neutral-zone trading posts. Everything in play reads the map, so without
+   * this the restock refills a copy nobody reads and the hub shop stays empty
+   * until the process restarts.
+   *
+   * A missing row leaves the map untouched: planets are never deleted, so a
+   * miss means a bad key or a racing write, neither of which should evict live
+   * state.
+   */
+  async reloadPlanet(xsect: number, ysect: number, plnum: number): Promise<void> {
+    const row = await this.prisma.planet.findFirst({ where: { xsect, ysect, plnum } });
+    if (!row) {
+      this.logger.warn(`reloadPlanet: no row for (${xsect},${ysect},${plnum})`);
+      return;
+    }
+    const state = prismaPlanetToState(row);
+    this.map.set(planetKey(state.xsect, state.ysect, state.plnum), state);
+  }
+
+  /**
+   * Re-read the two neutral-zone trading posts after midnight restocked them.
+   *
+   * `refreshNeutralZone` writes Postgres inside the midnight transaction, but
+   * every read in play goes through this map — so without this the restock
+   * refilled a row nobody reads. The posts are not immune to the drain: they
+   * carry 1,032,000 men, so `shouldRunEconomy` is true for them and each
+   * PLANTOCK consumes their food and starves their troops exactly as it would
+   * a colony's. Over days of uptime Zygor ran out and stayed out until the
+   * process restarted.
+   *
+   * @see midnight.repository.ts refreshNeutralZone
+   * @see GEMAIN.C:2147-2175 — "Updating Zygor" / "Updating T-station"
+   */
+  @OnEvent(MIDNIGHT_COMPLETED)
+  async onMidnightCompleted(): Promise<void> {
+    for (const plnum of NEUTRAL_ZONE_POSTS) {
+      await this.reloadPlanet(NEUTRAL_ZONE_SECTOR.x, NEUTRAL_ZONE_SECTOR.y, plnum);
+    }
+    this.logger.log('reloaded neutral-zone trading posts after midnight restock');
   }
 
   /** Returns the live PlanetState for a given (xsect, ysect, plnum), or undefined. */
