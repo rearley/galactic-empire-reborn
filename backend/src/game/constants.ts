@@ -10,6 +10,12 @@ const GAME_CONFIG = resolveGameConfig();
 export const MAXX = 30 as const;
 export const MAXY = 15 as const;
 
+/**
+ * Intra-sector resolution: a sector is SSMAX units across on each axis.
+ * @see GEMAIN.H:104
+ */
+export const SSMAX = 10000 as const;
+
 // ─── Movement/rotation constants ────────────────────────────────────────────
 
 /** Degrees rotated per tick when rotate command is active.
