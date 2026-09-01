@@ -60,6 +60,7 @@ import {
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
+import { attributePlanetKill } from '../game/combat/planet-kill';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -912,6 +913,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Also clears the victim's scantab so stale assignments don't persist on respawn.
    * @see specs/006b-combat/contracts/combat-events.md
    */
+  /**
+   * shipId → the planet whose ion cannons last hit it, and when.
+   *
+   * This is the evidence that a planet made a kill. The victim's `lastfired`
+   * cannot serve: `fireion` sets it to -1, but so does NO_CHANNEL when a
+   * firer leaves the game, so inferring from it would blame a colony for any
+   * death whose attacker had disconnected.
+   *
+   * Written on every ion hit, read and cleared when that ship dies, and only
+   * honoured inside ION_ATTRIBUTION_WINDOW_MS so a ship that was shot at,
+   * escaped and died elsewhere cannot inherit the name. Bounded by the number
+   * of ships currently besieging planets.
+   */
+  private readonly lastIonAttacker = new Map<string, { name: string; at: number }>();
+
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     const keyParts = event.victimShipKey.split(':');
@@ -978,9 +994,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.shipStateService.removeFromGame({ userid: event.victimUserid, shipno: victimShipno });
     }
 
+    // Name the killer when it was a planet. Without this the client saw no
+    // attacker and no weapon — the same shape a self-destruct produces — and
+    // announced the kill as "destroyed by unknown", so a defender was never
+    // told their own colony had done it.
+    const ionHit = this.lastIonAttacker.get(event.victimId) ?? null;
+    this.lastIonAttacker.delete(event.victimId);
+    const killedByPlanet = attributePlanetKill({
+      hasAttackerShip: event.attackerId !== null,
+      lastIonHitAt: ionHit?.at ?? null,
+      now: Date.now(),
+    });
+
     // Serialize loot amounts as strings — BigInt is not JSON-serializable.
     const payload = {
       ...event,
+      weapon: killedByPlanet ? ('ion' as const) : event.weapon,
+      attackerName: killedByPlanet ? (ionHit?.name ?? null) : (event.attackerName ?? null),
       loot: event.loot.map(l => ({ itemIndex: l.itemIndex, amount: l.amount.toString() })),
     };
     this.server.emit(COMBAT_SHIP_DESTROYED, payload);
@@ -1051,6 +1081,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @OnEvent(PLANET_ION_FIRED)
   handlePlanetIonFired(event: PlanetIonFiredEvent): void {
     const name = event.planetName || `planet ${event.plnum}`;
+    // Remember who is shooting so a kill this tick can name the planet. The
+    // kill itself carries no attacker — `fireion` sets lastfired to -1 — and
+    // neither this gateway nor CombatTickService can reach planet state, so
+    // the name has to come from the hit that caused the death.
+    this.lastIonAttacker.set(event.shipId, { name, at: Date.now() });
     const text = event.shieldsUp
       ? `** ION CANNON from ${name}! Shields absorb it — hull -${event.hullDamage}%, shields knocked ${event.shieldKnock}% **`
       : `** ION CANNON from ${name}! Hull -${event.hullDamage}% — raise shields! **`;

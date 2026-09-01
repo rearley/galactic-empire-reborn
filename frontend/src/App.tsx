@@ -164,14 +164,22 @@ function Terminal(): React.JSX.Element {
       }
     };
 
-    const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null }) => {
+    const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null; attackerName?: string | null }) => {
       if (event.victimId === localShipId) {
         setLogLines(prev =>
           [...prev, { text: `** YOUR SHIP HAS BEEN DESTROYED! **`, category: 'combat' as const }].slice(-MAX_LOG_ENTRIES),
         );
       } else {
         const victim = players.find(p => p.shipId === event.victimId)?.name ?? event.victimUserid;
-        const attacker = event.attackerId ? shipName(event.attackerId) : 'unknown';
+        // A planet's ion cannons leave no attacking ship — `fireion` sets the
+        // victim's lastfired to -1 — so `attackerId` is null and this used to
+        // fall through to "unknown", hiding the fact that someone's colony had
+        // defended itself. The server names the planet when it can.
+        const attacker = event.attackerId
+          ? shipName(event.attackerId)
+          : event.weapon === 'ion'
+            ? (event.attackerName ?? 'planetary defences')
+            : 'unknown';
         setLogLines(prev =>
           [...prev, {
             text: `${victim} has been destroyed by ${attacker}!`,

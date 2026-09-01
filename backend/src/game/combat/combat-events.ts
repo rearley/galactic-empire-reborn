@@ -97,7 +97,19 @@ export interface CombatShipDestroyedEvent {
   /** Plain userid or null — required by gold-transfer attacker lookup (T012). */
   attackerUserid: string | null;
   attackerChannel: number;
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | null;
+  /**
+   * `'ion'` means a planet's cannons made the kill — there is no attacking
+   * ship, so `attackerId`/`attackerUserid` are null and were previously
+   * indistinguishable from a self-destruct (both null, weapon null).
+   * @see planet-kill.ts, GEFUNCS.C:1796 fireion
+   */
+  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | null;
+  /**
+   * Who to name as the killer when no attacking SHIP resolves — the planet,
+   * for an ion kill. Null for ordinary ship-vs-ship kills, where the client
+   * resolves the name from `attackerId`.
+   */
+  attackerName?: string | null;
   sector: { x: number; y: number };
   tickAt: Date;
   /** Items looted from victim — GEFUNCS.C:killem (1122-1136). Empty when no attacker or no transfer. */

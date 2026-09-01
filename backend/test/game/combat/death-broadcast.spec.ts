@@ -61,11 +61,13 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       scoreAwarded: 0,
     };
     gateway.handleCombatShipDestroyed(event);
-    expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, event);
+    // `attackerName` is added by the gateway: it names the planet when a kill
+    // has no attacking ship (an ion-cannon kill), and is null otherwise.
+    expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, { ...event, attackerName: null });
     expect(toMock).not.toHaveBeenCalled();
   });
 
-  it('payload is forwarded unchanged (victimId, attackerId, channel, sector, tickAt)', () => {
+  it('payload is forwarded intact, plus the planet-kill attribution field', () => {
     const tickAt = new Date('2026-01-01T00:00:00Z');
     const event: CombatShipDestroyedEvent = {
       victimId: 'x:1',
@@ -83,6 +85,97 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     };
     gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledTimes(1);
-    expect(serverEmitMock.mock.calls[0][1]).toStrictEqual(event);
+    expect(serverEmitMock.mock.calls[0][1]).toStrictEqual({ ...event, attackerName: null });
+  });
+
+  /**
+   * The colony that made the kill must be named. `fireion` sets the victim's
+   * `lastfired` to -1 so no attacking ship resolves (GEFUNCS.C:1796), which
+   * left an ion kill carrying no attacker and no weapon — the same shape a
+   * self-destruct produces — and the client announced it as "destroyed by
+   * unknown". The gateway is the only layer that sees both the ion hit (which
+   * knows the planet) and the kill, so it carries the name across.
+   */
+  it('names the planet that killed a besieging ship', () => {
+    gateway.handlePlanetIonFired({
+      shipId: 'raider:2',
+      plnum: 1,
+      planetName: 'Aurelia-Landing',
+      hullDamage: 98,
+      shieldKnock: 0,
+      shieldsUp: false,
+    });
+
+    const event: CombatShipDestroyedEvent = {
+      victimId: 'raider:2',
+      attackerId: null,
+      victimShipKey: 'raider:2',
+      attackerShipKey: null,
+      victimUserid: 'raider',
+      attackerUserid: null,
+      attackerChannel: -1,
+      weapon: 'ion',
+      sector: { x: 1, y: 1 },
+      tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
+    };
+    gateway.handleCombatShipDestroyed(event);
+
+    expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
+      weapon: 'ion',
+      attackerName: 'Aurelia-Landing',
+    });
+  });
+
+  it('does not carry a stale planet name onto the next ship that dies', () => {
+    gateway.handlePlanetIonFired({
+      shipId: 'raider:2', plnum: 1, planetName: 'Aurelia-Landing',
+      hullDamage: 40, shieldKnock: 0, shieldsUp: false,
+    });
+
+    const base: CombatShipDestroyedEvent = {
+      victimId: 'raider:2', attackerId: null, victimShipKey: 'raider:2',
+      attackerShipKey: null, victimUserid: 'raider', attackerUserid: null,
+      attackerChannel: -1, weapon: 'ion', sector: { x: 1, y: 1 },
+      tickAt: new Date(), loot: [], scoreAwarded: 0,
+    };
+    gateway.handleCombatShipDestroyed(base);
+    // Same ship key dying again (respawned hull) with no fresh ion hit must
+    // not inherit the previous kill's planet.
+    gateway.handleCombatShipDestroyed(base);
+
+    expect(serverEmitMock.mock.calls[1][1]).toMatchObject({ attackerName: null });
+  });
+
+  /**
+   * The near-miss this fix had to avoid. `attackerChannel === -1` looks like
+   * C's ion sentinel, but this port also uses -1 for NO_CHANNEL, and
+   * ShipStateService resets a victim's `lastfired` to it when the recorded
+   * firer leaves the game. Inferring "a planet did this" from the channel
+   * alone would blame a colony every time a killer disconnected.
+   */
+  it('does not blame a planet when the attacker merely disconnected', () => {
+    const event: CombatShipDestroyedEvent = {
+      victimId: 'drifter:1',
+      attackerId: null,
+      victimShipKey: 'drifter:1',
+      attackerShipKey: null,
+      victimUserid: 'drifter',
+      attackerUserid: null,
+      // Reset to NO_CHANNEL because the firer left — no ion hit ever recorded.
+      attackerChannel: -1,
+      weapon: null,
+      sector: { x: 4, y: 4 },
+      tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
+    };
+    gateway.handleCombatShipDestroyed(event);
+
+    expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
+      weapon: null,
+      attackerName: null,
+    });
   });
 });
