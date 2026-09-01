@@ -8,6 +8,8 @@ import { PlanetStateService } from './planet-state.service';
 import { PlanetTickService } from './planet-tick.service';
 import { PlanetEconomyService } from './planet-economy.service';
 import { PlanetAttackService } from './planet-attack.service';
+import { PlanetDebugController } from './planet.debug.controller';
+import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
 import {
   PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS,
   loadPlattrt1, loadPlattrt2, loadPlattrf1, loadPlattrf2, loadPlattrf3, loadFireticks,
@@ -20,7 +22,10 @@ import {
  * production planets and combat both end up with MathRandomAdapter; tests
  * inject a Mulberry32Adapter into whichever provider they exercise.
  */
+const devOnlyControllers = debugEndpointsEnabled() ? [PlanetDebugController] : [];
+
 @Module({
+  controllers: devOnlyControllers,
   imports: [PrismaModule, GalaxyModule, forwardRef(() => ShipModule), forwardRef(() => TickModule)],
   providers: [
     PlanetStateService,
@@ -35,6 +40,6 @@ import {
     { provide: PLATTRF3, useFactory: () => loadPlattrf3() },
     { provide: FIRETICKS, useFactory: () => loadFireticks() },
   ],
-  exports: [PlanetStateService, PlanetEconomyService, PlanetAttackService],
+  exports: [PlanetStateService, PlanetEconomyService, PlanetAttackService, PlanetTickService],
 })
 export class PlanetModule {}

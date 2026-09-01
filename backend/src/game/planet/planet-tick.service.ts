@@ -72,4 +72,29 @@ export class PlanetTickService implements OnModuleInit {
       await this.planets.runEconomicTickFor(key);
     }
   }
+
+  /**
+   * Run `times` production ticks immediately on every populated planet,
+   * ignoring the PLANTOCK schedule. Playtest accelerator only — a real
+   * PLANTOCK is 30 minutes, so watching a colony actually grow otherwise
+   * costs hours of wall-clock per in-game day.
+   *
+   * Reached only through the GE_DEBUG_ENDPOINTS cheat routes; nothing in the
+   * game loop calls it.
+   */
+  async forceTick(times: number): Promise<{ planets: number; ticks: number }> {
+    const populated = this.planets.all().filter((p) => shouldRunEconomy(p));
+    for (let i = 0; i < times; i++) {
+      for (const p of populated) {
+        await this.planets.runEconomicTickFor(planetKey(p.xsect, p.ysect, p.plnum));
+      }
+    }
+    // Re-arm the normal schedule so the forced run does not also grant a free
+    // scheduled tick on the next sweep.
+    const nowMs = this.now();
+    for (const p of populated) {
+      this.lastTickMs.set(planetKey(p.xsect, p.ysect, p.plnum), nowMs);
+    }
+    return { planets: populated.length, ticks: times };
+  }
 }
