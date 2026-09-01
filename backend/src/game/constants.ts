@@ -240,6 +240,17 @@ export const TDAMMAX = GAME_CONFIG.TDAMMAX;
 export const MDAMMAX = GAME_CONFIG.MDAMMAX;
 
 /**
+ * Maximum ion-cannon damage — a planet's defensive battery.
+ *
+ * `numopt(IDAMMAX,1,100)`. Shields turn a volley into a scratch
+ * (`idammax * rndm(.15)`) plus a heavy shield knock; a bare hull takes
+ * `idammax * (rndm(.50)+.50)`, which at the default is fatal in two.
+ *
+ * @see GEMAIN.C:512  @see GEFUNCS.C:1785-1812 fireion
+ */
+export const IDAMMAX = GAME_CONFIG.IDAMMAX;
+
+/**
  * Maximum energy a missile can be loaded with, and the divisor C normalises a
  * missile's stored charge against before scaling by MDAMMAX.
  *

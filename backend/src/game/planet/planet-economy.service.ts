@@ -1,7 +1,8 @@
+import { checkSpy } from './spy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RANDOM, Random } from '../combat/random.port';
-import { I_MEN, I_TROOPS } from '../constants/items';
+import { I_MEN, I_TROOPS, I_SPY } from '../constants/items';
 import { MAIL_CLASS_DISTRESS } from '../constants';
 
 /** MailStat.type for the two starvation notices. @see GEPLANET.C:211, :246 */
@@ -9,6 +10,10 @@ const MESG06 = 6 as const;
 const MESG07 = 7 as const;
 /** MailStat.type for the revolt notice. @see GEPLANET.C:368 */
 const MESG30 = 30 as const;
+/** SPYC1 — to the spy's master: your spy was caught. @see GEPLANET.C:125 */
+const MESG_SPYC1 = 31 as const;
+/** SPYC2 — to the planet's owner: we caught a spy. @see GEPLANET.C:134 */
+const MESG_SPYC2 = 32 as const;
 import { applyEconomyTickWithLosses } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
@@ -61,6 +66,26 @@ export class PlanetEconomyService {
       }
       if (starved.men > 0) {
         this.mailStarvation(next, 'COLONISTS STARVED', MESG07, starved.men);
+      }
+    }
+
+    // Counter-espionage — `check_spy` runs on the same tick as `multiply`
+    // (GEMAIN.C:2139). A spy on a planet you have since taken goes home, and a
+    // garrison of counter-spies eventually catches an infiltrator.
+    // @see GEPLANET.C:93-145
+    const spy = checkSpy(
+      {
+        spyowner: next.spyowner ?? '',
+        owner: next.userid,
+        counterSpies: Number(next.items[I_SPY]?.qty ?? 0n),
+      },
+      this.random,
+    );
+    if (spy.outcome !== 'none') {
+      next.spyowner = '';
+      if (spy.outcome === 'caught') {
+        // C mails BOTH sides an "** Official Protest **" (GEPLANET.C:122-141).
+        this.mailSpyCaught(next, spy.spyowner);
       }
     }
 
@@ -125,6 +150,29 @@ export class PlanetEconomyService {
   }
 
   /** Fire-and-forget starvation notice; a failed insert must not stall the tick. */
+
+  /**
+   * Both sides hear about a caught spy — C sends an "** Official Protest **"
+   * to the spy's master (SPYC1) and to the planet's owner (SPYC2).
+   * Fire-and-forget: a failed insert must not stall the tick.
+   *
+   * @see GEPLANET.C:122-141
+   */
+  private mailSpyCaught(planet: PlanetState, spyowner: string): void {
+    const log = (err: unknown) => {
+      const stack = err instanceof Error ? err.stack : String(err);
+      this.logger.error(`Spy-caught mail failed for ${planet.name}: ${stack}`);
+    };
+    void this.insertDistressMail(
+      spyowner, 'OFFICIAL PROTEST', MESG_SPYC1, planet.name, planet.xsect, planet.ysect, 0,
+    ).catch(log);
+    if (planet.userid) {
+      void this.insertDistressMail(
+        planet.userid, 'OFFICIAL PROTEST', MESG_SPYC2, planet.name, planet.xsect, planet.ysect, 0,
+      ).catch(log);
+    }
+  }
+
   private mailStarvation(planet: PlanetState, topic: string, type: number, lost: number): void {
     const owner = planet.userid;
     if (owner === null) return;

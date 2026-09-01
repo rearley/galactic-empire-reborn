@@ -1,5 +1,10 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PlanetStateService } from '../planet/planet-state.service';
+import { resolveIonCannonHit, PLANET_ION_FIRED } from '../planet/ion-cannon';
+import { cdistance, shieldhit } from '../combat/combat-math';
+import { I_ION } from '../constants/items';
 import { I_FLUX } from '../constants/items';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
 import { ShipStateService } from './ship-state.service';
@@ -33,6 +38,9 @@ import { SHIELDDM,
 /** GEMAIN.C:2486 `zothusn += 3` — the 1s loop's stride over the ship table. */
 const MOVE_STRIDE = 3;
 
+/** `if (dist > 1000) ptr->hostile = 0;` — raw units. @see GEFUNCS.C:924 */
+const HOSTILE_RANGE = 1000;
+
 @Injectable()
 export class ShipTickService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ShipTickService.name);
@@ -46,10 +54,17 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     intBelow: (n: number) => Math.floor(Math.random() * n),
   };
 
+  /** Random port for the ion-cannon roll. */
+  private readonly rng2 = { next: () => Math.random() };
+
   constructor(
     private readonly tickService: TickService,
     private readonly shipState: ShipStateService,
     private readonly maintenanceService: MaintenanceService,
+    // Optional: a planet's ion cannons need the live planet map, and the many
+    // hand-built test harnesses construct this service without one.
+    @Optional() private readonly planets?: PlanetStateService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   onModuleInit(): void {
@@ -251,6 +266,10 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       void this.maintenanceService.runAutoRepair(ship);
     }
 
+    // 5. Ion cannons — a planet you have attacked shoots back.
+    // @see GEFUNCS.C:1785-1812 fireion, called from warrtia (GEMAIN.C:2265)
+    this.fireIon(ship);
+
     // 3. Auto-shield (US4, FR-006).
     if (ship.autoShield === true && ship.shieldstat === 0) {
       const decision = decideAutoShield(ship);
@@ -263,4 +282,59 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       }
     }
   }
+  /**
+   * A planet the pilot has attacked fires its ion cannons at them.
+   *
+   *   if (ptr->hostile > 1) {
+   *     plnum = ptr->hostile - 10;
+   *     if (plptr->items[I_IONCANNON].qty > 0) { ... }
+   *   }
+   *
+   * `hostile` is set to `where` (10 + plnum) by `att` (GECMDS.C:3568) and is
+   * this routine's only consumer — before this existed, ion cannons were a
+   * tradeable item with no effect and there was no reason to garrison a
+   * colony. `checkdist` (GEFUNCS.C:907-930) drops the mark once the pilot is
+   * more than 1000 raw units from the planet, so pulling away ends it.
+   *
+   * @see GEFUNCS.C:1785-1812 fireion, GEFUNCS.C:797-798 the checkdist call
+   */
+  private fireIon(ship: ShipState): void {
+    if (ship.hostile <= 1 || !this.planets) return;
+
+    const plnum = ship.hostile - 10;
+    const planet = this.planets.get(Math.floor(ship.xcoord), Math.floor(ship.ycoord), plnum);
+    if (!planet) return;
+
+    // checkdist: far enough away and the planet stops caring.
+    if (cdistance(ship, planet) * 10_000 > HOSTILE_RANGE) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.hostile = 0; });
+      return;
+    }
+
+    if ((planet.items[I_ION]?.qty ?? 0n) <= 0n) return;
+
+    const shieldsUp = ship.shieldstat === 1;
+    const hit = resolveIonCannonHit(this.rng2, shieldsUp);
+
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.damage = s.damage + hit.hullDamage;
+      // `ptr->lastfired = -1` — killed by a planet, credited to nobody.
+      s.lastfired = -1;
+      if (shieldsUp && hit.shieldKnock > 0) {
+        const r = shieldhit(s.shield, s.shieldtype, hit.shieldKnock);
+        s.shield = r.newCharge;
+        if (r.outcome === 'damaged') s.shieldstat = SHIELDDM;
+      }
+    });
+
+    this.events?.emit(PLANET_ION_FIRED, {
+      shipId: `${ship.userid}:${ship.shipno}`,
+      plnum,
+      planetName: planet.name ?? '',
+      hullDamage: hit.hullDamage,
+      shieldKnock: hit.shieldKnock,
+      shieldsUp,
+    });
+  }
+
 }
