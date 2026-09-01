@@ -141,4 +141,25 @@ describe('server notices reach the event log', () => {
     });
     expect(screen.getByTestId('event-log').textContent).toContain('destroyed by');
   });
+
+  /**
+   * Not every death has a killer. A gravity crash sets damage to 101 with no
+   * attacker (GEFUNCS.C:887) and a self-destruct has none by definition, so
+   * both arrived with attackerId null and weapon null — and the client
+   * announced "destroyed by unknown", inventing an assailant for a pilot who
+   * simply flew into a planet.
+   */
+  it('does not invent a killer for a death that had none', () => {
+    render(<App />);
+    fire('combat.ship-destroyed', {
+      victimId: 'usr_clumsy:1',
+      victimUserid: 'usr_clumsy',
+      attackerId: null,
+      weapon: null,
+      attackerName: null,
+    });
+    const text = screen.getByTestId('event-log').textContent ?? '';
+    expect(text).not.toContain('unknown');
+    expect(text).toContain('destroyed');
+  });
 });
