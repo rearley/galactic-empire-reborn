@@ -2109,3 +2109,55 @@ collision, then the shield cluster.
   and abandoned test planets keep their names.
 - Midnight integration tests contend on the advisory lock when Jest runs them in
   parallel workers; they pass on re-run.
+
+## 2026-09-01 — fidelity audit worked through (all 65 findings)
+
+**Completed:** every finding in `docs/FIDELITY_AUDIT.md`, in seven commits.
+The report keeps the commit-by-commit map; the headline changes:
+
+- *Tier 1 exploits* (`740cc2a`) — missiles did ~500x intended damage; jammer and
+  zipper reached the whole galaxy on a sector-vs-raw unit mismatch; `buy` never
+  read your balance; midnight wrote its empty-team marker into a primary key and
+  froze scoring permanently once two teams emptied; the mail purge swept a table
+  nothing writes to.
+- *Tier 2 combat* (`d7deb46`) — the shield knockdown cluster (four findings, one
+  `shieldhit` return type), decoys made single-use and stackable, phasers no
+  longer recharge on an empty battery, and shooting a Cybertron now claims it.
+- *Tier 4 energy* (`4260b28`, `9bd81b3`) — deceleration is free again (running
+  dry at warp was unrecoverable), passive recharge and auto-flux restored, a
+  finished repair restores `topspeed` (blown engines were permanent), the
+  restorative block moved from the 1s tick to the 6s one it belongs on, and
+  hyperspace, gravity wells and wormholes implemented — three mechanics that
+  had no effect at all.
+- *Tier 3 AI* (`8e57b0f`) — Cybertron countdowns count seconds again; the two
+  targeting columns had each other's meaning; break-off, shields and pursuit
+  were inverted or missing; the allowance went to energy and was discarded.
+- *Tiers 5-7* (`aa3e5c4`) — planet economy loop guards, integer starvation,
+  zero-population skip, revolt draws, trade gates, and the scoring constants
+  that were `lngopt` ceilings rather than values.
+- *Tier 8* (`997a4b6`) — `sca sh` announces itself, `damstr` bands, `rep sys`
+  subsystem lines, roster filtering, scan prefix matching, cloak and hails.
+
+**Tests:** backend 3395 passing (362 suites), frontend 156, browser 38. Every
+fix was written test-first. New pure modules with their own specs:
+`ship-channel.registry`, `cyb-decisions` additions (`canPursue`, `notClaimed`,
+`layDecoys`, `decideCybEvasion`, `creditAllowance`), `droid-cadence`,
+`physics/hyperspace`, `physics/gravity`, `physics/sector-change`,
+`planet/trade-access`, `player/kill-score`, `commands/scan-announce`,
+`handlers/helpers/scan-subcommand`, `handlers/ros-format`.
+
+**Decisions made:** droids stay out of the neutral zone despite C having no such
+filter, and PLTVCASH/PLTVDIV are chosen sysop values — both in DECISIONS.md.
+
+**Next:** reset the world and play through it. The point is to find what these
+changes broke as much as what they fixed — several are large behavioural swings
+(missiles are now a finisher rather than a delete button; `buy` is all-or-
+nothing; hull repair is 6x slower; a 120% tax rate wipes a colony's stockpiles).
+
+**Known issues:**
+- A flush that fails repeatedly still only logs. The DMMF test guards the known
+  cause; the swallow itself should escalate.
+- The browser suite shares the dev database.
+- Several seeded-PRNG AI tests had to have their seeds re-derived when draw
+  order changed. They assert behaviour, but they are brittle by construction —
+  worth converting to injected draw sequences when one next needs touching.
