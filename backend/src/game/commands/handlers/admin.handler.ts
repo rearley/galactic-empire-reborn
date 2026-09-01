@@ -6,6 +6,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { resolveItemKeyword, parseUint32 } from '../validators';
 import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
+import { parseTaxRate } from './helpers/tax-rate';
 
 /**
  * Handles the `admin` / `adm` command — planet owner configuration.
@@ -24,7 +25,7 @@ const ADMIN_USAGE: readonly string[] = [
   '  adm markup <item> <value>      sale price',
   '  adm sellflag <item> on|off     offer item to visitors',
   '  adm reserve <item> <value>     hold back from sale',
-  '  adm tax <0-119>                tax rate',
+  '  adm tax <0-100>                tax rate',
   '  adm beacon <message>           message shown to visitors',
   '  adm password <word|none|team>  who may land',
 ];
@@ -137,11 +138,15 @@ export class AdminHandlerService {
         break;
       }
       case 'tax': {
-        const value = parseUint32(args[1] ?? '');
-        if (value === undefined) {
+        // Clamping here meant the service's range check could never fire, so
+        // `adm tax 150` stored 100 and answered "Setting saved." — the one adm
+        // setter that confirmed a value it had not saved. C refuses instead.
+        // @see helpers/tax-rate.ts, GEMAIN.C:3224
+        const rate = parseTaxRate(args[1] ?? '');
+        if (!rate.ok) {
           return usageError();
         }
-        change = { type: 'taxrate', value: Math.min(119, value) };
+        change = { type: 'taxrate', value: rate.value };
         break;
       }
       case 'beacon': {
