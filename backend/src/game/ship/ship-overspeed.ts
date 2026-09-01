@@ -47,11 +47,14 @@ export function decideOverspeed(ship: ShipState, rng: OverspeedRng): OverspeedDe
 
   // Overspeed condition: going faster than rated topspeed and still accelerating
   if (intspeed > ship.topspeed && ship.speed <= ship.speed2b) {
-    let diff = ((intspeed - ship.topspeed) * 100) / intspeed;
-    diff = 60 - diff;
+    // C declares `diff` as int, so the division truncates BEFORE the
+    // subtraction: (3*100)/9 is 33, not 33.33, giving 60-33 = 27 rather than
+    // 26. Carrying the float through and flooring once at the end raised the
+    // break chance on every roll. @see GEFUNCS.C:742-747
+    let diff = 60 - Math.trunc(((intspeed - ship.topspeed) * 100) / intspeed);
     if (diff < 0) diff = 5;
-    // Ensure diff is at least 1 to avoid modulo-by-zero
-    const safeDiff = Math.max(1, Math.floor(diff));
+    // Guard against modulo-by-zero; C's `gernd()%diff` would divide by zero.
+    const safeDiff = Math.max(1, diff);
 
     if (rng.intBelow(safeDiff) === 0) {
       if (ship.warncntr > 4) {

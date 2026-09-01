@@ -1,4 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { applyHyperspaceTransition } from './hyperspace';
+import { checkGravity } from './gravity';
+import { applySectorChangeEffects } from './sector-change';
+import { GalaxyService } from '../galaxy/galaxy.service';
+import { Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MOVENGMIN, MOVENGUSE } from '../constants';
 import { ShipState, shipKey } from '../ship/ship-state.types';
@@ -12,6 +16,9 @@ import {
   PhysicsBoundaryWrappedEvent,
   PhysicsHyperspaceEvent,
   PhysicsSectorTransitionEvent,
+  PHYSICS_GRAVITY,
+  PHYSICS_DESTRUCT_CANCELLED,
+  PhysicsGravityEvent,
 } from './physics-events';
 import {
   accelerationStep,
@@ -54,6 +61,9 @@ export class PhysicsTickService implements OnModuleInit {
     private readonly shipState: ShipStateService,
     private readonly shipClassCache: ShipClassCacheService,
     private readonly events: EventEmitter2,
+    // Optional so the hand-built test harnesses keep working; without it a ship
+    // simply never encounters gravity, which is the pre-existing behaviour.
+    @Optional() private readonly galaxy?: GalaxyService,
   ) {}
 
   onModuleInit(): void {
@@ -208,6 +218,14 @@ export class PhysicsTickService implements OnModuleInit {
       };
       this.events.emit(PHYSICS_HYPERSPACE, payload);
 
+      // The event had no listener, so `where` never became 1 for a player and
+      // every `where === 1` gate in the game was dead code. The state change
+      // belongs inline — an event nobody consumes is the bug, not the design.
+      // @see GEFUNCS.C:580-628 hyperspace
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        applyHyperspaceTransition(s, accel.hyperspaceEvent as 'enter' | 'exit');
+      });
+
       // Set auto-shield warp-exit trigger (T024 — consumed by ShipTickService.processShip).
       if (accel.hyperspaceEvent === 'exit') {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
@@ -245,6 +263,9 @@ export class PhysicsTickService implements OnModuleInit {
         s.ycoord = wrappedY;
       });
 
+      // C calls gravity() from moveship on every move (GEFUNCS.C:794-795).
+      this.applyGravity(ship, postSector, ctx);
+
       if (xWrapped || yWrapped) {
         const axis = xWrapped && yWrapped ? 'both' : xWrapped ? 'x' : 'y';
         const wrapped: PhysicsBoundaryWrappedEvent = {
@@ -258,6 +279,19 @@ export class PhysicsTickService implements OnModuleInit {
       }
 
       if (preSector.x !== postSector.x || preSector.y !== postSector.y) {
+        // C clears `hostile` and cancels an armed self-destruct on reaching a
+        // neutral sector, right here inside moveship. @see GEFUNCS.C:724-730
+        let destructCancelled = false;
+        this.shipState.mutate(ship.userid, ship.shipno, (v) => {
+          destructCancelled = applySectorChangeEffects(v, postSector);
+        });
+        if (destructCancelled) {
+          this.events.emit(PHYSICS_DESTRUCT_CANCELLED, {
+            shipId: shipKey(ship.userid, ship.shipno),
+            tickAt: ctx.firedAt,
+          });
+        }
+
         const payload: PhysicsSectorTransitionEvent = {
           shipId: shipKey(ship.userid, ship.shipno),
           fromSector: preSector,
@@ -287,4 +321,54 @@ export class PhysicsTickService implements OnModuleInit {
       }
     }
   }
+  /**
+   * Planet and wormhole proximity — the only reason to be careful where you
+   * point a warp run. Fly into a planet and the hull is written off; fly into
+   * a wormhole and you come out at its destination, 5.5 damage worse off and
+   * with every torpedo and missile lock cleared.
+   *
+   * Neither existed in the port: `gravity` had no implementation and the
+   * wormhole rows the galaxy generator writes had no reader.
+   *
+   * @see GEFUNCS.C:836-905 gravity
+   */
+  private applyGravity(ship: ShipState, sector: { x: number; y: number }, ctx: TickContext): void {
+    if (!this.galaxy) return;
+
+    const bodies = this.galaxy.getGravityBodies(sector.x, sector.y);
+    if (bodies.length === 0) return;
+
+    for (const event of checkGravity(ship, bodies)) {
+      const payload: PhysicsGravityEvent = {
+        shipId: shipKey(ship.userid, ship.shipno),
+        plnum: event.plnum,
+        isWormhole: event.isWormhole,
+        band: event.band,
+        tickAt: ctx.firedAt,
+      };
+      this.events.emit(PHYSICS_GRAVITY, payload);
+
+      if (!event.effect) continue;
+
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        if (event.effect!.kind === 'crash') {
+          s.damage = event.effect!.damage;
+          return;
+        }
+        const w = event.effect as { destination: { xcoord: number; ycoord: number }; damage: number };
+        s.xcoord = w.destination.xcoord;
+        s.ycoord = w.destination.ycoord;
+        s.damage += w.damage;
+        // cleartm(usrn) — a transit shakes off everything chasing you.
+        for (let i = 0; i < s.ltorpsDistance.length; i++) s.ltorpsDistance[i] = 0;
+        for (let i = 0; i < s.ltorpsChannel.length; i++) s.ltorpsChannel[i] = 255;
+        for (let i = 0; i < s.lmisslDistance.length; i++) s.lmisslDistance[i] = 0;
+        for (let i = 0; i < s.lmisslChannel.length; i++) s.lmisslChannel[i] = 255;
+      });
+
+      // A crash or a jump ends this ship's move.
+      break;
+    }
+  }
+
 }

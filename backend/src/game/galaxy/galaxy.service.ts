@@ -8,6 +8,7 @@ import { Rng } from './rng';
 import { rollPlanetInventory } from './planet-seed';
 import { S00, S00_PLNUM } from './s00';
 import { GalaxyConfig, GalaxyWormholeView } from './galaxy.types';
+import { GravityBody } from '../physics/gravity';
 
 /**
  * Galaxy generator and in-memory read model.
@@ -121,6 +122,35 @@ export class GalaxyService implements OnModuleInit {
     }
     const raw = this.wormholesBySector.get(`${xsect},${ysect}`) ?? [];
     return raw.map((w) => ({ xcoord: w.xcoord, ycoord: w.ycoord, visible: w.visible === 1 }));
+  }
+
+  /**
+   * Every body in a sector a ship can fall into — planets and wormholes alike,
+   * with the position, slot number and (for wormholes) exit coordinates the
+   * gravity check needs.
+   *
+   * Positions are fixed at generation, so the boot-time read model is the right
+   * source here; ownership, which does change, is not part of this view.
+   *
+   * @see GEFUNCS.C:846-900 gravity  @see src/game/physics/gravity.ts
+   */
+  getGravityBodies(xsect: number, ysect: number): GravityBody[] {
+    if (!inUniverse(xsect, ysect)) return [];
+    const bodies: GravityBody[] = [];
+
+    for (const p of this.planetsBySector.get(`${xsect},${ysect}`) ?? []) {
+      bodies.push({ xcoord: p.xcoord, ycoord: p.ycoord, plnum: p.plnum, type: p.type });
+    }
+    for (const w of this.wormholesBySector.get(`${xsect},${ysect}`) ?? []) {
+      bodies.push({
+        xcoord: w.xcoord,
+        ycoord: w.ycoord,
+        plnum: w.plnum,
+        type: w.type === 0 ? PLTYPE_WORM : w.type,
+        destination: { xcoord: w.destXcoord, ycoord: w.destYcoord },
+      });
+    }
+    return bodies;
   }
 
   /**
