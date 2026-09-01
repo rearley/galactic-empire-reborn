@@ -2161,3 +2161,66 @@ nothing; hull repair is 6x slower; a 120% tax rate wipes a colony's stockpiles).
 - Several seeded-PRNG AI tests had to have their seeds re-derived when draw
   order changed. They assert behaviour, but they are brittle by construction —
   worth converting to injected draw sequences when one next needs touching.
+
+## 2026-09-01 — reset the world and played it
+
+**Completed:** reset the galaxy (441 sectors, 210 planets, 20 wormholes, 24 AI
+ships) and played a new pilot through trade, scanning, combat, colonisation and
+the nightly job. Seven defects the 3,400-test suite could not see, in two
+commits.
+
+`0a28c08` — four from ordinary play:
+- **Midnight ran exactly once per backend process.** `pg_try_advisory_lock` is
+  session-scoped and Prisma pools connections, so the `finally` unlock ran on a
+  different session and the lock leaked. Every later run — the nightly cron
+  included — was rejected until restart. Now transaction-scoped. This is also
+  the real cause of the "flaky" midnight tests: advisory locks are
+  cluster-wide, so the dev server's leaked lock on `ge` blocked `ge_test`.
+- **Gravity and destruct notices had no listener** — effects applied, the pilot
+  was never told. The same emitted-but-unconsumed mistake as hyperspace,
+  reintroduced while fixing it.
+- **The client swallowed blank input**, making the new FORHELP unreachable.
+- **The Zygor-3 gold bank was dead** — the availability gate went in without
+  its gold clause (GECMDS.C:4417-4423).
+
+`eee696d` — three from asking whether a new player can see an ambush coming:
+- **The Cybertron taunt went to the attacker's sector room**, not the targeted
+  pilot's terminal. Since a heavy hunts from outside your scanners, that taunt
+  is the only warning the game gives, and it reached nobody.
+- **`cyb_annoy` had no odds gate** (C rolls 1-in-20).
+- **Combat lines named attackers by userid**, which no command accepts —
+  "Cybrg-222" where `sca sh` needs "Cybrg-49340".
+
+**Tests:** backend 3418 (367 suites), frontend 157, browser 38. All test-first.
+
+**Decisions made:** the quick kill stays. A Sarten Obliterator scans 6 sectors
+to an Interceptor's 1.5 and C's range scan tops out at your own scan range
+(`scanrange/((10-x)^2)`, GECMDS.C:2517), so there is no way to see it coming;
+the taunt is a 1-in-20 chance, not a guarantee. That is the original's own
+number and we are keeping it.
+
+**Next:** ion cannons — see Known issues. Nothing else outstanding.
+
+**Known issues:**
+- **Ion cannons do nothing.** `fireion()` (GEFUNCS.C:1785-1812) is called every
+  6s from `warrtia` (GEMAIN.C:2265): a planet you have attacked (`hostile > 1`)
+  that holds I_IONCANNON shoots back — `idammax * rndm(.15)` plus a 40-89
+  shield knock through raised shields, `idammax * (rndm(.50)+.50)` without.
+  The port has no implementation, so ion cannons are a tradeable item with no
+  effect and there is no reason to garrison a colony. This is also the missing
+  consumer for `hostile`, which the audit flagged as written-but-never-read;
+  IDAMMAX is likewise unused.
+- **Spy removal (FR-013) is absent** — `spyowner` clears only by overwrite or
+  ownership change.
+- `msgFilter` is written in four places and read by none (DECISIONS D4).
+- A flush that fails repeatedly still only logs.
+- The browser suite shares the dev database.
+- Several seeded-PRNG AI tests are brittle by construction.
+
+**Doc hygiene:** `GAME_MECHANICS.md` still carries "deferred to feature
+006/009/019" notes for work that shipped long ago — mine cloak and neutral-zone
+gates, `rep cargo`/`rep wpns`, revolt, autoRepair/autoShield wiring are all
+implemented. The 26 sysop options marked `implemented: false` in
+`game-config.ts` are mostly values hard-coded elsewhere (TOOCLOSE, CLENGUSE,
+MAILDAYS, PLODDS, CHGLOSER…) rather than missing mechanics; the genuine gaps
+there are IDAMMAX and SCRBONUS.
