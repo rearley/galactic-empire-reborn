@@ -10,6 +10,7 @@
 // module-level side-effectful constant.
 jest.mock('../../../src/game/player/score.config', () => ({ scoreF2: 100 }));
 
+import { killScoreAward, killScoreDeduction } from '../../../src/game/player/kill-score';
 import { PlayerScoreRepository } from '../../../src/game/player/player-score.repository';
 
 function makePrisma(
@@ -78,9 +79,9 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       );
     });
 
-    it('floors fractional result', async () => {
-      // scoreF2=100 (mocked), scr=333 → transfer = floor(333/100 * 100) = 333
-      // (no fractional part here; test with non-round scr/scoreF2 combo via mock override)
+    it('scales only the victim\'s deduction by scoreF2, never the award', async () => {
+      // The attacker's award is `amt` and is never touched by score_f2
+      // (GEFUNCS.C:1183). Only the deduction is `(amt/100)*score_f2`.
       jest.resetModules();
       jest.mock('../../../src/game/player/score.config', () => ({ scoreF2: 3 }));
       // Use a local re-import for this override
@@ -88,12 +89,12 @@ describe('PlayerScoreRepository.transferKillScore', () => {
         await import('../../../src/game/player/player-score.repository');
       const { prisma, updateMock } = makePrisma({});
       const repo = new Repo2(prisma as never);
-      // scr=100, scoreF2=3 → floor(100/100 * 3) = floor(3) = 3
+      // scr=100, scoreF2=3 → deduction (100/100)*3 = 3; award stays 100.
       await repo.transferKillScore('attacker', 'victim', 100, false, false);
       expect(updateMock).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userid: 'attacker' },
-          data: expect.objectContaining({ score: { increment: 3n } }),
+          data: expect.objectContaining({ score: { increment: 100n } }),
         }),
       );
     });
@@ -128,9 +129,10 @@ describe('PlayerScoreRepository.transferKillScore', () => {
     });
   });
 
-  describe('AI attacker formula: floor((scr / 100) * scoreF2 / 10)', () => {
-    it('awards 1/10 of normal transfer for AI attacker', async () => {
-      // scoreF2=100 (mocked), scr=1000 → normal=1000, AI=floor(1000/10)=100
+  describe('AI attacker: only the victim\'s deduction is divided by ten', () => {
+    it('still books the full amount for the Cybertron', async () => {
+      // GEFUNCS.C:1161 divides `ded_amt` by ten, not `amt` — dying to a
+      // Cybertron stings less, but the Cybertron scores the same as anyone.
       const { prisma, updateMock } = makePrisma({}, 'Cybrg-1');
       const repo = new PlayerScoreRepository(prisma as never);
 
@@ -139,7 +141,7 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       expect(updateMock).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userid: 'Cybrg-1' },
-          data: expect.objectContaining({ score: { increment: 100n } }),
+          data: expect.objectContaining({ score: { increment: 1000n } }),
         }),
       );
     });
@@ -203,5 +205,49 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       );
       expect(victimUpdates).toHaveLength(0);
     });
+  });
+});
+
+/**
+ * The attacker's award and the victim's deduction are two different numbers.
+ *
+ * GEFUNCS.C:1155-1184:
+ *
+ *   amt     = scr + bonus;
+ *   ded_amt = (amt/100L)*score_f2;
+ *   if (killed by a Cybertron) ded_amt = ded_amt/10;
+ *   ... victim loses ded_amt ...
+ *   (wuptr->score)   += amt;      // the ATTACKER gets the unscaled amount
+ *   (wuptr->klscore) += amt;
+ *
+ * Only `ded_amt` is scaled by score_f2, and only `ded_amt` is divided by ten
+ * when an AI made the kill. The port computed a single `transfer` and used it
+ * for both sides, so at any score_f2 other than the shipped 100 the attacker's
+ * award was scaled too — and an AI kill paid a tenth of what it should.
+ *
+ * Latent at the default (score_f2 = 100 makes ded_amt == amt), which is why it
+ * survived: change the knob and the two sides silently diverge.
+ */
+describe('kill score — award and deduction are computed separately', () => {
+  it('awards the attacker the full amount regardless of score_f2', () => {
+    expect(killScoreAward(750)).toBe(750);
+  });
+
+  it('deducts (amt/100)*score_f2, truncating the division first', () => {
+    // 750/100 = 7 in C's long arithmetic, so the deduction is 700, not 750.
+    expect(killScoreDeduction(750, 100, false)).toBe(700);
+    expect(killScoreDeduction(750, 50, false)).toBe(350);
+    expect(killScoreDeduction(750, 0, false)).toBe(0);
+  });
+
+  it('divides only the DEDUCTION by ten when an AI made the kill', () => {
+    expect(killScoreDeduction(750, 100, true)).toBe(70);
+    // The Cybertron still books the whole amount.
+    expect(killScoreAward(750)).toBe(750);
+  });
+
+  it('truncates as C\'s long arithmetic does — (amt/100)*score_f2', () => {
+    // amt/100 truncates FIRST: 199/100 = 1, then *100 = 100, not 199.
+    expect(killScoreDeduction(199, 100, false)).toBe(100);
   });
 });

@@ -3,7 +3,7 @@
  * Uses the pure applyEconomyTick function (no services needed).
  */
 
-import { applyEconomyTick } from '../../src/game/planet/planet-economy';
+import { applyEconomyTick, shouldRunEconomy } from '../../src/game/planet/planet-economy';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
 import { NUMITEMS, I_MEN, I_FOOD } from '../../src/game/constants/items';
 
@@ -64,11 +64,13 @@ describe('T045 — applyEconomyTick with zero population', () => {
     expect(final.items[I_FOOD].qty).toBe(1000n);
   });
 
-  it('zero men: cash unchanged after 100 ticks', () => {
+  it('a zero-population planet is never handed to the economy at all', () => {
+    // C gates on `plptr->items[0].qty > 0 && plptr->userid[0] != 0`
+    // (GEMAIN.C:2132), so the question is not what multiply() does to an empty
+    // world — it is never called on one. That is what keeps a garrisoned but
+    // depopulated planet frozen rather than slowly bleeding out.
     const initial = makeZeroPopPlanet();
-    const final = runTicks(initial, 100);
-
-    expect(final.cash).toBe(1000n);
+    expect(shouldRunEconomy(initial)).toBe(false);
   });
 
   it('zero men: all non-food numeric item quantities remain zero after 100 ticks', () => {

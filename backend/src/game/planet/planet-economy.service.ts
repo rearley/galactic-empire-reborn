@@ -75,11 +75,15 @@ export class PlanetEconomyService {
     if (revoltPressure <= troops) return { state: next, revolted: false };
 
     // GEPLANET.C:359 — gernd() % 10 == 0
-    const randVal = Math.floor(this.random.next() * 100);
-    if (randVal % 10 !== 0) return { state: next, revolted: false };
+    if (Math.floor(this.random.next() * 10) !== 0) return { state: next, revolted: false };
 
-    // Revolt!
-    const divisor = (randVal % 8) + 2;
+    // Revolt! The severity is a SECOND, independent draw:
+    // `cnt = plptr->items[I_TROOPS].qty / ((gernd()%8)+2)`. Deriving it from
+    // the same value as the gate above left only {0,10,...,90} in play, whose
+    // residues mod 8 are {0,2,4,6} — so the divisor could only ever be 2, 4, 6
+    // or 8, unevenly weighted, instead of uniform over 2..9.
+    // @see GEPLANET.C:359-361
+    const divisor = Math.floor(this.random.next() * 8) + 2;
     const newTroops = Math.floor(troops / divisor);
 
     const items = next.items.map((it) => ({ ...it }));

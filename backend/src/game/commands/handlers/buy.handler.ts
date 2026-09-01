@@ -7,6 +7,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
 import { planetKey } from '../../planet/planet-state.types';
+import { decideTradeAccess } from '../../planet/trade-access';
 import { resolveItemKeyword, parseUint32 } from '../validators';
 
 /**
@@ -46,23 +47,24 @@ export class BuyHandlerService {
       return { lines: [{ text: formatMessage(MessageId.BUY1), category: 'system' }] };
     }
 
-    // Password gate for non-owners
-    if (state.userid !== null && state.userid !== ship.userid) {
-      const pwd = state.password;
-      if (pwd && pwd !== 'none') {
-        if (pwd === 'team') {
-          if (state.teamcode !== 0n) {
-            return { lines: [{ text: formatMessage(MessageId.BUYPAS3), category: 'system' }] };
-          }
-        } else {
-          // Password required but not provided as arg[2]
-          const providedPwd = args[2]?.trim() ?? '';
-          if (providedPwd !== pwd) {
-            return { lines: [{ text: formatMessage(MessageId.BUYPAS1), category: 'system' }] };
-          }
-        }
-      }
+    // Ownership and password gates — C runs these before any price or stock is
+    // consulted. @see GECMDS.C:4232-4246, 4322
+    const access = decideTradeAccess(
+      state,
+      ship.userid,
+      ship.teamcode ?? 0n,
+      args[2]?.trim() || undefined,
+    );
+    if (!access.ok) {
+      const message =
+        access.reason === 'NO_OWNER'
+          ? MessageId.BUY7
+          : access.reason === 'WRONG_TEAM'
+            ? MessageId.BUYPAS3
+            : MessageId.BUYPAS1;
+      return { lines: [{ text: formatMessage(message), category: 'system' }] };
     }
+    const welcome = access.welcome === true;
 
     const qty = parseUint32(args[0] ?? '');
     if (qty === undefined || qty === 0) {
@@ -133,8 +135,15 @@ export class BuyHandlerService {
       data: { cash: { decrement: result.totalCost } },
     });
 
+    const lines: CommandResult['lines'] = [];
+    // BUYPAS4 — C greets a team-mate before the purchase confirmation.
+    if (welcome) {
+      lines.push({ text: formatMessage(MessageId.BUYPAS4), category: 'info' });
+    }
+
     return {
       lines: [
+        ...lines,
         {
           text: formatMessage(
             MessageId.BUY2,

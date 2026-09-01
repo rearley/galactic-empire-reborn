@@ -1,5 +1,12 @@
 import { resolveGameConfig } from '../config/game-config';
 
+/** Parse a sysop option from the environment, clamped to C's legal range. */
+function clampOption(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const n = raw === undefined ? NaN : Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 /**
  * Constants for the midnight maintenance pass — sourced verbatim from the original C source.
  * The balance-regression test (SC-006) imports each constant and asserts its exact value.
@@ -30,11 +37,37 @@ export const TEAMBONU: bigint = BigInt(resolveGameConfig().TEAMBONU) * 100n;
 /** Default mail retention in days (env-overridable). @see GEMAIN.C:497 */
 export const MAILDAYS_DEFAULT: number = 7;
 
-/** Planet cash-value divisor. @see GEMAIN.C:593 */
-export const PLTVCASH: number = 201_228_378;
+/**
+ * Planet cash-value divisor. Scoring credits `(cash + tax) / (1000000 /
+ * PLTVCASH)`, so 1000 means one point per 1000 credits banked.
+ *
+ * This was pinned to 201,228,378, which is NOT a value — it is the `lngopt`
+ * MAX BOUND, the third argument, and the same number is the ceiling for maxpl,
+ * weight, value, manhours, phaserprice and shieldprice (GEMAIN.C:557-596).
+ * C's own expression proves it: at that magnitude `1000000L / pltvcash`
+ * truncates to zero and the divide traps. As a "value" it turned the divisor
+ * into a ~201x multiplier, so banked planet cash dominated the leaderboard and
+ * combat contributed nothing measurable to `score = plscore + klscore`.
+ *
+ * Sysop-tunable via PLTVCASH. Must be in 1..1_000_000 for the C expression to
+ * remain a divisor.
+ *
+ * @see GEMAIN.C:593 lngopt(PLTVCASH, 0L, 201228378L)  @see GEMAIN.C:1352
+ */
+export const PLTVCASH: number = clampOption(process.env['PLTVCASH'], 1_000, 1, 1_000_000);
 
-/** Planet item-value divisor. @see GEMAIN.C:596 */
-export const PLTVDIV: number = 201_228_378;
+/**
+ * Planet item-value divisor: `v += value[i] * (qty[i] / PLTVDIV)`.
+ *
+ * Same ceiling-as-value mistake. At 201,228,378 every stockpile truncated to
+ * zero — MAXPL tops out at 1e9, well under the divisor — so inventory was
+ * invisible to score and the only rational play was converting everything to
+ * cash. 10,000 keeps a million-strong colony worth a few hundred points,
+ * comparable to a kill rather than dwarfing or vanishing beside one.
+ *
+ * @see GEMAIN.C:596 lngopt(PLTVDIV, 0L, 201228378L)  @see GEMAIN.C:1356
+ */
+export const PLTVDIV: number = clampOption(process.env['PLTVDIV'], 10_000, 1, 1_000_000);
 
 /** Default CHGLOSER percentage (env-overridable, 0–100). @see GEMAIN.C:605 */
 export const CHGLOSER_DEFAULT: number = 100;

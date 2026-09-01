@@ -18,14 +18,23 @@ import { PLANTIME, PLANTOCK_SECONDS } from '../../src/game/constants';
  */
 class FakePlanets {
   readonly ticked: string[] = [];
-  constructor(private readonly planets: Array<{ xsect: number; ysect: number; plnum: number; userid: string | null }>) {}
+  constructor(
+    private readonly planets: Array<{
+      xsect: number; ysect: number; plnum: number; userid: string | null;
+      items: Array<{ qty: bigint }>;
+    }>,
+  ) {}
   all() { return this.planets; }
   async runEconomicTickFor(key: string): Promise<void> { this.ticked.push(key); }
 }
 
 function makeService(count: number, nowMs = 0) {
+  // A populated planet — the tick skips zero-population worlds outright
+  // (GEMAIN.C:2132), so slot 0 (I_MEN) has to be non-zero for these
+  // scheduling tests to see any work at all.
   const planets = Array.from({ length: count }, (_, i) => ({
     xsect: i, ysect: 0, plnum: 1, userid: 'owner',
+    items: Array.from({ length: 14 }, () => ({ qty: 1000n })),
   }));
   const fake = new FakePlanets(planets);
   let clock = nowMs;

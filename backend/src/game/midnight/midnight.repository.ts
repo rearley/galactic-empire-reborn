@@ -287,10 +287,13 @@ export class MidnightRepository {
    */
   async applyPerMemberTeamScore(tx: TxClient): Promise<void> {
     const users = await tx.user.findMany({
+      // C gates only on `tmpusr.teamcode > 0` — no score test anywhere in the
+      // block (GEMAIN.C:1258-1286). Excluding zero-score members meant a
+      // team's fresh recruits were counted in `teamcount`, the divisor, while
+      // contributing no bonus: the team's score went DOWN for recruiting.
       where: {
         userid: { not: KEY_USERID },
         teamcode: { gt: 0n },
-        score: { gt: 0n },
       },
       select: { userid: true, teamcode: true, score: true },
     });

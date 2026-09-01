@@ -62,8 +62,10 @@ describe('valuePlanet — pure formula (GEMAIN.C:1348-1359)', () => {
   });
 
   it('BigInt safety — rich planet with 64-bit-range values', () => {
-    const cash = 2_000_000_000n * 1_000n; // 2 trillion
-    const tax  = 1_000_000_000n * 1_000n; // 1 trillion
+    // PLTVCASH is a DIVISOR now, so the inputs have to be correspondingly
+    // larger to land the result in 64-bit territory.
+    const cash = 2_000_000_000n * 1_000_000n; // 2 quadrillion
+    const tax  = 1_000_000_000n * 1_000_000n; // 1 quadrillion
     const qty  = makeItemsQty(Array(NUMITEMS).fill(BigInt(PLTVDIV) * 1_000n));
     const cashTerm = (cash + tax) * BigInt(PLTVCASH) / 1_000_000n;
     const itemTerm = BASE_PRICES.reduce((acc, bp) => {

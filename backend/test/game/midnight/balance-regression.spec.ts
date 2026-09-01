@@ -47,12 +47,23 @@ describe('midnight balance regression (SC-006)', () => {
     expect(MAILDAYS_DEFAULT).toBe(7);
   });
 
-  it('PLTVCASH = 201_228_378', () => {
-    expect(PLTVCASH).toBe(201_228_378);
+  /**
+   * 201,228,378 is the `lngopt` MAX BOUND shared by seven sysop options
+   * (GEMAIN.C:557-596), not a value. Pinned as one it made PLTVCASH a ~201x
+   * multiplier on banked cash and PLTVDIV large enough to truncate every
+   * stockpile to zero. These now hold chosen sysop values, env-overridable,
+   * and the regression guard is that they stay in the range where C's
+   * expressions are actually divisions.
+   * @see test/game/midnight/planet-value-scale.spec.ts
+   */
+  it('PLTVCASH is a divisor, not the lngopt ceiling', () => {
+    expect(PLTVCASH).toBe(1_000);
+    expect(Math.floor(1_000_000 / PLTVCASH)).toBeGreaterThan(0);
   });
 
-  it('PLTVDIV = 201_228_378', () => {
-    expect(PLTVDIV).toBe(201_228_378);
+  it('PLTVDIV is a divisor, not the lngopt ceiling', () => {
+    expect(PLTVDIV).toBe(10_000);
+    expect(PLTVDIV).toBeLessThan(201_228_378);
   });
 
   it('CHGLOSER_DEFAULT = 100', () => {

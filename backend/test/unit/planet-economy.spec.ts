@@ -68,17 +68,21 @@ describe('applyEconomyTick', () => {
     expect(result.items[I_TROOPS].qty).toBeLessThan(10000n);
   });
 
-  it('gold-to-cash conversion zeroes gold qty and increases cash (zero-pop planet to isolate gold logic)', () => {
-    // With men=0 the production loop breaks immediately, so the cash-decay tfact is not applied.
-    // This lets us verify the gold conversion in isolation.
-    const planet = makePlanet();
-    planet.items[I_MEN].qty = 0n;
-    planet.items[I_GOLD].qty = 100n;
-    const initialCash = planet.cash;
-    const result = applyEconomyTick(planet);
-    expect(result.items[I_GOLD].qty).toBe(0n);
-    // cash += 100 * BASEPRICE[I_GOLD] (100) = +10000n
-    expect(result.cash).toBeGreaterThan(initialCash);
+  it('gold-to-cash conversion zeroes gold qty and adds its value', () => {
+    // The conversion happens before the production loop, so compare against
+    // what the loop's tfact decay leaves of a planet holding no gold.
+    // (A zero-population planet is no longer a useful isolation trick — C
+    // never runs multiply() on one at all, GEMAIN.C:2132.)
+    const withGold = makePlanet();
+    withGold.items[I_GOLD].qty = 100n;
+    const withoutGold = makePlanet();
+    withoutGold.items[I_GOLD].qty = 0n;
+
+    const a = applyEconomyTick(withGold);
+    const b = applyEconomyTick(withoutGold);
+
+    expect(a.items[I_GOLD].qty).toBe(0n);
+    expect(a.cash).toBeGreaterThan(b.cash);
   });
 
   it('tax accrual increases tax proportional to taxrate and men count', () => {
