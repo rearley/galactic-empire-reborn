@@ -147,6 +147,13 @@ export const PMINFIRE = 60 as const;
 export const PRELOAD = 10 as const;
 /** @see GEMAIN.H:82 #define PENGUSE 57 — energy consumed per tick while phasers charge */
 export const PENGUSE = 57 as const;
+
+/**
+ * The reserve `useenergy()` refuses to dip into: it only spends when
+ * `energy >= amount + 500`, and returns 0 (spending nothing) otherwise.
+ * @see GEFUNCS.C:1500-1514 `if (ptr->energy >= amount+500) /* fudge a bit *\/`
+ */
+export const USEENERGY_RESERVE = 500 as const;
 /** @see GEMAIN.H:83 #define PMINENG 500 — minimum ship energy required to fire phasers */
 export const PMINENG = 500 as const;
 /** @see GEMAIN.H:84 #define PHABIAS 2 — phaser arc bias (extra degrees) */

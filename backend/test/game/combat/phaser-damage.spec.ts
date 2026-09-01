@@ -1,5 +1,5 @@
-import { PDAMMAX } from '../../../src/game/constants';
-import { phaserDamage } from '../../../src/game/combat/combat-math';
+import { PDAMMAX, PFIRDST, TONFACT, HPDAMMAX, HPFIRDST } from '../../../src/game/constants';
+import { phaserDamage, hyperPhaserDamage } from '../../../src/game/combat/combat-math';
 
 describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GECMDS.C:956-973)', () => {
   const base = { phasrtype: 1, phasr: 100, focus: 0, victimMaxTons: 0, victimAtWarp: false };
@@ -17,8 +17,10 @@ describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GEC
   });
 
   it('half-disfact deals roughly half (linear pfirdist=1)', () => {
-    // dist=12000 -> dd=0.5 -> dp=0.5 -> dam=PDAMMAX/2 -> *0.8
-    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(Math.floor(PDAMMAX * 0.5 * 0.8));
+    // dist=12000 -> dd=0.5 -> dp=0.5 -> dam = trunc(PDAMMAX/2) -> *0.8
+    // The base truncates inside pdamage (`unsigned dam`), so this is not the
+    // same as flooring PDAMMAX*0.5*0.8 once at the end.
+    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(Math.floor(Math.trunc(PDAMMAX * 0.5) * 0.8));
   });
 
   it('heavier victim takes less (tonfact divisor)', () => {
@@ -41,5 +43,48 @@ describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GEC
 
   it('sysop phaser (type 20) is fixed at 101', () => {
     expect(phaserDamage({ ...base, phasrtype: 20, distRaw: 0 })).toBe(101);
+  });
+});
+
+/**
+ * `pdamage` returns `unsigned dam` — the base damage is TRUNCATED to a whole
+ * number inside pdamage, and only then do firep/firehp scale it by phasrtype
+ * and the victim's tonnage (GECMDS.C:956-969, 1056-1063). The port carried a
+ * float all the way through and floored once at the end, which lets a fraction
+ * of a point of base damage ride the outer multiplier up into whole points.
+ *
+ * @see GEFUNCS.C:2060-2092 `unsigned dam; ... dam = pdammax * dp;`
+ */
+describe('pdamage truncates its base damage before the outer scaling', () => {
+  it('matches the value C would produce across a range of shots', () => {
+    for (const distRaw of [0, 1234, 5678, 9999, 15000]) {
+      for (const focus of [1, 3, 7]) {
+        const args = {
+          phasrtype: 3,
+          phasr: 87,
+          distRaw,
+          focus,
+          victimMaxTons: 1300,
+          victimAtWarp: false,
+        };
+        const disfact = 20000 + args.phasrtype * 4000;
+        const dd = Math.max(0, 1 - distRaw / disfact);
+        const fd = 1 - focus / 11;
+        const dp = Math.pow(dd, PFIRDST) * (fd * fd) * (args.phasr / 100);
+        // C: `unsigned dam = pdammax * dp` — truncated HERE, not at the end.
+        const cDam = Math.trunc(PDAMMAX * dp);
+        const tonfact = 1 + args.victimMaxTons / TONFACT;
+        const expected = Math.floor((cDam * ((1 + args.phasrtype) / 2.5)) / tonfact);
+        expect(phaserDamage(args)).toBe(expected);
+      }
+    }
+  });
+
+  it('applies the same truncation on the hyper-phaser branch', () => {
+    const distRaw = 7777;
+    const dd = Math.max(0, 1 - distRaw / 40000);
+    const cDam = Math.trunc(HPDAMMAX * Math.pow(dd, HPFIRDST));
+    const expected = Math.floor((cDam * 4) / (1 + 1300 / TONFACT));
+    expect(hyperPhaserDamage({ phasrtype: 4, distRaw, victimMaxTons: 1300 })).toBe(expected);
   });
 });

@@ -124,7 +124,9 @@ export function phaserDamage(args: {
   const dd = Math.max(0, 1 - distRaw / disfact);
   const fd = 1 - focus / 11;
   const dp = Math.pow(dd, PFIRDST) * (fd * fd) * (phasr / 100);
-  const dam = PDAMMAX * dp;
+  // C declares `unsigned dam`, so the base is truncated HERE — before firep
+  // scales it by phasrtype and tonnage. @see GEFUNCS.C:2065, 2088
+  const dam = Math.trunc(PDAMMAX * dp);
   const tonfact = 1 + victimMaxTons / TONFACT;
   let factor = (dam * ((1 + phasrtype) / 2.5)) / tonfact;
   if (victimAtWarp) factor /= 2;
@@ -156,7 +158,8 @@ export function hyperPhaserDamage(args: {
   if (phasrtype === 20) return 101; // sysop phaser
   const dd = Math.max(0, 1 - distRaw / 40000);
   const dp = Math.pow(dd, HPFIRDST);
-  const dam = HPDAMMAX * dp;
+  // `unsigned dam` — truncated before firehp's outer scaling. @see GEFUNCS.C:2065, 2077
+  const dam = Math.trunc(HPDAMMAX * dp);
   const tonfact = 1 + victimMaxTons / TONFACT;
   const factor = (dam * phasrtype) / tonfact;
   return Math.floor(factor);
@@ -175,13 +178,30 @@ export function damageScale(damageFactor: number): number {
   return 100 / damageFactor;
 }
 
+/** The three ways a shield hit can land. @see GEFUNCS.C:2453-2469 */
+export type ShieldHitOutcome =
+  /** `shield <= 2` — SHDAMAG. Shields blow into SHIELDDM and take a further knock*3. */
+  | 'damaged'
+  /** `shield < SHMINCHG` — SHKNKDN. A warning only; the shields STAY UP. */
+  | 'warned'
+  /** Still comfortably charged. */
+  | 'none';
+
 /**
  * Apply incoming damage through raised shields.
- * Shields completely absorb the hit (hullDamage = 0); shield charge drains by `knock`.
- * Returns knockedDown=true when charge falls below SHMINCHG (shield collapses).
  *
- * Formula: dmax = 80 - (shieldtype * SHIELD_FACTOR); knock = floor(dmax * damage/100)
- * shieldtype 20 is impenetrable (dmax = 0, no charge drain).
+ * Shields absorb the hit entirely (hullDamage = 0) and lose `knock` charge:
+ *
+ *   dmax  = 80 - shieldtype * SHIELD_FACTOR   (type 20 is impenetrable, dmax 0)
+ *   knock = floor(dmax * damage/100)
+ *
+ * The result then splits three ways, and the distinction matters: only the
+ * `damaged` branch takes the shields out of action, and it does so into
+ * SHIELDDM — a state `shi up` refuses and only the repair climb clears. The
+ * `warned` branch prints a warning and changes nothing. Collapsing the two,
+ * as the port used to, made shields fail two charge points early and fail into
+ * a freely re-raisable state, which put the whole repair path out of reach of
+ * combat.
  *
  * @see GEFUNCS.C:2430 shieldhit
  */
@@ -189,21 +209,25 @@ export function shieldhit(
   shieldCharge: number,
   shieldtype: number,
   damage: number,
-): { newCharge: number; hullDamage: number; shieldConsumed: number; knockedDown: boolean } {
+): {
+  newCharge: number;
+  hullDamage: number;
+  shieldConsumed: number;
+  outcome: ShieldHitOutcome;
+} {
   const dmax = shieldtype === 20 ? 0 : Math.max(0, 80 - shieldtype * SHIELD_FACTOR);
   const knock = Math.floor(dmax * (damage / 100));
   let newCharge = shieldCharge - knock;
-  let knockedDown = false;
+  let outcome: ShieldHitOutcome = 'none';
 
   if (newCharge <= 2) {
-    // Shield critically damaged — extra drain, collapses
     newCharge = newCharge - knock * 3;
-    knockedDown = true;
+    outcome = 'damaged';
   } else if (newCharge < SHMINCHG) {
-    knockedDown = true;
+    outcome = 'warned';
   }
 
-  return { newCharge, hullDamage: 0, shieldConsumed: knock, knockedDown };
+  return { newCharge, hullDamage: 0, shieldConsumed: knock, outcome };
 }
 
 /**
@@ -460,6 +484,29 @@ export function lockFact(
 export function decoyIntercept(rand: Random, decodds: number): boolean {
   if (decodds <= 0) return false;
   return Math.floor(rand.next() * decodds) === 0;
+}
+
+/**
+ * Walk the decoy slots and roll `decoyIntercept` once for each LIVE decoy,
+ * stopping at the first that succeeds.
+ *
+ * Returns the index of the slot that intercepted, or -1 if none did. The
+ * caller is responsible for zeroing that slot — a decoy is spent when it works.
+ *
+ * Two things follow from C's loop that a single boolean test cannot express:
+ * decoys stack (three deployed decoys get three rolls at the incoming round),
+ * and each intercept costs one. The port used to test `hasActiveDecoy()` and
+ * roll once, so a single decoy shrugged off every torpedo fired at it for its
+ * whole 15-tick life and stacking bought nothing.
+ *
+ * @see GEFUNCS.C:1581-1592 torpedoes  @see GEFUNCS.C:1666-1677 missiles
+ */
+export function tryDecoyIntercept(rand: Random, decout: readonly number[], decodds: number): number {
+  for (let j = 0; j < decout.length; j++) {
+    if ((decout[j] ?? 0) <= 0) continue;
+    if (decoyIntercept(rand, decodds)) return j;
+  }
+  return -1;
 }
 
 /**

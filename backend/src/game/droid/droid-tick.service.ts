@@ -40,6 +40,7 @@ import {
   JAMTIME,
   MAXTORPS,
   WARP_THRESHOLD,
+  SHIELDDM,
 } from '../constants';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import { buildDroidConfig } from './droid.config';
@@ -406,14 +407,22 @@ export class DroidTickService implements OnModuleInit {
         victimMaxTons: this.classCache.getMaxTons(target.shpclass),
         victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
-      const shieldUp = target.shieldstat === 1 && target.shield > 0;
+      // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
+    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
+    // raised on an empty capacitor still absorbs the next hit in full —
+    // and blows on it. Requiring charge > 0 here handed full hull damage
+    // to anyone who had just raised shields.
+    const shieldUp = target.shieldstat === 1;
       let hullDamage = damage;
       let shieldConsumed = 0;
       if (shieldUp) {
         const r = shieldhit(target.shield, target.shieldtype, damage);
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.shield = r.newCharge;
-          if (r.knockedDown) v.shieldstat = 0;
+          // Only a BLOWN shield goes out of action, and it goes into SHIELDDM
+          // — not plain "down" — so `shi up` refuses until it is repaired.
+          // @see GEFUNCS.C:2459-2462
+          if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = droid.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });

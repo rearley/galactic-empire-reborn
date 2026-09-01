@@ -35,6 +35,8 @@ import {
   PMINFIRE,
   SE100DAM,
   WARP_THRESHOLD,
+  SHIELDDM,
+  GESTAT_AUTO,
 } from '../../constants';
 import { CombatTickService } from '../../combat/combat-tick.service';
 
@@ -207,7 +209,22 @@ export class PhaserHandlerService {
       // C: `if (damage >= 1)` gates the hit.
       if (damage < 1) continue;
 
-      const shieldUp = candidate.shieldstat === 1 && candidate.shield > 0;
+      // A hit on a Cybertron makes you its target, overriding whatever it was
+      // chasing and the noClaim rules. Without this, PvE was pure proximity:
+      // you could not pull one off a teammate, and one you shot ignored you.
+      // @see GECMDS.C:980-981 `if (wptr->status == GESTAT_AUTO) wptr->cybmine = usrn;`
+      if (candidate.status === GESTAT_AUTO) {
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
+          v.cybmine = ship.channel ?? NO_CHANNEL;
+        });
+      }
+
+      // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
+      // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield raised
+      // on an empty capacitor still absorbs the next hit in full — and blows
+      // on it. Requiring charge > 0 here handed full hull damage to anyone who
+      // had just raised shields.
+      const shieldUp = candidate.shieldstat === 1;
       let hullDamage = damage;
       let shieldConsumed = 0;
 
@@ -215,7 +232,10 @@ export class PhaserHandlerService {
         const r = shieldhit(candidate.shield, candidate.shieldtype, damage);
         this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
           v.shield = r.newCharge;
-          if (r.knockedDown) v.shieldstat = 0;
+          // Only a BLOWN shield goes out of action, and it goes into SHIELDDM
+          // — not plain "down" — so `shi up` refuses until it is repaired.
+          // @see GEFUNCS.C:2459-2462
+          if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
@@ -372,10 +392,13 @@ export class PhaserHandlerService {
 
       // C-009 Fix 1: firehp applies damage STRAIGHT TO HULL (`wptr->damage += damage`,
       // GECMDS.C:1078) — no shieldhit call, shields are bypassed entirely.
+      // A hyper hit claims a Cybertron exactly as a normal one does.
+      // @see GECMDS.C:1071-1072
       this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
         v.damage = v.damage + damage;
         v.lastfired = ship.channel ?? NO_CHANNEL;
         v.cantexit = FIRETICKS;
+        if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
       });
 
       const hitEvent: CombatHitEvent = {

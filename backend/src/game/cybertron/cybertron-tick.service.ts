@@ -26,6 +26,7 @@ import {
   CYB_BE_EASY,
   CYBSLO,
   UNIVMAX,
+  SHIELDDM,
 } from '../constants';
 import {
   CYBERTRON_EVENT,
@@ -429,7 +430,12 @@ export class CybertronTickService implements OnModuleInit {
         victimMaxTons: this.shipClassCache.getMaxTons(target.shpclass),
         victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
-      const shieldUp = target.shieldstat === 1 && target.shield > 0;
+      // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
+    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
+    // raised on an empty capacitor still absorbs the next hit in full —
+    // and blows on it. Requiring charge > 0 here handed full hull damage
+    // to anyone who had just raised shields.
+    const shieldUp = target.shieldstat === 1;
       let hullDamage = damage;
       let shieldConsumed = 0;
 
@@ -437,7 +443,8 @@ export class CybertronTickService implements OnModuleInit {
         const result = shieldhit(target.shield, target.shieldtype, damage);
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.shield = result.newCharge;
-          if (result.knockedDown) v.shieldstat = 0;
+          // @see GEFUNCS.C:2459-2462 — SHIELDDM, not plain "down".
+          if (result.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = ship.channel ?? NO_CHANNEL;
           v.cantexit = FIRETICKS;
         });
