@@ -58,6 +58,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  sell <qty> <item>      — sell items',
       '  tra down <qty> <item>  — move cargo down to your planet',
       '  tra up <qty> <item>    — load cargo from your planet',
+      '  tra <qty> <item> <ship> — hand cargo to another ship in your sector',
       '  jet <qty|ALL> <item>   — jettison items',
       '  pri                    — show item prices',
       '  pln                    — show planet inventory',
