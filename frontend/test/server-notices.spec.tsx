@@ -93,4 +93,52 @@ describe('server notices reach the event log', () => {
     fire('message.send', { text: 'orphan' });
     expect(screen.getByTestId('event-log').textContent).not.toContain('undefined');
   });
+
+  /**
+   * A colony that successfully defends itself is the payoff for garrisoning
+   * one, and everyone watching was told "destroyed by unknown". `fireion` sets
+   * the victim's `lastfired` to -1 so no attacking ship resolves
+   * (GEFUNCS.C:1796), which left an ion kill with no attacker and no weapon —
+   * exactly the shape a self-destruct produces — so the client's
+   * `attackerId ? ... : 'unknown'` fallback swallowed it.
+   */
+  it('names the planet when a colony\'s ion cannons make the kill', () => {
+    render(<App />);
+    fire('combat.ship-destroyed', {
+      victimId: 'usr_raider:2',
+      victimUserid: 'usr_raider',
+      attackerId: null,
+      weapon: 'ion',
+      attackerName: 'Aurelia-Landing',
+    });
+    const text = screen.getByTestId('event-log').textContent ?? '';
+    expect(text).toContain('Aurelia-Landing');
+    expect(text).not.toContain('unknown');
+  });
+
+  it('still credits planetary defences when the planet cannot be named', () => {
+    render(<App />);
+    fire('combat.ship-destroyed', {
+      victimId: 'usr_raider:2',
+      victimUserid: 'usr_raider',
+      attackerId: null,
+      weapon: 'ion',
+      attackerName: null,
+    });
+    const text = screen.getByTestId('event-log').textContent ?? '';
+    expect(text).toContain('planetary defences');
+    expect(text).not.toContain('unknown');
+  });
+
+  it('leaves an ordinary ship kill alone', () => {
+    render(<App />);
+    fire('combat.ship-destroyed', {
+      victimId: 'usr_raider:2',
+      victimUserid: 'usr_raider',
+      attackerId: 'usr_hunter:1',
+      weapon: 'phaser',
+      attackerName: null,
+    });
+    expect(screen.getByTestId('event-log').textContent).toContain('destroyed by');
+  });
 });

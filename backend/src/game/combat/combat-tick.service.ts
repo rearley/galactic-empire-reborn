@@ -290,6 +290,12 @@ export class CombatTickService implements OnModuleInit {
           attackerChannel,
           // Weapon type is not separately tracked at kill time; the per-hit
           // events emitted earlier this tick carry the weapon. Leave null.
+          //
+          // A planet kill is NOT inferred here from `attackerChannel === -1`:
+          // that value is also NO_CHANNEL ("nobody has fired on me"), which a
+          // victim is reset to when its firer leaves the game. The gateway
+          // names the planet, because it holds the actual evidence — a
+          // recorded ion hit. @see planet-kill.ts
           weapon: null,
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,

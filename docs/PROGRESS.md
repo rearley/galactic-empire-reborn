@@ -2401,11 +2401,12 @@ new-ship onboarding.
   `mnu_admenu1a` does exactly this.
 
 **Known issues (not fixed):**
-- A ship killed by ion cannons is announced to onlookers as "destroyed by
-  unknown". `fireion` sets `lastfired = -1` (as C does) so no attacking ship
-  resolves, and `CombatShipDestroyedEvent.weapon` has no `'ion'` variant — so
-  the kill is indistinguishable from a self-destruct. Display only; the defender
-  still sees the raider die, but is not told their own colony did it.
+- ~~A ship killed by ion cannons is announced as "destroyed by unknown".~~
+  Fixed. Note the trap found while fixing it: `lastfired == -1` is NOT
+  sufficient evidence of a planet kill, because this port also uses -1 for
+  `NO_CHANNEL` and resets a victim to it when its firer leaves the game.
+  Attribution is now evidence-based — the gateway must have a recorded ion hit
+  on that ship, within ION_ATTRIBUTION_WINDOW_MS.
 - ~~300 fighters attacking a colony reported "You lost 0; defenders lost 0".~~
   Traced to two defects in the original's `attack_fig` and fixed — see
   docs/DECISIONS.md, 2026-09-01.
