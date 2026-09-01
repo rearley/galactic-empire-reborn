@@ -75,6 +75,7 @@ import {
   notClaimed,
   shouldTaunt,
   CYB_ANNOY_ODDS,
+  creditsAreOwed,
 } from './cyb-decisions';
 import { pickTaunt } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
@@ -234,10 +235,14 @@ export class CybertronTickService implements OnModuleInit {
     // carried no purse worth taking. Accumulated here and flushed on the
     // spawn-slot cadence rather than writing to Postgres every activation.
     // @see GECYBS.C:228-229
-    this.pendingAllowance.set(
-      ship.userid,
-      (this.pendingAllowance.get(ship.userid) ?? 0n) + BigInt(CYB_ALLOW),
-    );
+    // Droids share `status === GESTAT_AUTO` with Cybertrons but are ephemeral
+    // and have no User row, so crediting them threw on every flush.
+    if (creditsAreOwed(ship.userid)) {
+      this.pendingAllowance.set(
+        ship.userid,
+        (this.pendingAllowance.get(ship.userid) ?? 0n) + BigInt(CYB_ALLOW),
+      );
+    }
 
     // cybupdate decrement + direction wander (@see GECYBS.C:455 db_update)
     this.cybUpdateDb(ship, topSpeed);

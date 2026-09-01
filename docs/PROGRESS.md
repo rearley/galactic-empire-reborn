@@ -2278,3 +2278,58 @@ its default of 0.
   with `e2e_*` rows.
 - Several seeded-PRNG AI tests are brittle by construction; worth converting to
   injected draw sequences when one next needs touching.
+
+## 2026-09-01 — second full playtest on a reset world
+
+**Method:** reset the galaxy, restarted on a clean build, and played a new
+pilot with in-game commands only — no debug endpoints, no SQL lookups for
+navigation. Three ships lost in the process.
+
+**Verified working end to end:**
+- *Trade* — buy gated by cargo tonnage (all-or-nothing, `buy 300 foo` refused
+  at 860/1000 tons) and by cash; sell; `pri`.
+- *Movement* — impulse and warp with relative course, `nav <x> <y>` autopilot
+  with its arrival notice, sector-transition messages, hyperspace dropping
+  shields on entry.
+- *Exploring* — `sca lo` (4.5pc radius crossing sector lines), `sca se`,
+  `sca ra 1-9`, `sca pl`, `sca sh <name|letter>`, prefix matching.
+- *Planets* — claim and name, `tra down`, `adm rate/tax/sellflag/markup`,
+  `pln`, and PRODUCTION: a 200-colonist world on a Toxic/Sparse planet went
+  Men 200 -> 201, Food 150 -> 151, Tax 0 -> 2 in one PLANTOCK, matching the C
+  formula by hand ((200 x 0.8 x 3500/60000)/7 x 0.875 = 1.3 men; 100 troops eat
+  1 food; floor(15/1200 x 201) = 2 tax).
+- *Combat* — phaser hit and full discharge, torpedo lock refused at range 1.3
+  and granted closer, a Vakory drone raising shields when hit then fleeing,
+  mines/jammers/decoys deploying and decrementing.
+- *Midnight* — ran on demand, production report mail matching the colony.
+
+**Defects found and fixed:**
+- `war <speed> [degrees]` ignored the course argument (`775dd24`).
+- Outgoing combat lines named the victim by userid ("hits @Droid-6") where
+  `sca sh` needs the ship name — the same defect as the incoming line, which
+  had already been fixed. Both halves now carry a resolved ship name.
+- The Cybertron allowance was credited to droids, which are ephemeral and have
+  no User row, so every flush logged "Record to update not found". C never hits
+  this: droids reach `droid_lives` through the class `tick_func` table and never
+  the allowance line.
+- `/debug/tick-stats` reported only two of the three tick counters, which made a
+  stalled planet economy invisible from outside. It reports all three now — that
+  omission cost real time during this playtest.
+- Navigation help still read `war <warp>` / `imp <pct>` with no course argument.
+
+**Observations, not defects:**
+- Travel is slow in wall-clock terms and the planet economy runs once per
+  planet per 30 minutes (PLANTOCK), so a 200-person colony grows by about one
+  person a tick. That is C's cadence and C's formula.
+- A starting colony scores 0: PLTVDIV of 10000 truncates any stockpile under
+  10,000 units, and PLTVCASH of 1000 means 1000 credits banked per point. Both
+  are sysop choices and C truncates identically, but a new player sees no score
+  movement for a long time. A sysop wanting visible early progress would pick a
+  smaller PLTVDIV.
+- Hyperspace forces you to travel unshielded, which is what killed two of the
+  three ships. That is the restored mechanic working as intended.
+- One Cybertron camped sectors (1,8)-(1,9) and killed two ships there at 63%
+  hull per shot — consistent with a heavy class, and consistent with the
+  scan-range asymmetry already recorded.
+
+**Tests:** backend 3459 (372 suites), frontend 157, browser 38.
