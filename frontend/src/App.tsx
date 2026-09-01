@@ -179,10 +179,16 @@ function Terminal(): React.JSX.Element {
           ? shipName(event.attackerId)
           : event.weapon === 'ion'
             ? (event.attackerName ?? 'planetary defences')
-            : 'unknown';
+            : null;
+        // Some deaths genuinely have no killer — a gravity crash sets damage
+        // to 101 with no attacker (GEFUNCS.C:887), and a self-destruct has
+        // none by definition. Saying "destroyed by unknown" invented an
+        // assailant for a pilot who flew into a planet.
         setLogLines(prev =>
           [...prev, {
-            text: `${victim} has been destroyed by ${attacker}!`,
+            text: attacker
+              ? `${victim} has been destroyed by ${attacker}!`
+              : `${victim} has been destroyed!`,
             category: 'combat' as const,
           }].slice(-MAX_LOG_ENTRIES),
         );
