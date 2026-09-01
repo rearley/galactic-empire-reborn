@@ -165,9 +165,18 @@ export class PlanetAttackService {
     let kill1 = 0;
     let kill2 = 0;
 
-    // Step 1: ratio compute (FLOATING POINT — the bug: left2==0 → ratio=0). @see GECMDS.C:~3800
-    // This is intentional fidelity — do NOT add a zero-guard. SC-008.
-    const ratio = left2 > 0 ? (left1 / left2) * 100 : 0;
+    // Step 1: attack strength as a percentage of the defending fighter wing.
+    //
+    // DEVIATION FROM C (deliberate — see docs/DECISIONS.md). C computes
+    // `(left1/left2)*100` and guards only against the divide, leaving
+    // `ratio = 0` when the planet has no fighters — the case where the attack
+    // is in fact completely unopposed in the air. C's own source marks the
+    // spot "there is a bug here". Because every consequence of a fighter raid
+    // is gated on this number (item destruction at >5, the owner alert at >1,
+    // distress mail at >2), the strongest possible raid on an undefended
+    // planet did nothing and told nobody. Unopposed now reads as maximal.
+    const ratio =
+      left2 > 0 ? (left1 / left2) * 100 : left1 > 0 ? Number.POSITIVE_INFINITY : 0;
 
     // Step 2: ground anti-air (only if >500 troops AND random gate). @see GECMDS.C:~3820
     if (left1 > 0 && Number(planet.items[I_TROOPS].qty) > 500 && (gernd(this.random) % 5 - 1) > 0) {
@@ -190,7 +199,16 @@ export class PlanetAttackService {
       kill2 = 0;
     }
 
-    // Step 5: cap and apply. @see GECMDS.C:~3860
+    // Step 5: cap and apply.
+    //
+    // DEVIATION FROM C (deliberate — see docs/DECISIONS.md). C puts the caps
+    // and both subtractions inside `if (left2 > 0L)`, so when the planet has
+    // no fighters of its own the ground anti-air computed in step 2 is thrown
+    // away: `left1 -= kill1` never runs and every attacker flies home
+    // untouched. The `prfmsg(ATTACKF8)` announcing the ground fire still
+    // prints, so C narrates a defence it then declines to apply. Ground fire
+    // is gated on the planet's TROOPS, not its fighters, so there is no
+    // reading in which that is intended.
     if (kill1 > left1) kill1 = left1;
     if (kill2 > left2) kill2 = left2;
     left1 -= kill1;

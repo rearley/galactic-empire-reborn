@@ -1555,3 +1555,46 @@ the game. The old values made planet cash the only thing that counted.
 **Alternatives rejected:** Leaving them and documenting the distortion —
 scoring is the game's only long-run objective. Picking 1 for both — cash would
 have become invisible instead of dominant.
+
+## 2026-09-01 — Fix the original's bugs rather than reproduce them
+
+**Context:** A playtest raid put 300 fighters against a colony holding 20,948
+troops and no fighters of its own. Nothing happened: no attacker losses, no
+defender losses, no damage to the planet, no alert to its owner. Reading
+`attack_fig()` (GECMDS.C) showed two separate defects in the original, one of
+which C's own source marks `/* there is a bug here */`.
+
+1. `ratio = (left1/left2)*100` guards only the divide, so a planet with **no**
+   fighters yields `ratio = 0` — the one case where the raid meets no air
+   defence at all. Item destruction (`ratio > 5`), the owner alert (`> 1`) and
+   distress mail (`> 2`) all hang off that number, so an unopposed raid of any
+   size did nothing and told nobody.
+2. Ground anti-air is computed from the planet's TROOPS and announced with
+   `ATTACKF8`, but the caps and both subtractions sit inside `if (left2 > 0L)`.
+   With no defending wing, `left1 -= kill1` never runs: C narrates a defence
+   and then declines to apply it.
+
+**Decision:** Fix both. `ratio` is maximal when the attack is unopposed, and
+ground fire is applied whether or not the planet has fighters. `spec.md`
+FR-014-019 and acceptance scenario 5, which had mandated preserving both, are
+marked superseded rather than deleted.
+
+**Reason:** The project rule is fidelity to the original's *design* — its
+formulas, constants and cadences. It was never meant to include reproducing
+mistakes the original's own author flagged in a comment. Both defects make the
+game strictly worse and neither has a reading in which it is intended: ground
+fire keyed to troops that only lands when fighters are present is not a
+mechanic, and an unopposed raid scoring zero inverts what the ratio means.
+
+**Alternatives rejected:**
+- *Keep both, as the spec required.* Rejected on the owner's instruction, and
+  because the previous framing ("intentional behavior preservation") had
+  hardened into a test asserting `expect(true).toBe(true)` — a placeholder
+  standing in for a defect nobody could state a purpose for.
+- *Fix the ratio only.* The two defects share a cause; fixing one leaves
+  fighters still unable to be shot down over a garrisoned world.
+
+**Precedent:** Where the original's behaviour is merely surprising but coherent
+(the planet counter drifting until midnight recounts it, `PLTVDIV` truncating a
+young colony's score to zero, re-claiming a planet overwriting its name) it
+stays. This decision covers defects, not quirks.
