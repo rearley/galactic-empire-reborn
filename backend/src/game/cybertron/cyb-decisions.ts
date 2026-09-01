@@ -368,3 +368,20 @@ export const CYB_ANNOY_ODDS = 20;
 export function shouldTaunt(rand: Random, odds: number): boolean {
   return Math.floor(rand.next() * odds) === 1;
 }
+
+
+/**
+ * Is this AI ship's owner a Cybertron with a User row to credit?
+ *
+ * `CybertronTickService` walks every `status === GESTAT_AUTO` ship, and that
+ * includes droids — they are AI too. Droids are ephemeral (no DB row, no User
+ * record), so crediting them CYB_ALLOW threw "Record to update not found" on
+ * every flush.
+ *
+ * C never hits this: `cyb_lives` is only reached through the per-class
+ * `tick_func` table (GEMAIN.C:2418), so a droid runs `droid_lives` and never
+ * touches the allowance line at GECYBS.C:229.
+ */
+export function creditsAreOwed(userid: string): boolean {
+  return userid.startsWith('Cybrg-');
+}

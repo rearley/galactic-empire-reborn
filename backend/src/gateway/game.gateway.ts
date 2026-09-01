@@ -851,7 +851,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatHit(event: CombatHitEvent): void {
     // Name the attacking SHIP, not its userid — `sca sh` takes the ship name,
     // and AI ships are absent from the roster the client resolves names from.
-    const enriched: CombatHitEvent = { ...event, attackerName: this.shipNameOf(event.attackerId) };
+    const enriched: CombatHitEvent = {
+      ...event,
+      attackerName: this.shipNameOf(event.attackerId),
+      victimName: this.shipNameOf(event.victimId),
+    };
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_HIT, enriched);
     // Victim may be in a different sector room (cross-sector phaser range) — deliver directly.

@@ -30,6 +30,8 @@ export interface CombatHitEvent {
    */
   attackerName?: string;
   victimId: string;
+  /** The victim SHIP's name, for the same reason as `attackerName`. */
+  victimName?: string;
   weapon: 'phaser' | 'torpedo' | 'missile' | 'mine';
   damageHull: number;
   damageShield: number;

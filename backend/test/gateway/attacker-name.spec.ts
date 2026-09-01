@@ -31,10 +31,11 @@ describe('GameGateway — combat notices name the attacking SHIP', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: (userid: string, shipno: number) =>
-        userid === 'Cybrg-222' && shipno === 1
-          ? ({ userid, shipno, shipname: 'Cybrg-49340' } as never)
-          : undefined,
+      get: (userid: string, shipno: number) => {
+        if (userid === 'Cybrg-222' && shipno === 1) return { userid, shipno, shipname: 'Cybrg-49340' } as never;
+        if (userid === '@Droid-6' && shipno === 1) return { userid, shipno, shipname: 'Vakory Survey Drone136' } as never;
+        return undefined;
+      },
     } as unknown as ShipStateService;
 
     const gateway = new GameGateway(
@@ -84,6 +85,17 @@ describe('GameGateway — combat notices name the attacking SHIP', () => {
     });
     const sent = roomEmits.find((e) => e.event === COMBAT_HIT);
     expect((sent!.payload as { attackerName?: string }).attackerName).toBeUndefined();
+  });
+
+  it('names the VICTIM ship too, for the line about someone else being hit', () => {
+    // The outgoing line ("Corvin-3 hits @Droid-6") had the same defect as the
+    // incoming one: the roster excludes AI, so it fell back to the userid.
+    const { gateway, roomEmits } = build();
+    (gateway as unknown as { handleCombatHit: (e: unknown) => void }).handleCombatHit({
+      ...hit, attackerId: 'usr_abc:2', victimId: '@Droid-6:1',
+    });
+    const sent = roomEmits.find((e) => e.event === COMBAT_HIT);
+    expect((sent!.payload as { victimName?: string }).victimName).toBe('Vakory Survey Drone136');
   });
 
   it('does not disturb the rest of the payload', () => {
