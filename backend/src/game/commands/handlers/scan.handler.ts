@@ -13,6 +13,7 @@ import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
 import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
+import { scanDistanceUnits } from './helpers/scan-distance';
 
 /**
  * Convert raw speed units to a display string for the side panel.
@@ -795,7 +796,7 @@ export class ScanHandlerService implements OnModuleInit {
       // planet in a sector reported bearing 0 and there was no way to steer to
       // the one worth claiming.
       lines.push({
-        text: formatMessage(MessageId.SCAN10, relativeBearing(ship, planet), dist.toFixed(2)),
+        text: formatMessage(MessageId.SCAN10, relativeBearing(ship, planet), scanDistanceUnits(dist)),
         category: 'info',
       });
     }
