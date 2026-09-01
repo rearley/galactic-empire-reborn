@@ -95,6 +95,7 @@ export enum MessageId {
   ORBITALR = 'ORBITALR',
   ORBITNO = 'ORBITNO',
   ORBITPK = 'ORBITPK',
+  ORBIT_TOO_FAR = 'ORBIT_TOO_FAR',
 
   // land (feature 005)
   LAND_NOT_ORBIT = 'LAND_NOT_ORBIT',
@@ -490,6 +491,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // orbit (feature 005) — GECMDS.C:758 cmd_orbit
   [MessageId.ORBIT01]: 'Now in orbit around %s.',
   [MessageId.ORBITALR]: 'You are already in orbit.',
+  // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
+  [MessageId.ORBIT_TOO_FAR]: 'You are too far away to enter orbit. Close on the planet first.',
   [MessageId.ORBITNO]: 'There is nothing to orbit here.',
   [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
 
