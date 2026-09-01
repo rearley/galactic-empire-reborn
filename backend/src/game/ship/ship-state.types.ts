@@ -112,6 +112,13 @@ export interface ShipState {
   topspeed: number;
   /** Maximum cargo capacity in tons. Loaded from ShipClass.maxTons at hydration. @see GEMAIN.H WARSHP */
   maxTons?: number;
+  /**
+   * The class's rated top warp. Denormalised from ShipClass.maxWarp at
+   * hydration so a completed repair can restore `topspeed` without
+   * ShipModule having to reach into PhysicsModule.
+   * @see GEFUNCS.C:420 `ptr->topspeed = shipclass[ptr->shpclass].max_warp;`
+   */
+  maxWarp?: number;
   warncntr: number;
 
   /** Auto-shield flag — toggled by `set auto-shield on/off`. @see GECMDS.C:5190 cmd_set */

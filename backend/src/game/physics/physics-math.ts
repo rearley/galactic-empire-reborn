@@ -70,7 +70,8 @@ export function accelerationStep(
   const gap = Math.abs(targetSpeed - currentSpeed);
 
   let newSpeed: number;
-  if (gap <= step) {
+  const snapped = gap <= step;
+  if (snapped) {
     newSpeed = targetSpeed;
   } else {
     newSpeed = goingUp ? currentSpeed + step : currentSpeed - step;
@@ -85,10 +86,21 @@ export function accelerationStep(
     hyperspaceEvent = 'exit';
   }
 
-  // Energy debit: `if (ptr->speed < 1000) usage = 0; else usage = ACCENGAMT;`
-  // Per research R-2 the gate uses post-step speed (the step that keeps you
-  // at-or-above warp pays the toll; below-warp steps are free).
-  const energyDebit = newSpeed < WARP_THRESHOLD ? 0 : ACCENGAMT;
+  // Energy debit. C has exactly ONE useenergy call in accel(), and it sits in
+  // the accelerate branch's non-snap path:
+  //
+  //   if (speed < speed2b)                      ACCELERATING
+  //     if (|speed-speed2b| <= accelrate) speed = speed2b;    <- snap, free
+  //     else { usage = (speed < 1000) ? 0 : ACCENGAMT; ... }
+  //   else if (speed > speed2b) speed -= decelrate;           <- free
+  //
+  // So: slowing down is always free and always possible (which is what stops a
+  // ship that ran dry at warp from coasting forever), the snap step is free,
+  // and the gate reads the PRE-step speed — the step that carries you across
+  // the warp threshold is free, and every step already at warp is charged.
+  //
+  // @see GEFUNCS.C:492-497 (the debit) and :534-573 (deceleration)
+  const energyDebit = !goingUp || snapped || currentSpeed < WARP_THRESHOLD ? 0 : ACCENGAMT;
 
   return { newSpeed, energyDebit, hyperspaceEvent };
 }

@@ -117,7 +117,10 @@ describe('PhysicsTickService', () => {
       expect(ship.speed).toBe(1000);
       expect(ship.xcoord).toBeCloseTo(5.0 + 1000 / COORD_SCALE, 10);
       expect(ship.ycoord).toBeCloseTo(5.0, 10);
-      expect(ship.energy).toBe(50000 - ACCENGAMT - MOVENGUSE);
+      // The step from 0 to 1000 snaps onto the target, and C's snap branch
+      // never calls useenergy — only MOVENGUSE is charged.
+      // @see GEFUNCS.C:484-497
+      expect(ship.energy).toBe(50000 - MOVENGUSE);
       expect(h.capturedHyperspace).toHaveLength(1);
       expect(h.capturedHyperspace[0]).toMatchObject({ direction: 'enter', speed: 1000, shipId: 'u1:1' });
     });

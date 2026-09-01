@@ -10,6 +10,7 @@ import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { SHIELDDM } from '../../../src/game/constants';
 
+
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
@@ -114,12 +115,20 @@ describe('subsystem repair — helm', () => {
   });
 });
 
-describe('subsystem repair — cloak', () => {
-  it('cloak=-4: one tick moves it toward 0 by 1', () => {
+describe('subsystem repair — cloak is NOT this service\'s job', () => {
+  /**
+   * C has exactly one increment site for a damaged cloak — `cloakstat`
+   * (GEFUNCS.C:1388-1398), called once per 6-second warrtia (GEMAIN.C:2259).
+   * The port had it here AND in ShipManagementTickService, healing a shot-out
+   * cloak at 7 points per 6 seconds instead of 1. ShipManagementTickService
+   * owns it; this service leaves it alone.
+   */
+  it('leaves a damaged cloak to ShipManagementTickService', () => {
     const ship = makeShip({ cloak: -4 });
-    const { fireTick } = makeHarness(ship);
+    const { svc, fireTick } = makeHarness(ship);
+    svc.onModuleInit();
     fireTick();
-    expect(ship.cloak).toBe(-3);
+    expect(ship.cloak).toBe(-4);
   });
 });
 
@@ -238,7 +247,7 @@ describe('subsystem repair — all at once', () => {
     fireTick();
     expect(ship.tactical).toBe(-4);
     expect(ship.helm).toBe(-2);
-    expect(ship.cloak).toBe(-3);
+    expect(ship.cloak).toBe(-4); // owned by ShipManagementTickService
     expect(ship.firecntl).toBe(6);
     expect(ship.shield).toBe(-9);
     expect(ship.shieldstat).toBe(SHIELDDM);

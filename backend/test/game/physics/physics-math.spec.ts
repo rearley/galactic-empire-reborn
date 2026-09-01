@@ -96,10 +96,13 @@ describe('physics-math', () => {
       expect(r.energyDebit).toBe(0);
     });
 
-    it('returns ACCENGAMT debit when post-step speed is at/above warp threshold', () => {
+    it('does not charge for a snap onto the target speed', () => {
+      // gap 1000 <= accelrate 1000, so this is C's SNAP branch — which sets
+      // `speed = speed2b` and never calls useenergy. See
+      // deceleration-is-free.spec.ts for the full debit rules.
       const r = accelerationStep(0, 1000, 1000);
       expect(r.newSpeed).toBe(1000);
-      expect(r.energyDebit).toBe(ACCENGAMT);
+      expect(r.energyDebit).toBe(0);
     });
 
     it('emits hyperspace=enter when crossing 999 → ≥1000', () => {
