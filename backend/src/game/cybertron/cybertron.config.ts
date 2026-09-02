@@ -3,9 +3,19 @@
  * Values sourced verbatim from reference/ge-source/GECYBS.C class table.
  * Override via env: CYBERTRON_CLASS_<N>_TOT_TO_CREATE, _TOOCLOSE, _HYPERDIST1, _HYPERDIST2, _CYB_GOLD.
  *
- * @see GECYBS.C class table — tot_to_create, tooclose, hyperdist1, hyperdist2, cyb_gold
+ * @see GECYBS.C class table — tot_to_create, hyperdist1, hyperdist2
+ *
+ * NOTE `tooclose` and `cyb_gold` are NOT per-class. C reads each as a single
+ * global sysop option and applies it to every automaton (`gernd()%cyb_gold` at
+ * GECYBS.C:170). This table carried per-class copies ranging 10_000..200_000
+ * for cyb_gold — every one of them above the option's own legal maximum of
+ * 32_000, so killing a Cybertron paid a fortune the original could not produce
+ * and the whole progression curve behind it collapsed. They now come from
+ * GAME_CONFIG; the per-class shape is kept only so the call sites stay uniform.
  * @see specs/007-cybertron-ai/plan.md R-6 (config split rationale)
  */
+
+import { CYBGOLD, TOOCLOSE } from '../constants';
 export interface CybertronClassConfig {
   /** How many of this class should exist at steady state. @see GECYBS.C tot_to_create */
   tot_to_create: number;
@@ -29,11 +39,11 @@ export interface CybertronClassConfig {
  * @see reference/wiki/cpu-ships.md — Make column = tot_to_create; hyperwarp >25 / brake <10
  */
 export const CYBERTRON_CLASS_DEFAULTS: Record<number, CybertronClassConfig> = {
-  21: { tot_to_create: 10, tooclose: 3000, hyperdist1: 25, hyperdist2: 10, cyb_gold: 50_000 },
-  22: { tot_to_create: 5, tooclose: 3000, hyperdist1: 25, hyperdist2: 10, cyb_gold: 100_000 },
-  23: { tot_to_create: 1, tooclose: 3000, hyperdist1: 25, hyperdist2: 10, cyb_gold: 200_000 },
-  24: { tot_to_create: 6, tooclose: 3000, hyperdist1: 25, hyperdist2: 10, cyb_gold: 10_000 },
-  25: { tot_to_create: 2, tooclose: 3000, hyperdist1: 25, hyperdist2: 10, cyb_gold: 500_000 },
+  21: { tot_to_create: 10, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
+  22: { tot_to_create: 5, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
+  23: { tot_to_create: 1, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
+  24: { tot_to_create: 6, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
+  25: { tot_to_create: 2, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
 };
 
 /**

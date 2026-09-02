@@ -43,8 +43,8 @@ describe('midnight balance regression (SC-006)', () => {
     expect(TEAMBONU).toBe(BigInt(resolveGameConfig().TEAMBONU) * 100n);
   });
 
-  it('MAILDAYS_DEFAULT = 7', () => {
-    expect(MAILDAYS_DEFAULT).toBe(7);
+  it('MAILDAYS_DEFAULT is canon 3, not the port\'s 7', () => {
+    expect(MAILDAYS_DEFAULT).toBe(3);
   });
 
   /**
@@ -66,8 +66,8 @@ describe('midnight balance regression (SC-006)', () => {
     expect(PLTVDIV).toBeLessThan(201_228_378);
   });
 
-  it('CHGLOSER_DEFAULT = 100', () => {
-    expect(CHGLOSER_DEFAULT).toBe(100);
+  it('CHGLOSER_DEFAULT is canon 2 percent, not the numopt ceiling of 100', () => {
+    expect(CHGLOSER_DEFAULT).toBe(2);
   });
 
   it('MAXTEAMS = 50', () => {

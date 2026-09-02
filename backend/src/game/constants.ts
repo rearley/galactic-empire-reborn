@@ -261,6 +261,32 @@ export const TEAMMAX = GAME_CONFIG.TEAMMAX;
  */
 export const SCRBONUS = GAME_CONFIG.SCRBONUS;
 
+/**
+ * Upper bound on the gold a newly created Cybertron carries: `gernd()%cyb_gold`
+ * (GECYBS.C:170). A single GLOBAL in the original, canon 1200.
+ * @see GEMAIN.C numopt(CYBGOLD,0,32000)
+ */
+export const CYBGOLD = GAME_CONFIG.CYBGOLD;
+
+/**
+ * Range below which a Cybertron presses a normal-space attack (GECYBS.C
+ * tooclose). Also a global, canon 2500.
+ */
+export const TOOCLOSE = GAME_CONFIG.TOOCLOSE;
+
+/** Days of mail retained by the midnight purge. Canon 3. */
+export const MAILDAYS = GAME_CONFIG.MAILDAYS;
+
+/** Percentage of a victim's score transferred on a kill. Canon 35. */
+export const SCRFACT = GAME_CONFIG.SCRFACT;
+
+/**
+ * Percentage of a killed player's CASH the killer takes. Canon 2.
+ * The port ran 100 — the numopt ceiling — so a death cost a player their
+ * entire bank. @see GEMAIN.C:605
+ */
+export const CHGLOSER = GAME_CONFIG.CHGLOSER;
+
 export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
 
 /**

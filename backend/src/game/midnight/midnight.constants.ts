@@ -20,6 +20,8 @@ function clampOption(raw: string | undefined, fallback: number, min: number, max
  * @see GEMAIN.H:222  — #define MAIL_CLASS_PRODRPT 3
  */
 
+import { MAILDAYS as CANON_MAILDAYS, CHGLOSER as CANON_CHGLOSER } from '../constants';
+
 /**
  * Team bonus added once per member inside the per-user loop.
  *
@@ -35,7 +37,9 @@ function clampOption(raw: string | undefined, fallback: number, min: number, max
 export const TEAMBONU: bigint = BigInt(resolveGameConfig().TEAMBONU) * 100n;
 
 /** Default mail retention in days (env-overridable). @see GEMAIN.C:497 */
-export const MAILDAYS_DEFAULT: number = 7;
+// Canon MAILDAYS is 3 (MBMGEMSG.MSG). This held its own 7, so the option table
+// and the purge disagreed and the option read `implemented: false`.
+export const MAILDAYS_DEFAULT: number = CANON_MAILDAYS;
 
 /**
  * Planet cash-value divisor. Scoring credits `(cash + tax) / (1000000 /
@@ -70,7 +74,9 @@ export const PLTVCASH: number = clampOption(process.env['PLTVCASH'], 1_000, 1, 1
 export const PLTVDIV: number = clampOption(process.env['PLTVDIV'], 10_000, 1, 1_000_000);
 
 /** Default CHGLOSER percentage (env-overridable, 0–100). @see GEMAIN.C:605 */
-export const CHGLOSER_DEFAULT: number = 100;
+// Canon CHGLOSER is 2 percent. 100 was the numopt CEILING — we were taking a
+// killed player's ENTIRE bank.
+export const CHGLOSER_DEFAULT: number = CANON_CHGLOSER;
 
 /** Maximum number of teams in the team table. @see GEMAIN.H:240 */
 export const MAXTEAMS: number = 50;

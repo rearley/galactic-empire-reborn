@@ -110,12 +110,64 @@ describe('starvation uses integer division, as C does', () => {
   });
 
   it('applies the same integer rule to civilians', () => {
+    // The rule under test is the integer quotient: 150 men is 150/100 = 1,
+    // which is not > 1, so nobody starves. The fixture carries 2 food rather
+    // than 1 because civilians now EAT — one unit per hundred — so a single
+    // unit would be consumed by the meal and leave the colony starving for a
+    // reason that has nothing to do with integer division.
     const planet = makePlanet();
     planet.items[I_TROOPS].qty = 0n;
-    planet.items[I_FOOD].qty = 1n;
+    planet.items[I_FOOD].qty = 2n;
     planet.items[I_MEN].qty = 150n;
     const after = applyEconomyTick(planet);
     expect(after.items[I_MEN].qty).toBe(150n);
+  });
+});
+
+describe('civilians eat (an inherited C defect, deliberately fixed)', () => {
+  // GEPLANET.C:221-230 debits food for TROOPS only and then starves MEN
+  // against that same stock, so a colony with colonists and no garrison
+  // consumes nothing forever. Food is one of the two goods Tahanian Station
+  // exists to sell, and that made it worthless.
+  // @see docs/DECISIONS.md — colonists will eat
+
+  it('a garrison-free colony consumes food', () => {
+    const planet = makePlanet();
+    planet.items[I_TROOPS].qty = 0n;
+    planet.items[I_MEN].qty = 500n;
+    planet.items[I_FOOD].qty = 100n;
+    const after = applyEconomyTick(planet);
+    // 500 men eat 500/100 = 5.
+    expect(after.items[I_FOOD].qty).toBe(95n);
+  });
+
+  it('feeds troops and civilians from the same store', () => {
+    const planet = makePlanet();
+    planet.items[I_TROOPS].qty = 300n;
+    planet.items[I_MEN].qty = 500n;
+    planet.items[I_FOOD].qty = 100n;
+    const after = applyEconomyTick(planet);
+    // 300/100 + 500/100 = 3 + 5 = 8.
+    expect(after.items[I_FOOD].qty).toBe(92n);
+  });
+
+  it('starves civilians once the store cannot feed them', () => {
+    const planet = makePlanet();
+    planet.items[I_TROOPS].qty = 0n;
+    planet.items[I_MEN].qty = 1000n;
+    planet.items[I_FOOD].qty = 0n;
+    const after = applyEconomyTick(planet);
+    // 1000/100 = 10 > 0 food, so an eighth dies: 1000 - 125 = 875.
+    expect(after.items[I_MEN].qty).toBe(875n);
+  });
+
+  it('never drives the food store negative', () => {
+    const planet = makePlanet();
+    planet.items[I_TROOPS].qty = 5000n;
+    planet.items[I_MEN].qty = 5000n;
+    planet.items[I_FOOD].qty = 3n;
+    const after = applyEconomyTick(planet);
+    expect(after.items[I_FOOD].qty).toBe(0n);
   });
 });
 
