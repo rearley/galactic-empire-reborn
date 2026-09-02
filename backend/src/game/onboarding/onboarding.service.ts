@@ -7,7 +7,8 @@ import { isValidShipName } from './name-validator';
 import { prismaShipToState } from '../ship/ship-state.mappers';
 import { ShipState } from '../ship/ship-state.types';
 import { ENGYMAX, GESTAT_USER } from '../constants';
-import { START_CASH, START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
+import { START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
+import { onboardingUserUpdate } from './onboarding-cash';
 
 export interface ClassListEntry {
   classNumber: number;
@@ -156,9 +157,14 @@ export class OnboardingService {
       } as never,
     });
 
+    // Cash is granted only on a captain's FIRST hull. This path also serves
+    // the empty-fleet rebuild, so setting it unconditionally wiped a banked
+    // balance down to the stipend when someone lost their last ship — and
+    // topped a bankrupt captain back up to it. C leaves the bank alone here
+    // (GEFUNCS.C:106-113). @see onboarding-cash.ts
     await this.prisma.user.update({
       where: { userid },
-      data: { cash: START_CASH, noships: 1, topshipno: newShipno },
+      data: onboardingUserUpdate(userRow?.topshipno ?? 0, newShipno),
     });
 
     const state = prismaShipToState(ship);

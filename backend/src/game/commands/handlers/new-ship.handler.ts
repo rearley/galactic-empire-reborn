@@ -189,7 +189,12 @@ export class NewShipHandlerService {
       try {
         await this.createShipTransaction(
           ship.userid, newShipno, shipName, classNumber, shipClass, items,
-          { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
+          // The buyer's exact position, not the sector index. Flooring put a
+          // hull "docked at Zygor" at the sector's corner instead — up to
+          // 7,071 units from the station, which since orbit began requiring a
+          // 250-unit approach is a long impulse crawl back to where you
+          // already were.
+          { x: ship.xcoord, y: ship.ycoord },
         );
         created = true;
       } catch (err: unknown) {
