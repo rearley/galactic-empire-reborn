@@ -350,7 +350,12 @@ describe('pha command semantics (Plan 1 T5)', () => {
     const h = makeHarness([firerInNZ, victim]);
     h.handler.command.handler(firerInNZ, ['0', '0'], ctx);
     expect(getShip(h, firerInNZ).damage).toBeGreaterThanOrEqual(SE100DAM);
-    expect(getShip(h, firerInNZ).phasr).toBe(0); // self-zap also discharges
+    // The charge is NOT spent. C returns at GECMDS.C:940, before `phasr = 0`
+    // (:1006) and before `cantexit = FIRETICKS` (:945), so the neutral branch
+    // is an early abort costing hull damage only. The port added both as extra
+    // penalties, which mattered because every player spawns at (0,0).
+    expect(getShip(h, firerInNZ).phasr).toBe(100);
+    expect(getShip(h, firerInNZ).cantexit).toBe(0);
     expect(getShip(h, victim).damage).toBe(0);
     // No COMBAT_PHASER_FIRED should fire when the beam never leaves the ship.
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);

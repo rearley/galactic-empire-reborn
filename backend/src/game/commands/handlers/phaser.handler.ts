@@ -156,10 +156,20 @@ export class PhaserHandlerService {
     // This must execute BEFORE emitting COMBAT_PHASER_FIRED so that no fired
     // event leaks when the beam never actually leaves the ship.
     if (isInNeutralZone(ship)) {
+      // The neutral branch is an EARLY ABORT that costs hull damage only. C
+      // returns at GECMDS.C:940, before `cantexit = FIRETICKS` (:945) and
+      // before `phasr = 0` (:1006), so the firer keeps both its charge and its
+      // ability to jump. The port added both as extra penalties.
+      //
+      // (zaphim's own body is not in the distribution -- only its declaration
+      // in GEPROTO.H -- so this rests on the call-site structure rather than on
+      // reading the function. Nothing in that structure spends the charge.)
+      //
+      // It matters because everyone spawns at (0,0): one mistaken keypress cost
+      // 40 hull, the entire phaser bank, and a warp lockout. With SE100DAM back
+      // at its shipped 10, it now costs 10 hull and nothing else.
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;
-        s.phasr = 0;
-        s.cantexit = FIRETICKS;
       });
       return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
     }
@@ -337,10 +347,20 @@ export class PhaserHandlerService {
     // Neutral-zone self-zap (GECMDS.C:1031 zaphim) — same backfire as normal,
     // BEFORE any fired event leaks.
     if (isInNeutralZone(ship)) {
+      // The neutral branch is an EARLY ABORT that costs hull damage only. C
+      // returns at GECMDS.C:940, before `cantexit = FIRETICKS` (:945) and
+      // before `phasr = 0` (:1006), so the firer keeps both its charge and its
+      // ability to jump. The port added both as extra penalties.
+      //
+      // (zaphim's own body is not in the distribution -- only its declaration
+      // in GEPROTO.H -- so this rests on the call-site structure rather than on
+      // reading the function. Nothing in that structure spends the charge.)
+      //
+      // It matters because everyone spawns at (0,0): one mistaken keypress cost
+      // 40 hull, the entire phaser bank, and a warp lockout. With SE100DAM back
+      // at its shipped 10, it now costs 10 hull and nothing else.
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;
-        s.phasr = 0;
-        s.cantexit = FIRETICKS;
       });
       return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
     }
