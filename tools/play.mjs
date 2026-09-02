@@ -66,8 +66,13 @@ socket.on('disconnect', (r) => out('..', `disconnected (${r})`));
 socket.on('error', (e) => out('!!', `server error: ${JSON.stringify(e)}`));
 socket.on('command:result', (p) => {
   for (const l of p.lines ?? []) out('<<', l.text);
-  if (p.scanRender) renderScan(p.scanRender);
 });
+// The gateway splits a scan in two: `command:result` carries only the header
+// line, and the grid + side panel arrive as their own `scan:render` event
+// (game.gateway.ts:1329-1333). Subscribing to command:result alone yields a
+// range header and nothing else, which is what made every playtest scan look
+// empty.
+socket.on('scan:render', (p) => renderScan(p));
 
 /**
  * Render the scan payload.

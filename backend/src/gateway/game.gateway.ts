@@ -13,6 +13,8 @@ import {
   PhysicsGravityEvent,
   PHYSICS_DESTRUCT_CANCELLED,
   PhysicsDestructCancelledEvent,
+  PHYSICS_HYPERSPACE,
+  PhysicsHyperspaceEvent,
 } from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -1068,6 +1070,47 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * innermost band is where the physics tick writes the hull off or throws you
    * through. Without this the effect happened silently.
    */
+  /**
+   * Hyperspace entry/exit narration.
+   *
+   * C prints HYSHDN, HYCLDN and HYPERIN as you cross the threshold
+   * (GEFUNCS.C:590-601). The port applied the state changes and said nothing,
+   * so a pilot who raised shields, jumped to warp and stopped was unshielded
+   * with no indication of it. In a playtest that killed a starter Interceptor
+   * one sector out from the hub: shields dropped on the jump, stayed down, and
+   * a Murdonian took it apart in four hits.
+   *
+   * Each line is conditional in C, and stays conditional here — announcing
+   * "shields down" to someone who never raised them is noise.
+   */
+  @OnEvent(PHYSICS_HYPERSPACE)
+  handlePhysicsHyperspace(event: PhysicsHyperspaceEvent): void {
+    const room = `user:${useridOf(event.shipId)}`;
+    if (event.direction === 'enter') {
+      if (event.shieldsDropped) {
+        this.server.to(room).emit('event.log', {
+          category: 'combat',
+          text: '** Shields collapse as you enter hyperspace. **',
+        });
+      }
+      if (event.cloakDropped) {
+        this.server.to(room).emit('event.log', {
+          category: 'combat',
+          text: '** Your cloak collapses as you enter hyperspace. **',
+        });
+      }
+      this.server.to(room).emit('event.log', {
+        category: 'system',
+        text: 'Entering hyperspace.',
+      });
+      return;
+    }
+    this.server.to(room).emit('event.log', {
+      category: 'system',
+      text: 'Dropping out of hyperspace.',
+    });
+  }
+
   @OnEvent(PHYSICS_GRAVITY)
   handleGravity(event: PhysicsGravityEvent): void {
     const userid = event.shipId.split(':')[0];

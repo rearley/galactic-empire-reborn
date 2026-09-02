@@ -24,14 +24,31 @@ import { MAXTORPS, MAXDECOY } from '../constants';
  *
  * @see GEFUNCS.C:580-628 hyperspace
  */
-export function applyHyperspaceTransition(ship: ShipState, direction: 'enter' | 'exit'): void {
+export interface HyperspaceTransition {
+  /** Shields were up and have been dropped — C prints HYSHDN. */
+  shieldsDropped: boolean;
+  /** Cloak was up and has been dropped — C prints HYCLDN. */
+  cloakDropped: boolean;
+}
+
+export function applyHyperspaceTransition(
+  ship: ShipState,
+  direction: 'enter' | 'exit',
+): HyperspaceTransition {
   if (direction === 'exit') {
     ship.where = 0;
-    return;
+    return { shieldsDropped: false, cloakDropped: false };
   }
 
-  if (ship.shieldstat === 1) ship.shieldstat = 0;
-  if (ship.cloak > 0) ship.cloak = 0;
+  // C prints each message ONLY when it actually took something from you
+  // (GEFUNCS.C:590-598), so the caller needs to know which applied. Telling a
+  // pilot "shields down" when they were already down is noise; NOT telling them
+  // when it just happened is how they die.
+  const shieldsDropped = ship.shieldstat === 1;
+  const cloakDropped = ship.cloak > 0;
+
+  if (shieldsDropped) ship.shieldstat = 0;
+  if (cloakDropped) ship.cloak = 0;
   ship.where = 1;
 
   for (let i = 0; i < MAXTORPS; i++) {
@@ -41,4 +58,6 @@ export function applyHyperspaceTransition(ship: ShipState, direction: 'enter' | 
   for (let i = 0; i < Math.min(MAXDECOY, ship.decout.length); i++) {
     ship.decout[i] = 0;
   }
+
+  return { shieldsDropped, cloakDropped };
 }

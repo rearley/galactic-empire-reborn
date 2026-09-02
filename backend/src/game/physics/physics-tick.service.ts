@@ -211,21 +211,32 @@ export class PhysicsTickService implements OnModuleInit {
     // Hyperspace event — emit only when the step actually applied (i.e., the
     // useenergy gate did not refuse the change).
     if (speedChanged && accel.hyperspaceEvent !== null) {
+      // The state change belongs inline — this event once had no listener at
+      // all, so `where` never became 1 for a player and every `where === 1`
+      // gate in the game was dead code.
+      //
+      // The MESSAGES were the other half of that same gap and outlived the
+      // fix: C prints HYSHDN, HYCLDN and HYPERIN on entry (GEFUNCS.C:590-601),
+      // and the port printed none of them. A pilot who raised shields, jumped
+      // to warp and stopped had no idea they were now unshielded. That is not
+      // cosmetic: it is how a new player dies a sector out from the hub without
+      // ever knowing what went wrong. The transition therefore reports what it
+      // took, and the gateway says so.
+      // @see GEFUNCS.C:580-628 hyperspace
+      let dropped = { shieldsDropped: false, cloakDropped: false };
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        dropped = applyHyperspaceTransition(s, accel.hyperspaceEvent as 'enter' | 'exit');
+      });
+
       const payload: PhysicsHyperspaceEvent = {
         shipId: shipKey(ship.userid, ship.shipno),
         direction: accel.hyperspaceEvent,
         speed: accel.newSpeed,
         tickAt: ctx.firedAt,
+        shieldsDropped: dropped.shieldsDropped,
+        cloakDropped: dropped.cloakDropped,
       };
       this.events.emit(PHYSICS_HYPERSPACE, payload);
-
-      // The event had no listener, so `where` never became 1 for a player and
-      // every `where === 1` gate in the game was dead code. The state change
-      // belongs inline — an event nobody consumes is the bug, not the design.
-      // @see GEFUNCS.C:580-628 hyperspace
-      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        applyHyperspaceTransition(s, accel.hyperspaceEvent as 'enter' | 'exit');
-      });
 
       // Set auto-shield warp-exit trigger (T024 — consumed by ShipTickService.processShip).
       if (accel.hyperspaceEvent === 'exit') {
