@@ -17,8 +17,14 @@ import {
 } from '../../src/game/commands/_ship-management-constants';
 
 describe('cloak balance constants', () => {
-  it('CLOAK_ENERGY_USE default is 50 (canonical CLENGUSE numopt default)', () => {
-    expect(CLOAK_ENERGY_USE_DEFAULT).toBe(50);
+  it('CLOAK_ENERGY_USE default is canon CLENGUSE 7500, not the port\'s 50', () => {
+    // The old title called 50 "the canonical CLENGUSE numopt default". It was
+    // neither canonical nor a numopt default -- MBMGEMSG.MSG ships 7500, and
+    // the numopt bounds are 1..32000. At 50 against a ship's ~50 000 energy a
+    // cloak could be held indefinitely, and since cloaked ships cannot be
+    // locked by torpedoes or missiles, cloak-capable classes were effectively
+    // projectile-proof. @see test/balance/sysop-options-canon.balance.spec.ts
+    expect(CLOAK_ENERGY_USE_DEFAULT).toBe(7500);
   });
 
   it('CLOAK_ENERGY_USE_MIN is 1 (canonical lower clamp)', () => {
@@ -41,8 +47,8 @@ describe('cloak balance constants', () => {
     expect(CLOAK_RAMP_FULL).toBe(10);
   });
 
-  it('loadCloakEnergyUse() returns default 50 when env is empty', () => {
-    expect(loadCloakEnergyUse({})).toBe(50);
+  it('loadCloakEnergyUse() returns canon 7500 when env is empty', () => {
+    expect(loadCloakEnergyUse({})).toBe(7500);
   });
 
   it('loadCloakEnergyUse() clamps to min 1', () => {

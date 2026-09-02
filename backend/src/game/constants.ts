@@ -190,6 +190,13 @@ export const PLATTRT1 = GAME_CONFIG.PLATTRT1 / 100;
 export const PLATTRT2 = GAME_CONFIG.PLATTRT2 / 100;
 
 /**
+ * Energy spent to raise the cloak and per tick to hold it.
+ * @see GEMAIN.C:519 clenguse = numopt(CLENGUSE,1,32000)
+ * @see GEFUNCS.C:1374, :1384 — cloakstat drains it and auto-decloaks below it
+ */
+export const CLENGUSE = GAME_CONFIG.CLENGUSE;
+
+/**
  * Max ships a player may own (env MAXSHIPS, 1–50).
  * @see GEMAIN.C:462 numopt(MAXSHIPS,1,50)
  */
