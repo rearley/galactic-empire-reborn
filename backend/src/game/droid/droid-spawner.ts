@@ -71,11 +71,17 @@ export class DroidSpawner {
     const topspeed = cls?.maxWarp ?? 1; // @see GEMAIN.H — topspeed = max_warp factor
     const phasrtype = cls?.maxPhaser ?? 1;
     const shieldtype = cls?.maxShields ?? 1;
+    // GEDROIDS.C:203-210 dispatches BEHAVIOUR on typename; the display name is
+    // built from SNAME, a different column: sprintf("%s%u", shipclass.shipname,
+    // usrn*usrn + gernd()%100) at GEDROIDS.C:129. The port used the type name
+    // for both, so a Murdonian announced itself as "Murdonian Transport217"
+    // instead of canon's "Trans-Gal #2217".
     const typename = DROID_CLASS_TYPENAMES[classNumber] ?? 'Droid';
+    const namePrefix = this.classCache.get(classNumber)?.shipNameTemplate || typename;
 
     // @see GEDROIDS.C:129 — shipname = shipclass.shipname + usrn*usrn + gernd()%100
     const usrn = this.nextSlotIndex;
-    const shipname = nameOverride ?? this.uniqueGeneratedName(typename, usrn);
+    const shipname = nameOverride ?? this.uniqueGeneratedName(namePrefix, usrn);
 
     // @see GEDROIDS.C:131-140 — C branches on universe size; the port only had
     // the large-universe arm, so half of every spawn landed outside a galaxy

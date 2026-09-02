@@ -39,6 +39,8 @@ export interface ShipClassEntry {
   damageFactor: number;
   /** Human-readable ship class name (e.g. "Scout", "Destroyer"). Used in the ship-select menu. */
   typeName: string;
+  /** Canon SNAME: the display-name PREFIX for automatons. @see MBMGESHP.MSG SxxSNAME */
+  shipNameTemplate: string;
 }
 
 @Injectable()
@@ -72,6 +74,7 @@ export class ShipClassCacheService implements OnModuleInit {
         canAttackPlanet: true,
         damageFactor: true,
         typeName: true,
+        shipNameTemplate: true,
       },
     });
     for (const row of rows) {
@@ -96,6 +99,7 @@ export class ShipClassCacheService implements OnModuleInit {
         canAttackPlanet: row.canAttackPlanet,
         damageFactor: row.damageFactor,
         typeName: row.typeName,
+        shipNameTemplate: row.shipNameTemplate,
       });
     }
     this.logger.log(`Hydrated ${this.cache.size} ship classes`);
@@ -206,6 +210,7 @@ export class ShipClassCacheService implements OnModuleInit {
       canAttackPlanet: true,
       damageFactor: 100,
       typeName: '',
+      shipNameTemplate: '',
       ...entry,
     });
   }

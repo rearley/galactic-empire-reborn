@@ -50,6 +50,7 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
   canAttackPlanet: false,
   damageFactor: 100,
   typeName: 'Droid',
+  shipNameTemplate: '',
 };
 
 // Murdonian overrides
