@@ -19,7 +19,8 @@
 
 import { Mulberry32Adapter } from '../../src/game/combat/random.port';
 import { cdistance, inScanRange } from '../../src/game/combat/combat-math';
-import { UNIVMAX } from '../../src/game/constants';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { CybertronTickService } from '../../src/game/cybertron/cybertron-tick.service';
 import { CybertronRepository } from '../../src/game/cybertron/cybertron.repository';
 import { DroidTickService } from '../../src/game/droid/droid-tick.service';
@@ -179,22 +180,41 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     });
   }
 
-  test('no weapon gate reaches beyond a quarter of the GALAXY width', () => {
+  test('the DEPLOYED galaxy is large enough that no weapon reach dominates it', () => {
+    // Reads config/game.config.json rather than the runtime UNIVMAX, because
+    // the test run deliberately shrinks the galaxy for speed
+    // (test/helpers/test-galaxy-size.ts). The property being guarded is about
+    // the world we actually ship, so it must be measured against that value.
+    //
     // The previous bound divided by 30 and called it "the map width". 30 is
     // MAXX, the width of the ASCII sca-lo projection GRID - a fixed 30x15
     // viewport - not the size of the galaxy. Conflating the two capped every
-    // weapon gate at 7.5 sectors, which canon exceeds almost everywhere
-    // (the Dreadnought alone reaches 50), so the bound only held while the
+    // weapon gate at 7.5 sectors, which canon exceeds almost everywhere (the
+    // Dreadnought alone reaches 50), so the bound only held while the ship
     // table was compressed to fit it.
     //
-    // Re-derived against the real extent: sectors run -UNIVMAX..+UNIVMAX on
-    // both axes, so the galaxy is 2*UNIVMAX+1 sectors wide. The intent worth
-    // keeping is that no ship a player can face controls a large share of the
-    // galaxy with its weapons.
+    // Canon scan ranges are absolute, and UNIVMAX is a sysop option, so the
+    // two must be chosen together: at canon's UNIVMAX=300 a Dreadnought's 50
+    // sectors is 8% of the galaxy, but drop UNIVMAX far enough and the same
+    // ship scans the entire world. This is the guard on that coupling.
     //
-    // The Sysopian Death Star (class 41, admin-only, 100m tons, warp 255,
-    // canon scan 1m = a 100-sector radius) is deliberately god-tier - exempt.
-    const galaxyWidthSectors = 2 * UNIVMAX + 1;
+    // The Sysopian Death Star (class 41, admin-only, warp 255, canon scan 1m
+    // = a 100-sector radius) is deliberately god-tier - exempt.
+    // The file groups options into sections ("weapons", "galaxy", ...), so the
+    // lookup walks one level rather than assuming a section name.
+    const deployed = JSON.parse(
+      readFileSync(resolve(__dirname, '../../config/game.config.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    let univmax: number | undefined;
+    for (const section of Object.values(deployed)) {
+      if (section && typeof section === 'object' && 'UNIVMAX' in section) {
+        univmax = (section as Record<string, number>).UNIVMAX;
+        break;
+      }
+    }
+    expect(typeof univmax).toBe('number');
+
+    const galaxyWidthSectors = 2 * univmax! + 1;
     const maxGateSectors = galaxyWidthSectors / 4;
     for (const c of SHIP_CLASSES.filter((x) => x.classNumber !== 41)) {
       expect(c.scanRange / 10_000).toBeLessThanOrEqual(maxGateSectors);

@@ -1,4 +1,5 @@
 import { GalaxyConfig } from './galaxy.types';
+import { MAXPLSE, PLODDS, WORMODDS } from '../constants';
 
 /**
  * Thrown when an environment variable contains an invalid value for galaxy configuration.
@@ -79,13 +80,14 @@ export function parseRange(
  */
 export function loadGalaxyConfig(env: NodeJS.ProcessEnv): GalaxyConfig {
   const seed = parseUint32(env.GALAXY_SEED, 0xc0ffee, 'GALAXY_SEED');
-  // Defaults are canon's, from MBMGEMSG.MSG:
-  //   PLODDS   {Frequency Factor for planets: 3}
-  //   WORMODDS {Frequency Factor for wormholes: 6}
-  //   MAXPLSE  {Maximum planets in a sector? 5}
-  const plodds = parseRange(env.GALAXY_PLODDS, 3, 1, 20, 'GALAXY_PLODDS');
-  const wormodds = parseRange(env.GALAXY_WORMODDS, 6, 1, 100, 'GALAXY_WORMODDS');
-  const maxplanets = parseRange(env.GALAXY_MAXPLANETS, 5, 1, 9, 'GALAXY_MAXPLANETS');
+  // Defaults come from GAME_CONFIG, which resolves them from the canon values
+  // in MBMGEMSG.MSG (PLODDS 3, WORMODDS 6, MAXPLSE 5). They are NOT restated
+  // here: this loader used to carry its own copies, which is how PLODDS sat at
+  // 4 and WORMODDS at 10 while the option table said otherwise. The
+  // GALAXY_*-prefixed env vars remain as a generator-local override.
+  const plodds = parseRange(env.GALAXY_PLODDS, PLODDS, 1, 20, 'GALAXY_PLODDS');
+  const wormodds = parseRange(env.GALAXY_WORMODDS, WORMODDS, 1, 100, 'GALAXY_WORMODDS');
+  const maxplanets = parseRange(env.GALAXY_MAXPLANETS, MAXPLSE, 1, 9, 'GALAXY_MAXPLANETS');
 
   return { seed, plodds, wormodds, maxplanets };
 }

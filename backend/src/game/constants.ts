@@ -129,10 +129,43 @@ export const PLTYPE_PLNT = 2 as const;
 export const PLTYPE_WORM = 3 as const;
 
 /**
- * Maximum number of planets that can be placed in the galaxy.
- * @see GEMAIN.H:123
+ * Number of object SLOTS a sector has — a fixed array bound, not a tunable.
+ *
+ * `PLNTCOORD planets[MAXPLANETS]` (GEMAIN.H:417) sizes the array, and
+ * `plnum <= MAXPLANETS` (GECMDS.C:786, :2312) validates a slot number against
+ * it. Always 9.
+ *
+ * NOT to be confused with the lowercase runtime variable of the same name:
+ * `maxplanets = numopt(MAXPLSE,1,9)` (GEMAIN.C:477) is the GENERATION DENSITY
+ * option, default 5, and is exported below as MAXPLSE. The port had
+ * `MAXPLANETS = GAME_CONFIG.MAXPLSE`, which drove the fixed array bound from
+ * the density knob — so lowering the knob to its canon 5 would have made slots
+ * 6..9 invalid, and the neutral zone needs six.
+ *
+ * @see GEMAIN.H:119 #define MAXPLANETS 9
  */
-export const MAXPLANETS = GAME_CONFIG.MAXPLSE;
+export const MAXPLANETS = 9 as const;
+
+/**
+ * Generation density: the upper bound on objects rolled into a sector, as
+ * `gernd()%maxplanets` (GEPLANET.C:485), so a sector gets 0..MAXPLSE-1 objects.
+ * @see GEMAIN.C:477 maxplanets = numopt(MAXPLSE,1,9)
+ */
+export const MAXPLSE = GAME_CONFIG.MAXPLSE;
+
+/**
+ * Planet frequency: a sector gets objects when `gernd()%plodds == 0`
+ * (GEPLANET.C:484), so roughly one sector in PLODDS is populated.
+ * @see GEMAIN.C:475 plodds = numopt(PLODDS,1,20)
+ */
+export const PLODDS = GAME_CONFIG.PLODDS;
+
+/**
+ * Wormhole frequency: an object slot becomes a wormhole rather than a planet
+ * when `gernd()%wormodds == 0` (GEPLANET.C:548).
+ * @see GEMAIN.C:476 wormodds = numopt(WORMODDS,1,100)
+ */
+export const WORMODDS = GAME_CONFIG.WORMODDS;
 
 /**
  * Max ships a player may own (env MAXSHIPS, 1–50).

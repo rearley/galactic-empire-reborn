@@ -16,7 +16,24 @@ import {
   CombatMissEvent,
   CombatSubsystemDamagedEvent,
 } from '../../../../src/game/combat/combat-events';
-import { FIRETICKS, HPFIRAMT, HPMINFIR, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
+import { FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
+
+/**
+ * Fixture engagement distance, in sectors.
+ *
+ * These tests exercise phaser MECHANICS -- firing arc, PHABIAS widening, shield
+ * absorption, subsystem damage, cantexit -- none of which care about magnitude,
+ * but all of which need the shot to actually land. They used to place the
+ * victim a full sector away, which worked only because the port ran PFIRDST=3.
+ * Canon ships PFIRDST=7 (GEMAIN.C:495), and the falloff is brutal: a
+ * phasrtype-1 phaser deals 34 at point-blank, 7 at half a sector, and 0 by a
+ * sector and a half. At one sector these fixtures silently became zero-damage
+ * shots and the assertions had nothing to observe.
+ *
+ * Scaling the radius does not change any bearing, so the arc geometry the tests
+ * were written for is preserved exactly.
+ */
+const ENGAGEMENT_DIST = 0.05;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -111,7 +128,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     // northward — see GEFUNCS.C / lineOfFire atan2(dx,-dy).
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1, damage: 0,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -165,7 +182,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     // Bob also at warp, due north at range 1 — inside the hyper beam arc.
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5, ycoord: 4, speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -183,7 +200,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const ally = makeShip({
       userid: 'a', shipno: 2, shipname: 'Ally',
-      xcoord: 5, ycoord: 4, shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, ally]);
     h.handler.command.handler(alice, ['0', '0'], ctx);
@@ -202,7 +219,8 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const rad = (4.5 * Math.PI) / 180;
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5 + Math.sin(rad), ycoord: 5 - Math.cos(rad),
+      xcoord: 5 + ENGAGEMENT_DIST * Math.sin(rad),
+      ycoord: 5 - ENGAGEMENT_DIST * Math.cos(rad),
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -216,7 +234,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
   it('sets cantexit = FIRETICKS on firer and on every hit victim', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, cantexit: 0 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       shield: 5000, shieldstat: 1, cantexit: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -265,7 +283,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 5, ycoord: 4,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -282,7 +300,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob',
-      xcoord: 5, ycoord: 4,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
     });
     const h = makeHarness([alice, bob]);
     h.handler.command.handler(alice, ['0', '0'], ctx);
@@ -346,20 +364,56 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(getShip(h, firer).phasr).toBe(0);
   });
 
-  it('still hits a victim at warp (PHATOWRP=0) — damage is halved but lands', () => {
-    // With PHATOWRP=0 any phaser can reach a warping victim; the damage is
-    // halved (T4) but still ≥1 at close range, so the hit lands.
-    const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
-    const warpVictim = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
-      speed: 2000, damage: 0,
+  describe('victim-at-warp gate (PHATOWRP, GECMDS.C:949)', () => {
+    // This was a single test asserting that ANY phaser reaches a warping
+    // victim, valid only because the port ran PHATOWRP=0 -- the numopt FLOOR,
+    // which makes the guard vacuous. Canon ships 5, so the gate is real and
+    // reserves warp-shooting to Mark-5 and above.
+    //
+    // This is the mechanic behind the game's fundamental escape move. With the
+    // gate disabled, a starter Interceptor's Mark-1 could shoot a ship that had
+    // jumped to warp, and "run away" did not work for anyone.
+
+    const warpVictimAt = (dist: number) =>
+      makeShip({ userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - dist, speed: 2000, damage: 0 });
+
+    it('a below-threshold phaser cannot touch a victim at warp', () => {
+      expect(PHATOWRP).toBeGreaterThan(1);
+      const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
+      const victim = warpVictimAt(ENGAGEMENT_DIST);
+      const h = makeHarness([firer, victim]);
+      h.handler.command.handler(firer, ['0', '0'], ctx);
+      expect(getShip(h, victim).damage).toBe(0);
+      // The charge is still spent -- the shot was fired and simply did not connect.
+      expect(getShip(h, firer).phasr).toBe(0);
     });
-    const h = makeHarness([firer, warpVictim]);
-    const res = h.handler.command.handler(firer, ['0', '0'], ctx) as CommandResult;
-    expect(res.lines.some((l) => /hit/i.test(l.text))).toBe(true);
-    expect(getShip(h, warpVictim).damage).toBeGreaterThan(0);
-    // Firer must be fully discharged after firing (GECMDS.C:1006).
-    expect(getShip(h, firer).phasr).toBe(0);
+
+    it('a phaser at or above the threshold still lands, for halved damage', () => {
+      const firer = makeShip({
+        userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: PHATOWRP,
+      });
+      const victim = warpVictimAt(ENGAGEMENT_DIST);
+      const h = makeHarness([firer, victim]);
+      const res = h.handler.command.handler(firer, ['0', '0'], ctx) as CommandResult;
+      expect(res.lines.some((l) => /hit/i.test(l.text))).toBe(true);
+      expect(getShip(h, victim).damage).toBeGreaterThan(0);
+      expect(getShip(h, firer).phasr).toBe(0);
+    });
+
+    it('the same phaser does MORE damage to a victim that is not at warp', () => {
+      const shoot = (speed: number) => {
+        const firer = makeShip({
+          userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: PHATOWRP,
+        });
+        const victim = makeShip({
+          userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed, damage: 0,
+        });
+        const h = makeHarness([firer, victim]);
+        h.handler.command.handler(firer, ['0', '0'], ctx);
+        return getShip(h, victim).damage;
+      };
+      expect(shoot(2000)).toBeLessThan(shoot(0));
+    });
   });
 
   it('phaser fires even when firer has jammer active (phasers do not lock)', () => {
@@ -369,9 +423,9 @@ describe('pha command semantics (Plan 1 T5)', () => {
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 7,
       phasr: 100, phasrtype: 1, jammer: 5,
     });
-    // Victim due north at range 1, in arc.
+    // Victim due north, in arc, at a range this phaser can actually reach.
     const victim = makeShip({
-      userid: 'b', shipno: 2, xcoord: 0, ycoord: 6,
+      userid: 'b', shipno: 2, xcoord: 0, ycoord: 7 - ENGAGEMENT_DIST,
       shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([firer, victim]);
@@ -396,7 +450,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
       speed: WARP_THRESHOLD, energy: HPMINFIR - 1,
     });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -414,7 +468,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
       speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
     });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -440,7 +494,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     // Bob in arc but sub-warp (speed 0) — hyper only reaches warp targets.
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: 0, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
@@ -480,7 +534,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
       speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
     });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -506,7 +560,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
       speed: WARP_THRESHOLD, energy: 50000, hypha: 0,
     });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: WARP_THRESHOLD,
     });
     const h = makeHarness([alice, bob]);
@@ -522,7 +576,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
       speed: WARP_THRESHOLD, energy: 50000, hypha: 1,
     });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -550,9 +604,18 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
   // rand #2: which = 4 → tactical.
   // rand #3: magnitude = -floor(v3 * 80).
   it('C-010: normal phaser hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and tactical mutated', () => {
+    // Subsystem damage needs a hit in the 20..99 band: above 20 to trigger the
+    // roll, below the 100 kill threshold so there is a surviving ship whose
+    // `tactical` field can be observed. Under canon falloff a Mark-10 deals 205
+    // at knife range -- an outright kill -- and 26 at a sector and a half, so
+    // this fixture deliberately stands off rather than closing.
+    // One sector: a Mark-10 lands ~55 here -- inside the band. 1.5 sectors
+    // dropped it to ~26, close enough to the 20 floor that the roll no longer
+    // fired reliably.
+    const SUBSYSTEM_BAND_DIST = 1.0;
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 10 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - SUBSYSTEM_BAND_DIST,
       shield: 0, shieldstat: 0, damage: 0,
     });
     // Seed 7 so rand #1 → roll check = 0 → subsystem hit
@@ -601,7 +664,7 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     // shield-projectile-fidelity.spec.ts and mine-shield-fidelity.spec.ts.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
     const bob = makeShip({
-      userid: 'b', shipno: 2, xcoord: 5, ycoord: 4,
+      userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       shield: 9999, shieldstat: 1, shieldtype: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
@@ -633,7 +696,7 @@ describe('a phaser hit claims a Cybertron for the firer', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const cyb = makeShip({
       userid: 'cyb', shipno: 1, channel: 12, shipname: 'Cybrg-1',
-      xcoord: 5, ycoord: 4, status: 2, cybmine: 99, shieldstat: 0, damage: 0,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, status: 2, cybmine: 99, shieldstat: 0, damage: 0,
     });
     const h = makeHarness([alice, cyb]);
 
@@ -647,7 +710,7 @@ describe('a phaser hit claims a Cybertron for the firer', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const cyb = makeShip({
       userid: 'cyb', shipno: 1, channel: 12,
-      xcoord: 5, ycoord: 4, status: 2, cybmine: 3, shieldstat: 0,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, status: 2, cybmine: 3, shieldstat: 0,
     });
     const h = makeHarness([alice, cyb]);
     h.handler.command.handler(alice, ['0', '0'], ctx);
@@ -658,7 +721,7 @@ describe('a phaser hit claims a Cybertron for the firer', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const bob = makeShip({
       userid: 'b', shipno: 1, channel: 12,
-      xcoord: 5, ycoord: 4, status: 1, cybmine: 42, shieldstat: 0,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, status: 1, cybmine: 42, shieldstat: 0,
     });
     const h = makeHarness([alice, bob]);
     h.handler.command.handler(alice, ['0', '0'], ctx);

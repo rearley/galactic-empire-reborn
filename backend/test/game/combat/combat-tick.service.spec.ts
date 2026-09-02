@@ -1,4 +1,4 @@
-import { TDAMMAX, PENGUSE } from '../../../src/game/constants';
+import { TDAMMAX, PENGUSE, MISSILE_CHARGE_MAX } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { CombatTickService } from '../../../src/game/combat/combat-tick.service';
@@ -316,7 +316,7 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
       ltorpsChannel: [7, 255, 255],
       ltorpsDistance: [10, 0, 0], // less than TORPSPED → goes negative → hit
     });
-    const h = await makeHarnessSeeded([alice, bob], 99);
+    const h = await makeHarnessSeeded([alice, bob], 7);
 
     const emitted: Array<{ event: string; payload: unknown }> = [];
     h.events.onAny((event: string | string[], payload: unknown) => {
@@ -345,11 +345,18 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
       shield: 0, shieldstat: 0, damage: 0,
+    // A missile's hull damage is proportional to the charge it carried:
+    // floor(MDAMMAX * (charge / MISSILE_CHARGE_MAX) * factor). This fixture
+    // used a charge of 2000 against a MISSILE_CHARGE_MAX of 50_000 -- 4% of a
+    // full missile -- which produced observable damage only because the port
+    // ran MDAMMAX at the numopt ceiling of 100. Canon ships 25, so 4% floors
+    // to zero and the assertions had nothing to measure. Firing a FULL
+    // missile is both the normal case and independent of the tuning.
       lmisslChannel: [9, 255, 255],
       lmisslDistance: [10, 0, 0],
-      lmisslEnergy: [2000, 0, 0],
+      lmisslEnergy: [MISSILE_CHARGE_MAX, 0, 0],
     });
-    const h = await makeHarnessSeeded([alice, bob], 99);
+    const h = await makeHarnessSeeded([alice, bob], 7);
 
     const emitted: Array<{ event: string; payload: unknown }> = [];
     h.events.onAny((event: string | string[], payload: unknown) => {
@@ -378,11 +385,18 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
       const bob = makeShip({
         userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
         shield: 0, shieldstat: 0, damage: 0,
+      // A missile's hull damage is proportional to the charge it carried:
+      // floor(MDAMMAX * (charge / MISSILE_CHARGE_MAX) * factor). This fixture
+      // used a charge of 2000 against a MISSILE_CHARGE_MAX of 50_000 -- 4% of a
+      // full missile -- which produced observable damage only because the port
+      // ran MDAMMAX at the numopt ceiling of 100. Canon ships 25, so 4% floors
+      // to zero and the assertions had nothing to measure. Firing a FULL
+      // missile is both the normal case and independent of the tuning.
         lmisslChannel: [9, 255, 255],
         lmisslDistance: [10, 0, 0],
-        lmisslEnergy: [2000, 0, 0],
+        lmisslEnergy: [MISSILE_CHARGE_MAX, 0, 0],
       });
-      const h = await makeHarnessSeeded([alice, bob], 99);
+      const h = await makeHarnessSeeded([alice, bob], 7);
       // Override the damageFactor for class 1 (bob's shpclass) to the desired value.
       h.classCache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, damageFactor: victimDamageFactor });
       await h.fire();
@@ -400,7 +414,13 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
   });
 
   it('decoy intercept — when carrier has active decoy and roll succeeds, emit COMBAT_DECOY_INTERCEPT and clear slot, no COMBAT_HIT', async () => {
-    // Mulberry32(99) first next() ≈ 0.26 < 0.5 (DECODDS=50) → intercept fires.
+    // The decoy roll is C's 1-in-N form: floor(rand * DECODDS) === 0
+    // (GEFUNCS.C:1585). This fixture used seed 99, whose first draw is ~0.26 --
+    // chosen when the port ran DECODDS=2, where any draw below 0.5 intercepted.
+    // Canon ships DECODDS=11, so an intercept needs a draw below ~0.0909 and
+    // seed 99 no longer fires. Mulberry32(7) draws ~0.0117, which intercepts at
+    // any DECODDS the option permits (1..20), so this fixture no longer depends
+    // on the tuning.
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
@@ -409,7 +429,7 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
       // Distance after decrement will be 1000 — below 5000 → decoy roll triggered.
       ltorpsDistance: [TORPSPED + 1000, 0, 0],
     });
-    const h = await makeHarnessSeeded([alice, bob], 99);
+    const h = await makeHarnessSeeded([alice, bob], 7);
 
     const emitted: Array<{ event: string; payload: unknown }> = [];
     h.events.onAny((event: string | string[], payload: unknown) => {
@@ -448,7 +468,20 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
       ltorpsChannel: [7, 255, 255],
       ltorpsDistance: [10, 0, 0],
     });
-    const h = await makeHarnessSeeded([alice, bob], 128);
+    // Subsystem damage triggers above 20. Torpedo hull damage is
+    // floor(TDAMMAX * factor * damageScale) with factor in 0.5..1.0 when
+    // shields are down, so the band depends directly on TDAMMAX: at the numopt
+    // ceiling of 100 almost any seed cleared 20, but canon ships 35, which
+    // spans roughly 15..31 -- and seed 128's draw lands under the threshold.
+    // The seed has to satisfy the whole draw SEQUENCE, not just the damage:
+    //   draw 1 -> hull damage, must land above the 20 threshold
+    //   draw 2 -> floor(d2 * (101-dmg)/1.5) === 0, the "did a subsystem break"
+    //   draw 3 -> which of the six subsystems (4 = tactical)
+    //   draw 4 -> magnitude, must be non-zero for the field to visibly change
+    // At the old TDAMMAX ceiling of 100 the damage step was satisfied by almost
+    // any seed, so seed 128 worked; under canon's 35 the band is ~15..31 and
+    // the conjunction is much narrower. Seed 300 gives dmg 28 and tactical -22.
+    const h = await makeHarnessSeeded([alice, bob], 300);
 
     const emitted: Array<{ event: string; payload: unknown }> = [];
     h.events.onAny((event: string | string[], payload: unknown) => {

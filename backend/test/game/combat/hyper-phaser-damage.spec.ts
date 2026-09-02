@@ -12,10 +12,10 @@ import { hyperPhaserDamage } from '../../../src/game/combat/combat-math';
  */
 describe('hyperPhaserDamage — C firehp/pdamage warp branch', () => {
   it('point-blank (dist 0): floor(HPDAMMAX * phasrtype / 1)', () => {
-    // dd=1, dp=1, dam=200, factor=200*1/1=200
-    expect(hyperPhaserDamage({ phasrtype: 1, distRaw: 0, victimMaxTons: 0 })).toBe(200);
-    // factor=200*3=600
-    expect(hyperPhaserDamage({ phasrtype: 3, distRaw: 0, victimMaxTons: 0 })).toBe(600);
+    // dd=1 so dp=1 regardless of HPFIRDST, and the result is HPDAMMAX*phasrtype.
+    // Canon HPDAMMAX is 50; the port ran 200, the numopt CEILING.
+    expect(hyperPhaserDamage({ phasrtype: 1, distRaw: 0, victimMaxTons: 0 })).toBe(50);
+    expect(hyperPhaserDamage({ phasrtype: 3, distRaw: 0, victimMaxTons: 0 })).toBe(150);
   });
 
   it('falls to zero at 40000 raw and beyond (dd clamped to 0)', () => {
@@ -34,11 +34,24 @@ describe('hyperPhaserDamage — C firehp/pdamage warp branch', () => {
     expect(hyperPhaserDamage({ phasrtype: 20, distRaw: 30000, victimMaxTons: 15000 })).toBe(101);
   });
 
-  it('HPFIRDST=1 ⇒ linear falloff: half distance ⇒ half base damage', () => {
-    // dist=20000 → dd=0.5 → dp=0.5 → dam=100 → factor=100*phasrtype/1
-    expect(hyperPhaserDamage({ phasrtype: 2, distRaw: 20000, victimMaxTons: 0 })).toBe(200);
-    // sanity: that is exactly half of the point-blank value for the same phasrtype
+  it('HPFIRDST=9 ⇒ the hyperspace beam dies almost immediately', () => {
+    // This test used to assert LINEAR falloff, because the port ran HPFIRDST=1
+    // -- the numopt FLOOR. Canon ships 9, so dp = dd^9 and the beam collapses:
+    //
+    //     dist        0     4000   10000   20000+
+    //     phasrtype 1 50      19       3        0
+    //     phasrtype 10 500   190      30        0
+    //
+    // The combination of the old floor and the old ceiling was the single most
+    // lethal error in the port: at HPDAMMAX 200 / HPFIRDST 1, a hyperspace
+    // phaser at two sectors dealt ~937 after the Mark-10 scaling -- an instant
+    // kill against a 100-damage threshold -- where canon deals nothing at all.
     const pointBlank = hyperPhaserDamage({ phasrtype: 2, distRaw: 0, victimMaxTons: 0 });
-    expect(hyperPhaserDamage({ phasrtype: 2, distRaw: 20000, victimMaxTons: 0 })).toBe(pointBlank / 2);
+    const halfRange = hyperPhaserDamage({ phasrtype: 2, distRaw: 20_000, victimMaxTons: 0 });
+    expect(halfRange).toBe(0);
+    expect(halfRange).toBeLessThan(pointBlank / 10);
+
+    // Still meaningful at knife range, which is the point of the weapon.
+    expect(hyperPhaserDamage({ phasrtype: 2, distRaw: 4_000, victimMaxTons: 0 })).toBeGreaterThan(0);
   });
 });

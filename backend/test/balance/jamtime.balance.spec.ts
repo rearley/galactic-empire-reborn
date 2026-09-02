@@ -6,7 +6,15 @@
  * numopt CLAMPS, so 10 is the highest value the original game can run with. The
  * port used 20, meaning jammers persisted for twice the maximum duration the
  * original permits — the same class of defect as TDAMMAX/MDAMMAX, not a balance
- * preference.
+ * preference. It was then "fixed" to 10, the ceiling; MBMGEMSG.MSG ships 3.
+
+ * NOTE ON DEFAULTS. This file no longer pins the option's value; that belongs
+ * to test/balance/sysop-options-canon.balance.spec.ts, which checks every
+ * option against the shipped default in MBMGEMSG.MSG. The pin here asserted the
+ * numopt CEILING, on the reasoning that the ceiling was the highest legal value
+ * and the shipped one was unrecoverable. The shipped value was always in the
+ * .MSG, and it is not the ceiling.
+
  *
  * The semantics are identical on both sides, which is what makes the values
  * directly comparable: C sets `wptr->jammer = jamtime * ddist` where ddist is a
@@ -27,8 +35,11 @@ describe('JAMTIME balance', () => {
     expect(JAMTIME).toBeLessThanOrEqual(10);
   });
 
-  it('defaults to the legal ceiling of 10', () => {
-    expect(JAMTIME).toBe(10);
+  it('is a duration a jammer could plausibly hold, not the clamp ceiling', () => {
+    // Canon ships 3 (MBMGEMSG.MSG). Asserted as a range so this file stays
+    // about jammer BEHAVIOUR; the exact default is owned by the canon test.
+    expect(JAMTIME).toBeLessThan(10);
+    expect(JAMTIME).toBeGreaterThan(0);
   });
 
   it('a jammer at the carrier lasts JAMTIME ticks, and none beyond scan range', () => {

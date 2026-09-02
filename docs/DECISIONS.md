@@ -1750,3 +1750,116 @@ sysop is meant to set, so freezing a deployment's choice defeats the config
 system. They now assert each value stays inside C's `numopt` range — which
 still catches a typo'd config — and the phaser formula test derives its
 expectation from the configured exponent instead of assuming the linear case.
+
+## 2026-09-02 — Canon is the source of truth; sysop options re-baselined from MBMGEMSG.MSG
+
+**Context:** The original distribution was obtained in full (github.com/bsimser/ge,
+vendored read-only at `reference/ge-upstream/`). Our nine C files proved
+byte-identical to it, but the *data* files had never been available: the port had
+reconstructed ship classes and sysop options from wiki tables and from bounds.
+
+`game-config.ts` had stated that option values "are not part of the reference
+source, so there is nothing to recover" and therefore that "any value inside the
+bounds is legitimate". This is false — `MBMGEMSG.MSG` carries the shipped default
+in the braces of every option block. Working from that premise, 44 of 51 defaults
+were wrong and 20 sat exactly ON a clamp bound, in both directions (HPDAMMAX at
+the ceiling of 200 against a shipped 50; PFIRDST at the floor of 1 against 7).
+A 15-agent adversarial audit traced ~35 of its 98 findings to that one comment.
+
+**Decision:** The classic game is the source of truth. Precedence: C source, then
+the `.MSG` data files, then the wiki. In-game help text states intent and is never
+authoritative for a number. Canon values are GENERATED and pinned by tests that
+re-read the original files — never hand-transcribed.
+
+`config/game.config.json` now contains DEVIATIONS ONLY. Restating a value you did
+not choose is how the drift hid: the file looked authoritative and silently
+overrode every correction made to the defaults.
+
+**Reason:** Both drifts found this week (ship scanRange, and the option defaults)
+shared one shape — a plausible comment asserting canon was unavailable, which then
+licensed a guess that no test could contradict, because the tests were written
+from the same premise.
+
+**Alternatives rejected:** Keeping the tuned values and documenting them wholesale
+— rejected because they were not tuning decisions, they were bound-picking; there
+was nothing to preserve. Hand-correcting the 44 values — rejected as the same
+failure mode that produced them.
+
+---
+
+## 2026-09-02 — UNIVMAX deploys at 100, against a canon default of 300
+
+**Context:** Canon ships UNIVMAX=300, a 601x601 galaxy. Scan ranges are ABSOLUTE,
+so galaxy size and scanner reach are a ratio and must be chosen together: canon's
+Interceptor sees 10 sectors, which is 1.7% of canon's galaxy width but would be
+32% of the 31x31 galaxy the port was running.
+
+**Decision:** `default: 300` in `SYSOP_OPTIONS` (canon), deployed at **100**
+(201x201) in `config/game.config.json`.
+
+**Reason:** Canon's galaxy assumed a busy BBS. With a handful of concurrent
+players, 361,201 sectors means they never meet. At 100 the Interceptor's canon
+scan is 5% of galaxy width — roughly 3x canon's relative reach, which suits a
+smaller player base — while the Dreadnought's 50-sector reach stays just under a
+quarter of the width, guarded by a test that reads the DEPLOYED config.
+
+**Alternatives rejected:** UNIVMAX 300 (players never meet); UNIVMAX 15 with
+compressed scan ranges (the status quo — it fought the projection code, which had
+already been corrected to expect canon values).
+
+---
+
+## 2026-09-02 — PLANTOCK deploys at 120 minutes, against a canon default of 360
+
+**Context:** Canon's planet production tick is 360 minutes; the port hard-coded
+1800 seconds (30 minutes) while its JSDoc claimed 30 was canonical. Colony
+economies therefore ran 12x faster than the original, inflating planet-derived
+score against combat-derived score — the exact ratio 3.2c retuned.
+
+**Decision:** Add PLANTOCK to `SYSOP_OPTIONS` with canon default 360; deploy 120.
+
+**Reason:** 4x slower than today and 3x faster than canon. Six-hour production
+ticks suit a BBS people dialled into for hours, not a web game with daily logins;
+120 keeps a daily visit meaningful without letting planet income dominate scoring.
+
+**Alternatives rejected:** 360 (world feels static between logins); 30 (keeps the
+scoring imbalance the original explicitly retuned).
+
+---
+
+## 2026-09-02 — UNIVWRAP implemented, defaulting to canon NO
+
+**Context:** Canon ships UNIVWRAP=NO: `GEFUNCS.C:651-705` pins a ship at
++/-(univmax-2), calls `telezip()`, which zeroes speed and speed2b and adds
+TELEDAM (17). The port always wrapped instead, teleporting the ship across the
+galaxy at full speed for free. `TELEDAM = 17` was defined in `constants.ts` and
+balance-tested but read by no runtime code.
+
+**Decision:** Implement the mechanic and the sysop option; default to canon NO.
+
+**Reason:** Running for the edge should be a dead end, not a free jump. The free
+jump currently benefits Cybertrons chasing a player as much as the player fleeing,
+so removing it is not simply harder on newcomers.
+
+**Alternatives rejected:** Implementing it but defaulting to wrap (kinder to a
+fleeing new player, but preserves the same free escape for pursuers); leaving it
+unimplemented (TELEDAM stays dead code pinned by a test that guards nothing).
+
+---
+
+## 2026-09-02 — Colonists will eat (fixing an inherited original bug)
+
+**Context:** `GEPLANET.C:221-230` debits food only for troops, then starves men
+against that same stock. A colony with no garrison consumes zero food forever —
+and food is what the user's guide sends new players to Tahanian Station to buy.
+
+**Decision:** Fix it: debit `floor(men/100)` before the starvation test. Sequenced
+AFTER the PLANTOCK decision and paired with a food-production retune.
+
+**Reason:** Standing project rule — fidelity means the original's design, not its
+defects. This one makes an entire documented supply chain inert and devalues one
+of the two goods the starting hub exists to sell.
+
+**Alternatives rejected:** Preserving it as a faithful reproduction — contradicts
+the standing rule. Fixing it immediately and independently — production rate and
+consumption multiply, so they must be retuned together.
