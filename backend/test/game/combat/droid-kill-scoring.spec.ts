@@ -52,7 +52,7 @@ describe('US6 — Droid kill scoring (FR-025/026)', () => {
     events = new EventEmitter2();
     transferKillScore = jest.fn().mockResolvedValue(undefined);
     applyCashPenalty = jest.fn().mockResolvedValue(0n);
-    const repo = { transferKillScore, applyCashPenalty } as unknown as PlayerScoreRepository;
+    const repo = { transferKillScore, applyCashPenalty, getRospos: jest.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
     service = new PlayerScoreService(events, repo, CHGLOSER_DEFAULT);
     service.onModuleInit();
   });

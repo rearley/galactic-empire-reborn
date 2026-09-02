@@ -30,6 +30,19 @@ export class PlayerScoreRepository {
    * @see GEFUNCS.C:1157-1185
    * @see GEFUNCS.C:1161  AI 1/10 branch
    */
+  /**
+   * The victim's roster position, for the SCRBONUS term. 0 when unranked or
+   * unknown (an AI victim has no user row), which pays no bonus.
+   * @see GEMAIN.C:1302-1332 — rospos is assigned by the midnight job
+   */
+  async getRospos(userid: string): Promise<number> {
+    const row = await this.prisma.user.findUnique({
+      where: { userid },
+      select: { rospos: true },
+    });
+    return row?.rospos ?? 0;
+  }
+
   async transferKillScore(
     attackerUserid: string,
     victimUserid: string,

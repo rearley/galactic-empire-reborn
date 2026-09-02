@@ -41,6 +41,9 @@ function makeService(transferKillScoreMock: jest.Mock) {
   const repo = {
     transferKillScore: transferKillScoreMock,
     applyCashPenalty: jest.fn().mockResolvedValue(0n),
+    // SCRBONUS divides by the victim's roster position (GEFUNCS.C:1150-1153);
+    // 0 is unranked and pays no bonus, so these assertions stay about the base.
+    getRospos: jest.fn().mockResolvedValue(0),
   };
   const service = new PlayerScoreService(
     events,
@@ -173,6 +176,7 @@ describe('PlayerScoreService — idempotency (T029a)', () => {
     const repo = {
       transferKillScore: transferMock,
       applyCashPenalty: jest.fn().mockResolvedValue(0n),
+      getRospos: jest.fn().mockResolvedValue(0),
     };
     const service = new PlayerScoreService(events, repo as never, 0);
 

@@ -47,7 +47,9 @@ describe('US5 — CHGLOSER PvP cash penalty (GEFUNCS.C:killem)', () => {
     events = new EventEmitter2();
     transferKillScore = jest.fn().mockResolvedValue(undefined);
     applyCashPenalty = jest.fn().mockResolvedValue(100n);
-    const repo = { transferKillScore, applyCashPenalty } as unknown as PlayerScoreRepository;
+    const repo = { transferKillScore, applyCashPenalty,
+      // SCRBONUS term reads the victim's rank; 0 = unranked, no bonus.
+      getRospos: jest.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
     service = new PlayerScoreService(events, repo, CHGLOSER_DEFAULT);
     service.onModuleInit();
   });
@@ -95,7 +97,10 @@ describe('US5 — CHGLOSER PvP cash penalty (GEFUNCS.C:killem)', () => {
   it('does NOT call applyCashPenalty when chgLoserPercent = 0', async () => {
     const eventsZero = new EventEmitter2();
     const penaltyMockZero = jest.fn().mockResolvedValue(0n);
-    const repoZero = { transferKillScore: jest.fn().mockResolvedValue(undefined), applyCashPenalty: penaltyMockZero } as unknown as PlayerScoreRepository;
+    const repoZero = { transferKillScore: jest.fn().mockResolvedValue(undefined),
+    // PlayerScoreService reads the victim's rank for the SCRBONUS term
+    // (GEFUNCS.C:1150-1153). 0 = unranked, which pays no bonus.
+    getRospos: jest.fn().mockResolvedValue(0), applyCashPenalty: penaltyMockZero } as unknown as PlayerScoreRepository;
     const svcZero = new PlayerScoreService(eventsZero, repoZero, 0);
     svcZero.onModuleInit();
 

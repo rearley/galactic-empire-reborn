@@ -20,6 +20,22 @@
  * the victim's loss.
  */
 
+/**
+ * Bonus added to a kill, inversely proportional to the VICTIM's roster rank.
+ *
+ *   if (waruptr->rospos > 0) bonus = (long)(score_bonus/(waruptr->rospos));
+ *                                                      GEFUNCS.C:1150-1153
+ *
+ * `killem(ptr,usrn)` is called with the victim, so `waruptr` is the victim's
+ * user record: the higher the ship you killed was ranked, the bigger the prize.
+ * rospos 0 means unranked (GEMAIN.C:1302-1332 assigns it only to qualifiers),
+ * and pays nothing. C's long division truncates.
+ */
+export function killScoreBonus(victimRospos: number, scoreBonus: number): number {
+  if (victimRospos <= 0) return 0;
+  return Math.max(0, Math.trunc(scoreBonus / victimRospos));
+}
+
 /** What the killer books. Unscaled — `amt = scr + bonus`. */
 export function killScoreAward(amt: number): number {
   return Math.max(0, Math.trunc(amt));
