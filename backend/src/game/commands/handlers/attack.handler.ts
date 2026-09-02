@@ -6,7 +6,8 @@ import { ShipStateService } from '../../ship/ship-state.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { PlanetAttackService } from '../../planet/planet-attack.service';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
-import { PLTYPE_WORM } from '../../constants';
+import { PLTYPE_WORM, SE100DAM } from '../../constants';
+import { isInNeutralZone } from '../../combat/neutral-zone';
 import { I_TROOPS, I_FIGHTER } from '../../constants/items';
 import { FIRETICKS } from '../attack.config';
 import { resolveItemKeyword } from '../validators';
@@ -75,7 +76,20 @@ export class AttackHandlerService {
       return { lines: [{ text: formatMessage(MessageId.ATT_WORMHOLE), category: 'system' }] };
     }
 
-    // FR-014-005: neutral zone — skip (zaphim handled by combat tick; no precondition msg).
+    // FR-014-005: neutral zone. C fires zaphim and RETURNS WITHOUT RESOLVING
+    // THE ATTACK (GECMDS.C:3555-3559) -- the same early abort as firep. This
+    // was a comment claiming the combat tick handled it; nothing did, so `att`
+    // in the hub was completely unpunished. Sector (0,0) is where every new
+    // player buys ships, ordnance, men and food, and our fixture planets carry
+    // no troops or fighters, so the trade hub could be raided and taken on the
+    // first attack.
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+    }
+
     // FR-014-004: self-attack check.
     if (planet.userid === ship.userid) {
       return { lines: [{ text: formatMessage(MessageId.ATT_SELF), category: 'system' }] };
