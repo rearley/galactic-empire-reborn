@@ -168,6 +168,28 @@ export const PLODDS = GAME_CONFIG.PLODDS;
 export const WORMODDS = GAME_CONFIG.WORMODDS;
 
 /**
+ * Planet ground-combat coefficients, stored as the raw option / 100.
+ *
+ *   plattrf1 = numopt(PLATTRF1,5,100)  / 100.0    (GEMAIN.C:532-548)
+ *   plattrf2 = numopt(PLATTRF2,5,1000) / 100.0
+ *   plattrf3 = numopt(PLATTRF3,5,1000) / 100.0
+ *   plattrt1 = numopt(PLATTRT1,5,1000) / 100.0
+ *   plattrt2 = numopt(PLATTRT2,5,1000) / 100.0
+ *
+ * Canon ships 18 / 100 / 55 / 125 / 35, i.e. 0.18 / 1.00 / 0.55 / 1.25 / 0.35.
+ * The port ran all five at 0.05 -- the numopt FLOOR of 5/100 -- which is not a
+ * balance choice but the same bound-picking that produced the weapon values.
+ *
+ * GECMDS.C:3671 and :3676 carry Murdock's own worked comments on the results,
+ * `/*.766*\/` and `/* .344 *\/`, and those are only reachable at 1.25 and 0.35.
+ */
+export const PLATTRF1 = GAME_CONFIG.PLATTRF1 / 100;
+export const PLATTRF2 = GAME_CONFIG.PLATTRF2 / 100;
+export const PLATTRF3 = GAME_CONFIG.PLATTRF3 / 100;
+export const PLATTRT1 = GAME_CONFIG.PLATTRT1 / 100;
+export const PLATTRT2 = GAME_CONFIG.PLATTRT2 / 100;
+
+/**
  * Max ships a player may own (env MAXSHIPS, 1–50).
  * @see GEMAIN.C:462 numopt(MAXSHIPS,1,50)
  */

@@ -144,7 +144,7 @@ describe('PlanetAttackService — troop branch mail (T014)', () => {
     const planet = makePlanet(1, 0, 'owner');
     const ship = makeShip(); // 50000 attackers vs 1 defender
 
-    await service.attackTroop(50000, ship, planet);
+    await service.attackTroop(1000, ship, planet);
 
     if (mailCreates.length > 0) {
       const mail = (mailCreates[0] as { data: Record<string, unknown> }).data;
@@ -158,9 +158,15 @@ describe('PlanetAttackService — troop branch mail (T014)', () => {
     const { service, mailCreates } = makeService(42);
     // Tiny attack vs massive defence → ratio = 0
     const planet = makePlanet(100_000, 0, 'owner');
-    const ship = makeShip(); // 50000 attackers vs 100000 defenders
+    // `ratio` is a PERCENTAGE in canon: (left1*100)/left2, gated at `> 2`
+    // (GECMDS.C:3655, :3673). "Outnumbered enough to go unnoticed" therefore
+    // means the landing party is under 2 percent of the garrison, not merely
+    // smaller than it. This fixture used 50 000 against 100 000, which reads as hopeless but
+    // is 50 percent of the defenders -- comfortably over the threshold. It only
+    // passed while the port omitted the x100 and computed an integer quotient of 0.
+    const ship = makeShip(); // 1000 attackers vs 100000 defenders -> ratio = 1 percent
 
-    await service.attackTroop(50000, ship, planet);
+    await service.attackTroop(1000, ship, planet);
 
     // ratio = floor(50000/100000) = 0 ≤ 1 → no mail
     expect(mailCreates.length).toBe(0);
