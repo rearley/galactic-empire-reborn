@@ -19,6 +19,7 @@
 
 import { Mulberry32Adapter } from '../../src/game/combat/random.port';
 import { cdistance, inScanRange } from '../../src/game/combat/combat-math';
+import { UNIVMAX } from '../../src/game/constants';
 import { CybertronTickService } from '../../src/game/cybertron/cybertron-tick.service';
 import { CybertronRepository } from '../../src/game/cybertron/cybertron.repository';
 import { DroidTickService } from '../../src/game/droid/droid-tick.service';
@@ -178,22 +179,24 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     });
   }
 
-  test('no weapon gate reaches beyond a quarter of the map width', () => {
-    // Re-derived for the proportional table. The previous bound ("15% of the
-    // 33.5-sector diagonal", i.e. 5.03 sectors) was fitted to the ad-hoc
-    // round-2 values, not to a design intent. What actually matters is that no
-    // single ship can control a large share of the map with its weapons: the
-    // Dreadnought's 7.5 sectors is a quarter of the 30-sector width, and it is
-    // the canonical ceiling — its canon scanRange is a 50-sector radius.
+  test('no weapon gate reaches beyond a quarter of the GALAXY width', () => {
+    // The previous bound divided by 30 and called it "the map width". 30 is
+    // MAXX, the width of the ASCII sca-lo projection GRID - a fixed 30x15
+    // viewport - not the size of the galaxy. Conflating the two capped every
+    // weapon gate at 7.5 sectors, which canon exceeds almost everywhere
+    // (the Dreadnought alone reaches 50), so the bound only held while the
+    // table was compressed to fit it.
     //
-    // NOTE this is the WEAPON/lock gate. The sca-lo projection radius is 3x
-    // larger by design (SCAN_LO_PROJECTION_MULTIPLIER), so a Dreadnought's
-    // long-range overview does span most of the galaxy — that is the flagship's
-    // canonical role, not an escaped bound.
-    // The Sysopian Death Star (34) is admin-only and deliberately god-tier
-    // (100m tons, warp 255, canon scan 1m = a 100-sector radius) — exempt.
-    const maxGateSectors = 30 / 4;
-    for (const c of SHIP_CLASSES.filter((x) => x.classNumber !== 34)) {
+    // Re-derived against the real extent: sectors run -UNIVMAX..+UNIVMAX on
+    // both axes, so the galaxy is 2*UNIVMAX+1 sectors wide. The intent worth
+    // keeping is that no ship a player can face controls a large share of the
+    // galaxy with its weapons.
+    //
+    // The Sysopian Death Star (class 41, admin-only, 100m tons, warp 255,
+    // canon scan 1m = a 100-sector radius) is deliberately god-tier - exempt.
+    const galaxyWidthSectors = 2 * UNIVMAX + 1;
+    const maxGateSectors = galaxyWidthSectors / 4;
+    for (const c of SHIP_CLASSES.filter((x) => x.classNumber !== 41)) {
       expect(c.scanRange / 10_000).toBeLessThanOrEqual(maxGateSectors);
     }
   });
@@ -213,23 +216,43 @@ describe('Range model — inScanRange agrees with per-class scanRange', () => {
     }
   });
 
-  test('every combative AI keeps a workable engagement bubble', () => {
-    // Round 2 over-compressed AI scanRange and "Cybertrons appeared inert in
-    // playtest" — this guard is the regression for that. It used to pin the
-    // Scout at >= 20 000 (2 sectors), a figure calibrated against the old
-    // INFLATED AI table (the Scout was 25 000 where canon x0.15 gives 7 500).
+  test('combative AI scanRange gates ENGAGEMENT only, never pursuit', () => {
+    // This guard used to require every combative AI to see at least 0.3
+    // sectors, on the stated premise that "an AI must be able to detect
+    // something beyond the sector it occupies, so it can acquire a target that
+    // wanders in". That premise is wrong, and it outlived the x0.15 rescale it
+    // was written for.
     //
-    // Under the proportional rescale the floor is expressed as intent: an AI
-    // must be able to detect something beyond the sector it occupies, so it can
-    // acquire a target that wanders in rather than needing a collision.
+    // The original runs TWO separate loops and only one of them is ranged:
+    //   - target selection, GECYBS.C:711-728 - loops every terminal and takes
+    //     the closest passing (in game, not cloaked, lta <= shpclass,
+    //     notclaimed). There is NO distance gate. Pursuit is galaxy-wide.
+    //   - engagement,       GECYBS.C:249-252 - fires only while
+    //     ddist < shipclass[hunter].scanrange.
     //
-    // NOTE this is weaker than the old pin, and whether 0.75 sectors is enough
-    // for the Scout in the live world is a PLAYTEST question, not a unit-test
-    // one — see docs/GAME_MECHANICS.md.
+    // So scanRange decides how close a Cybertron must get before it shoots,
+    // not whether it can find you. Canon gives the Cyberquad (class 22) a
+    // scanRange of 1_000 - a tenth of a sector - which is not an inert ship
+    // but a point-blank brawler: it hunts you across the galaxy and opens fire
+    // only once it is on top of you. Pinning an arbitrary floor here would
+    // silently overwrite that design.
+    //
+    // Field values themselves are owned by the canon conformance test.
+    // @see test/balance/ship-class-canon.balance.spec.ts
     const combative = SHIP_CLASSES.filter((c) => c.classNumber >= 21 && c.classNumber <= 25);
-    for (const c of combative) {
-      expect(c.scanRange / 10_000).toBeGreaterThanOrEqual(0.3);
-    }
+    expect(combative).toHaveLength(5);
+
+    // Engagement reach in sectors, straight from canon.
+    const reach = Object.fromEntries(
+      combative.map((c) => [c.classNumber, c.scanRange / 10_000]),
+    );
+    expect(reach).toEqual({
+      21: 5,    // Cybertron Scout       - the picket, sees furthest for its size
+      22: 0.1,  // Cyberquad             - point-blank brawler, tough=1
+      23: 20,   // Cybertron Base Star   - immobile fortress, phaser 16
+      24: 2,    // Sarten Attack Drone
+      25: 40,   // Sarten Obliterator    - phaser 16, outranges everything
+    });
   });
 });
 

@@ -79,8 +79,12 @@ export function parseRange(
  */
 export function loadGalaxyConfig(env: NodeJS.ProcessEnv): GalaxyConfig {
   const seed = parseUint32(env.GALAXY_SEED, 0xc0ffee, 'GALAXY_SEED');
-  const plodds = parseRange(env.GALAXY_PLODDS, 4, 1, 20, 'GALAXY_PLODDS');
-  const wormodds = parseRange(env.GALAXY_WORMODDS, 10, 1, 100, 'GALAXY_WORMODDS');
+  // Defaults are canon's, from MBMGEMSG.MSG:
+  //   PLODDS   {Frequency Factor for planets: 3}
+  //   WORMODDS {Frequency Factor for wormholes: 6}
+  //   MAXPLSE  {Maximum planets in a sector? 5}
+  const plodds = parseRange(env.GALAXY_PLODDS, 3, 1, 20, 'GALAXY_PLODDS');
+  const wormodds = parseRange(env.GALAXY_WORMODDS, 6, 1, 100, 'GALAXY_WORMODDS');
   const maxplanets = parseRange(env.GALAXY_MAXPLANETS, 5, 1, 9, 'GALAXY_MAXPLANETS');
 
   return { seed, plodds, wormodds, maxplanets };

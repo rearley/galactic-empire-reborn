@@ -74,16 +74,16 @@ describe('GalaxyService bootstrap (G1)', () => {
     expect(meta!.seed).toBe(BigInt(12648430));
   });
 
-  it('G1.4 — GalaxyMeta row records default plodds=4', async () => {
+  it('G1.4 — GalaxyMeta row records canon default plodds=3', async () => {
     const meta = await prisma.galaxyMeta.findFirst();
     expect(meta).not.toBeNull();
-    expect(meta!.plodds).toBe(4);
+    expect(meta!.plodds).toBe(3); // MBMGEMSG.MSG PLODDS {Frequency Factor for planets: 3}
   });
 
-  it('G1.5 — GalaxyMeta row records default wormodds=10', async () => {
+  it('G1.5 — GalaxyMeta row records canon default wormodds=6', async () => {
     const meta = await prisma.galaxyMeta.findFirst();
     expect(meta).not.toBeNull();
-    expect(meta!.wormodds).toBe(10);
+    expect(meta!.wormodds).toBe(6); // MBMGEMSG.MSG WORMODDS {Frequency Factor for wormholes: 6}
   });
 
   it('G1.6 — GalaxyMeta row records default maxplanets=5', async () => {

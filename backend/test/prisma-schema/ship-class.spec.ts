@@ -6,7 +6,7 @@
 import { prisma, truncateAll } from "./helpers/prisma-test-client";
 import { SHIP_CLASSES } from "../../prisma/seed/ship-classes";
 
-const EXPECTED_CLASS_NUMBERS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 34, 21, 22, 23, 24, 25, 31, 32, 33]);
+const EXPECTED_CLASS_NUMBERS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 31, 32, 33, 41]);
 
 beforeEach(async () => {
   await truncateAll();
@@ -72,7 +72,7 @@ describe("ShipClass entity", () => {
     expect(found.maxWarp).toBe(10);
     expect(found.maxTons).toBe(1_000);
     expect(found.maxPrice).toBe(65_000n);
-    expect(found.scanRange).toBe(15_000);
+    expect(found.scanRange).toBe(100_000);
     expect(found.points).toBe(750);
     expect(found.cybCanAttack).toBe(true);
     // The Interceptor's wiki "Cyb#" of 1 is the GANG-UP LIMIT — how many
@@ -105,9 +105,9 @@ describe("ShipClass entity", () => {
     expect(found.damageFactor).toBe(100);
   });
 
-  it("class 34 — Sysopian Death Star spot-check", async () => {
+  it("class 41 — Sysopian Death Star spot-check", async () => {
     await prisma.shipClass.createMany({ data: SHIP_CLASSES as never[] });
-    const found = await prisma.shipClass.findUniqueOrThrow({ where: { classNumber: 34 } });
+    const found = await prisma.shipClass.findUniqueOrThrow({ where: { classNumber: 41 } });
     expect(found.maxWarp).toBe(255);
     expect(found.maxTons).toBe(100_000_000);
     expect(found.maxPrice).toBe(32_000_000n);

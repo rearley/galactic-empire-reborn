@@ -11,15 +11,16 @@ import { UNIVMAX } from '../../src/game/constants';
  * At that point, the counts and wormhole coords will be populated and
  * these assertions will go GREEN with no edits required here.
  *
- * G7: At default seed (12648430) and default tunables (plodds=4,
- *     wormodds=10, maxplanets=5), planet and wormhole counts fall within
+ * G7: At default seed (12648430) and canon default tunables (plodds=3,
+ *     wormodds=6, maxplanets=5 — MBMGEMSG.MSG), planet and wormhole counts fall within
  *     expected ranges.
  *
  * G8: Every wormhole's destination coords point to the centre of a valid
  *     sector grid cell that is distinct from the wormhole's source sector.
  *
  * @see specs/004-galaxy-generator/contracts/galaxy-service.md — G7, G8
- * @see GEMAIN.H — MAXX=30, MAXY=15, plodds=4, wormodds=10, maxplanets=5
+ * @see GEMAIN.H — MAXX=30, MAXY=15 (the sca-lo viewport)
+ * @see MBMGEMSG.MSG — PLODDS=3, WORMODDS=6, MAXPLSE=5
  * @see GEPLANET.C:455-650 xgetsector — wormhole placement logic
  */
 describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
@@ -60,32 +61,55 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
   // ── G7: Balance — planet and wormhole counts ─────────────────────────────────
 
   /**
-   * DENSITY, not a raw count. UNIVMAX is a sysop option
-   * (numopt(UNIVMAX,10,32767), GEMAIN.C:474) and the galaxy is
-   * (2*UNIVMAX+1)^2 sectors, so an absolute bound silently encodes one
-   * deployment's world size. Raising UNIVMAX from 10 to 15 — to dilute the
-   * Cybertron kill circles that covered half the map — took the galaxy from
-   * 441 to 961 sectors and broke these, even though planets per sector barely
-   * moved (0.476 -> 0.465). The bounds below are the original [100,300] and
-   * [10,40] expressed per sector against the 441-sector galaxy they were
-   * calibrated on, so they now hold at any world size.
+   * DENSITY DERIVED FROM THE TUNABLES, not a raw count and not a fixed band.
+   *
+   * UNIVMAX, PLODDS, WORMODDS and MAXPLSE are all sysop options
+   * (GEMAIN.C:474 and MBMGEMSG.MSG), so any constant here silently encodes one
+   * deployment's settings. These bounds were previously "the original [100,300]
+   * and [10,40] per sector against the 441-sector galaxy they were calibrated
+   * on" — which survived a UNIVMAX change but still hard-coded plodds=4 and
+   * wormodds=10. Adopting canon's PLODDS=3 / WORMODDS=6 pushed wormhole density
+   * to 0.111 against a 0.091 ceiling: the world was correct and the test was
+   * measuring the previous configuration.
+   *
+   * The generator is a straightforward chain (GEPLANET.C:484-551):
+   *   P(sector gets objects) = 1 / plodds
+   *   E[slots | objects]     = mean of rng.intBelow(maxplanets), i.e. uniform
+   *                            over 0..maxplanets-1, so (maxplanets - 1) / 2
+   *   P(slot is a wormhole)  = 1 / wormodds, else it is a planet
+   * so the expected per-sector densities follow directly, and the assertion
+   * becomes "the generator behaves as its own configuration says it should" at
+   * any world size and any tunable setting.
    */
-  const BASELINE_SECTORS = 441; // (2*10+1)^2, the size these bounds came from
+  const TOLERANCE = 0.1; // +/-10%: sampling noise over tens of thousands of sectors is well inside this
 
-  it('G7.1 — planet DENSITY matches the calibrated range at any UNIVMAX', async () => {
+  async function expectedDensities() {
+    const meta = await prisma.galaxyMeta.findFirst();
+    expect(meta).not.toBeNull();
+    const { plodds, wormodds, maxplanets } = meta!;
+    const objectsPerSector = (1 / plodds) * ((maxplanets - 1) / 2);
+    return {
+      planets: objectsPerSector * (1 - 1 / wormodds),
+      wormholes: objectsPerSector * (1 / wormodds),
+    };
+  }
+
+  it('G7.1 — planet DENSITY matches what the tunables predict', async () => {
     const count = await prisma.planet.count();
     const sectors = (2 * UNIVMAX + 1) ** 2;
     const density = count / sectors;
-    expect(density).toBeGreaterThanOrEqual(100 / BASELINE_SECTORS);
-    expect(density).toBeLessThanOrEqual(300 / BASELINE_SECTORS);
+    const { planets: expected } = await expectedDensities();
+    expect(density).toBeGreaterThanOrEqual(expected * (1 - TOLERANCE));
+    expect(density).toBeLessThanOrEqual(expected * (1 + TOLERANCE));
   });
 
-  it('G7.2 — wormhole DENSITY matches the calibrated range at any UNIVMAX', async () => {
+  it('G7.2 — wormhole DENSITY matches what the tunables predict', async () => {
     const count = await prisma.wormhole.count();
     const sectors = (2 * UNIVMAX + 1) ** 2;
     const density = count / sectors;
-    expect(density).toBeGreaterThanOrEqual(10 / BASELINE_SECTORS);
-    expect(density).toBeLessThanOrEqual(40 / BASELINE_SECTORS);
+    const { wormholes: expected } = await expectedDensities();
+    expect(density).toBeGreaterThanOrEqual(expected * (1 - TOLERANCE));
+    expect(density).toBeLessThanOrEqual(expected * (1 + TOLERANCE));
   });
 
   // ── G8: Wormhole destination coordinate integrity ────────────────────────────

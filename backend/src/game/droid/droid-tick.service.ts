@@ -197,7 +197,12 @@ export class DroidTickService implements OnModuleInit {
     }
 
     const clsConfig = this.config.classes[classNumber];
-    const scanRange = clsConfig?.scanRange ?? 25_000;
+    // scanRange comes from the ShipClass table (canon MBMGESHP.MSG SxxSRNG),
+    // NOT from droid config. DroidClassConfig used to keep its own copy, which
+    // drifted to the old compressed 3_750 while the table said 25_000 -- so a
+    // Murdonian would not return fire at a range the class table said it could
+    // see. One rule, one home.
+    const scanRange = this.classCache.get(classNumber)?.scanRange ?? 25_000;
     const tickAt = ctx.tickNumber;
 
     let detected = false;

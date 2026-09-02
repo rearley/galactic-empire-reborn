@@ -30,6 +30,21 @@ function inUniverse(xsect: number, ysect: number): boolean {
   return xsect >= -UNIVMAX && xsect <= UNIVMAX && ysect >= -UNIVMAX && ysect <= UNIVMAX;
 }
 
+/** Ceiling for the first-boot generation transaction. @see onModuleInit */
+const GALAXY_GENERATION_TIMEOUT_MS = 120_000;
+/** How long to wait for a connection before starting generation. */
+const GALAXY_GENERATION_MAX_WAIT_MS = 10_000;
+
+/**
+ * Rows accumulated during generation, flushed in bulk at the end.
+ * @see GalaxyService.flushBuffer
+ */
+interface GenerationBuffer {
+  sectors: Prisma.SectorCreateManyInput[];
+  wormholes: Prisma.WormholeCreateManyInput[];
+  planets: Prisma.PlanetCreateManyInput[];
+}
+
 @Injectable()
 export class GalaxyService implements OnModuleInit {
   private readonly logger = new Logger(GalaxyService.name);
@@ -70,6 +85,15 @@ export class GalaxyService implements OnModuleInit {
       // Fresh DB — generate the galaxy
       await this.runGeneration(tx, cfg);
       generated = true;
+    }, {
+      // Generation is one all-or-nothing transaction: GalaxyMeta is written
+      // last, and its presence is what marks the galaxy complete, so a partial
+      // galaxy must never be committed. Prisma's 5 s default is sized for
+      // request-scoped work, not for seeding (2*UNIVMAX+1)^2 sectors on first
+      // boot. Bulk inserts brought this well under the limit, but the ceiling
+      // has to allow for a cold database and a large UNIVMAX.
+      timeout: GALAXY_GENERATION_TIMEOUT_MS,
+      maxWait: GALAXY_GENERATION_MAX_WAIT_MS,
     });
 
     await this.hydrate();
@@ -193,12 +217,20 @@ export class GalaxyService implements OnModuleInit {
     // The universe is a square centred on the origin: sectors run -UNIVMAX..
     // +UNIVMAX on both axes, so the neutral zone at (0,0) sits at its CENTRE
     // with room in every direction. @see GEMAIN.H:70 NEUTRAL_X / GEMAIN.C:2204
+    // Row generation is buffered, then bulk-inserted. Writing each row with its
+    // own create() cost one round trip per row; at UNIVMAX=100 that is 40 401
+    // sectors plus ~20 000 planets, which blew the interactive transaction
+    // timeout long before it finished. Buffering does not affect determinism:
+    // the RNG is still drawn in exactly the same order, only the writes move.
+    const buf: GenerationBuffer = { sectors: [], wormholes: [], planets: [] };
     for (let y = -UNIVMAX; y <= UNIVMAX; y++) {
       for (let x = -UNIVMAX; x <= UNIVMAX; x++) {
         if (x === 0 && y === 0) continue; // already done
-        await this.generateSector(tx, rng, x, y, cfg);
+        this.generateSector(buf, rng, x, y, cfg);
       }
     }
+
+    await this.flushBuffer(tx, buf);
 
     // GalaxyMeta is the LAST write — its presence is the atomicity signal
     await tx.galaxyMeta.create({
@@ -317,19 +349,17 @@ export class GalaxyService implements OnModuleInit {
    * Insert a non-origin sector with randomized planets/wormholes.
    * @see GEPLANET.C:484-651 xgetsector (non-origin path)
    */
-  private async generateSector(
-    tx: Prisma.TransactionClient,
+  private generateSector(
+    buf: GenerationBuffer,
     rng: Rng,
     x: number,
     y: number,
     cfg: GalaxyConfig,
-  ): Promise<void> {
+  ): void {
     // gernd()%plodds==0 triggers planet placement — GEPLANET.C:484
     if (rng.intBelow(cfg.plodds) !== 0) {
       // No objects in this sector
-      await tx.sector.create({
-        data: { xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: 0 },
-      });
+      buf.sectors.push({ xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: 0 });
       return;
     }
 
@@ -337,15 +367,11 @@ export class GalaxyService implements OnModuleInit {
     const slotCount = rng.intBelow(cfg.maxplanets);
 
     if (slotCount === 0) {
-      await tx.sector.create({
-        data: { xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: 0 },
-      });
+      buf.sectors.push({ xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: 0 });
       return;
     }
 
-    await tx.sector.create({
-      data: { xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: slotCount },
-    });
+    buf.sectors.push({ xsect: x, ysect: y, plnum: 0, type: SECTYPE_NORMAL, numplan: slotCount });
 
     // Track placed coords for peer-distance check
     const placedCoords: Array<{ xcoord: number; ycoord: number }> = [];
@@ -367,8 +393,7 @@ export class GalaxyService implements OnModuleInit {
           destY = Math.floor(rng.next() * UNIVERSE_SIDE) - UNIVMAX;
         } while (destX === x && destY === y);
 
-        await tx.wormhole.create({
-          data: {
+        buf.wormholes.push({
             xsect: x,
             ysect: y,
             plnum,
@@ -379,7 +404,6 @@ export class GalaxyService implements OnModuleInit {
             destXcoord: destX + 0.5,
             destYcoord: destY + 0.5,
             name: '',
-          },
         });
       } else {
         // Planet placement — GEPLANET.C:579-631
@@ -391,8 +415,7 @@ export class GalaxyService implements OnModuleInit {
         // GEPLANET.C:617-627 — ~25% of planets generate already inhabited.
         const { itemsQty, itemsRate } = rollPlanetInventory(rng);
 
-        await tx.planet.create({
-          data: {
+        buf.planets.push({
             xsect: x,
             ysect: y,
             plnum,
@@ -420,9 +443,29 @@ export class GalaxyService implements OnModuleInit {
             itemsReserve: new Array<number>(NUMITEMS).fill(0),
             itemsMarkup2a: new Array<number>(NUMITEMS).fill(0),
             itemsSold2a: new Array<bigint>(NUMITEMS).fill(0n),
-          },
         });
       }
+    }
+  }
+
+  /**
+   * Bulk-insert the buffered rows.
+   *
+   * Chunked because Postgres caps a statement at 65 535 bound parameters and a
+   * Planet row binds around thirty columns; 1 000 rows per statement stays well
+   * inside that for the widest table while still cutting round trips by three
+   * orders of magnitude.
+   */
+  private async flushBuffer(tx: Prisma.TransactionClient, buf: GenerationBuffer): Promise<void> {
+    const CHUNK = 1_000;
+    for (let i = 0; i < buf.sectors.length; i += CHUNK) {
+      await tx.sector.createMany({ data: buf.sectors.slice(i, i + CHUNK) });
+    }
+    for (let i = 0; i < buf.wormholes.length; i += CHUNK) {
+      await tx.wormhole.createMany({ data: buf.wormholes.slice(i, i + CHUNK) });
+    }
+    for (let i = 0; i < buf.planets.length; i += CHUNK) {
+      await tx.planet.createMany({ data: buf.planets.slice(i, i + CHUNK) });
     }
   }
 
