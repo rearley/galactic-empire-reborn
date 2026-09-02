@@ -22,7 +22,8 @@ export type TeamCreateError =
 export type TeamJoinError =
   | { error: 'already_on_team' }
   | { error: 'no_such_team' }
-  | { error: 'wrong_password' };
+  | { error: 'wrong_password' }
+  | { error: 'team_full'; limit: number };
 
 export const MAX_TEAMNAME_LENGTH = 30;
 export const MAX_TEAM_PASSWORD_LENGTH = 8;

@@ -150,6 +150,13 @@ export class TeaHandlerService {
           return { lines: [{ text: `No such team: ${parsed.name}`, category: 'system' }] };
         case 'wrong_password':
           return { lines: [{ text: 'Wrong password.', category: 'system' }] };
+        case 'team_full':
+          return {
+            lines: [{
+              text: `That team is full (${result.limit} members maximum).`,
+              category: 'system',
+            }],
+          };
       }
     }
 

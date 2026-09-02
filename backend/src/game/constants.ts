@@ -222,6 +222,19 @@ export const CLENGUSE = GAME_CONFIG.CLENGUSE;
  */
 export const UNIVWRAP = GAME_CONFIG.UNIVWRAP === 1;
 
+/**
+ * Maximum members on one team, enforced when joining.
+ *
+ *   if (teamtab[i].teamcount >= team_max) { prfmsg(TEAMBIG); return; }
+ *                                                     GECMDS.C:5357
+ *
+ * Canon ships 10; the port declared the option at 32000 -- the clamp ceiling --
+ * and never checked it anywhere. The midnight job awards TEAMBONU per member
+ * and divides team score by `teamcount`, so an uncapped team farms the
+ * per-member term without limit. Capping team size is the defect 3.2c patched.
+ */
+export const TEAMMAX = GAME_CONFIG.TEAMMAX;
+
 export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
 
 /**

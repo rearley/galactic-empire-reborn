@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TeamRepository } from './team.repository';
 import { ShipState } from '../ship/ship-state.types';
 import { TeamCreateError, TeamJoinError, TeamListEntry, TEAM_LIST_DISPLAY_CAP } from './team.types';
+import { TEAMMAX } from '../constants';
 
 interface CreateArgs {
   ship: ShipState;
@@ -97,6 +98,15 @@ export class TeamService {
 
     if (team.password !== password) {
       return { error: 'wrong_password' };
+    }
+
+    // Team size cap. C refuses the join outright when the team is already at
+    // team_max (GECMDS.C:5357). Counted live from the user table rather than
+    // read off Team.teamcount, because that column is only recomputed by the
+    // midnight job and would let a team overfill within a single day.
+    const members = await this.prisma.user.count({ where: { teamcode: team.teamcode } });
+    if (members >= TEAMMAX) {
+      return { error: 'team_full', limit: TEAMMAX };
     }
 
     await this.prisma.user.update({

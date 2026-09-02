@@ -3,6 +3,7 @@ import { TeamRepository } from '../../src/game/team/team.repository';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { TEAM_LIST_DISPLAY_CAP, MAXTEAMS, MAX_TEAMNAME_LENGTH, MAX_TEAM_PASSWORD_LENGTH } from '../../src/game/team/team.types';
+import { TEAMMAX } from '../../src/game/constants';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -44,6 +45,8 @@ function makeService(
     user: {
       update: jest.fn().mockResolvedValue({}),
       groupBy: jest.fn().mockResolvedValue([]),
+      // joinByPassword counts live members to enforce TEAMMAX (GECMDS.C:5357).
+      count: jest.fn().mockResolvedValue(0),
     },
     team: {
       aggregate: jest.fn().mockResolvedValue({ _max: { teamcode: null } }),
@@ -178,7 +181,7 @@ describe('TeamService.create', () => {
 describe('TeamService.joinByPassword', () => {
   it('returns no_such_team when name has no case-insensitive match', async () => {
     const repo = { findByNameLower: jest.fn().mockResolvedValue(null) } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn() } } as unknown as PrismaService;
+    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Unknown', password: 'pw' });
     expect(result).toEqual({ error: 'no_such_team' });
@@ -188,7 +191,7 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'correct' }),
     } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn() } } as unknown as PrismaService;
+    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Raiders', password: 'wrong' });
     expect(result).toEqual({ error: 'wrong_password' });
@@ -198,7 +201,7 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'Secret' }),
     } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn() } } as unknown as PrismaService;
+    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Raiders', password: 'secret' });
     expect(result).toEqual({ error: 'wrong_password' });
@@ -215,13 +218,47 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn().mockResolvedValue({}) } } as unknown as PrismaService;
+    const prisma = {
+      user: { update: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0) },
+    } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
     const result = await svc.joinByPassword({ ship, name: 'Raiders', password: 'pw' });
     expect(result).toEqual({ ok: true, teamname: 'Raiders' });
     expect(ship.teamcode).toBe(7n);
     expect(ship.dirty).toBe(true);
+  });
+
+  it('refuses to join a team that is already at TEAMMAX', async () => {
+    // GECMDS.C:5357 refuses outright once teamcount >= team_max. Counted live
+    // from the user table, not from Team.teamcount, which the midnight job
+    // only recomputes daily -- reading that column would let a team overfill
+    // freely within a single day.
+    const repo = {
+      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+    } as unknown as TeamRepository;
+    const update = jest.fn().mockResolvedValue({});
+    const prisma = {
+      user: { update, count: jest.fn().mockResolvedValue(TEAMMAX) },
+    } as unknown as PrismaService;
+    const svc = new TeamService(prisma, repo);
+    const ship = makeShip({ teamcode: undefined });
+    const result = await svc.joinByPassword({ ship, name: 'Raiders', password: 'pw' });
+    expect(result).toEqual({ error: 'team_full', limit: TEAMMAX });
+    expect(update).not.toHaveBeenCalled();
+    expect(ship.teamcode).toBeUndefined();
+  });
+
+  it('admits the member who exactly fills the last slot', async () => {
+    const repo = {
+      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+    } as unknown as TeamRepository;
+    const prisma = {
+      user: { update: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(TEAMMAX - 1) },
+    } as unknown as PrismaService;
+    const svc = new TeamService(prisma, repo);
+    const result = await svc.joinByPassword({ ship: makeShip({ teamcode: undefined }), name: 'Raiders', password: 'pw' });
+    expect(result).toEqual({ ok: true, teamname: 'Raiders' });
   });
 });
 
