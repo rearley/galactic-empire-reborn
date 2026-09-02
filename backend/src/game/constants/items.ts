@@ -1,6 +1,19 @@
 /**
- * Planet item constants — canonical defaults from MBMGEMSG.MSG via reference/wiki/items.md.
- * Hardcoded (NOT env-configurable) per research Decision 9.
+ * Planet item constants.
+ *
+ * MAXPL, ITEM_TONS, ITEM_VALUE and MANHOURS are read from the ORIGINAL option
+ * database, MBMGEMSG.MSG, by `node tools/extract-item-tables.mjs`, and pinned
+ * by test/balance/item-tables-canon.balance.spec.ts. They previously carried
+ * "@see reference/wiki/items.md" -- a summary page whose numbers are rounded,
+ * and wrong: it put the ion cannon planet cap at 500_000 against canon's 250,
+ * spies at 10_000 against 5, and gold's cargo weight at 0.5 against 2.
+ *
+ * BASEPRICE is the exception and is NOT canon-derived: `baseprice[i] =
+ * numopt(ITMPR01+i,...)` was added at GEMAIN.C:569 AFTER the shipped .MSG was
+ * written, so the file contains no ITMPR blocks at all and there is nothing to
+ * recover. It stays wiki-sourced, and says so at its own definition.
+ *
+ * @see GEMAIN.C:550-570 — the five parallel option families
  * @see GEMAIN.H:141-156
  */
 
@@ -27,35 +40,70 @@ export const ITEM_NAMES: readonly string[] = Object.freeze([
   'Fighters', 'Decoys', 'Troops', 'Zippers', 'Jammers', 'Mines', 'Gold', 'Spies',
 ]);
 
-/** Base price per item. @see reference/wiki/items.md */
+/**
+ * Base price per item.
+ *
+ * NOT canon: the shipped MBMGEMSG.MSG has no ITMPR blocks (see file header), so
+ * these come from the wiki and cannot be verified against the original. Gold is
+ * the one that matters -- it is the cash-to-gold bank rate at Zygor -- and the
+ * wiki disagrees with itself: sysop-options.md and colonizing-planets.md both
+ * say 1000, while items.md says 100. items.md is the same summary row that gets
+ * gold's WEIGHT demonstrably wrong, so the two agreeing sources win.
+ * @see docs/DECISIONS.md — gold base price
+ */
 export const BASEPRICE: readonly number[] = Object.freeze([
-  2, 20, 7, 33, 200, 2, 50, 18, 1, 99, 21, 16, 100, 100,
+  2, 20, 7, 33, 200, 2, 50, 18, 1, 99, 21, 16, 1000, 100,
 ]);
 
-/** Manhours per item — used in multiply() production formula. @see GEPLANET.C:multiply */
+/** Units produced per 10K man-weeks. @see MBMGEMSG.MSG ITMMH01-14, GEPLANET.C:multiply */
 export const MANHOURS: readonly number[] = Object.freeze([
   3500, 300, 500, 4, 200, 8000, 100, 900, 200, 100, 300, 500, 30, 20,
 ]);
 
-/** Maximum planet inventory per item. @see reference/wiki/items.md */
+/**
+ * Maximum stock of each item on one planet. @see MBMGEMSG.MSG ITMPL01-14
+ *
+ * The wiki's rounded figures were out by up to three orders of magnitude. The
+ * ion cannon cap is the one that reached the player: at 500_000 a mature colony
+ * mounts a planetary battery the original could never accumulate, and a new
+ * pilot who stumbles onto a developed world is killed by fire that should not
+ * exist. Canon is 250.
+ */
 export const MAXPL: readonly number[] = Object.freeze([
-  1_000_000_000,
-     50_000_000,
-     50_000_000,
-        500_000,
-     20_000_000,
-    100_000_000,
-        500_000,
-     50_000_000,
-     20_000_000,
-     50_000_000,
-     20_000_000,
-     50_000_000,
-      5_000_000,
-         10_000,
+  201_228_378, // men
+       39_633, // missiles
+       59_833, // torpedoes
+          250, // ion cannons
+          923, // flux pods
+  187_312_837, // food
+      579_332, // fighters
+        5_399, // decoys
+  201_228_378, // troops
+        5_233, // zippers
+       25_928, // jammers
+       25_867, // mines
+       10_000, // gold
+            5, // spies
 ]);
 
-/** Cargo tons per unit of each item. @see reference/wiki/items.md */
+/**
+ * Cargo tons per ONE unit. @see MBMGEMSG.MSG ITMWT01-14
+ *
+ * The option is "Weight of 100 <item>", so each value is the option / 100.
+ * Thirteen of the fourteen were already right; gold read 0.5 where canon's
+ * 200-per-100 gives 2, making it four times cheaper to haul than it should be.
+ */
 export const ITEM_TONS: readonly number[] = Object.freeze([
-  1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 0.5, 1,
+  1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 2, 1,
+]);
+
+/**
+ * Score value per unit, for planet valuation. @see MBMGEMSG.MSG ITMVAL01-14
+ *
+ * Only men score, at 10 points each; every other item is worth zero. This is
+ * NOT the same table as BASEPRICE, which is what valuePlanet currently uses.
+ * @see GEMAIN.C:561 value[i] = lngopt(ITMVAL01+i,...)
+ */
+export const ITEM_VALUE: readonly number[] = Object.freeze([
+  10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
