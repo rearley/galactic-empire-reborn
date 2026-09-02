@@ -1687,3 +1687,66 @@ invented command that shadows a real one is a standing invitation to it.
 playtest was in flight whose land-rush persona was using `land`; removing it
 mid-run would have invalidated that agent's mission and produced a phantom bug
 report.
+
+## 2026-09-02 — Tuning the new-player curve through C's own sysop options
+
+**Context:** Three pilots played the fixed build for ~2.5 hours between them and
+landed ZERO kills across 19 deaths. Verification refuted all 42 findings as
+faithful ports, so nothing was broken — the difficulty was.
+
+The survivability probe made the cause unambiguous. Every one of its seven
+deaths was a class-25 Sartern Obliterator, from 3.4 to 5.4 sectors away. The
+single run it survived was the one where the nearest Obliterator was 8.1
+sectors off. Median survival outside the hub was under 60 seconds; the two
+newcomers never fired a profitable shot.
+
+Damage to a 100-hull starter Interceptor, by class, at PFIRDST=1:
+
+    class                n   1sec   2sec   3sec   5sec
+    21 Scout            10     18      8      0      0
+    22 Cyberquad         5     26     14      2      0
+    23 Base Star         1    140    121    102     65
+    24 Attack Drone      6     11      3      0      0
+    25 Obliterator       2    140    121    102     65
+
+21 of the 24 Cybertrons are survivable. Three are not, and they kill from
+eleven times an Interceptor's scanner range, so the victim never sees them.
+
+**Decision:** Change only values C exposes through `numopt`, in
+`config/game.config.json`. No `#define` is touched — `CYBSLO`, the 1-in-3
+new-player mercy roll, stays exactly as the original has it.
+
+- `PFIRDST` 1 -> 3 (`numopt(PFIRDST,1,20)`, GEMAIN.C:493). This is the phaser
+  falloff EXPONENT in `pdamage`: `dp = pow(dd, pfirdist)`. We had it at 1, the
+  gentlest value in its range, making damage decay linearly. At 3 an
+  Obliterator's shot goes 121 -> 70 at two sectors and 65 -> 11 at five, while
+  point-blank barely moves (158 -> 157). Close combat stays lethal; sniping
+  from beyond sensor range stops being an execution. It applies symmetrically
+  to players.
+- `SE100DAM` 101 -> 40 (`numopt(SE100DAM,1,101)`, GEMAIN.C:463). Firing inside
+  the neutral zone zaps you for this. At 101 against a 100-point hull it is
+  certain death with no confirmation; one pilot lost two ships to it in a row,
+  the second because his queued command after respawning was `pha`. At 40 it is
+  a severe lesson rather than a wipe.
+
+**Reason:** These are the knobs the original shipped for exactly this purpose,
+and the numbers we had were provisional — both sat at an endpoint of C's range
+rather than at a considered value. Changing them alters no code and no formula.
+
+**Alternatives rejected:**
+- *Raise CYBSLO.* It is a `#define` in GEMAIN.H, not a sysop option, so
+  changing it would be a deviation from the original rather than a use of it.
+- *Set `tot_to_create` to 0 for classes 23 and 25.* Held in reserve. It is
+  per-class sysop config and would remove the problem outright, but it also
+  removes the top of the reward curve — those three ships carry 200,000 and
+  500,000 gold. Try the damage curve first; this remains the next lever if
+  measurement still shows newcomers cannot leave the hub.
+- *Lower PDAMMAX.* Blunter: it scales every phaser in the game down uniformly,
+  including the player's, without addressing the range problem specifically.
+
+**Test consequence:** two balance-regression tests pinned the deployed values
+and failed. That was the pin being wrong, not the change: these are options the
+sysop is meant to set, so freezing a deployment's choice defeats the config
+system. They now assert each value stays inside C's `numopt` range — which
+still catches a typo'd config — and the phaser formula test derives its
+expectation from the configured exponent instead of assuming the linear case.

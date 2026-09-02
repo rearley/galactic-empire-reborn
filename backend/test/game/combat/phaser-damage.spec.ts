@@ -16,11 +16,18 @@ describe('phaserDamage — C pdamage falloff (GEFUNCS.C:2060 + firep scaling GEC
     expect(phaserDamage({ ...base, distRaw: 30000 })).toBe(0);
   });
 
-  it('half-disfact deals roughly half (linear pfirdist=1)', () => {
-    // dist=12000 -> dd=0.5 -> dp=0.5 -> dam = trunc(PDAMMAX/2) -> *0.8
+  it('halves at half the falloff distance', () => {
+    // dist=12000 -> dd=0.5 -> dp = 0.5^PFIRDST -> dam = trunc(PDAMMAX*dp) -> *0.8
     // The base truncates inside pdamage (`unsigned dam`), so this is not the
-    // same as flooring PDAMMAX*0.5*0.8 once at the end.
-    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(Math.floor(Math.trunc(PDAMMAX * 0.5) * 0.8));
+    // same as flooring the product once at the end.
+    //
+    // PFIRDST is a sysop option (numopt(PFIRDST,1,20), GEMAIN.C:493) and this
+    // deployment does not have to run at 1, so the expectation is derived from
+    // the configured exponent rather than assuming the linear case.
+    const dp = Math.pow(0.5, PFIRDST);
+    expect(phaserDamage({ ...base, distRaw: 12000 })).toBe(
+      Math.floor(Math.trunc(PDAMMAX * dp) * 0.8),
+    );
   });
 
   it('heavier victim takes less (tonfact divisor)', () => {
