@@ -214,8 +214,23 @@ export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
  */
 export const MAXSHIPS = GAME_CONFIG.MAXSHIPS;
 
-/** Planet lock-time in seconds. @see GEMAIN.C:469 (PLANTOCK; canonical default 30 minutes) */
-export const PLANTOCK_SECONDS = 1800 as const;
+/**
+ * How long one full sweep of the planet table takes, in seconds.
+ *
+ *   plantock = lngopt(PLANTOCK,1,32760) * 60L;      GEMAIN.C:469
+ *
+ * The option is in MINUTES and canon ships 360 -- a six-hour production cycle.
+ * This was hard-coded to 1800 seconds under a comment calling 30 minutes "the
+ * canonical default", so colony economies ran twelve times faster than the
+ * original. That inflates planet-derived score against combat-derived score,
+ * which is the exact ratio version 3.2c retuned.
+ *
+ * Deployed at 120 minutes: four times slower than the port was running, three
+ * times faster than canon. Six-hour ticks suit a BBS people dialled into for
+ * hours, not a web game with daily logins.
+ * @see docs/DECISIONS.md — PLANTOCK deploys at 120
+ */
+export const PLANTOCK_SECONDS = GAME_CONFIG.PLANTOCK * 60;
 
 /** Minimum planet-update tick interval in seconds. @see GEMAIN.C:658 */
 export const PLANTIME_MIN_SECONDS = 4 as const;

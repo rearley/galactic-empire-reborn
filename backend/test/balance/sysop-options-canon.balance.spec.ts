@@ -40,11 +40,27 @@ const MSG = resolve(
 );
 
 /**
- * Options we deliberately ship away from canon. Each needs a reason and a
- * docs/DECISIONS.md entry. Keep this list SHORT -- it is the escape hatch that
- * let the original drift happen.
+ * Options we deliberately ship away from canon, in config/game.config.json.
+ * Each needs a reason and a docs/DECISIONS.md entry. Keep this list SHORT --
+ * an unexamined escape hatch is what let the original drift happen.
  */
-const DEVIATIONS: Record<string, { value: number; reason: string }> = {};
+const DEVIATIONS: Record<string, { value: number; reason: string }> = {
+  UNIVMAX: {
+    value: 100,
+    reason:
+      "Canon's 601x601 galaxy assumed a busy BBS; with a handful of concurrent " +
+      'players they would never meet. Scan ranges are absolute, so galaxy size ' +
+      'and scanner reach must be chosen together. See docs/DECISIONS.md.',
+  },
+  PLANTOCK: {
+    value: 120,
+    reason:
+      'Canon 360 minutes is a six-hour production cycle, which suits a BBS ' +
+      'people dialled into for hours rather than a web game with daily logins. ' +
+      '120 is 3x canon speed and 4x slower than the port was running. ' +
+      'See docs/DECISIONS.md.',
+  },
+};
 
 /** Options MBMGEMSG.MSG does not declare; canonDefault is null for these. */
 const NOT_IN_MSG = ['HYPDST1', 'HYPDST2'];
@@ -90,24 +106,14 @@ describe('every declared option records the shipped default', () => {
   });
 });
 
-describe('defaults match canon unless a deviation is declared', () => {
+describe('every default IS canon, without exception', () => {
+  // Deliberate tuning belongs in config/game.config.json, checked separately
+  // below -- never in the defaults. Keeping the two apart is the point: the
+  // default records what the original shipped, the config records what we
+  // chose, and the difference between them stays visible.
   it.each(names.filter((n) => !NOT_IN_MSG.includes(n)))('%s', (name) => {
     const opt = SYSOP_OPTIONS[name as keyof typeof SYSOP_OPTIONS];
-    const canon = msg.get(name)!;
-    const dev = DEVIATIONS[name];
-    if (dev) {
-      expect(opt.default).toBe(dev.value);
-      expect(dev.reason.length).toBeGreaterThan(20);
-      return;
-    }
-    expect(opt.default).toBe(canon);
-  });
-
-  it('declares no deviation that is actually equal to canon', () => {
-    // A stale entry here would mask a future real drift.
-    for (const [name, dev] of Object.entries(DEVIATIONS)) {
-      expect(dev.value).not.toBe(msg.get(name));
-    }
+    expect(opt.default).toBe(msg.get(name)!);
   });
 });
 
@@ -118,5 +124,63 @@ describe('canon defaults sit inside the C clamp bounds', () => {
     const opt = SYSOP_OPTIONS[name as keyof typeof SYSOP_OPTIONS];
     expect(opt.canonDefault).toBeGreaterThanOrEqual(opt.min);
     expect(opt.canonDefault).toBeLessThanOrEqual(opt.max);
+  });
+});
+
+describe('config/game.config.json holds deviations, and only declared ones', () => {
+  // The defaults above are canon. This file is the OTHER half: what we actually
+  // deploy. It previously restated all 51 options -- 44 at values that were
+  // never canon -- and silently overrode every correction made to the defaults.
+  // Nothing checked it, so nothing could notice. This does.
+  const raw = JSON.parse(
+    readFileSync(resolve(__dirname, '../../config/game.config.json'), 'utf8'),
+  ) as Record<string, unknown>;
+
+  /** Flatten sections, skipping `_`-prefixed documentation keys. */
+  const deployed = new Map<string, number>();
+  for (const [key, section] of Object.entries(raw)) {
+    if (key.startsWith('_')) continue;
+    if (section && typeof section === 'object' && !Array.isArray(section)) {
+      for (const [name, value] of Object.entries(section as Record<string, unknown>)) {
+        if (name.startsWith('_')) continue;
+        deployed.set(name, value as number);
+      }
+    }
+  }
+
+  it('every deployed option is a declared deviation', () => {
+    for (const name of deployed.keys()) {
+      expect(DEVIATIONS[name]).toBeDefined();
+    }
+  });
+
+  it('every deployed option actually differs from canon', () => {
+    // An entry equal to canon is noise that makes the file look authoritative
+    // over values nobody chose -- exactly how the previous drift stayed hidden.
+    for (const [name, value] of deployed) {
+      expect(value).not.toBe(msg.get(name));
+    }
+  });
+
+  it('every deployed option matches its declared value and carries a reason', () => {
+    for (const [name, value] of deployed) {
+      expect(value).toBe(DEVIATIONS[name].value);
+      expect(DEVIATIONS[name].reason.length).toBeGreaterThan(40);
+    }
+  });
+
+  it('every declared deviation is actually deployed', () => {
+    // A stale declaration would license a future drift that nothing deploys.
+    for (const name of Object.keys(DEVIATIONS)) {
+      expect(deployed.has(name)).toBe(true);
+    }
+  });
+
+  it('every deployed value is inside the C clamp bounds', () => {
+    for (const [name, value] of deployed) {
+      const opt = SYSOP_OPTIONS[name as keyof typeof SYSOP_OPTIONS];
+      expect(value).toBeGreaterThanOrEqual(opt.min);
+      expect(value).toBeLessThanOrEqual(opt.max);
+    }
   });
 });
