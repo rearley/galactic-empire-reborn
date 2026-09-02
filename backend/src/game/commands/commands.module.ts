@@ -9,7 +9,6 @@ import { WarpHandlerService } from './handlers/warp.handler';
 import { ScanHandlerService } from './handlers/scan.handler';
 import { ReportHandlerService } from './handlers/report.handler';
 import { OrbitHandlerService } from './handlers/orbit.handler';
-import { LandHandlerService } from './handlers/land.handler';
 import { BuyHandlerService } from './handlers/buy.handler';
 import { SellHandlerService } from './handlers/sell.handler';
 import { AdminHandlerService } from './handlers/admin.handler';
@@ -74,7 +73,6 @@ import { MailModule } from '../mail/mail.module';
     ScanHandlerService,
     ReportHandlerService,
     OrbitHandlerService,
-    LandHandlerService,
     BuyHandlerService,
     SellHandlerService,
     AdminHandlerService,
@@ -133,7 +131,6 @@ export class CommandsModule implements OnModuleInit {
     private readonly scanHandler: ScanHandlerService,
     private readonly reportHandler: ReportHandlerService,
     private readonly orbitHandler: OrbitHandlerService,
-    private readonly landHandler: LandHandlerService,
     private readonly buyHandler: BuyHandlerService,
     private readonly sellHandler: SellHandlerService,
     private readonly adminHandler: AdminHandlerService,
@@ -188,7 +185,6 @@ export class CommandsModule implements OnModuleInit {
     this.commandRouter.register(this.scanHandler.command);
     this.commandRouter.register(this.reportHandler.command);
     this.commandRouter.register(this.orbitHandler.command);
-    this.commandRouter.register(this.landHandler.command);
     this.commandRouter.register(this.buyHandler.command);
     this.commandRouter.register(this.sellHandler.command);
     this.commandRouter.register(this.adminHandler.command);

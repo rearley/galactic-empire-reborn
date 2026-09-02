@@ -3,6 +3,7 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants/items';
+import { MAXPLNTS } from '../../src/game/constants';
 
 /**
  * Claiming a planet belongs to `adm`, not to a command of our own invention.
@@ -41,8 +42,11 @@ function makeShip(o: Partial<ShipState> = {}): ShipState {
   } as ShipState;
 }
 
-function makeService(planetUserid: string | null) {
-  const claim = jest.fn().mockResolvedValue({ ok: true });
+function makeService(
+  planetUserid: string | null,
+  claimResult: unknown = { ok: true },
+) {
+  const claim = jest.fn().mockResolvedValue(claimResult);
   const planetService = {
     get: jest.fn().mockReturnValue({
       xsect: 3, ysect: 4, plnum: 1, userid: planetUserid, name: planetUserid ? 'Held' : '',
@@ -103,5 +107,32 @@ describe('adm on an unclaimed planet — C\'s claim flow', () => {
     const { svc } = makeService('usr_other');
     const r = await svc.command.handler(makeShip(), [], {}) as { lines: { text: string }[] };
     expect(r.lines[0].text).toBe(formatMessage(MessageId.ADM_NOT_OWNER));
+  });
+
+  /**
+   * Coverage moved here from the deleted `land` handler: the per-captain
+   * planet cap (GECMDS.C:3487 `if (waruptr->planets >= max_plnts)`) and the
+   * neutral-zone refusal must survive the move to `adm`.
+   */
+  it('reports the per-captain planet cap rather than claiming anyway', async () => {
+    const { svc } = makeService(null, { ok: false, reason: 'PLANET_LIMIT' });
+    const r = await svc.command.handler(makeShip(), ['claim', 'Overreach'], {}) as
+      { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS)));
+  });
+
+  it('refuses to claim a neutral-zone trading post', async () => {
+    const { svc } = makeService(null, { ok: false, reason: 'NEUTRAL_ZONE' });
+    const r = await svc.command.handler(makeShip(), ['claim', 'MyZygor'], {}) as
+      { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_NEUTRAL_ZONE));
+  });
+
+  it('refuses when not in orbit at all', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip({ where: 0 }), [], {}) as
+      { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.ADM_NOT_LANDED));
+    expect(claim).not.toHaveBeenCalled();
   });
 });

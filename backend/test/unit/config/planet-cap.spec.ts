@@ -55,32 +55,22 @@ describe('planet ownership cap', () => {
 });
 
 describe('the refusal reaches the player', () => {
-  it('land reports the cap instead of the optimistic LAND_CLAIMED line', async () => {
+  it('adm reports the cap instead of the optimistic claimed line', async () => {
     // Previously the claim was fire-and-forget, so the cap was enforced but the
-    // player still saw "You have claimed X". CommandHandler already allowed a
-    // Promise result, so awaiting it needed no router change.
-    const { LandHandlerService } = await import('../../../src/game/commands/handlers/land.handler');
+    // player still saw "You have claimed X". Claiming now lives in `adm`, where
+    // C puts it (GEMAIN.C:2899) — the invented `land` command was removed.
+    const { AdminHandlerService } = await import('../../../src/game/commands/handlers/admin.handler');
     const { formatMessage, MessageId } = await import('../../../src/game/commands/messages');
 
     const planetService = {
-      // The handler looks the planet up in live state before claiming.
-      get: () => ({ plnum: 1, userid: null, name: null }),
+      get: () => ({ xsect: 0, ysect: 0, plnum: 1, userid: null, name: null }),
       claim: jest.fn().mockResolvedValue({ ok: false, reason: 'PLANET_LIMIT' }),
     };
-    const galaxyService = {
-      getSectorPlanets: () => [{ plnum: 1, userid: null, name: null }],
-    };
-    const scanHandler = { clearScantab: jest.fn() };
 
-    const svc = new LandHandlerService(
-      galaxyService as never,
-      {} as never, // shipService — unused on this path
-      planetService as never,
-      scanHandler as never,
-    );
+    const svc = new AdminHandlerService(planetService as never);
 
     const ship = { userid: 'alice', shipno: 1, where: 11, xcoord: 0.5, ycoord: 0.5 } as never;
-    const result = await (svc.command.handler(ship, ['NewWorld'], {} as never) as Promise<{
+    const result = await (svc.command.handler(ship, ['claim', 'NewWorld'], {} as never) as Promise<{
       lines: Array<{ text: string }>;
     }>);
 
