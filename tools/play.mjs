@@ -66,7 +66,41 @@ socket.on('disconnect', (r) => out('..', `disconnected (${r})`));
 socket.on('error', (e) => out('!!', `server error: ${JSON.stringify(e)}`));
 socket.on('command:result', (p) => {
   for (const l of p.lines ?? []) out('<<', l.text);
+  if (p.scanRender) renderScan(p.scanRender);
 });
+
+/**
+ * Render the scan payload.
+ *
+ * `sca lo` / `sca ra` / `sca se` return their contents as a structured
+ * `scanRender` (a grid of cells plus a side panel), NOT as text lines. This
+ * harness printed only `lines`, so every scan looked empty — no ships, no
+ * planets, just the range header — and a playtest reported "nothing on scan"
+ * that was purely an instrumentation gap. The same shape of gap once hid combat
+ * hits for three sessions.
+ */
+function renderScan(sr) {
+  const cells = sr.grid ?? [];
+  if (cells.length) {
+    const xs = cells.map((c) => c.x);
+    const ys = cells.map((c) => c.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    for (let y = y0; y <= y1; y++) {
+      let row = '';
+      for (let x = x0; x <= x1; x++) {
+        const c = cells.find((k) => k.x === x && k.y === y);
+        row += c ? (c.char ?? '?') : ' ';
+      }
+      if (row.trim()) out('##', row);
+    }
+  }
+  for (const r of sr.sidePanel ?? []) {
+    // distance is raw units; bearing and heading are signed -180..180.
+    out('##', `${r.letter}  dist:${r.distance}  brg:${r.bearing}  hdg:${r.heading}  ${r.speedDisplay ?? ''}`);
+  }
+  if (!cells.length && !(sr.sidePanel ?? []).length) out('##', '(scan grid empty)');
+}
 socket.on('event.log', (p) => out('**', p.text));
 socket.on('message.send', (p) => out('[]', `[${p.channel}] ${p.from}: ${p.text}`));
 socket.on('combat.ship-destroyed', (p) =>
