@@ -104,15 +104,32 @@ export class TeamService {
     // team_max (GECMDS.C:5357). Counted live from the user table rather than
     // read off Team.teamcount, because that column is only recomputed by the
     // midnight job and would let a team overfill within a single day.
-    const members = await this.prisma.user.count({ where: { teamcode: team.teamcode } });
-    if (members >= TEAMMAX) {
+    //
+    // Counting and joining must be ATOMIC. Read-then-write is a time-of-check /
+    // time-of-use race: two pilots joining the last slot concurrently both read
+    // TEAMMAX-1 and both succeed, putting the team over its cap -- which is the
+    // whole thing the cap exists to prevent, since the midnight job pays
+    // TEAMBONU per member. The original could not hit this (a BBS ran one
+    // session at a time); a websocket server can.
+    //
+    // The team row is locked FOR UPDATE first, so concurrent joins to the SAME
+    // team serialise behind it while joins to different teams stay parallel.
+    const joined = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT teamcode FROM "Team" WHERE teamcode = ${team.teamcode} FOR UPDATE`;
+
+      const members = await tx.user.count({ where: { teamcode: team.teamcode } });
+      if (members >= TEAMMAX) return false;
+
+      await tx.user.update({
+        where: { userid: ship.userid },
+        data: { teamcode: team.teamcode },
+      });
+      return true;
+    });
+
+    if (!joined) {
       return { error: 'team_full', limit: TEAMMAX };
     }
-
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { teamcode: team.teamcode },
-    });
 
     ship.teamcode = team.teamcode;
     ship.dirty = true;
