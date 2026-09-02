@@ -70,7 +70,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       'Planet',
       '  orb                    — orbit nearest planet',
       '  land <name>            — land / claim / name planet',
-      '  adm                    — planet inventory & admin',
+      '  adm                    — claim an unclaimed world, or administer your own',
       '  adm rate <item> <n>    — set production rate (0-100)',
       '  adm sellflag <item> on|off — open/close item to buyers',
       '  adm markup <item> <n>  — set selling price',

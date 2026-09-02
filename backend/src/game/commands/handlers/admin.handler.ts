@@ -7,6 +7,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { resolveItemKeyword, parseUint32 } from '../validators';
 import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
 import { parseTaxRate } from './helpers/tax-rate';
+import { MAXPLNTS } from '../../constants';
 import { describeTradeAccess } from './helpers/trade-access-label';
 
 /**
@@ -66,7 +67,19 @@ export class AdminHandlerService {
     const ysect = Math.floor(ship.ycoord);
     const state = this.planetService.get(xsect, ysect, plnum);
 
-    if (!state || state.userid !== ship.userid) {
+    if (!state) {
+      return { lines: [{ text: formatMessage(MessageId.ADM_NOT_OWNER), category: 'system' }] };
+    }
+
+    // An unclaimed planet is offered to you, as C does. `adm` is where
+    // claiming lives in the original — the command table has no `land`
+    // (GECMDS.C:122) — and the flow is mnu_admenu1 "do you wish to claim this
+    // planet" followed by mnu_admenu1a "enter the name" (GEMAIN.C:2899-2981).
+    if (state.userid === null) {
+      return await this.offerClaim(ship, state, args);
+    }
+
+    if (state.userid !== ship.userid) {
       return { lines: [{ text: formatMessage(MessageId.ADM_NOT_OWNER), category: 'system' }] };
     }
 
@@ -177,4 +190,67 @@ export class AdminHandlerService {
 
     return { lines: [{ text: formatMessage(MessageId.ADM_OK), category: 'success' }] };
   }
+
+  /**
+   * C's two-step claim: offer, then name.
+   *
+   *   mnu_admenu1  — "do you wish to claim this planet" (y/n); on yes it sets
+   *                  plptr->userid, ++planets and resets every rate to 0 bar
+   *                  men and food at 50, then prompts ADMENU1A.
+   *   mnu_admenu1a — takes the name and drops you into the admin menu.
+   *
+   * The rate reset lives in PlanetStateService.claim, which both steps share.
+   * @see GEMAIN.C:2899-2981
+   */
+  private async offerClaim(
+    ship: ShipState,
+    state: { xsect: number; ysect: number; plnum: number },
+    args: string[],
+  ): Promise<CommandResult> {
+    const first = args[0]?.toLowerCase();
+
+    if (first === undefined) {
+      return {
+        lines: [{ text: formatMessage(MessageId.ADM_CLAIM_OFFER), category: 'system' }],
+        expectFollowup: 'adm',
+      };
+    }
+
+    if (first === 'yes' || first === 'y') {
+      return {
+        lines: [{ text: formatMessage(MessageId.LAND_NAME_PROMPT), category: 'system' }],
+        expectFollowup: 'adm claim',
+      };
+    }
+
+    if (first !== 'claim') {
+      // Anything other than a confirmation ends it — re-prompting here would
+      // re-arm expectFollowup and eat the captain's next command.
+      return { lines: [{ text: formatMessage(MessageId.ADM_CLAIM_DECLINED), category: 'system' }] };
+    }
+
+    const name = args.slice(1).join(' ').trim();
+    if (name.length < 1 || name.length > 19 || !/^[\x20-\x7E]+$/.test(name)) {
+      return { lines: [{ text: formatMessage(MessageId.LAND_INVALID_NAME), category: 'system' }] };
+    }
+
+    const claimed = await this.planetService
+      .claim(state.xsect, state.ysect, state.plnum, ship.userid, name)
+      .catch(() => ({ ok: false as const, reason: 'NOT_FOUND' as const }));
+
+    if (!claimed.ok) {
+      const text =
+        claimed.reason === 'PLANET_LIMIT'
+          ? formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS))
+          : claimed.reason === 'NEUTRAL_ZONE'
+            ? formatMessage(MessageId.LAND_NEUTRAL_ZONE)
+            : formatMessage(MessageId.LAND_REFUSED);
+      return { lines: [{ text, category: 'system' }] };
+    }
+
+    return {
+      lines: [{ text: formatMessage(MessageId.LAND_CLAIMED, name), category: 'success' }],
+    };
+  }
+
 }

@@ -138,6 +138,8 @@ export enum MessageId {
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
   ADM_NOT_LANDED = 'ADM_NOT_LANDED',
   ADM_NOT_OWNER = 'ADM_NOT_OWNER',
+  ADM_CLAIM_OFFER = 'ADM_CLAIM_OFFER',
+  ADM_CLAIM_DECLINED = 'ADM_CLAIM_DECLINED',
   ADM_MENU = 'ADM_MENU',
   ADM_INVALID = 'ADM_INVALID',
   ADM_OK = 'ADM_OK',
@@ -557,6 +559,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // Same `where < 10` orbit gate as buy — see BUY1.
   [MessageId.ADM_NOT_LANDED]: 'You must be in orbit around your planet to administer it.',
   [MessageId.ADM_NOT_OWNER]: 'You are not the owner of this planet.',
+  // C's ADMENU1 — `adm` on an unclaimed planet you orbit offers it to you,
+  // then ADMENU1A asks for a name. @see GEMAIN.C:2899 mnu_admenu1
+  [MessageId.ADM_CLAIM_OFFER]: 'This planet is unclaimed. Do you wish to claim it? (yes/no)',
+  [MessageId.ADM_CLAIM_DECLINED]: 'You leave it as you found it.',
   [MessageId.ADM_MENU]: 'Admin options: rate, markup, sellflag, reserve, tax, beacon, password',
   [MessageId.ADM_INVALID]: 'Invalid value.',
   [MessageId.ADM_OK]: 'Setting saved.',
