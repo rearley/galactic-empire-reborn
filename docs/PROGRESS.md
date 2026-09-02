@@ -2413,3 +2413,66 @@ new-ship onboarding.
 - `aba` gives up a planet with no confirmation prompt.
 
 **Tests:** backend 3,489 (375 suites), frontend 161, browser 38.
+
+## 2026-09-02 — fourth playtest: five personas in one shared world
+
+**How it was played:** a fresh galaxy, then five scripted personas driving the
+real socket through `tools/play.mjs` (HTTP register/login for a JWT, then
+`command` in and `command:result` out — the same pipeline the browser uses),
+orchestrated as a Workflow. I played alongside them in the browser as a sixth
+pilot, covering the React layer the harness cannot see. 21 agents, no failures,
+~3.25 hours.
+
+**Result:** 51 raw findings, adversarially verified against `reference/ge-source`
+with instructions to default to REFUTED. Six survived. Note that a handful of
+the refutations are findings I fixed *while the run was in progress* — two
+personas explicitly re-verified against the rebuilt server mid-session — so
+"refuted" here is not always "was never wrong".
+
+**Confirmed and fixed:**
+- *The neutral zone was the wrong shape.* C's `neutral()` is floor-based over
+  the whole of sector (0,0) (GEPLANET.C:866); this tested a ±0.5 bubble around
+  the origin POINT, wrong at both ends. The trading posts sit at 0.1-0.9, so
+  most of the hub — where every new pilot must dock — could be fired on.
+  `CybertronTickService` had the rule right all along in its own copy, so the
+  AI honoured a boundary the player weapons did not. (`6be9a3b`)
+- *Every scan mode drew AI as captains and captains as AI* —
+  `status === 1 ? 'ai' : 'human'`, but status 1 is GESTAT_USER. A unit test had
+  pinned the inversion in its own name. (`d07f311`)
+- *Dying emptied your bank.* Onboarding set `cash: START_CASH` unconditionally
+  on a path that also serves the empty-fleet rebuild: a refund for the poor, a
+  wipe for the rich. C leaves the bank alone (GEFUNCS.C:106-113). (`a793403`)
+- *Overspeed blew the drive with no warning* — the escalation ladder existed but
+  every message sat behind a stale TODO, years after the per-ship routing it
+  waited on shipped. (`4caa5e7`)
+- *`adm password team` from a teamless owner* was accepted and left "team"
+  standing as an ordinary password anyone could type; C clears both in that
+  case (GEMAIN.C:3266-3290). The admin screen also never showed who may land
+  and labelled the tax pool "Cash". (`d07f311`)
+- *`pri` refused what `buy` allowed* for gold at Zygor — `price` kept its own
+  copy of the buy gates and it had drifted. It now quotes through
+  `computeBuyOutcome`. (`ffdd7b5`)
+
+**Also fixed this round, found by playing in the browser:**
+`rot @<deg>` (C's absolute turn) was never implemented; `imp` quoted a range
+that did not match its own validator; `rot` reported the delta instead of the
+resulting heading; `sca pl` reported distance 100x coarser than the orbit gate
+it must be flown against; a bare speed order cancelled a turn already ordered;
+`tra` could not address another captain and ignored the receiving hold;
+`wit <qty>` ignored its quantity; `adm tax` confirmed values it discarded;
+deaths with no killer were announced as "destroyed by unknown".
+
+**Corrected in-flight:** I added a help line claiming scan bearings are compass
+headings, followed my own bad help, and flew past the planet. Bearings are
+RELATIVE (`cbearing` always takes the observer's heading). Help fixed and a test
+now asserts it cannot claim otherwise (`686ea94`).
+
+**Harness limitation worth recording:** a ship is evicted from the world when
+its socket closes, and each `play.mjs` run disconnects at the end, so agents are
+only present while their script runs. Concurrency is also capped at
+(cores - 2) = 2 on this machine. Genuine simultaneous PvP is therefore hard to
+stage; the siege phase pairs raider with defender deliberately. `sca lo` and
+friends return a `scanRender` socket payload the text harness does not render —
+one persona wrote its own renderer to compare the grid against `sca pl`.
+
+**Tests:** backend 3,567 (386 suites), frontend 165.
