@@ -12,9 +12,11 @@ galactic-empire-reborn/
       schema.prisma          ← Prisma schema (10 models + MidnightRun, all C structs mapped)
       migrations/            ← Versioned migration files (never edit after creation)
       seed/
-        ship-classes.ts      ← 18 ShipClass seed rows (static reference data)
+        ship-classes.ts      ← GENERATED from canon — see "Canon pipeline" below
     src/                     ← NestJS application (see module map below)
-    test/                    ← Jest test suite (248 suites / 2421 tests as of feature 019)
+    test/                    ← Jest test suite (396 suites / 4282 tests)
+    config/
+      game.config.json       ← DEVIATIONS ONLY; defaults come from canon
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
@@ -22,13 +24,50 @@ galactic-empire-reborn/
     src/                     ← React + Vite + Tailwind terminal UI
     test/                    ← Vitest test suite
   .env.example               ← DATABASE_URL, TEST_DATABASE_URL, JWT_SECRET templates
-  reference/
-    ge-source/               ← Original C source (READ ONLY)
-    wiki/                    ← Game wiki (READ ONLY)
+  tools/                     ← Canon extractors (see "Canon pipeline" below)
+  reference/                 ← ALL READ ONLY; see reference/README.md
+    ge-source/               ← The nine original C files
+    ge-upstream/             ← The FULL original distribution (data files, manuals)
+    wiki/                    ← Community wiki transcription
   specs/
     001-prisma-schema/ … 016-navigation-spy/  ← spec-kit feature specs
   docs/                      ← Living architecture docs (this file)
 ```
+
+
+## Canon pipeline
+
+Original values reach the codebase by extraction, never by hand. Every table
+that was once hand-transcribed had drifted, so the path is now one-directional
+and pinned at both ends:
+
+```
+reference/ge-upstream/mbmgemp/GE/MSG/*.MSG      the original option database
+        │
+        ├── tools/extract-ship-classes.mjs --ts ──→ backend/prisma/seed/ship-classes.ts
+        ├── tools/extract-sysop-options.mjs ──────→ SYSOP_OPTIONS[].canonDefault
+        └── tools/extract-item-tables.mjs ────────→ constants/items.ts
+                                                          │
+                          test/balance/*-canon.balance.spec.ts
+                          re-parses the .MSG INDEPENDENTLY and fails on drift
+```
+
+The conformance tests deliberately re-implement the parse rather than importing
+the extractor, so a bug in the generator cannot hide behind a test that shares
+it. That caught a real one immediately: `SNAME`'s trailing space is significant,
+and trimming it turns `"Cyberquad " + 223` into `Cyberquad223`.
+
+**Config resolution** is `canon default → config/game.config.json → env`, each
+step clamped to the C's `numopt`/`lngopt` bounds. `game.config.json` holds
+DEVIATIONS ONLY: every entry must be a declared deviation carrying a written
+reason, must actually differ from canon, and must sit inside the C bounds —
+enforced by `sysop-options-canon.balance.spec.ts`. Restating a value nobody
+chose is how the previous drift stayed hidden.
+
+**Private config loaders are a smell.** `droid.config.ts`, `attack.config.ts`,
+`cloak.config.ts` and `galaxy.config.ts` each kept their own defaults for values
+the option table already owned, and each had drifted. They now read
+`GAME_CONFIG` and keep only their env override.
 
 ## Prisma layer
 

@@ -5,6 +5,74 @@ Updated at the end of every implement session per CLAUDE.md.
 
 ---
 
+<!-- TOC -->
+## Contents
+
+One section per mechanic. Each cites the C function it ports, so this doubles as
+an index from mechanic to original source.
+
+- [Fleet Ownership (feature 030-multi-ship)](#fleet-ownership-feature-030-multi-ship)
+- [Movement (feature 006a)](#movement-feature-006a)
+- [Universe Edge — wrap or wall (feature 019 — US1; corrected 2026-09-02)](#universe-edge-wrap-or-wall-feature-019-us1-corrected-2026-09-02)
+- [Overspeed Engine Damage (feature 019 — US2)](#overspeed-engine-damage-feature-019-us2)
+- [Auto-Repair Tick (feature 019 — US3)](#auto-repair-tick-feature-019-us3)
+- [Auto-Shield Tick (feature 019 — US4)](#auto-shield-tick-feature-019-us4)
+- [AI Kill Scoring (feature 019 — US5)](#ai-kill-scoring-feature-019-us5)
+- [Droid Presence Bridge (feature 019 — US6)](#droid-presence-bridge-feature-019-us6)
+- [Command dispatch (feature 003)](#command-dispatch-feature-003)
+- [cmd_rotate (feature 003)](#cmd_rotate-feature-003)
+- [cmd_impulse (feature 003)](#cmd_impulse-feature-003)
+- [cmd_warp (feature 003)](#cmd_warp-feature-003)
+- [cmd_scan (features 003 + 004 + 015)](#cmd_scan-features-003-004-015)
+- [cmd_report (feature 003)](#cmd_report-feature-003)
+- [ShipState dirty flush (feature 003)](#shipstate-dirty-flush-feature-003)
+- [The neutral-zone trading posts](#the-neutral-zone-trading-posts)
+- [Universe shape](#universe-shape)
+- [Procedural galaxy generation (feature 004)](#procedural-galaxy-generation-feature-004)
+- [Planet orbit / land / claim (feature 005)](#planet-orbit-land-claim-feature-005)
+- [Planet buy / sell (feature 005)](#planet-buy-sell-feature-005)
+- [Planet economy tick / multiply() (feature 005)](#planet-economy-tick-multiply-feature-005)
+- [Dormant ships (`GESTAT_AVAIL`)](#dormant-ships-gestat_avail)
+- [Colony abandonment (`aba`)](#colony-abandonment-aba)
+- [Planet administration (feature 005)](#planet-administration-feature-005)
+- [Planet beacon visibility (feature 005)](#planet-beacon-visibility-feature-005)
+- [report cargo (feature 005)](#report-cargo-feature-005)
+- [Combat (feature 006b)](#combat-feature-006b)
+- [Validators (feature 003)](#validators-feature-003)
+- [Cybertron AI (feature 007)](#cybertron-ai-feature-007)
+- [Droid AI (feature 008)](#droid-ai-feature-008)
+- [Midnight Maintenance Pass (feature 009)](#midnight-maintenance-pass-feature-009)
+- [cmd_new — new-player onboarding (feature 011)](#cmd_new-new-player-onboarding-feature-011)
+- [cmd_rename — ship rename (feature 011)](#cmd_rename-ship-rename-feature-011)
+- [cmd_who — list active ships (feature 012)](#cmd_who-list-active-ships-feature-012)
+- [cmd_dat — ship stat block (feature 012)](#cmd_dat-ship-stat-block-feature-012)
+- [cmd_ros — leaderboard (features 012, 018)](#cmd_ros-leaderboard-features-012-018)
+- [cmd_fre — channel frequency (feature 012)](#cmd_fre-channel-frequency-feature-012)
+- [cmd_sen — send message (feature 012)](#cmd_sen-send-message-feature-012)
+- [cmd_tea — team management (features 012, 018)](#cmd_tea-team-management-features-012-018)
+- [cmd_cloak — cloaking device (feature 013)](#cmd_cloak-cloaking-device-feature-013)
+- [cmd_transfer — ship-to-ship cargo transfer (feature 013)](#cmd_transfer-ship-to-ship-cargo-transfer-feature-013)
+- [cmd_jettison — discard cargo (feature 013)](#cmd_jettison-discard-cargo-feature-013)
+- [cmd_set — ship option flags (features 013 + 015)](#cmd_set-ship-option-flags-features-013-015)
+- [cmd_maint — maintenance (feature 013)](#cmd_maint-maintenance-feature-013)
+- [cmd_destruct/abort — self-destruct countdown (feature 013)](#cmd_destructabort-self-destruct-countdown-feature-013)
+- [cmd_abandon — ship abandonment (feature 013)](#cmd_abandon-ship-abandonment-feature-013)
+- [cmd_att — planet attack (feature 014)](#cmd_att-planet-attack-feature-014)
+- [cmd_pln — list owned planets (feature 014)](#cmd_pln-list-owned-planets-feature-014)
+- [cmd_pri — price quote (feature 014)](#cmd_pri-price-quote-feature-014)
+- [cmd_maint — planet password gate (feature 014, deferred from 013)](#cmd_maint-planet-password-gate-feature-014-deferred-from-013)
+- [Autopilot (nav \<x\> \<y\>) (feature 016)](#autopilot-nav-x-y-feature-016)
+- [Spy (spy) (feature 016)](#spy-spy-feature-016)
+- [Help (hel / ?) (feature 016)](#help-hel-feature-016)
+- [Clear Screen (cls) (feature 016)](#clear-screen-cls-feature-016)
+- [Player Mail (mai / rea / del) (feature 017)](#player-mail-mai-rea-del-feature-017)
+- [Source Fidelity Audit Corrections (feature 020)](#source-fidelity-audit-corrections-feature-020)
+- [Range Model & AI Engagement](#range-model-ai-engagement)
+- [Ion cannons — planetary defence (2026-09-01)](#ion-cannons-planetary-defence-2026-09-01)
+- [Counter-espionage — catching a spy (2026-09-01)](#counter-espionage-catching-a-spy-2026-09-01)
+
+<!-- /TOC -->
+
 ## Fleet Ownership (feature 030-multi-ship)
 
 **Source**: GEFUNCS.C:104-145 (`lookupshp`), 264-267 (`initshp` counter wiring), 319-384 (`findships`/`selectship`), 1270-1281 (`killem`); GECMDS.C:4558-4583 (`cmd_new` — new ship at Zygor); GEMAIN.H:296-297 (`noships`/`topshipno`), 550-556 (`SHPKEY`).
@@ -107,22 +175,46 @@ hydrated once on boot from `prisma.shipClass.findMany` and never re-fetched.
 
 ---
 
-## Universe Boundary Wrap (feature 019 — US1)
+## Universe Edge — wrap or wall (feature 019 — US1; corrected 2026-09-02)
 
-**Source**: GEFUNCS.C:651-705 (`moveship` wrapping block)
+**Source**: GEFUNCS.C:651-705 (`moveship` boundary block), GEFUNCS.C:819-833
+(`telezip`), GEMAIN.C:475 (`univwrap = ynopt(UNIVWRAP)`)
 
-After position integration, `PhysicsTickService` calls `wrapCoord(value, max)` on each
-axis when `ship.where <= 1` (normal space or hyperspace — not orbit/docked):
+The boundary has **two arms**, chosen by the `UNIVWRAP` sysop option. Canon ships
+`NO`, and we deploy the canon default.
+
+Applied after position integration, on each axis, only when `ship.where <= 1`.
+
+**Wrap off (canon).** The ship is pinned just inside the boundary and `telezip`
+fires:
 
 ```
-wrapCoord(v, max) = ((v % max) + max) % max
+coord = ±(univmax - 2)
+speed = 0; speed2b = 0; damage += TELEDAM     // TELEDAM = 17, never scaled by DAMF
 ```
 
-`MAXX = 30`, `MAXY = 15`. Ships that cross the `x = 30` or `y = 15` boundary reappear at
-the opposite edge preserving heading, speed, cargo, and weapon locks. The `PHYSICS_BOUNDARY_WRAPPED`
-event is emitted with pre- and post-wrap coordinates for clients to update cached state.
+Emits `PHYSICS_UNIVERSE_EDGE`. The pin is `univmax - 2`, not `univmax`: a ship
+parked exactly on the boundary would re-trigger the edge every tick and take 17
+hull every six seconds.
 
-The `telezip` non-wrap fallback from the original is dead code under `univwrap=true`.
+**Wrap on.** The ship crosses to the far side, preserving heading, speed, cargo
+and weapon locks. Emits `PHYSICS_BOUNDARY_WRAPPED`.
+
+### What this section used to say, and why it was wrong
+
+It described only the wrap arm, on `MAXX = 30` / `MAXY = 15`, and called telezip
+"dead code under `univwrap=true`". Three errors:
+
+- `MAXX`/`MAXY` are the **ASCII scan viewport**, not the galaxy. The universe is
+  `±UNIVMAX` on both axes.
+- `univwrap` was never true in canon — it ships `NO`.
+- Because only the wrap arm existed, reaching the boundary bought a free
+  full-speed jump clean across the galaxy, inverting the mechanic. Running for
+  the edge is supposed to be a dead end. It was not even a player advantage: a
+  Cybertron in pursuit got the same free jump.
+
+`TELEDAM` was defined in `constants.ts` and covered by a balance test the whole
+time, but read by no runtime code — a pinned number nothing consumed.
 
 ---
 

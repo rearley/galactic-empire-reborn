@@ -1,3 +1,33 @@
+# Progress log
+
+Append-only, **newest at the bottom**. 63 entries.
+
+<!-- INDEX -->
+## Most recent first
+
+The 15 latest entries, reversed — the log itself reads oldest-first, which makes
+"what is the current state" the hardest thing to find in it.
+
+- [2026-09-02 — the full original distribution, and a canon re-baseline](#2026-09-02-the-full-original-distribution-and-a-canon-re-baseline)
+- [2026-09-02 — fourth playtest: five personas in one shared world](#2026-09-02-fourth-playtest-five-personas-in-one-shared-world)
+- [2026-09-01 — third playtest: two pilots, a colony, a freighter and a siege](#2026-09-01-third-playtest-two-pilots-a-colony-a-freighter-and-a-siege)
+- [2026-09-01 — second full playtest on a reset world](#2026-09-01-second-full-playtest-on-a-reset-world)
+- [2026-09-01 — ion cannons, counter-espionage, flush escalation](#2026-09-01-ion-cannons-counter-espionage-flush-escalation)
+- [2026-09-01 — reset the world and played it](#2026-09-01-reset-the-world-and-played-it)
+- [2026-09-01 — fidelity audit worked through (all 65 findings)](#2026-09-01-fidelity-audit-worked-through-all-65-findings)
+- [2026-08-31 — fidelity audit + attribution fixes](#2026-08-31-fidelity-audit-attribution-fixes)
+- [2026-06-26 — 029-scan-sh-detail (and broader cleanup session)](#2026-06-26-029-scan-sh-detail-and-broader-cleanup-session)
+- [2026-05-26 — range coherence + AI engagement fix](#2026-05-26-range-coherence-ai-engagement-fix)
+- [2026-05-07 — feature 014-planet-attack](#2026-05-07-feature-014-planet-attack)
+- [2026-05-05 — 008-droid-ai](#2026-05-05-008-droid-ai)
+- [Roadmap to v1 — Planned Features](#roadmap-to-v1-planned-features)
+- [2026-05-02 — 005-planet-system](#2026-05-02-005-planet-system)
+- [2026-05-01 — 004-galaxy-generator](#2026-05-01-004-galaxy-generator)
+
+<!-- /INDEX -->
+
+---
+
 ## 2026-08-31 — planet economy was running ~33x too fast
 
 Prompted by a playtester's eyebrow: a colony of 29,664 was growing by ~200 people a minute — "at
@@ -2476,3 +2506,57 @@ friends return a `scanRender` socket payload the text harness does not render �
 one persona wrote its own renderer to compare the grid against `sca pl`.
 
 **Tests:** backend 3,567 (386 suites), frontend 165.
+
+## 2026-09-02 — the full original distribution, and a canon re-baseline
+
+**Completed:** Obtained the complete original GE distribution (github.com/bsimser/ge,
+MIT) and vendored it read-only at `reference/ge-upstream/`. Our nine C files proved
+**byte-identical** to it — nothing derived from reading C was at risk — but the *data*
+files had never been available, so ship classes, sysop options and item tables had all
+been reconstructed from wiki tables and from clamp bounds.
+
+Re-baselined from canon, each with an extractor in `tools/` and a conformance test that
+re-reads the original file independently of the extractor:
+
+- **Ship classes** (`MBMGESHP.MSG`): all 18 active classes. Interceptor scan range
+  15_000 → 100_000; Sysopian Death Star renumbered 34 → 41; slots 10-20 and 26-30
+  correctly excluded as `<NONE>` (26-30 carry a stale leftover name that would have
+  invented five Cybertrons).
+- **Sysop options** (`MBMGEMSG.MSG`): 44 of 51 defaults were wrong, 20 sitting exactly
+  on a clamp bound, erring in both directions. `PFIRDST` 3→7 and `HPFIRDST` 1→9 changed
+  combat shape more than any magnitude did — a hyperspace phaser at two sectors went
+  from ~937 damage (an instant kill) to zero.
+- **Item tables** (`ITMPL`/`ITMWT`/`ITMVAL`/`ITMMH`): ion cannon planet cap 500_000 → 250.
+
+Then worked the ranked list from the audit below: signed `cbearing`, ground-combat
+`ratio` ×100 with the `PLATTR*` coefficients, neutral-zone over-punishment and the
+unpunished `att`, `CLENGUSE`, `canPursue` index basis, overspeed clamp, canon `SNAME`
+ship names, scan distance resolution and the threat column, `START_CASH`, `PLANTOCK`,
+`UNIVWRAP` + `TELEDAM`, `TEAMMAX`.
+
+**Tests:** 4282 passing across 396 suites, up from 4059. Suite time 616s → ~80s, by
+running generation tests against a small galaxy (they exercise generation *logic*, not
+world size) while the one property that depends on deployed size reads
+`config/game.config.json` directly.
+
+**Decisions made:** Five recorded in `DECISIONS.md` — canon as source of truth with a
+written precedence order, `UNIVMAX` deployed at 100 against a canon 300, `PLANTOCK` at
+120 against 360, `UNIVWRAP` implemented defaulting to canon `NO`, and colonists made to
+eat (an inherited original bug). Gold's base price is the one value with no canon at
+all — `ITMPR` blocks postdate the shipped `.MSG` — so it rests on wiki evidence and says
+so, with a test asserting the *absence* positively.
+
+**Next:** Reset the world and playtest it. Ship classes, galaxy size, item tables, weapon
+values, bearings and starting cash have all changed; none of it has been exercised by a
+human. Then the remaining audit phases.
+
+**Known issues:**
+- `SCRBONUS` is unimplemented. The formula is `bonus = SCRBONUS / victim.rospos`, but
+  `rospos` is a `User` column the midnight job assigns while kills are scored
+  synchronously from in-memory ship state that does not carry it. Needs a decision about
+  where `rospos` lives, not a one-liner.
+- The audit's cloak finding was **wrong** and was not applied: it called the 1→2→10 ramp
+  invented, but `GEFUNCS.C:1717-1724` does exactly that ramp and prints `CLOKUP`. Our
+  implementation was already faithful.
+- Earlier audit docs (`FIDELITY_AUDIT.md`, `020-audit-findings.md`) predate the
+  distribution; their value claims need re-checking, their logic claims stand.
