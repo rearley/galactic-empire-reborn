@@ -23,6 +23,7 @@ import {
   DROID_GLOBAL_DEFAULTS,
   DROID_CLASS_DEFAULTS,
 } from '../../../src/game/droid/droid.config';
+import { SHIP_CLASSES } from '../../../prisma/seed/ship-classes';
 
 describe('T039 — Droid AI balance-regression constants', () => {
 
@@ -84,21 +85,25 @@ describe('T039 — Droid AI balance-regression constants', () => {
     expect(DROID_GLOBAL_DEFAULTS.vakoryDamageThreshold).toBe(75);
   });
 
-  // ─── DROID_CLASS_DEFAULTS scan ranges ────────────────────────────────────────
+  // ─── droid scan range lives in the ShipClass table, not here ───────────────
 
-  it('DROID_CLASS_DEFAULTS[31].scanRange is 3750 (Scow — canon 25 000 x 0.15)', () => {
-    expect(DROID_CLASS_DEFAULTS[31]).toBeDefined();
-    expect(DROID_CLASS_DEFAULTS[31]!.scanRange).toBe(3750);
+  // These used to pin DROID_CLASS_DEFAULTS[n].scanRange to 3750, titled
+  // "canon 25 000 x 0.15" -- the test named the canon value and asserted the
+  // compressed one. DroidClassConfig no longer carries scanRange at all:
+  // droid-tick.service.ts reads it from the ShipClass table, so there is one
+  // home for the value instead of two that drift.
+  it.each([31, 32, 33])('class %s scanRange comes from the canon ShipClass table', (n) => {
+    const cls = SHIP_CLASSES.find((c) => c.classNumber === n);
+    expect(cls).toBeDefined();
+    // MBMGESHP.MSG S31SRNG / S32SRNG / S33SRNG all read 25000.
+    expect(cls!.scanRange).toBe(25_000);
   });
 
-  it('DROID_CLASS_DEFAULTS[32].scanRange is 3750 (Murdonian Transport — canon 25 000 x 0.15)', () => {
-    expect(DROID_CLASS_DEFAULTS[32]).toBeDefined();
-    expect(DROID_CLASS_DEFAULTS[32]!.scanRange).toBe(3750);
-  });
-
-  it('DROID_CLASS_DEFAULTS[33].scanRange is 3750 (Vakory Survey Drone — canon 25 000 x 0.15)', () => {
-    expect(DROID_CLASS_DEFAULTS[33]).toBeDefined();
-    expect(DROID_CLASS_DEFAULTS[33]!.scanRange).toBe(3750);
+  it('DroidClassConfig does not reintroduce a second copy of scanRange', () => {
+    for (const n of [31, 32, 33]) {
+      expect(DROID_CLASS_DEFAULTS[n]).toBeDefined();
+      expect(DROID_CLASS_DEFAULTS[n]).not.toHaveProperty('scanRange');
+    }
   });
 
   // ─── DROID_CLASS_DEFAULTS: all three classes present ────────────────────────

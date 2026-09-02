@@ -54,7 +54,10 @@ export class OnboardingService {
     return classes.map((c) => ({
       classNumber: c.classNumber,
       typeName: c.typeName,
-      description: `${c.shipNameTemplate} — Shields:${c.maxShields} Phaser:${c.maxPhaser} Warp:${c.maxWarp}`,
+      // typeName, not shipNameTemplate: canon leaves SNAME empty for USER
+      // classes because the player names their own ship. SNAME is a display
+      // PREFIX for automatons only. @see MBMGESHP.MSG S01SNAME {}
+      description: `${c.typeName} — Shields:${c.maxShields} Phaser:${c.maxPhaser} Warp:${c.maxWarp}`,
       maxShields: c.maxShields,
       maxPhaser: c.maxPhaser,
       maxWarp: c.maxWarp,

@@ -1,15 +1,16 @@
 /**
  * Per-class tunable config for Droid AI ships.
  * Defaults verbatim from GEDROIDS.C and the original C-source class table.
- * Override via env: DROID_CLASS_<N>_SCAN_RANGE, etc.
+ * Override via env: DROID_CLASS_<N>_TOPSPEED, etc.
+ *
+ * scanRange deliberately does NOT live here: it belongs to the ShipClass table
+ * (canon MBMGESHP.MSG SxxSRNG) and a second copy drifted out of step with it.
  *
  * @see GEDROIDS.C — droid_init, droid_act_class_10/11/12
  * @see reference/ge-source/GEMAIN.H — class table (scanrange, max_phasr, max_shlds, topspeed)
  */
 
 export interface DroidClassConfig {
-  /** Per-class scan range in internal units. @see GEDROIDS.C:276 ddist < scanrange */
-  scanRange: number;
   /** Top speed in warp units (×1000 for internal speed). @see GEDROIDS.C:398 topspeed*1000 */
   topspeed: number;
   /** Max phaser charge level. @see GEDROIDS.C:droid_init:142 max_phasr */
@@ -32,11 +33,11 @@ export interface DroidGlobalConfig {
 /** Class-specific defaults (verbatim from reference/wiki/cpu-ships.md and GEDROIDS.C). */
 export const DROID_CLASS_DEFAULTS: Record<number, DroidClassConfig> = {
   // Lydorian Garbage Scow — class 31
-  31: { scanRange: 3_750, topspeed: 1, maxPhaser: 1, maxShields: 1 },
+  31: { topspeed: 1, maxPhaser: 1, maxShields: 1 },
   // Murdonian Transport — class 32
-  32: { scanRange: 3_750, topspeed: 8, maxPhaser: 5, maxShields: 2 },
+  32: { topspeed: 8, maxPhaser: 5, maxShields: 2 },
   // Vakory Survey Drone — class 33
-  33: { scanRange: 3_750, topspeed: 4, maxPhaser: 1, maxShields: 1 },
+  33: { topspeed: 4, maxPhaser: 1, maxShields: 1 },
 };
 
 export const DROID_GLOBAL_DEFAULTS: DroidGlobalConfig = {
@@ -55,7 +56,6 @@ export function buildDroidConfig(): {
     const n = Number(classNumStr);
     const prefix = `DROID_CLASS_${n}_`;
     classes[n] = {
-      scanRange: envInt(`${prefix}SCAN_RANGE`, defaults.scanRange),
       topspeed: envInt(`${prefix}TOPSPEED`, defaults.topspeed),
       maxPhaser: envInt(`${prefix}MAX_PHASER`, defaults.maxPhaser),
       maxShields: envInt(`${prefix}MAX_SHIELDS`, defaults.maxShields),

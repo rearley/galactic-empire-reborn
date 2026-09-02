@@ -34,6 +34,7 @@ import {
   GESTAT_USER,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import { SHIP_CLASSES } from '../../../prisma/seed/ship-classes';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -107,9 +108,9 @@ function buildHarness(seed = 12) {
     // Adjacent to the scow, out of the neutral zone so the runDroidActions
     // player-filter (skips floor(x)===0 && floor(y)===0) keeps this player.
     // The offset is a FRACTION of the scow's own scanRange — the annoy check is
-    // gated on it, so a hardcoded 0.5-sector gap silently stopped exercising
-    // this path when the droid classes were rescaled to canon x0.15.
-    xcoord: 10 + (DROID_CLASS_DEFAULTS[DROID_CLASS_SCOW]!.scanRange / 10_000) * 0.5,
+    // gated on it, so a hardcoded gap silently stops exercising this path
+    // whenever the class is retuned. scanRange lives in the ShipClass table.
+    xcoord: 10 + (SHIP_CLASSES.find((c) => c.classNumber === DROID_CLASS_SCOW)!.scanRange / 10_000) * 0.5,
     ycoord: 7,
     status: GESTAT_USER,
     isEphemeral: undefined,

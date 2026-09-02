@@ -9,14 +9,14 @@ describe('galaxy config loader', () => {
       expect(config.seed).toBe(12648430);
     });
 
-    it('returns default plodds (4) when GALAXY_PLODDS is unset', () => {
+    it('returns canon default plodds (3, MBMGEMSG.MSG PLODDS) when GALAXY_PLODDS is unset', () => {
       const config = loadGalaxyConfig({});
-      expect(config.plodds).toBe(4);
+      expect(config.plodds).toBe(3);
     });
 
-    it('returns default wormodds (10) when GALAXY_WORMODDS is unset', () => {
+    it('returns canon default wormodds (6, MBMGEMSG.MSG WORMODDS) when GALAXY_WORMODDS is unset', () => {
       const config = loadGalaxyConfig({});
-      expect(config.wormodds).toBe(10);
+      expect(config.wormodds).toBe(6);
     });
 
     it('returns default maxplanets (5) when GALAXY_MAXPLANETS is unset', () => {
