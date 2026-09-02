@@ -952,7 +952,15 @@ export class CybertronTickService implements OnModuleInit {
       userid,
       shipno,
       classNumber,
-      shipname: `Cybrg-${shipno * shipno + Math.floor(this.random.next() * 100)}`,
+      // C builds the display name as sprintf("%s%u", shipclass[class].shipname,
+      // usrn*usrn + gernd()%100) -- GECYBS.C:155. The prefix is canon's SNAME,
+      // which differs per class: "Cybertron ", "Cyberquad ", "Cyber Base-",
+      // "SADx3", "SOBx9". The port used one literal for all five, so every
+      // hostile read as "Cybrg-nnnn" and a new pilot could not tell a Scout
+      // from a Cyberquad from a Base Star -- in canon the name announces the
+      // threat class, which is how you learn what to run from. `Cybrg-` remains
+      // the USERID prefix used for lookups; this is the visible ship name.
+      shipname: `${clsEntry?.shipNameTemplate ?? 'Cybrg-'}${shipno * shipno + Math.floor(this.random.next() * 100)}`,
       xcoord,
       ycoord,
       phasrtype: clsEntry?.maxPhaser ?? 1,

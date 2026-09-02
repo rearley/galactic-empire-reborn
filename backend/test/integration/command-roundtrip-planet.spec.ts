@@ -160,6 +160,7 @@ describe('command round-trip (planet) integration (T066)', () => {
             classNumber: 1,
             scanRange: 5000,
             typeName: 'Interceptor',
+            shipNameTemplate: '',
             hasCloak: false,
             maxTons: 200,
           },
