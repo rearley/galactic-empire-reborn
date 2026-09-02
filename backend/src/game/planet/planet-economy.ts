@@ -73,8 +73,20 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
     updatedTroops = survivors;
   }
 
-  // Food eating — GEPLANET.C:~222
-  const foodEaten = Math.min(updatedFood, Math.floor(updatedTroops / 100));
+  // Food eating — GEPLANET.C:221-230.
+  //
+  // FIXED, not reproduced. C debits food for TROOPS only
+  // (`items[I_TROOPS].qty/100`) and then starves MEN against that same stock.
+  // A colony with colonists and no garrison therefore eats NOTHING, forever —
+  // a perpetual-motion economy in which food, one of the two goods Tahanian
+  // Station exists to sell, is worthless. Colonists eat here.
+  //
+  // The rate is C's own: one unit of food per hundred people, integer-divided,
+  // applied to both populations. @see docs/DECISIONS.md — colonists will eat
+  const foodEaten = Math.min(
+    updatedFood,
+    Math.floor(updatedTroops / 100) + Math.floor(updatedMen / 100),
+  );
   updatedFood -= foodEaten;
 
   // Men starvation — GEPLANET.C:~228

@@ -25,6 +25,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { seedNeutralZonePlanets } from './neutral-zone.fixture';
+import { MAILDAYS_DEFAULT } from '../../../src/game/midnight/midnight.constants';
 
 let app: TestingModule;
 let prisma: PrismaService;
@@ -78,13 +79,19 @@ function mailRow(ageInDays: number, recipient = 'alice', classNum = 1, msgnoOffs
 }
 
 describe('US3 — mail purge (T024)', () => {
-  it('deletes mail older than 7 days (default MAILDAYS)', async () => {
+  // Ages are expressed relative to MAILDAYS_DEFAULT rather than the literal it
+  // used to hold. Canon MAILDAYS is 3 (MBMGEMSG.MSG); this file hard-coded 7,
+  // which was the port's own figure, so the fixtures silently encoded a second
+  // declaration of the retention window.
+  const KEEP = MAILDAYS_DEFAULT;
+
+  it('deletes mail older than the retention window', async () => {
     await prisma.mailStat.createMany({
       data: [
-        mailRow(8, 'alice', 1, 0),   // 8 days old — should be deleted
-        mailRow(10, 'alice', 1, 1),  // 10 days old — should be deleted
-        mailRow(6, 'alice', 1, 2),   // 6 days old — should be kept
-        mailRow(1, 'alice', 1, 3),   // 1 day old — should be kept
+        mailRow(KEEP + 1, 'alice', 1, 0),  // past the window — deleted
+        mailRow(KEEP + 3, 'alice', 1, 1),  // well past — deleted
+        mailRow(KEEP - 1, 'alice', 1, 2),  // inside — kept
+        mailRow(0, 'alice', 1, 3),         // today — kept
       ],
     });
 
@@ -92,16 +99,14 @@ describe('US3 — mail purge (T024)', () => {
 
     const remaining = await prisma.mailStat.findMany({ where: { userid: 'alice' } });
     expect(remaining).toHaveLength(2);
-    expect(remaining.every((m) => m.stamp >= daysAgoStamp(7))).toBe(true);
+    expect(remaining.every((m) => m.stamp >= daysAgoStamp(KEEP))).toBe(true);
   });
 
-  it('preserves mail exactly at the 7-day boundary', async () => {
-    // Exactly 7 days old — stamp = now - 7*86400. Should be deleted (< threshold means strictly less).
-    // Actually: threshold = now - maildays * 86400. Mail with stamp < threshold is deleted.
-    // 7 days old stamp = now - 7*86400 = threshold → NOT deleted (not strictly less).
-    const exactlySevenDays = daysAgoStamp(7);
+  it('preserves mail exactly at the boundary', async () => {
+    // threshold = now - maildays*86400, and deletion is strictly less than it,
+    // so mail landing exactly on the boundary survives.
     await prisma.mailStat.create({
-      data: { ...mailRow(0, 'alice', 1, 10), stamp: exactlySevenDays },
+      data: { ...mailRow(0, 'alice', 1, 10), stamp: daysAgoStamp(KEEP) },
     });
 
     await service.run();
@@ -132,11 +137,13 @@ describe('US3 — mail purge (T024)', () => {
   });
 
   it('preserves mail within retention window', async () => {
+    // All inside the window, expressed relative to it: 6 days old is outside a
+    // canon 3-day retention and only survived while this file assumed 7.
     await prisma.mailStat.createMany({
       data: [
-        mailRow(1, 'alice', 1, 30),
-        mailRow(3, 'alice', 1, 31),
-        mailRow(6, 'alice', 1, 32),
+        mailRow(0, 'alice', 1, 30),
+        mailRow(KEEP - 1, 'alice', 1, 31),
+        mailRow(KEEP, 'alice', 1, 32),
       ],
     });
 

@@ -117,15 +117,20 @@ describe('US5 — CHGLOSER PvP cash penalty (GEFUNCS.C:killem)', () => {
 // ─── applyCashPenalty unit tests (pure math) ─────────────────────────────────
 
 describe('applyCashPenalty math — GEFUNCS.C:killem (chgloser block)', () => {
-  it('CHGLOSER_DEFAULT = 100 (transfers 100% of loser cash)', () => {
-    expect(CHGLOSER_DEFAULT).toBe(100);
+  it('CHGLOSER_DEFAULT is canon 2 percent, not the numopt ceiling', () => {
+    // Was pinned at 100 — the clamp CEILING — so a killed player forfeited
+    // their ENTIRE bank. Canon fines 2 percent (MBMGEMSG.MSG). With a starting
+    // balance of 100_000 that is the difference between a setback and being
+    // wiped out by one death.
+    expect(CHGLOSER_DEFAULT).toBe(2);
   });
 
   it('transfer = floor(loser.cash * percent / 100)', () => {
-    // At 100%: transfer = loser.cash
     const loserCash = 1_000_000n;
     const transfer = loserCash * BigInt(CHGLOSER_DEFAULT) / 100n;
-    expect(transfer).toBe(1_000_000n);
+    expect(transfer).toBe(loserCash * BigInt(CHGLOSER_DEFAULT) / 100n);
+    // A death is survivable: the fine leaves most of the bank intact.
+    expect(transfer).toBeLessThan(loserCash / 10n);
   });
 
   it('transfer capped at loser.cash (cannot go negative)', () => {
