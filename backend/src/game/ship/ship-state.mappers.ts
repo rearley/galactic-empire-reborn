@@ -94,6 +94,12 @@ export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
     recentlySelfFiredTorp,
     maxTons,
     maxWarp,
+    // Resolved lock target, written by `loc`. The DB column is `lock` (the
+    // target's channel); this is the "userid:shipno" key used to re-find the
+    // ship in memory. Leaving it in scope made every flush for any pilot who
+    // had locked a target throw `Unknown argument 'lockKey'` — silently, so
+    // their ship simply stopped being saved. @see test/unit/ship-flush-columns.spec.ts
+    lockKey,
     // channel: assigned on entry to the world and released on exit, so it has
     // no DB column. This function returns `...rest` straight to Prisma, so any
     // in-memory-only field left in scope makes EVERY flush throw — and the
