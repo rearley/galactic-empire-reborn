@@ -1,0 +1,107 @@
+[https://www.dropbox.com/scl/fi/6k4wx9fvk6scmm1ol1lxz/GE-Scripts.zip?rlkey=gx5xdonhnnne92gjdn1lf6kry&st=s3p787w5&dl=0 GE Scripts] Collection of scripts for automating time-intensive actions in the game, making playing more fun.
+
+New Version change logs will be posted at the bottom of this page when new features/bug fixes are added.
+
+Please email airlockmadam@gmail.com with requests to add features or fix bugs (preferably w/screenshot.)
+
+<u>'''Autopilot:'''</u> Automatically moves you to a sector you select, and enters orbit around a planet if requested.
+
+                Can also be used for moving from planet to planet within the current sector.
+
+                Moves at maximum possible speed ("max" warp + 50%) with built-in protection from this overdrive
+
+                blowing the engines out - reduces speed when warning message is received, and will attempt to
+
+               "speed" again any time a course correction is made. Performs repairs, then raises shields and
+
+               attempts to cloak at destination, for safety in case user is AFK.
+
+<u>'''Light Sail:'''</u>  A copy of the autopilot that works at impulse speeds only.
+
+                  Intended for a ship that has no warp drive, for moving while cloaked, 
+
+                  or for moving with warp engines disabled.
+
+<u>'''Overdrive Protection:'''</u> Protects against blowing out your engines while on manual control, 
+
+                                   allowing you to move at Max Warp + 50% ("Overdrive") and will automatically 
+
+reduce your speed if a warning message is received. 
+
+                                   This is built in to the other scripts that move.
+
+<u>'''Colonizer:'''</u> Purchases colonists from Tahanian Station (planet 2 in 0 0) and moves them to a sector you select.
+
+                 Automatically adjusts amount entered to account for the weight you're already carrying, and to
+
+                 purchase food as a % of the total men each trip carries.
+
+<u>'''Product Mover:'''</u>  Moves inventory from one planet to another. Must start from orbit around a planet you own.
+
+            Still experimental, seems to work fine moving 1 product but still bugs with moving multiple
+
+            products at the same time. Updates for this and the other scripts will be posted at the bottom of this page.
+
+<u>'''Volley:'''</u>    Fires all phasers, torpedoes, and missiles, attempts to raise shields. 
+
+              Missiles will be set at max charge. Can be used while at warp or out of warp.
+
+              Phasers will fire in the direction you are currently heading, so you'll need 
+
+              to put the enemy in your cross-hairs at 0 heading for phasers to hit their target.
+
+<u>'''Cloak:'''</u>    '''[Not required in GE-Next, which automatically loads flux pods, but helpful in older versions.]'''
+
+Raises cloak, then makes sure the cloak doesn't fail by loading a new flux pod any time neutron flux               goes below 5000.
+
+<u>'''Jam:'''</u>       Launches a jammer every 13 seconds until you shut it off or run out of jammers,
+
+               allowing you to escape when you're damaged and don't want to fight.
+
+<u>'''Online Watch:'''</u>   Shows any players currently in "Galactic Empire" using the BBS # command.
+
+                         Updates every 120 seconds, so also works as a Keep Alive script.
+
+<u>'''Comms Watch:'''</u>   Watches for communications or important activity in game, and displays in a pop-up window.
+
+<u>'''Reports:'''</u>    Scrolls through all production reports in the GE menu, without having to hit next.
+
+                 Recommend setting your telnet program to log to a file before running this.
+
+<u>'''Pause Kill:'''</u>  Automatically clears "(N)onstop, (Pause), (Continue) prompts, for BBSes that don't allow
+
+                   you to update Account Settings to Continuous or doesn't preserve that setting each time you login.
+
+<u>'''Sentinel:'''</u>   Performs a scan at maximum range every 5 seconds.
+
+'''<nowiki>#</nowiki>versions'''
+
+v1.0 Released 06/24/2025.
+
+All scripts created by Madam Airlock.
+
+v1.1 Released 06/28/2025
+
+Updated Autopilot, Light Sail, and Colonizer to v1.1 - tweaks to make sure cloak and shields get raised again after repairs are completed.
+
+v1.2 Released 07/19/2025 - Stable Version
+
+Bug fixes on moving scripts, including a major bug in Light Sail. 
+
+Updated repair routines in all moving scripts so that repairs are done at both ends of trip if possible (or at end if it's a one-way trip, as with Autopilot). Colonizer now only waits for repairs where it's safe in 0,0 - if attempt fails at destination it immediately drops colonists and heads back to 0,0.
+
+Updated shield/cloak to not activate in 0,0 to save flux pods.
+
+v1.3 Released 08/09/2025
+
+Fixed bugs, including a major one that was preventing moving scripts and Overdrive Protection from working in ships with no shields,  no phasers, or neither.
+
+Upgraded Light Sail to recognize when it gets within orbital distance of a planet while still moving between sectors. Now, any time it gets within orbital range of a planet that isn't the destination, it will stop, back away a bit, then circle around past the planet for safety.
+
+Deleted Orbit script: obsolete, use Autopilot to warp to orbit or Light Sail to move at impulse.
+
+   Upgraded Cloak script to recognize when it is running in GE-Next, and terminate itself since cloak will not fail in GE-Next, script is only needed for older versions of GE.
+
+   Added new script Sentinel to do a long range scan every 5 seconds.
+
+Coming in v1.4: New script Gold Digger to log in every 4 hours, jump in all of your ships, and transfer up gold if they're in orbit, then log out.

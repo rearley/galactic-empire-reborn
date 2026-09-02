@@ -1,0 +1,1 @@
+The DATA command provides information about the game environment in a [[wikipedia:Comma-separated_values|comma-delimited]] format. Generally not used by players directly, it is designed to be used by terminal programs. (TO DO)

@@ -1,0 +1,34 @@
+== DAMF ==
+The damage factor, or DAMF, is a value that determines the durability of a certain class of ship. 100 is "neutral," in that it does not affect the other calculations that determine the amount of damage from a given strike. 200 means the ship can take twice as much damage.
+
+Example DAMFs in GE classic: Interceptor 90, Heavy Freighter 200, Star Cruiser 100, Dreadnought 125, Freight Barge 200, Cybertron Scout 90, Cyberquad 100, Cyber-Base 2000, Sarten Obliterator 500
+
+Example DAMFs in ge-next 0.2.6: Interceptor 100, Scout 80, Minelayer 125, Heavy Freighter 200, Battle Cruiser 225, Dreadnought 250, Planetary Transport 900, MBM Dreadnought 125, Cyb 1x 100, Cyb 2x 175, Cyb 4x 300, Cyb 8x 425, Cyb Base 550, SCT 175, SDD 225, Zyg 400
+
+== What damage is adjusted with DAMF? ==
+Damage from mines, torpedoes, and missiles.
+
+Not affected by DAMF: damage from a wormhole (always 5.5), damage from the Enforcer Planet (always the value of SE100DAM, by default 10), damage from hitting the galactic perimeter (always 17), crashing into a planet (always 101), destruct command (always 101). warp engines blowing up (random between 0 and 19), and ion cannon hits (random, depending on shield status).
+
+In ge-next, phasers are affected by DAMF. However, in GE classic, phaser damage is factored by the size of the ship, as determined by its cargo size. This is actually how mine, torpedo, and missile damage was factored before Galactic Empire 3.2c<ref>[[GEREADME.DOC#As Released (3.2c)]]</ref>. Phaser damage was never converted from this old system to the DAMF system. Which takes us to...
+
+== Why are SOBs so formidable? ==
+I've often been asked why the 8x ships in ge-next are easier to take out than the SOBs in ge-classic. With the SOB having a DAMF of 500, and the 8x having a DAMF of 425, there shouldn't be much difference, right?
+
+First, to clear up a misconception: There is no special code for SOBs in GE classic. All the Cybs, the SADs, and the SOBs all use the exact same logic. The Cyberquads and SOBs are set as "tough," meaning they're likely to fire more often, and they have higher phaser and shield classes, but how they pursue, when they retreat, when they decide to fire, is all exactly the same.
+
+Here's the big difference: in GE classic, the cargo size of a Cyberquad is 12,500, whereas the cargo size of a SOB is 234,000!
+
+In GE classic, phaser damage is factored like this: 1.0 + ((cargo size) / 15000).
+
+This means a Cyberquad's effective DAMF on a phaser strike is 183 (1.0 + 12500/15000 = 1.8<SPAN style="text-decoration:overline">33</SPAN>), whereas the DAMF on hitting a SOB with phasers is 1660 (1.0 + 234000/15000 = 16.6)!
+
+That's why you can't pick them off with a strong phaser from long distances like you can the bigger ships in ge-next, and since they have a class 16 phaser, when they come in close, they're deadly.
+
+== The ge-next approach ==
+In ge-next, phaser damage is affected by the DAMF in the same way as other damage. The cargo size of a ship is no longer factored into anything. (In fact, I'm willing to bet you didn't notice that the ship dimensions are no longer included in ship scans... this was a calculation based on the cargo size.)
+
+== How to make a more formidable Cyb ==
+We can raise the DAMF of a class, of course, but the 8x already has a much higher DAMF than the Battle Cruiser and Dreadnought. At a certain point, they just start to become invulnerable, like the SOB is to phasers.
+
+The key to a more formidable Cyb is giving them the ability to use strategies like human players do. Stay at impulse when an attacker is pursuing at warp to take shots with the standard phasers. Speed up or slow down as appropriate to gain an advantage instead of just matching or slightly exceeding the attacker's speed. Any many other things... coming soon.

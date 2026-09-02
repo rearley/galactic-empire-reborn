@@ -1,0 +1,3 @@
+The RG# command shows the [[registration]] number of the currently running copy of Galactic Empire, and shows whether or not it is in a free demonstration period. It doesn't work in Galactic Empire 3.2d or e, but apparently did in earlier versions. As it is not useful for normal players, it is not listed in the [[HELP]] command.
+
+The command can be found but is [[wikipedia:Comment_(computer_programming)|commented out]] in the source code of Galactic Empire 3.2e<ref>GECMDS.C, line 155</ref>, suggesting it was no longer useful and was disabled.

@@ -1,0 +1,59 @@
+== Phasers ==
+
+== Torpedoes ==
+Torpedoes are a projectile weapon. Despite traveling at a speed of almost warp 16 (2441 [[Parsec|parsecs]]/[[centock]] [[MBMGEMSG.MSG#Weapons|by default]]), torpedoes cannot be fired by a vessel at warp, nor be fired at or hit a vessel at warp.
+
+Torpedoes contain a charge of their own and do not need to be charged from a ship's flux pile, unlike missiles.
+
+Torpedoes always hit their target unless the ship they are pursuing jumps to warp, or they are intercepted by a decoy.
+
+=== Use ===
+To use torpedoes, a ship must be at impulse speed or a full stop. Shields will be lowered once a torpedo is fired, and will not raise again automatically.
+
+Enter:
+
+<code>TOR [SHIP LETTER]</code>
+
+for example, <code>TOR C</code> to fire on ship C or <code>TOR @</code> to fire on the locked on ship.
+
+Torpedoes will travel toward the specified ship until they hit their target, are intercepted by a decoy, or the target ship goes to warp.
+
+=== Offensive strategy ===
+Torpedoes can only be fired while not at warp, and only at a ship that is not at warp.
+
+=== Defensive strategy ===
+A player may make a quick jump to warp 1 or higher (even for as little as one centock) to cause any torpedoes pursuing them to lose their target lock and disappear. However, this will drop the player's shields, making them more vulnerable to phasers or hyper-phasers.
+
+A player can deploy [[Weapons and combat#Decoys|decoys]] to reduce (not eliminate) the chance of being hit by an incoming torpedo.
+
+== Missiles ==
+Unlike torpedoes, missiles are capable of traveling at warp speed and hitting ships traveling at warp. Missiles must be charged from the ship's flux pile, and the more a missile is charged, the further it will travel and more damage it will do when it hits another ship.
+
+== Mines ==
+
+== Zippers ==
+
+== Decoys ==
+
+== Jammers ==
+Jammers can be deployed from a ship to block the scanners of all ships in the area, including the ship using the jammer.
+
+=== Usage ===
+Just enter <code>JAM</code>. The jammer command does not have any options.
+
+=== Strategy ===
+Jammers are mainly a defensive weapon, and useful for covering a retreat. A ship commander that is on the losing end of battle may use a jammer, then try to escape at a high warp on a random heading. Successive jammers can be used to prolong the length of the jamming.
+
+Jammers can also be used offensively, for example in a sneak attack.
+
+== Lock ==
+
+== Maintenance ==
+To repair your ship, you can purchase the services of a maintenance team while orbiting Zygor, Tahanian Station, or any planet with a population of at least 25,000 men<ref>GECMDS.C, line 4484</ref>. If a planet has a trade password, it is required<ref>GECMDS.C, lines 4469-4482</ref>. The price is 2500 in the neutral zone and 200 at any other planet.
+
+The duration of the maintenance is one centock plus one centock for every three percent of damage<ref>GECMDS.C, line 4516</ref>. During the final centock of the repair process, any ship systems that are offline are repaired, the top speed of the warp engines is restored if it was lowered, and any charge in the shield bank is lowered to zero<ref>GEFUNCS.C, lines 411-421</ref>. Unless you're in a hurry, recharge your shields after the maintenance is completed.
+
+If you break orbit, fire weapons, or are being targeted by another ship, the maintenance process ends.
+
+=== Usage ===
+Just enter <code>MAI</code>. If the planet has a trade password, enter <code>MAI [PASSWORD]</code>.

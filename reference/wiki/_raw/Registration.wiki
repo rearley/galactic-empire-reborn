@@ -1,0 +1,7 @@
+On commercial copies of Galactic Empire, a registration number was provided to you once you purchased it. This value had to be entered under the REGNO field of [[MBMGEMSG.MSG]] in order for the game to function properly.
+
+
+When the source code to Galactic Empire was made freely available, the REGNO required was changed to be the same as the MajorBBS registration number. If you are using a copy compiled from source or downloaded from the [https://www.mbbsemu.com/ MBBSEmu] site, simply set REGNO to the same number as your MajorBBS registration number (or the value of GSBL.BTURNO in appsettings.json in an MBBSEmu installation).
+
+
+On commercial copies of Galactic Empire, the required value is as follows: take the [https://xor.pw/ XOR value] of your MajorBBS registration number and 10094056, then for each digit of the resulting number, add each digit of 10094056 [[wikipedia:Modulo|modulo]] 10<ref>https://github.com/bsimser/ge/tree/master/register</ref>. For example, if your MajorBBS registration number is 52947184, the XOR value of 52947184 and 10094056 is 62778648; you would then add each digit of 62778648 and 10094056 (6+1=7, 2+0=2, 7+0=7, 7+9=1[6], 8+4=1[2], 6+0=6, 4+5=9, 8+6=1[4]). The resulting registration number would be 72762694.

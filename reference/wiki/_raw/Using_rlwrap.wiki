@@ -1,0 +1,80 @@
+[https://github.com/hanslub42/rlwrap RLWRAP] is a program for Linux and Unix-like operating systems, and it can also be installed in Windows using [[wikipedia:Windows_Subsystem_for_Linux|WSL]].
+
+Using rlwrap with a telnet client when playing Galactic Empire gives the user several advantages:
+
+* Full arrow key editing support: use the left and right arrow keys to edit commands as they're being typed
+* Command history: use the up and down arrow keys to scroll through a history of commands
+* Commands aren't sent to the server until enter is pressed: output is not paused as the user is typing
+Some BBS systems may have trouble initializing ANSI color support when using rlwrap, YMMV. (TO DO: possible to fix this?)
+
+== Basic use ==
+Install rlwrap if needed; look online for instructions for your particular operating system.
+
+Run your telnet client with rlwrap:
+
+<code>rlwrap -a -A telnet example.com port</code>
+
+where "example.com" is the BBS server hosting Galactic Empire, and "port" is the port number if required. (-a is required for telnet, -A enables enhanced ANSI color support.)
+
+Once you're in the game, you can play as normal. The screen will continue to scroll while you're typing commands. If you make a mistake as you're typing, you can now use the left and right arrow keys to edit the line. You can also press up arrow to pull up the last command you entered, which can be very helpful for executing repetitive commands.
+
+== Password masking ==
+By default, rlwrap will display your BBS password on the screen as you're typing it in, and save it in the command history. If this is a concern, add your BBS's password prompt after the -a option like this:
+
+<code>rlwrap -aPassword: -A telnet example.com port</code>
+
+This will exclude any "Password:" prompt from rlwrap's processing.
+
+If your BBS's password prompt has ANSI color codes, this becomes a little more complicated. To find the codes, use <code>tee</code>:
+
+<code>telnet example.com port | tee color_test</code>
+
+Log in to your BBS, and log out. Then open the color_test file using vi or nano and look for the password prompt.
+
+== Simple color filter ==
+If you've ever noticed Galactic Empire's output getting dimmer as you play, it's because the game starts using ANSI bold text (code 1) but the output from certain commands (mainly HELP commands) often resets the screen to normal text (code 0). Here is a simple filter based off rlwrap's "scrub_prompt" filter that resets all prompts to bold text:
+
+
+<code>#! /usr/bin/perl</code>
+
+<code># filter for Galactic Empire</code>
+
+<code>use lib ($ENV{RLWRAP_FILTERDIR} or ".");</code>
+
+<code>use RlwrapFilter;</code>
+
+<code>use strict;</code>
+
+<code>my $filter = new RlwrapFilter;</code>
+
+<code>my $name = $filter -> name;</code>
+
+<code>$filter -> help_text("Usage: rlwrap -z '$name [-o]' <command>\n".</code>
+
+<code>                     "Galactic Empire rlwrap filter\n"</code>
+
+<code>);</code>
+
+<code>$filter -> prompt_handler(\&scrub);</code>
+
+<code>$filter -> run;</code>
+
+<code>sub scrub {</code>
+
+<code>    my ($dirty) = @_;</code>
+
+<code>    my $clean = $dirty;</code>
+
+<code>    $clean =~ s/^>/\x1b\[1;37m>/g; # change prompts to white bold</code>
+
+<code>    return $clean;</code>
+
+<code>}</code>
+
+
+Save this file as "ge_filter" (or whatever you like) and enter <code>chmod +x ge_filter</code> to make it executable. Use this filter with rlwrap's -z option:
+
+<code>rlwrap -aPassword: -A -z ./ge_filter telnet example.com port</code>
+
+== License ==
+rlwrap (and scrub_prompt) are licensed under the [https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html GNU GPL version 2].

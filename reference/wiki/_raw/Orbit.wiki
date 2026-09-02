@@ -1,0 +1,10 @@
+The ORBIT command causes your ship to stop at a planet so that you can interact with it. You must be within 250 [[Parsec|parsecs]] of a planet, and you must enter the command while traveling at impulse or at a full stop. You must be orbiting a planet to use the ADMIN, ATTACK, BUY, MAINTENANCE, PRICE, SPY, and TRANSFER commands. You must be orbiting Zygor in sector 0 0 to use the NEW and SELL commands.
+
+Your ship will come to a full stop after successfully issuing the orbit command (your ship does not actually [[wikipedia:Orbit|orbit]] the planet).
+
+When you are traveling at impulse and come with 250 parsecs of a planet, the helm will notify you that you are within the gravity pull of a planet. Once you see this message, you can issue the ORBIT command. When you are within 50 parsecs of a planet, the helm will notify you that you are dangerously close to the planet. If you come within 25 parsecs of a planet when traveling at impulse, your ship will crash into the planet and be destroyed.
+
+Although it seems counterintuitive, it is actually safer to approach a planet at warp than at impulse, since you will actually travel through the planet instead of crashing into it if you get too close. You can also stop within the 25 parsec "crash zone" and not be destroyed if you come to a stop from warp.
+
+== Issuing command ==
+Enter <code>ORB [planet number]</code>.

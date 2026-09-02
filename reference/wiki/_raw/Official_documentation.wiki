@@ -1,0 +1,17 @@
+Below is a collection of the original documentation that came with [[Galactic Empire]], presented as it was originally distributed, typos and all. It should be noted that many aspects of the game changed throughout the game's development, and the documentation below was not always updated to match those changes.
+
+
+
+[[GEINST.DOC]] is a guide for installing Galactic Empire onto a MajorBBS system and basic configuration.
+
+[[GEREADME.DOC]] is the release notes for the game, including a changelog.
+
+[[GESYSOP.DOC]] is a list of commands that can be used by the sysop.
+
+[[GETERM.DOC]] explains how to use the DATA command, which can be used by terminal programs
+
+[[MBMGEHLP.MSG]] is the in-game help.
+
+[[MBMGEMP.DOC]] is a user's guide.
+
+[[MBMGEMNU.TXT]] is the text that is displayed when you select "What's new" from the main menu. This is from version 3.2d (and e).

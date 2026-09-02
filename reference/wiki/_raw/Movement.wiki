@@ -1,0 +1,49 @@
+In [[Galactic Empire]], ships can travel at impulse and warp. Warp 1 is the speed of light, which is 153.<SPAN STYLE="text-decoration:overline">846153</SPAN> (10000÷65) [[Parsec|parsecs]] per [[centock]]. Impulse 1 is 1% of this speed, or 1.<SPAN STYLE="text-decoration:overline">538461</SPAN> parsecs per centock.<ref>GEFUNCS.C lines 648-649: ptr->coord.xcoord = ptr->coord.xcoord + ((ptr->speed * sin(degtorad(ptr->heading)))/65000.0); ptr->coord.ycoord = ptr->coord.ycoord - ((ptr->speed * cos(degtorad(ptr->heading)))/65000.0);</ref> 
+
+Since a parsec is the smallest unit of distance in the game, all speeds that are not multiples of 13 will round up and round down as necessary. For example, since impulse 50 is 76.923076 parsecs/centock, a ship traveling at impulse 50 will travel 77 parsecs almost every centock, and occasionally 76 parsecs/centock. 
+
+== Impulse ==
+At impulse speed, ships are able to raise [[Defensive systems#Shield|shields]], activate cloaking, deploy [[Defensive systems#Decoy|decoys]], use standard [[Weapons and combat#Phasers|phasers]], and fire (and be hit by) [[Weapons and combat#Torpedoes|torpedoes]].
+
+
+
+Example speeds:
+
+IMP 1 = 1-2 parsecs / centock
+
+IMP 13 = 20 parsecs / centock
+
+IMP 15 = 23-24 parsecs / centock
+
+IMP 50 = 76-77 parsecs / centock
+
+IMP 65 = 100 parsecs / centock
+
+IMP 99 = 152-153 parsecs / centock
+
+== Warp ==
+At warp speed, shields, cloaking, decoys, and torpedoes cannot be used, and torpedoes cannot hit the player. Phasers switch to hyperphasers.
+
+
+
+Example speeds:
+
+WAR 1 = 153-154 parsecs / centock
+
+WAR 5 = 769-770 parsecs / centock
+
+WAR 10 = 1538-1539 parsecs / centock
+
+WAR 13 = 2000 parsecs / centock
+
+WAR 20 = 3076-3077 parsecs / centock
+
+WAR 50 = 7692-7693 parsecs / centock
+
+WAR 65 = 10000 parsecs / centock
+
+WAR 75 = 11538-11539 parsecs / centock
+
+== Rotation ==
+
+== Navigation ==
