@@ -381,11 +381,17 @@ export class ScanHandlerService implements OnModuleInit {
       const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
       const row: SidePanelRow = {
         letter: entry.letter,
-        distance: Math.round(entry.dist / 10000),
+        // RAW units, as C prints them: `spr("%ld",(long)(sptr->ship[i].dist))`
+        // at GECMDS.C:5985. Dividing by 10 000 collapsed the only continuous
+        // range readout in the game to a single digit -- a droid closing from
+        // 14 900 to 10 100 read "1" both times, and anything inside half a
+        // sector read "0" -- exactly when a new pilot is deciding to fight or
+        // run. docs/DECISIONS.md D7 already specifies a right-justified 6-char
+        // field, which only makes sense for the raw magnitude.
+        distance: Math.trunc(entry.dist),
         bearing: entry.bearing,
-        // Rounded like bearing and like `rep nav`: an unrounded float rendered
-        // as "Hdg:69.83440234557376" and broke the legend's column alignment.
-        heading: Math.round(entry.heading) % 360,
+        // Already relative and signed from scantab; see its `heading` docs.
+        heading: entry.heading,
         speedDisplay: showarpDisplay(entry.speed),
       };
       if (ship.scanNames && other) {

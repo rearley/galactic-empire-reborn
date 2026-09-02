@@ -17,7 +17,11 @@ export interface ScantabEntry {
   letter: string;
   /** Bearing from self to other, 0..359 degrees. */
   bearing: number;
-  /** Other ship's current heading, 0..359 degrees. */
+  /**
+   * Where THIS ship is, seen from the other ship, relative to the other ship's
+   * own heading and signed -180..180. Near 0 means his nose is on you.
+   * @see GECMDS.C:2885 cbearing(&wptr->coord, &ptr->coord, wptr->heading)
+   */
   heading: number;
   /** Other ship's current speed (raw). */
   speed: number;
@@ -150,7 +154,14 @@ export function buildScantab(
     dist,
     letter: assignments.get(key)!,
     bearing: calcBearing(self, ship),
-    heading: ship.heading,
+    // C's two columns answer DIFFERENT questions (GECMDS.C:2884-2885):
+    //   bearing = cbearing(me, him, my heading)   -- where is he, from me
+    //   heading = cbearing(him, me, HIS heading)  -- where am I, from him
+    // The second is the free threat read: near 0 means his nose is pointed at
+    // you and you are inside his firing arc. The port reported his absolute
+    // compass heading instead, which tells a pilot nothing without doing the
+    // subtraction themselves.
+    heading: Math.round(cbearing(ship, self, ship.heading)),
     speed: ship.speed,
     flag: 1,
   }));
