@@ -102,9 +102,13 @@ export class DroidTickService implements OnModuleInit {
     // Spawn evaluation is the port's own slot mechanic and stays on the 6s
     // tick; droid ACTIONS are C's `autortia`, once a second, gated by each
     // droid's own countdown. @see GEMAIN.C:2406-2438, GEDROIDS.C:216-227
-    this.tickService.subscribe(TickKind.PHYSICS, (ctx) => this.onPhysicsTick(ctx));
+    // Spawning and droid actions both live in C's `autortia`, which runs once
+    // a SECOND (GEMAIN.C:2296). Running the spawn counter on the 6s physics
+    // tick made `ticktock2 >= 30` mean 180 seconds instead of 30, so the
+    // Murdonian Transport — the designated starter target — was absent for
+    // most of a session.
     this.tickService.subscribe(TickKind.SHIP_UPDATE, (ctx) => this.onAiTick(ctx));
-    this.logger.log('DroidTickService subscribed to PHYSICS and SHIP_UPDATE ticks');
+    this.logger.log('DroidTickService subscribed to the SHIP_UPDATE tick (C autortia)');
   }
 
   /** Returns the live population map — exposed for tests. */
@@ -112,24 +116,18 @@ export class DroidTickService implements OnModuleInit {
     return this.livePopulation;
   }
 
-  private onPhysicsTick(ctx: TickContext): void {
-    this.spawnTickCounter = (this.spawnTickCounter + 1) % DROID_SPAWN_TICK_CADENCE;
-    if (this.spawnTickCounter !== 0) return;
-
-    // Gate: at least one human player must be online
-    const hasPlayer = this.shipState.findAllShips().some((s) => s.status === GESTAT_USER);
-    if (!hasPlayer) return;
-
-    this.runSpawnEvaluation(ctx);
-  }
-
   /**
-   * C's `autortia` for droids: once a second, every droid either counts down
-   * or acts. @see GEMAIN.C:2406-2424
+   * C's `autortia`: once a second it both evaluates the spawn slot (every
+   * 30th call — `ticktock2 >= 30`, GEMAIN.C:2321) and lets every droid count
+   * down or act. @see GEMAIN.C:2296-2424
    */
   private onAiTick(ctx: TickContext): void {
     const hasPlayer = this.shipState.findAllShips().some((s) => s.status === GESTAT_USER);
     if (!hasPlayer) return;
+
+    this.spawnTickCounter = (this.spawnTickCounter + 1) % DROID_SPAWN_TICK_CADENCE;
+    if (this.spawnTickCounter === 0) this.runSpawnEvaluation(ctx);
+
     this.runDroidActions(ctx);
   }
 

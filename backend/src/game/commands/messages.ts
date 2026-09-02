@@ -102,6 +102,7 @@ export enum MessageId {
   TRAN_NO_ROOM = 'TRAN_NO_ROOM',
   WTHDR_TOO_MUCH = 'WTHDR_TOO_MUCH',
   WTHDR_FMT = 'WTHDR_FMT',
+  PRICE_NONE = 'PRICE_NONE',
 
   // land (feature 005)
   LAND_NOT_ORBIT = 'LAND_NOT_ORBIT',
@@ -511,6 +512,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // C's ADMENU2D — the pool cannot cover the amount asked for.
   [MessageId.WTHDR_TOO_MUCH]: 'The tax pool only holds %d credits.',
   [MessageId.WTHDR_FMT]: 'Usage: wit [amount]  (no amount withdraws everything)',
+  // Bare `pri` on a planet offering nothing. Distinct from BUY5, which is the
+  // item-scoped "that item is not for sale" answer to `pri <qty> <item>`.
+  [MessageId.PRICE_NONE]: 'This planet has nothing for sale.',
   [MessageId.ORBITNO]: 'There is nothing to orbit here.',
   [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
 

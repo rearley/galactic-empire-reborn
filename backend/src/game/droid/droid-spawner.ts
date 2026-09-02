@@ -21,6 +21,8 @@ import {
   CYBTICKTIME,
 } from '../constants';
 import { randomMurdonianLoadout, randomSparseLoadout } from './droid-decisions';
+import { rollDroidSpawnCoord } from './droid-spawn-coord';
+import { UNIVMAX } from '../constants';
 
 /** @see GEDROIDS.C:203-210 — typename dispatch in droid_lives */
 const DROID_CLASS_TYPENAMES: Record<number, string> = {
@@ -75,15 +77,17 @@ export class DroidSpawner {
     const usrn = this.nextSlotIndex;
     const shipname = nameOverride ?? this.uniqueGeneratedName(typename, usrn);
 
-    // @see GEDROIDS.C:135-140 — coords from rndm(39.9)-19.8; re-roll if neutral zone (0,0)
+    // @see GEDROIDS.C:131-140 — C branches on universe size; the port only had
+    // the large-universe arm, so half of every spawn landed outside a galaxy
+    // that is +/-10. Re-roll if the neutral zone (0,0) comes up.
     let xcoord: number, ycoord: number;
     if (at) {
       xcoord = at.x;
       ycoord = at.y;
     } else {
       do {
-        xcoord = this.rng.next() * 39.9 - 19.8;
-        ycoord = this.rng.next() * 39.9 - 19.8;
+        xcoord = rollDroidSpawnCoord(this.rng, UNIVMAX);
+        ycoord = rollDroidSpawnCoord(this.rng, UNIVMAX);
       } while (Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
     }
 

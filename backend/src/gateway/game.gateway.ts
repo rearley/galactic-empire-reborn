@@ -61,6 +61,7 @@ import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
+import { shouldBroadcastTransition } from './transition-visibility';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
@@ -1025,7 +1026,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const payload = {
       ...event,
       weapon: killedByPlanet ? ('ion' as const) : event.weapon,
-      attackerName: killedByPlanet ? (ionHit?.name ?? null) : (event.attackerName ?? null),
+      // Name the killer. A planet kill takes the planet's name; a ship kill
+      // resolves the attacking ship's, because the client's own player list
+      // holds live PLAYERS only — an AI killer is never in it, so a Cybertron
+      // kill rendered as a bare id or nothing at all and two playtest pilots
+      // died repeatedly with no combat text. The hit path already does this.
+      attackerName: killedByPlanet
+        ? (ionHit?.name ?? null)
+        : (event.attackerName ?? (event.attackerId ? this.shipNameOf(event.attackerId) ?? null : null)),
       loot: event.loot.map(l => ({ itemIndex: l.itemIndex, amount: l.amount.toString() })),
     };
     this.server.emit(COMBAT_SHIP_DESTROYED, payload);
@@ -1189,13 +1197,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(PHYSICS_SECTOR_TRANSITION)
   handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
-    this.server.emit('physics.sector-transition', event);
-
     const { shipId, fromSector, toSector } = event;
 
-    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
-
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
+
+    // Not every mover is public. This used to `server.emit` unconditionally,
+    // handing every client a live position feed for all 24 Cybertrons and
+    // every droid — while `who` deliberately hides AI so a pilot cannot route
+    // around them without scanning. @see transition-visibility.ts
+    if (shouldBroadcastTransition(movingShip?.status)) {
+      this.server.emit('physics.sector-transition', event);
+    }
+
+    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
     if (!movingShip) return;
 
     // Move the player's socket to the new sector room so they receive sector-scoped events.

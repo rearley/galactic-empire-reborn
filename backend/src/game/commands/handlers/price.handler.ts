@@ -66,7 +66,10 @@ export class PriceHandlerService {
         }
       }
       if (lines.length === 0) {
-        return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
+        // BUY5 is the item-scoped refusal for `pri <qty> <item>`; a bare `pri`
+        // named no item, so answering with it told the pilot an item they had
+        // not mentioned was unavailable.
+        return { lines: [{ text: formatMessage(MessageId.PRICE_NONE), category: 'system' }] };
       }
       return { lines };
     }
