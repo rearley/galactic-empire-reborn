@@ -1,65 +1,17 @@
 {
-  "weapons": {
-    "PDAMMAX": 25,
-    "PFIRDST": 3,
-    "HPDAMMAX": 200,
-    "HPFIRDST": 1,
-    "TDAMMAX": 100,
-    "MDAMMAX": 100,
-    "IDAMMAX": 100,
-    "MNDAMMAX": 150,
-    "TORFACT": 1,
-    "MISFACT": 1,
-    "TORPSPED": 500,
-    "MISLSPED": 300,
-    "MISENGFC": 10,
-    "PHATOWRP": 0,
-    "SE100DAM": 40,
-    "NUMMINES": 200,
-    "USRMINES": 200,
-    "DECODDS": 2,
-    "JAMTIME": 10,
-    "CLENGUSE": 1000
-  },
+  "_README": [
+    "DEVIATIONS ONLY. Every sysop option defaults to the value the original",
+    "shipped in MBMGEMSG.MSG (see SYSOP_OPTIONS.canonDefault in",
+    "src/game/config/game-config.ts). List an option here only to run it away",
+    "from canon on purpose, and record the reason in docs/DECISIONS.md.",
+    "",
+    "This file previously restated all 51 options, 44 of them at values that",
+    "were never canon - mostly a clamp bound picked because the shipped",
+    "defaults were believed unrecoverable. Restating a value you did not",
+    "choose is how that drift hid: the file looked authoritative and silently",
+    "overrode every correction made to the defaults."
+  ],
   "world": {
-    "UNIVMAX": 100,
-    "PLODDS": 4,
-    "WORMODDS": 10,
-    "MAXPLSE": 9,
-    "S00PLNUM": 5,
-    "MAXPLNTS": 256
-  },
-  "limits": {
-    "MAXPLRS": 256,
-    "MAXSHIPS": 10,
-    "NUMSHIPS": 500,
-    "MAXDROID": 6,
-    "MAXLIST": 20,
-    "MAXPLREC": 32767,
-    "FREEBIES": 0,
-    "SHOWOPT": 0,
-    "MAILDAYS": 7,
-    "STRTCASH": 5000
-  },
-  "ai": {
-    "TOOCLOSE": 3000,
-    "HYPDST1": 25,
-    "HYPDST2": 10,
-    "CYBGOLD": 32000
-  },
-  "planets": {
-    "PLATTRF1": 100,
-    "PLATTRF2": 100,
-    "PLATTRF3": 100,
-    "PLATTRT1": 100,
-    "PLATTRT2": 100,
-    "REPAIRRT": 1
-  },
-  "scoring": {
-    "SCRFACT": 100,
-    "SCRBONUS": 0,
-    "CHGLOSER": 100,
-    "TEAMBONU": 0,
-    "TEAMMAX": 32000
+    "UNIVMAX": 100
   }
 }

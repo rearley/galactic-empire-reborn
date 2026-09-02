@@ -107,9 +107,17 @@ describe('loadGameConfig', () => {
     // The port used to read decodds as a 0-100 percentage, which made it
     // incomparable to the C bound of 1..20 and forced a special case here.
     // decoyIntercept now rolls gernd()%decodds==0 like C, so the option is
-    // ordinary: default 2 reproduces the old 50% intercept exactly.
+    // ordinary.
+    //
+    // The default is no longer pinned here. It was 2 -- chosen to reproduce
+    // the port's old 50% intercept -- against a shipped DECODDS of 11 (~9%).
+    // At 2, three decoys ate 87.5% of incoming rounds versus canon's 24%,
+    // which made guided weapons nearly useless against any decoy carrier.
+    // Defaults are owned by the canon conformance test; this one only asserts
+    // that the option is wired and carries the C bounds.
+    // @see test/balance/sysop-options-canon.balance.spec.ts
     expect(SYSOP_OPTIONS.DECODDS.implemented).toBe(true);
-    expect(SYSOP_OPTIONS.DECODDS.default).toBe(2);
+    expect(SYSOP_OPTIONS.DECODDS.canonDefault).toBe(11);
     expect(SYSOP_OPTIONS.DECODDS.max).toBe(20);
   });
 });

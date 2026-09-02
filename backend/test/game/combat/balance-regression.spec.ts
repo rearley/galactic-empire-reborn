@@ -25,22 +25,20 @@ describe('combat balance regression', () => {
   it('MAXTORPS === 3', () => expect(MAXTORPS).toBe(3));
   it('MAXMISSL === 3', () => expect(MAXMISSL).toBe(3));
   it('MINERANGE === 10000', () => expect(MINERANGE).toBe(10000));
-  // numopt CLAMPS both of these to 1..100 (GEMAIN.C:508, 511). The previous
-  // pins of 200/300 encoded values the original cannot produce.
-  // @see test/balance/projectile-dammax.balance.spec.ts
-  it('TDAMMAX === 100 (numopt ceiling)', () => expect(TDAMMAX).toBe(100));
-  it('MDAMMAX === 100 (numopt ceiling)', () => expect(MDAMMAX).toBe(100));
-  it('MINEDAMMAX === 150', () => expect(MINEDAMMAX).toBe(150));
-    // decoyIntercept now uses the C 1-in-N form (GEFUNCS.C:1585) instead of a
-  // 0-100 percentage, so decodds is a divisor: 2 reproduces the old 50%.
-  it('DECODDS === 2 (1-in-2 = the former 50%)', () => expect(DECODDS).toBe(2));
-  it('TORPSPED === 500', () => expect(TORPSPED).toBe(500));
-  it('MISLSPED === 300', () => expect(MISLSPED).toBe(300));
-  it('MISENGFC === 10', () => expect(MISENGFC).toBe(10));
-  // numopt CLAMPS jamtime to 1..10 (GEMAIN.C:496); the previous pin of 20
-  // encoded a value the original cannot produce.
-  // @see test/balance/jamtime.balance.spec.ts
-  it('JAMTIME === 10 (numopt ceiling)', () => expect(JAMTIME).toBe(10));
+  // SYSOP OPTIONS ARE NOT PINNED HERE. TDAMMAX, MDAMMAX, MINEDAMMAX, DECODDS,
+  // TORPSPED, MISLSPED, MISENGFC and JAMTIME are all runtime options, and
+  // their defaults belong to the file that checks them against the original
+  // option database:
+  //   @see test/balance/sysop-options-canon.balance.spec.ts
+  //
+  // They were pinned here to 100/100/150/2/500/300/10/10, and the comments
+  // that justified those numbers show how it happened: an earlier pass found
+  // pins of 200 and 300 for TDAMMAX/MDAMMAX, recognised that numopt could
+  // never produce them, and moved them to the CEILING of the clamp. But the
+  // ceiling is not the shipped value either -- MBMGEMSG.MSG ships TDAMMAX 35
+  // and MDAMMAX 25. Pinning a bound looks rigorous and asserts nothing about
+  // what the game actually shipped, so this file now keeps only the fixed
+  // #define constants above, which are genuinely immutable design values.
 
   describe('mine sweep cadence — `timer % 5 === 0`', () => {
     it('returns mines whose timer ∈ {0, 5, 10} but excludes {1, 2, 3, 4}', () => {

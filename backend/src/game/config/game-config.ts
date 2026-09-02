@@ -5,11 +5,32 @@
  * (GEMAIN.C:459-524), each clamped to a range. Two things follow, and keeping
  * them apart is the reason this file exists:
  *
- *   - The VALUE is not canon. It was whatever a given sysop chose, and the
- *     `.cnf` files are not part of the reference source, so there is nothing to
- *     recover. Any value inside the bounds is legitimate.
  *   - The BOUNDS are canon. A value outside them is one the original could
  *     never produce, which makes it a fidelity defect rather than a preference.
+ *   - The SHIPPED DEFAULT is also canon, and is recorded here as
+ *     `canonDefault`. A sysop could of course change it, but the value Murdock
+ *     shipped is the one the game was balanced around, so it is the right
+ *     starting point rather than an arbitrary pick inside the range.
+ *
+ * This file previously asserted the opposite -- that the values "are not part
+ * of the reference source, so there is nothing to recover", and therefore that
+ * "any value inside the bounds is legitimate". That was false, and expensive.
+ * `MBMGEMSG.MSG` is the original's option database and carries the default
+ * inside the braces of every block:
+ *
+ *     MAXPLRS {The maximum players in the game at once: 30} N 1 256
+ *
+ * Because nothing was thought to be recoverable, 44 of the 51 options had been
+ * seeded by picking a bound or guessing a round number -- 20 of them sat
+ * exactly ON a clamp bound. The errors ran in BOTH directions (HPDAMMAX at the
+ * ceiling of 200 against a shipped 50; PFIRDST at the floor of 1 against 7),
+ * which is the fingerprint of bounds-picking rather than deliberate tuning.
+ * The audit behind that finding is docs/CANON_AUDIT_2026-09.md.
+ *
+ * Defaults are now generated from the .MSG and pinned: any drift between
+ * `default` and `canonDefault` must be a DELIBERATE, documented deviation.
+ * @see test/balance/sysop-options-canon.balance.spec.ts
+ * @see tools/extract-sysop-options.mjs
  *
  * That second point was learned the hard way: TDAMMAX sat at 200 against a
  * ceiling of 100, MDAMMAX at 300 against 100, and JAMTIME at 20 against 10 —
@@ -34,6 +55,15 @@ export interface SysopOption {
   max: number;
   /** Value used when neither the config file nor the environment supplies one. */
   default: number;
+  /**
+   * The default the original shipped, from MBMGEMSG.MSG. `null` for the two
+   * options that file does not declare (HYPDST1/HYPDST2).
+   *
+   * `default` should equal this. Where it deliberately does not, the reason
+   * belongs in docs/DECISIONS.md and in the deviation list of the conformance
+   * test -- not in a comment here, which is how the last drift went unnoticed.
+   */
+  canonDefault: number | null;
   /** Where the numopt call lives in the original source. */
   cReference: string;
   /** Whether this option currently backs a gameplay constant. */
@@ -45,62 +75,70 @@ export interface SysopOption {
 }
 
 export const SYSOP_OPTIONS = {
-  MAXPLRS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:459', implemented: true },
-  FREEBIES: { min: 0, max: 1, default: 0, cReference: 'GEMAIN.C:460', implemented: false },
-  MAXLIST: { min: 3, max: 50, default: 20, cReference: 'GEMAIN.C:461', implemented: false },
-  MAXSHIPS: { min: 1, max: 50, default: 10, cReference: 'GEMAIN.C:462', implemented: true },
-  SE100DAM: { min: 1, max: 101, default: 101, cReference: 'GEMAIN.C:463', implemented: true },
-  SHOWOPT: { min: 0, max: 5, default: 0, cReference: 'GEMAIN.C:464', implemented: false },
-  MAXPLNTS: { min: 1, max: 256, default: 256, cReference: 'GEMAIN.C:468', implemented: true },
-  NUMSHIPS: { min: 1, max: 500, default: 500, cReference: 'GEMAIN.C:470', implemented: false,
+  MAXPLRS: { min: 1, max: 256, default: 30, canonDefault: 30, cReference: 'GEMAIN.C:459', implemented: true },
+  FREEBIES: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:460', implemented: false },
+  MAXLIST: { min: 3, max: 50, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:461', implemented: false },
+  MAXSHIPS: { min: 1, max: 50, default: 8, canonDefault: 8, cReference: 'GEMAIN.C:462', implemented: true },
+  SE100DAM: { min: 1, max: 101, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:463', implemented: true },
+  SHOWOPT: { min: 0, max: 5, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:464', implemented: false },
+  MAXPLNTS: { min: 1, max: 256, default: 20, canonDefault: 20, cReference: 'GEMAIN.C:468', implemented: true },
+  NUMSHIPS: { min: 1, max: 500, default: 30, canonDefault: 30, cReference: 'GEMAIN.C:470', implemented: false,
     note: 'Not enforced: in C this only SIZES the ship array (nships = nterms + numships, GEMAIN.C:697). There is no runtime gate on it, so adding one would be an invention rather than a port.' },
-  MAXDROID: { min: 0, max: 500, default: 6, cReference: 'GEMAIN.C:471', implemented: true },
-  PLODDS: { min: 1, max: 20, default: 4, cReference: 'GEMAIN.C:472', implemented: false },
-  WORMODDS: { min: 1, max: 100, default: 10, cReference: 'GEMAIN.C:473', implemented: false },
+  MAXDROID: { min: 0, max: 500, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:471', implemented: true },
+  PLODDS: { min: 1, max: 20, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:472', implemented: false },
+  WORMODDS: { min: 1, max: 100, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:473', implemented: false },
   // Half-extent of the universe square: sectors run -UNIVMAX..+UNIVMAX on
   // both axes, so the galaxy is (2*UNIVMAX+1)^2 sectors with the neutral zone
-  // at its centre. 10 gives 441 sectors, matching the density the AI population
-  // was tuned against; raising it makes a larger, emptier galaxy.
-  UNIVMAX: { min: 10, max: 32767, default: 10, cReference: 'GEMAIN.C:474', implemented: true },
-  S00PLNUM: { min: 3, max: 9, default: 5, cReference: 'GEMAIN.C:476', implemented: false },
-  MAXPLSE: { min: 1, max: 9, default: 9, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLANETS' },
-  TEAMBONU: { min: 0, max: 32000, default: 0, cReference: 'GEMAIN.C:478', implemented: true },
-  TEAMMAX: { min: 0, max: 32000, default: 32000, cReference: 'GEMAIN.C:479', implemented: false },
-  HPFIRDST: { min: 1, max: 20, default: 1, cReference: 'GEMAIN.C:491', implemented: true },
-  HPDAMMAX: { min: 1, max: 200, default: 200, cReference: 'GEMAIN.C:492', implemented: true },
-  PFIRDST: { min: 1, max: 20, default: 1, cReference: 'GEMAIN.C:493', implemented: true },
-  PDAMMAX: { min: 1, max: 200, default: 25, cReference: 'GEMAIN.C:494', implemented: true },
-  JAMTIME: { min: 1, max: 10, default: 10, cReference: 'GEMAIN.C:496', implemented: true },
-  MAILDAYS: { min: 1, max: 7, default: 7, cReference: 'GEMAIN.C:497', implemented: false },
-  TORPSPED: { min: 1, max: 10000, default: 500, cReference: 'GEMAIN.C:498', implemented: true },
-  MISLSPED: { min: 1, max: 10000, default: 300, cReference: 'GEMAIN.C:499', implemented: true },
-  NUMMINES: { min: 1, max: 200, default: 200, cReference: 'GEMAIN.C:501', implemented: false },
-  USRMINES: { min: 1, max: 200, default: 200, cReference: 'GEMAIN.C:502', implemented: true, constant: 'USERMINES' },
-  DECODDS: { min: 1, max: 20, default: 2, cReference: 'GEMAIN.C:504', implemented: true },
-  TORFACT: { min: 1, max: 50, default: 1, cReference: 'GEMAIN.C:506', implemented: true },
-  TDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:508', implemented: true },
-  MISFACT: { min: 1, max: 50, default: 1, cReference: 'GEMAIN.C:509', implemented: true },
-  MDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:511', implemented: true },
-  IDAMMAX: { min: 1, max: 100, default: 100, cReference: 'GEMAIN.C:512', implemented: true },
-  MNDAMMAX: { min: 1, max: 200, default: 150, cReference: 'GEMAIN.C:513', implemented: true, constant: 'MINEDAMMAX' },
-  REPAIRRT: { min: 1, max: 50, default: 1, cReference: 'GEMAIN.C:514', implemented: false },
-  TOOCLOSE: { min: 1, max: 32000, default: 3000, cReference: 'GEMAIN.C:517', implemented: false },
-  CLENGUSE: { min: 1, max: 32000, default: 1000, cReference: 'GEMAIN.C:519', implemented: false },
-  STRTCASH: { min: 1, max: 32000, default: 5000, cReference: 'GEMAIN.C:521', implemented: true, constant: 'START_CASH' },
-  MAXPLREC: { min: 10, max: 32767, default: 32767, cReference: 'GEMAIN.C:524', implemented: false },
-  CYBGOLD: { min: 0, max: 32000, default: 32000, cReference: 'GEMAIN.C:527', implemented: false },
-  HYPDST1: { min: 1, max: 32000, default: 25, cReference: 'GEMAIN.C:529', implemented: false },
-  HYPDST2: { min: 1, max: 32000, default: 10, cReference: 'GEMAIN.C:530', implemented: false },
-  PLATTRF1: { min: 5, max: 1000, default: 100, cReference: 'GEMAIN.C:532', implemented: false },
-  PLATTRF2: { min: 5, max: 1000, default: 100, cReference: 'GEMAIN.C:535', implemented: false },
-  PLATTRF3: { min: 5, max: 1000, default: 100, cReference: 'GEMAIN.C:539', implemented: false },
-  PLATTRT1: { min: 5, max: 1000, default: 100, cReference: 'GEMAIN.C:543', implemented: false },
-  PLATTRT2: { min: 5, max: 1000, default: 100, cReference: 'GEMAIN.C:547', implemented: false },
-  PHATOWRP: { min: 0, max: 100, default: 0, cReference: 'GEMAIN.C:598', implemented: true },
-  MISENGFC: { min: 1, max: 2000, default: 10, cReference: 'GEMAIN.C:600', implemented: true },
-  SCRBONUS: { min: 0, max: 32700, default: 0, cReference: 'GEMAIN.C:602', implemented: false },
-  SCRFACT: { min: 0, max: 32700, default: 100, cReference: 'GEMAIN.C:603', implemented: false },
-  CHGLOSER: { min: 0, max: 100, default: 100, cReference: 'GEMAIN.C:605', implemented: false },} as const satisfies Record<string, SysopOption>;
+  // at its centre.
+  //
+  // The canon default is 300 -- a 601x601 galaxy. The previous comment here
+  // credited 10 to the C source and justified it as "the density the AI
+  // population was tuned against"; 10 is simply numopt's LOWER CLAMP
+  // (GEMAIN.C:474), not a value anyone chose. config/game.config.json deploys
+  // 100, which IS a deliberate tune: canon's galaxy assumed a busy BBS, and at
+  // 300 a handful of concurrent players would never meet. Scan ranges are
+  // absolute, so UNIVMAX and scanRange must be chosen together.
+  // @see docs/DECISIONS.md
+  UNIVMAX: { min: 10, max: 32767, default: 300, canonDefault: 300, cReference: 'GEMAIN.C:474', implemented: true },
+  S00PLNUM: { min: 3, max: 9, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:476', implemented: false },
+  MAXPLSE: { min: 1, max: 9, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLSE' },
+  TEAMBONU: { min: 0, max: 32000, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:478', implemented: true },
+  TEAMMAX: { min: 0, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:479', implemented: false },
+  HPFIRDST: { min: 1, max: 20, default: 9, canonDefault: 9, cReference: 'GEMAIN.C:491', implemented: true },
+  HPDAMMAX: { min: 1, max: 200, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:492', implemented: true },
+  PFIRDST: { min: 1, max: 20, default: 7, canonDefault: 7, cReference: 'GEMAIN.C:493', implemented: true },
+  PDAMMAX: { min: 1, max: 200, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:494', implemented: true },
+  JAMTIME: { min: 1, max: 10, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:496', implemented: true },
+  MAILDAYS: { min: 1, max: 7, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:497', implemented: false },
+  TORPSPED: { min: 1, max: 10000, default: 2441, canonDefault: 2441, cReference: 'GEMAIN.C:498', implemented: true },
+  MISLSPED: { min: 1, max: 10000, default: 1212, canonDefault: 1212, cReference: 'GEMAIN.C:499', implemented: true },
+  NUMMINES: { min: 1, max: 200, default: 12, canonDefault: 12, cReference: 'GEMAIN.C:501', implemented: false },
+  USRMINES: { min: 1, max: 200, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:502', implemented: true, constant: 'USERMINES' },
+  DECODDS: { min: 1, max: 20, default: 11, canonDefault: 11, cReference: 'GEMAIN.C:504', implemented: true },
+  TORFACT: { min: 1, max: 50, default: 40, canonDefault: 40, cReference: 'GEMAIN.C:506', implemented: true },
+  TDAMMAX: { min: 1, max: 100, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:508', implemented: true },
+  MISFACT: { min: 1, max: 50, default: 21, canonDefault: 21, cReference: 'GEMAIN.C:509', implemented: true },
+  MDAMMAX: { min: 1, max: 100, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:511', implemented: true },
+  IDAMMAX: { min: 1, max: 100, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:512', implemented: true },
+  MNDAMMAX: { min: 1, max: 200, default: 75, canonDefault: 75, cReference: 'GEMAIN.C:513', implemented: true, constant: 'MINEDAMMAX' },
+  REPAIRRT: { min: 1, max: 50, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:514', implemented: false },
+  TOOCLOSE: { min: 1, max: 32000, default: 2500, canonDefault: 2500, cReference: 'GEMAIN.C:517', implemented: false },
+  CLENGUSE: { min: 1, max: 32000, default: 7500, canonDefault: 7500, cReference: 'GEMAIN.C:519', implemented: false },
+  STRTCASH: { min: 1, max: 32000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:521', implemented: true, constant: 'START_CASH' },
+  MAXPLREC: { min: 10, max: 32767, default: 32767, canonDefault: 32767, cReference: 'GEMAIN.C:524', implemented: false },
+  CYBGOLD: { min: 0, max: 32000, default: 1200, canonDefault: 1200, cReference: 'GEMAIN.C:527', implemented: false },
+  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: null, cReference: 'GEMAIN.C:529', implemented: false },
+  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: null, cReference: 'GEMAIN.C:530', implemented: false },
+  PLATTRF1: { min: 5, max: 1000, default: 18, canonDefault: 18, cReference: 'GEMAIN.C:532', implemented: false },
+  PLATTRF2: { min: 5, max: 1000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:535', implemented: false },
+  PLATTRF3: { min: 5, max: 1000, default: 55, canonDefault: 55, cReference: 'GEMAIN.C:539', implemented: false },
+  PLATTRT1: { min: 5, max: 1000, default: 125, canonDefault: 125, cReference: 'GEMAIN.C:543', implemented: false },
+  PLATTRT2: { min: 5, max: 1000, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:547', implemented: false },
+  PHATOWRP: { min: 0, max: 100, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:598', implemented: true },
+  MISENGFC: { min: 1, max: 2000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:600', implemented: true },
+  SCRBONUS: { min: 0, max: 32700, default: 1000, canonDefault: 1000, cReference: 'GEMAIN.C:602', implemented: false },
+  SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: false },
+  CHGLOSER: { min: 0, max: 100, default: 2, canonDefault: 2, cReference: 'GEMAIN.C:605', implemented: false },} as const satisfies Record<string, SysopOption>;
 
 export type SysopOptionName = keyof typeof SYSOP_OPTIONS;
 export type GameConfig = Record<SysopOptionName, number>;
@@ -203,8 +241,14 @@ export function flattenConfigFile(
   };
 
   for (const [key, value] of Object.entries(raw)) {
+    // JSON has no comment syntax, and a deviations-only file needs to explain
+    // itself, so keys beginning with `_` are documentation and are skipped.
+    // Section names are not validated, only the option names inside them, so a
+    // `_`-prefixed key at either level is safe to ignore.
+    if (key.startsWith('_')) continue;
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
+        if (inner.startsWith('_')) continue;
         place(inner, innerValue);
       }
     } else {

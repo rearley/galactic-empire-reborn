@@ -38,9 +38,14 @@ describe('projectile damage ceilings stay within the original numopt bounds', ()
     expect(MINEDAMMAX).toBeLessThanOrEqual(200);
   });
 
-  it('defaults to the legal ceiling for torpedoes and missiles', () => {
-    expect(TDAMMAX).toBe(100);
-    expect(MDAMMAX).toBe(100);
+  it('leaves a torpedo needing several hits to kill, per the shipped values', () => {
+    // MBMGEMSG.MSG ships TDAMMAX 35 and MDAMMAX 25, not the 1..100 ceiling.
+    // At 100 an unshielded torpedo dealt 50-100 against a 100-damage kill
+    // threshold, i.e. a one-shot; at 35 it deals 17-35, so three or four hits.
+    // Exact defaults are owned by sysop-options-canon.balance.spec.ts.
+    expect(TDAMMAX).toBeLessThan(100);
+    expect(MDAMMAX).toBeLessThan(100);
+    expect(TDAMMAX).toBeGreaterThan(MDAMMAX);
   });
 
   it('a torpedo roll cannot reach the 100-damage kill threshold on its own', () => {

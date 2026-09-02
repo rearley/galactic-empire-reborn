@@ -177,16 +177,30 @@ describe('combat balance constants (Plan 1)', () => {
     expect(SE100DAM).toBeLessThanOrEqual(101);     // numopt(SE100DAM,1,101)
     expect(PHATOWRP).toBeGreaterThanOrEqual(0);
     expect(PHATOWRP).toBeLessThanOrEqual(100);     // numopt(PHATOWRP,0,100)
-    // TORFACT/MISFACT are NOT sysop options — these stay pinned.
-    expect(TORFACT).toBeCloseTo(0.1, 10);
-    expect(MISFACT).toBeCloseTo(0.1, 10);
+    // TORFACT/MISFACT ARE sysop options -- GEMAIN.C:507 numopt(TORFACT,1,100)
+    // and :510 numopt(MISFACT,1,100), both stored /10. The comment here used to
+    // claim otherwise and pinned them at 0.1, i.e. the raw clamp FLOOR of 1.
+    // Canon ships 40 and 21, so 4.0 and 2.1.
+    //
+    // The exponent matters: lock-on needs (5-d)/TORFACT > 0.7, so at 4.0 a
+    // standing target must be inside ~2.2 sectors, while at 0.1 the test was
+    // satisfied out to 4.93 sectors and the speed term never bound at all --
+    // deleting the whole skill element of manoeuvring into a firing solution.
+    // Exact values are owned by sysop-options-canon.balance.spec.ts.
+    expect(TORFACT).toBeGreaterThan(1);
+    expect(MISFACT).toBeGreaterThan(1);
+    expect(TORFACT).toBeGreaterThan(MISFACT);
   });
 });
 
 import { MAXSHIPS as _MAXSHIPS } from '../../src/game/constants';
 
 describe('multi-ship constants (030)', () => {
-  it('pins MAXSHIPS default (P-007)', () => {
-    expect(_MAXSHIPS).toBe(10);
+  it('MAXSHIPS is a sysop option inside its C bounds, not a pinned constant', () => {
+    // Was pinned to 10, the round number the port picked; MBMGEMSG.MSG ships 8.
+    // numopt(MAXSHIPS,1,50) at GEMAIN.C:462. The default is owned by
+    // test/balance/sysop-options-canon.balance.spec.ts.
+    expect(_MAXSHIPS).toBeGreaterThanOrEqual(1);
+    expect(_MAXSHIPS).toBeLessThanOrEqual(50);
   });
 });
