@@ -7,6 +7,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ScanHandlerService } from './scan.handler';
+import { decideTradeAccess } from '../../planet/trade-access';
 
 /**
  * Handles the `land` / `lan` command — land on the planet currently in orbit.
@@ -112,42 +113,49 @@ export class LandHandlerService {
       };
     }
 
-    // Owned by someone else
-    const pwd = state.password;
-
-    // No password set or "none" — refuse
-    if (!pwd || pwd === 'none') {
+    // Owned by someone else — decided by the SHARED rule the buy path uses.
+    //
+    // This branch used to carry its own copy, and the copy was broken. Its
+    // comment claimed "ship carries no explicit teamcode field, so we simply
+    // allow if arg === 'team' OR if they know the real password", and then
+    // admitted on `arg === 'team' || arg === ''`. ShipState.teamcode does
+    // exist, and the visitor's team was never compared to the planet's — so a
+    // bare `land`, or `land team` from any stranger, docked at a team-locked
+    // world. @see planet/trade-access.ts, GECMDS.C:4232-4246
+    // `land` keeps a STRICTER default than trading: a foreign colony with no
+    // password set is closed to visitors, even though it will happily sell to
+    // them. C has no `land` command at all — claiming goes through the `adm`
+    // menu (GEMAIN.C:2899) — so there is no original to defer to here, and the
+    // closed-by-default behaviour is left as the port had it. Only the team
+    // check below changes.
+    const pwd = (state.password ?? '').toLowerCase();
+    if ((pwd === '' || pwd === 'none') && state.teamcode === 0n) {
       return { lines: [{ text: formatMessage(MessageId.LAND_REFUSED), category: 'system' }] };
     }
 
-    // Team password check
-    if (pwd === 'team') {
-      const ship2 = this.shipService.get(ship.userid, ship.shipno);
-      if (ship2 && state.teamcode !== 0n) {
-        // Team code matching: check if ship's userid has a matching teamcode
-        // We use planet.teamcode directly — ship carries no explicit teamcode field
-        // so we simply allow if arg === "team" OR if they know the real password
-        // For the team-pass case: allowed unconditionally when password == "team" + arg provided
-        if (arg === 'team' || arg === '') {
-          // Clear scantab on successful dock.
-          this.scanHandler.clearScantab(ship.userid, ship.shipno);
-          return { lines: [{ text: formatMessage(MessageId.BUYPAS4), category: 'success' }] };
-        }
-      }
-      return { lines: [{ text: formatMessage(MessageId.LAND_REFUSED), category: 'system' }] };
+    const access = decideTradeAccess(
+      { userid: state.userid, password: state.password, teamcode: state.teamcode },
+      ship.userid,
+      ship.teamcode ?? 0n,
+      arg || undefined,
+    );
+
+    if (!access.ok) {
+      const text =
+        access.reason === 'BAD_PASSWORD'
+          ? formatMessage(arg ? MessageId.LAND_PASSFAIL : MessageId.LAND_REFUSED)
+          : formatMessage(MessageId.LAND_REFUSED);
+      return { lines: [{ text, category: 'system' }] };
     }
 
-    // Password provided
-    if (arg && arg === pwd) {
-      // Clear scantab on successful dock.
-      this.scanHandler.clearScantab(ship.userid, ship.shipno);
-      return { lines: [{ text: formatMessage(MessageId.LAND_OK, state.name), category: 'success' }] };
-    }
-
-    if (!arg) {
-      return { lines: [{ text: formatMessage(MessageId.LAND_REFUSED), category: 'system' }] };
-    }
-
-    return { lines: [{ text: formatMessage(MessageId.LAND_PASSFAIL), category: 'system' }] };
+    this.scanHandler.clearScantab(ship.userid, ship.shipno);
+    return {
+      lines: [{
+        text: access.welcome
+          ? formatMessage(MessageId.BUYPAS4)
+          : formatMessage(MessageId.LAND_OK, state.name),
+        category: 'success',
+      }],
+    };
   }
 }

@@ -145,4 +145,46 @@ describe('LandHandlerService', () => {
     expect(svc.command.keyword).toBe('land');
     expect(svc.command.aliases).toContain('lan');
   });
+
+  /**
+   * The team hole. `land` used to carry its own copy of the access rule and
+   * admit on `arg === 'team' || arg === ''`, never comparing the visitor's
+   * team to the planet's — so a bare `land`, or `land team` from any stranger,
+   * docked at a team-locked world. Its comment justified this with "ship
+   * carries no explicit teamcode field", which was false: ShipState.teamcode
+   * exists (ship-state.types.ts:178). It now shares decideTradeAccess with the
+   * buy path. @see planet/trade-access.ts
+   */
+  it('refuses a stranger at a team-locked planet', async () => {
+    const { svc } = makeService(makePlanetState({
+      userid: 'owner', name: 'Bastion', password: 'team', teamcode: 42n,
+    }));
+    const stranger = makeShip({ userid: 'u1' });
+    stranger.teamcode = 0n;
+
+    for (const args of [[], ['team']]) {
+      const result = (await svc.command.handler(stranger, args, {})) as CommandResult;
+      expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_REFUSED));
+    }
+  });
+
+  it('refuses a captain on a different team', async () => {
+    const { svc } = makeService(makePlanetState({
+      userid: 'owner', name: 'Bastion', password: 'team', teamcode: 42n,
+    }));
+    const rival = makeShip({ userid: 'u1' });
+    rival.teamcode = 7n;
+    const result = (await svc.command.handler(rival, [], {})) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_REFUSED));
+  });
+
+  it('admits an actual team-mate', async () => {
+    const { svc } = makeService(makePlanetState({
+      userid: 'owner', name: 'Bastion', password: 'team', teamcode: 42n,
+    }));
+    const mate = makeShip({ userid: 'u1' });
+    mate.teamcode = 42n;
+    const result = (await svc.command.handler(mate, [], {})) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUYPAS4));
+  });
 });
