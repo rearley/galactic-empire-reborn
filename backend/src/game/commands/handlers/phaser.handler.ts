@@ -59,7 +59,9 @@ import { CombatTickService } from '../../combat/combat-tick.service';
  *   4. focus ∈ [0, 5] (when supplied) — else NUMOOR(0, 5)
  *   5. firer not cloaked (`cloak == 0`) — else PHA_CLOAK (GECMDS.C:923)
  *   6. firing inside the neutral zone self-zaps (GECMDS.C:937 zaphim):
- *      firer takes SE100DAM hull damage, phasr → 0, no outgoing damage.
+ *      firer takes SE100DAM hull damage and nothing else. C returns at :940,
+ *      before `cantexit = FIRETICKS` (:945) and before `phasr = 0` (:1006), so
+ *      the charge is kept and the ship can still jump.
  *
  * Per victim (GECMDS.C:946-1004): a victim at warp is unreachable unless
  * `phasrtype >= PHATOWRP` (949); victims inside the neutral zone are immune
