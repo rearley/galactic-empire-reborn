@@ -55,7 +55,7 @@ describe('help text matches the commands it documents', () => {
     const KNOWN_VERBS = new Set(
       [
         'abandon', 'abort', 'admin', 'att', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
-        'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'land', 'loc',
+        'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'loc',
         'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
         'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',
         'sys', 'tea', 'tor', 'transfer', 'warp', 'who', 'withdraw', 'zip',
@@ -126,7 +126,8 @@ describe('help text matches the commands it documents', () => {
     // uses for `admin`; prefixes make the two identical here.
     const REGISTERED = [
       'abandon', 'abort', 'admin', 'att', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
-      'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'land', 'loc',
+      // `land` was removed — C has no such command; claiming lives in `adm`.
+      'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'loc',
       'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
       'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',
       'sys', 'tea', 'tor', 'transfer', 'warp', 'who', 'withdraw', 'zip',

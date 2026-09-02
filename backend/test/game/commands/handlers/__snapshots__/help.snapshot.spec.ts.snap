@@ -96,7 +96,6 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  sca lo [full]  — local scan; se = sector, ra <1-9> = range",
       "  who            — who is in the galaxy",
       "  orb            — orbit nearest planet",
-      "  land <name>    — land on planet",
       "  (imp or war breaks orbit and puts you back in flight)",
     ],
     "title": "Navigation",
@@ -105,7 +104,6 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
     "body": [
       "Planet",
       "  orb                    — orbit nearest planet",
-      "  land <name>            — land / claim / name planet",
       "  adm                    — claim an unclaimed world, or administer your own",
       "  adm rate <item> <n>    — set production rate (0-100)",
       "  adm sellflag <item> on|off — open/close item to buyers",
@@ -170,7 +168,6 @@ exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
   "  sca lo [full]  — local scan; se = sector, ra <1-9> = range",
   "  who            — who is in the galaxy",
   "  orb            — orbit nearest planet",
-  "  land <name>    — land on planet",
   "  (imp or war breaks orbit and puts you back in flight)",
 ]
 `;
@@ -179,7 +176,6 @@ exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
 [
   "Planet",
   "  orb                    — orbit nearest planet",
-  "  land <name>            — land / claim / name planet",
   "  adm                    — claim an unclaimed world, or administer your own",
   "  adm rate <item> <n>    — set production rate (0-100)",
   "  adm sellflag <item> on|off — open/close item to buyers",

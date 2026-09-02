@@ -27,7 +27,6 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  sca lo [full]  — local scan; se = sector, ra <1-9> = range',
       '  who            — who is in the galaxy',
       '  orb            — orbit nearest planet',
-      '  land <name>    — land on planet',
       '  (imp or war breaks orbit and puts you back in flight)',
     ],
   },
@@ -69,7 +68,6 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
     body: [
       'Planet',
       '  orb                    — orbit nearest planet',
-      '  land <name>            — land / claim / name planet',
       '  adm                    — claim an unclaimed world, or administer your own',
       '  adm rate <item> <n>    — set production rate (0-100)',
       '  adm sellflag <item> on|off — open/close item to buyers',

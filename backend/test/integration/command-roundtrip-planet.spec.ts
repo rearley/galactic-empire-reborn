@@ -242,9 +242,9 @@ describe('command round-trip (planet) integration (T066)', () => {
   });
 
   // -------------------------------------------------------------------------
-  // T066-2: land Aurora on unowned planet → LAND_CLAIMED
+  // T066-2: adm claim Aurora on unowned planet → LAND_CLAIMED
   // -------------------------------------------------------------------------
-  it('land Aurora on unowned planet → LAND_CLAIMED message', async () => {
+  it('adm claim Aurora on unowned planet → LAND_CLAIMED message', async () => {
     // Put ship in orbit of plnum=1
     const ship = shipService.get(USERID, SHIPNO)!;
     shipService.mutate(USERID, SHIPNO, (s) => {
@@ -252,9 +252,10 @@ describe('command round-trip (planet) integration (T066)', () => {
     });
     const shipInOrbit = shipService.get(USERID, SHIPNO)!;
 
-    // `land` awaits the claim now, so its outcome (including a PLANET_LIMIT
-    // refusal) reaches the player instead of being fire-and-forget.
-    const result = (await commandRouter.dispatch('land Aurora', shipInOrbit, {})) as CommandResult;
+    // Claiming lives in `adm`, where C puts it (GEMAIN.C:2899) — the invented
+    // `land` command was removed. The claim is awaited, so its outcome
+    // (including a PLANET_LIMIT refusal) reaches the player.
+    const result = (await commandRouter.dispatch('adm claim Aurora', shipInOrbit, {})) as CommandResult;
 
     // Args are now passed with original casing preserved (keyword is lowercased, args are not).
     expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'Aurora'));
