@@ -61,6 +61,7 @@ import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
+import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -927,6 +928,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * of ships currently besieging planets.
    */
   private readonly lastIonAttacker = new Map<string, { name: string; at: number }>();
+
+  /**
+   * Overspeed strain and engine failure — routed to the one captain it
+   * happened to, as C does (`outprfge(FILTER,usrn)` / `ALWAYS`). These used to
+   * be dropped entirely behind a stale TODO, so a pilot's first sign of
+   * trouble was a dead warp drive. @see ship/overspeed-events.ts
+   */
+  @OnEvent(SHIP_OVERSPEED)
+  handleShipOverspeed(event: ShipOverspeedEvent): void {
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'combat',
+      text: event.kind === 'break' ? `** ${event.text} **` : event.text,
+    });
+  }
 
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
