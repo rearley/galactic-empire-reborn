@@ -1,0 +1,107 @@
+import { AdminHandlerService } from '../../src/game/commands/handlers/admin.handler';
+import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { ShipState } from '../../src/game/ship/ship-state.types';
+import { NUMITEMS } from '../../src/game/constants/items';
+
+/**
+ * Claiming a planet belongs to `adm`, not to a command of our own invention.
+ *
+ * C has no `land` — the full table in GECMDS.C:122 is 47 commands and none of
+ * them is it. You orbit an unclaimed world, type `adm`, and it offers:
+ *   mnu_admenu1  — "do you wish to claim this planet" (y/n)
+ *   mnu_admenu1a — "enter the name of the new planet"
+ * then drops you into the admin menu (GEMAIN.C:2899-2981).
+ *
+ * This port invented `land` to do the same job and never implemented the adm
+ * branch, so `adm` refused every planet you did not already own. The invented
+ * command then grew two defects of its own — a team lock that admitted
+ * strangers, and a docking concept C does not have.
+ */
+function makeShip(o: Partial<ShipState> = {}): ShipState {
+  return {
+    userid: 'usr_me', shipno: 1, shipname: 'Probe', shpclass: 1,
+    heading: 0, head2b: 0, speed: 0, speed2b: 0,
+    xcoord: 3.5, ycoord: 4.5, damage: 0, energy: 1000,
+    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
+    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+    where: 11,
+    ltorpsChannel: [], ltorpsDistance: [],
+    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
+    decout: [], jammer: 0, freq: [0, 0, 0],
+    items: Array(NUMITEMS).fill(0n) as bigint[],
+    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
+    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
+    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
+    navTargetX: null, navTargetY: null,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    dirty: false, ...o,
+  } as ShipState;
+}
+
+function makeService(planetUserid: string | null) {
+  const claim = jest.fn().mockResolvedValue({ ok: true });
+  const planetService = {
+    get: jest.fn().mockReturnValue({
+      xsect: 3, ysect: 4, plnum: 1, userid: planetUserid, name: planetUserid ? 'Held' : '',
+      cash: 0n, tax: 0n, taxrate: 0, password: '', teamcode: 0n,
+      items: Array.from({ length: NUMITEMS }, () => ({
+        qty: 0n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+      })),
+    }),
+    claim,
+    applyAdminChange: jest.fn().mockResolvedValue({ ok: true }),
+  } as unknown as PlanetStateService;
+  return { svc: new AdminHandlerService(planetService), claim };
+}
+
+describe('adm on an unclaimed planet — C\'s claim flow', () => {
+  it('offers the planet rather than refusing it', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip(), [], {}) as
+      { lines: { text: string }[]; expectFollowup?: string };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.ADM_CLAIM_OFFER));
+    expect(r.expectFollowup).toBe('adm');
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('asks for a name once you accept', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip(), ['yes'], {}) as
+      { lines: { text: string }[]; expectFollowup?: string };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_NAME_PROMPT));
+    expect(r.expectFollowup).toBe('adm claim');
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('claims it under the name you give', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip(), ['claim', 'New', 'Terra'], {}) as
+      { lines: { text: string }[] };
+    expect(claim).toHaveBeenCalledWith(3, 4, 1, 'usr_me', 'New Terra');
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'New Terra'));
+  });
+
+  it('walks away when you decline', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip(), ['no'], {}) as { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.ADM_CLAIM_DECLINED));
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('refuses a name that is not usable', async () => {
+    const { svc, claim } = makeService(null);
+    const r = await svc.command.handler(makeShip(), ['claim', 'A'.repeat(20)], {}) as
+      { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_INVALID_NAME));
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a planet someone else holds', async () => {
+    const { svc } = makeService('usr_other');
+    const r = await svc.command.handler(makeShip(), [], {}) as { lines: { text: string }[] };
+    expect(r.lines[0].text).toBe(formatMessage(MessageId.ADM_NOT_OWNER));
+  });
+});
