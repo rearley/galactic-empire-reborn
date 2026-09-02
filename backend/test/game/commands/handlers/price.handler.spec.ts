@@ -284,13 +284,15 @@ describe('PriceHandlerService — bare "pri" listing (T039)', () => {
     expect(result.lines.length).toBe(2);
   });
 
-  it('returns BUY5 when no items are for sale', async () => {
+  // BUY5 is the item-scoped "that item is not for sale" answer to
+  // `pri <qty> <item>`. A bare `pri` named no item, so it gets its own line.
+  it('returns PRICE_NONE when no items are for sale', async () => {
     const items = makeItems({ sellIdx: [] }); // nothing for sale
     const planet = makePlanet({ items });
     const { handler } = makeHandler({ planet });
     const ship = makeShip({ where: 10, userid: 'buyer' });
     const result = await handler.command.handler(ship, [], {}) as Lines;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY5));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.PRICE_NONE));
   });
 
   it('owner sees all items including non-sellable', async () => {

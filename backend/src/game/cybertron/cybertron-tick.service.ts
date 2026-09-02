@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone as inNeutralZone } from '../combat/neutral-zone';
+import { headingToward } from '../physics/physics-math';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Inject, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
@@ -412,7 +413,10 @@ export class CybertronTickService implements OnModuleInit {
         const dx = target.xcoord - ship.xcoord;
         const dy = target.ycoord - ship.ycoord;
         if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-          ship.head2b = ((Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360;
+          // Same convention as the firing solution and every other bearing in the
+          // port. This used atan2(dx, dy) — a Y-axis flip — so the Cybertron aimed
+          // correctly and then drove the opposite way. @see physics-math.headingToward
+          ship.head2b = headingToward(dx, dy);
         }
 
         // Attack condition: within tooclose range, or class is attackable, or target is battle-locked
@@ -811,8 +815,10 @@ export class CybertronTickService implements OnModuleInit {
     const dx = target.xcoord - ship.xcoord;
     const dy = target.ycoord - ship.ycoord;
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-      // Convert to heading: 0=north, increasing clockwise — atan2 in standard math → bearing
-      ship.head2b = ((Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360;
+      // Same convention as the firing solution and every other bearing in the
+      // port. This used atan2(dx, dy) — a Y-axis flip — so the Cybertron aimed
+      // correctly and then drove the opposite way. @see physics-math.headingToward
+      ship.head2b = headingToward(dx, dy);
     }
   }
 

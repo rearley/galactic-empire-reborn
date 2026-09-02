@@ -372,7 +372,14 @@ export const CLASSTYPE_CYBORG = 2 as const;
 export const CLASSTYPE_DROID = 3 as const;
 /** Max live Droids per class (2 × 3 classes = 6 total cap). @see GEDROIDS.C:droid_init */
 export const DROID_MAX_PER_CLASS = 2 as const;
-/** Physics-tick rollover cadence for spawn + per-Droid action evaluation. @see GEMAIN.C:2325 (ticktock2 >= 30) */
+/**
+ * Droid spawn cadence, counted on the ONE-SECOND tick.
+ *
+ * C's `autortia` runs once a second and evaluates the spawn slot on every 30th
+ * call (`ticktock2 >= 30`, GEMAIN.C:2321), i.e. every 30 seconds. Counting
+ * these on the 6-second physics tick instead made it 180 seconds, which is
+ * why the starter target was absent for most of a session.
+ */
 export const DROID_SPAWN_TICK_CADENCE = 30 as const;
 /** Annoy roll denominator: gernd()%4 == 1 → ~25% hit rate. @see GEDROIDS.C:droid_annoy:237 */
 export const DROID_ANNOY_DENOM = 4 as const;

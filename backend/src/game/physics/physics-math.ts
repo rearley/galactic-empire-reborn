@@ -203,3 +203,20 @@ export function wrapUniverse(value: number, univmax: number): number {
 export function sectorOf(coord: { x: number; y: number }): { x: number; y: number } {
   return { x: Math.floor(coord.x), y: Math.floor(coord.y) };
 }
+
+/**
+ * Compass heading from one point toward another, given the deltas.
+ *
+ * 0 = north and increases clockwise, which is fixed by `moveShip` above:
+ * it advances `y - cos(heading)`, so north is DECREASING y. That makes
+ * `atan2(dx, -dy)` the inverse of movement, and it is the convention every
+ * bearing in the port uses — scans, nav, the engine-course helper, droid
+ * targeting and the Cybertron's own firing solution.
+ *
+ * Two Cybertron pursuit sites used `atan2(dx, dy)` instead, a Y-axis flip, so
+ * the AI aimed correctly and then drove away from anything north of it.
+ * Sharing one helper is what stops the two drifting again.
+ */
+export function headingToward(dx: number, dy: number): number {
+  return ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+}

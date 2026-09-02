@@ -178,4 +178,45 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       attackerName: null,
     });
   });
+
+  /**
+   * A ship kill must name the ship that made it.
+   *
+   * `attackerName` was only ever filled for a PLANET kill, so an ordinary
+   * ship-vs-ship death shipped `attackerId` with no name and `weapon: null`.
+   * The client resolves a name from its own player list, which holds live
+   * PLAYERS only — an AI killer is not in it — so a Cybertron kill rendered as
+   * a bare id or nothing at all. Two playtest pilots were killed repeatedly
+   * and saw no combat text whatsoever; one reconstructed his own death from
+   * `rep sys` showing shields fall 100% -> 30% -> destroyed.
+   *
+   * The hit path already resolves names this way (COMBAT_HIT carries
+   * attackerName/victimName); the kill path did not.
+   */
+  it('names the ship that made a kill, including an AI one', () => {
+    const gw = gateway as unknown as {
+      shipStateService: { get: jest.Mock };
+    };
+    gw.shipStateService.get = jest.fn().mockReturnValue({ shipname: 'Cybrg-49326' });
+
+    const event: CombatShipDestroyedEvent = {
+      victimId: 'usr_tarq:1',
+      attackerId: 'Cybrg-49326:222',
+      victimShipKey: 'usr_tarq:1',
+      attackerShipKey: 'Cybrg-49326:222',
+      victimUserid: 'usr_tarq',
+      attackerUserid: 'Cybrg-49326',
+      attackerChannel: 222,
+      weapon: null,
+      sector: { x: 0, y: -1 },
+      tickAt: new Date(),
+      loot: [],
+      scoreAwarded: 0,
+    };
+    gateway.handleCombatShipDestroyed(event);
+
+    expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
+      attackerName: 'Cybrg-49326',
+    });
+  });
 });
