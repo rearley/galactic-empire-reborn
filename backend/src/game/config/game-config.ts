@@ -223,6 +223,35 @@ export const DEFAULT_CONFIG_PATH = 'config/game.config.json';
  * complete, playable configuration, which keeps tests and fresh checkouts
  * working without setup.
  */
+/**
+ * Every place the tuning file might live, in priority order.
+ *
+ * The single path this replaced was `resolve(__dirname, '../../..', ...)`,
+ * which is correct from `src/game/config` and WRONG from
+ * `dist/src/game/config` — it resolved to `dist/config/game.config.json`,
+ * which no build produces. Every compiled deployment therefore ignored the
+ * sysop config and ran on defaults, silently, because a missing file is a
+ * legitimate state. ts-jest runs from source, so tests never saw it.
+ *
+ * Exported for tests: the bug was in path arithmetic, so the arithmetic is
+ * what needs asserting.
+ */
+export function candidateConfigPaths(fromDir: string): string[] {
+  /* eslint-disable-next-line @typescript-eslint/no-require-imports */
+  const path = require('path') as typeof import('path');
+  const out: string[] = [];
+  const push = (p: string): void => { if (!out.includes(p)) out.push(p); };
+
+  // dist/src/game/config -> backend, and src/game/config -> backend
+  push(path.resolve(fromDir, '../../../..', DEFAULT_CONFIG_PATH));
+  push(path.resolve(fromDir, '../../..', DEFAULT_CONFIG_PATH));
+  // a deployment that ships the file inside the build output
+  push(path.resolve(fromDir, '../..', DEFAULT_CONFIG_PATH));
+  // last resort: wherever the process was started
+  push(path.resolve(process.cwd(), DEFAULT_CONFIG_PATH));
+  return out;
+}
+
 export function resolveGameConfig(
   opts: { path?: string; env?: Record<string, string | undefined> } = {},
 ): LoadResult {
@@ -233,13 +262,25 @@ export function resolveGameConfig(
   const path = require('path') as typeof import('path');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
-  const resolvedPath = opts.path ?? path.resolve(__dirname, '../../..', DEFAULT_CONFIG_PATH);
+  const candidates = opts.path ? [opts.path] : candidateConfigPaths(__dirname);
+  const found = candidates.find((p) => fs.existsSync(p));
 
   let file: Partial<Record<string, number>> = {};
-  if (fs.existsSync(resolvedPath)) {
-    const raw = JSON.parse(fs.readFileSync(resolvedPath, 'utf8')) as Record<string, unknown>;
+  if (found !== undefined) {
+    const raw = JSON.parse(fs.readFileSync(found, 'utf8')) as Record<string, unknown>;
     file = flattenConfigFile(raw);
   }
 
-  return loadGameConfig({ file, env }, { collectWarnings: true });
+  const result = loadGameConfig({ file, env }, { collectWarnings: true });
+
+  // Say which file is in force, or that none is. Silence here is what let a
+  // whole playtest be measured against a config the server never loaded.
+  // eslint-disable-next-line no-console
+  console.log(
+    found !== undefined
+      ? `[GameConfig] tuning file: ${found} (${Object.keys(file).length} options)`
+      : `[GameConfig] no tuning file found — running on defaults. Looked in: ${candidates.join(', ')}`,
+  );
+
+  return result;
 }
