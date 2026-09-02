@@ -68,15 +68,29 @@ const NOT_IN_MSG = ['HYPDST1', 'HYPDST2'];
 function parseMsgDefaults(): Map<string, number> {
   const text = readFileSync(MSG, 'utf8');
   const out = new Map<string, number>();
-  const re = /^([A-Z][A-Z0-9]*) \{([^}]*)\}[ \t]+N[ \t]+(-?\d+)[ \t]+(-?\d+)[ \t]*$/gm;
-  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
-    const inner = m[2];
+
+  /** Value after the trailing `: ` or `? ` label. */
+  const tail = (inner: string): string => {
     const c = inner.lastIndexOf(': ');
     const q = inner.lastIndexOf('? ');
-    const raw = (q > c ? inner.slice(q + 2) : c !== -1 ? inner.slice(c + 2) : inner).trim();
-    const n = Number(raw);
+    return (q > c ? inner.slice(q + 2) : c !== -1 ? inner.slice(c + 2) : inner).trim();
+  };
+
+  // Numeric options: NAME {label: value} N min max
+  const numeric = /^([A-Z][A-Z0-9]*) \{([^}]*)\}[ \t]+N[ \t]+(-?\d+)[ \t]+(-?\d+)[ \t]*$/gm;
+  for (let m = numeric.exec(text); m !== null; m = numeric.exec(text)) {
+    const n = Number(tail(m[2]));
     if (Number.isFinite(n)) out.set(m[1], n);
   }
+
+  // Boolean options: NAME {label? YES|NO} B. C reads these with ynopt, so they
+  // are 0/1 on our side -- UNIVWRAP is one, and omitting the B form would have
+  // left it silently unchecked.
+  const bool = /^([A-Z][A-Z0-9]*) \{([^}]*)\}[ \t]+B[ \t]*$/gm;
+  for (let m = bool.exec(text); m !== null; m = bool.exec(text)) {
+    out.set(m[1], tail(m[2]) === 'YES' ? 1 : 0);
+  }
+
   return out;
 }
 

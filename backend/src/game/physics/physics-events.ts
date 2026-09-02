@@ -9,6 +9,12 @@
 export const PHYSICS_SECTOR_TRANSITION = 'physics.sector-transition' as const;
 export const PHYSICS_BOUNDARY_WRAPPED = 'physics.boundary-wrapped' as const;
 export const PHYSICS_HYPERSPACE = 'physics.hyperspace' as const;
+/**
+ * A ship struck the galactic perimeter with UNIVWRAP off: pinned just inside
+ * the boundary, momentum lost, TELEDAM hull damage applied.
+ * @see GEFUNCS.C:819-833 telezip
+ */
+export const PHYSICS_UNIVERSE_EDGE = 'physics.universe-edge' as const;
 
 /**
  * Emitted whenever a ship's coordinate update crosses a sector boundary
@@ -90,4 +96,11 @@ export interface PhysicsDestructCancelledEvent {
   /** Composite key — `${userid}:${shipno}`. */
   shipId: string;
   tickAt: Date;
+}
+
+/** Payload for {@link PHYSICS_UNIVERSE_EDGE}. */
+export interface PhysicsUniverseEdgeEvent {
+  shipId: string;
+  /** Hull damage applied — TELEDAM, always 17 and never scaled by DAMF. */
+  damage: number;
 }

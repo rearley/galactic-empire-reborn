@@ -17,10 +17,12 @@ import { SYSOP_OPTIONS, loadGameConfig, flattenConfigFile, resolveGameConfig } f
 
 describe('sysop option registry', () => {
   it('declares every numopt/lngopt option found in the C source', () => {
-    // 52 since PLANTOCK joined them. It is an lngopt (GEMAIN.C:469) held in
-    // MINUTES, and was previously a hard-coded PLANTOCK_SECONDS = 1800 under a
-    // comment calling 30 minutes canonical -- canon ships 360.
-    expect(Object.keys(SYSOP_OPTIONS)).toHaveLength(52);
+    // 52 since PLANTOCK joined them -- an lngopt (GEMAIN.C:469) held in
+    // MINUTES, previously a hard-coded 1800 seconds under a comment calling 30
+    // minutes canonical, where canon ships 360. 53 since UNIVWRAP joined, a
+    // ynopt (GEMAIN.C:475) that had no representation at all while the port
+    // unconditionally wrapped.
+    expect(Object.keys(SYSOP_OPTIONS)).toHaveLength(53);
   });
 
   it('records the C clamp bounds for each option', () => {
@@ -102,9 +104,11 @@ describe('loadGameConfig', () => {
     // the bounds are recorded and the gap stays visible.
     // 26 since IDAMMAX joined them — ion cannons are implemented
     // (GEFUNCS.C:1785-1812 fireion). 27 since PLANTOCK became an option
-    // rather than a hard-coded constant.
+    // rather than a hard-coded constant, and 28 since UNIVWRAP was implemented
+    // together with TELEDAM -- a constant that was defined and balance-tested
+    // but read by no runtime code, because only the wrap arm existed.
     const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(27);
+    expect(wired.length).toBe(28);
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {

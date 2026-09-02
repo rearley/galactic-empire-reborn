@@ -3,7 +3,7 @@ import {
   ACCENGAMT,
   COORD_SCALE,
   MOVENGMIN,
-  MOVENGUSE, UNIVMAX } from '../../../src/game/constants';
+  MOVENGUSE, UNIVMAX, TELEDAM } from '../../../src/game/constants';
 import {
   PHYSICS_BOUNDARY_WRAPPED,
   PHYSICS_HYPERSPACE,
@@ -11,6 +11,8 @@ import {
   PhysicsBoundaryWrappedEvent,
   PhysicsHyperspaceEvent,
   PhysicsSectorTransitionEvent,
+  PHYSICS_UNIVERSE_EDGE,
+  PhysicsUniverseEdgeEvent,
 } from '../../../src/game/physics/physics-events';
 import { MAXX, MAXY } from '../../../src/game/constants';
 import { PhysicsTickService } from '../../../src/game/physics/physics-tick.service';
@@ -252,49 +254,77 @@ describe('PhysicsTickService', () => {
       return { ...h, capturedWrapped };
     }
 
-    it('ship near the east edge wraps x into [-UNIVMAX, +UNIVMAX]', () => {
-      // The universe is centred on the origin, so the east edge is +UNIVMAX and
-      // crossing it puts the ship at the west edge. @see GEFUNCS.C:653-660
+    // Canon ships UNIVWRAP=NO (GEMAIN.C:475), so these now cover the WALL, not
+    // the wrap. The port implemented only the wrap arm, which handed anyone
+    // reaching the boundary a free full-speed jump clean across the galaxy --
+    // pursuers as much as anyone fleeing them.
+    //
+    // Both arms of the branch are covered as pure functions in
+    // physics-math.spec.ts; what is asserted here is the telezip side effect,
+    // which the tick applies: GEFUNCS.C:819-833 zeroes speed and speed2b and
+    // adds TELEDAM.
+
+    it('ship crossing the east edge is pinned just inside it, not wrapped', () => {
       const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(ship.xcoord).toBeGreaterThanOrEqual(-UNIVMAX);
-      expect(ship.xcoord).toBeLessThanOrEqual(UNIVMAX);
-      expect(ship.xcoord).toBeLessThan(0); // came out the far side
+      expect(ship.xcoord).toBe(UNIVMAX - 2);
+      expect(ship.xcoord).toBeGreaterThan(0); // did NOT come out the far side
     });
 
-    it('ship near the south edge wraps y into [-UNIVMAX, +UNIVMAX]', () => {
+    it('ship crossing the south edge is pinned just inside it', () => {
       const ship = makeShip({ xcoord: 0, ycoord: UNIVMAX - 0.05, heading: 180, speed: 5000, speed2b: 5000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(ship.ycoord).toBeGreaterThanOrEqual(-UNIVMAX);
-      expect(ship.ycoord).toBeLessThanOrEqual(UNIVMAX);
-      expect(ship.ycoord).toBeLessThan(0);
+      expect(ship.ycoord).toBe(UNIVMAX - 2);
+      expect(ship.ycoord).toBeGreaterThan(0);
     });
 
-    it('wrap preserves heading and speed', () => {
-      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+    it('striking the edge costs all momentum and TELEDAM hull', () => {
+      // The reason the wall matters: you cannot use the boundary to escape,
+      // because you arrive stopped and damaged.
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0, damage: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(ship.heading).toBe(90);
+      expect(ship.speed).toBe(0);
+      expect(ship.speed2b).toBe(0);
+      expect(ship.damage).toBe(TELEDAM);
+      expect(ship.heading).toBe(90); // heading is untouched
+    });
+
+    it('emits PHYSICS_UNIVERSE_EDGE, and does NOT emit a wrap event', () => {
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
+      const h = makeWrapHarness(ship);
+      const edges: PhysicsUniverseEdgeEvent[] = [];
+      h.events.on(PHYSICS_UNIVERSE_EDGE, (e: PhysicsUniverseEdgeEvent) => edges.push(e));
+      h.fire();
+      expect(edges).toHaveLength(1);
+      expect(edges[0].damage).toBe(TELEDAM);
+      expect(h.capturedWrapped).toHaveLength(0);
+    });
+
+    it('leaves a ship inside the boundary alone', () => {
+      const ship = makeShip({ xcoord: 0, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0, damage: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.speed).toBe(9000);
+      expect(ship.damage).toBe(0);
+    });
+
+    it('does not apply the edge in hyperspace (where > 1)', () => {
+      // C guards the whole block with `if (ptr->where <= 1)`.
+      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 2, damage: 0 });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.damage).toBe(0);
       expect(ship.speed).toBe(9000);
     });
 
-    it('emits PHYSICS_BOUNDARY_WRAPPED when wrap fires', () => {
-      // At speed=9000, dx ≈ 0.138 per tick — starting just inside the east edge
-      // puts the next position past +UNIVMAX, which wraps.
+    it('sector-transition event fires with the post-edge sector', () => {
       const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
       const h = makeWrapHarness(ship);
       h.fire();
-      expect(h.capturedWrapped.length).toBeGreaterThanOrEqual(1);
-      expect(h.capturedWrapped[0].axis).toBe('x');
-    });
-
-    it('sector-transition event fires exactly once with post-wrap sector', () => {
-      const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 0 });
-      const h = makeWrapHarness(ship);
-      h.fire();
-      // After wrap the ship is at the west edge, so the sector is negative.
+      // The ship is pinned just inside the east edge, not wrapped west.
       const trans = h.capturedSector.filter((e) => e.shipId === 'u1:1');
       if (trans.length > 0) {
         // If a sector transition fired, toSector should be in-range
