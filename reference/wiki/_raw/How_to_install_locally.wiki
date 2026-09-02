@@ -1,0 +1,7 @@
+Galactic Empire can be installed with [https://www.mbbsemu.com/ MBBSEmu] on any Windows, Linux, or macOS X computer.
+
+
+Galactic Empire is currently not fully functional on MBBSEmu, but development is ongoing.
+
+
+When MBBSEmu is able to run it, there will be full installation instructions here.

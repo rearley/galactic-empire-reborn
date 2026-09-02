@@ -1,0 +1,166 @@
+== List of items ==
+The following are items that can be purchased, sold, transferred to and from planets, and carried in a ships inventory. All values are default values.
+
+=== Men ===
+[[MBMGEMSG.MSG#Item weight|Weight]]: 1 ton
+
+[[MBMGEMSG.MSG#Planet item production rate|Production rate]]: 3500
+
+[[MBMGEMSG.MSG#Base prices|Base price]]: 2
+
+Purpose: Men create items, pay taxes, and add to the score of the user who owns their planet.
+
+More information: [[Colonizing planets]]
+
+=== Missiles ===
+Weight: 5 tons
+
+Production rate: 300
+
+Base price: 20
+
+Purpose: Ship-to-ship combat.
+
+More information: [[Weapons and combat#Missiles]]
+
+=== Torpedoes ===
+Weight: 3 tons
+
+Production rate: 500
+
+Base price: 7
+
+Purpose: Ship-to-ship combat.
+
+More information: [[Weapons and combat#Torpedoes]]
+
+=== Ion cannons ===
+Weight: 250 tons
+
+Production rate: 4
+
+Base price: 33
+
+Purpose: Planetary defense.
+
+More information: [[Colonizing planets#Ion cannons]]
+
+=== Flux pods ===
+Weight: 20 tons
+
+Production rate: 200
+
+Base price: 200
+
+Purpose: Powering ships.
+
+More information: [[Neutron flux]]
+
+=== Food cases ===
+Weight: 2 tons
+
+Production rate: 8000
+
+Base price: 2
+
+Purpose: Sustenance for men and troops on a planet.
+
+More information: [[Colonizing planets]]
+
+=== Fighters ===
+Weight: 15 tons
+
+Production rate: 100
+
+Base price: 50
+
+Purpose: Planetary defense and attack.
+
+More information: [[Colonizing planets#Fighters]] and [[Attacking planets]]
+
+=== Decoys ===
+Weight: 3 tons
+
+Production rate: 900
+
+Base price: 18
+
+Purpose: Defense in ship-to-ship combat, reduces chance of being hit by torpedoes and missiles.
+
+More information: [[Defensive systems#Decoy]]
+
+=== Troops ===
+Weight: 2 tons
+
+Production rate: 200
+
+Base price: 1
+
+Purpose: Planetary defense and attack.
+
+More information: [[Colonizing planets#Troops]] and [[Attacking planets]]
+
+=== Zippers ===
+Weight: 5 tons
+
+Production rate: 100
+
+Base price: 99
+
+Purpose: Triggers mines.
+
+More information: [[Weapons and combat#Zippers]]
+
+=== Jammers ===
+Weight: 4 tons
+
+Production rate: 300
+
+Base price: 21
+
+Purpose: Jams scanners of ships in the area.
+
+More information: [[Weapons and combat#Jammers]]
+
+=== Mines ===
+Weight: 5 tons
+
+Production rate: 500
+
+Base price:16
+
+Purpose: Ship-to-ship combat.
+
+More information: [[Weapons and combat#Mines]]
+
+=== Gold ===
+Weight: 0.5 tons
+
+Production rate: 30
+
+Base price: 100
+
+Purpose: Sell for cash, increase planetary production.
+
+More information: (TO DO)
+
+=== Spies ===
+Weight: 1 ton
+
+Production rate: 20
+
+Base price: 100
+
+Purpose: Find out information about other planets.
+
+More information: [[Attacking planets#Spies]]
+
+== Buy ==
+
+== Sell ==
+
+== Jettison ==
+
+== Transfer ==
+
+== Price ==

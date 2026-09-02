@@ -1,0 +1,48 @@
+== Bugs as of version 3.2e ==
+
+* When running warp engines at a speed higher for which they are rated, they will become damaged over time. When changing warp speed after the warp engines have been damaged, the helm will report that the warp engines are damaged, and recommend you not travel over a particular warp speed until repaired. At that point, your warp speed will be set to that recommended value, even if your command was to go to a lower speed (or stop completely). Ideally the game would only override the warp value you entered if you enter a speed over the new recommended top speed. ''(fixed in ge-next 0.1)''
+* Several informative screens, such as the player roster and [[MBMGEHLP.MSG#HELP CLASS|HELP CLASS]], do not take into account the length of some values, leaving a jumbled display. ''(fixed in ge-next 0.1)''
+* [[Cash]] (in a user's bank, in a planet's tax reserve, and in a planetary bank) is stored as a 32-bit unsigned integer, but displayed as signed, and will overflow after reaching [[wikipedia:2,147,483,647|2,147,483,647]]. The game should set a cap on those values so they don't overflow. ''(fixed in ge-next 0.1)''
+* If you enter an invalid rotational direction with the warp command, the game will correctly tell you to "enter a number in the range from -180 to 180," but then also say that the helm is not functional. ''(fixed in ge-next 0.1)''
+* Spies that are on a planet as it's being attacked will report that the attacker took over the planet even if they actually didn't. Spies will also report "the outcome was unclear" when an attacker does take over the planet. ''(Fixed in ge-next 0.02)''
+* If a planet has no troops, it cannot be taken over with troops. The victory message will be displayed, but the planet will not change hands. To take it over, attack with a fighter or transfer down 1 troop, then attack with troops.
+* Entering "LOCK A" as the first command of a session, before doing any scans, can sometimes allow a player to lock on to their own ship. However, attempting to scan or fire upon the locked on ship displays the "That would be foolish" error message from the helm. (TO DO: why does this sometimes happen and sometimes not)
+* Entering any characters after "BUY" when using the buy command causes the price command to be executed instead. For example, entering "BUYTHIS 1 TOR" will give you the price of one torpedo, but not actually buy it. ''(fixed in ge-next 0.1)''
+* The "TEAM MEMBERS" command doesn't work after setting up a team (TO DO: does it only work after the next update?)
+* Ion cannons can fire on a ship on that has attacked the planet previously as soon as a user enters the game, if the ship is orbiting that planet, even if the planet has changed hands. (TO DO: research what does and doesn't trigger this)
+* The planet administration menu says that planet names can be up to 20 characters, but the game actually only supports 19. ''(fixed in ge-next 0.02)''
+* Men don't eat. Men can starve if there isn't enough food, but men don't reduce the amount of food on a planet. Troops eat food every cycle (one food case for every 100 troops), but there is no corresponding code for men to eat. ''(fixed in ge-next 0.1)''
+* After a revolt, the message that is sent to the planet's (prior) owner is supposed to list the amount of troops that were killed, but it actually lists the amount that remain. ''(Fixed in ge-next 0.01)''
+* Once an item is maxed on a planet, you will receive notices for each cycle, even if you turn off production on the item afterward. To stop the notices, you have to remove at least one unit from the planet's stock.<ref>GEPLANET.C, line 313, "temp >= max"</ref> ''(fixed in ge-next 0.1)''
+* Attacking troops that surrender to a planet's defenses are not added to the planet's stock.<ref>GECMDS.C, lines 3709 and 3745</ref>
+* Using SYS GOTO while at warp unsets the Hyperspace flag but keeps you at warp, allowing you to use shields/etc at warp speed. ''(fixed in ge-next 0.1)''
+* Empty neutron flux can "roll over." (TO DO)
+* When you own a planet and you buy goods from it, you are charged the base price. The message from the BUY command shows the total you actual paid, but shows the set planet price instead of the base price for the "each." ''(fixed in ge-next 0.1)''
+
+== Potential improvements ==
+
+* Messages from the helm could be cleaned up and have a more standard appearance, including spelling fixes and consistent capitalization and punctuation. ''(fixed in ge-next 0.1)''
+* ANSI colors codes don't always end their colors properly, e.g. HELP CLASS switching to dimmer characters, HELP not ending its red. ''(fixed in ge-next 0.01)''
+* The helm could notify the player that the hyper-phaser is ready to use again, similar to how that is reported when using the phasers at impulse.
+* Flux pods automatically reload as of version 3.0a<ref>[[GEREADME.DOC#07/15/92 Release 3.0a (BETA RELEASE)]]</ref>, and was further adjusted to automatically reload when the flux pile drops below 5000 in version 3.0l<ref>[[GEREADME.DOC#11/01/92 Release 3.0l (General Release - NOT BETA!!)]]</ref>. However, it is still possible to run out of flux even when you have flux pods in your inventory, such as when using hyper-phasers at warp, causing you to be unable to fire, or fall out of warp in combat. Whether or not this is a "bug" could be debatable, but a smarter flux reload subroutine that takes into account what you're doing as opposed to just reloading at a set value could be helpful. (Then again, if the flux pods always reload when needed, regardless of the circumstances, what's the point of the FLUX command?)
+* Warp engine damage is not currently reported in "REP SYS." ''(added in ge-next 0.1)''
+* When firing phasers at a ship in the neutral zone, the phasers will not hit the ship, which is the correct behavior. A message from the helm indicating that the phasers were dissipated by the neutral zone would be helpful. Phasers can also fire through the neutral zone, which maybe shouldn't be the case.
+* If you fire torpedoes at a ship and it goes to warp, the torpedoes simply go away. A message from the helm indicating that the torpedoes didn't reach their target and have self-destructed would be helpful.
+* When missiles that have been fired run out of flux power, they simply go away. The helm should report that missiles did not reach their target so the player knows they may fire more.
+* When torpedoes or missiles are fired at a ship and that ship enters the neutral zone, the torpedoes or missiles simply go away. A message from the helm indicating that the weapons were destroyed by the neutral zone defenses would be helpful.
+* When a planet revolts and becomes **FREE**, their work assignments, tax rate, item pricing, and trade password remain the same. Thus, a player can set up a planet with a extremely high tax rate, allow it to revolt, and still obtain goods from it for a reduced price or perhaps take it over again later to raid the tax revenue which has continued to accumulate at a rate which is normally not allowed. Ideally, a planet that has revolted would implement its own trade policies and stop taxing itself.
+* As of version 3.0o, using fighters to attack a planet that has troops but no fighters results in the attack being unsuccessful and all the fighters returning to the ship<ref>[[GEREADME.DOC#01/15/93 Release 3.0o]]</ref>, but the game doesn't do a very good job of explaining this.
+* The PRICE command will not show the price of the goods as requested if you can't actually hold that amount on your current ship, which isn't necessary. A message like "(quantity) (item) will cost (amount), but that would put us overweight" would be more helpful. ''(added in ge-next 0.1)''
+* The ROTATE command accepts both relative headings such as "ROT 45" (rotate 45 degrees to starboard) and "ROT -45" (rotate 45 degrees to port), and absolute headings such as "ROT @45" (rotate as needed to face 45 degrees). However, the WARP and IMPULSE commands only support relative headings, with something like "WARP 10 @90" not supported. ''(added in ge-next 0.1)''
+* The SELL command could accept "all" as well as the number of items to sell, like the JETTISON command does. ''(added in ge-next 0.1)''
+* The BUY command could accept "all," buying all available stock on the planet, and "max", filling the remaining capacity of the ship. ''(added in ge-next 0.1)''
+* The TRANSFER command could accept "all" and "max" as well. ''(added in ge-next 0.1)''
+
+== Historical bugs ==
+
+*In version 3.2d and earlier, speeds are not always displayed correctly. All of these issues were fixed in version 3.2e<ref>[[GEREADME.DOC#08/06/94 Release 3.2e]]</ref>.
+**Impulse speeds between 1 and 9 are reported by the helm as "warp 0 point 10" through "warp 0 point 90," and impulse speeds between 10 and 99 are reported as "warp 0 point 100" through "warp 0 point 990." Reports and scans show (for example) impulse speed 1 as "warp 0.100" and impulse speed 10 as "warp 0.1000."
+**When going to warp 33 or higher, the helm will report that the ship is traveling at the current warp speed plus "point -536," instead of point zero. This does not change the actual speed at which the ship is traveling, or the speed displayed when scanning the ship. Warp values 66 and higher show "point 464."
+**Warp values after [[wikipedia:65,536|65.536]] are not displayed correctly in ship scans and the navigation report, and "roll over." For example, warp 66 is displayed as warp 0.464.
+
+== Citations ==

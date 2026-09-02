@@ -1,19 +1,17 @@
-# Colonizing planets
-
-## Finding a planet
+== Finding a planet ==
 While traveling throughout the galaxy, use sector scans to see if your current sector has planets. There can be between one and nine planets in a sector (including wormholes), however with default settings this is usually limited to five (MAXPLSE).
 
 Inside a sector with planets, use planet scans to check on the planet's attributes. Generally you want a planet with the best attributes ("good" or "very good"), as these planets can hold more items and produce items more quickly than planets with worse conditions.
 
 Other things to consider when picking a planet:
 
-- Some unclaimed planets are already inhabited with small quantities of men and food, making it easier to get started.
-- Planets closer to the center of a sector are more difficult for attacking ships to escape from, if the planet is equipped with sector-firing ion cannons.
+* Some unclaimed planets are already inhabited with small quantities of men and food, making it easier to get started.
+* Planets closer to the center of a sector are more difficult for attacking ships to escape from, if the planet is equipped with sector-firing ion cannons.
 
-## Claiming a planet
-To
+== Claiming a planet ==
+To 
 
-## Abandon a planet
+== Abandon a planet ==
 The ABANDON command will renounce your claim to a planet. You must be orbiting a planet that you own to issue the command. The planet will revert to having no owner, and can then be claimed by anyone. The planet will be removed from your list of planets, and you will lose any points you have been allotted for the population of the planet.
 
 The command has no options. Simply enter:
@@ -26,30 +24,30 @@ or
 
 (TO DO: what effects does this have on a planet's administration)
 
-## Planetary defense
+== Planetary defense ==
 
-### Ion cannons
+=== Ion cannons ===
 
-### Fighters
+=== Fighters ===
 
-### Troops
+=== Troops ===
 
-## List of owned planets
+== List of owned planets ==
 
-## Production cycle
+== Production cycle ==
 
-1. One food case is consumed for every 100 troops.<ref>GEPLANET.C, lines 206-209. 222-230</ref>
-1.* If there is not enough food for the troops, 1/8th of all the troops perish and the amount of food on the planet is set to zero.
-1.* If there is enough food for the troops, one food case per 100 troops is subtracted from the food amount on the planet.
-1.* If there are fewer than 100 troops, no food is consumed and no troops perish regardless of the amount of food.
-1.If there is not enough food for the men (one food case per 100 men), then 1/8th of all men perish.<ref>GEPLANET.C, lines 234-245</ref>
-1.*If there are fewer than 100 men, no food is consumed and no men perish regardless of the amount of food.
-1.*Due to an apparent oversight, men don't consume food.
-1.The amount by which to reduce production based on the planet's tax rate is calculated by dividing the tax rate by 120 and subtracting from 1. If there is a 0% tax rate, production is 100% of maximum. If there is a 100% tax rate, production is 16.<SPAN STYLE="text-decoration:overline">66</SPAN>% of maximum.<ref>GEPLANET.C, line 257</ref>
-1.Gold on the planet is converted into cash for the planetary bank, based on the base price of gold (by default, 1000).<ref>GEPLANET.C, lines 261-265</ref>
-1.Production begins. For each item:
+# One food case is consumed for every 100 troops.<ref>GEPLANET.C, lines 206-209. 222-230</ref>
+#* If there is not enough food for the troops, 1/8th of all the troops perish and the amount of food on the planet is set to zero.
+#* If there is enough food for the troops, one food case per 100 troops is subtracted from the food amount on the planet.
+#* If there are fewer than 100 troops, no food is consumed and no troops perish regardless of the amount of food.
+#If there is not enough food for the men (one food case per 100 men), then 1/8th of all men perish.<ref>GEPLANET.C, lines 234-245</ref> 
+#*If there are fewer than 100 men, no food is consumed and no men perish regardless of the amount of food.
+#*Due to an apparent oversight, men don't consume food.
+#The amount by which to reduce production based on the planet's tax rate is calculated by dividing the tax rate by 120 and subtracting from 1. If there is a 0% tax rate, production is 100% of maximum. If there is a 100% tax rate, production is 16.<SPAN STYLE="text-decoration:overline">66</SPAN>% of maximum.<ref>GEPLANET.C, line 257</ref>
+#Gold on the planet is converted into cash for the planetary bank, based on the [[MBMGEMSG.MSG#Base prices|base price]] of gold (by default, 1000).<ref>GEPLANET.C, lines 261-265</ref>
+#Production begins. For each item:
 ##The quantity to produce (before being adjusted by other factors) is determined by:
-##*The individual production rate of each item is divided by 10,000.<ref>GEPLANET.C, line 274</ref>
+##*The individual [[MBMGEMSG.MSG#Planet item production rate|production rate of each item]] is divided by 10,000.<ref>GEPLANET.C, line 274</ref>
 ##*The amount of men is multiplied by the effort rate set by the planet owner (divided by 100 to be a percentage), then multiplied by the production rate as determined on the line above, then divided by 6.<ref name=":0">GEPLANET.C, line 278</ref>
 ##*This result is divided by 7.<ref name=":0" />
 ##**Example: on a planet with 100,000 men, where the owner has set 10% of production to go toward torpedoes, where the production rate of torpedoes is 500 (the default in MBMGEMSG.MSG), the amount would be calculated like this: (100000×(10÷100)×((500÷10000)÷6))÷7 = 11.<SPAN style="text-decoration:overline">904761</SPAN>.
@@ -67,15 +65,15 @@ or
 ##*However, no matter the planetary conditions, it only takes one unit of cash in the bank to make sure you at least get the production bonus on men.
 ##The new quantity of the item is determined by multiplying the item amount calculated on line 5.1 by the factor calculated on lines 5.2 (env/resc), 5.3 (tax), and 5.5 (cash bonus), and adding that amount to the existing item quantity.<ref>GEPLANET.C, lines 290-291</ref>
 ##*Using the example on line 5.3: 11.<SPAN style="text-decoration:overline">904761</SPAN> torpedoes is multiplied by 1.1458<SPAN style="text-decoration:overline">33</SPAN>, for a total of 13.6408 or thereabouts. Therefore, the amount of new torpedoes created is 13 (everything after the decimal point is discarded). If there is cash in the bank (1.5× bonus), it would be 20.4612 or 20 torpedoes created.
-##The planetary maximum for each item is considered, based on the maximums as defined in MBMGEMSG.MSG. This value is multiplied by that same factor.<ref>GEPLANET.C, lines 295-297</ref>
+##The planetary maximum for each item is considered, based on [[MBMGEMSG.MSG#Maximum amount of items on a planet|the maximums as defined in MBMGEMSG.MSG]]. This value is multiplied by that same factor.<ref>GEPLANET.C, lines 295-297</ref>
 ##*Using the example from line 6: the default max amount of torpedoes is 59833. 59833 multiplied by 1.1458<SPAN style="text-decoration:overline">33</SPAN> is 68558.6458 or so. Therefore, the maximum amount of torpedoes is 68558, or 102837 if there is cash in the planetary bank.
-##***VERY IMPORTANT:** Changing your tax rates or allowing your planetary bank to run out of money can massively affect your planetary maximums. If you have any items at or near the maximum, you can lose massive quantities of items by not minding these values!
+##*'''VERY IMPORTANT:''' Changing your tax rates or allowing your planetary bank to run out of money can massively affect your planetary maximums. If you have any items at or near the maximum, you can lose massive quantities of items by not minding these values!
 ##If the amount of an item before the production cycle began is less than the newly determined maximum, but will be over the maximum after the produced amount is added, a message is sent to the player that item has reached its maximum.<ref>GEPLANET.C, lines 313-326</ref>
 ##Finally, the item's quantity is updated to the new value. If the new value would go over the newly determined maximum, the value is changed to the maximum.<ref>GEPLANET.C, lines 328-333</ref>
 ##Everything in step 5 repeats for each item. Keep in mind that men are processed first, so the updated value of men will be used to calculate the remaining items.
-1.After all items have been updated, the amount to add to the tax bank is determined. The tax rate specified by the owner of the planet is divided by 1200, and then multiplied by the new amount of men. This amount is added to the tax bank.<ref>GEPLANET.C, lines 335-338</ref>
-1.*Example: A 10% tax rate with 100,000 men would add 833 Cs to the tax bank per cycle (10÷1200×100000=833.<SPAN style="text-decoration:overline">33</SPAN>).
-1.Revolt odds are calculated. The tax rate (as an integer) set by the user is divided by 120, and that result is multiplied by 0.35. This value is multiplied by the amount of men. If this value is greater than the amount of troops, there is a 10% chance of a revolt.<ref>GEPLANET.C, lines 348-359</ref> Since this occurs every cycle, a revolt will happen eventually if the ratio of men to troops remains too high.
-1.*Example: With a 10% tax rate, the factor is 0.0291<SPAN style="text-decoration:overline">66</SPAN> ((10÷120)×0.35). As such, having 2917 troops for every 100,000 men will ensure there is never a revolt.
-1.*If there is a revolt, a random amount between one half and 1/9th of the troops are kept under the employ of the newly freed planet, and the rest perish.<ref>GEPLANET.C, lines 363-364</ref>
+#After all items have been updated, the amount to add to the tax bank is determined. The tax rate specified by the owner of the planet is divided by 1200, and then multiplied by the new amount of men. This amount is added to the tax bank.<ref>GEPLANET.C, lines 335-338</ref>
+#*Example: A 10% tax rate with 100,000 men would add 833 Cs to the tax bank per cycle (10÷1200×100000=833.<SPAN style="text-decoration:overline">33</SPAN>).
+#Revolt odds are calculated. The tax rate (as an integer) set by the user is divided by 120, and that result is multiplied by 0.35. This value is multiplied by the amount of men. If this value is greater than the amount of troops, there is a 10% chance of a revolt.<ref>GEPLANET.C, lines 348-359</ref> Since this occurs every cycle, a revolt will happen eventually if the ratio of men to troops remains too high.
+#*Example: With a 10% tax rate, the factor is 0.0291<SPAN style="text-decoration:overline">66</SPAN> ((10÷120)×0.35). As such, having 2917 troops for every 100,000 men will ensure there is never a revolt.
+#*If there is a revolt, a random amount between one half and 1/9th of the troops are kept under the employ of the newly freed planet, and the rest perish.<ref>GEPLANET.C, lines 363-364</ref>
 <references />

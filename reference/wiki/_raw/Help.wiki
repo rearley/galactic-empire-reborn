@@ -1,0 +1,5 @@
+The HELP command displays the in-game help. Enter <code>HELP [topic]</code> or <code>? [topic]</code> to view the help.
+
+Entering <code>HELP</code> or <code>?</code> by itself will display a list of help topics. "Hyper," "lock," "navigate," and "newprice" are also valid topics that are omitted from this screen.
+
+Help messages are stored in the [[MBMGEHLP.MSG]] file; see this article to read the in-game help on this wiki.

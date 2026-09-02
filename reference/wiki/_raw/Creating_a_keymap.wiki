@@ -1,0 +1,191 @@
+To play [[Galactic Empire]] effectively, particularly when it comes to combat, it is essential to create [[wikipedia:Macro_(computer_science)#Keyboard_and_mouse_macros|keyboard macros]]. A player that can execute common commands at the press of a button will have a distinct advantage over someone who is fumbling with the keyboard, trying to type commands as quickly as possible without making mistakes. Which keys to map to which commands, and how simple or complex a keymap should be, is up to the user. Below are some examples of keymaps, and also a brief explanation of how to program them in [https://dtelnet.sourceforge.net/ dtelnet], a Telnet program for Microsoft Windows.
+
+== A simple F-key keymap ==
+This keymap uses the F1-F12 keys for commonly used, mostly combat-related functions.
+
+
+F1 SCA SE    F2 SCA RA 9    F3 TOR @ (x3)   F4 MIS @ 50000 (x3)    F5 MIN 50 (x3)    F6 ZIP
+
+F7 SCA PL 1     F8 PHA 0      F9 PHA 180       F10 SCA SH @      F11 SHI UP      F12 WAR 0
+
+The two mostly commonly used scans are the first two keys on the left. The next two keys fire weapons at the locked on vessel. The next two keys lay mines with the longest detonation delay possible, and trigger them. F7 scans the first planet in the sector, helpful for those pit stops at Zygor. The next two keys fire phasers both straight ahead and directly behind, useful for firing at ships in pursuit. Finally, there is a command to raise the shields and a command for all stop.
+
+Some reasons why this keymap is effective: the keys to scan the area around you and the command to scan the locked on ships are on different hands, enabling the user to execute both quickly without moving their hands. Projectile weapons are grouped together. The shield up command is right next to the all stop command, so after dropping out of warp the user only needs to move over one key to quickly raise shields.
+
+=== dtelnet keymap ===
+To set up keymapping in dtelnet, first find the location of your .INI configuration file by selecting "About Dave's Telnet..." from the Help menu. If your Windows login name is "gefan," the filename is probably <code>C:\Users\gefan\Dtelnet\dtelnet.ini</code>. Once you've found the file, open it Notepad or the text editor of your choice, and add a section called <code>[Keymap]</code>. Then, using the key codes found [https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes here] and "/r" to press ENTER, program the keys. Using our example above:
+
+<code>[Keymap]</code>
+
+<code>0x070 = "SCA SE\r"</code>
+
+<code>0x071 = "SCA RA 9\r"</code>
+
+<code>0x072 = "TOR @\rTOR @\rTOR @\rSHI UP\r"</code>
+
+<code>0x073 = "MIS @ 50000\rMIS @ 50000\rMIS @ 50000\rSHI UP\r"</code>
+
+<code>0x074 = "MIN 50\rMIN 50\rMIN 50\r"</code>
+
+<code>0x075 = "ZIP\r"</code>
+
+<code>0x076 = "SCA PL 1\r"</code>
+
+<code>0x077 = "PHA 0\rSHI UP\r"</code>
+
+<code>0x078 = "PHA 180\rSHI UP\r"</code>
+
+<code>0x079 = "SCA SH @\r"</code>
+
+<code>0x07A = "SHI UP\r"</code>
+
+<code>0x07B = "WAR 0\r"</code>
+
+
+Save the .INI file and restart dtelnet, and the F1-F12 keys should now execute those commands.
+
+== A more complex F-key keymap ==
+Obviously, there are many more commonly used commands that would be nice to have at the push of a button. Using the SHIFT, CTRL, and ALT keys, up to 48 commands can be programmed. To keep things as easy to remember as possible, put variations of the same command on the same F-key.
+
+For example, let's add a long range scan to SHIFT-F1, add different scan ranges to F2, add the ability to fire on non-locked ships to F3 and F4, combine the mining commands onto one key in F5, add the ability to scan four different planets to F6, move both phaser commands to F7, add the four reports to F8, put four different ship scans on F9, add four impulse speeds to F10, add other defensive commands to the F11 key, and add three different warp speeds to F12.
+
+If it seems like this is way too much possibly memorize, you're probably right. There is of course nothing keeping you from entering any of these keys the old fashioned way, and in the heat of battle it may be easier to just type "WAR 15" then to remember it's CTRL-F12. However, over time you will likely find yourself using them more and more.
+
+=== dtelnet keymap ===
+Here's the example above as a dtelnet keymap. Make sure that the modified keys (that is, keys pressed with SHIFT, ALT, etc.) come BEFORE the non-modified keys in your .INI file.
+
+
+<code>[Keymap]</code>
+
+<code>Shift,0x070 = "SCA LO\r"</code>
+
+<code>0x070 = "SCA SE\r"</code>
+
+<code>Alt,0x071 = "SCA RA 3\r"</code>
+
+<code>Ctrl,0x071 = "SCA RA 5\r"</code>
+
+<code>Shift,0x071 = "SCA RA 7\r"</code>
+
+<code>0x071 = "SCA RA 9\r"</code>
+
+<code>Alt,0x072 = "TOR C\rTOR C\rTOR C\rSHI UP\r"</code>
+
+<code>Ctrl,0x072 = "TOR B\rTOR B\rTOR B\rSHI UP\r"</code>
+
+<code>Shift,0x072 = "TOR A\rTOR A\rTOR A\rSHI UP\r"</code>
+
+<code>0x072 = "TOR @\rTOR @\rTOR @\rSHI UP\r"</code>
+
+<code>Alt,0x073 = "MIS C 50000\rMIS C 50000\rMIS C 50000\rSHI UP\r"</code>
+
+<code>Ctrl,0x073 = "MIS B 50000\rMIS B 50000\rMIS B 50000\rSHI UP\r"</code>
+
+<code>Shift,0x073 = "MIS A 50000\rMIS A 50000\rMIS A 50000\rSHI UP\r"</code>
+
+<code>0x073 = "MIS @ 50000\rMIS @ 50000\rMIS @ 50000\rSHI UP\r"</code>
+
+<code>Shift,0x074 = "ZIP\r"</code>
+
+<code>0x074 = "MIN 50\rMIN 50\rMIN 50\r"</code>
+
+<code>Alt,0x075 = "SCA PL 4\r"</code>
+
+<code>Ctrl,0x075 = "SCA PL 3\r"</code>
+
+<code>Shift,0x075 = "SCA PL 2\r"</code>
+
+<code>0x075 = "SCA PL 1\r"</code>
+
+<code>Shift,0x076 = "PHA 180\rSHI UP\r"</code>
+
+<code>0x076 = "PHA 0\rSHI UP\r"</code>
+
+<code>Alt,0x077 = "REP ACC\r"</code>
+
+<code>Ctrl,0x077 = "REP NAV\r"</code>
+
+<code>Shift,0x077 = "REP INV\r"</code>
+
+<code>0x077 = "REP SYS\r"</code>
+
+<code>Alt,0x078 = "SCA SH C\r"</code>
+
+<code>Ctrl,0x078 = "SCA SH B\r"</code>
+
+<code>Shift,0x078 = "SCA SH A\r"</code>
+
+<code>0x078 = "SCA SH @\r"</code>
+
+<code>Alt,0x079 = "IMP 99\r"</code>
+
+<code>Ctrl,0x079 = "IMP 75\r"</code>
+
+<code>Shift,0x079 = "IMP 50\r"</code>
+
+<code>0x079 = "IMP 25\r"</code>
+
+<code>Alt,0x07A = "DEC\rDEC\rDEC\r"</code>
+
+<code>Ctrl,0x07A = "JAM\r"</code>
+
+<code>Shift,0x07A = "CLO ON\r"</code>
+
+<code>0x07A = "SHI UP\r"</code>
+
+<code>Alt,0x07B = "WAR 30\r"</code>
+
+<code>Ctrl,0x07B = "WAR 15\r"</code>
+
+<code>Shift,0x07B = "WAR 8\r"</code>
+
+<code>0x07B = "WAR 0\r"</code>
+
+== Other ideas ==
+Even with all the most commonly used commands mapped to F-keys, there will still be plenty of commands that a user will have to type out completely. Instead of typing all three characters of the command, you can assign the most common commands to keys on the keyboard, and then enter the value. Use a modifier such as CTRL so they don't interfere with normal command entry, and end the commands with a space (but not a \r for ENTER). For example, with the below added to dtelnet.ini, you could press CTRL-P 66 ENTER instead of PHA [SPACE] 66 ENTER.
+
+<code>Ctrl,0x43 = "CLO "</code>
+
+<code>Ctrl,0x49 = "IMP "</code>
+
+<code>Ctrl,0x4C = "LOC "</code>
+
+<code>Ctrl,0x4E = "NAV "</code>
+
+<code>Ctrl,0x4F = "ORB "</code>
+
+<code>Ctrl,0x50 = "PHA "</code>
+
+<code>Ctrl,0x52 = "ROT "</code>
+
+<code>Ctrl,0x53 = "SCA "</code>
+
+<code>Ctrl,0x57 = "WAR "</code>
+
+
+
+Add rotate commands to modified arrow keys (making SHIFT-UP do nothing in case accidentally pressed):
+
+<code>Shift,0x25 = "ROT -10\r"</code>
+
+<code>Ctrl,0x25 = "ROT -45\r"</code>
+
+<code>Alt,0x25 = "ROT -90\r"</code>
+
+<code>Shift,0x26 = ""</code>
+
+<code>Ctrl,0x26 = "ROT -1\r"</code>
+
+<code>Alt,0x26 = "ROT 1\r"</code>
+
+<code>Shift,0x27 = "ROT 10\r"</code>
+
+<code>Ctrl,0x27 = "ROT 45\r"</code>
+
+<code>Alt,0x27 = "ROT 90\r"</code>
+
+<code>Shift,0x28 = "ROT 180\r"</code>
+
+<code>Ctrl,0x28 = "ROT -179\r"</code>
+
+<code>Alt,0x28 = "ROT 179\r"</code>

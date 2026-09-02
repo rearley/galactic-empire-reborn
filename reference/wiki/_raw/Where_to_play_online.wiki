@@ -1,0 +1,32 @@
+You can play Galactic Empire online on the following BBS systems:
+
+== ge-next ==
+
+* [http://wabac.ccsnet.com/ The WABAC Machine] [telnet://bbs.ccsnet.com:23 telnet link] is now running [https://manicpop.org/ge-next/ ge-next], the new Galactic Empire expansion/mod from manicpop.org. (Select game 2.)
+
+== Stock 3.2e ==
+These boards have a standard Galactic Empire 3.2e with no apparent modifications to the game settings.
+
+* [http://tdod.org/ The Dawn of Demise] [telnet://tdod.org:3000/ telnet link]
+* [https://www.telnetbbsguide.com/bbs/liquid-digital/ Liquid Digital] [telnet://98.212.225.126 telnet link]
+* [http://soc4ever.com/ Swords of Chaos Forever] [telnet://bbs.soc4ever.com telnet link]
+* [http://wabac.ccsnet.com/ The WABAC Machine] [telnet://bbs.ccsnet.com:23 telnet link] (Game 1)
+
+== Others ==
+These boards offer a bit more of a challenge for experienced players.
+* [https://thekeep.net/ The Keep] has Galactic Empire 3.2e with several modifications. Gold is more plentiful from destroying NPCs, but worth half as much. There are several high capacity freighters available. Maximum population on planets is lowered and maximum planetary defenses are raised. Several additional classes of hostile NPCs are included. [telnet://thekeep.net telnet link]
+* [http://onix.org/ Onix] has Galactic Empire 3.2d with a wide variety of Star Trek-themed ships (both user ships and NPCs) and a massive 64000x64000 galaxy, and Galactic Empire Trainer 3.0p.3. [telnet://onixbbs.servebbs.com:2525 telnet link]
+* [https://saturn5bbs.com/ Saturn 5] has Galactic Empire 3.2e with a modest bump in freighter capacity, one additional user ship, and a couple custom enemy NPCs. [telnet://bbs.saturn5bbs.com telnet link]
+
+== Elwynor's 32-bit version ("3.3") ==
+These boards run a version of Galactic Empire 3.2e ported to the 32-bit MBBS/WorldGroup platform by [http://www.elwynor.com/ Elwynor Technologies], but have otherwise stock settings.
+
+* [https://www.telnetbbsguide.com/bbs/dreamline-bbs/ Dreamline] [telnet://din.elwynor.com telnet link]
+* [https://www.telnetbbsguide.com/bbs/ilefinian-castle/ Ilefinian Castle] [telnet://bbs.elwynor.com telnet link]
+* [http://thepenaltybox.org/ The Penalty Box] [telnet://thepenaltybox.org telnet link]
+* [http://www.seabreezegn.com/ Sea Breeze Gaming Network] [telnet://seabreeze.servegame.com telnet link]
+* [https://starbase21.net/ Starbase 21] [telnet://bbs.starbase21.net telnet link]
+* [https://www.telnetbbsguide.com/bbs/tqps-mpgs/ TQPS] [telnet://tqps.ddns.net telnet link]
+
+
+If you know of any others please [mailto:anthony@manicpop.org contact me].

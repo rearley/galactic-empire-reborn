@@ -1,0 +1,41 @@
+[[GEINST.DOC]] – installation guide
+
+[[GEREADME.DOC]] – list of files and changelog
+
+[[GESYSOP.DOC]] – list of [[Sys|SYS]] commands available to the sysop (included in source package)
+
+[[GETERM.DOC]] – how to use the [[Data|DATA]] command (included in source package)
+
+[[MBMGEHLP.MSG]] – in-game [[Help|HELP]] messages in text editable format (converted to .MCV for runtime)
+
+[[MBMGEMAL.DAT]] – mailbox database
+
+MBMGEMAL.NEW – empty mailbox database
+
+[[MBMGEMNU.TXT]] – the text displayed when a user selects "What's new?" from the main menu
+
+MBMGEMP.DLL – the game executable
+
+[[MBMGEMP.DOC]] – user's guide
+
+MBMGEMP.MDF – module definition file
+
+[[MBMGEMSG.MSG]] – main configuration file in text editable format (converted to .MCV for runtime)
+
+[[MBMGEPLT.DAT]] – planet database
+
+MBMGEPLT.NEW – empty planet database
+
+[[MBMGESHP.DAT]] – ship database
+
+[[MBMGESHP.MSG]] – ship configuration file in text editable format (converted to .MCV for runtime)
+
+MBMGESHP.NEW – empty ship database
+
+[[MBMGETEA.DAT]] – team database
+
+MBMGETEA.NEW – empty team database
+
+[[MBMGEUSR.DAT]] – user database
+
+MBMGEUSR.NEW – empty user database

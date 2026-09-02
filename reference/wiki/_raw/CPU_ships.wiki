@@ -1,0 +1,282 @@
+
+== Combative ships ==
+{| class="wikitable"
+|+
+!#
+!Class
+!Name
+!Shi
+!Pha
+!Tor
+!Mis
+!Dec
+!Jam
+!Zip
+!Min
+!Att
+!Clo
+!Acc
+!Warp
+!Tons
+!Scan
+!Pts
+!User
+!Make
+!Tough
+!Dmg
+|-
+|21
+|Cybertron Scout
+|Cybertron ###
+|2
+|2
+|Y
+|N
+|Y
+|Y
+|Y
+|Y
+|N
+|N
+|2k
+|8
+|900
+|50k
+|1000
+|0
+|10
+|0
+|90
+|-
+|22
+|Cybertron Battle Cruiser
+|Cyberquad ###
+|3
+|3
+|Y
+|N
+|Y
+|Y
+|N
+|Y
+|Y
+|N
+|5k
+|10
+|12.5k
+|1000
+|2000
+|0
+|5
+|1
+|100
+|-
+|23
+|Cybertron Base Star
+|Cyber Base-###
+|9
+|16
+|N
+|N
+|Y
+|Y
+|Y
+|Y
+|N
+|N
+|0
+|0
+|1.25m
+|200k
+|10000
+|20
+|1
+|1
+|2000
+|-
+|24
+|Sarten Attack Drone
+|SADx3###
+|1
+|1
+|N
+|N
+|Y
+|Y
+|N
+|N
+|N
+|N
+|1.2k
+|8
+|100
+|20k
+|50
+|0
+|6
+|0
+|30
+|-
+|25
+|Sarten Obliterator
+|SOBx9###
+|5
+|16
+|Y
+|N
+|N
+|N
+|N
+|N
+|Y
+|N
+|200
+|15
+|234k
+|400k
+|500
+|3
+|2
+|1
+|500
+|}
+Shi = shields this type of ship has
+
+Pha = phaser this type of ship has
+
+Tor = has torpedo capability
+
+Mis = has missile capability
+
+Dec = has decoy capability
+
+Jam = has jammer capability
+
+Zip = has zipper capability
+
+Mine = has mine capability
+
+Atck = can launch planetary attacks (CPU ships can't do this regardless of settings)
+
+Clo = has cloaking capability
+
+Acc = acceleration rate (how quickly ship speeds up and slows down)
+
+Warp = top warp speed (when not at hyperwarp)
+
+Tons = maximum weight ship can hold
+
+Scan = range of scanner in parsecs (100k means 10 sectors in any direction), the long range scanner is 10x this value
+
+Pts = points awarded for destroying a ship of this type
+
+User = lowest user ship class this CPU will pursue (for example, 5 means it'll only come after a user in a Star Cruiser or higher numbered ship, except for the Freight Barge which is set to CYB = N)
+
+Make = the maximum amount of this ship that can exist at the same time
+
+Tough = 0 for stupid, 1 for smart (TO DO: look into the actual difference)
+
+Dmg = damage effect factor (100 is "normal," lower numbers mean ship is more fragile, higher numbers mean ship is more resilient)
+
+All CPU ships are defined with a price of 20000, but since they can't be purchased this is never used.
+{| class="wikitable"
+|+
+!#
+!Class
+!Name
+!Shi
+!Pha
+!Tor
+!Mis
+!Dec
+!Jam
+!Zip
+!Min
+!Att
+!Clo
+!Acc
+!Warp
+!Tons
+!Price
+!Scan
+!Pts
+!User
+!Make
+!Tough
+!Damage
+|-
+|31
+|Lydorian Garbage Scow
+|NCC Lx4###
+|1
+|1
+|N
+|N
+|Y
+|Y
+|Y
+|Y
+|N
+|N
+|50
+|1
+|10000
+|20000
+|25000
+|5
+|0
+|2
+|0
+|100
+|-
+|32
+|Murdonian Transport
+|Trans-Gal #2###
+|2
+|5
+|N
+|N
+|Y
+|Y
+|Y
+|Y
+|N
+|N
+|400
+|8
+|30000
+|20000
+|25000
+|200
+|0
+|2
+|0
+|100
+|-
+|33
+|Vakory Survey Drone
+|Vakory SD-82###
+|1
+|1
+|N
+|N
+|Y
+|Y
+|Y
+|Y
+|N
+|N
+|1200
+|4
+|100
+|20000
+|25000
+|50
+|0
+|2
+|0
+|100
+|}
+
+== Hyperwarp ==
+In order to keep CPU ships close to human players, combative CPU ships that are ([https://manicpop.org/gewiki/MBMGEMSG.MSG#CPU_ships by default], this can be adjusted) more than 25 sectors away from a human player they are pursuing will travel at "hyperwarp," which is 20 times the normal CPU ship's speed. They will drop back down to normal speeds when they are within 10 sectors. When scanning a ship traveling at hyperwarp, the scan will read "Hyper," masking the actual speed<ref>[./GEREADME.DOC#08/06/94_Release_3.2e GEREADME.DOC#08/06/94 Release 3.2e]</ref>.

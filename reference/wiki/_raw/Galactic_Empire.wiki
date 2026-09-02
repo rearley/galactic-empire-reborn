@@ -1,0 +1,70 @@
+Galactic Empire is a game for MajorBBS systems developed by M.B. Murdock.
+
+This wiki is a work in progress. Signups are not open at the moment. If you'd like to contribute please [mailto:anthony@manicpop.org contact me].
+
+Update April 2025: If this looks like something I just threw together in a few hours, it's because it is. Right now all of my focus is on [https://manicpop.org/ge-next/ ge-next] a Galactic Empire mod/expansion. Eventually I will get back to working on this site, with more detailed information. I will keep the "Where to play online" and "How to install locally" pages up to date as needed.
+
+Join the [https://discord.gg/SqhYmZvWsn Galactic Empire Discord server]
+
+[[GE scripts]] contributed by [[User:Madam Airlock|Madam Airlock]]: Player scripts for automating regular actions in the game and making playing more fun.
+
+[[Proposed changes for Elwynor]]
+
+[[Competition history|ge-next game test / competition history!]]
+
+== Deep dives ==
+[[What is DAMF|What is DAMF?, or, Why are SOBs so hard?]]
+
+== Background ==
+[[Official documentation]]
+
+[[Where to play online]]
+
+[[How to install locally]]
+
+[[Source code]]
+
+[[Other online resources]]
+
+[[Bugs and potential improvements]]
+
+[[Files]]
+
+== Gameplay and strategy ==
+[[Items]]
+
+[[Commands]]
+
+[[Player ships]]
+
+[[CPU ships]]
+
+[[Movement]]
+
+[[Communications]]
+
+[[Reports and scans]]
+
+[[Weapons and combat]]
+
+[[Defensive systems]]
+
+[[Colonizing planets]]
+
+[[Attacking planets]]
+
+[[Teams and trade alliances]]
+
+[[Scoring]]
+
+== User customization ==
+[[SET|SET command]]
+
+[[Creating a keymap]]
+
+[[Using rlwrap]]
+
+== Administration ==
+[[Sysop configuration]]
+
+[[Sysop commands]]

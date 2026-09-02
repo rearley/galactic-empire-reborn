@@ -1,0 +1,35 @@
+# Sysop commands
+
+If you are logged in as the sysop, or have configured the game to give such access to others, you can use the SYS command.
+
+GESYSOP.DOC covers the sysop commands.
+
+The following help text is from entering SYS HELP:
+
+Sysop Command List
+
+<code>sys help                    - Produces this list</code>
+
+<code>sys get nnn <itemname>      - Creates items on this ship</code>
+
+<code>sys kill <username>         - Kills the ship commanded by username</code>
+
+<code>sys cash nnn                - Creates nnn cash</code>
+
+<code>sys goto xsector ysector    - Teleports ship to sector</code>
+
+<code>sys class nnn               - Changes ship to class number nnn</code>
+
+<code>sys shieldtype nnn          - Changes shields to class number nnn</code>
+
+<code>sys phasertype nnn          - Changes phaser to class number nnn</code>
+
+<code>sys maint                   - Starts FAST maintenance</code>
+
+<code>sys unjam                   - Clears jamming</code>
+
+<code>sys list nn                 - Lists 50 ships in game beginning with nn</code>
+
+<code>sys classlist               - Lists index of ship classes</code>
+
+<code>sys cybpause nnn            - pauses the cybertrons for nnn secs</code>

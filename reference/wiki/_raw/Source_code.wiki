@@ -1,0 +1,42 @@
+Galactic Empire's source code was released under the [https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html GNU General Public License (GPLv2)] in 2002 by Mike Murdock and posted here: [https://sourceforge.net/p/gnu-ge/code/ https://sourceforge.net/p/gnu-ge/code/]
+
+It was moved to [https://github.com/bsimser/ge https://github.com/bsimser/ge] in 2016 by Bil Simser.
+
+
+
+
+Files from source
+
+GECMDS.C
+
+GECYBS.C
+
+GEDROIDS.C
+
+GEFUNCS.C
+
+GEGLOBAL.H
+
+GELIB.C
+
+GEMAIN.C
+
+GEMAIN.H
+
+GEPLANET.C
+
+GEPROTO.H
+
+GESAMPLE.C
+
+MBMGEGRF.C
+
+MBMGEMP.LNK
+
+MBMGEMP.MAK
+
+README.TXT
+
+SECURE.C
+
+SECURE.H

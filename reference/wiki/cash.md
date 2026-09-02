@@ -1,0 +1,7 @@
+# Cash
+
+Cash is stored as a 32-bit signed integer, and as such overflows after 2,147,483,647. Earning 1 cash more than 2,147,483,647 causes the cash value to go to -2,147,483,648. Further addition of cash causes the negative value to go towards zero (e.g. earning 500 cash while at -2,147,483,648 results in -2,147,483,148), while spending cash while you have a negative value (interestingly, the game does allow you to do this) can bring you back to a positive value.
+
+Cash stored as tax revenue and in the planetary bank will also overflow after 2,147,483,647.
+
+The most cash that can be granted at once with the SYS CASH command is 2,147,483,647. Any values higher than this are treated the same as entering SYS CASH 0

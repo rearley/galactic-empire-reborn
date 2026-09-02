@@ -1,0 +1,4 @@
+Exit [[Galactic Empire]] with the <code>X</code> command. You will be returned to the main menu, where you can re-enter the game with a different ship, or exit completely.
+
+== Galactic Codes of Engagement ==
+You must wait a 10 [[centock]] period of time before exiting the game after using any weapons or having any weapons fired at you.

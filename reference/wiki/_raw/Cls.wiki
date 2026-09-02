@@ -1,0 +1,1 @@
+The CLS command clears the screen. This command has no options, simply enter <code>CLS</code>.

@@ -1,0 +1,16 @@
+From around October 2024 to January 2025, ManicPop, Oliver, and Archwiki tested ge-next 0.1 on WABAC. The winner was:
+
+[[File:Oliver wins.jpg|alt=ge-next 0.1 winner|frameless]]
+
+
+From June 25th, 2025 to October 1st, 2025, we tested ge-next 0.2 on WABAC. The final score was:
+
+[[File:0.2 final score.png|alt=0.2 final score|frameless]]
+
+☢
+
+The final score when we final decommissioned the 0.2-era game on April 26th, 2026 was:
+
+[[File:Screenshot 20260426 153206.png|alt=ge-next 0.2 final final|frameless]]
+
+☢

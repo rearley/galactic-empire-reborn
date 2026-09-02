@@ -1,0 +1,8 @@
+[https://www.themajorbbs.com/forumsold/viewtopic.php?t=3034 A post on a MajorBBS forum] where Mike Murdock mentioned he was working on a Linux port of the game in 2008
+
+[https://www.themajorbbs.com/forumsold/viewtopic.php?t=7101 Another post] about attempts to port the game
+
+[https://www.themajorbbs.com/forumsold/viewtopic.php?t=14 An "introduce yourself" post] with Mike Murdock
+
+
+[https://www.digger.net/projects/gecp/ Galactic Empire Control Panel] is a DOS (and Java) frontend for GE
