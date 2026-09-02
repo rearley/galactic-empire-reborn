@@ -1643,3 +1643,47 @@ same `initshp` as a first-time pilot's ship (GECMDS.C:4572), and initshp sets
 `shieldtype = 1; phasrtype = 1` (GEFUNCS.C:233-234). The port's onboarding path
 copied those lines; the purchase path did not — the same omission that left
 `topspeed` at 0 and made every bought ship unable to warp.
+
+## 2026-09-02 — Claiming belongs to `adm`; `land` is removed
+
+**Context:** The port shipped a `land` command doing three jobs: claim an
+unowned planet and name it, "dock" at your own, and "dock" at someone else's
+behind a password. The owner asked why it exists, given the original has no
+such command.
+
+It does not. The complete table at GECMDS.C:122 is 47 entries —
+`aba abo adm att buy clo cls dat dec des flu fre hel imp jam jet loc mai min
+mis nav new orb pha pla pri ren rep ros rot sca sel sen set shi spy sys tea
+tor tra war who zip` — and claiming happens through `adm`: orbit an unclaimed
+world, `adm` offers it (mnu_admenu1, "do you wish to claim this planet"), then
+mnu_admenu1a takes the name (GEMAIN.C:2899-2981). There is no docking concept
+at all; you orbit, and orbit is what every planet command gates on.
+
+**Decision:** Implement C's claim flow in `adm`, then delete `land`.
+
+**Reason:** Fidelity, and a concrete cost already paid. `land` was not a
+harmless convenience — it grew two defects of its own. Its team-lock branch
+admitted any stranger who typed nothing (`arg === 'team' || arg === ''`, never
+comparing the visitor's team to the planet's), justified by a comment claiming
+"ship carries no explicit teamcode field" when `ShipState.teamcode` exists. And
+it invented a closed-by-default docking rule inconsistent with trading: a
+colony with no password refused visitors while happily selling to them.
+
+Both are instances of the pattern that produced most of this playtest round's
+bugs — two implementations of one rule drifting apart. The neutral zone (AI
+copy correct, player copy wrong), the buy gates (`buy` correct, `pri` wrong),
+and planet access (`buy` correct, `land` wrong) were all the same shape. An
+invented command that shadows a real one is a standing invitation to it.
+
+**Alternatives rejected:**
+- *Keep `land` as an alias for `adm`.* Preserves the same hazard in miniature
+  and keeps teaching players a verb the original does not have.
+- *Keep `land`, fix its bugs.* Already done twice. The third fix is deletion.
+- *Delete `land` first.* Not possible: `adm` refused every planet the caller did
+  not already own, so `land` was the only way to claim anything. The claim path
+  had to exist in `adm` before `land` could go.
+
+**Sequencing note:** the two halves shipped as separate commits because a
+playtest was in flight whose land-rush persona was using `land`; removing it
+mid-run would have invalidated that agent's mission and produced a phantom bug
+report.
