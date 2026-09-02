@@ -72,6 +72,19 @@ socket.on('message.send', (p) => out('[]', `[${p.channel}] ${p.from}: ${p.text}`
 socket.on('combat.ship-destroyed', (p) =>
   out('##', `DESTROYED victim=${p.victimUserid} attacker=${p.attackerName ?? p.attackerId ?? 'none'} weapon=${p.weapon ?? 'none'}`));
 
+// Incoming fire. The gateway sends COMBAT_HIT to the victim's own socket
+// (game.gateway.ts:868) and this client did not listen, so a pilot being shot
+// saw nothing at all and reported deaths as silent — an instrumentation gap
+// mistaken for a game defect across three playtests. A browser client has
+// always handled these.
+socket.on('combat.hit', (p) =>
+  out('><', `HIT ${p.attackerName ?? p.attackerId ?? '?'} -> ${p.victimName ?? p.victimId ?? '?'}`
+        + ` ${p.weapon ?? '?'} hull-${Math.round(p.damageHull ?? 0)}% shield-${Math.round(p.damageShield ?? 0)}%`));
+socket.on('combat.miss', (p) =>
+  out('><', `MISS ${p.weapon ?? '?'} from ${p.attackerId ?? '?'}`));
+socket.on('combat.subsystem-damaged', (p) =>
+  out('><', `SUBSYSTEM ${p.subsystem ?? '?'} damaged`));
+
 socket.on('prompt:ship-name', () => {
   out('..', `naming ship ${shipName}`);
   socket.emit('prompt:reply', { value: shipName });
