@@ -7,6 +7,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { resolveItemKeyword, parseUint32 } from '../validators';
 import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
 import { parseTaxRate } from './helpers/tax-rate';
+import { describeTradeAccess } from './helpers/trade-access-label';
 
 /**
  * Handles the `admin` / `adm` command — planet owner configuration.
@@ -27,7 +28,7 @@ const ADMIN_USAGE: readonly string[] = [
   '  adm reserve <item> <value>     hold back from sale',
   '  adm tax <0-100>                tax rate',
   '  adm beacon <message>           message shown to visitors',
-  '  adm password <word|none|team>  who may land',
+  '  adm password <word|none|team>  who may trade here',
 ];
 
 /** Invalid-value message followed by the full sub-command usage. */
@@ -38,13 +39,6 @@ function usageError(): CommandResult {
       ...ADMIN_USAGE.map((text) => ({ text, category: 'system' as const })),
     ],
   };
-}
-
-/** How the admin screen describes who may land. @see GEMAIN.C:3024 ADMIN06 */
-function describeLanding(password: string, teamcode: bigint): string {
-  if (teamcode > 0n) return 'team members only';
-  if (!password || password.toLowerCase() === 'none') return 'anyone';
-  return `password "${password}"`;
 }
 
 @Injectable()
@@ -100,12 +94,12 @@ export class AdminHandlerService {
         lines.push({ text: '(no items in stock, no rates set)', category: 'info' });
       }
       // C prints four separate lines here — planet cash, the tax pool, the
-      // rate, and who may land (GEMAIN.C:3018-3024). This showed only two, and
+      // rate, and who may trade (GEMAIN.C:3018-3024). This showed only two, and
       // labelled the TAX POOL as "Cash", so an owner could never see the
       // planet's own cash or the landing password they had set.
       lines.push({ text: `Cash: ${Number(state.cash).toLocaleString()} cr   Tax collected: ${Number(state.tax).toLocaleString()} cr`, category: 'info' });
       lines.push({ text: `Tax rate: ${state.taxrate}%`, category: 'info' });
-      lines.push({ text: `Landing: ${describeLanding(state.password, state.teamcode)}`, category: 'info' });
+      lines.push({ text: `Trading: ${describeTradeAccess(state.password, state.teamcode)}`, category: 'info' });
       lines.push(...ADMIN_USAGE.map((text) => ({ text, category: 'system' as const })));
       return { lines };
     }
