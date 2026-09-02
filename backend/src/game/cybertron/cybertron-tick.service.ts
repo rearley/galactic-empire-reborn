@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { isInNeutralZone as inNeutralZone } from '../combat/neutral-zone';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Inject, Optional } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
@@ -816,11 +817,13 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
-   * Returns true if the given coordinate is in the neutral zone (sector 0,0).
-   * @see GEPLANET.C:866 neutral — floor(xcoord)==0 && floor(ycoord)==0
+   * Neutral-zone membership. Delegates to the shared helper, which now agrees
+   * with this rule — it used to test a ±0.5 bubble, so the AI honoured a
+   * boundary the player weapons did not.
+   * @see combat/neutral-zone.ts, GEPLANET.C:866
    */
   private isInNeutralZone(ship: { xcoord: number; ycoord: number }): boolean {
-    return Math.floor(ship.xcoord) === 0 && Math.floor(ship.ycoord) === 0;
+    return inNeutralZone(ship);
   }
 
   /**

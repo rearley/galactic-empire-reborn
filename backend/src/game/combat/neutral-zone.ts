@@ -1,26 +1,32 @@
 /**
- * True if a coordinate lies in the neutral-zone origin sector.
+ * True if a coordinate lies in the neutral zone — the whole of sector (0,0).
  *
- * The C source `neutral()` tests `coord1(x)==0 && coord1(y)==0` where
- * `coord1` truncates toward the sector index. The origin sector spans
- * (−0.5, +0.5) on each axis in this port's sector-unit coordinates.
+ *   xsect = coord1(coord->xcoord);
+ *   ysect = coord1(coord->ycoord);
+ *   return (xsect == 0 && ysect == 0);
  *
- * @see GEFUNCS.C:neutral, GECMDS.C:937 (firep self-zap gate)
+ * `coord1` is floor (GECMDS.C:3102), so the zone is 0 <= x < 1 on each axis.
+ *
+ * This tested a ±0.5 bubble around the origin POINT instead, which is wrong at
+ * both ends: it protected x in (-0.5, 0), which floors to sector -1, and left
+ * x in [0.5, 1) exposed, which is squarely inside sector 0. The five trading
+ * posts sit between 0.1 and 0.9, so most of the hub — the one place a new
+ * pilot is meant to be safe — could be fired on. CybertronTickService had this
+ * right all along with its own floor-based copy citing the same C line, so the
+ * AI honoured a boundary the player weapons did not.
+ *
+ * @see GEPLANET.C:866 neutral, GECMDS.C:937 (firep self-zap gate)
  */
 export function isInNeutralZone(coord: { xcoord: number; ycoord: number }): boolean {
-  return coord.xcoord > -0.5 && coord.xcoord < 0.5 && coord.ycoord > -0.5 && coord.ycoord < 0.5;
+  return Math.floor(coord.xcoord) === 0 && Math.floor(coord.ycoord) === 0;
 }
 
 /**
- * The origin SECTOR — distinct from the neutral-zone coordinate bubble above.
+ * The origin sector's index, for rules that need the coordinates rather than a
+ * membership test (for example, locating the trading posts).
  *
- * `isInNeutralZone` tests a ±0.5 bubble around the origin, which is what the
- * combat rules use. Sector membership is `Math.floor(coord) === 0`, a larger
- * area: the five neutral-zone planets sit at 0.2..0.8 on each axis, inside
- * sector 0,0 but mostly OUTSIDE the combat bubble.
- *
- * Use this for rules about the sector (for example, nothing here is
- * claimable); use isInNeutralZone for rules about the protected bubble.
+ * `isInNeutralZone` above is the membership test and now covers exactly this
+ * sector; the two no longer describe different areas.
  */
 /**
  * Owner recorded on the five neutral-zone trading posts.
