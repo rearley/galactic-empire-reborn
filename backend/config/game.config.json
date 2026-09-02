@@ -1,7 +1,7 @@
 {
   "weapons": {
     "PDAMMAX": 25,
-    "PFIRDST": 1,
+    "PFIRDST": 3,
     "HPDAMMAX": 200,
     "HPFIRDST": 1,
     "TDAMMAX": 100,
@@ -14,7 +14,7 @@
     "MISLSPED": 300,
     "MISENGFC": 10,
     "PHATOWRP": 0,
-    "SE100DAM": 101,
+    "SE100DAM": 40,
     "NUMMINES": 200,
     "USRMINES": 200,
     "DECODDS": 2,

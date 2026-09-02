@@ -157,16 +157,29 @@ describe('T060 — GEMAIN.H ↔ TS balance constant pins', () => {
 import { PDAMMAX, PFIRDST, TORFACT, MISFACT, SE100DAM, PHATOWRP, MAXSHIPS } from '../../src/game/constants';
 
 describe('combat balance constants (Plan 1)', () => {
-  it('pins phaser + lock + self-zap defaults', () => {
-    // PDAMMAX is a sysop option, not a GEMAIN.H define: numopt(PDAMMAX,1,200)
-    // gives only the bounds. 25 is the playtest default (env-overridable) —
-    // 200 made every phaser one-shot, since ships die at damage >= 100.
-    expect(PDAMMAX).toBe(25);
-    expect(PFIRDST).toBe(1);
+  /**
+   * These are sysop OPTIONS, not GEMAIN.H defines — C supplies only the bounds
+   * via numopt (GEMAIN.C:463, 493, 494, 598), and the deployment picks a value
+   * in `config/game.config.json`. Pinning the deployed number froze a knob the
+   * original exists to expose: tuning PFIRDST from 1 to 3 to stop Sartern
+   * Obliterators one-shotting starter hulls from five sectors broke this test,
+   * which is the opposite of what a balance guard should do.
+   *
+   * What is worth guarding is that every value stays inside C's range, so a
+   * typo in the config file is caught rather than clamped silently.
+   */
+  it('keeps phaser, lock and self-zap options inside C\'s ranges', () => {
+    expect(PDAMMAX).toBeGreaterThanOrEqual(1);
+    expect(PDAMMAX).toBeLessThanOrEqual(200);      // numopt(PDAMMAX,1,200)
+    expect(PFIRDST).toBeGreaterThanOrEqual(1);
+    expect(PFIRDST).toBeLessThanOrEqual(20);       // numopt(PFIRDST,1,20)
+    expect(SE100DAM).toBeGreaterThanOrEqual(1);
+    expect(SE100DAM).toBeLessThanOrEqual(101);     // numopt(SE100DAM,1,101)
+    expect(PHATOWRP).toBeGreaterThanOrEqual(0);
+    expect(PHATOWRP).toBeLessThanOrEqual(100);     // numopt(PHATOWRP,0,100)
+    // TORFACT/MISFACT are NOT sysop options — these stay pinned.
     expect(TORFACT).toBeCloseTo(0.1, 10);
     expect(MISFACT).toBeCloseTo(0.1, 10);
-    expect(SE100DAM).toBe(101);
-    expect(PHATOWRP).toBe(0);
   });
 });
 
