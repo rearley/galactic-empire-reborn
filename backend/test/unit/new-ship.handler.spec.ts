@@ -379,4 +379,29 @@ describe('NewShipHandlerService — name collisions between captains', () => {
     expect(created.data['shield']).toBe(0);
     expect(created.data['phasr']).toBe(100);
   });
+
+  /**
+   * "New Heavy Freighter purchased and docked at Zygor" — and then the hull
+   * materialised at the sector's (0,0) corner, up to 7,071 units from the
+   * station the buyer was orbiting. The position was floored to the sector
+   * index, throwing away the intra-sector coordinates entirely.
+   *
+   * That was survivable when `orb` worked from anywhere in the sector. Now
+   * that orbit requires closing to within 250 units, it is a seven-minute
+   * impulse crawl back to the station you were already docked at.
+   */
+  it('leaves the new hull where the buyer is, not at the sector corner', async () => {
+    const { service, prismaMock } = makeService();
+    const buyer = makeShip();
+    buyer.xcoord = 0.4812;
+    buyer.ycoord = 0.5533;
+
+    await service.command.handler(buyer, ['ship', '4'], {});
+
+    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(created.data['xcoord']).toBeCloseTo(0.4812, 6);
+    expect(created.data['ycoord']).toBeCloseTo(0.5533, 6);
+  });
 });
