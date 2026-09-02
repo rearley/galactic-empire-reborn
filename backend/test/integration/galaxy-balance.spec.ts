@@ -59,23 +59,33 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
 
   // ── G7: Balance — planet and wormhole counts ─────────────────────────────────
 
-  it('G7.1 — planet count is within [100, 300] at default seed and tunables', async () => {
+  /**
+   * DENSITY, not a raw count. UNIVMAX is a sysop option
+   * (numopt(UNIVMAX,10,32767), GEMAIN.C:474) and the galaxy is
+   * (2*UNIVMAX+1)^2 sectors, so an absolute bound silently encodes one
+   * deployment's world size. Raising UNIVMAX from 10 to 15 — to dilute the
+   * Cybertron kill circles that covered half the map — took the galaxy from
+   * 441 to 961 sectors and broke these, even though planets per sector barely
+   * moved (0.476 -> 0.465). The bounds below are the original [100,300] and
+   * [10,40] expressed per sector against the 441-sector galaxy they were
+   * calibrated on, so they now hold at any world size.
+   */
+  const BASELINE_SECTORS = 441; // (2*10+1)^2, the size these bounds came from
+
+  it('G7.1 — planet DENSITY matches the calibrated range at any UNIVMAX', async () => {
     const count = await prisma.planet.count();
-    // plodds=4, wormodds=10, maxplanets=5 over the universe square
-    // (-UNIVMAX..+UNIVMAX on both axes).
-    // Expected range derived from: sectors × (1/plodds) odds per sector
-    // with up to maxplanets planets each → rough centre ~562, clamped by
-    // actual placement logic; empirical range confirmed against C source.
-    expect(count).toBeGreaterThanOrEqual(100);
-    expect(count).toBeLessThanOrEqual(300);
+    const sectors = (2 * UNIVMAX + 1) ** 2;
+    const density = count / sectors;
+    expect(density).toBeGreaterThanOrEqual(100 / BASELINE_SECTORS);
+    expect(density).toBeLessThanOrEqual(300 / BASELINE_SECTORS);
   });
 
-  it('G7.2 — wormhole count is within [10, 40] at default seed and tunables', async () => {
+  it('G7.2 — wormhole DENSITY matches the calibrated range at any UNIVMAX', async () => {
     const count = await prisma.wormhole.count();
-    // wormodds=10 → ~1-in-10 chance per sector → ~45 expected; capped by
-    // available unique destination sectors. Empirical range from C source.
-    expect(count).toBeGreaterThanOrEqual(10);
-    expect(count).toBeLessThanOrEqual(40);
+    const sectors = (2 * UNIVMAX + 1) ** 2;
+    const density = count / sectors;
+    expect(density).toBeGreaterThanOrEqual(10 / BASELINE_SECTORS);
+    expect(density).toBeLessThanOrEqual(40 / BASELINE_SECTORS);
   });
 
   // ── G8: Wormhole destination coordinate integrity ────────────────────────────
