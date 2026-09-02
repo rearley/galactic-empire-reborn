@@ -16,8 +16,11 @@
 import { SYSOP_OPTIONS, loadGameConfig, flattenConfigFile, resolveGameConfig } from '../../../src/game/config/game-config';
 
 describe('sysop option registry', () => {
-  it('declares every numopt option found in the C source', () => {
-    expect(Object.keys(SYSOP_OPTIONS)).toHaveLength(51);
+  it('declares every numopt/lngopt option found in the C source', () => {
+    // 52 since PLANTOCK joined them. It is an lngopt (GEMAIN.C:469) held in
+    // MINUTES, and was previously a hard-coded PLANTOCK_SECONDS = 1800 under a
+    // comment calling 30 minutes canonical -- canon ships 360.
+    expect(Object.keys(SYSOP_OPTIONS)).toHaveLength(52);
   });
 
   it('records the C clamp bounds for each option', () => {
@@ -95,12 +98,13 @@ describe('loadGameConfig', () => {
   });
 
   it('marks which options are actually wired into gameplay', () => {
-    // 25 of the 51 back a live constant today; the rest are declared so the
-    // bounds are recorded and the gap is visible.
+    // Of the 52 declared, these back a live constant; the rest are declared so
+    // the bounds are recorded and the gap stays visible.
     // 26 since IDAMMAX joined them — ion cannons are implemented
-    // (GEFUNCS.C:1785-1812 fireion).
+    // (GEFUNCS.C:1785-1812 fireion). 27 since PLANTOCK became an option
+    // rather than a hard-coded constant.
     const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(26);
+    expect(wired.length).toBe(27);
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {
