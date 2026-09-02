@@ -81,7 +81,15 @@ export function decideOverspeed(ship: ShipState, rng: OverspeedRng): OverspeedDe
     return {
       kind: 'recover',
       topspeed: newTopspeed,
-      speed2b: newTopspeed * 1000,
+      // C writes `ptr->speed2b = ptr->topspeed*1000.0` flat (GEFUNCS.C:777),
+      // which SETS the target speed rather than capping it -- so a pilot who
+      // heeded the warning and typed `war 0` to stop and repair was instead
+      // pushed back up to the new top speed and kept flying. Under fire that is
+      // fatal: you cannot stop to raise shields or run repairs at the moment
+      // you most need to. Clamped instead, per the project rule that the
+      // original's defects are fixed rather than reproduced.
+      // @see docs/DECISIONS.md — canon is the source of truth, bugs excepted
+      speed2b: Math.min(ship.speed2b, newTopspeed * 1000),
       warncntr: 0,
     };
   }

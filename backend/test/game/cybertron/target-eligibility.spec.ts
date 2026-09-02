@@ -34,16 +34,26 @@ describe('canPursue — the hunter\'s lowest_to_attk (GECYBS.C:711, 719)', () =>
     }
   });
 
-  it('a Cybertron Scout (User = 10) pursues only class 9 and up', () => {
-    // lta = 10 - 1 = 9; `lta <= wptr->shpclass`.
-    expect(canPursue(10, 8)).toBe(false);
-    expect(canPursue(10, 9)).toBe(true);
-    expect(canPursue(10, 34)).toBe(true);
+  it('a hunter with User = 10 pursues class 10 and up', () => {
+    expect(canPursue(10, 9)).toBe(false);
+    expect(canPursue(10, 10)).toBe(true);
+    expect(canPursue(10, 41)).toBe(true);
   });
 
-  it('uses `>= lta`, not `>= lowest_to_attk` — the port was one class too strict', () => {
-    expect(canPursue(6, 5)).toBe(true); // lta = 5
-    expect(canPursue(6, 4)).toBe(false);
+  it("C's -1 is an index-basis conversion, not part of the rule", () => {
+    // These asserted `lta = lowest_to_attk - 1` applied to OUR class numbers,
+    // which double-counts a conversion C has already made. `wptr->shpclass` is
+    // a 0-BASED index into shipclass[]: GEMAIN.C:898 increments i once per
+    // block, GECMDS.C:412 prints i+1 as the number the player sees, and
+    // GECMDS.C:4562 parses a typed class with atoi()-1. Our shpclass is the
+    // 1-based classNumber from the seed, so the threshold applies directly.
+    //
+    // The case that reached a player: the Sarten Obliterator has LATK 3. Canon
+    // starts it at display class 3, the Heavy Freighter; subtracting again
+    // pulled it down to class 2, the Stealth Fighter -- the ship a player
+    // upgrades into straight after the Interceptor.
+    expect(canPursue(3, 2)).toBe(false); // Stealth Fighter: exempt
+    expect(canPursue(3, 3)).toBe(true);  // Heavy Freighter: fair game
   });
 
   it('User = 0 pursues all', () => {
