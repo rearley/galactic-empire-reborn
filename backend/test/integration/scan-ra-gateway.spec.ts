@@ -130,7 +130,7 @@ describe('T021 — sca ra 5 gateway integration', () => {
 
     beforeEach(async () => {
       const self = makeShip({ userid: 'player1', shipno: 1, xcoord: 10, ycoord: 7, scanHome: false, where: 0 });
-      const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 10.005, ycoord: 7, status: 1 });
+      const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 10.005, ycoord: 7, status: 2 });
       const human = makeShip({ userid: 'player2', shipno: 1, xcoord: 10.003, ycoord: 7.002, status: 0 });
 
       const scanService = await makeScanService([self, ai, human], 50_000);

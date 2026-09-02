@@ -190,9 +190,9 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     expect(header).toContain(`— Sector ${xsect},${ysect}`);
   });
 
-  test('AI ship (status=1) gets colour "ai"', async () => {
+  test('AI ship (status=GESTAT_AUTO) gets colour "ai"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
-    const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 0.01, ycoord: 0, status: 1 });
+    const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 0.01, ycoord: 0, status: 2 });
     const { service: svc } = makeService([self, ai], SCAN_RANGE);
     await svc.onModuleInit();
 

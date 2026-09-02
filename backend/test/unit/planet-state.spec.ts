@@ -400,16 +400,20 @@ describe('PlanetStateService — applyAdminChange()', () => {
     expect(result).toEqual({ ok: false, reason: 'INVALID' });
   });
 
+  /**
+   * `none` and `team` are keywords that also drive the planet's team lock, so
+   * the change carries the owner's teamcode. @see planet-password.ts
+   */
   it('sets password', async () => {
     const { svc } = await setup();
-    const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'password', value: 'secret' });
+    const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'password', value: 'secret', ownerTeamcode: null });
     expect(result).toEqual({ ok: true });
     expect(svc.get(1, 1, 1)?.password).toBe('secret');
   });
 
   it('INVALID when password > 10 chars', async () => {
     const { svc } = await setup();
-    const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'password', value: 'tooooooolong' });
+    const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'password', value: 'tooooooolong', ownerTeamcode: null });
     expect(result).toEqual({ ok: false, reason: 'INVALID' });
   });
 

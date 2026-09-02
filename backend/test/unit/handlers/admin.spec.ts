@@ -210,7 +210,9 @@ describe('AdminHandlerService', () => {
     const { svc, applyAdminChangeMock } = makeService();
     await svc.command.handler(makeShip(), ['password', 'secret'], {});
     expect(applyAdminChangeMock).toHaveBeenCalledWith(
-      expect.any(String), 'owner', { type: 'password', value: 'secret' },
+      // The owner's teamcode rides along: `none`/`team` drive the planet's
+      // team lock, not just the stored word. @see planet-password.ts
+      expect.any(String), 'owner', { type: 'password', value: 'secret', ownerTeamcode: null },
     );
   });
 
@@ -218,7 +220,7 @@ describe('AdminHandlerService', () => {
     const { svc, applyAdminChangeMock } = makeService();
     await svc.command.handler(makeShip(), ['password'], {});
     expect(applyAdminChangeMock).toHaveBeenCalledWith(
-      expect.any(String), 'owner', { type: 'password', value: 'none' },
+      expect.any(String), 'owner', { type: 'password', value: 'none', ownerTeamcode: null },
     );
   });
 

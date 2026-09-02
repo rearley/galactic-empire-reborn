@@ -40,6 +40,13 @@ function usageError(): CommandResult {
   };
 }
 
+/** How the admin screen describes who may land. @see GEMAIN.C:3024 ADMIN06 */
+function describeLanding(password: string, teamcode: bigint): string {
+  if (teamcode > 0n) return 'team members only';
+  if (!password || password.toLowerCase() === 'none') return 'anyone';
+  return `password "${password}"`;
+}
+
 @Injectable()
 export class AdminHandlerService {
   constructor(private readonly planetService: PlanetStateService) {}
@@ -92,7 +99,13 @@ export class AdminHandlerService {
       if (!hasAny) {
         lines.push({ text: '(no items in stock, no rates set)', category: 'info' });
       }
-      lines.push({ text: `Tax rate: ${state.taxrate}%  Cash: ${Number(state.tax).toLocaleString()} cr`, category: 'info' });
+      // C prints four separate lines here — planet cash, the tax pool, the
+      // rate, and who may land (GEMAIN.C:3018-3024). This showed only two, and
+      // labelled the TAX POOL as "Cash", so an owner could never see the
+      // planet's own cash or the landing password they had set.
+      lines.push({ text: `Cash: ${Number(state.cash).toLocaleString()} cr   Tax collected: ${Number(state.tax).toLocaleString()} cr`, category: 'info' });
+      lines.push({ text: `Tax rate: ${state.taxrate}%`, category: 'info' });
+      lines.push({ text: `Landing: ${describeLanding(state.password, state.teamcode)}`, category: 'info' });
       lines.push(...ADMIN_USAGE.map((text) => ({ text, category: 'system' as const })));
       return { lines };
     }
@@ -156,7 +169,7 @@ export class AdminHandlerService {
       }
       case 'password': {
         const value = args[1] ?? 'none';
-        change = { type: 'password', value };
+        change = { type: 'password', value, ownerTeamcode: ship.teamcode ?? null };
         break;
       }
       default:

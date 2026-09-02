@@ -10,6 +10,7 @@ import { applyEconomyTick } from './planet-economy';
 import { PlanetEconomyService } from './planet-economy.service';
 import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
 import { TAXRATE_MAX } from '../commands/handlers/helpers/tax-rate';
+import { resolvePlanetPassword } from './planet-password';
 import { OnEvent } from '@nestjs/event-emitter';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 
@@ -483,12 +484,19 @@ export class PlanetStateService implements OnModuleInit {
           }
           state.beacon = change.value;
           break;
-        case 'password':
+        case 'password': {
           if (change.value.length > 10) {
             return { ok: false as const, reason: 'INVALID' as const };
           }
-          state.password = change.value;
+          // "none"/"team" are keywords that also drive the planet's team lock;
+          // storing the raw word left team access inert and let a teamless
+          // owner's `adm password team` admit anyone typing "team".
+          // @see planet-password.ts, GEMAIN.C:3266-3290
+          const resolved = resolvePlanetPassword(change.value, change.ownerTeamcode);
+          state.password = resolved.password;
+          state.teamcode = resolved.teamcode;
           break;
+        }
         default: {
           const _: never = change;
           return { ok: false as const, reason: 'INVALID' as const };

@@ -61,4 +61,4 @@ export type AdminChange =
   | { type: 'reserve';  itemIndex: number; value: number }
   | { type: 'taxrate';  value: number }
   | { type: 'beacon';   value: string }
-  | { type: 'password'; value: string };
+  | { type: 'password'; value: string; ownerTeamcode: bigint | null };
