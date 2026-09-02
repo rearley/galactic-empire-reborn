@@ -228,14 +228,21 @@ describe('scan pl — bearing to the planet', () => {
     // Same geometry, ship turned around: the planet is now behind it.
     const behind = await scanFrom({ xcoord: 10.5, ycoord: 7.9, heading: 180 });
     expect(bearingOf(ahead)).not.toBe(bearingOf(behind));
-    expect(bearingOf(behind)).toBe((bearingOf(ahead) + 180) % 360);
+    // Signed: turning 180 degrees flips the sign as well as the magnitude, so
+    // compare on the absolute compass angle rather than modulo arithmetic.
+    const toAbsolute = (relative: number, heading: number) => ((relative + heading) % 360 + 360) % 360;
+    expect(toAbsolute(bearingOf(ahead), 0)).toBe(toAbsolute(bearingOf(behind), 180));
   });
 
-  it('stays within 0..359', async () => {
+  it('stays within the -180..180 a player can act on', async () => {
+    // Scans report a SIGNED bearing, as GELIB.C:142-166 does -- negative to
+    // port, positive to starboard. This asserted 0..359, which is the range
+    // valdegree REJECTS (GEFUNCS.C:1941): a target off the port bow printed
+    // something like 300 and `pha 300` came back "number out of range".
     for (const heading of [0, 45, 90, 200, 359]) {
       const b = bearingOf(await scanFrom({ xcoord: 10.9, ycoord: 7.9, heading }));
-      expect(b).toBeGreaterThanOrEqual(0);
-      expect(b).toBeLessThan(360);
+      expect(b).toBeGreaterThanOrEqual(-180);
+      expect(b).toBeLessThanOrEqual(180);
     }
   });
 });

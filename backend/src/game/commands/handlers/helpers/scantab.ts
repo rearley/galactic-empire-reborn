@@ -1,4 +1,5 @@
 import { ShipState } from '../../../ship/ship-state.types';
+import { cbearing } from '../../../physics/physics-math';
 
 /** Maximum number of scantab slots — widened to full alphabet (vs. original 15). */
 const NOSCANTAB = 26;
@@ -53,11 +54,12 @@ function calcDist(self: ShipState, other: ShipState): number {
  * @see GECMDS.C:2822 (cbearing(&warsptr->coord,&wptr->coord,warsptr->heading))
  */
 function calcBearing(self: ShipState, other: ShipState): number {
-  const dx = other.xcoord - self.xcoord;
-  const dy = other.ycoord - self.ycoord;
-  // Absolute compass angle: north=0, clockwise. y increases downward so negate dy.
-  const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-  return Math.round((absAngle - self.heading + 360) % 360);
+  // Signed -180..180, via the shared helper. Both sites here already
+  // DOCUMENTED themselves as matching cbearing and "heading-relative, not
+  // compass-absolute", then folded to 0..359 anyway -- which is the range
+  // valdegree rejects, so the number shown could not be used.
+  // @see GELIB.C:142-166
+  return Math.round(cbearing(self, other, self.heading));
 }
 
 /**

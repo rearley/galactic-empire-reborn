@@ -5,6 +5,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { cdistance } from '../../combat/combat-math';
 import { UNIVMAX } from '../../constants';
+import { cbearing } from '../../physics/physics-math';
 
 /**
  * Calculates bearing from (fromX, fromY) to (toX, toY).
@@ -21,10 +22,21 @@ import { UNIVMAX } from '../../constants';
  * hidden while every ship spawned facing 0, because the two formulas happen to
  * agree for due-east targets.
  */
-function calcBearing(fromX: number, fromY: number, toX: number, toY: number): number {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  return Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360);
+function calcBearing(
+  ship: { xcoord: number; ycoord: number; heading: number },
+  toX: number,
+  toY: number,
+): number {
+  // C prints cbearing(from, to, warsptr->heading) -- a SIGNED, HEADING-RELATIVE
+  // bearing (GECMDS.C:5142-5155). This function used to omit the heading term
+  // entirely and return an absolute compass bearing, so `nav` told the pilot to
+  // steer to a number that only coincided with the right answer while the ship
+  // happened to be facing 0.
+  //
+  // Display only. The autopilot steers on an absolute heading computed in
+  // engine-course.ts, which is our own addition -- `nav` in the original is a
+  // report, not an autopilot.
+  return Math.round(cbearing(ship, { xcoord: toX, ycoord: toY }, ship.heading));
 }
 
 /**
@@ -55,7 +67,7 @@ export class NavHandlerService {
         // Active autopilot — show status
         const tx = (ship.navTargetX ?? 0) + 0.5;
         const ty = (ship.navTargetY ?? 0) + 0.5;
-        const bearing = calcBearing(ship.xcoord, ship.ycoord, tx, ty);
+        const bearing = calcBearing(ship, tx, ty);
         const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
 
         return {
@@ -127,7 +139,7 @@ export class NavHandlerService {
 
       const tx = xParsed + 0.5;
       const ty = yParsed + 0.5;
-      const bearing = calcBearing(ship.xcoord, ship.ycoord, tx, ty);
+      const bearing = calcBearing(ship, tx, ty);
       const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
 
       return {

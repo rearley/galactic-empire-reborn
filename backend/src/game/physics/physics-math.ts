@@ -220,3 +220,33 @@ export function sectorOf(coord: { x: number; y: number }): { x: number; y: numbe
 export function headingToward(dx: number, dy: number): number {
   return ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
 }
+
+/**
+ * Relative bearing from one ship to a point, SIGNED, in -180..180.
+ *
+ *     b = normal(360 - heading + vector(from, to));
+ *     if (b > 180) b = b - 360;
+ *
+ * The sign is the whole point: negative is to port, positive to starboard, and
+ * the magnitude is how far you must turn. `valdegree` (GEFUNCS.C:1941) accepts
+ * only -180..180, so this is exactly the number a player can feed straight back
+ * into a command.
+ *
+ * The port had no equivalent, because cbearing lives in GELIB.C -- one of the
+ * files missing from reference/ge-source until the full distribution was
+ * vendored. Every display site had independently reimplemented it as an
+ * UNSIGNED 0..359 value, so a target off the port bow scanned as e.g. 300 and
+ * `pha 300` was then rejected as out of range. Half of all targets were
+ * unshootable, with nothing on screen to suggest subtracting 360.
+ *
+ * @see GELIB.C:142-166 cbearing
+ * @see GEFUNCS.C:1941 valdegree — the -180..180 consumer
+ */
+export function cbearing(
+  from: { xcoord: number; ycoord: number },
+  to: { xcoord: number; ycoord: number },
+  heading: number,
+): number {
+  const b = normalizeHeading(headingToward(to.xcoord - from.xcoord, to.ycoord - from.ycoord) - heading);
+  return b > 180 ? b - 360 : b;
+}

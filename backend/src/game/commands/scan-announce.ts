@@ -1,4 +1,5 @@
 import { cdistance } from '../combat/combat-math';
+import { cbearing } from '../physics/physics-math';
 
 /** What the scanned ship is told. @see GECMDS.C:2261-2280 */
 export type ScanAnnouncementKind =
@@ -42,10 +43,12 @@ export function decideScanAnnouncement(
   target: { xcoord: number; ycoord: number; heading: number; scanRange: number },
   targetKnowsScanner: boolean,
 ): ScanAnnouncement {
-  const dx = scanner.xcoord - target.xcoord;
-  const dy = scanner.ycoord - target.ycoord;
-  const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-  const bearing = Math.round((absAngle - target.heading + 360) % 360) % 360;
+  // Signed -180..180, from the TARGET's frame toward the scanner:
+  // cbearing(&wptr->coord, &warsptr->coord, wptr->heading). This is the number
+  // a hunted pilot turns on to face or flee the contact, so folding it to
+  // 0..359 handed them a heading `rot` would refuse.
+  // @see GELIB.C:142-166
+  const bearing = Math.round(cbearing(target, scanner, target.heading));
 
   const distRaw = cdistance(target, scanner) * 10_000;
   if (distRaw > target.scanRange) return { kind: 'SCAN2', bearing };

@@ -6,6 +6,7 @@ import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
+import { cbearing } from '../../physics/physics-math';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
@@ -74,10 +75,11 @@ function relativeBearing(
   ship: { xcoord: number; ycoord: number; heading: number },
   target: { xcoord: number; ycoord: number },
 ): number {
-  const dx = target.xcoord - ship.xcoord;
-  const dy = target.ycoord - ship.ycoord;
-  const absAngle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-  return Math.round((absAngle - ship.heading + 360) % 360) % 360;
+  // Delegates to the shared cbearing so scans report the SIGNED -180..180
+  // bearing the original does. This used to fold to 0..359, which made every
+  // target off the port bow print a value `pha` and `rot` reject outright.
+  // @see GELIB.C:142-166
+  return Math.round(cbearing(ship, target, ship.heading));
 }
 
 @Injectable()

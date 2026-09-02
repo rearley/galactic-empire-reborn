@@ -280,34 +280,69 @@ describe('NavHandlerService — command metadata', () => {
 });
 
 /**
- * The bearing `nav` prints and the bearing the autopilot steers by were
- * computed with different formulas: the handler used `atan2(dx, dy)` while the
- * physics tick uses `atan2(dx, -dy)`. Heading 0 is north (y-decreasing), so the
- * handler's number was mirrored about the east-west axis — it told a pilot
- * heading for a target due north to steer 180.
+ * `nav` prints a bearing RELATIVE to the ship's own heading, signed -180..180,
+ * exactly as the original does: GECMDS.C:5142 passes `warsptr->heading` into
+ * cbearing, and GELIB.C:142-166 folds the result about 180.
  *
- * Invisible until spawn headings became random, because a ship sitting at
- * heading 0 happened to agree for due-east targets.
+ * Two separate defects lived here. The handler first used `atan2(dx, dy)` where
+ * the physics tick uses `atan2(dx, -dy)`, mirroring the number about the
+ * east-west axis. That was fixed, but the replacement returned an ABSOLUTE
+ * compass bearing -- it never subtracted the heading at all -- which is a
+ * different formula from the original's and produces a number no command will
+ * accept: `pha` and `rot` are gated on valdegree's -180..180 (GEFUNCS.C:1941),
+ * so any target off the port bow printed something like 300 and was then
+ * refused, with nothing on screen suggesting you subtract 360.
+ *
+ * The invariant asserted below holds at ANY heading: converting the reported
+ * relative bearing back to absolute must give the heading the autopilot steers.
+ * The previous test compared the two directly, which only ever worked because
+ * the fixture sat at heading 0 -- the same blind spot that hid the original bug.
  */
-describe('NavHandlerService — reported bearing matches the steering', () => {
-  /** Same expression the physics tick uses to point the ship at the target. */
+describe('NavHandlerService — reported bearing is relative to the ship heading', () => {
+  /** Same expression the physics tick and engine-course use to point the ship. */
   const steeringBearing = (fromX: number, fromY: number, toX: number, toY: number): number =>
     Math.round(((Math.atan2(toX - fromX, -(toY - fromY)) * 180) / Math.PI + 360) % 360);
 
-  const reported = (text: string): number => Number(/bearing (\d+)/.exec(text)?.[1] ?? NaN);
+  /** Accepts the sign: a bearing to port is negative. */
+  const reported = (text: string): number => Number(/bearing (-?\d+)/.exec(text)?.[1] ?? NaN);
 
-  it.each([
+  const cases: Array<[string, number, number, number, number]> = [
     ['due north', 5, 9, 5, 2],
     ['due south', 5, 2, 5, 9],
     ['due east', 2, 5, 9, 5],
     ['due west', 9, 5, 2, 5],
     ['north-east', 2, 9, 8, 3],
-  ])('agrees with the autopilot for a target %s', (_label, sx, sy, tx, ty) => {
-    const { handler, state, ctx } = makeService({ xcoord: sx + 0.5, ycoord: sy + 0.5 });
-    const result = handler.command.handler(state, [String(tx), String(ty)], ctx) as {
+  ];
+
+  describe.each([0, 45, 90, 180, 270])('at heading %s', (heading) => {
+    it.each(cases)('reports a steerable relative bearing for a target %s', (_l, sx, sy, tx, ty) => {
+      const { handler, state, ctx } = makeService({
+        xcoord: sx + 0.5, ycoord: sy + 0.5, heading,
+      });
+      const result = handler.command.handler(state, [String(tx), String(ty)], ctx) as {
+        lines: Array<{ text: string }>;
+      };
+      const bearing = reported(result.lines[0].text);
+
+      // Always a number a player can hand straight back to rot/pha.
+      expect(Number.isNaN(bearing)).toBe(false);
+      expect(bearing).toBeGreaterThanOrEqual(-180);
+      expect(bearing).toBeLessThanOrEqual(180);
+
+      // And it still points at the target: relative + own heading = absolute.
+      const absolute = ((bearing + heading) % 360 + 360) % 360;
+      const expected = steeringBearing(sx + 0.5, sy + 0.5, tx + 0.5, ty + 0.5);
+      expect(Math.abs(absolute - expected)).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('reports a negative bearing for a target off the port bow', () => {
+    // The case that was unshootable: heading 0, target due west. The port
+    // printed 270, which pha and rot both reject.
+    const { handler, state, ctx } = makeService({ xcoord: 9.5, ycoord: 5.5, heading: 0 });
+    const result = handler.command.handler(state, ['2', '5'], ctx) as {
       lines: Array<{ text: string }>;
     };
-    const expected = steeringBearing(sx + 0.5, sy + 0.5, tx + 0.5, ty + 0.5);
-    expect(reported(result.lines[0].text)).toBe(expected);
+    expect(reported(result.lines[0].text)).toBe(-90);
   });
 });
