@@ -1,4 +1,4 @@
-import { tryEnergyDebit } from '../physics/physics-math';
+import { tryEnergyDebit, cbearing } from '../physics/physics-math';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -472,12 +472,18 @@ export class CombatTickService implements OnModuleInit {
           tickAt: ctx.firedAt,
         };
         this.events.emit(COMBAT_MINE_DETONATION, det);
-      } else {
-        // Proximity warning — mine in range but not yet detonated.
+      } else if (ship.jammer === 0) {
+        // Proximity warning — mine in range but not yet armed. C prints MINE6
+        // with BEARING and DISTANCE (GEFUNCS.C:1472-1478), and suppresses it
+        // entirely while the ship is jammed. The bearing is the entire value of
+        // the warning: it is what lets a pilot steer away from a mine that will
+        // otherwise do up to MNDAMMAX to them.
         const warn: CombatMineWarningEvent = {
           mineId: mine.id,
           victimId: shipKey(ship.userid, ship.shipno),
           sector: { x: Math.floor(mine.xcoord), y: Math.floor(mine.ycoord) },
+          bearing: Math.round(cbearing(ship, mine, ship.heading)),
+          distance: Math.trunc(cdistance(ship, mine) * 10_000),
           tickAt: ctx.firedAt,
         };
         this.events.emit(COMBAT_MINE_WARNING, warn);

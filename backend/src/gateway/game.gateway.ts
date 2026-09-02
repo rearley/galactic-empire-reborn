@@ -15,6 +15,8 @@ import {
   PhysicsDestructCancelledEvent,
   PHYSICS_HYPERSPACE,
   PhysicsHyperspaceEvent,
+  PHYSICS_UNIVERSE_EDGE,
+  PhysicsUniverseEdgeEvent,
 } from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -28,6 +30,8 @@ import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
   COMBAT_MINE_DETONATION,
+  COMBAT_MINE_WARNING,
+  CombatMineWarningEvent,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
   COMBAT_SHIP_DESTROYED,
@@ -1108,6 +1112,38 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(room).emit('event.log', {
       category: 'system',
       text: 'Dropping out of hyperspace.',
+    });
+  }
+
+  /**
+   * Mine proximity warning.
+   *
+   * C prints MINE6 with bearing and distance for a mine in range that has not
+   * armed yet, and suppresses it while the ship is jammed (GEFUNCS.C:1472-1478).
+   * The port emitted the event and nothing listened, so mines gave NO warning
+   * at all — and a mine does up to MNDAMMAX to a hull that dies at 100.
+   */
+  @OnEvent(COMBAT_MINE_WARNING)
+  handleCombatMineWarning(event: CombatMineWarningEvent): void {
+    this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
+      category: 'combat',
+      text: `** Mine detected — bearing ${event.bearing}, range ${event.distance}. **`,
+    });
+  }
+
+  /**
+   * Striking the galactic perimeter.
+   *
+   * telezip zeroes speed and speed2b and applies TELEDAM, then prints TELEPORT
+   * (GEFUNCS.C:819-833). Emitted without a listener when UNIVWRAP was
+   * implemented, which would have left a pilot stopped dead and damaged with no
+   * explanation — the same silence this commit removes elsewhere.
+   */
+  @OnEvent(PHYSICS_UNIVERSE_EDGE)
+  handlePhysicsUniverseEdge(event: PhysicsUniverseEdgeEvent): void {
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'combat',
+      text: `** You strike the galactic perimeter. All way comes off and the hull takes ${event.damage} damage. **`,
     });
   }
 

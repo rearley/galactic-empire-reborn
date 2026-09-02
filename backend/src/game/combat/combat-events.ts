@@ -69,6 +69,14 @@ export interface CombatMineWarningEvent {
   mineId: number;
   victimId: string;
   sector: { x: number; y: number };
+  /**
+   * Signed bearing to the mine, relative to the ship's heading
+   * (GEFUNCS.C:1430 `cbearing(&wptr->coord,&mptr->coord,wptr->heading)`).
+   * This is the whole point of the warning — it is what lets a pilot steer off.
+   */
+  bearing: number;
+  /** Raw distance in units, as C prints it (MINE6). */
+  distance: number;
   tickAt: Date;
 }
 
