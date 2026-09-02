@@ -5,6 +5,26 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { TEAM_LIST_DISPLAY_CAP, MAXTEAMS, MAX_TEAMNAME_LENGTH, MAX_TEAM_PASSWORD_LENGTH } from '../../src/game/team/team.types';
 import { TEAMMAX } from '../../src/game/constants';
 
+
+/**
+ * Prisma double for joinByPassword, which does its count-and-join inside a
+ * $transaction with the team row locked FOR UPDATE -- read-then-write outside a
+ * transaction is a TOCTOU race that lets two concurrent joins share the last
+ * slot. The mock runs the callback against the same doubles so the sequence is
+ * exercised rather than stubbed away.
+ */
+function makePrisma(opts: { memberCount: number; update?: jest.Mock }): PrismaService {
+  const update = opts.update ?? jest.fn().mockResolvedValue({});
+  const tx = {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    user: { count: jest.fn().mockResolvedValue(opts.memberCount), update },
+  };
+  return {
+    user: { update, count: jest.fn().mockResolvedValue(opts.memberCount) },
+    $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+  } as unknown as PrismaService;
+}
+
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Alpha',
@@ -181,7 +201,7 @@ describe('TeamService.create', () => {
 describe('TeamService.joinByPassword', () => {
   it('returns no_such_team when name has no case-insensitive match', async () => {
     const repo = { findByNameLower: jest.fn().mockResolvedValue(null) } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Unknown', password: 'pw' });
     expect(result).toEqual({ error: 'no_such_team' });
@@ -191,7 +211,7 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'correct' }),
     } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Raiders', password: 'wrong' });
     expect(result).toEqual({ error: 'wrong_password' });
@@ -201,7 +221,7 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'Secret' }),
     } as unknown as TeamRepository;
-    const prisma = { user: { update: jest.fn(), count: jest.fn().mockResolvedValue(0) } } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Raiders', password: 'secret' });
     expect(result).toEqual({ error: 'wrong_password' });
@@ -218,9 +238,7 @@ describe('TeamService.joinByPassword', () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
-    const prisma = {
-      user: { update: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0) },
-    } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
     const result = await svc.joinByPassword({ ship, name: 'Raiders', password: 'pw' });
@@ -238,9 +256,7 @@ describe('TeamService.joinByPassword', () => {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
     const update = jest.fn().mockResolvedValue({});
-    const prisma = {
-      user: { update, count: jest.fn().mockResolvedValue(TEAMMAX) },
-    } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: TEAMMAX, update });
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
     const result = await svc.joinByPassword({ ship, name: 'Raiders', password: 'pw' });
@@ -249,13 +265,39 @@ describe('TeamService.joinByPassword', () => {
     expect(ship.teamcode).toBeUndefined();
   });
 
+  it('counts and joins inside one transaction, with the team row locked', async () => {
+    // The cap is only meaningful if the check and the write are atomic. Two
+    // pilots taking the last slot concurrently would otherwise both read
+    // TEAMMAX-1 and both succeed. The original could not hit this -- a BBS ran
+    // one session at a time -- but a websocket server can.
+    const repo = {
+      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+    } as unknown as TeamRepository;
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      user: { count: jest.fn().mockResolvedValue(0), update: jest.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+    } as unknown as PrismaService;
+    const svc = new TeamService(prisma, repo);
+
+    await svc.joinByPassword({ ship: makeShip({ teamcode: undefined }), name: 'Raiders', password: 'pw' });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // The lock is taken BEFORE the count, or it serialises nothing.
+    const lockOrder = tx.$queryRaw.mock.invocationCallOrder[0];
+    const countOrder = tx.user.count.mock.invocationCallOrder[0];
+    const updateOrder = tx.user.update.mock.invocationCallOrder[0];
+    expect(lockOrder).toBeLessThan(countOrder);
+    expect(countOrder).toBeLessThan(updateOrder);
+  });
+
   it('admits the member who exactly fills the last slot', async () => {
     const repo = {
       findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
-    const prisma = {
-      user: { update: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(TEAMMAX - 1) },
-    } as unknown as PrismaService;
+    const prisma = makePrisma({ memberCount: TEAMMAX - 1 });
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip({ teamcode: undefined }), name: 'Raiders', password: 'pw' });
     expect(result).toEqual({ ok: true, teamname: 'Raiders' });
