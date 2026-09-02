@@ -10,6 +10,11 @@ import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
 import { ShipStateService } from './ship-state.service';
 import { ShipState } from './ship-state.types';
 import { decideOverspeed, OverspeedRng } from './ship-overspeed';
+import {
+  SHIP_OVERSPEED,
+  ShipOverspeedEvent,
+  overspeedMessage,
+} from './overspeed-events';
 import { MaintenanceService } from './maintenance.service';
 import { decideAutoShield } from './auto-shield';
 import { SHIELDDM,
@@ -128,6 +133,13 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.warncntr = overspeed.warncntr;
         });
+        // `prfmsg(WARPFAST + ptr->warncntr)` — the rung BEFORE the increment,
+        // so the first strain warning is rung 0. @see overspeed-events.ts
+        this.events?.emit(SHIP_OVERSPEED, {
+          shipId: `${ship.userid}:${ship.shipno}`,
+          kind: 'warn',
+          text: overspeedMessage('warn', overspeed.warncntr - 1),
+        } satisfies ShipOverspeedEvent);
         break;
       case 'break':
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
@@ -136,6 +148,11 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
           s.speed2b = overspeed.speed2b;
           s.damage += overspeed.damage;
         });
+        this.events?.emit(SHIP_OVERSPEED, {
+          shipId: `${ship.userid}:${ship.shipno}`,
+          kind: 'break',
+          text: overspeedMessage('break', overspeed.warncntr),
+        } satisfies ShipOverspeedEvent);
         break;
       case 'recover':
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
@@ -147,8 +164,6 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       case 'noop':
         break;
     }
-    // TODO (US2): emit WARPBRK/WARPFAST/WARPSPD events to ship's socket when
-    // GameGateway socket-routing is available for per-ship messages.
   }
 
   /**
