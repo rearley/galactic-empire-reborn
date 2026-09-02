@@ -14,6 +14,7 @@ import { inScanRange, damstr } from '../../combat/combat-math';
 import { ITEM_NAMES } from '../../constants/items';
 import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
 import { scanDistanceUnits } from './helpers/scan-distance';
+import { scanShipColour } from './helpers/scan-ship-colour';
 
 /**
  * Convert raw speed units to a display string for the side panel.
@@ -460,7 +461,7 @@ export class ScanHandlerService implements OnModuleInit {
       const yf = (other.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
 
       if (xf >= 0 && xf < SCAN_GRID_WIDTH && yf >= 0 && yf < SCAN_GRID_HEIGHT) {
-        const colour: ScanCell['colour'] = other.status === 1 ? 'ai' : 'human';
+        const colour: ScanCell['colour'] = scanShipColour(other.status);
         cells.push({
           x: Math.floor(xf),
           y: Math.floor(yf),
@@ -579,7 +580,7 @@ export class ScanHandlerService implements OnModuleInit {
       if (Math.floor(other.xcoord) !== xsect || Math.floor(other.ycoord) !== ysect) continue;
 
       const { x, y } = project(other.xcoord, other.ycoord);
-      const colour: ScanCell['colour'] = other.status === 1 ? 'ai' : 'human';
+      const colour: ScanCell['colour'] = scanShipColour(other.status);
       put({ x, y, type: 'ship', char: entry.letter, colour });
     }
 

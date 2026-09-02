@@ -131,7 +131,7 @@ describe('T026 — sca se gateway integration', () => {
     beforeEach(async () => {
       const self = makeShip({ userid: 'player1', shipno: 1, xcoord: SELF_X, ycoord: SELF_Y, scanHome: false, where: 0 });
       // AI ship in the same sector
-      const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 10.2, ycoord: 7.2, status: 1 });
+      const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 10.2, ycoord: 7.2, status: 2 });
       // Human ship in the same sector
       const human = makeShip({ userid: 'player2', shipno: 1, xcoord: 10.8, ycoord: 7.8, status: 0 });
       // Ship in a different sector — should NOT appear

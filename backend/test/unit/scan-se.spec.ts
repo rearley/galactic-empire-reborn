@@ -202,7 +202,7 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
 
   test('AI ship (status=1) in same sector has colour "ai"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
-    const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 5.3, ycoord: 7.3, status: 1 });
+    const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 5.3, ycoord: 7.3, status: 2 });
     const { service } = makeService([self, ai]);
     await service.onModuleInit();
 
