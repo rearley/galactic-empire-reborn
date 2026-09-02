@@ -122,11 +122,17 @@ describe('PlanetAttackService — owner alert (troop branch)', () => {
     const alertPayloads: unknown[] = [];
     events.on(ATTACK_OWNER_ALERT_EVENT, (payload) => alertPayloads.push(payload));
 
+    // `ratio` is a PERCENTAGE in canon: (left1*100)/left2, gated at `> 2`
+    // (GECMDS.C:3655, :3673). "Outnumbered enough to go unnoticed" therefore
+    // means the landing party is under 2 percent of the garrison, not merely
+    // smaller than it. This fixture used 10 000 against 50 000, which reads as hopeless but
+    // is 20 percent of the defenders -- comfortably over the threshold. It only
+    // passed while the port omitted the x100 and computed an integer quotient of 0.
     const planet = makePlanetWithOwner('defender');
     planet.items[I_TROOPS].qty = 50_000n; // massive defenders
-    const ship = makeShip(); // only 10000 attackers → ratio = 0
+    const ship = makeShip(); // 500 attackers → ratio = 1 percent, below the gate
 
-    await service.attackTroop(10000, ship, planet);
+    await service.attackTroop(500, ship, planet);
 
     expect(alertPayloads.length).toBe(0);
   });

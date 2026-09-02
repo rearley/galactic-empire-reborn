@@ -74,8 +74,17 @@ export class PlanetAttackService {
     kill1 += groundKills;
     narration.push(formatMessage(MessageId.ATT_GROUND_TROOP_KILL, groundKills));
 
-    // Step 3: ratio-based attacker counter-kill. @see GECMDS.C:3610–3617
-    const ratio = left2 > 0 ? Math.floor(left1 / left2) : 0;
+    // Step 3: ratio-based attacker counter-kill. @see GECMDS.C:3610-3617
+    //
+    // C is `ratio = (left1*100UL)/left2` (GECMDS.C:3655) -- a PERCENTAGE. The
+    // port divided without the x100, so `ratio > 2` asked for twice the
+    // garrison instead of 2% of it. 500 troops landing on a 400-troop garrison
+    // scored 1 rather than 125: defenders took zero casualties however many
+    // troops landed, no planet items were destroyed, and the owner was never
+    // alerted or mailed -- all three are gated on this one value. Ground
+    // invasion, the normal route from a first kill to a first income, did not
+    // work at all. The fighter branch below already had the x100.
+    const ratio = left2 > 0 ? Math.floor((left1 * 100) / left2) : 0;
     if (ratio > 2) {
       kill2 = Math.floor(left1 * (rndm(this.random, this.plattrt2) + 0.1));
     } else {
