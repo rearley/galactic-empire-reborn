@@ -79,18 +79,27 @@ export const COORD_SCALE = 65000 as const;
  * Long-range scan (`sca lo`) projection multiplier — scaling factor applied
  * to a ship's `scanRange` when projecting the long-range overview.
  *
- * **TS deviation from C-canonical.** The C source hard-codes `× 10` at
- * `GECMDS.C:2668`, but that constant was calibrated for sysop-configurable
- * universes up to 32,767 sectors wide (`UNIVMAX` is `numopt(UNIVMAX,10,32767)`
- * in `GEMAIN.C:474`). Our port hard-codes the minimum `MAXX=30, MAXY=15`
- * (the C-source minimum), so the 10× factor produces a galaxy-wide overview
- * even for a starter Interceptor. A smaller factor restores the "long-range
- * scan is wider than tactical scan but not the whole universe" intent.
+ * **Deviation from C, and it is a RATIO, not a free knob.** C hard-codes `× 10`
+ * (`GECMDS.C:2668`). This is 3, and the defence is that it reproduces canon's
+ * *relative* reach under our deliberately smaller galaxy:
  *
- * Dial this up or down to tune how much of the galaxy a ship reveals on
- * `sca lo`. Tune in tandem with per-class `ShipClass.scanRange` (smaller
- * scanRange tightens both tactical and overview; this constant adjusts the
- * overview-to-tactical ratio).
+ *     canon:  100_000 x 10 = 100 sector radius, half-width 300  ->  33%
+ *     ours:   100_000 x  3 =  30 sector radius, half-width 100  ->  30%
+ *
+ * So a pilot sees very nearly the same FRACTION of the galaxy on `sca lo` as
+ * they did in 1991. Taking canon's 10 while UNIVMAX is 100 would put a starter
+ * Interceptor's overview at a 100-sector radius in a 201-sector galaxy — the
+ * entire world, from the hub.
+ *
+ * This constant is therefore COUPLED to UNIVMAX and must move with it. If
+ * UNIVMAX ever returns to canon's 300, this returns to 10.
+ * @see docs/DECISIONS.md — UNIVMAX deploys at 100
+ * @see test/balance/scan-projection-ratio.balance.spec.ts
+ *
+ * The previous justification here was wrong: it called `MAXX=30, MAXY=15` the
+ * size of the galaxy. Those are the dimensions of the ASCII scan VIEWPORT
+ * (`GEMAIN.H:121-122`); the galaxy is +/-UNIVMAX on both axes. Conflating the
+ * two is the same error that capped every weapon gate at 7.5 sectors.
  */
 export const SCAN_LO_PROJECTION_MULTIPLIER = 3 as const;
 

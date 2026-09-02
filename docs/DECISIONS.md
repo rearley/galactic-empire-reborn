@@ -1230,6 +1230,16 @@ unnecessary boilerplate and couples test setup to module composition.
 
 ## 2026-05-07 — 013-ship-management: four deviations from canonical C source
 
+> **STALE — these deviations were later reverted to canon.** Verified 2026-09-02:
+> D1 `transfer` is canon `tra up|down` against the orbited planet, gated on
+> `where >= 10` (`transfer.handler.ts`, GECMDS.C:3300/3354); D2 bare `aba` is
+> canon planet-abandon with the ship-scuttle moved behind an explicit
+> `aba ship` (`abandon.handler.ts`, GECMDS.C:3420); D3's maint password gate is
+> implemented (`MaintenanceService`); D4's `set` carries `scannames` and
+> `filter` (`set-options.catalog.ts`) alongside the port's auto-shield and
+> auto-repair options. Kept for the reasoning, not as a description of the code.
+
+
 **Context**: Eight commands ported from GECMDS.C have semantics that cannot be mapped 1:1 to the web architecture.
 
 **D1 — `transfer` moves cargo between ships (not ship→planet)**
