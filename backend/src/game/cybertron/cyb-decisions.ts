@@ -301,14 +301,24 @@ export function decideCybEvasion(input: CybEvasionInput, rand: Random): CybEvasi
  *   lta = shipclass[hunter].lowest_to_attk - 1;
  *   if (lta <= wptr->shpclass) ...
  *
- * Note the `- 1`: a CPU whose "User" column reads 6 pursues class 5 and up,
- * not class 6 and up. The port compared against the raw column and was one
- * class too strict — on top of reading the column off the wrong table.
+ * C's `- 1` is an INDEX-BASIS CONVERSION, not part of the rule. `wptr->shpclass`
+ * is a 0-based index into shipclass[]: GEMAIN.C:898 increments `i` once per
+ * class block, GECMDS.C:412 prints `i+1` as the class number a player sees, and
+ * GECMDS.C:4562 parses a typed class with `atoi(margv[2])-1`. Our `shpclass` is
+ * the 1-based classNumber straight from the seed, so subtracting one here
+ * repeats a conversion already made and pursues one class too low.
  *
- * @see GECYBS.C:711, 719  @see reference/wiki/cpu-ships.md "User"
+ * The visible case is the Sarten Obliterator, LATK 3. Canon starts it at
+ * display class 3, the Heavy Freighter. Ours pursued class 2, the Stealth
+ * Fighter -- the ship a player upgrades into straight after the Interceptor.
+ * Class 23's LATK of 20 lands the same in either basis, which is why only one
+ * class showed the symptom while every future LATK inherited the fault.
+ *
+ * @see GECYBS.C:711, 719
+ * @see GEMAIN.C:898, GECMDS.C:412, GECMDS.C:4562 — the 0-based basis
  */
 export function canPursue(hunterLowestToAttack: number, victimClass: number): boolean {
-  return hunterLowestToAttack - 1 <= victimClass;
+  return hunterLowestToAttack <= victimClass;
 }
 
 /**

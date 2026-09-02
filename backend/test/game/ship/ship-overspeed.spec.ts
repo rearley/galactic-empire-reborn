@@ -88,6 +88,31 @@ describe('decideOverspeed — recovery', () => {
     }
   });
 
+  it('never RAISES the target speed — a pilot who cut engines stays stopped', () => {
+    // C writes `ptr->speed2b = ptr->topspeed*1000.0` flat (GEFUNCS.C:777),
+    // setting the target rather than capping it. A pilot who took the warning
+    // and typed `war 0` to stop and repair was pushed back up to the new top
+    // speed and kept flying -- fatal under fire, since you cannot stop to raise
+    // shields or run repairs at the moment you most need to. Fixed, per the
+    // standing rule that the original's defects are not reproduced.
+    const stopped = makeShip({ speed: 3000, topspeed: 9, speed2b: 0, warncntr: 3 });
+    const result = decideOverspeed(stopped, alwaysWin);
+    expect(result.kind).toBe('recover');
+    if (result.kind === 'recover') {
+      expect(result.topspeed).toBe(3);   // the derate still bites
+      expect(result.speed2b).toBe(0);    // but the throttle is left where it was
+    }
+  });
+
+  it('still derates the target speed when it exceeds the new ceiling', () => {
+    const cruising = makeShip({ speed: 3000, topspeed: 9, speed2b: 9000, warncntr: 3 });
+    const result = decideOverspeed(cruising, alwaysWin);
+    expect(result.kind).toBe('recover');
+    if (result.kind === 'recover') {
+      expect(result.speed2b).toBe(3000); // clamped down to topspeed * 1000
+    }
+  });
+
   it('returns noop when speed normalizes but warncntr is 0', () => {
     const ship = makeShip({ speed: 3000, topspeed: 5, speed2b: 5000, warncntr: 0 });
     expect(decideOverspeed(ship, alwaysWin)).toEqual({ kind: 'noop' });
