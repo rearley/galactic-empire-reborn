@@ -35,7 +35,7 @@ function makeEvent(over: Partial<CombatShipDestroyedEvent> = {}): CombatShipDest
 function buildHarness() {
   const events = new EventEmitter2();
   const transferKillScore = jest.fn().mockResolvedValue(undefined);
-  const repo = { transferKillScore } as unknown as PlayerScoreRepository;
+  const repo = { transferKillScore, getRospos: jest.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
   const svc = new PlayerScoreService(events, repo, 0);
   svc.onModuleInit();
   return { events, transferKillScore };

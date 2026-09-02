@@ -6,6 +6,8 @@ import {
 } from '../combat/combat-events';
 import { PlayerScoreRepository } from './player-score.repository';
 import { isAiUserid } from '../commands/helpers/ai-userid';
+import { killScoreBonus } from './kill-score';
+import { SCRBONUS } from '../constants';
 
 /**
  * Named constant for AI victim userid prefixes — documents which prefixes
@@ -63,7 +65,20 @@ export class PlayerScoreService implements OnModuleInit {
     const isAiVictim = isAiUserid(victimUserid);
     const isAiAttacker = isAiUserid(attackerUserid);
 
-    await this.repo.transferKillScore(attackerUserid, victimUserid, scoreAwarded, isAiVictim, isAiAttacker);
+    // `amt = scr + bonus` (GEFUNCS.C:1155). The bonus divides SCRBONUS by the
+    // VICTIM's roster position, so killing the top-ranked commander pays far
+    // more than killing a drifter. It is applied here rather than in the combat
+    // tick because rospos is a User column the midnight job assigns, and the
+    // tick scores synchronously from in-memory ship state that does not carry
+    // it. An AI victim has no user row and so pays no bonus, which matches C:
+    // an automaton is never on the roster.
+    const bonus = isAiVictim
+      ? 0
+      : killScoreBonus(await this.repo.getRospos(victimUserid), SCRBONUS);
+
+    await this.repo.transferKillScore(
+      attackerUserid, victimUserid, scoreAwarded + bonus, isAiVictim, isAiAttacker,
+    );
 
     // CHGLOSER cash penalty: only when both sides are non-AI human players
     // @see GEFUNCS.C:killem (1087-1218 chgloser block)

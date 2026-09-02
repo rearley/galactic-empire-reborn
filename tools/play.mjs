@@ -84,6 +84,9 @@ socket.on('scan:render', (p) => renderScan(p));
  * that was purely an instrumentation gap. The same shape of gap once hid combat
  * hits for three sessions.
  */
+/** Side panel from the most recent scan — what `engage` aims at. */
+let lastContacts = [];
+
 function renderScan(sr) {
   const cells = sr.grid ?? [];
   if (cells.length) {
@@ -100,7 +103,8 @@ function renderScan(sr) {
       if (row.trim()) out('##', row);
     }
   }
-  for (const r of sr.sidePanel ?? []) {
+  lastContacts = (sr.sidePanel ?? []).slice();
+  for (const r of lastContacts) {
     // distance is raw units; bearing and heading are signed -180..180.
     out('##', `${r.letter}  dist:${r.distance}  brg:${r.bearing}  hdg:${r.heading}  ${r.speedDisplay ?? ''}`);
   }
@@ -145,6 +149,28 @@ for (const raw of script.split('\n')) {
   if (m) { out('..', `wait ${m[1]}s`); await sleep(Number(m[1]) * 1000); continue; }
   const r = /^reply\s+(.*)$/i.exec(line);
   if (r) { socket.emit('prompt:reply', { value: r[1] }); await sleep(1500); continue; }
+
+  // `engage [maxDist]` — scan, then fire at the NEAREST contact's actual
+  // bearing. Firing at a hard-coded `pha 0` is why four kill tests failed: the
+  // target sits wherever it sits, and reading its bearing off the scan is the
+  // whole point of the scan. This is what a player does.
+  const e = /^engage(?:\s+(\d+))?$/i.exec(line);
+  if (e) {
+    const maxDist = Number(e[1] ?? 15000);
+    out('>>', 'sca lo full');
+    socket.emit('command', { input: 'sca lo full' });
+    await sleep(2000);
+    const target = lastContacts
+      .filter((c) => typeof c.bearing === 'number' && c.distance <= maxDist)
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (!target) { out('..', `engage: no contact within ${maxDist}`); continue; }
+    const cmd = `pha ${target.bearing} 5`;
+    out('..', `engage: ${target.letter} at ${target.distance} bearing ${target.bearing}`);
+    out('>>', cmd);
+    socket.emit('command', { input: cmd });
+    await sleep(Number(process.env.GE_CMD_DELAY ?? 1600));
+    continue;
+  }
   out('>>', line);
   socket.emit('command', { input: line });
   await sleep(Number(process.env.GE_CMD_DELAY ?? 1600));

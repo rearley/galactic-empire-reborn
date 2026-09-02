@@ -244,6 +244,23 @@ export const UNIVWRAP = GAME_CONFIG.UNIVWRAP === 1;
  */
 export const TEAMMAX = GAME_CONFIG.TEAMMAX;
 
+/**
+ * Kill bonus, divided by the VICTIM's roster position.
+ *
+ *   if (waruptr->rospos > 0)
+ *       bonus = (long)(score_bonus/(waruptr->rospos));
+ *   amt = scr + bonus;                              GEFUNCS.C:1150-1155
+ *
+ * `killem(ptr, usrn)` takes the victim, and `waruptr = warusroff(usrn)` is the
+ * victim's user record — so the bonus scales with how highly ranked the ship
+ * you killed was. Killing the #1 commander pays the full SCRBONUS; killing #10
+ * pays a tenth; killing someone unranked pays nothing.
+ *
+ * Without it every kill is worth its hull class and nothing else, so the roster
+ * ossifies: an underdog has no reason to pick the hardest fight available.
+ */
+export const SCRBONUS = GAME_CONFIG.SCRBONUS;
+
 export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
 
 /**
