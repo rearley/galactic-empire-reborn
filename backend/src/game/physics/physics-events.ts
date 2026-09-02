@@ -64,6 +64,10 @@ export interface PhysicsHyperspaceEvent {
   speed: number;
   /** TickContext.firedAt. */
   tickAt: Date;
+  /** Entering dropped RAISED shields — the player must be told (HYSHDN). */
+  shieldsDropped?: boolean;
+  /** Entering dropped an ACTIVE cloak (HYCLDN). */
+  cloakDropped?: boolean;
 }
 
 /** @see GEFUNCS.C:836-905 gravity */
