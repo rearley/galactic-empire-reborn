@@ -12,6 +12,12 @@ import {
 } from '../../src/game/constants/items';
 import { PLANTOCK_SECONDS, PLANTIME_MIN_SECONDS } from '../../src/game/constants';
 
+// MANHOURS, MAXPL and ITEM_TONS are no longer snapshotted here. They are canon
+// and are checked against MBMGEMSG.MSG itself, item by item, by
+// test/balance/item-tables-canon.balance.spec.ts. Keeping a second hand-written
+// copy is what let the wiki's rounded figures survive: the snapshot agreed with
+// the constant because both came from the same wrong source.
+
 describe('balance-planet — regression pins', () => {
   it('NUMITEMS === 14', () => {
     expect(NUMITEMS).toBe(14);
@@ -33,35 +39,17 @@ describe('balance-planet — regression pins', () => {
   });
 
   it('BASEPRICE snapshot', () => {
-    expect(BASEPRICE).toEqual([2, 20, 7, 33, 200, 2, 50, 18, 1, 99, 21, 16, 100, 100]);
+    // BASEPRICE is the one item table with no canon: the shipped MBMGEMSG.MSG
+    // has no ITMPR blocks, because baseprice was added at GEMAIN.C:569 later
+    // than that file. So it is pinned HERE rather than against the original.
+    // Gold moved 100 -> 1000: it is the cash-to-gold bank rate at Zygor, and
+    // two wiki sources say 1000 against one that also gets gold's weight wrong.
+    // @see docs/DECISIONS.md — gold base price
+    expect(BASEPRICE).toEqual([2, 20, 7, 33, 200, 2, 50, 18, 1, 99, 21, 16, 1000, 100]);
   });
 
-  it('MANHOURS snapshot', () => {
-    expect(MANHOURS).toEqual([3500, 300, 500, 4, 200, 8000, 100, 900, 200, 100, 300, 500, 30, 20]);
-  });
 
-  it('MAXPL snapshot', () => {
-    expect(MAXPL).toEqual([
-      1_000_000_000,
-         50_000_000,
-         50_000_000,
-            500_000,
-         20_000_000,
-        100_000_000,
-            500_000,
-         50_000_000,
-         20_000_000,
-         50_000_000,
-         20_000_000,
-         50_000_000,
-          5_000_000,
-             10_000,
-    ]);
-  });
 
-  it('ITEM_TONS snapshot', () => {
-    expect(ITEM_TONS).toEqual([1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 0.5, 1]);
-  });
 
   it('all frozen arrays have length NUMITEMS', () => {
     expect(ITEM_NAMES.length).toBe(NUMITEMS);

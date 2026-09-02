@@ -5,11 +5,18 @@
  */
 import { applyEconomyTick } from '../../src/game/planet/planet-economy';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
-import { NUMITEMS, I_MEN, I_FOOD, I_TROOPS, I_GOLD } from '../../src/game/constants/items';
+import { NUMITEMS, I_MEN, I_FOOD, I_TROOPS, I_GOLD, MAXPL } from '../../src/game/constants/items';
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
-  const items = Array.from({ length: NUMITEMS }, () => ({
-    qty: 1000n,
+  // Stock every item at 1000, EXCEPT where canon's per-planet cap is lower.
+  // GEPLANET.C applies `maxpl[i] * fact` as a storage ceiling that can clamp a
+  // planet DOWN, so a fixture holding more than an item's cap is not a planet
+  // the game can produce. A flat 1000 across the board was only viable while
+  // MAXPL carried the wiki's rounded figures; canon caps spies at 5 and ion
+  // cannons at 250, so those slots were being clamped and the "no growth at
+  // zero population" assertion was reading a legitimate cap as growth.
+  const items = Array.from({ length: NUMITEMS }, (_unused, i) => ({
+    qty: BigInt(Math.min(1000, MAXPL[i])),
     rate: 10,
     sell: true,
     reserve: 0,

@@ -1863,3 +1863,28 @@ of the two goods the starting hub exists to sell.
 **Alternatives rejected:** Preserving it as a faithful reproduction — contradicts
 the standing rule. Fixing it immediately and independently — production rate and
 consumption multiply, so they must be retuned together.
+
+## 2026-09-02 — Gold base price set to 1000, on wiki evidence only
+
+**Context:** `baseprice[i] = numopt(ITMPR01+i,...)` is read at `GEMAIN.C:569`, but
+the shipped `MBMGEMSG.MSG` contains **no ITMPR blocks at all** — that option family
+was added to the code after the message file we have. So unlike MAXPL, ITEM_TONS,
+ITEM_VALUE and MANHOURS, the base-price table cannot be recovered from canon.
+
+Gold is the one entry that matters: it is the cash-to-gold rate at the Zygor bank
+and therefore the whole reason to carry gold. The wiki disagrees with itself —
+`sysop-options.md` (a direct option-block transcription from a later `.MSG`) and
+`colonizing-planets.md` both say **1000**; `items.md` says **100**.
+
+**Decision:** 1000.
+
+**Reason:** Two independent sources against one, and the dissenting source is the
+same `items.md` summary row that gives gold's cargo weight as 0.5 where canon says
+2 — it is demonstrably unreliable on exactly this item. At 100, gold converts to
+planetary cash at a tenth of the intended rate and the Zygor markup collapses with
+it, removing most of the trade loop a new player uses to fund a first real ship.
+
+**Alternatives rejected:** Keeping 100 (rests on the one source proven wrong here).
+Leaving BASEPRICE out of the canon conformance test silently — instead the test
+asserts positively that `MBMGEMSG.MSG` has no ITMPR blocks, so if a fuller message
+file ever turns up, it fails and tells us to move BASEPRICE onto canon.
