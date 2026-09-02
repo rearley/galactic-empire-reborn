@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { computeBuyOutcome } from '../../planet/planet-trade';
+import { isInNeutralZone } from '../../combat/neutral-zone';
 import { ShipState } from '../../ship/ship-state.types';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -88,44 +90,42 @@ export class PriceHandlerService {
       return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
     }
 
-    const item = planet.items[itemIndex];
-
-    // Item must be for sale or requester is owner.
-    // Unowned neutral-zone planets with explicit sell flags are open shops.
-    if (!isOwner && !item.sell) {
-      return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
-    }
-
-    // BUY8: cargo capacity sufficient for amount.
+    // Quote through the SAME gate `buy` executes, rather than a second copy of
+    // it. The copy had drifted: it checked planet stock for gold at Zygor-3,
+    // where the bank is backed by the buyer's own cash, so `pri <n> gol`
+    // refused the exact purchase `buy <n> gol` then completed.
+    // @see planet/planet-trade.ts computeBuyOutcome
     let usedTons = 0;
     for (let i = 0; i < NUMITEMS; i++) {
       usedTons += Number(ship.items[i] ?? 0n) * ITEM_TONS[i];
     }
-    const capacityRemaining = (ship.maxTons ?? 1000) - usedTons;
-    if (capacityRemaining < qty * ITEM_TONS[itemIndex]) {
-      return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
-    }
-
-    // BUY3: sufficient stock (subtract reserve for foreigners).
-    const available = isOwner
-      ? Number(item.qty)
-      : Math.max(0, Number(item.qty) - item.reserve);
-    if (available < qty) {
-      return { lines: [{ text: formatMessage(MessageId.BUY3), category: 'system' }] };
-    }
-
-    const unitPrice = isOwner ? BASEPRICE[itemIndex] : item.markup2a;
-    const totalCost = unitPrice * qty;
-
-    // BUY2 (cash check): captain has enough cash. @see GECMDS.C cmd_price step f
     const userRow = await this.prisma.user.findUnique({
       where: { userid: ship.userid },
       select: { cash: true },
     });
     const cash = userRow?.cash ?? 0n;
-    if (cash < BigInt(totalCost)) {
-      return { lines: [{ text: formatMessage(MessageId.PRICE_NO_CASH), category: 'system' }] };
+
+    const outcome = computeBuyOutcome({
+      planet,
+      itemIndex,
+      requestedQty: qty,
+      buyerIsOwner: isOwner,
+      buyerCargoCapacityRemaining: (ship.maxTons ?? 1000) - usedTons,
+      isNeutralZone: isInNeutralZone(ship),
+      buyerCash: cash,
+    });
+
+    if (!outcome.ok) {
+      const msg =
+        outcome.reason === 'SELL_FLAG_OFF' ? MessageId.BUY5
+        : outcome.reason === 'CAPACITY_FULL' || outcome.reason === 'WONT_FIT' ? MessageId.BUY8
+        : outcome.reason === 'AT_RESERVE' ? MessageId.BUY3
+        : MessageId.PRICE_NO_CASH;
+      return { lines: [{ text: formatMessage(msg), category: 'system' }] };
     }
+
+    const unitPrice = outcome.unitPrice;
+    const totalCost = Number(outcome.totalCost);
 
     return {
       lines: [
