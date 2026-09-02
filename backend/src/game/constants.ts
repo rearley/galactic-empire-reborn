@@ -197,6 +197,18 @@ export const PLATTRT2 = GAME_CONFIG.PLATTRT2 / 100;
 export const CLENGUSE = GAME_CONFIG.CLENGUSE;
 
 /**
+ * Credits a new player starts with.
+ *
+ *   startcash = (long)numopt(STRTCASH,1,32000);
+ *   startcash *= 1000L;                            GEMAIN.C:521-522
+ *
+ * The x1000 lives here rather than at the call site so the option keeps the
+ * meaning it has in the original -- STRTCASH is in THOUSANDS of credits, and
+ * canon ships 100, i.e. 100 000 credits.
+ */
+export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
+
+/**
  * Max ships a player may own (env MAXSHIPS, 1–50).
  * @see GEMAIN.C:462 numopt(MAXSHIPS,1,50)
  */

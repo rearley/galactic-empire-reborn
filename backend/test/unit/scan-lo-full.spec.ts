@@ -187,7 +187,11 @@ describe('T027 — sca lo full: kind and sidePanel', () => {
     const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
     const row = result.scanRender!.sidePanel![0];
     expect(Number.isInteger(row.heading)).toBe(true);
-    expect(row.heading).toBe(70);
+    // The column is NOT the other ship's compass heading. C prints
+    // cbearing(him, me, HIS heading) -- where I am, seen from him
+    // (GECMDS.C:2885) -- so it is signed and relative.
+    expect(row.heading).toBeGreaterThanOrEqual(-180);
+    expect(row.heading).toBeLessThanOrEqual(180);
   });
 
   it('sca lo full with no other ships produces empty sidePanel', async () => {
@@ -277,7 +281,17 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
     expect(Number.isInteger(rows[0].bearing)).toBe(true);
   });
 
-  it('row fields: heading matches the other ship heading', async () => {
+  it('row fields: heading is where I am from HIM, not his compass heading', async () => {
+    // The two columns answer different questions (GECMDS.C:2884-2885):
+    //   bearing = cbearing(me, him, my heading)  -- where is he, from me
+    //   heading = cbearing(him, me, his heading) -- where am I, from him
+    // The second is the threat read a pilot acts on: near 0 means his nose is
+    // pointed at you and you are inside his arc. Reporting his absolute
+    // heading, as the port did, leaves the pilot to do that subtraction.
+    //
+    // Here he sits due EAST of the player and is facing 137. From his position
+    // the player lies due west (absolute 270), so relative to his own heading
+    // that is 270 - 137 = 133.
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const other = makeOther(
       { userid: 'u2', shipno: 1 },
@@ -285,7 +299,19 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
       { heading: 137, speed: 0 },
     );
     const rows = await getRows(player, [other]);
-    expect(rows[0].heading).toBe(137);
+    expect(rows[0].heading).toBe(133);
+  });
+
+  it('row fields: heading is ~0 when the other ship is pointed straight at you', async () => {
+    // The case the column exists for.
+    const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
+    const other = makeOther(
+      { userid: 'u2', shipno: 1 },
+      { xcoord: 5, ycoord: 4 },      // due north of the player
+      { heading: 180, speed: 0 },    // facing south, i.e. at the player
+    );
+    const rows = await getRows(player, [other]);
+    expect(Math.abs(rows[0].heading)).toBeLessThanOrEqual(1);
   });
 
   it('row fields: letter is a single uppercase letter A-Z', async () => {
