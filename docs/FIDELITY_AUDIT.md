@@ -1,5 +1,14 @@
 # Fidelity Audit — port vs. original C source
 
+> **SUPERSEDED, in part.** This audit predates
+> `reference/ge-upstream/` — the full original distribution, obtained 2026-09-02.
+> It was written against the nine C files and the wiki, so **any claim about a
+> VALUE here should be re-checked** with the extractors in `tools/`; several
+> figures it treats as canonical came from wiki tables that turned out to be
+> rounded or wrong. Its findings about **logic** stand.
+>
+> Current audit: `CANON_AUDIT_2026-09.md`. Index: `README.md`.
+
 **Run:** 2026-08-31. **Method:** ten subsystem auditors read `reference/ge-source/`
 and the corresponding port code independently, each followed by an adversarial
 reviewer instructed to refute its findings by re-reading both sides. 76 findings
