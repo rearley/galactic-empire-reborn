@@ -102,6 +102,8 @@ export const SYSOP_OPTIONS = {
   UNIVMAX: { min: 10, max: 32767, default: 300, canonDefault: 300, cReference: 'GEMAIN.C:474', implemented: true },
   S00PLNUM: { min: 3, max: 9, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:476', implemented: false },
   // lngopt, not numopt, and stored in MINUTES: GEMAIN.C:469 multiplies by 60.
+  // ynopt, so 0/1. GEMAIN.C:475 univwrap = ynopt(UNIVWRAP); canon ships NO.
+  UNIVWRAP: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:475', implemented: true, constant: 'UNIVWRAP' },
   PLANTOCK: { min: 1, max: 32760, default: 360, canonDefault: 360, cReference: 'GEMAIN.C:469', implemented: true, constant: 'PLANTOCK_SECONDS' },
   MAXPLSE: { min: 1, max: 9, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLSE' },
   TEAMBONU: { min: 0, max: 32000, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:478', implemented: true },

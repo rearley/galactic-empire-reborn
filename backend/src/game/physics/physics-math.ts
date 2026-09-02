@@ -250,3 +250,39 @@ export function cbearing(
   const b = normalizeHeading(headingToward(to.xcoord - from.xcoord, to.ycoord - from.ycoord) - heading);
   return b > 180 ? b - 360 : b;
 }
+
+/**
+ * Apply the universe edge to one coordinate axis.
+ *
+ * Canon ships UNIVWRAP=NO, in which case crossing an edge does NOT teleport the
+ * ship across the galaxy. It is pinned just inside the boundary and `telezip`
+ * fires (GEFUNCS.C:651-705, :819-833):
+ *
+ *     ptr->coord.xcoord = (double)(univmax-2);
+ *     telezip(ptr,usrn);      // speed = 0, speed2b = 0, damage += TELEDAM
+ *
+ * Note the asymmetry with the wrap branch: the wall is a hard stop that costs
+ * you your momentum and 17 hull, so running for the edge is a dead end. The
+ * port implemented only the wrap arm, which handed a free full-speed jump
+ * across the galaxy to anyone who reached the boundary -- pursuers included.
+ *
+ * Returns the new coordinate and whether the edge was struck, so the caller can
+ * apply the telezip effects once per move rather than once per axis.
+ *
+ * @see GEFUNCS.C:651-705 moveship — both arms
+ * @see GEFUNCS.C:819-833 telezip
+ */
+export function applyUniverseEdge(
+  value: number,
+  univmax: number,
+  wrap: boolean,
+): { value: number; hitEdge: boolean } {
+  if (!Number.isFinite(value)) return { value: 0, hitEdge: false };
+  if (wrap) {
+    const wrapped = wrapUniverse(value, univmax);
+    return { value: wrapped, hitEdge: false };
+  }
+  if (value > univmax) return { value: univmax - 2, hitEdge: true };
+  if (value < -univmax) return { value: -(univmax - 2), hitEdge: true };
+  return { value, hitEdge: false };
+}

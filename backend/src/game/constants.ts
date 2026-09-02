@@ -206,6 +206,22 @@ export const CLENGUSE = GAME_CONFIG.CLENGUSE;
  * meaning it has in the original -- STRTCASH is in THOUSANDS of credits, and
  * canon ships 100, i.e. 100 000 credits.
  */
+/**
+ * Does the galaxy wrap at its edges?
+ *
+ * `univwrap = ynopt(UNIVWRAP)` (GEMAIN.C:475), and canon ships NO. With wrap
+ * OFF, crossing an edge pins the ship at +/-(univmax-2) and calls telezip:
+ * speed and speed2b are zeroed and TELEDAM hull damage is applied
+ * (GEFUNCS.C:651-705, :819-833).
+ *
+ * The port always wrapped, teleporting a ship clean across the galaxy at full
+ * speed for free -- which inverts the mechanic. Running for the edge should be
+ * a dead end, and note the free jump helped a Cybertron chasing a player as
+ * much as the player fleeing.
+ * @see docs/DECISIONS.md — UNIVWRAP implemented, defaulting to canon NO
+ */
+export const UNIVWRAP = GAME_CONFIG.UNIVWRAP === 1;
+
 export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
 
 /**

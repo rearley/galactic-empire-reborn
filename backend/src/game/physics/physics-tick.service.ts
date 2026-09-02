@@ -12,6 +12,7 @@ import { TickContext, TickKind } from '../tick/tick.types';
 import {
   PHYSICS_BOUNDARY_WRAPPED,
   PHYSICS_HYPERSPACE,
+  PHYSICS_UNIVERSE_EDGE,
   PHYSICS_SECTOR_TRANSITION,
   PhysicsBoundaryWrappedEvent,
   PhysicsHyperspaceEvent,
@@ -26,9 +27,9 @@ import {
   rotationStep,
   sectorOf,
   tryEnergyDebit,
-  wrapUniverse,
+  applyUniverseEdge,
 } from './physics-math';
-import { UNIVMAX } from '../constants';
+import { TELEDAM, UNIVWRAP, UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 
 /**
@@ -241,19 +242,21 @@ export class PhysicsTickService implements OnModuleInit {
       const preSector = sectorOf({ x: preX, y: preY });
       const next = positionIntegration(preX, preY, ship.heading, ship.speed);
 
-      // Universe boundary wrap — only in normal space (where <= 1).
-      // @see GEFUNCS.C:651-705 moveship univwrap branch
+      // Universe boundary — only in normal space (where <= 1).
+      // @see GEFUNCS.C:651-705 moveship — wrap and no-wrap arms
       let wrappedX = next.x;
       let wrappedY = next.y;
       let xWrapped = false;
       let yWrapped = false;
+      let hitEdge = false;
       if (ship.where <= 1) {
-        const wx = wrapUniverse(next.x, UNIVMAX);
-        const wy = wrapUniverse(next.y, UNIVMAX);
-        xWrapped = wx !== next.x;
-        yWrapped = wy !== next.y;
-        wrappedX = wx;
-        wrappedY = wy;
+        const ex = applyUniverseEdge(next.x, UNIVMAX, UNIVWRAP);
+        const ey = applyUniverseEdge(next.y, UNIVMAX, UNIVWRAP);
+        xWrapped = UNIVWRAP && ex.value !== next.x;
+        yWrapped = UNIVWRAP && ey.value !== next.y;
+        hitEdge = ex.hitEdge || ey.hitEdge;
+        wrappedX = ex.value;
+        wrappedY = ey.value;
       }
 
       const postSector = sectorOf({ x: wrappedX, y: wrappedY });
@@ -261,7 +264,21 @@ export class PhysicsTickService implements OnModuleInit {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.xcoord = wrappedX;
         s.ycoord = wrappedY;
+        if (hitEdge) {
+          // telezip: the wall takes your momentum and 17 hull.
+          // @see GEFUNCS.C:819-833
+          s.speed = 0;
+          s.speed2b = 0;
+          s.damage = s.damage + TELEDAM;
+        }
       });
+
+      if (hitEdge) {
+        this.events.emit(PHYSICS_UNIVERSE_EDGE, {
+          shipId: shipKey(ship.userid, ship.shipno),
+          damage: TELEDAM,
+        });
+      }
 
       // C calls gravity() from moveship on every move (GEFUNCS.C:794-795).
       this.applyGravity(ship, postSector, ctx);

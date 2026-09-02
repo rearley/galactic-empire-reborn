@@ -6,6 +6,7 @@ import {
   sectorOf,
   tryEnergyDebit,
   wrapCoord,
+  applyUniverseEdge,
 } from '../../../src/game/physics/physics-math';
 import { ACCENGAMT, COORD_SCALE, MAXX, MAXY, WARP_THRESHOLD } from '../../../src/game/constants';
 
@@ -244,5 +245,61 @@ describe('physics-math', () => {
     it('360 → 0', () => expect(normalizeHeading(360)).toBe(0));
     it('0 → 0', () => expect(normalizeHeading(0)).toBe(0));
     it('359.5 → 359.5', () => expect(normalizeHeading(359.5)).toBe(359.5));
+  });
+});
+
+describe('applyUniverseEdge — both arms of the UNIVWRAP branch', () => {
+  // GEFUNCS.C:651-705. The port only ever implemented the wrap arm, so the
+  // wall -- which is what canon ships -- had no code and no test. Covered as a
+  // pure function because the tick can only ever exercise the deployed arm.
+  const UM = 100;
+
+  describe('wrap = true (UNIVWRAP YES)', () => {
+    it('carries a ship across to the far side', () => {
+      const { value, hitEdge } = applyUniverseEdge(UM + 0.5, UM, true);
+      expect(value).toBeLessThan(0);
+      expect(hitEdge).toBe(false);
+    });
+
+    it('is symmetric on the negative edge', () => {
+      const { value, hitEdge } = applyUniverseEdge(-UM - 0.5, UM, true);
+      expect(value).toBeGreaterThan(0);
+      expect(hitEdge).toBe(false);
+    });
+  });
+
+  describe('wrap = false (UNIVWRAP NO — canon)', () => {
+    it('pins the ship just inside the positive edge and reports the strike', () => {
+      const { value, hitEdge } = applyUniverseEdge(UM + 0.5, UM, false);
+      expect(value).toBe(UM - 2);
+      expect(hitEdge).toBe(true);
+    });
+
+    it('pins the ship just inside the negative edge', () => {
+      const { value, hitEdge } = applyUniverseEdge(-UM - 0.5, UM, false);
+      expect(value).toBe(-(UM - 2));
+      expect(hitEdge).toBe(true);
+    });
+
+    it('never moves a ship that is inside the boundary', () => {
+      for (const v of [0, 1, -1, UM - 3, -(UM - 3), UM, -UM]) {
+        expect(applyUniverseEdge(v, UM, false)).toEqual({ value: v, hitEdge: false });
+      }
+    });
+
+    it('leaves the ship inside the galaxy, not on its rim', () => {
+      // `univmax-2` rather than `univmax` matters: a ship parked exactly on the
+      // boundary would re-trigger the edge on the next tick and take TELEDAM
+      // every six seconds.
+      const { value } = applyUniverseEdge(UM + 50, UM, false);
+      expect(Math.abs(value)).toBeLessThan(UM);
+    });
+  });
+
+  it('returns 0 for non-finite input, in either arm', () => {
+    for (const wrap of [true, false]) {
+      expect(applyUniverseEdge(NaN, UM, wrap)).toEqual({ value: 0, hitEdge: false });
+      expect(applyUniverseEdge(Infinity, UM, wrap)).toEqual({ value: 0, hitEdge: false });
+    }
   });
 });
