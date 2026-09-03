@@ -13,7 +13,7 @@
  * That is canon and must not change for normal play. What must change is the
  * DEV OVERRIDE: a droid spawned stationary for a playtest is registered as
  * frozen, and the tick re-zeroes its speed after the AI has run, so phaser
- * range (falloff dd^7, PFIRDST=7) is a controlled variable across an
+ * range (falloff dd^PFIRDST, shipped at 5) is a controlled variable across an
  * engagement. Nothing on the normal spawn path can set the flag.
  */
 
@@ -186,17 +186,27 @@ describe('DroidSpawner/DroidTickService — dev-only frozen droid', () => {
     expect(shipMap.get(`${free.userid}:1`)!.speed2b).toBeGreaterThan(0);
   });
 
-  it('a userid recycled by a later normal spawn is not frozen', () => {
+  it('a normal spawn CLEARS a stale freeze on the userid it reclaims', () => {
+    // allocateUserid walks nextSlotIndex and wraps at 9999, so a dev-frozen
+    // slot really can come back round to a live droid. This is the `else
+    // { this.frozen.delete(...) }` arm in droid-spawner.ts; without winding the
+    // counter back, the second spawn simply gets a DIFFERENT userid and the
+    // test proves nothing -- which is what the first version of it did.
     const { svc, spawner } = buildHarness(42);
     const pop = svc.getLivePopulation();
+    const counter = spawner as unknown as { nextSlotIndex: number };
 
+    const slotBefore = counter.nextSlotIndex;
     const frozen = spawner.spawn(DROID_CLASS_TRANSPORT, pop, { x: 1, y: 1 }, true, 'A')!;
     expect(spawner.isFrozen(frozen.userid, 1)).toBe(true);
 
-    // Free the slot, then let the normal path take the same userid back.
+    // Free the slot and rewind the allocator so the next spawn MUST reclaim
+    // the same userid. The freeze is deliberately left in place.
     pop.get(DROID_CLASS_TRANSPORT)!.delete(frozen.userid);
-    spawner.unfreeze(frozen.userid, 1);
+    counter.nextSlotIndex = slotBefore;
+
     const reused = spawner.spawn(DROID_CLASS_TRANSPORT, new Map(), undefined, undefined, 'B')!;
+    expect(reused.userid).toBe(frozen.userid);
     expect(spawner.isFrozen(reused.userid, 1)).toBe(false);
   });
 });

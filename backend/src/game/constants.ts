@@ -470,6 +470,21 @@ export const JAMTIME = GAME_CONFIG.JAMTIME;
  * @see GEMAIN.C:494 numopt(PDAMMAX,1,200)
  */
 export const PDAMMAX = GAME_CONFIG.PDAMMAX;
+/**
+ * Passive hull repair, in damage points per 6-second physics tick.
+ *
+ * `repairrate = (double)numopt(REPAIRRT,1,50) / 100.0` (GEMAIN.C:514-515), and
+ * `checkdam` subtracts it from every ship on every TICKTIME pass
+ * (GEFUNCS.C:1009-1010, called from GEMAIN.C:2267). At the shipped default of 6
+ * that is 0.06 a tick — 0.6 a minute, so a hull at 100% is clean after about
+ * two and three-quarter hours of flying.
+ *
+ * This is NOT the queued repair `mai` buys, which is `repairship` and clears
+ * 3 damage a second. It is the slow background heal that means a mauled pilot
+ * with no credits is not stuck forever.
+ */
+export const REPAIRRATE = GAME_CONFIG.REPAIRRT / 100;
+
 /** @see GEMAIN.C:493 numopt(PFIRDST,1,20) — normal-phaser distance falloff exponent. */
 export const PFIRDST = GAME_CONFIG.PFIRDST;
 /** @see GEMAIN.C:492 numopt(HPDAMMAX,1,200) — max hyper-phaser damage base (warp branch). */

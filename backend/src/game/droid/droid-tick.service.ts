@@ -236,7 +236,8 @@ export class DroidTickService implements OnModuleInit {
    * from the normal spawn path is never in that registry, so nothing here can
    * touch it.
    *
-   * Why it matters: phaser damage falls off as dd^7 (PFIRDST 7, GEMAIN.H), so
+   * Why it matters: phaser damage falls off as dd^PFIRDST (a sysop option,
+   * shipped at 5: MBMGEMSG.MSG:417, read at GEMAIN.C:493), so
    * uncontrolled drift moves every damage figure a playtest records.
    */
   private enforceFreeze(droid: ShipState): void {

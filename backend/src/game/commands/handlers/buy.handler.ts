@@ -114,7 +114,7 @@ export class BuyHandlerService {
         // BUY3 names the number actually for sale. The old wording blamed the
         // planet's "reserve" — zero on every neutral-zone planet, and there
         // was no way from inside the game to learn the real limit.
-        // @see GECMDS.C:4381-4383
+        // @see GECMDS.C:4380-4381
         case 'AT_RESERVE':
           return {
             lines: [
@@ -125,7 +125,7 @@ export class BuyHandlerService {
             ],
           };
         // Every `chkweight` failure is BUY8 in C — a completely full hold is
-        // not a different message. @see GECMDS.C:4326
+        // not a different message. @see GECMDS.C:4328
         case 'CAPACITY_FULL':
           return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
         case 'WONT_FIT':

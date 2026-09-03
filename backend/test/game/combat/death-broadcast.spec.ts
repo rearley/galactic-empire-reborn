@@ -72,7 +72,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     // targeted emit is YOURDEAD to the victim, which C sends with
     // outprfge(ALWAYS,usrn) — it tells them they escaped and are back at
     // Zygor, and it is addressed to them alone.
-    // @see GEFUNCS.C:978-987, MBMGEMSG.MSG:1828-1840
+    // @see GEFUNCS.C:978-987, MBMGEMSG.MSG:2099-2111
     expect(toMock).toHaveBeenCalledTimes(1);
     expect(toMock).toHaveBeenCalledWith('user:b');
   });
@@ -100,7 +100,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
 
   /**
    * The colony that made the kill must be named. `fireion` sets the victim's
-   * `lastfired` to -1 so no attacking ship resolves (GEFUNCS.C:1796), which
+   * `lastfired` to -1 so no attacking ship resolves (GEFUNCS.C:1797), which
    * left an ion kill carrying no attacker and no weapon — the same shape a
    * self-destruct produces — and the client announced it as "destroyed by
    * unknown". The gateway is the only layer that sees both the ion hit (which

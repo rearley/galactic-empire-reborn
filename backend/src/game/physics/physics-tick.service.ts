@@ -32,6 +32,7 @@ import {
 import { TELEDAM, UNIVWRAP, UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 import { cdistance } from '../combat/combat-math';
+import { SHIP_SPEED_REPORT, ShipSpeedReportEvent } from './speed-events';
 
 /**
  * Orchestrates the 6-second PHYSICS tick: rotates, accelerates, moves, debits
@@ -289,6 +290,19 @@ export class PhysicsTickService implements OnModuleInit {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.speed = accel.newSpeed;
       });
+    }
+
+    // The helm answers when it reaches the ordered speed. C prints SPEEDIS on
+    // either snap, or SPEED0 when that snap is a dead stop
+    // (GEFUNCS.C:487-489, :543-553), to the captain's own socket.
+    if (speedChanged && accel.snapped) {
+      const evt: ShipSpeedReportEvent = {
+        shipId: shipKey(ship.userid, ship.shipno),
+        userid: ship.userid,
+        shipno: ship.shipno,
+        speed: accel.newSpeed,
+      };
+      this.events.emit(SHIP_SPEED_REPORT, evt);
     }
 
     // Hyperspace event — emit only when the step actually applied (i.e., the

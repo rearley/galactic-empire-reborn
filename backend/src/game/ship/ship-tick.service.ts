@@ -29,6 +29,7 @@ import { SHIELDDM,
   ENGYMAX,
   ENGYMIN,
   ENGRECHG,
+  REPAIRRATE,
 } from '../constants';
 
 /**
@@ -252,7 +253,22 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    // 3. Shield status — GEFUNCS.C:1336-1352 shieldstat
+    // 3. Passive hull repair — GEFUNCS.C:1009-1010, the last thing checkdam
+    // does. `if (ptr->damage > 0.0) ptr->damage -= repairrate;` runs for every
+    // ship on every TICKTIME pass, outside every combat guard, and on top of
+    // the queued repair above. Canon's order is repairship (GEMAIN.C:2257)
+    // then checkdam (:2267), so this sits after it.
+    //
+    // The port had no repairrate at all, so hull damage only ever fell inside
+    // the repair `mai` buys. A pilot who came out of a fight mauled and broke
+    // had no way back; canon lets them fly it off at 0.6 damage a minute.
+    if (ship.damage > 0) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage > REPAIRRATE ? s.damage - REPAIRRATE : 0;
+      });
+    }
+
+    // 4. Shield status — GEFUNCS.C:1336-1352 shieldstat
     // Raised shields either collapse for want of power or charge; the debit in
     // shieldchg happens at the TOP of the function, before the charge test, so
     // holding a fully-charged shield up still costs `type * SHENGUSE`.
@@ -299,16 +315,16 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       s.energy = s.energy < ENGYMAX ? Math.min(ENGYMAX, s.energy + ENGRECHG) : ENGYMAX;
     });
 
-    // 4. Auto-repair (US3, FR-005).
+    // 5. Auto-repair (US3, FR-005).
     if (ship.autoRepair === true) {
       void this.maintenanceService.runAutoRepair(ship);
     }
 
-    // 5. Ion cannons — a planet you have attacked shoots back.
+    // 6. Ion cannons — a planet you have attacked shoots back.
     // @see GEFUNCS.C:1785-1812 fireion, called from warrtia (GEMAIN.C:2265)
     this.fireIon(ship);
 
-    // 3. Auto-shield (US4, FR-006).
+    // 7. Auto-shield (US4, FR-006).
     if (ship.autoShield === true && ship.shieldstat === 0) {
       const decision = decideAutoShield(ship);
       if (decision.action === 'raise') {

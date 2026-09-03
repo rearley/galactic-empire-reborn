@@ -216,7 +216,7 @@ describe('PriceHandlerService — BUY3: insufficient stock', () => {
     const ship = makeShip({ where: 10 });
     // Request more than available (5)
     const result = await handler.command.handler(ship, ['100', 'foo'], {}) as Lines;
-    // BUY3 names `avail` — the count for sale. @see GECMDS.C:4381-4383
+    // BUY3 names `avail` — the count for sale. @see GECMDS.C:4380-4381
     expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY3, 5, ITEM_NAMES[I_FOOD]));
   });
 });

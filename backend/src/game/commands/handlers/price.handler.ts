@@ -119,7 +119,7 @@ export class PriceHandlerService {
     });
 
     if (!outcome.ok) {
-      // BUY3 carries `avail`, the count C prints. @see GECMDS.C:4381-4383
+      // BUY3 carries `avail`, the count C prints. @see GECMDS.C:4380-4381
       if (outcome.reason === 'AT_RESERVE') {
         return {
           lines: [

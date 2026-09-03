@@ -65,7 +65,7 @@ an index from mechanic to original source.
 - [Spy (spy) (feature 016)](#spy-spy-feature-016)
 - [Help (hel / ?) (feature 016)](#help-hel-feature-016)
 - [Clear Screen (cls) (feature 016)](#clear-screen-cls-feature-016)
-- [Player Mail (mai / rea / del) (feature 017)](#player-mail-mai-rea-del-feature-017)
+- [Player Mail (rea / del) (feature 017)](#player-mail-rea-del-feature-017)
 - [Source Fidelity Audit Corrections (feature 020)](#source-fidelity-audit-corrections-feature-020)
 - [Range Model & AI Engagement](#range-model-ai-engagement)
 - [Ion cannons — planetary defence (2026-09-01)](#ion-cannons-planetary-defence-2026-09-01)
@@ -2260,7 +2260,7 @@ Player in orbit of an enemy planet (`where >= 10`, not self-owned, not neutral z
 
 ---
 
-## Player Mail (mai / rea / del) (feature 017)
+## Player Mail (rea / del) (feature 017)
 
 **Source**: GEMAIN.H:220 (`MAIL_CLASS_DISTRESS=1`, `MAIL_CLASS_PRODRPT=3`), GEMAIN.H:531 (`MAILSTAT` struct)
 

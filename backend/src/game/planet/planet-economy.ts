@@ -28,7 +28,7 @@ export interface StarvationLosses {
  * alone, so a garrisoned but depopulated world bled an eighth of its troops
  * every tick until the garrison was gone; in C it holds indefinitely.
  *
- * @see GEMAIN.C:2132
+ * @see GEMAIN.C:2130
  */
 /**
  * A planet whose population has revolted. C writes this into the owner field
@@ -217,7 +217,7 @@ export function isNeutralZoneRestockPlanet(state: PlanetState): boolean {
  * Both blocks live INSIDE `plarti`'s continuous planet loop and fire on the
  * same pass, immediately after `multiply()` has run for that record — so the
  * storage clamp `multiply` applies (`qty > maxpl[i]*fact` -> clamp,
- * GEPLANET.C:328-331) is undone the instant it happens and the hub always
+ * GEPLANET.C:328-332) is undone the instant it happens and the hub always
  * holds 1,032,000 of everything it sells. Restoring only at midnight left the
  * shop selling MAXPL quantities for the rest of the day: spies five at a time,
  * ion cannons 250, and gold zero, since the tick converts the whole gold pile

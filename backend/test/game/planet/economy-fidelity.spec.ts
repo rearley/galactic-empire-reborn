@@ -194,7 +194,7 @@ describe('production and tax see the grown population', () => {
 /**
  * A depopulated planet is frozen, not slowly bled.
  *
- * GEMAIN.C:2132 — `if (plptr->items[0].qty > 0 && plptr->userid[0] != 0)`.
+ * GEMAIN.C:2130 — `if (plptr->items[0].qty > 0 && plptr->userid[0] != 0)`.
  * Slot 0 is I_MEN, so a world with no civilians is skipped ENTIRELY: no
  * starvation, no gold conversion, no tax. The port filtered on ownership only,
  * so a garrisoned but depopulated world lost an eighth of its troops every

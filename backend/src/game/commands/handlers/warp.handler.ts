@@ -93,8 +93,16 @@ export class WarpHandlerService {
         });
       }
 
-      // Leave orbit on engine fire — GECMDS.C:617 LEAVEORB
-      if (ship.where >= 10) ship.where = 0;
+      // Leave orbit on engine fire — canon does three things here, not one:
+      // `refresh(); prfmsg(LEAVEORB); where = 0; repair = 0;`
+      // (GECMDS.C:617-623). The port zeroed `where` silently and kept the repair
+      // queue, so a ship could buy a 2,500-credit repair at Zygor and carry it
+      // away, healing 3 damage a second in deep space.
+      if (ship.where >= 10) {
+        ship.where = 0;
+        ship.repair = 0;
+        lines.push({ text: formatMessage(MessageId.LEAVEORB), category: 'system' });
+      }
 
       const currentWarp = Math.round(ship.speed / 1000);
 

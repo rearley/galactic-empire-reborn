@@ -80,7 +80,7 @@ export class SellHandlerService {
           // Canon order is (tax, net, quantity, item) — "After the Transfer Tax
           // of %s we have netted %s C's for our %s %s, Sir!". The port led with
           // the quantity, so the tax was printed as the amount received.
-          // @see MBMGEMSG.MSG:4008
+          // @see MBMGEMSG.MSG:4277
           text: formatMessage(
             MessageId.SELL2,
             Number(result.fee),

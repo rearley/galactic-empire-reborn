@@ -109,7 +109,7 @@ export interface CombatShipDestroyedEvent {
    * `'ion'` means a planet's cannons made the kill — there is no attacking
    * ship, so `attackerId`/`attackerUserid` are null and were previously
    * indistinguishable from a self-destruct (both null, weapon null).
-   * @see planet-kill.ts, GEFUNCS.C:1796 fireion
+   * @see planet-kill.ts, GEFUNCS.C:1797 fireion
    */
   weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | null;
   /**

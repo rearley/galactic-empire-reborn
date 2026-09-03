@@ -187,7 +187,7 @@ export class PlanetEconomyService {
   }
 
   /**
-   * Writes to MailStat, not Mail: MailStat is the table `mai` reads, so a row in
+   * Writes to MailStat, not Mail: MailStat is the table `rea` reads, so a row in
    * Mail is invisible to the player. The revolt notice used to land there.
    *
    * @see GEFUNCS.C:2290 sendit — C has one delivery path for both structs

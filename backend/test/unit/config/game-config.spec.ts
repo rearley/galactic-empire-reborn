@@ -108,7 +108,7 @@ describe('loadGameConfig', () => {
     // together with TELEDAM -- a constant that was defined and balance-tested
     // but read by no runtime code, because only the wrap arm existed.
     const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(28);
+    expect(wired.length).toBe(29);
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {

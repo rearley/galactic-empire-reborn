@@ -8,7 +8,7 @@
  * port handled it by dropping the captain at the ship-name prompt with no word
  * that they had lost a hull, let alone to whom. Three playtest personas hit it.
  *
- * The fix borrows canon's own habit: YOURDEAD (MBMGEMSG.MSG:1828-1840) never
+ * The fix borrows canon's own habit: YOURDEAD (MBMGEMSG.MSG:2099-1840) never
  * lets a pilot discover a loss by inference. On re-entry, if a SHIP LOST mail
  * is still sitting unread in the inbox, say so in one line — killer, sector,
  * and where to read the rest.

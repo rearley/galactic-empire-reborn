@@ -246,7 +246,7 @@ export class CombatTickService implements OnModuleInit {
         // Canon's killem does the kill credit and the cargo transfer in one
         // place, and so do we now: the gateway's disconnect kill calls the
         // same helper instead of shipping an empty hold.
-        // @see GEFUNCS.C:1116-1136, GEMAIN.C:1418
+        // @see GEFUNCS.C:1116-1136, GEMAIN.C:1420
         const loot: LootTransfer[] = attacker
           ? resolveKillSpoils(victim, attacker, {
               mutate: (userid, shipno, fn) => this.shipState.mutate(userid, shipno, fn),

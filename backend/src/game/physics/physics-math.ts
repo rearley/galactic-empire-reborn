@@ -60,9 +60,9 @@ export function accelerationStep(
   currentSpeed: number,
   targetSpeed: number,
   maxAccel: number,
-): { newSpeed: number; energyDebit: number; hyperspaceEvent: 'enter' | 'exit' | null } {
+): { newSpeed: number; energyDebit: number; hyperspaceEvent: 'enter' | 'exit' | null; snapped: boolean } {
   if (currentSpeed === targetSpeed) {
-    return { newSpeed: currentSpeed, energyDebit: 0, hyperspaceEvent: null };
+    return { newSpeed: currentSpeed, energyDebit: 0, hyperspaceEvent: null, snapped: false };
   }
 
   const goingUp = targetSpeed > currentSpeed;
@@ -102,7 +102,11 @@ export function accelerationStep(
   // @see GEFUNCS.C:492-497 (the debit) and :534-573 (deceleration)
   const energyDebit = !goingUp || snapped || currentSpeed < WARP_THRESHOLD ? 0 : ACCENGAMT;
 
-  return { newSpeed, energyDebit, hyperspaceEvent };
+  // `snapped` is the tick on which the helm actually REACHES the ordered
+  // speed. C reports it — SPEEDIS, or SPEED0 if the snap landed on a stop
+  // (GEFUNCS.C:487-489, :543-553) — and the caller needs to know which tick
+  // that was, so it travels out with the step.
+  return { newSpeed, energyDebit, hyperspaceEvent, snapped };
 }
 
 /**

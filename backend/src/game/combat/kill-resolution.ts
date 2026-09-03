@@ -24,7 +24,7 @@ const DEFAULT_MAX_TONS = 5000;
  * Credits a kill and moves what the killer can carry out of the wreck.
  *
  * This is canon's `killem` body, and canon has exactly ONE of it: `warhupa`
- * calls the same `killem()` on a mid-combat hangup (GEMAIN.C:1418) that
+ * calls the same `killem()` on a mid-combat hangup (GEMAIN.C:1420) that
  * `checkdam` calls on a normal death, and the cargo loop is unconditional on
  * how the victim died. The port had two copies — the combat tick's, which did
  * the transfer, and the gateway's disconnect path, which hardcoded `loot: []`
@@ -40,14 +40,14 @@ const DEFAULT_MAX_TONS = 5000;
  *     entirely rather than part-loaded.
  *
  * @see GEFUNCS.C:1116-1136 killem
- * @see GEMAIN.C:1418 warhupa — same killem on the hangup path
+ * @see GEMAIN.C:1420 warhupa — same killem on the hangup path
  */
 export function resolveKillSpoils(
   victim: Pick<ShipState, 'items'>,
   attacker: ShipState,
   deps: KillSpoilsDeps,
 ): LootTransfer[] {
-  // ++(wuptr->kills) — GEFUNCS.C:1119.
+  // ++(wuptr->kills) — GEFUNCS.C:1118.
   deps.mutate(attacker.userid, attacker.shipno, (a) => {
     a.kills += 1;
   });

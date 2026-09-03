@@ -11,7 +11,7 @@
  * for any death whose attacker had simply disconnected. C shares the overload
  * but never had to name the killer, so it never had to tell them apart.
  *
- * @see GEFUNCS.C:1796 fireion, GEFUNCS.C:226 initshp
+ * @see GEFUNCS.C:1797 fireion, GEFUNCS.C:226 initshp
  * @see ship-channel.registry.ts NO_CHANNEL
  */
 export const IONCANNON_LASTFIRED = -1;

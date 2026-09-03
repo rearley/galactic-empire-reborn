@@ -78,6 +78,11 @@ export function quoteUpgrade(priceTable: bigint[], currentType: number, newType:
     delta = 0n;
   }
 
+  // `delta > 0` matters: an EXACT zero is not raised to the minimum charge.
+  // GECMDS.C:4689 is `if (delta < 1000 && delta > 0)`, and the two swaps where
+  // list price and trade-in cancel (shield 7 -> 6, shield 18 -> 17) are free in
+  // canon. The port's old upgradeCost had a bare `delta < 1000n ? 1000n` and
+  // charged 1,000 for them.
   if (delta < 1_000n && delta > 0n) {
     minCharge = true;
     delta = 1_000n;

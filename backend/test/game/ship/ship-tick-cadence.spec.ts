@@ -20,6 +20,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
+import { REPAIRRATE } from '../../../src/game/constants';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 
 
@@ -96,7 +97,9 @@ describe('the restorative block is driven by the 6s physics tick', () => {
     expect(ship.damage).toBe(30); // the 1s tick does not repair
 
     h.firePhysics();
-    expect(ship.damage).toBe(27);
+    // 3 from the queued repair, then REPAIRRATE from checkdam's passive heal,
+    // which canon runs on the same pass (GEMAIN.C:2257 then :2267).
+    expect(ship.damage).toBeCloseTo(30 - 3 - REPAIRRATE, 10);
   });
 
   it('recovers a shot-out subsystem one point per 6-second tick', () => {

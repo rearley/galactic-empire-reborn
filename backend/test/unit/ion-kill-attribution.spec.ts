@@ -6,7 +6,7 @@ import {
 
 /**
  * A ship killed by a colony's ion cannons was announced to everyone watching
- * as "destroyed by unknown". `fireion` sets `lastfired = -1` (GEFUNCS.C:1796)
+ * as "destroyed by unknown". `fireion` sets `lastfired = -1` (GEFUNCS.C:1797)
  * so no attacker resolves, and the destroyed event had no way to say a planet
  * did it — the same shape a self-destruct produces.
  *

@@ -57,7 +57,7 @@ export class PlanetTickService implements OnModuleInit {
     const due = this.planets
       .all()
       // C skips a planet with no population outright — no starvation, no gold
-      // conversion, no tax. @see GEMAIN.C:2132
+      // conversion, no tax. @see GEMAIN.C:2130
       .filter((p) => shouldRunEconomy(p))
       .filter((p) => {
         const key = planetKey(p.xsect, p.ysect, p.plnum);
