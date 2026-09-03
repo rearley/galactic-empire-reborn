@@ -1981,3 +1981,45 @@ it, removing most of the trade loop a new player uses to fund a first real ship.
 Leaving BASEPRICE out of the canon conformance test silently — instead the test
 asserts positively that `MBMGEMSG.MSG` has no ITMPR blocks, so if a fuller message
 file ever turns up, it fails and tells us to move BASEPRICE onto canon.
+
+## 2026-09-03 — Message text comes from the shipped catalogue, not paraphrase
+
+**Context:** A playtest found the port paraphrasing `.MSG` strings throughout.
+Mechanics were correct in every case, but three paraphrases lost information a
+player needs: `ZAPHIM1` names the **Enforcer Planet**, which is the only in-game
+explanation of why the neutral zone is enforced; `NUMOOR` rendered a negative
+bound as "(-180-180)", reading as one negative number; `ORBIT1` carries the
+plnum *and* the name, and the number is what you type into `sca pl <n>`.
+
+**Decision:** Use the shipped text verbatim where one exists. Invent wording only
+where the port adds a feature canon does not have.
+
+**Reason:** The `.MSG` file is canon at the same level as the C. Paraphrasing is
+a silent deviation with no record, and it had already cost three pieces of
+information nobody noticed losing.
+
+**Alternatives rejected:** Rewriting for clarity — the playtest proposed rewording
+`GRAVITY1` to teach orbit range in situ. That is an invention, and canon's
+`ORBIT2` deliberately gives no distance; the gravity bands are how the range is
+learned. Rejected as a deviation dressed as a fix.
+
+---
+
+## 2026-09-03 — Striking the galactic perimeter no longer strands you in hyperspace
+
+**Context:** `telezip` (GEFUNCS.C:819-833) zeroes `speed` and `speed2b` and adds
+TELEDAM, but never calls `hyperspace(ptr,usrn,0)`. The only exit transition
+(GEFUNCS.C:537-539) requires `speed/1000 >= 1`, which a dead stop makes
+impossible. A ship that hits the perimeter at warp is therefore flagged as being
+in hyperspace, at zero speed, permanently — and every `where === 1` gate in the
+game continues to treat it as warping.
+
+**Decision:** Drop the ship out of hyperspace when telezip fires.
+
+**Reason:** This is an oversight in the original, not a design. The escape in
+canon is to `war 1` and then `war 0` again, which no player would deduce, and
+the state is otherwise permanent. Standing rule: the original's defects are
+fixed, not reproduced.
+
+**Alternatives rejected:** Reproducing it faithfully and hinting at the escape in
+the message — that documents a bug rather than fixing it.

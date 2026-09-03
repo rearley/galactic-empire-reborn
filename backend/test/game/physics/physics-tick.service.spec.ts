@@ -321,6 +321,23 @@ describe('PhysicsTickService', () => {
       expect(ship.damage).toBe(0);
     });
 
+    it('drops a warping ship out of hyperspace instead of stranding it', () => {
+      // C's telezip zeroes speed and speed2b but never calls
+      // hyperspace(ptr,usrn,0), and the only exit transition requires
+      // `speed/1000 >= 1` (GEFUNCS.C:537-539) — impossible at a dead stop. The
+      // original leaves you flagged as in-hyperspace forever; the escape is to
+      // `war 1` then `war 0`, which no player would deduce. Fixed.
+      const ship = makeShip({
+        xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90,
+        speed: 9000, speed2b: 9000, where: 1, damage: 0,
+      });
+      const h = makeWrapHarness(ship);
+      h.fire();
+      expect(ship.speed).toBe(0);
+      expect(ship.damage).toBe(TELEDAM);
+      expect(ship.where).toBe(0);
+    });
+
     it('does not apply the edge in hyperspace (where > 1)', () => {
       // C guards the whole block with `if (ptr->where <= 1)`.
       const ship = makeShip({ xcoord: UNIVMAX - 0.05, ycoord: 0, heading: 90, speed: 9000, speed2b: 9000, where: 2, damage: 0 });
