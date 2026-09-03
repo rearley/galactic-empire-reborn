@@ -69,8 +69,26 @@ Two types — both driven entirely by the server tick, no client involvement:
   from `GEMAIN.H`). Have skill variance (`cybskill`), accumulate gold, respect
   neutral zone. See `GECYBS.C` for full behavior logic.
 - **Droids**: Ephemeral (not persisted, respawn fresh). Simpler behavior.
-  Includes the **Murdonian Transport** (class 11) — a heavily armed freighter
-  that serves as a PvE target for new players. See `GEDROIDS.C`.
+  Classes 31 (Lydorian Garbage Scow), 32 (Murdonian Transport) and 33 (Vakory
+  Survey Drone). See `GEDROIDS.C`.
+
+  **The starter target is the SCOW, not the Murdonian.** This file previously
+  called the Murdonian "a heavily armed freighter that serves as a PvE target
+  for new players", and the canon arithmetic says otherwise. Phaser damage is
+  divided by `1.0 + max_tons/TONFACT` with `TONFACT 15000` (GECMDS.C:962-969,
+  GEMAIN.H:102):
+
+  | | tons | divisor | phaser |
+  |---|---|---|---|
+  | Interceptor (starter) | 1,000 | 1.07 | Mark 1 |
+  | Lydorian Scow (31) | 10,000 | 1.67 | Mark 1 |
+  | Murdonian (32) | 30,000 | **3.00** | **Mark 5** |
+
+  A Murdonian is ~2.8x tougher on tonnage alone and out-guns a starter 5:1 —
+  roughly 4-5x net, confirmed in playtest. Worse, shields fully deflect phaser
+  damage (GECMDS.C:986-997 never touches `wptr->damage` in the SHIELDUP
+  branch), so an under-gunned attacker is in a regen stalemate, not a slow win.
+  Point new pilots at the Scow.
 
 ### WebSocket / Real-time
 
