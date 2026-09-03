@@ -45,10 +45,10 @@ export function formatDetail(entry: MailListEntry): string[] {
   if (entry.payload.kind === 'ship_loss') {
     const p = entry.payload as ShipLossPayload;
     lines.push(`Sector:   (${p.sectorX}, ${p.sectorY})`);
-    lines.push(
-      `Distress beacon recovered: your ship was destroyed by ${p.killer}. `
-      + 'You were not aboard to answer.',
-    );
+    // Does NOT claim the captain was absent: the mail is written on every
+    // destruction, and a pilot who was online has already seen YOURDEAD live.
+    // Asserting "you were not aboard" was wrong half the time.
+    lines.push(`Distress beacon recovered: your ship was destroyed by ${p.killer}.`);
   } else if (entry.payload.kind === 'revolt') {
     const p = entry.payload as RevoltPayload;
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
