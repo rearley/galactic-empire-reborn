@@ -1525,9 +1525,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // is routinely outside your own scanners and opens fire from there. The
     // taunt is the only warning the game gives, and sending it to the
     // attacker's sector room meant the target never received it.
-    this.server.to(`user:${useridOf(event.targetShipKey)}`).emit(CYBERTRON_EVENT.TAUNT, event);
-    // Bystanders in the Cybertron's own sector still see the exchange.
-    this.server.to(`sector:${event.sector.x}:${event.sector.y}`).emit(CYBERTRON_EVENT.TAUNT, event);
+    //
+    // ONE emit, two rooms. Socket.io de-duplicates across rooms within a single
+    // emit but not across two calls, so the previous pair of `.emit()`s sent
+    // every taunt TWICE to a target standing in the taunter's own sector — the
+    // ordinary case, since that is where a Cybertron does its taunting.
+    // Bystanders in that sector still see the exchange.
+    this.server
+      .to(`user:${useridOf(event.targetShipKey)}`)
+      .to(`sector:${event.sector.x}:${event.sector.y}`)
+      .emit(CYBERTRON_EVENT.TAUNT, event);
   }
 
   /** @see GECYBS.C:255 CYB_BREAKOFF roll */
@@ -1646,7 +1653,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(DroidEvents.ANNOY)
   handleDroidAnnoy(event: DroidAnnoyEvent): void {
-    const targetRoom = `to:${event.toUserid}:${event.toShipno}`;
+    // `user:<userid>` — the only per-captain room the gateway joins (see
+    // handleConnection). This read `to:<userid>:<shipno>`, which nothing ever
+    // joins, so the targeted half of the delivery went nowhere; it survived
+    // only because a droid is usually in its victim's sector anyway.
+    const targetRoom = `user:${event.toUserid}`;
     const sectorRoom = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(targetRoom).to(sectorRoom).emit(DroidEvents.ANNOY, event);
   }

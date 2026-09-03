@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TeamRepository } from './team.repository';
 import { ShipState } from '../ship/ship-state.types';
@@ -386,11 +387,25 @@ export class TeamService {
     return this.lastMsgno;
   }
 
-  /** Founder password handed out at team creation. @see GECMDS.C:5559 TEAMCRT */
+  /**
+   * Founder password handed out at team creation. @see GECMDS.C:5559 TEAMCRT
+   *
+   * `randomInt`, not `Math.random()`. This string is the credential gating
+   * `tea newpass`, `tea newname` and `tea kick`, so predicting it is a team
+   * takeover — and Math.random is a deterministic PRNG whose internal state can
+   * be recovered from a handful of outputs. Founding two teams of your own and
+   * reading their secrets would have put you in a position to predict the next
+   * one anybody was issued. It is also the project's own rule
+   * (`random.port.ts`: "never use Math.random() inline"), applied outside
+   * combat for the first time.
+   *
+   * `randomInt(n)` is rejection-sampled and unbiased; `% n` over a
+   * power-of-two source is not, and 32 divides evenly only by luck here.
+   */
   private static generateSecret(): string {
     let out = '';
     for (let i = 0; i < SECRET_LENGTH; i++) {
-      out += SECRET_ALPHABET[Math.floor(Math.random() * SECRET_ALPHABET.length)];
+      out += SECRET_ALPHABET[randomInt(SECRET_ALPHABET.length)];
     }
     return out;
   }

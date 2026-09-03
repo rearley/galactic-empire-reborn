@@ -19,9 +19,11 @@
 > used — see `reference/ge-upstream/PROVENANCE.md`.)
 >
 > **Result: the report is in very good shape.** All 65 findings' *logic* stands,
-> and roughly 120 of the ~130 C citations resolve exactly. Nine claims are
-> wrong, all listed below; five are one-line citation slips, four are
-> substantive.
+> and roughly 120 of the ~130 C citations resolve exactly. **Twelve** claims are
+> wrong, all listed below: six substantive and six one-line citation slips.
+> (This line originally said "Nine … five … four", which matched neither the
+> tables beneath it nor the re-check that produced them — a counting error in
+> the summary of a counting exercise.)
 >
 > ### Substantive corrections
 >

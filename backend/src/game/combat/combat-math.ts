@@ -368,7 +368,7 @@ export function missileFluxCost(charge: number, misengfc: number): number {
  *
  * Note the PLUS. `energy` is a `double` (GEMAIN.H:334), so this is not an
  * overflow artefact — the shot is allowed to leave the pile up to MOVENGMIN-1
- * in the red, and `warsptr->energy -= eng_flu` at GECMDS.C:1314 duly takes it
+ * in the red, and `warsptr->energy -= eng_flu` at GECMDS.C:1312 duly takes it
  * there. Reading it as the more obvious `- MOVENGMIN` (keep a movement reserve)
  * would make missiles strictly harder to fire than the original allows, so the
  * `+` is reproduced verbatim. It is a leniency, not a defect: nothing wraps,

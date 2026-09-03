@@ -116,7 +116,7 @@ export const SYSOP_OPTIONS = {
   // @see docs/DECISIONS.md
   UNIVMAX: { min: 10, max: 32767, default: 300, canonDefault: 300, cReference: 'GEMAIN.C:474', implemented: true },
   S00PLNUM: { min: 3, max: 9, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:476', implemented: false,
-    note: 'No consumer. src/game/galaxy/s00.ts hard-codes S00_PLNUM = 5 as a fixed fixture, so the option cannot vary it.' },
+    note: 'No consumer: src/game/galaxy/s00.ts exports S00_PLNUM = 6 as a fixed fixture, so the option cannot vary it. The value now matches canon (it read 5 until 2026-09-03) and is pinned by test/balance/s00-canon.balance.spec.ts.' },
   // lngopt, not numopt, and stored in MINUTES: GEMAIN.C:469 multiplies by 60.
   // ynopt, so 0/1. GEMAIN.C:475 univwrap = ynopt(UNIVWRAP); canon ships NO.
   UNIVWRAP: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:475', implemented: true, constant: 'UNIVWRAP' },

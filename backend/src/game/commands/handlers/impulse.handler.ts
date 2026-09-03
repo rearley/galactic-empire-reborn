@@ -45,7 +45,7 @@ export interface IonTrailReport {
 export interface IonTrailRng {
   /** GELIB.C:122 `rndm(mod)` — uniform double in [0, mod). */
   rndm(mod: number): number;
-  /** GELIB.C:112 `gernd()` — raw `rand()`. */
+  /** GELIB.C:132-136 `gernd()` — raw `rand()`. */
   gernd(): number;
 }
 

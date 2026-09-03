@@ -18,7 +18,7 @@
  * BASEPRICE is now canon-derived and pinned like the rest.
  *
  * @see GEMAIN.C:550-570 — the five parallel option families
- * @see GEMAIN.H:141-156
+ * @see GEMAIN.H:141-157
  */
 
 export const NUMITEMS = 14 as const;
