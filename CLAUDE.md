@@ -144,29 +144,30 @@ balanced, better documented, or pinned by a passing test. Deviations are allowed
 only when they are deliberate, written down in `docs/DECISIONS.md`, and
 justified by something other than "we could not find the canonical value".
 
-The full original distribution is vendored, READ ONLY, at
-`/reference/ge-upstream/` — see its `PROVENANCE.md`. Our nine C files in
-`/reference/ge-source/` are byte-identical to it.
+The full original distribution is vendored, READ ONLY, at `/reference/`.
 
-**Precedence when sources disagree:**
+> **Before reading anything under `/reference/`, read `reference/CLAUDE.md`.**
+> It maps every file in that tree and says which copy of each data file is the
+> real one. This is not bureaucracy: the distribution contains several
+> generations and several variants of the same configuration, they look
+> identical, and picking the wrong one has already put wrong numbers into this
+> codebase twice.
+
+The short version:
 
 1. **The C source** — `reference/ge-source/` (identical to `ge-upstream/mbmgemp/*.C`)
 2. **The `.MSG` data files** — `ge-upstream/mbmgemp/GE/REL/`, above all
-   `MBMGESHP.MSG` (the ship class table the game loaded at boot) and
-   `MBMGEMSG.MSG` (sysop options, items, neutral-zone planets)
-
-   **Use `GE/REL/`, never `GE/MSG/`.** The distribution ships three copies of
-   each `.MSG`. `GE/REL/` and the `mbmgemp/` root are byte-identical and
-   complete; `GE/MSG/MBMGEMSG.MSG` is an EARLIER snapshot missing 277 message
-   ids, nine of which the C source reads by name — `ITMPR01` (item base
-   prices), `SHLDPR01`/`PHSRPR01` (shipyard price tables), `HYPDST1/2`,
-   `CYBNEW`, `DROIDNEW`, `CYBBASEM`, `CYBLASTM`. A build cannot run against it.
-   It also disagrees on three numeric options: `PFIRDST` 7 vs a shipped **5**,
-   `HPFIRDST` 9 vs **5**, and `ITMWT13` (gold weight) 200 vs **50**. All three
-   reached our balance constants before this was caught. `MBMGESHP.MSG` is
-   identical in all three locations, so ship classes were never affected.
+   `MBMGESHP.MSG` (the ship class table loaded at boot) and `MBMGEMSG.MSG`
+   (sysop options, items, neutral-zone planets).
+   **Never `GE/MSG/`** — a pre-3.2d snapshot that disagrees on `PFIRDST`,
+   `HPFIRDST` and gold's weight. **Never `GE/REL2/`** — a second,
+   differently-tuned instance where 33 of 60 shared options differ.
+   `backend/test/balance/msg-provenance.balance.spec.ts` enforces both.
 3. **`reference/wiki/`** — a community transcription. Useful, and has been
    caught being wrong. Never cite it against 1 or 2.
+
+The vendored release is **3.2e (1994-08-06)**, the last one; `GE/DOCS/GEREADME.DOC`
+is the changelog and is often the fastest answer to "why is this value what it is".
 
 **In-game help text (`MBMGEHLP.MSG`) sits outside this ranking.** It states
 design *intent*, and the shipped configuration frequently does not implement it.
