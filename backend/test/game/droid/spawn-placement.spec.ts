@@ -25,21 +25,21 @@ import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.
 const SCOW_ENTRY: ShipClassEntry = {
   maxAcceleration: 1200, maxWarp: 1, maxPhaser: 1, maxShields: 1,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
-  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, noClaim: 0,
+  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
   tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50, canAttackPlanet: false, damageFactor: 100, typeName: 'Droid', shipNameTemplate: '',
 };
 
 const MURDONIAN_ENTRY: ShipClassEntry = {
   maxAcceleration: 1200, maxWarp: 8, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
-  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, noClaim: 0,
+  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
   tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50, canAttackPlanet: false, damageFactor: 100, typeName: 'Droid', shipNameTemplate: '',
 };
 
 const VAKORY_ENTRY: ShipClassEntry = {
   maxAcceleration: 1200, maxWarp: 4, maxPhaser: 1, maxShields: 1,
   scanRange: 20_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
-  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, noClaim: 0,
+  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
   tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50, canAttackPlanet: false, damageFactor: 100, typeName: 'Droid', shipNameTemplate: '',
 };
 

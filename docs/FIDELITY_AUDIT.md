@@ -9,6 +9,79 @@
 >
 > Current audit: `CANON_AUDIT_2026-09.md`. Index: `README.md`.
 
+> ## VALUE RE-CHECK 2026-09-03
+>
+> Acting on this document's own "any claim about a VALUE here should be
+> re-checked" warning: **every numeric claim and every `file:line` citation in
+> this report has now been re-read** against `reference/ge-source/*.C` and the
+> **shipped** `reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG`. (The other
+> copy of that file, `GE/MSG/`, is an earlier partial snapshot and must not be
+> used — see `reference/ge-upstream/PROVENANCE.md`.)
+>
+> **Result: the report is in very good shape.** All 65 findings' *logic* stands,
+> and roughly 120 of the ~130 C citations resolve exactly. Nine claims are
+> wrong, all listed below; five are one-line citation slips, four are
+> substantive.
+>
+> ### Substantive corrections
+>
+> | Where | Claim | Verdict |
+> |---|---|---|
+> | **7.3 `score_f2`** | "Latent at the shipped default 100." | **WRONG.** Canon `SCRFACT` is **35** (`GE/REL/MBMGEMSG.MSG:472`; `GEMAIN.C:603`). The bug is **live**, not latent: the port awards the attacker a 35%-scaled amount where C awards the full `amt`. `game-config.ts` already records `canonDefault: 35, implemented: false` with a note that `score.config.ts` reads its own `SCORE_F2` env var defaulting to 100. |
+> | **7.4 `TEAMBONU`** | "Latent at the default 0." | **WRONG.** Canon `TEAMBONU` is **5** (`:529`), i.e. `teambonus = 500` after `GEMAIN.C:478`'s `*100L`. The bug is **live**: every zero-score team member is denied their 500. `game-config.ts:125` now carries `default: 5`. |
+> | **7.1 `PLTVCASH`** | "Fix: choose a real sysop value (must be ≤ 1e6 for the expression to be a divisor)." | **Was UNVERIFIABLE; now RESOLVED.** Canon is **10** (`:1831`), giving `v = (cash+tax)/100000`. The diagnosis (201,228,378 is the `lngopt` ceiling, `GEMAIN.C:593`) is CONFIRMED. `midnight.constants.ts:63` currently defaults to **1000** — a live 100x deviation from canon. |
+> | **7.2 `PLTVDIV`** | "Fix: pick a sane divisor." | **Was UNVERIFIABLE; now RESOLVED.** Canon is **10000** (`:1823`) — which is exactly what `midnight.constants.ts:77` already defaults to. Nothing to change. |
+> | **1.1 missiles** | "Max possible missile hull damage is 100." | **Half wrong.** 100 is the `numopt(MDAMMAX,1,100)` **ceiling** (`GEMAIN.C:511`), not the value. Shipped `MDAMMAX` is **25** (`:333`), so canon's ceiling on missile hull damage is 25 and the port's overshoot is worse than stated. |
+> | **1.7 mail purge** | "purge mail older than 7 days" | **Wrong number, right finding.** The 7 is C's *comment* (`GEMAIN.C:1182`); the shipped retention is `MAILDAYS = 3` (`:449`, clamp `numopt(MAILDAYS,1,7)` at `GEMAIN.C:497`). `midnight.constants.ts` has since been corrected to canon 3. |
+>
+> ### Citation slips (value/logic unaffected; the corrected line is given)
+>
+> | Where | Cited | Correct |
+> |---|---|---|
+> | 1.1 | `GEFUNCS.C:1648` for the missile `rndm(.1)` | **`GEFUNCS.C:1642`** (`:1648` is `power = mptr->energy/999`) |
+> | 2.1 | `GECMDS.C:986` "branches solely on `shieldstat != SHIELDUP`" | **`GECMDS.C:982`** (`:986` is the `outprfge`) |
+> | 4.7 | `GEFUNCS.C:2497-2499` for the shield energy debit | **`GEFUNCS.C:2502-2503`** — and the report omits the guard: `if (type < 20)`, so a sysop type-20 shield draws nothing |
+> | 5.3 | `GEPLANET.C:359-361` for "two independent `gernd()` calls" | **`GEPLANET.C:359` and `:363`** |
+> | 5.4 | `GEPLANET.C:232-234` for the men `/8` | **`GEPLANET.C:234-236`** |
+> | 1.7 | `GEMAIN.C:1160-1161` for the MAILSTAT `mailit()` | **`GEMAIN.C:1163`** (`:1160` is the `/*HERE*/` marker) |
+>
+> ### Spot-checks that came back CONFIRMED (not exhaustive, but the load-bearing ones)
+>
+> `MDAMMAX` clamp `GEMAIN.C:511`; `ddist *= 10000` at `GECMDS.C:1637` and `:1705`;
+> `buy` affordability `GECMDS.C:4333` and negative-cash clamp `:4208-4209`;
+> `amt4sale` `GECMDS.C:4411-4415` and the gold branch `:4417-4423` (the gate is
+> `plnum == 1`, and `plnum` is 1-based via `where = 10 + plnum`, `GECMDS.C:801` —
+> so "Zygor-3" in this report means canon's planet **#1, named simply "Zygor"**,
+> `GE/REL/MBMGEMSG.MSG:559`); teamcode sentinel `GEMAIN.C:1293-1301`; shield
+> knockdown `GEFUNCS.C:2453-2469`; `cmd_shields` gates `GECMDS.C:3114-3170`;
+> decoy loops `GEFUNCS.C:1581-1592` / `:1666-1677` with `DECOYTIME 15`
+> (`GEMAIN.H:132`) and `MAXDECOY 10` (`:127`); torpedo/missile channel writes
+> `GECMDS.C:1202` / `:1317`; `cybmine` on phaser hit `GECMDS.C:980-981` /
+> `:1071-1072`; `useenergy`'s `+500` `GEFUNCS.C:1507`; `unsigned dam`
+> `GEFUNCS.C:2067`; the AI 1s countdown `GEMAIN.C:2401-2426` + `rtkick(1,…)`
+> `:2438`; `isquad` `GECYBS.C:834-838` and `CYB_BREAKOFF` `:255`; `notclaimed`
+> `GECYBS.C:357-376` and `lta` `:711/:719`; the four pursuit clamps `:745-746,
+> :760-761, :774-775, :789-790`; `cyb_lay_decoys` `:606-612` called from `:296`;
+> the three evasive branches `:541-557, :559-565, :566-580` (`rndm(5000)+4500` at
+> `:575`); `CYB_ALLOW 35` `GEMAIN.H:170` + `GECYBS.C:229` and `CYB_MAXCASH`
+> `:121-122`; droid ticks 18-33 idle / 6-11 locked `GEDROIDS.C:216-227` (with
+> `CYBTICKTIME 6`, `GEMAIN.H:135`); `int diff,intspeed` `GEFUNCS.C:639` and the
+> 27-vs-26 arithmetic `:743-745`; the 6s restorative block `GEMAIN.C:2256-2274`
+> and `TICKTIME 6` `GEMAIN.H:133`; the seven repair-completion fields
+> `GEFUNCS.C:413-421`; `SHMINPWR` collapse `GEFUNCS.C:1340-1352`; gravity
+> `GEFUNCS.C:836-902`; hyperspace `GEFUNCS.C:580-626`; `hostile`
+> `GEFUNCS.C:724, :797-798, :907-929`; the planet loop `GEPLANET.C:268-333` with
+> cash decay at `:286` and the cap at `:295/:297`; starvation integer division
+> `GEPLANET.C:206-209` (100 troops → 88; 150 troops + 1 food does not starve);
+> `GEMAIN.C:2130`; `BUYPAS3/4` `GECMDS.C:4232-4246`; `BUY7` `GECMDS.C:4322`;
+> `score_f2` split `GEFUNCS.C:1155-1157, :1162, :1184-1185`; `TEAMBONU`
+> `GEMAIN.C:1275`; `outprfge` `GEMAIN.C:2547-2576`; `cmd_set`'s four options
+> `GECMDS.C:5196-5201`.
+>
+> **Not re-verified:** the port-side (`backend/src/…`) line numbers throughout.
+> Those files have moved under seven commits since 2026-08-31 and this pass
+> checked canon only.
+
 **Run:** 2026-08-31. **Method:** ten subsystem auditors read `reference/ge-source/`
 and the corresponding port code independently, each followed by an adversarial
 reviewer instructed to refute its findings by re-reading both sides. 76 findings
@@ -56,9 +129,9 @@ Ranked by effect on actual play.
 
 ### 1.1 Missiles one-shot everything
 - **Port:** `backend/src/game/combat/combat-tick.service.ts:596-597` passes the raw stored charge (`carrier.lmisslEnergy[i]`, legal range 1..50000 per `missile.handler.ts:88-96`) as `dmgMax` into `rollProjectileHullDamage` (`combat-math.ts:259-267`).
-- **C:** `GEFUNCS.C:1645-1659` — `damfact = ton_fact(energy)/50000.0; damage += mdammax*damfact*(rndm(.5)+.5)`, with `mdammax` clamped 1..100. Max possible missile hull damage is 100.
+- **C:** `GEFUNCS.C:1645-1659` — `damfact = ton_fact(energy)/50000.0; damage += mdammax*damfact*(rndm(.5)+.5)`, with `mdammax` clamped 1..100. Max possible missile hull damage is 100. **[RE-CHECK 2026-09-03: WRONG — 100 is the `numopt(MDAMMAX,1,100)` **ceiling** (`GEMAIN.C:511`). The shipped value is **25** (`GE/REL/MBMGEMSG.MSG:333`), so canon's cap is 25 and the overshoot is ~4x worse than stated.]**
 - **Effect:** any missile above ~200 charge is an instant kill regardless of hull, class or shields. ~500x the intended damage.
-- **Fix:** normalise — `dmgMax = MDAMMAX * (charge / 50000)`. Also split the shields-up branch: C uses `rndm(.1)` for missiles (`GEFUNCS.C:1648`), not the torpedo `rand*0.5`.
+- **Fix:** normalise — `dmgMax = MDAMMAX * (charge / 50000)`. Also split the shields-up branch: C uses `rndm(.1)` for missiles (`GEFUNCS.C:1642` **[RE-CHECK 2026-09-03: citation corrected from `:1648`, which is `power = mptr->energy/999`]**), not the torpedo `rand*0.5`.
 
 ### 1.2 Jammer jams the entire galaxy
 - **Port:** `backend/src/game/commands/handlers/jammer.handler.ts:55-61` feeds `cdistance()` (sector units, 0..33) into `jammerCounter(dist, scanRange, JAMTIME)` (`combat-math.ts:422-425`), which expects raw units (3750..50000).
@@ -90,7 +163,7 @@ Ranked by effect on actual play.
 
 ### 1.7 The mail purge deletes from a table nothing writes to
 - **Port:** `midnight.repository.ts:169-178` deletes from `tx.mail`. Repo-wide, the only writers of the `Mail` model are test files. All real mail goes to `MailStat` — production reports (`midnight.repository.ts:156`), attack notices (`planet-attack.service.ts:296`), economy notices (`planet-economy.service.ts:150`) — and the inbox reads only `MailStat` (`mail-inbox.repository.ts:19`).
-- **C:** `GEMAIN.C:1182-1196` — phase 3 walks `gebb4`, the single file `mailit()` writes *all* mail into, including the MAILSTAT production records mailed at `GEMAIN.C:1160-1161`.
+- **C:** `GEMAIN.C:1182-1196` — phase 3 walks `gebb4`, the single file `mailit()` writes *all* mail into, including the MAILSTAT production records mailed at `GEMAIN.C:1163` **[RE-CHECK 2026-09-03: citation corrected from `:1160-1161` (the `/*HERE*/` marker). Separately, the section title's **"7 days" is WRONG**: 7 is C's comment text and the `numopt` ceiling (`GEMAIN.C:497`); shipped `MAILDAYS` is **3** (`GE/REL/MBMGEMSG.MSG:449`).]**.
 - **Effect:** mail never expires. 10 planets = 3,650 undeletable inbox rows per year; unbounded table growth.
 - **Fix:** point `purgeMail` at `MailStat` (age cutoff + `*`-prefixed recipients). Note `specs/017-mail-inbox/research.md:144` asserts the purge already covers this — correct that too.
 
@@ -104,7 +177,7 @@ Four findings, one root cause.
 - `combat-math.ts:196-206` returns a single `knockedDown` boolean for both the `newCharge <= 2` and `newCharge < SHMINCHG` branches; every caller (`phaser.handler.ts:218`, `cybertron-tick.service.ts:440`, `droid-tick.service.ts:416`) responds `v.shieldstat = 0`.
 - **C `GEFUNCS.C:2453-2469`:** `shield <= 2` → `shieldstat = SHIELDDM` **and** `shield -= knock*3`; the `else if (shield < SHMINCHG)` branch prints `SHKNKDN` only and **leaves shields up**.
 - `shield.handler.ts:21-25` sets `shieldstat = 1` unconditionally. **C `GECMDS.C:3114-3170`** rejects on `max_shlds == 0` (SHIELD0), `where == 1` (SHLD1), `shieldtype == 0` (SHLD2), `energy <= SHMINPWR` (SHNOPWR) and `shieldstat == SHIELDDM` (SHNORPR).
-- `phaser.handler.ts:209` adds `&& candidate.shield > 0` to the shields-up test. **C `GECMDS.C:986`** branches solely on `shieldstat != SHIELDUP`; `shieldup()` (`GEFUNCS.C:2409-2415`) grants no charge, so a just-raised 0-charge shield still absorbs the hit fully in C.
+- `phaser.handler.ts:209` adds `&& candidate.shield > 0` to the shields-up test. **C `GECMDS.C:982`** **[RE-CHECK 2026-09-03: citation corrected from `:986`, which is the `outprfge`]** branches solely on `shieldstat != SHIELDUP`; `shieldup()` (`GEFUNCS.C:2409-2415`) grants no charge, so a just-raised 0-charge shield still absorbs the hit fully in C.
 
 **Net effect:** shields fail two charge points early, fail into a freely re-raisable state, and a defender who has just raised shields or is pinned at 0 charge eats full hull damage. The `shieldrep` climb at `ship-tick.service.ts:137-143` is unreachable from combat. Sustained phaser pressure — the defining Cybertron/PvP tactic — buys nothing.
 
@@ -238,7 +311,7 @@ Two findings, one seed bug.
 
 ### 4.7 Raised shields are free, and never collapse
 - **Port:** `ship-tick.service.ts:148-160` nests the debit inside both `ship.shield < maxCharge` and `ship.energy >= energyCost`. `SHMINPWR` is read nowhere (`constants.ts:167` only).
-- **C:** `GEFUNCS.C:2497-2499` debits `type*SHENGUSE` at the *top* of `shieldchg`, before the charge test; `GEFUNCS.C:1340-1352` `shieldstat()` collapses shields (`SHIELDDN`, `shield = 0`, SHDNNOP) when `energy < SHMINPWR`.
+- **C:** `GEFUNCS.C:2502-2503` **[RE-CHECK 2026-09-03: citation corrected from `:2497-2499`; and the report omits the guard — the debit is wrapped in `if (type < 20)`, so a sysop type-20 shield draws no energy]** debits `type*SHENGUSE` at the *top* of `shieldchg`, before the charge test; `GEFUNCS.C:1340-1352` `shieldstat()` collapses shields (`SHIELDDN`, `shield = 0`, SHDNNOP) when `energy < SHMINPWR`.
 - **Fix:** debit unconditionally while shields are up; add the `SHMINPWR` collapse.
 
 ### 4.8 Completed repairs don't restore `topspeed` (or subsystems)
@@ -291,12 +364,12 @@ Two findings, one seed bug.
 
 ### 5.3 Revolt reuses one RNG draw
 - **Port:** `planet-economy.service.ts:78` draws `randVal` once, gates on `randVal % 10 !== 0` (`:79`), derives `divisor = (randVal % 8) + 2` from it (`:82`). Survivors are `{0,10,…,90}`, whose `%8` residues are only `{0,2,4,6}` — divisor ∈ {2,4,6,8}, weighted 3/10, 3/10, 2/10, 2/10.
-- **C:** `GEPLANET.C:359-361` — two independent `gernd()` calls; divisor uniform over 2..9.
+- **C:** `GEPLANET.C:359` and `:363` **[RE-CHECK 2026-09-03: citation corrected from `:359-361`]** — two independent `gernd()` calls; divisor uniform over 2..9.
 - **Fix:** draw a second random for the divisor.
 
 ### 5.4 Population re-read and integer truncation
 - `planet-economy.ts:87, 105` use the pre-growth `updatedMen` captured at `:46/64` for every item and for the tax. **C `GEPLANET.C:271`** re-reads `men` inside the loop, and I_MEN is slot 0 written back at `:332`, so slots 1-13 and the tax at `:335-338` see the grown population. **Fix:** update `updatedMen` after slot 0.
-- `planet-economy.ts:50, 61` compare real quotients (`troops / 100 > food`) and compute `Math.floor(qty - qty/8)`. **C `GEPLANET.C:206-209, 232-234`** uses unsigned integer division on both — 100 troops leaves 88, not 87, and 150 troops with 1 food does *not* starve. Line 57 floors correctly, which shows the intent. **Fix:** `Math.floor` both divisions.
+- `planet-economy.ts:50, 61` compare real quotients (`troops / 100 > food`) and compute `Math.floor(qty - qty/8)`. **C `GEPLANET.C:206-209, 234-236`** **[RE-CHECK 2026-09-03: second range corrected from `:232-234`]** uses unsigned integer division on both — 100 troops leaves 88, not 87, and 150 troops with 1 food does *not* starve. Line 57 floors correctly, which shows the intent. **Fix:** `Math.floor` both divisions.
 
 ---
 
@@ -310,10 +383,10 @@ Two findings, one seed bug.
 
 ## Tier 7 — Scoring formulas
 
-- **`PLTVCASH` inflates planet cash ~201x.** `midnight.constants.ts:35` hard-codes `201_228_378`, so `value-pl.ts:28-29` turns C's divisor into a multiplier. That number is `lngopt`'s **max bound** at `GEMAIN.C:593`, used identically as the ceiling for phaserprice, maxpl, weight, value, manhours and shieldprice (`GEMAIN.C:557-589`) — with that value C's expression `(cash+tax)/(1000000L/pltvcash)` divides by zero, proving it is not what C runs. Since `score = plscore + klscore`, banked planet cash dominates the leaderboard and combat contributes nothing measurable. **Fix:** choose a real sysop value (must be ≤ 1e6 for the expression to be a divisor) and make it configurable.
-- **`PLTVDIV` zeroes all stockpiles.** Same ceiling value at `midnight.constants.ts:38`; `value-pl.ts:31-34` computes `qty / 201_228_378`, which truncates to 0 for all 13 non-Men items against `MAXPL` (≤1e8) and to 4 for a fully-maxed Men stock. **C `GEMAIN.C:1357, 596`.** Inventory is invisible to score, so the only rational play is converting everything to cash. (The `BASEPRICE`-vs-`value[]` substitution is deliberate — `specs/009.../research.md:224-238` D12 — leave it.) **Fix:** pick a sane divisor.
-- **`score_f2` scales the wrong side.** `player-score.repository.ts:39-42, 64-74` computes one `transfer = floor((scr/100)*scoreF2)` (and `/10` for AI attackers) and uses it for both the victim decrement and the attacker award. **C `GEFUNCS.C:1145-1185`** — `amt = scr + bonus; ded_amt = (amt/100)*score_f2;` only `ded_amt` is scaled and only `ded_amt` is `/10`'d for AI killers; the attacker gets unscaled `amt`. Latent at the shipped default 100. `specs/019.../spec.md:325-331` claims the award path is already correct. **Fix:** compute the two separately.
-- **`TEAMBONU` skipped for zero-score members.** `midnight.repository.ts:277-284` adds `score: { gt: 0n }` to the where clause; **C `GEMAIN.C:1249-1286`** adds `teambonus` for every member regardless of score, and `teamcount` (the divisor) includes them. Latent at the default 0. **Fix:** drop the predicate.
+- **`PLTVCASH` inflates planet cash ~201x.** `midnight.constants.ts:35` hard-codes `201_228_378`, so `value-pl.ts:28-29` turns C's divisor into a multiplier. That number is `lngopt`'s **max bound** at `GEMAIN.C:593`, used identically as the ceiling for phaserprice, maxpl, weight, value, manhours and shieldprice (`GEMAIN.C:557-589`) — with that value C's expression `(cash+tax)/(1000000L/pltvcash)` divides by zero, proving it is not what C runs. Since `score = plscore + klscore`, banked planet cash dominates the leaderboard and combat contributes nothing measurable. **Fix:** set it to canon **10** (**[RE-CHECK 2026-09-03: RESOLVED — `GE/REL/MBMGEMSG.MSG:1831` `PLTVCASH {The point value of each 1,000,000 : 10}`. `midnight.constants.ts` currently defaults to 1000, still a 100x deviation.]**) and keep it configurable.
+- **`PLTVDIV` zeroes all stockpiles.** Same ceiling value at `midnight.constants.ts:38`; `value-pl.ts:31-34` computes `qty / 201_228_378`, which truncates to 0 for all 13 non-Men items against `MAXPL` (≤1e8) and to 4 for a fully-maxed Men stock. **C `GEMAIN.C:1357, 596`.** Inventory is invisible to score, so the only rational play is converting everything to cash. (The `BASEPRICE`-vs-`value[]` substitution is deliberate — `specs/009.../research.md:224-238` D12 — leave it.) **Fix:** canon is **10000** (**[RE-CHECK 2026-09-03: RESOLVED — `GE/REL/MBMGEMSG.MSG:1823`. `midnight.constants.ts` already defaults to 10000, so this one needs no change.]**).
+- **`score_f2` scales the wrong side.** `player-score.repository.ts:39-42, 64-74` computes one `transfer = floor((scr/100)*scoreF2)` (and `/10` for AI attackers) and uses it for both the victim decrement and the attacker award. **C `GEFUNCS.C:1145-1185`** — `amt = scr + bonus; ded_amt = (amt/100)*score_f2;` only `ded_amt` is scaled and only `ded_amt` is `/10`'d for AI killers; the attacker gets unscaled `amt`. Latent at the shipped default 100. `specs/019.../spec.md:325-331` claims the award path is already correct. **[RE-CHECK 2026-09-03: The clause **"Latent at the shipped default 100" is WRONG** — canon `SCRFACT` is **35** (`GE/REL/MBMGEMSG.MSG:472`), so this is a live scoring bug, not a dormant one.]** **Fix:** compute the two separately.
+- **`TEAMBONU` skipped for zero-score members.** `midnight.repository.ts:277-284` adds `score: { gt: 0n }` to the where clause; **C `GEMAIN.C:1249-1286`** adds `teambonus` for every member regardless of score, and `teamcount` (the divisor) includes them. **[RE-CHECK 2026-09-03: **"Latent at the default 0" is WRONG** — canon `TEAMBONU` is **5** (`GE/REL/MBMGEMSG.MSG:529`), i.e. 500 after `GEMAIN.C:478`'s `*100L`. Live bug.]** **Fix:** drop the predicate.
 
 ---
 

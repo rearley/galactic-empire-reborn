@@ -19,6 +19,7 @@ export interface MailListEntry {
   stamp: number;
   payload:
     | ProductionReportPayload
+    | ProductionCapPayload
     | DistressSignalPayload
     | StarvationPayload
     | RevoltPayload
@@ -33,6 +34,25 @@ export interface ProductionReportPayload {
   debt: bigint;
   tax: bigint;
   itemqty: bigint[];
+}
+
+/**
+ * A planet whose stock of one item hit its ceiling — canon's MESG08+i.
+ *
+ * Shares MAIL_CLASS_PRODRPT with the nightly report (GEPLANET.C:317), so it is
+ * `type`, not `class`, that tells the two apart.
+ *
+ * @see GEPLANET.C:313-326
+ */
+export interface ProductionCapPayload {
+  kind: 'production_cap';
+  /** Item slot 0-13 — the `i` in MESG08+i. */
+  itemIndex: number;
+  planetName: string;
+  sectorX: number;
+  sectorY: number;
+  /** C's `mail.long1` = `max` = `(long)(maxpl[i]*fact)`. */
+  cap: bigint;
 }
 
 export interface DistressSignalPayload {

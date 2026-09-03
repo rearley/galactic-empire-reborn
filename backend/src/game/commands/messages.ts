@@ -186,6 +186,8 @@ export enum MessageId {
   MIN_NEUTRAL = 'MIN_NEUTRAL',
   MIN_NOAMMO = 'MIN_NOAMMO',
   MIN_FULL = 'MIN_FULL',
+  /** @see GE/REL/MBMGEMSG.MSG:5814 MINE2 — the galaxy mine table is full */
+  MIN_JAMMED = 'MIN_JAMMED',
   MIN_DEPLOYED = 'MIN_DEPLOYED',
   ZIP_NOAMMO = 'ZIP_NOAMMO',
   ZIP_SWEPT = 'ZIP_SWEPT',
@@ -403,6 +405,8 @@ export enum MessageId {
   /** @see MBMGEMSG.MSG:2122 KILLEDBY — galaxy-wide kill announcement */
   KILLEDBY = 'KILLEDBY',
   /** @see MBMGEMSG.MSG:2226 SPEEDIS — helm answers a speed change */
+  /** @see GE/REL/MBMGEMSG.MSG:2630 MISSL2 — a warp jump shook the missile off */
+  MISSL2 = 'MISSL2',
   SPEEDIS = 'SPEEDIS',
   /** @see MBMGEMSG.MSG:2231 SPEED0 — helm answers a full stop */
   SPEED0 = 'SPEED0',
@@ -674,6 +678,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MIN_NEUTRAL]: 'Cannot lay mines in the neutral zone.',
   [MessageId.MIN_NOAMMO]: 'No mines in cargo.',
   [MessageId.MIN_FULL]: 'Your mine limit is deployed.',
+  // Canon's answer when `laymine` finds no free slot in the galaxy-wide table
+  // and returns 0 (GECMDS.C:1772-1780). Distinct from MIN_FULL, which is the
+  // per-captain USRMINES cap. @see GE/REL/MBMGEMSG.MSG:5814
+  [MessageId.MIN_JAMMED]: 'The mine launcher is temporarly jammed, Sir!',
   [MessageId.MIN_DEPLOYED]: 'Mine deployed.',
   [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
   [MessageId.ZIP_SWEPT]: 'Mines swept.',
@@ -909,6 +917,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // that printed garbage in the shipped game.
   [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %s, Sir!',
   [MessageId.SPEED0]: 'Helm reports we are at a dead stop, Sir!',
+  // @see GE/REL/MBMGEMSG.MSG:2630
+  [MessageId.MISSL2]: 'The missile tracking us has lost lockon and self destructed Sir!',
 
   // Shipyard narration. Canon quotes the trade-in FIRST (NEW19/NEW29) and then
   // the Yardmaster's fitting report, which is what makes an upgrade priced at

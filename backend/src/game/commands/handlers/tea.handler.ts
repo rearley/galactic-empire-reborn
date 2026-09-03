@@ -6,9 +6,32 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { parseTeaArgs, validateName, validatePassword } from '../../team/team-name';
 import { renderTeamList } from '../../team/team-render';
+import { TeamAdminError } from '../../team/team.types';
+import {
+  TEAMBDSC,
+  TEAMBNAM,
+  TEAMBPSS,
+  TEAMEXST,
+  TEAMFMT,
+  TEAMMHDR,
+  TEAMNFND,
+  TEAMNOT,
+  TEAMNTM,
+  teamCreatedFounderBlock,
+  teamKicked,
+  teamNewName,
+  teamNewPassword,
+} from '../../team/team-messages';
 
 /**
- * Handles `tea [create|list|<name> <pw>|leave]` — full team management.
+ * Handles the `tea` sub-verbs.
+ *
+ * Canon's `cmd_team` accepts join / score / unjoin / start / members / kick /
+ * newpass / newname, plus a `dumpitout` debug verb (GECMDS.C:5299, 5384, 5431,
+ * 5471, 5565, 5614, 5682, 5724, 5766). All but `dumpitout` are implemented;
+ * see docs/DECISIONS.md for why that one is not, and for the port's `create` /
+ * `list` / `leave` spellings, which are kept as aliases of `start` / `score` /
+ * `unjoin`.
  * On join/leave/create: writes User.teamcode via Prisma, mirrors into ShipState,
  * and triggers a player.snapshot rebroadcast.
  * @see GECMDS.C:5277 cmd_team
@@ -40,16 +63,41 @@ export class TeaHandlerService {
       return this.showTeam(ship);
     }
 
-    if (arg0 === 'leave') {
+    // `unjoin` is the canon spelling (GECMDS.C:5431); `leave` is this port's.
+    if (arg0 === 'leave' || arg0 === 'unjoin') {
       return this.leaveTeam(ship);
     }
 
-    if (arg0 === 'list') {
+    // `score` is the canon spelling (GECMDS.C:5384).
+    if (arg0 === 'list' || arg0 === 'score') {
       return this.listTeams();
     }
 
-    if (arg0 === 'create') {
+    // `start` is the canon spelling (GECMDS.C:5471).
+    if (arg0 === 'create' || arg0 === 'start') {
       return this.createTeam(ship, args.slice(1));
+    }
+
+    // Canon requires the `join` keyword (GECMDS.C:5299); this port also accepts
+    // the bare `tea <name> <pw>` form below.
+    if (arg0 === 'join') {
+      return this.joinTeam(ship, args.slice(1));
+    }
+
+    if (arg0 === 'members') {
+      return this.showMembers(ship);
+    }
+
+    if (arg0 === 'kick') {
+      return this.kickMember(ship, args.slice(1));
+    }
+
+    if (arg0 === 'newpass') {
+      return this.changePassword(ship, args.slice(1));
+    }
+
+    if (arg0 === 'newname') {
+      return this.changeName(ship, args.slice(1));
     }
 
     // args.length === 1 → single non-keyword token → show current team (FR-016a)
@@ -118,7 +166,10 @@ export class TeaHandlerService {
     }
 
     return {
-      lines: [{ text: `Team ${result.teamname} created. You are its first member.`, category: 'success' }],
+      lines: [
+        { text: `Team ${result.teamname} created. You are its first member.`, category: 'success' as const },
+        ...teamCreatedFounderBlock(result.secret).map((text) => ({ text, category: 'system' as const })),
+      ],
       broadcasts: [{ room: '__player_snapshot__', event: 'player.snapshot', payload: {} }],
     };
   }
@@ -164,5 +215,93 @@ export class TeaHandlerService {
       lines: [{ text: `You have joined team ${result.teamname}.`, category: 'success' }],
       broadcasts: [{ room: '__player_snapshot__', event: 'player.snapshot', payload: {} }],
     };
+  }
+
+  // ── Founder-gated sub-verbs (GECMDS.C:5565/5614/5682/5724) ────────────────
+
+  /** `tea members` @see GECMDS.C:5565 */
+  private async showMembers(ship: ShipState): Promise<CommandResult> {
+    const result = await this.teamService.membersOf(ship);
+    if ('error' in result) {
+      return { lines: [{ text: TEAMNOT, category: 'system' }] };
+    }
+    return {
+      lines: [
+        { text: TEAMMHDR, category: 'system' },
+        { text: result.members.join(', '), category: 'info' },
+      ],
+    };
+  }
+
+  /** `tea kick <founder password> <userid>` @see GECMDS.C:5614 */
+  private async kickMember(ship: ShipState, rest: string[]): Promise<CommandResult> {
+    if (rest.length < 2) {
+      return { lines: [{ text: TEAMFMT, category: 'system' }] };
+    }
+
+    const result = await this.teamService.kick({ ship, secret: rest[0], userid: rest[1] });
+    if ('error' in result) {
+      return { lines: [{ text: this.adminErrorMessage(result), category: 'system' }] };
+    }
+
+    // The kicked pilot may be flying right now; in-memory ShipState is the
+    // source of truth during play, so the DB write alone would leave them on
+    // the team until their next login.
+    for (const target of this.shipService.findByUserid(result.userid)) {
+      target.teamcode = undefined;
+      target.dirty = true;
+    }
+
+    return {
+      lines: teamKicked(result.userid).map((text) => ({ text, category: 'success' as const })),
+      broadcasts: [{ room: '__player_snapshot__', event: 'player.snapshot', payload: {} }],
+    };
+  }
+
+  /** `tea newpass <founder password> <new password>` @see GECMDS.C:5682 */
+  private async changePassword(ship: ShipState, rest: string[]): Promise<CommandResult> {
+    if (rest.length < 2) {
+      return { lines: [{ text: TEAMFMT, category: 'system' }] };
+    }
+
+    const result = await this.teamService.newPassword({ ship, secret: rest[0], password: rest[1] });
+    if ('error' in result) {
+      return { lines: [{ text: this.adminErrorMessage(result), category: 'system' }] };
+    }
+
+    return { lines: [{ text: teamNewPassword(result.password), category: 'success' }] };
+  }
+
+  /** `tea newname <founder password> <new name>` @see GECMDS.C:5724 */
+  private async changeName(ship: ShipState, rest: string[]): Promise<CommandResult> {
+    if (rest.length < 2) {
+      return { lines: [{ text: TEAMFMT, category: 'system' }] };
+    }
+
+    // C `rstrin()`s the tail so the name may contain spaces (GECMDS.C:5744).
+    const name = rest.slice(1).join(' ');
+    const result = await this.teamService.newName({ ship, secret: rest[0], name });
+    if ('error' in result) {
+      return { lines: [{ text: this.adminErrorMessage(result), category: 'system' }] };
+    }
+
+    return {
+      lines: [{ text: teamNewName(result.teamname), category: 'success' }],
+      broadcasts: [{ room: '__player_snapshot__', event: 'player.snapshot', payload: {} }],
+    };
+  }
+
+  private adminErrorMessage(err: TeamAdminError): string {
+    switch (err.error) {
+      case 'not_on_team': return TEAMNOT;
+      case 'bad_secret': return TEAMBDSC;
+      case 'user_not_found': return TEAMNFND;
+      case 'not_on_your_team': return TEAMNTM;
+      case 'password_too_long': return TEAMBPSS;
+      case 'password_has_space': return 'Team password may not contain spaces.';
+      case 'name_too_short': return TEAMBNAM;
+      case 'name_too_long': return 'Team name must be 30 characters or fewer.';
+      case 'name_taken': return TEAMEXST;
+    }
   }
 }

@@ -49,7 +49,7 @@ function makeHarness(ships: ShipState[]) {
     },
   } as unknown as ShipStateService;
 
-  return new DecoyHandlerService(shipState);
+  return new DecoyHandlerService(shipState, { getHasDecoy: () => true } as never);
 }
 
 const ctx: CommandContext = {};

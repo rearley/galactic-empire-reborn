@@ -76,10 +76,9 @@ import {
   canPursue,
   notClaimed,
   shouldTaunt,
-  CYB_ANNOY_ODDS,
   creditsAreOwed,
 } from './cyb-decisions';
-import { pickTaunt } from './taunt-pool';
+import { pickTaunt, bandName, CYB_ANNOY_BANDS, type CybAnnoyBand } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
 
 /**
@@ -426,12 +425,13 @@ export class CybertronTickService implements OnModuleInit {
 
         if (canAttack) {
           this.cybAttack(ship, target, tough, ddist, ctx);
-          this.cybAnnoy(ship, target, ctx);
+          // cyb_annoy(ptr,zothusn,20,13,16) @see GECYBS.C:295
+          this.cybAnnoy(ship, target, ctx, CYB_ANNOY_BANDS.ATTACK);
           this.cybLayDecoys(ship);
         } else {
           // C taunts in both branches, but only lays decoys when it engages.
-          // @see GECYBS.C:294-303
-          this.cybAnnoy(ship, target, ctx);
+          // cyb_annoy(ptr,zothusn,20,9,12) @see GECYBS.C:300
+          this.cybAnnoy(ship, target, ctx, CYB_ANNOY_BANDS.DECLINE);
         }
       }
     }
@@ -644,18 +644,28 @@ export class CybertronTickService implements OnModuleInit {
    * Taunt the target — pick message, emit cybertron.taunt. No weapon fire.
    * @see GECYBS.C:379 cyb_annoy
    */
-  private cybAnnoy(ship: ShipState, target: ShipState, ctx: TickContext): void {
-    // `if ((gernd()%rnd) == 1)`, rnd = 20 at both call sites. The port had no
-    // gate and taunted every pass. @see GECYBS.C:295, 300, 391
-    if (!shouldTaunt(this.random, CYB_ANNOY_ODDS)) return;
+  private cybAnnoy(
+    ship: ShipState,
+    target: ShipState,
+    ctx: TickContext,
+    band: CybAnnoyBand,
+  ): void {
+    // `if ((gernd()%rnd) == 1)` — note `== 1`, not `== 0`. `rnd` is per call
+    // site: 60 approaching, 30 braking, 20 in range. The port had no gate at
+    // all and taunted every pass. @see GECYBS.C:391
+    if (!shouldTaunt(this.random, band.odds)) return;
 
-    const message = pickTaunt(this.random);
+    // Release 3.2e draws from this class's own 16-message family, four
+    // messages of which belong to this band. @see GECYBS.C:392-397
+    const message = pickTaunt(this.random, ship.shpclass, band, ship.shipname);
+    if (message === null) return;
     const tickAt = typeof ctx === 'object' && ctx !== null && 'tickNumber' in ctx
       ? (ctx as { tickNumber: number }).tickNumber : 0;
     const taunt: CybertronTauntPayload = {
       attackerShipKey: shipKey(ship.userid, ship.shipno),
       targetShipKey: shipKey(target.userid, target.shipno),
       message,
+      band: bandName(band),
       sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
       tickAt,
     };
@@ -799,6 +809,21 @@ export class CybertronTickService implements OnModuleInit {
     const prevWhere = ship.where;
 
     const band = pickPursuitBand(dist, hyperdist1, hyperdist2, prevWhere, classMaxShields, topSpeed, this.random);
+
+    // cyb_annoy in the pursuit ladder. C taunts in three of the four bands and
+    // says nothing while actually in hyperwarp:
+    //   low_dist >= hyperdist2      cyb_annoy(ptr,low_ship,60,1,4)   :769
+    //   low_dist  >  3.0            cyb_annoy(ptr,low_ship,30,5,8)   :782
+    //   low_dist <=  3.0            cyb_annoy(ptr,low_ship,30,5,8)   :801
+    // `low_ship` is the hunted player, so the taunt goes to their own terminal.
+    if (dist < hyperdist1) {
+      this.cybAnnoy(
+        ship,
+        target,
+        ctx,
+        dist >= hyperdist2 ? CYB_ANNOY_BANDS.APPROACH : CYB_ANNOY_BANDS.BRAKE,
+      );
+    }
 
     ship.speed2b = band.desiredSpeed;
     // C also touches `ptr->speed` directly in every band — a snap on hyperwarp

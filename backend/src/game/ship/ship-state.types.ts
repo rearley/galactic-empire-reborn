@@ -51,6 +51,22 @@ export interface ShipState {
    * @see GEMAIN.H:340 — lastfired is the *usernumber* of the last user to fire on you
    */
   channel?: number;
+  /**
+   * Who `lastfired` pointed at, recorded at the moment the damage LANDED.
+   *
+   * In-memory only, and never persisted — it exists to survive a channel scrub
+   * within a session, not a restart. `ShipStateService.leave()` has to null out
+   * every `lastfired` aimed at a channel it is recycling, which used to destroy
+   * the one piece of evidence the ship-loss mail needed: a killer who logged
+   * off in the same tick as the kill came out as "an unknown assailant".
+   * Canon carries no equivalent because it never recycles a `usrnum` densely
+   * enough to need the scrub (GEFUNCS.C:1224-1225 scrubs only on death;
+   * GEMAIN.C:1410-1432 warhupa scrubs nothing).
+   *
+   * The `channel` is kept beside the name so a reader can tell whether the name
+   * still describes `lastfired`. @see attackerNameFromLastFired
+   */
+  lastfiredBy?: { channel: number; name: string };
   shieldtype: number;
   shieldstat: number;
   shield: number;

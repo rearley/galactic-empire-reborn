@@ -69,9 +69,13 @@ export class ShipStateService implements OnModuleInit {
    * simply lives with the mis-attribution. We do not, because our channel
    * recycling is denser.
    *
-   * The cost is narrow and real: a killer who logs off in the same tick as
-   * their victim's death becomes unattributable, and the ship-loss mail falls
-   * back to "an unknown assailant". @see docs/DECISIONS.md
+   * The scrub used to cost us attribution: a killer who logged off in the same
+   * tick as their victim's death became unnameable, and the ship-loss mail
+   * fell back to "an unknown assailant". It no longer does. Every weapon now
+   * records the firer's NAME on the victim as `lastfiredBy` at the moment the
+   * damage lands, so the channel can be recycled without taking the evidence
+   * with it — which is why `lastfiredBy` is deliberately NOT scrubbed here.
+   * @see attackerNameFromLastFired, docs/DECISIONS.md
    */
   private leave(userid: string, shipno: number): void {
     const departing = this.map.get(shipKey(userid, shipno));
@@ -80,6 +84,9 @@ export class ShipStateService implements OnModuleInit {
     const freed = this.channels.release(userid, shipno);
     if (freed === NO_CHANNEL) return;
     for (const s of this.map.values()) {
+      // Only the CHANNEL is cleared. `s.lastfiredBy` keeps the departing
+      // ship's name, and the freed channel it belonged to, so a kill this tick
+      // can still say who did it.
       if (s.lastfired === freed) s.lastfired = NO_CHANNEL;
     }
   }

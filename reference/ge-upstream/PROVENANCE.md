@@ -80,3 +80,58 @@ Of the 179 sysop options both copies define, exactly **three** disagree:
 All three had reached our constants from the stale copy and were corrected on
 2026-09-03. Anything sourced from `GE/MSG/` before that date is suspect and
 should be re-checked against `GE/REL/`.
+
+### `MBMGEHLP.MSG` — diffed 2026-09-03
+
+The help database was the one `.MSG` never checked after the `MBMGEMSG.MSG`
+episode. It has now been diffed properly. **Result: the two copies differ in
+exactly one line, and no number in either copy is load-bearing.**
+
+Both copies define the **same 62 ids** (`HLPINDEX`, `HLPSTART`, … `HLPZIP`);
+none is present in one and absent from the other. Of those 62, 61 are
+byte-identical. The whole delta is one line inside `HLPSET`, present in
+`GE/REL/` (line 961) and missing from `GE/MSG/`:
+
+```
+  filter     -  filters out 80% of the battle messages
+```
+
+That is the third independent confirmation that **`GE/REL/` is the later,
+shipped copy**: `filter` is `options[MSG_FILTER]`, the fourth entry of
+`cmd_set`'s option table (`GECMDS.C:5196-5201`, `#define NUMOPTS 4`), so the
+earlier help text documents only three of the four options the shipped binary
+accepts. The 57-byte size difference is this line and nothing else.
+
+**The "80%" is prose, not a constant.** Nothing reads it. The mechanism is
+binary: `outprfge` (`GEMAIN.C:2547-2576`) calls `clrprf()` and returns for a
+`FILTER`-class message when `options[MSG_FILTER] == TRUE`, and `outprf()`s it
+otherwise. 80% is Murdock's estimate of what share of battle chatter is sent
+`FILTER` rather than `ALWAYS`; there is no percentage anywhere in the code.
+
+Every other number stated in `MBMGEHLP.MSG` — sector size 10000x10000 parsecs,
+galaxy 6000x6000, bearings -180..+180, Cybertron top speed warp 8.0, the
+`HLPSCORE` kill-point table, "1/4 impulse" for wormholes, "10 to 50 troops in a
+pass" — is identical in both copies, so no help-derived figure in this port can
+have been contaminated by the stale snapshot. It remains true that
+`MBMGEHLP.MSG` states *intent* and is never authoritative for a value: the
+`HLPSCORE` table (Interceptor 10 … Dreadnought 500) is help text, and
+`MBMGESHP.MSG`'s `max_points` column is what the game actually loads.
+
+**Conclusion: no constant in this codebase is at risk from the `MBMGEHLP.MSG`
+divergence.** Use `GE/REL/` anyway, for consistency with the other two files.
+
+### Correction to a citation used elsewhere — the base-price block DOES ship
+
+`docs/CANON_AUDIT_2026-09.md` (D5, and its finding at `:338-341`) states that
+`grep ITMPR MBMGEMSG.MSG` "returns ZERO hits", concludes the shipped data file
+predates `GEMAIN.C:569`, and rules gold's base price unresolvable from canon.
+That grep was run against `GE/MSG/`. In the shipped `GE/REL/` copy the whole
+block is present at lines 1564-1660, including:
+
+```
+1612:ITMPR13 {Base price for gold: 1000} N 1 32000
+```
+
+So the value *is* canon, it *is* 1000, and the port's 100 is wrong. Likewise
+`SHLDPR01` (`:1664`) and `PHSRPR01` (`:1740`) ship — as the "nine option ids
+absent from `GE/MSG/`" list above already implied.

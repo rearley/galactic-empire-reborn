@@ -2,7 +2,7 @@ import { applyHyperspaceTransition } from './hyperspace';
 import { checkGravity } from './gravity';
 import { applySectorChangeEffects } from './sector-change';
 import { GalaxyService } from '../galaxy/galaxy.service';
-import { Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { COORD_SCALE, MOVENGMIN, MOVENGUSE } from '../constants';
 import { ShipState, shipKey } from '../ship/ship-state.types';
@@ -32,7 +32,13 @@ import {
 import { TELEDAM, UNIVWRAP, UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 import { cdistance } from '../combat/combat-math';
-import { SHIP_SPEED_REPORT, ShipSpeedReportEvent } from './speed-events';
+import {
+  SHIP_MISSILE_SHAKEN,
+  SHIP_SPEED_REPORT,
+  ShipMissileShakenEvent,
+  ShipSpeedReportEvent,
+} from './speed-events';
+import { RANDOM, Random, gernd } from '../combat/random.port';
 
 /**
  * Orchestrates the 6-second PHYSICS tick: rotates, accelerates, moves, debits
@@ -75,6 +81,10 @@ export class PhysicsTickService implements OnModuleInit {
     // Optional so the hand-built test harnesses keep working; without it a ship
     // simply never encounters gravity, which is the pre-existing behaviour.
     @Optional() private readonly galaxy?: GalaxyService,
+    // Optional so the many hand-built test harnesses keep working. Without one
+    // a ship simply never shakes a missile, which is the pre-existing
+    // behaviour rather than a silent change of odds.
+    @Optional() @Inject(RANDOM) private readonly random?: Random,
   ) {}
 
   onModuleInit(): void {
@@ -265,6 +275,9 @@ export class PhysicsTickService implements OnModuleInit {
     const maxAccel = this.shipClassCache.getMaxAcceleration(ship.shpclass);
 
     // 2. Acceleration (US1).
+    // Captured before the step: the mutate below overwrites ship.speed, and the
+    // warp-boundary test downstream needs the speed we came from.
+    const speedBefore = ship.speed;
     const accel = accelerationStep(ship.speed, ship.speed2b, maxAccel);
     let speedChanged = accel.newSpeed !== ship.speed;
     let speed2bForcedZero = false;
@@ -290,6 +303,36 @@ export class PhysicsTickService implements OnModuleInit {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.speed = accel.newSpeed;
       });
+    }
+
+    // Crossing a warp boundary can shake off missiles locked onto you.
+    // Canon puts this inside the non-snap accelerate branch, after the energy
+    // debit succeeds, and only when the integer warp number changes — the same
+    // condition that prints WARP. It then rolls `4 + gernd()%4` and zeroes
+    // every tracked missile if the new warp meets it.
+    // @see GEFUNCS.C:497-521
+    if (speedChanged && !accel.snapped && accel.newSpeed > speedBefore && this.random) {
+      const crossed = Math.trunc(speedBefore / 1000) !== Math.trunc(accel.newSpeed / 1000);
+      if (crossed) {
+        const threshold = 4 + (gernd(this.random) % 4);
+        if (accel.newSpeed / 1000 >= threshold) {
+          let count = 0;
+          this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+            for (let i = 0; i < s.lmisslDistance.length; i++) {
+              if (s.lmisslDistance[i] > 0) { s.lmisslDistance[i] = 0; count++; }
+            }
+          });
+          if (count > 0) {
+            const evt: ShipMissileShakenEvent = {
+              shipId: shipKey(ship.userid, ship.shipno),
+              userid: ship.userid,
+              shipno: ship.shipno,
+              count,
+            };
+            this.events.emit(SHIP_MISSILE_SHAKEN, evt);
+          }
+        }
+      }
     }
 
     // The helm answers when it reaches the ordered speed. C prints SPEEDIS on

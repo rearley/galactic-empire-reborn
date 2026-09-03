@@ -25,6 +25,12 @@ export interface CybertronTauntPayload {
   attackerShipKey: ShipKey;
   targetShipKey: ShipKey;
   message: string;
+  /**
+   * Which of the four 3.2e message bands this line came from — APPROACH,
+   * BRAKE, DECLINE or ATTACK. Observability only; the gateway forwards the
+   * payload wholesale. @see GECYBS.C:295, 300, 769, 782, 801
+   */
+  band?: 'APPROACH' | 'BRAKE' | 'DECLINE' | 'ATTACK';
   sector: { x: number; y: number };
   tickAt: number;
 }

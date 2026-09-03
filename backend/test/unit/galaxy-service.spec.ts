@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { Planet } from '@prisma/client';
-import { S00_PLNUM } from '../../src/game/galaxy/s00';
+import { S00, S00_PLNUM } from '../../src/game/galaxy/s00';
 
 // ── Minimal Planet factory ────────────────────────────────────────────────────
 
@@ -48,16 +48,27 @@ const prismaMock = {
 
 let service: GalaxyService;
 
-// Build the 5 fake planets for sector (0,0) matching the s00 fixture order.
-// plnum values are 1..5 to match the canonical neutral-zone layout.
-// @see s00.ts — Zygor-3 is index 0 (plnum=1)
-const fakeZygor = makePlanet({ xsect: 0, ysect: 0, plnum: 1, name: 'Zygor-3', resource: 2 });
-const fakeNexus = makePlanet({ xsect: 0, ysect: 0, plnum: 2, name: 'Nexus Prime', resource: 3, xcoord: 0.2, ycoord: 0.3 });
-const fakeCaldor = makePlanet({ xsect: 0, ysect: 0, plnum: 3, name: 'Caldor IV', resource: 1, xcoord: 0.7, ycoord: 0.2 });
-const fakeMinera = makePlanet({ xsect: 0, ysect: 0, plnum: 4, name: 'Minera', resource: 3, xcoord: 0.3, ycoord: 0.7 });
-const fakeDraconis = makePlanet({ xsect: 0, ysect: 0, plnum: 5, name: 'Draconis', resource: 0, xcoord: 0.8, ycoord: 0.8 });
+// Build the fake sector (0,0) rows straight FROM the fixture, so this spec can
+// never drift from it the way its hand-written Zygor-3/Nexus Prime/Caldor IV/
+// Minera/Draconis set did. Only the non-portal entries are planets: a type-3
+// entry is written to the Wormhole table instead. @see GEPLANET.C:517-520
+const s00Planets: Planet[] = S00.map((e, i) =>
+  makePlanet({
+    xsect: 0,
+    ysect: 0,
+    plnum: i + 1,
+    name: e.name,
+    xcoord: e.xcoord,
+    ycoord: e.ycoord,
+    enviorn: e.env,
+    resource: e.res,
+  }),
+).filter((_, i) => S00[i].type !== 3);
 
-const s00Planets: Planet[] = [fakeZygor, fakeNexus, fakeCaldor, fakeMinera, fakeDraconis];
+/** plnums of the entries that become planets — 1, 2, 3 in the shipped table. */
+const s00PlanetPlnums = S00.map((e, i) => (e.type === 3 ? null : i + 1)).filter(
+  (n): n is number => n !== null,
+);
 
 beforeAll(async () => {
   const module: TestingModule = await Test.createTestingModule({
@@ -82,10 +93,10 @@ beforeAll(async () => {
 // ── G9: findPlanetByName ──────────────────────────────────────────────────────
 
 describe('G9: findPlanetByName', () => {
-  it('returns the Zygor-3 planet when queried by exact name', () => {
-    const result = service.findPlanetByName('Zygor-3');
+  it('returns the Zygor planet when queried by exact name', () => {
+    const result = service.findPlanetByName('Zygor');
     expect(result).not.toBeNull();
-    expect(result!.name).toBe('Zygor-3');
+    expect(result!.name).toBe('Zygor');
   });
 
   it('returns null for an unknown planet name', () => {
@@ -93,21 +104,21 @@ describe('G9: findPlanetByName', () => {
   });
 
   it('lookup is case-insensitive — lowercase works', () => {
-    const result = service.findPlanetByName('zygor-3');
+    const result = service.findPlanetByName('zygor');
     expect(result).not.toBeNull();
-    expect(result!.name).toBe('Zygor-3');
+    expect(result!.name).toBe('Zygor');
   });
 
   it('lookup is case-insensitive — uppercase works', () => {
-    const result = service.findPlanetByName('ZYGOR-3');
+    const result = service.findPlanetByName('ZYGOR');
     expect(result).not.toBeNull();
-    expect(result!.name).toBe('Zygor-3');
+    expect(result!.name).toBe('Zygor');
   });
 
   it('returns the same object regardless of case variant', () => {
-    const lower = service.findPlanetByName('zygor-3');
-    const upper = service.findPlanetByName('ZYGOR-3');
-    const exact = service.findPlanetByName('Zygor-3');
+    const lower = service.findPlanetByName('zygor');
+    const upper = service.findPlanetByName('ZYGOR');
+    const exact = service.findPlanetByName('Zygor');
     expect(lower).toBe(exact);
     expect(upper).toBe(exact);
   });
@@ -116,20 +127,20 @@ describe('G9: findPlanetByName', () => {
 // ── G10: getSectorPlanets ─────────────────────────────────────────────────────
 
 describe('G10: getSectorPlanets', () => {
-  it(`returns ${S00_PLNUM} planets for sector (0,0) — matches S00_PLNUM fixture count`, () => {
+  it(`returns the ${s00PlanetPlnums.length} non-portal entries of the ${S00_PLNUM}-slot fixture`, () => {
     const planets = service.getSectorPlanets(0, 0);
-    expect(planets).toHaveLength(S00_PLNUM);
+    expect(planets).toHaveLength(s00PlanetPlnums.length);
+    expect(s00PlanetPlnums.length).toBeLessThan(S00_PLNUM);
   });
 
-  it('entries are in fixture order — plnum 1..5', () => {
+  it('entries keep their fixture plnum', () => {
     const planets = service.getSectorPlanets(0, 0);
-    const plnums = planets.map((p) => p.plnum);
-    expect(plnums).toEqual([1, 2, 3, 4, 5]);
+    expect(planets.map((p) => p.plnum)).toEqual(s00PlanetPlnums);
   });
 
-  it('first entry is Zygor-3 (plnum=1) — canonical starting planet', () => {
+  it('first entry is Zygor (plnum=1) — canonical starting planet', () => {
     const planets = service.getSectorPlanets(0, 0);
-    expect(planets[0].name).toBe('Zygor-3');
+    expect(planets[0].name).toBe('Zygor');
     expect(planets[0].plnum).toBe(1);
   });
 

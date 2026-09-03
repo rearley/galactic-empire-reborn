@@ -83,10 +83,15 @@ import {
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
-import { SHIP_SPEED_REPORT, ShipSpeedReportEvent } from '../game/physics/speed-events';
+import {
+  SHIP_MISSILE_SHAKEN,
+  SHIP_SPEED_REPORT,
+  ShipMissileShakenEvent,
+  ShipSpeedReportEvent,
+} from '../game/physics/speed-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { damstr } from '../game/combat/combat-math';
-import { resolveKillSpoils } from '../game/combat/kill-resolution';
+import { attackerNameFromLastFired, resolveKillSpoils } from '../game/combat/kill-resolution';
 import { isAiUserid } from '../game/commands/helpers/ai-userid';
 import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
 import { MAIL_CLASS_DISTRESS } from '../game/constants';
@@ -565,7 +570,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             // exists for, and precisely the case canon names unconditionally
             // (GEFUNCS.C:1116 sits AFTER the GESTAT_AUTO branch at :1110, so
             // an AI killer is named like any other).
-            attackerName: attackerShip ? attackerShip.shipname : null,
+            attackerName: attackerShip
+              ? attackerShip.shipname
+              : attackerNameFromLastFired(ship, (c) =>
+                  this.shipStateService.findAllShips().some((o) => o.channel === c)),
             attackerChannel: ship.lastfired,
             weapon: null,
             sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
@@ -1188,13 +1196,34 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const victimLabel = isAiUserid(event.victimUserid)
         ? (victimShipName ?? event.victimUserid)
         : event.victimUserid;
-      // Everyone EXCEPT the pilot who just died. Canon is
-      // `outwar(FILTER, usrn, 0)` (GEFUNCS.C:1117) where `usrn` is the victim's
-      // own channel, and outwar's loop is
-      // `if (zothusn != exclude && ingegame(zothusn))` (GEMAIN.C:1522-1523) —
-      // so the dying pilot is deliberately skipped. They get YOURDEAD instead,
-      // which is a better message and arrives a few lines below.
-      this.server.except(`user:${event.victimUserid}`).emit('event.log', {
+      // Everyone EXCEPT the pilot who just died, and except anyone who asked
+      // not to hear it. Canon is `outwar(FILTER, usrn, 0)` (GEFUNCS.C:1117),
+      // and both halves of that call matter:
+      //
+      //   • `usrn` is the victim's own channel and outwar's loop is
+      //     `if (zothusn != exclude && ingegame(zothusn))` (GEMAIN.C:1524) —
+      //     the dying pilot is deliberately skipped. They get YOURDEAD
+      //     instead, which is a better message and arrives a few lines below.
+      //   • FILTER is not decoration. outwar hands it to `outprfge`, which
+      //     drops the message for any recipient with `options[MSG_FILTER]`
+      //     set: `if (class == FILTER && (warusroff(shpno)->options[MSG_FILTER]
+      //     == TRUE)) { clrprf(); return; }` (GEMAIN.C:2562-2567). Compare
+      //     ALWAYS at GEMAIN.C:2557-2561, which bypasses the check — that is
+      //     the class YOURDEAD and CHGLSR are sent with.
+      //
+      // The port read User.options[3] into ShipState.msgFilter (GEMAIN.H:236)
+      // and then broadcast to everyone regardless, so the one option a pilot
+      // has for quieting the galaxy feed did nothing on the noisiest message
+      // in the game.
+      //
+      // Only ships in the map are considered, which is also canon's
+      // `ingegame(zothusn)` gate — a user with no ship in the universe is not
+      // a recipient at all.
+      const filteredRooms = this.shipStateService
+        .findAllShips()
+        .filter((s) => s.msgFilter)
+        .map((s) => `user:${s.userid}`);
+      this.server.except([`user:${event.victimUserid}`, ...new Set(filteredRooms)]).emit('event.log', {
         category: 'combat',
         text: formatMessage(MessageId.KILLEDBY, victimLabel, killerLabel),
       });
@@ -1389,6 +1418,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         String(Math.round((warp - Math.floor(warp)) * 100)).padStart(2, '0'),
       );
     this.server.to(`user:${event.userid}`).emit('event.log', { category: 'system', text });
+  }
+
+  /**
+   * A warp jump shook the missiles off. Canon prints MISSL2 once, however many
+   * were tracking, to the captain's own socket — `outprfge(FILTER, usrn)`.
+   * @see GEFUNCS.C:517-520
+   */
+  @OnEvent(SHIP_MISSILE_SHAKEN)
+  handleMissileShaken(event: ShipMissileShakenEvent): void {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(MessageId.MISSL2),
+    });
   }
 
   @OnEvent(PHYSICS_GRAVITY)

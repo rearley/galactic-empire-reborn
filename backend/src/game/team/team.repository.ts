@@ -19,7 +19,12 @@ export class TeamRepository {
   }
 
   /** @see GECMDS.C:5277 cmd_team */
-  async insertTeam(data: { teamcode: bigint; teamname: string; password: string }): Promise<void> {
+  async insertTeam(data: {
+    teamcode: bigint;
+    teamname: string;
+    password: string;
+    secret: string;
+  }): Promise<void> {
     await this.prisma.team.create({
       data: {
         teamcode: data.teamcode,
@@ -27,7 +32,7 @@ export class TeamRepository {
         password: data.password,
         teamcount: 1,
         teamscore: 0n,
-        secret: '',
+        secret: data.secret,
         flag: 0,
       },
     });

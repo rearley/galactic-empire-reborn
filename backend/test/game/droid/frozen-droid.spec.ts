@@ -38,7 +38,7 @@ import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.
 const TRANSPORT_CLASS_ENTRY: ShipClassEntry = {
   maxAcceleration: 1200, maxWarp: 3, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 30_000, hasTorpedo: false, hasMissile: false,
-  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, noClaim: 0,
+  hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
   tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50,
   canAttackPlanet: false, damageFactor: 100,
   typeName: 'Murdonian Transport', shipNameTemplate: 'Trans-Gal #',

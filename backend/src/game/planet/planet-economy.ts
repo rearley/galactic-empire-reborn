@@ -14,6 +14,19 @@ export interface StarvationLosses {
 }
 
 /**
+ * One item slot that reached its storage ceiling on this pass.
+ *
+ * `cap` is C's `max` — `(long)(maxpl[i]*fact)` — which is both the value the
+ * stock is clamped to and the number the MESG08+i notice prints.
+ *
+ * @see GEPLANET.C:295-326
+ */
+export interface ProductionCapHit {
+  item: number;
+  cap: number;
+}
+
+/**
  * Apply one economy tick to a planet state snapshot.
  * Ports GEPLANET.C:multiply lines 195–340 (stops before revolt — research Decision 6).
  * @see GEPLANET.C:195 multiply()
@@ -71,7 +84,9 @@ export function applyEconomyTick(state: PlanetState): PlanetState {
  * they cannot be recovered from the returned state alone once production has
  * added stock back on top.
  */
-export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetState; starved: StarvationLosses } {
+export function applyEconomyTickWithLosses(
+  state: PlanetState,
+): { state: PlanetState; starved: StarvationLosses; capped: ProductionCapHit[] } {
   // Deep-copy items to avoid mutating the original snapshot
   const items = state.items.map((it) => ({ ...it }));
   let cash = state.cash;
@@ -87,6 +102,7 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
   let updatedMen = men;
 
   const starved: StarvationLosses = { troops: 0, men: 0 };
+  const capped: ProductionCapHit[] = [];
 
   // C compares INTEGER quotients — `plptr->items[I_TROOPS].qty/100` on unsigned
   // longs — and takes an integer `qty/8` off the top. 150 troops against 1 food
@@ -164,7 +180,26 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
 
     const currentQty = Number(items[i].qty);
     const maxAllowed = MAXPL[i] * fact;
-    const newQty = Math.min(currentQty + qty * fact, maxAllowed);
+    const grown = currentQty + qty * fact;
+
+    // C: `max = (long)(maxf * fact)` — truncated before it is compared and
+    // before it is printed in the notice. @see GEPLANET.C:295-297
+    const cap = Math.floor(maxAllowed);
+
+    // C: `if (plptr->items[i].qty <= max && temp >= max)` — a crossing test,
+    // written with `<=` on the left. DELIBERATE DEVIATION: `<` here.
+    // Because the stock is clamped to `max` on the very next line, `<=` is
+    // true again on every subsequent pass, so a colony parked at its ceiling
+    // re-mails the same notice once per PLANTOCK sweep, per capped slot,
+    // forever — 14 notices every 30 minutes against a 3-day retention window.
+    // The condition's shape says the author meant "was below, now at or over";
+    // `<` is that. @see docs/DECISIONS.md — production-cap notice fires on the
+    // crossing only
+    if (currentQty < cap && Math.floor(grown) >= cap) {
+      capped.push({ item: i, cap });
+    }
+
+    const newQty = Math.min(grown, maxAllowed);
     items[i].qty = BigInt(Math.max(0, Math.floor(newQty)));
   }
 
@@ -186,6 +221,7 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
       tax,
     },
     starved,
+    capped,
   };
 }
 

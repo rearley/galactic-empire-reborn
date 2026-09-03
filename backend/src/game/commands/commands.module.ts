@@ -1,7 +1,9 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { ShipStateService } from '../ship/ship-state.service';
+import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { CommandRouterService } from './command-router.service';
 import { rotateCommand } from './handlers/rotate.handler';
-import { impulseCommand } from './handlers/impulse.handler';
+import { impulseCommand, ionTrailObserversFrom, setIonTrailObserverSource } from './handlers/impulse.handler';
 import { ShieldHandlerService } from './handlers/shield.handler';
 import { fluxCommand } from './handlers/flux.handler';
 import { LockHandlerService } from './handlers/lock.handler';
@@ -176,9 +178,26 @@ export class CommandsModule implements OnModuleInit {
     private readonly delHandler: DelHandlerService,
     // Ship purchase handler (021)
     private readonly newShipHandler: NewShipHandlerService,
+    // For the CLOK3 observer sweep installed in onModuleInit.
+    private readonly shipState: ShipStateService,
+    private readonly shipClassCache: ShipClassCacheService,
   ) {}
 
   onModuleInit(): void {
+    // CLOK3 — a cloaked ship opening the throttle leaks an ion trail. Canon
+    // sweeps EVERY captain in the game, not the sector, and asks each one's own
+    // class scan range (GECMDS.C:524-546), so the handler needs the live ship
+    // map and the class table. `impulseCommand` is a plain Command literal with
+    // no DI, which is why it takes its observers through this seam rather than
+    // a constructor. Without this line the whole mechanic was dead code.
+    setIonTrailObserverSource((mover) =>
+      ionTrailObserversFrom(
+        this.shipState.findAllShips(),
+        (c) => this.shipClassCache.getScanRange(c),
+        mover,
+      ),
+    );
+
     this.commandRouter.register(rotateCommand);
     this.commandRouter.register(impulseCommand);
     this.commandRouter.register(this.warpHandler.command);

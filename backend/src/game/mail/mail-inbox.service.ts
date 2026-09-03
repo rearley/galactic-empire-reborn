@@ -12,7 +12,9 @@ import {
   MailListing,
   ProductionReportPayload,
   ShipLossPayload,
+  ProductionCapPayload,
 } from './mail.types';
+import { capItemIndexForType } from './production-cap';
 import { classLabel } from './mail-render';
 import { MAIL_CLASS_DISTRESS } from '../constants';
 import { MAIL_CLASS_PRODRPT } from '../midnight/midnight.constants';
@@ -88,12 +90,26 @@ export class MailInboxService {
     row: MailStat,
   ):
     | ProductionReportPayload
+    | ProductionCapPayload
     | DistressSignalPayload
     | StarvationPayload
     | RevoltPayload
     | ShipLossPayload
     | GenericPayload {
     if (row.class === MAIL_CLASS_PRODRPT) {
+      // MESG08+i shares this class with the nightly MESG20 report
+      // (GEPLANET.C:317), so route on `type` before falling through.
+      const capItem = capItemIndexForType(row.type);
+      if (capItem !== null) {
+        return {
+          kind: 'production_cap',
+          itemIndex: capItem,
+          planetName: row.name1,
+          sectorX: row.int1,
+          sectorY: row.int2,
+          cap: row.cash,
+        };
+      }
       return {
         kind: 'production_report',
         planetName: row.name1,

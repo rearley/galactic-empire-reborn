@@ -13,6 +13,8 @@
  * loader makes an out-of-bounds value structurally impossible instead.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { SYSOP_OPTIONS, loadGameConfig, flattenConfigFile, resolveGameConfig } from '../../../src/game/config/game-config';
 
 describe('sysop option registry', () => {
@@ -99,16 +101,78 @@ describe('loadGameConfig', () => {
     expect(cfg.PDAMMAX).toBe(SYSOP_OPTIONS.PDAMMAX.default);
   });
 
-  it('marks which options are actually wired into gameplay', () => {
-    // Of the 52 declared, these back a live constant; the rest are declared so
-    // the bounds are recorded and the gap stays visible.
-    // 26 since IDAMMAX joined them — ion cannons are implemented
-    // (GEFUNCS.C:1785-1812 fireion). 27 since PLANTOCK became an option
-    // rather than a hard-coded constant, and 28 since UNIVWRAP was implemented
-    // together with TELEDAM -- a constant that was defined and balance-tested
-    // but read by no runtime code, because only the wrap arm existed.
-    const wired = Object.values(SYSOP_OPTIONS).filter((s) => s.implemented);
-    expect(wired.length).toBe(29);
+  it('names exactly the options that back no gameplay code', () => {
+    // A NAMED list, not a count. The flag was hand-maintained against a bare
+    // number and drifted badly: an audit on 2026-09-03 found 14 of the 24
+    // options marked `implemented: false` were in fact fully wired
+    // (PLODDS/WORMODDS in galaxy.config, TEAMMAX in team.service, the five
+    // PLATTR* in planet-attack.service, CHGLOSER and MAILDAYS in
+    // midnight.config, TOOCLOSE/CYBGOLD in cybertron.config, CLENGUSE in
+    // cloak.config, SCRBONUS in player-score.service), and the count test
+    // could not have caught it because the total never moved.
+    const unwired = Object.entries(SYSOP_OPTIONS)
+      .filter(([, s]) => !s.implemented)
+      .map(([n]) => n)
+      .sort();
+    expect(unwired).toEqual([
+      'FREEBIES', 'HYPDST1', 'HYPDST2', 'MAXLIST', 'MAXPLREC',
+      'NUMSHIPS', 'S00PLNUM', 'SCRFACT', 'SHOWOPT',
+    ]);
+  });
+
+  it('every unwired option explains itself', () => {
+    for (const [name, spec] of Object.entries(SYSOP_OPTIONS)) {
+      if (spec.implemented) continue;
+      expect({ name, note: spec.note ?? '' }.note.length).toBeGreaterThan(30);
+    }
+  });
+
+  describe('the flag is checked against the source tree, not trusted', () => {
+    // The strongest available test: read every .ts under src/, strip comments,
+    // and look for a real reference to the constant each option backs. A flag
+    // can now only be wrong if someone writes a matching identifier and never
+    // uses it, which is a far narrower failure than "nobody updated a number".
+    const SRC = path.resolve(__dirname, '../../../src');
+    const EXCLUDED = [
+      path.join(SRC, 'game', 'constants.ts'),        // the re-export shim itself
+      path.join(SRC, 'game', 'config', 'game-config.ts'),
+    ];
+
+    function walk(dir: string, out: string[] = []): string[] {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) walk(full, out);
+        else if (e.name.endsWith('.ts') && !EXCLUDED.includes(full)) out.push(full);
+      }
+      return out;
+    }
+
+    /** Source with block and line comments removed, so prose cannot vouch for a flag. */
+    const code = walk(SRC)
+      .map((f) => fs.readFileSync(f, 'utf8'))
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+
+    const symbolFor = (name: string, spec: unknown): string =>
+      (spec as { constant?: string }).constant ?? name;
+    const referenced = (sym: string): boolean => new RegExp(`\\b${sym}\\b`).test(code);
+
+    it('finds a live reference for every option marked implemented', () => {
+      const missing = Object.entries(SYSOP_OPTIONS)
+        .filter(([, s]) => s.implemented)
+        .map(([n, s]) => symbolFor(n, s))
+        .filter((sym) => !referenced(sym));
+      expect(missing).toEqual([]);
+    });
+
+    it('finds no live reference for any option marked unimplemented', () => {
+      const stray = Object.entries(SYSOP_OPTIONS)
+        .filter(([, s]) => !s.implemented)
+        .map(([n, s]) => symbolFor(n, s))
+        .filter((sym) => referenced(sym));
+      expect(stray).toEqual([]);
+    });
   });
 
   it('DECODDS is config-driven now that decoyIntercept uses the C 1-in-N form', () => {

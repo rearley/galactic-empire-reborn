@@ -5,7 +5,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { MineRegistry } from '../../combat/mine.registry';
-import { MineRepository } from '../../combat/mine.repository';
+import { MineRepository, MineTableFullError } from '../../combat/mine.repository';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { I_MINE } from '../../constants/items';
@@ -84,13 +84,27 @@ export class MineHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MIN_FULL), category: 'system' }] };
     }
 
-    const mine = await this.mineRepo.create({
-      channel: ship.channel ?? NO_CHANNEL,
-      timer,
-      xcoord: ship.xcoord,
-      ycoord: ship.ycoord,
-      deployedBy: ship.userid,
-    });
+    // The galaxy-wide table can be full even when this captain is under their
+    // own USRMINES cap. Canon's `laymine` simply finds no free slot, returns 0,
+    // and the caller prints MINE2 — nothing is spent and no combat lock is set,
+    // because both of those live inside the branch that found a slot.
+    // Letting the rejection escape rendered "Internal error processing command."
+    // @see GECMDS.C:1772-1780 the caller, :1805-1818 laymine
+    let mine: Awaited<ReturnType<MineRepository['create']>>;
+    try {
+      mine = await this.mineRepo.create({
+        channel: ship.channel ?? NO_CHANNEL,
+        timer,
+        xcoord: ship.xcoord,
+        ycoord: ship.ycoord,
+        deployedBy: ship.userid,
+      });
+    } catch (err: unknown) {
+      if (err instanceof MineTableFullError) {
+        return { lines: [{ text: formatMessage(MessageId.MIN_JAMMED), category: 'system' }] };
+      }
+      throw err;
+    }
 
     this.mineRegistry.add({
       id: mine.id,

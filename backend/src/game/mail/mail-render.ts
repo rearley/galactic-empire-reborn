@@ -13,7 +13,9 @@ import {
   StarvationPayload,
   RevoltPayload,
   ShipLossPayload,
+  ProductionCapPayload,
 } from './mail.types';
+import { renderProductionCapBody } from './production-cap';
 
 /** Returns the display label for a MailStat class value. */
 export function classLabel(klass: number): string {
@@ -64,6 +66,12 @@ export function formatDetail(entry: MailListEntry): string[] {
     const p = entry.payload as DistressSignalPayload;
     lines.push(`Attacker: ${p.attackerShipName}`);
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
+  } else if (entry.payload.kind === 'production_cap') {
+    // MESG08+i. `topic` is "Status Message" here, not a sender, so the body
+    // has to come from the item slot. @see GEPLANET.C:313-326
+    const p = entry.payload as ProductionCapPayload;
+    lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
+    lines.push(renderProductionCapBody(p.itemIndex, p.cap));
   } else if (entry.payload.kind === 'production_report') {
     const p = entry.payload as ProductionReportPayload;
     lines.push(`Planet: ${p.planetName}`);

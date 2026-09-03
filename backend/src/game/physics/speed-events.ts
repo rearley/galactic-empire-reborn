@@ -31,3 +31,27 @@ export interface ShipSpeedReportEvent {
   /** Raw speed units; 1000 per warp factor. */
   speed: number;
 }
+
+/**
+ * A warp boundary crossing shook off every missile locked onto the ship.
+ *
+ * Inside accel's non-snap accelerate branch, once the energy debit succeeds and
+ * only when the ship crosses an integer warp boundary, canon rolls a threshold
+ * of `4 + gernd()%4` and, if the new warp meets it, zeroes every tracked
+ * missile and prints MISSL2 — `outprfge(FILTER, usrn)`, the captain's own
+ * socket. The threshold is redrawn on every crossing, so warp 4 shakes a
+ * missile a quarter of the time and warp 7 always.
+ *
+ * This is the counter to guided weapons, and none of it was implemented.
+ *
+ * @see GEFUNCS.C:497-521, GE/REL/MBMGEMSG.MSG:2630 MISSL2
+ */
+export const SHIP_MISSILE_SHAKEN = 'ship.missile-shaken' as const;
+
+export interface ShipMissileShakenEvent {
+  shipId: string;
+  userid: string;
+  shipno: number;
+  /** How many locked missiles self-destructed. */
+  count: number;
+}
