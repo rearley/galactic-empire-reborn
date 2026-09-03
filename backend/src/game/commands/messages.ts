@@ -343,6 +343,16 @@ export enum MessageId {
   SHLDDN = 'SHLDDN',
   /** @see MBMGEMSG.MSG:1828-1840 YOURDEAD — told to the pilot who just died */
   YOURDEAD = 'YOURDEAD',
+  /** @see MBMGEMSG.MSG PFIRED — discharge notice to the firer */
+  PFIRED = 'PFIRED',
+  /** @see MBMGEMSG.MSG PHITHIM — to the firer, damage dealt to an unshielded victim */
+  PHITHIM = 'PHITHIM',
+  /** @see MBMGEMSG.MSG PHITYOU — to the victim, damage taken */
+  PHITYOU = 'PHITYOU',
+  /** @see MBMGEMSG.MSG PDEFLECT — to the firer, the beam was turned by shields */
+  PDEFLECT = 'PDEFLECT',
+  /** @see MBMGEMSG.MSG PHITDEF — to the victim, a deflected hit and its magnitude */
+  PHITDEF = 'PHITDEF',
 
   // spy (feature 016) — GECMDS.C cmd_spy
   SPY1 = 'SPY1',
@@ -790,6 +800,16 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SHLDUP]: 'Shields are now fully charged, Sir!',
   [MessageId.SHLDAT]: 'Shields are at %d percent charge, Sir!',
   [MessageId.SHLDDN]: 'Shields are now down, Sir!',
+  // Canon combat narration. Note the asymmetry, which is canon's own: a hull
+  // hit reports damage as a WORD via damstr (%s), while a DEFLECTED hit
+  // reports a numeric magnitude (%d). Without these the shooter was never told
+  // whether a beam was deflected or simply missed — which is what made three
+  // separate playtesters conclude phasers were broken.
+  [MessageId.PFIRED]: 'Phasers fired at %d percent power - focus %d',
+  [MessageId.PHITHIM]: "Sensors indicate we caused %s damage to Commander %s's ship!",
+  [MessageId.PHITYOU]: "Phaser hit from Commander %s's ship, caused %s damage, Sir!",
+  [MessageId.PDEFLECT]: "Sensors indicate our phasers were deflected by Commander %s's shields!",
+  [MessageId.PHITDEF]: "Phaser hit from Commander %s's ship, magnitude %d, was deflected by the shields, Sir!",
   [MessageId.YOURDEAD]:
     'WARNING! WARNING! WARNING! WARNING!\n'
     + 'Damage control reports severe structural damage in critical systems!\n\n'

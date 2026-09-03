@@ -9,6 +9,7 @@ import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import {
   cdistance,
+  damstr,
   hyperPhaserDamage,
   inScanRange,
   lineOfFire,
@@ -205,6 +206,16 @@ export class PhaserHandlerService {
     let hits = 0;
     const lines: CommandResult['lines'] = [];
 
+    // The discharge notice, before any per-victim result. C prints
+    // `prfmsg(PFIRED,(int)ptr->phasr,ptr->percent)` at GECMDS.C:943-944 — the
+    // power the bank actually held and the focus used. Without it a pilot has
+    // no confirmation of what they fired, which matters because the phaser
+    // fires at whatever charge it has and empties itself either way.
+    lines.push({
+      text: formatMessage(MessageId.PFIRED, phasrCharge, focus),
+      category: 'combat',
+    });
+
     for (const candidate of allShips) {
       // Skip self
       if (candidate.userid === ship.userid && candidate.shipno === ship.shipno) continue;
@@ -297,8 +308,16 @@ export class PhaserHandlerService {
         maxRange: scanRange / 10_000,
       });
       hits++;
+      // Canon narrates the two outcomes DIFFERENTLY, and the distinction is
+      // the point: PHITHIM when the hull takes it, PDEFLECT when the shields
+      // turn the beam (GECMDS.C:983-997). The port printed one debug line for
+      // both, so a shooter could not tell a deflection from a miss — three
+      // playtesters concluded from that that phasers were broken.
+      // damstr renders hull damage as a WORD; a deflection reports a number.
       lines.push({
-        text: `Phaser hit on ${candidate.shipname}: shield -${shieldConsumed}, hull -${hullDamage}.`,
+        text: shieldUp
+          ? formatMessage(MessageId.PDEFLECT, candidate.shipname)
+          : formatMessage(MessageId.PHITHIM, damstr(hullDamage), candidate.shipname),
         category: 'combat',
       });
     }
