@@ -8,6 +8,7 @@ import { ReaHandlerService } from '../../src/game/commands/handlers/rea.handler'
 import { MailInboxService } from '../../src/game/mail/mail-inbox.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import {
+  MailListing,
   MailListEntry,
   DistressSignalPayload,
   ProductionReportPayload,
@@ -84,10 +85,13 @@ function makeDistressEntry(): MailListEntry {
   };
 }
 
-function makeService(resolveResult: MailListEntry | null = null) {
+function makeService(
+  resolveResult: MailListEntry | null = null,
+  listing: MailListing = { userid: 'alice', entries: [], empty: true },
+) {
   const mockInbox = {
     resolveIndex: jest.fn().mockResolvedValue(resolveResult),
-    list: jest.fn(),
+    list: jest.fn().mockResolvedValue(listing),
     deleteByIndex: jest.fn(),
   } as unknown as MailInboxService;
 
@@ -95,26 +99,41 @@ function makeService(resolveResult: MailListEntry | null = null) {
   return { handler, mockInbox };
 }
 
-// ─── Usage line ───────────────────────────────────────────────────────────────
+// ─── Bare form: mailbox listing ──────────────────────────────────────────────
+//
+// The listing moved here from `mai`: `mai` is cmd_maint in the original table
+// (GECMDS.C:144), so bare `mai` must repair, and `rea` — not a canon keyword —
+// carries both halves of the port's mailbox.
 
-describe('ReaHandlerService — usage line', () => {
-  it('returns usage when no args provided', async () => {
-    const { handler } = makeService();
+describe('ReaHandlerService — bare form lists the mailbox', () => {
+  it('lists messages when no args are provided', async () => {
+    const entry = makeDistressEntry();
+    const { handler, mockInbox } = makeService(null, {
+      userid: 'alice', entries: [entry], empty: false,
+    });
     const result = await handler.command.handler(makeShip(), [], {});
-    expect(result.lines.some((l) => l.text.toLowerCase().includes('usage'))).toBe(true);
+    expect(mockInbox.list).toHaveBeenCalledWith('alice');
+    expect(result.lines.some((l) => l.text.includes('Distress Signal'))).toBe(true);
   });
 
-  it('usage line has "system" category', async () => {
-    const { handler } = makeService();
+  it('does not print a usage line any more', async () => {
+    const { handler } = makeService(null, { userid: 'alice', entries: [], empty: true });
     const result = await handler.command.handler(makeShip(), [], {});
-    const usageLine = result.lines.find((l) => l.text.toLowerCase().includes('usage'));
-    expect(usageLine?.category).toBe('system');
+    expect(result.lines.some((l) => l.text.toLowerCase().includes('usage'))).toBe(false);
   });
 
-  it('does NOT call resolveIndex on missing arg', async () => {
-    const { handler, mockInbox } = makeService();
+  it('says so when the mailbox is empty', async () => {
+    const { handler } = makeService(null, { userid: 'alice', entries: [], empty: true });
+    const result = await handler.command.handler(makeShip(), [], {});
+    const line = result.lines.find((l) => l.text.toLowerCase().includes('no mail'));
+    expect(line?.category).toBe('system');
+  });
+
+  it('does NOT call resolveIndex or deleteByIndex on the bare form (FR-013)', async () => {
+    const { handler, mockInbox } = makeService(null, { userid: 'alice', entries: [], empty: true });
     await handler.command.handler(makeShip(), [], {});
     expect(mockInbox.resolveIndex).not.toHaveBeenCalled();
+    expect(mockInbox.deleteByIndex).not.toHaveBeenCalled();
   });
 });
 

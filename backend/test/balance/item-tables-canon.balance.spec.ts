@@ -11,10 +11,14 @@
  * 0.5 against 2. The ion cannon figure was the one that reached players -- a
  * mature colony could mount a battery the original could never accumulate.
  *
- * BASEPRICE is deliberately NOT checked here. `baseprice[i] =
- * numopt(ITMPR01+i,...)` was added at GEMAIN.C:569 after this .MSG was written,
- * so the file has no ITMPR blocks and there is no canon to compare against.
- * A test asserting one would be inventing it.
+ * BASEPRICE used to be exempt here, on the belief that `baseprice[i] =
+ * numopt(ITMPR01+i,...)` (GEMAIN.C:569) post-dated the shipped .MSG. It did
+ * not -- we were reading the wrong copy. GE/MSG/MBMGEMSG.MSG is an EARLIER
+ * snapshot missing 277 ids, nine of which the C source reads by name
+ * (ITMPR01, SHLDPR01, PHSRPR01, HYPDST1/2, CYBNEW, DROIDNEW, CYBBASEM,
+ * CYBLASTM). The complete file is GE/REL/MBMGEMSG.MSG, byte-identical to the
+ * distribution root copy, and it carries all 25 ITMPR blocks. The two copies
+ * agree on every numeric option they share, so nothing else moved.
  *
  * @see GEMAIN.C:550-570
  * @see reference/ge-upstream/PROVENANCE.md
@@ -23,12 +27,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  MAXPL, ITEM_TONS, ITEM_VALUE, MANHOURS, NUMITEMS, ITEM_NAMES, I_ION, I_GOLD, I_SPY,
+  MAXPL, ITEM_TONS, ITEM_VALUE, MANHOURS, BASEPRICE, NUMITEMS, ITEM_NAMES, I_ION, I_GOLD, I_SPY,
 } from '../../src/game/constants/items';
 
 const MSG = resolve(
   __dirname,
-  '../../../reference/ge-upstream/mbmgemp/GE/MSG/MBMGEMSG.MSG',
+  '../../../reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG',
 );
 const text = readFileSync(MSG, 'utf8');
 
@@ -75,16 +79,21 @@ describe('the values the wiki got wrong', () => {
     expect(MAXPL[I_SPY]).toBe(5);
   });
 
-  it('gold weighs 2 tons per unit, not 0.5', () => {
-    expect(ITEM_TONS[I_GOLD]).toBe(2);
+  it('gold weighs 0.5 tons per unit', () => {
+    // ITMWT13 {Weight of 100 Gold: 50}. We briefly carried 2, transcribed from
+    // GE/MSG/MBMGEMSG.MSG, which says 200 -- one of only three numeric options
+    // on which the stale snapshot disagrees with the shipped file (the others
+    // are PFIRDST and HPFIRDST).
+    expect(ITEM_TONS[I_GOLD]).toBe(0.5);
   });
 });
 
-describe('base prices are not canon-derived', () => {
-  it('MBMGEMSG.MSG contains no ITMPR blocks', () => {
-    // Guards the claim in items.ts. If a future .MSG DOES carry them, this
-    // fails and BASEPRICE should be moved onto canon rather than the wiki.
-    expect(family('ITMPR')).toBeNull();
-    expect(/^ITMPR\d\d /m.test(text)).toBe(false);
+describe('base prices come from ITMPR01-14', () => {
+  it('matches the shipped option defaults item for item', () => {
+    const canon = family('ITMPR');
+    expect(canon).not.toBeNull();
+    for (let i = 0; i < NUMITEMS; i++) {
+      expect([ITEM_NAMES[i], BASEPRICE[i]]).toEqual([ITEM_NAMES[i], canon![i]]);
+    }
   });
 });

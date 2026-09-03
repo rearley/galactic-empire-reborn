@@ -111,10 +111,23 @@ export class BuyHandlerService {
       switch (result.reason) {
         case 'SELL_FLAG_OFF':
           return { lines: [{ text: formatMessage(MessageId.BUY5), category: 'system' }] };
+        // BUY3 names the number actually for sale. The old wording blamed the
+        // planet's "reserve" — zero on every neutral-zone planet, and there
+        // was no way from inside the game to learn the real limit.
+        // @see GECMDS.C:4381-4383
         case 'AT_RESERVE':
-          return { lines: [{ text: formatMessage(MessageId.BUY3), category: 'system' }] };
+          return {
+            lines: [
+              {
+                text: formatMessage(MessageId.BUY3, result.available, ITEM_NAMES[itemIndex]),
+                category: 'system',
+              },
+            ],
+          };
+        // Every `chkweight` failure is BUY8 in C — a completely full hold is
+        // not a different message. @see GECMDS.C:4326
         case 'CAPACITY_FULL':
-          return { lines: [{ text: formatMessage(MessageId.BUY4), category: 'system' }] };
+          return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
         case 'WONT_FIT':
           return { lines: [{ text: formatMessage(MessageId.BUY8), category: 'system' }] };
         case 'INSUFFICIENT_FUNDS':
@@ -145,8 +158,10 @@ export class BuyHandlerService {
       lines: [
         ...lines,
         {
+          // BUY9 is the purchase confirmation C prints; PRICE1 is the same
+          // sentence in the future tense for `pri`. @see GECMDS.C:4353-4361
           text: formatMessage(
-            MessageId.BUY2,
+            MessageId.BUY9,
             result.transferred,
             ITEM_NAMES[itemIndex],
             result.unitPrice,

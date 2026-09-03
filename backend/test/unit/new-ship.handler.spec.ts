@@ -3,7 +3,7 @@
  * Covers all paths: success, rejection conditions, list, usage, shield stub.
  * @see GECMDS.C:cmd_new
  */
-import { NewShipHandlerService } from '../../src/game/commands/handlers/new-ship.handler';
+import { NewShipHandlerService, quoteUpgrade } from '../../src/game/commands/handlers/new-ship.handler';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
@@ -403,5 +403,158 @@ describe('NewShipHandlerService — name collisions between captains', () => {
     };
     expect(created.data['xcoord']).toBeCloseTo(0.4812, 6);
     expect(created.data['ycoord']).toBeCloseTo(0.5533, 6);
+  });
+});
+
+/**
+ * `new phaser` / `new shield` narration.
+ *
+ * The port printed an invented stat line ("Phaser upgraded to type 3. Cost:
+ * 36,666 cr. Credits: 63,334 cr.") and never mentioned the trade-in on the old
+ * unit — the very thing that makes an upgrade cost 36,666 instead of the
+ * 40,000 list price.
+ *
+ * Canon prints the trade-in quote FIRST and then the Yardmaster's fitting
+ * report:
+ *   GECMDS.C:4668 prfmsg(NEW29,l2as(delta));   ← phaser trade-in
+ *   GECMDS.C:4701 prfmsg(NEW10,l2as(delta),type);
+ *   GECMDS.C:4606 prfmsg(NEW19,l2as(delta));   ← shield trade-in
+ *   GECMDS.C:4640 prfmsg(NEW7,l2as(delta),type);
+ * plus the two branches the port never wired at all:
+ *   GECMDS.C:4676-4686 / :4614-4624 NEW28/NEW18 downgrade refund minus a
+ *     credit/50 transaction fee
+ *   GECMDS.C:4688-4693 / :4626-4631 NEW17 minimum 1000 C install charge
+ */
+describe('NewShipHandlerService — shipyard narration for new phaser/shield', () => {
+  function makeUpgradeService(cash: bigint) {
+    const user = {
+      findUnique: jest.fn().mockResolvedValue({ cash }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const prismaMock = {
+      shipClass: {
+        findFirst: jest.fn().mockResolvedValue({ ...PLAYER_CLASS_4, maxPhaser: 10, maxShields: 10 }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      user,
+      ship: { create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const mutate = jest.fn();
+    const service = new NewShipHandlerService(
+      prismaMock as unknown as PrismaService,
+      { mutate, loadShip: jest.fn() } as unknown as ShipStateService,
+    );
+    return { service, user, mutate };
+  }
+
+  const textOf = (r: { lines: { text: string }[] }) => r.lines.map((l) => l.text).join('\n');
+
+  it('quotes the phaser trade-in, then the Yardmaster, in canon order', async () => {
+    // phaser 1 -> 3: trade-in 5000-(5000/3)=3334, cost 40000-3334=36666
+    const { service, user, mutate } = makeUpgradeService(100_000n);
+    const result = await service.command.handler(makeShip({ phasrtype: 1 }), ['phaser', '3'], {});
+
+    const text = textOf(result);
+    expect(text).toContain('They will credit us 3,334 for our existing used phaser, Sir!');
+    expect(text).toContain('The Yardmaster Reports: For the meager sum of 36,666');
+    expect(text).toContain('your ship now has a Mark-3 Phaser System.');
+    // Trade-in is quoted before the fitting report, as canon prints it.
+    expect(text.indexOf('credit us')).toBeLessThan(text.indexOf('Yardmaster'));
+    // No port-invented stat line.
+    expect(text).not.toMatch(/upgraded to type/i);
+
+    expect(user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { cash: { decrement: 36_666n } } }),
+    );
+    expect(mutate).toHaveBeenCalled();
+  });
+
+  it('quotes the shield trade-in, then the Yardmaster, in canon order', async () => {
+    // shield 1 -> 2: trade-in 3334, cost 10000-3334=6666
+    const { service, user } = makeUpgradeService(100_000n);
+    const result = await service.command.handler(makeShip({ shieldtype: 1 }), ['shield', '2'], {});
+
+    const text = textOf(result);
+    expect(text).toContain('They will credit us 3,334 for our existing used shield, Sir!');
+    expect(text).toContain('The Yardmaster Reports: For the meager sum of 6,666');
+    expect(text).toContain('your ship now has a Mark-2 Shield defense system.');
+    expect(user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { cash: { decrement: 6_666n } } }),
+    );
+  });
+
+  it('still quotes the trade-in when the captain cannot afford the fitting', async () => {
+    // phaser 1 -> 5: 220000-3334 = 216666
+    const { service, user, mutate } = makeUpgradeService(1_000n);
+    const result = await service.command.handler(makeShip({ phasrtype: 1 }), ['phaser', '5'], {});
+
+    const text = textOf(result);
+    expect(text).toContain('They will credit us 3,334 for our existing used phaser, Sir!');
+    expect(text).not.toMatch(/Yardmaster/);
+    expect(user.update).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it('pays back a downgrade, minus the credit/50 transaction fee (NEW28)', async () => {
+    // phaser 3 -> 1: trade-in 40000-13333=26667; delta 5000-26667 = -21667
+    // credit 21667, fee 21667/50 = 433, deposited 21234.
+    const { service, user, mutate } = makeUpgradeService(0n);
+    const result = await service.command.handler(makeShip({ phasrtype: 3 }), ['phaser', '1'], {});
+
+    const text = textOf(result);
+    expect(text).toContain('They will credit us 26,667 for our existing used phaser, Sir!');
+    expect(text).toContain('There is no charge for the new phaser and after deducting a transaction');
+    expect(text).toContain("fee of 433 C's 21,234 has been deposited to your account, Sir.");
+    // Canon still fits the unit and reports it, at a cost of zero.
+    expect(text).toContain('your ship now has a Mark-1 Phaser System.');
+    expect(user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { cash: { increment: 21_234n } } }),
+    );
+    expect(mutate).toHaveBeenCalled();
+  });
+
+  it('pays back a shield downgrade with the shield wording (NEW18)', async () => {
+    // shield 3 -> 1: trade-in 40000-13333=26667; credit 21667, fee 433, 21234
+    const { service } = makeUpgradeService(0n);
+    const result = await service.command.handler(makeShip({ shieldtype: 3 }), ['shield', '1'], {});
+
+    const text = textOf(result);
+    expect(text).toContain('There is no charge for the new shield and after deducting a transaction');
+    expect(text).toContain("fee of 433 C's 21,234 has been deposited to your account, Sir.");
+    expect(text).toContain('your ship now has a Mark-1 Shield defense system.');
+  });
+});
+
+/**
+ * The pure quote arithmetic, including the minimum-install branch that the
+ * shipped price tables happen never to reach (no canon price sits within
+ * 1..999 credits of another's 2/3 trade-in value), so it can only be exercised
+ * directly. @see GECMDS.C:4688-4693
+ */
+describe('quoteUpgrade — GECMDS.C upgrade arithmetic', () => {
+  it('charges the 1000 C minimum when the net cost is under it', () => {
+    // trade-in on type 1 = 900 - 300 = 600; new type 2 costs 1000 - 600 = 400.
+    const q = quoteUpgrade([900n, 1_000n], 1, 2);
+    expect(q.tradeIn).toBe(600n);
+    expect(q.minCharge).toBe(true);
+    expect(q.cost).toBe(1_000n);
+    expect(q.credit).toBe(0n);
+  });
+
+  it('does not invent a minimum charge when the trade-in covers the unit exactly', () => {
+    // trade-in 600, new unit 600 → delta 0: not > 0, so no minimum applies.
+    const q = quoteUpgrade([900n, 600n], 1, 2);
+    expect(q.cost).toBe(0n);
+    expect(q.credit).toBe(0n);
+    expect(q.minCharge).toBe(false);
+  });
+
+  it('never pays out a negative refund', () => {
+    const q = quoteUpgrade([100n, 1n], 1, 2);
+    // trade-in 100-33=67, delta 1-67 = -66, fee 66/50 = 1, credit 65.
+    expect(q.fee).toBe(1n);
+    expect(q.credit).toBe(65n);
+    expect(q.cost).toBe(0n);
   });
 });

@@ -50,6 +50,10 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     cantexit,
     lastfired,
     status,
+    channel: 4,
+    // An empty hold: the canon cargo transfer (GEFUNCS.C:1122-1136) now runs on
+    // this path too, so the victim needs the field it reads.
+    items: new Array<bigint>(14).fill(0n),
   });
 
   /** Build a mock Socket with controllable client.data. */
@@ -94,6 +98,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       removeFromGame: removeFromGameMock,
       findAllShips: findAllShipsMock,
       findByUserid: jest.fn().mockReturnValue([]),
+      mutate: jest.fn() as never,
     };
 
     registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
@@ -123,7 +128,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       mockPrisma,
       mockOnboarding,
       mockScanHandler,
-      { getTypeName: jest.fn() } as never,
+      { getTypeName: jest.fn(), getMaxTons: jest.fn().mockReturnValue(5000) } as never,
       mockRandom,
       mockEvents as never,
     );
@@ -193,6 +198,8 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
         channel: 7,
         shipname: 'Raider',
         shpclass: 2,
+        kills: 0,
+        items: new Array<bigint>(14).fill(0n),
         xcoord: 5.0,
         ycoord: 3.0,
         status: 1,

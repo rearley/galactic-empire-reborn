@@ -2098,3 +2098,77 @@ autopilot exists to remove exactly that work.
 **Alternatives rejected:** Leaving it, on the argument that arriving under power
 is closer to flying manually. That is sophistry: the feature already removes the
 steering, and stopping is the part that matters at speed.
+
+## 2026-09-03 — Autopilot arrival is a final-leg test, not a fixed shell
+
+**Context:** Round-3 playtest split three ways on whether `nav` could arrive at
+all. Two personas reported clean warp-9 arrivals; one reported the ship
+ping-ponging across the target forever, flipping 180 degrees every tick while
+`rep nav` kept claiming warp 5. Both were true.
+
+**Decision:** Arrival fires when the ship is inside the 250-unit shell **or**
+when this tick's travel reaches the target, and in that second case the final
+leg is truncated to the remaining distance rather than a whole tick.
+
+**Reason:** A tick moves `speed * 10000 / COORD_SCALE` raw units — 154 at warp 1,
+769 at warp 5, 1385 at warp 9 — against a 250-unit shell. Whenever the remaining
+distance fell in `(250, travel - 250)` the ship stepped clean over the shell,
+re-pointed at the target it had just passed, and repeated. Warp 1 is the one
+speed slow enough that every step lands inside, which is why the same trip
+arrived first try at `war 1` and the bug read as "autopilot only works at warp 1".
+Whether it worked at warp 9 was pure luck of phase — hence three personas, three
+different answers. Truncating the last step never moves the ship further than
+the physics already would, and it is the only way to end up inside orbit range
+of the place you asked to be taken to rather than up to 1385 units past it.
+
+**Alternatives rejected:** Scaling the shell to `travel * 0.6` — still leaves the
+ship stopped most of a tick short at high warp, i.e. outside orbit range of its
+own destination. Detecting overshoot by dot product — same outcome, one tick later.
+
+## 2026-09-03 — `rep nav` keeps canon's terse orbit branch
+
+**Context:** Three round-3 personas independently filed the same complaint: `rot`
+works in orbit and answers "Now turning to 173 degrees", but the `rep nav` that
+follows prints neither Heading nor Speed, so the pilot cannot see the rotation
+land. One noted that `pha <deg>` is aimed relative to heading
+(GECMDS.C:940 `normal(ptr->heading + ptr->degrees)`) and that `cmd_phas` has no
+`where` gate — so you can fire from orbit, aiming off a number the report hides.
+
+**Decision:** No change. Our report already matches canon exactly.
+
+**Reason:** `cmd_report`'s nav branch is three explicit cases with three
+deliberately different field lists (GECMDS.C:1965-1990): hyperspace prints
+REP02/REP03/REP04 (sector, speed, heading), free flight prints REP05/REP06/REP07,
+and orbit prints REP08 alone — planet number and sector — before all three fall
+through to REP32's position line. `heading` is computed at the top of the
+function and is available to the orbit branch; the author chose not to print it.
+That is a design choice, not an oversight, and nothing computes wrong. Under the
+project's precedence rule the classic game wins unless it is malfunctioning.
+
+**Alternatives rejected:** Adding Heading to the orbit branch on usability
+grounds. The gap the personas actually hit — "did my rotation take?" — is already
+answered by `rot`'s own reply, which is itself canon.
+
+## 2026-09-03 — Droid "unprovoked" fire is canon crossfire; no change
+
+**Context:** The round-3 hunter persona was hit twice for ~50% hull by Trans-Gal
+Murdonians on a hull that had never fired a shot, and wrote it up as an
+unprovoked-aggression defect — then could not reproduce it: a fresh class-32
+spawned 2,000 units away and left alone for 60 seconds never fired.
+
+**Decision:** No change. Both the AI gate and the beam sweep are already faithful.
+
+**Reason:** The fight-back gate is canon and correctly ported —
+GEDROIDS.C:340 `if (ptr->cantexit > 0 && ptr->lastfired >= 0)`, mirrored at
+`droid-act-class-11.ts:99`. What the persona was standing in was someone else's
+beam: canon's `firep` damages EVERY ship inside the arc, not an intended target
+(GECMDS.C:944-960 loops `for (othusn=0; othusn < nships; othusn++)` and hits
+anything within `smallest(heading,deg) < ptr->percent+PHABIAS`), and
+`phaser.handler.ts:219-245` sweeps `allShips` the same way. Their own logs show
+another player being destroyed by Trans-Gal #2193 in the same sector seconds
+before the shot that hit them.
+
+**Alternatives rejected:** Telling the bystander whose fight they walked into.
+Canon prints PHITYOU and nothing more, and the attacker's name — which PHITYOU
+already carries — is the whole of what canon offers. Adding an explanation line
+would be a port invention on a case canon deliberately leaves bare.

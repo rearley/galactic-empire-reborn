@@ -14,7 +14,9 @@
  * just been blown could type `shi up` and be fully protected again on the next
  * tick, which is what made sustained phaser pressure pointless.
  *
- * `shi down` has none of these gates — shielddn() is called directly.
+ * `shi down` has none of these gates — shielddn() is called directly, and its
+ * only output is prfmsg(SHLDDN) = "Shields are now down, Sir!"
+ * (GEFUNCS.C:2419-2427, MBMGEMSG.MSG:2031).
  */
 
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
@@ -106,7 +108,8 @@ describe('`shi up` gates — GECMDS.C:3114-3170', () => {
 describe('`shi dn` has no gates — shielddn() is called directly', () => {
   it('lowers shields even in hyperspace with a blown generator', () => {
     const s = makeShip({ where: 1, shieldstat: SHIELDDM, shieldtype: 0 });
-    expect(run(s, 'dn', 0).lines[0].text).toBe(formatMessage(MessageId.SHI_DN));
+    // SHLDDN, not the port's invented SHI_DN. @see GEFUNCS.C:2419-2427 shielddn
+    expect(run(s, 'dn', 0).lines[0].text).toBe(formatMessage(MessageId.SHLDDN));
     expect(s.shieldstat).toBe(0);
     expect(s.dirty).toBe(true);
   });

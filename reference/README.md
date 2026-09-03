@@ -11,7 +11,7 @@ Three trees, in order of authority. **All READ ONLY.**
 ## Precedence when they disagree
 
 1. **C source** (`ge-source/`, identical to `ge-upstream/mbmgemp/*.C`)
-2. **`.MSG` data files** (`ge-upstream/mbmgemp/GE/MSG/`)
+2. **`.MSG` data files** (`ge-upstream/mbmgemp/GE/REL/` — NOT `GE/MSG/`, which is a stale partial snapshot; see PROVENANCE.md)
 3. **`wiki/`**
 
 **In-game help text (`MBMGEHLP.MSG`) is outside this ranking.** It states design

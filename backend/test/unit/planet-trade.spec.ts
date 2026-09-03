@@ -69,7 +69,7 @@ describe('computeBuyOutcome', () => {
       planet, buyerIsOwner: false, itemIndex: I_FOOD,
       requestedQty: 10, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 0 });
   });
 
   /**
@@ -87,7 +87,7 @@ describe('computeBuyOutcome', () => {
       planet, buyerIsOwner: false, itemIndex: I_FOOD,
       requestedQty: 50, buyerCargoCapacityRemaining: 100, isNeutralZone: false, buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 10 });
   });
 
   it('sells exactly the amount available when the order matches it', () => {
@@ -154,7 +154,7 @@ describe('computeBuyOutcome', () => {
       requestedQty: 500, buyerCargoCapacityRemaining: 10000, isNeutralZone: true,
       buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 5 });
   });
 
   it('neutral zone refuses an order that will not fit, rather than part-filling', () => {
@@ -236,7 +236,7 @@ describe('computeBuyOutcome — the Zygor-3 gold bank (GECMDS.C:4417-4423)', () 
       requestedQty: 500, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
       buyerCash: 100n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 100 });
   });
 
   it('does not apply the rule to other items at Zygor-3', () => {
@@ -247,7 +247,7 @@ describe('computeBuyOutcome — the Zygor-3 gold bank (GECMDS.C:4417-4423)', () 
       requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
       buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 0 });
   });
 
   it('does not apply the rule at the other neutral-zone planets', () => {
@@ -259,7 +259,7 @@ describe('computeBuyOutcome — the Zygor-3 gold bank (GECMDS.C:4417-4423)', () 
       requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: true,
       buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 0 });
   });
 
   it('does not apply the rule outside the neutral zone', () => {
@@ -270,7 +270,7 @@ describe('computeBuyOutcome — the Zygor-3 gold bank (GECMDS.C:4417-4423)', () 
       requestedQty: 10, buyerCargoCapacityRemaining: 10_000, isNeutralZone: false,
       buyerCash: 1_000_000n,
     });
-    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(outcome).toEqual({ ok: false, reason: 'AT_RESERVE', available: 0 });
   });
 });
 

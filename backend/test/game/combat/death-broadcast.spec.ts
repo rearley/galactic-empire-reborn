@@ -39,9 +39,13 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockShipState = { removeFromGame: jest.fn(), get: jest.fn().mockReturnValue(undefined) } as unknown as ShipStateService;
     gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
-    (gateway as unknown as { server: { to: jest.Mock; emit: jest.Mock } }).server = {
+    (gateway as unknown as { server: unknown }).server = {
       to: toMock,
       emit: serverEmitMock,
+      // KILLEDBY goes out via except(victim) — canon's outwar skips the dying
+      // pilot's own channel (GEFUNCS.C:1117, GEMAIN.C:1522). This suite is
+      // about the STRUCTURED payload, so the text line is routed to a sink.
+      except: jest.fn().mockReturnValue({ emit: jest.fn() }),
     };
   });
 

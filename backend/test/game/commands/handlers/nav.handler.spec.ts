@@ -230,44 +230,97 @@ describe('NavHandlerService — engagement happy path', () => {
 });
 
 // ---------------------------------------------------------------------------
-// In-orbit auto-break
+// Orbit is NOT broken by a navigation query
 // ---------------------------------------------------------------------------
 
-describe('NavHandlerService — in-orbit auto-break', () => {
+describe('NavHandlerService — nav never breaks orbit', () => {
   /**
-   * `where === 1` is the AT-WARP state. Breaking orbit into it left a stopped
-   * ship reporting "In hyperspace" and, worse, flagged as warping for the gates
-   * that care — the hyper-phaser only reaches victims at `where === 1`
-   * (GECMDS.C:1045). Breaking orbit means normal flight, which is `where === 0`,
-   * exactly what `imp` does (GECMDS.C:512 LEAVEORB). C's cmd_navigate does not
-   * touch `where` at all; breaking orbit is this port's convenience, so it
-   * should at least land in the same state as every other engine command.
+   * C's cmd_navigate (GECMDS.C:5109-5155) is entirely argument validation,
+   * cdistance, cbearing and prfmsg(NAV01). It never writes warsptr->where and
+   * never touches repair. Breaking orbit is what the ENGINE commands do
+   * (GECMDS.C:511-516 imp, :617-622 war), and this port does it there too.
+   *
+   * The port used to undock as a side effect of `nav`, so a pilot parked at the
+   * Zygor-3 shop who merely asked which way (0,0) lay was thrown out of orbit
+   * and had to fly a 439-unit round trip on impulse to finish trading. The
+   * autopilot course itself is a documented deviation (docs/DECISIONS.md,
+   * feature 016 D1) and stays; the undocking does not.
    */
-  it('where >= 10 → breaks orbit into normal flight, not the warp state', () => {
+  it('in orbit (where >= 10) → orbit and repair progress are preserved', () => {
     const { handler, state, ctx } = makeService({
-      where: 13, xcoord: 5.0, ycoord: 5.0,
+      where: 13, repair: 42, xcoord: 5.0, ycoord: 5.0,
     });
     handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.where).toBe(0);
+    expect(state.where).toBe(13);
+    expect(state.repair).toBe(42);
     expect(state.holdcourse).toBe(1);
     expect(state.navTargetX).toBe(10);
     expect(state.navTargetY).toBe(8);
   });
 
-  it('where === 10 → also auto-breaks orbit', () => {
-    const { handler, state, ctx } = makeService({
-      where: 10, xcoord: 5.0, ycoord: 5.0,
-    });
+  it('in orbit → no LEAVEORB line is emitted', () => {
+    const { handler, state, ctx } = makeService({ where: 13 });
+    const res = handler.command.handler(state, ['10', '8'], ctx) as {
+      lines: { text: string }[];
+    };
+    const leaveorb = formatMessage(MessageId.LEAVEORB);
+    expect(res.lines.some((l) => l.text === leaveorb)).toBe(false);
+  });
+
+  it('where === 10 → still in orbit afterwards', () => {
+    const { handler, state, ctx } = makeService({ where: 10 });
+    handler.command.handler(state, ['10', '8'], ctx);
+    expect(state.where).toBe(10);
+  });
+
+  it('where < 10 → where unchanged', () => {
+    const { handler, state, ctx } = makeService({ where: 0 });
     handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(0);
   });
+});
 
-  it('where < 10 → no orbit break (where unchanged)', () => {
+// ---------------------------------------------------------------------------
+// The bearing is heading-relative — say so, or it looks like a random number
+// ---------------------------------------------------------------------------
+
+describe('NavHandlerService — explains the shrinking bearing', () => {
+  /**
+   * NAV01 prints cbearing(from, to, heading) — a bearing RELATIVE to the hull's
+   * present heading (GECMDS.C:5142-5155). Our physics tick steers head2b onto
+   * course every tick, so an identical `nav 0 0` from a standing start reported
+   * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
+   * arithmetic was right both times; nothing told the pilot why.
+   */
+  it('non-zero bearing → explains that the helm is swinging onto course', () => {
     const { handler, state, ctx } = makeService({
-      where: 0, xcoord: 5.0, ycoord: 5.0,
+      xcoord: 5.0, ycoord: 5.0, heading: 0,
     });
-    handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.where).toBe(0);
+    const res = handler.command.handler(state, ['10', '8'], ctx) as { lines: { text: string }[] };
+    const text = res.lines.map((l) => l.text).join('\n');
+    expect(text).toMatch(/relative to our (present|current) heading/i);
+    expect(text).toMatch(/onto course/i);
+  });
+
+  it('bearing already 0 → reports we are on course, not a turn in progress', () => {
+    // Target due east of (5,5); heading 90 already points at it.
+    const { handler, state, ctx } = makeService({
+      xcoord: 5.0, ycoord: 5.5, heading: 90,
+    });
+    const res = handler.command.handler(state, ['20', '5'], ctx) as { lines: { text: string }[] };
+    const text = res.lines.map((l) => l.text).join('\n');
+    expect(text).toMatch(/on course/i);
+    expect(text).not.toMatch(/swinging|coming onto course/i);
+  });
+
+  it('repeating the same nav while already on course says "already"', () => {
+    const { handler, state, ctx } = makeService({
+      xcoord: 5.0, ycoord: 5.5, heading: 90,
+      holdcourse: 1, navTargetX: 20, navTargetY: 5,
+    });
+    const res = handler.command.handler(state, ['20', '5'], ctx) as { lines: { text: string }[] };
+    const text = res.lines.map((l) => l.text).join('\n');
+    expect(text).toMatch(/already on course/i);
   });
 });
 

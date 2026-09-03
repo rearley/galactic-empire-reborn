@@ -8,7 +8,7 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { PlanetState, planetKey } from '../../../src/game/planet/planet-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
-import { NUMITEMS, I_FOOD } from '../../../src/game/constants/items';
+import { NUMITEMS, I_FOOD, ITEM_NAMES } from '../../../src/game/constants/items';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -76,7 +76,7 @@ describe('BuyHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY1));
   });
 
-  it('happy path returns BUY2 and calls planetService.buy', async () => {
+  it('happy path returns BUY9 and calls planetService.buy', async () => {
     const { svc, buyMock } = makeService(makePlanetState());
     const result = await svc.command.handler(makeShip(), ['10', 'food'], {});
     expect(result.lines[0].category).toBe('success');
@@ -84,10 +84,12 @@ describe('BuyHandlerService', () => {
   });
 
   /**
-   * BUY2 read '%d %s purchased for %d credits.' — three placeholders for four
-   * arguments, so the second %d consumed the UNIT price and the total was
-   * dropped. "100 Men purchased for 4 credits" while 400 credits left the
-   * account. Found by watching the balance during a new-pilot run.
+   * The confirmation is BUY9 — "%s %s purchased at the price of %u each for a
+   * total of %s, Sir." (MBMGEMSG.MSG:3309, GECMDS.C:4353-4361). The port used
+   * BUY2, which in canon is the CANNOT-AFFORD refusal, and its paraphrase read
+   * '%d %s purchased for %d credits.' — three placeholders for four arguments,
+   * so the second %d consumed the UNIT price and the total was dropped.
+   * "100 Men purchased for 4 credits" while 400 credits left the account.
    */
   it('reports what the purchase actually cost, not the unit price', async () => {
     const { svc } = makeService(makePlanetState(), {
@@ -106,16 +108,20 @@ describe('BuyHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY5));
   });
 
-  it('returns BUY3 when AT_RESERVE', async () => {
-    const { svc } = makeService(makePlanetState(), { ok: false, reason: 'AT_RESERVE' });
+  // BUY3 names the count for sale, as C does (GECMDS.C:4381-4383). The
+  // argument-free form printed a paraphrase that blamed the planet's reserve.
+  it('returns BUY3 naming the available count when AT_RESERVE', async () => {
+    const { svc } = makeService(makePlanetState(), { ok: false, reason: 'AT_RESERVE', available: 3 });
     const result = await svc.command.handler(makeShip(), ['10', 'food'], {});
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY3));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY3, 3, ITEM_NAMES[I_FOOD]));
   });
 
-  it('returns BUY4 when CAPACITY_FULL', async () => {
+  // Every chkweight failure is BUY8 in C (GECMDS.C:4326); BUY4 there is
+  // "They are not selling their %s, Sir!", a different refusal entirely.
+  it('returns BUY8 when CAPACITY_FULL', async () => {
     const { svc } = makeService(makePlanetState(), { ok: false, reason: 'CAPACITY_FULL' });
     const result = await svc.command.handler(makeShip(), ['10', 'food'], {});
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY4));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY8));
   });
 
   it('non-owner without password gets BUYPAS1 when planet has password', async () => {

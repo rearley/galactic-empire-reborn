@@ -247,7 +247,7 @@ describe('PlanetStateService — buy()', () => {
     const svc = new PlanetStateService(prisma as any, makeShips() as any);
     await svc.onModuleInit();
     const result = await svc.buy(planetKey(1, 1, 1), 'buyer', I_FOOD, 10, 100, 10_000_000n);
-    expect(result).toEqual({ ok: false, reason: 'AT_RESERVE' });
+    expect(result).toEqual({ ok: false, reason: 'AT_RESERVE', available: 0 });
   });
 
   it('neutral zone buy does not mutate planet state', async () => {

@@ -188,3 +188,63 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
     starved,
   };
 }
+
+/**
+ * The flat stock the GE22e patch writes into every slot it restocks.
+ * @see GEMAIN.C:2153 `planet.items[i].qty = 1032000L;`
+ */
+export const NEUTRAL_RESTOCK_QTY = 1_032_000n;
+
+/** Item slots the T-station (plnum 2) restocks. @see GEMAIN.C:2160-2178 */
+const T_STATION_SLOTS: readonly number[] = [I_TROOPS, I_MEN, I_FOOD];
+
+/**
+ * Is this one of the two neutral-zone trading posts the GE22e patch restocks?
+ *
+ * C tests `planet.xsect == 0 && planet.ysect == 0 && planet.plnum == 1` (Zygor)
+ * and the same with `plnum == 2` (the T-station). Every other planet in sector
+ * 0,0 — and every Zygor-numbered planet elsewhere — is an ordinary world.
+ *
+ * @see GEMAIN.C:2147, GEMAIN.C:2160
+ */
+export function isNeutralZoneRestockPlanet(state: PlanetState): boolean {
+  return state.xsect === 0 && state.ysect === 0 && (state.plnum === 1 || state.plnum === 2);
+}
+
+/**
+ * The GE22e "Updating Zygor" / "Updating T-station" patch.
+ *
+ * Both blocks live INSIDE `plarti`'s continuous planet loop and fire on the
+ * same pass, immediately after `multiply()` has run for that record — so the
+ * storage clamp `multiply` applies (`qty > maxpl[i]*fact` -> clamp,
+ * GEPLANET.C:328-331) is undone the instant it happens and the hub always
+ * holds 1,032,000 of everything it sells. Restoring only at midnight left the
+ * shop selling MAXPL quantities for the rest of the day: spies five at a time,
+ * ion cannons 250, and gold zero, since the tick converts the whole gold pile
+ * into planet cash (GEPLANET.C:261-265).
+ *
+ * `rnd` returns a float in [0,1) and stands in for C's `gernd()`; the markup is
+ * `(baseprice[i]*2) + (gernd()%baseprice[i])`.
+ *
+ * Pure: returns a new state, mutates nothing.
+ *
+ * @see GEMAIN.C:2145-2178 GE22e patch
+ */
+export function applyNeutralZoneRestock(
+  state: PlanetState,
+  rnd: () => number = Math.random,
+): PlanetState {
+  if (!isNeutralZoneRestockPlanet(state)) return state;
+
+  const slots =
+    state.plnum === 1 ? Array.from({ length: NUMITEMS }, (_, i) => i) : T_STATION_SLOTS;
+
+  const items = state.items.map((it) => ({ ...it }));
+  for (const i of slots) {
+    items[i].qty = NEUTRAL_RESTOCK_QTY;
+    items[i].sell = true;
+    items[i].markup2a = BASEPRICE[i] * 2 + Math.floor(rnd() * BASEPRICE[i]);
+  }
+
+  return { ...state, items };
+}

@@ -196,6 +196,9 @@ describe('command round-trip (planet) integration (T066)', () => {
 
     const planetServiceMock = {
       get: jest.fn().mockReturnValue(planet),
+      // `orb` reads the live planet map now, not the boot-time galaxy snapshot
+      // (a planet named this session used to orbit as "(unnamed)").
+      bySector: jest.fn().mockReturnValue([planet]),
       claim: jest.fn().mockResolvedValue({ ok: true }),
       buy: jest.fn().mockResolvedValue({ ok: true, transferred: 10, unitPrice: 2, totalCost: 20n }),
       sell: jest.fn().mockResolvedValue({ ok: true, transferred: 5, proceeds: 9n, fee: 1n }),

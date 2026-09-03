@@ -125,22 +125,23 @@ export class NavHandlerService {
       // lies. The port answered "Already at target sector." and left them with
       // no way to find the one planet the whole opening depends on.
 
-      // Auto-break orbit into normal flight. `where === 1` is the AT-WARP
-      // state — parking a stopped ship there reported "In hyperspace" and left
-      // it flagged as warping for the gates that care (the hyper-phaser only
-      // reaches victims at `where === 1`, GECMDS.C:1045). `imp` uses 0 for the
-      // same transition (GECMDS.C:512 LEAVEORB).
+      // NO ORBIT BREAK. C's cmd_navigate (GECMDS.C:5109-5155) is argument
+      // validation, cdistance, cbearing and prfmsg(NAV01) and nothing else — it
+      // never writes warsptr->where and never resets repair. Breaking orbit is
+      // what the ENGINE commands do (GECMDS.C:511-516 imp, :617-622 war), and
+      // warp/impulse in this port already do it.
       //
-      // Canon ANNOUNCES a broken orbit and resets repair progress: both real
-      // orbit-breakers do `prfmsg(LEAVEORB); where = 0; repair = 0;`
-      // (GECMDS.C:511-516 imp, :617-622 war). Leaving orbit silently meant a
-      // pilot could ask for a bearing and lose their orbit without being told.
-      let leftOrbit = false;
-      if (ship.where >= 10) {
-        ship.where = 0;
-        ship.repair = 0;
-        leftOrbit = true;
-      }
+      // This handler used to undock as a side effect, so a pilot parked at the
+      // Zygor-3 shop who merely asked which way (0,0) lay was thrown out of
+      // orbit by a QUERY and had to fly a 439-unit round trip on impulse to get
+      // back and finish trading. The autopilot course is a documented deviation
+      // (docs/DECISIONS.md, feature 016 D1) and stays; the undocking does not.
+
+      // Was this exact target already engaged? Read it BEFORE overwriting.
+      const alreadyEngaged =
+        ship.holdcourse === 1 &&
+        ship.navTargetX === xParsed &&
+        ship.navTargetY === yParsed;
 
       // Engage autopilot
       ship.navTargetX = xParsed;
@@ -153,17 +154,29 @@ export class NavHandlerService {
       const bearing = calcBearing(ship, tx, ty);
       const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
 
-      const lines: CommandResult['lines'] = [];
-      if (leftOrbit) {
-        lines.push({ text: formatMessage(MessageId.LEAVEORB), category: 'system' });
-      }
+      // NAV01's bearing is RELATIVE to the hull's present heading
+      // (GECMDS.C:5142-5155 passes warsptr->heading to cbearing). Our physics
+      // tick steers head2b onto the autopilot course every tick, so an
+      // identical `nav 0 0` seconds later prints a smaller number — bearing 131
+      // and then bearing 0, with no rotate issued in between. The arithmetic
+      // was right both times; nothing said why, and it landed on a new pilot's
+      // very first navigation attempt.
+      const helm =
+        bearing === 0
+          ? alreadyEngaged
+            ? 'Helm reports we are already on course, Sir!'
+            : 'Helm reports we are on course, Sir!'
+          : 'Bearing is relative to our present heading, Sir — the helm is ' +
+            'swinging onto course, so a repeat nav will read a smaller bearing ' +
+            'until it reads 0.';
+
       return {
         lines: [
-          ...lines,
           {
             text: formatMessage(MessageId.NAV01, xParsed, yParsed, bearing, dist),
             category: 'success',
           },
+          { text: helm, category: 'system' },
         ],
       };
     },

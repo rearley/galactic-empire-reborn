@@ -34,22 +34,28 @@ describe('hyperPhaserDamage — C firehp/pdamage warp branch', () => {
     expect(hyperPhaserDamage({ phasrtype: 20, distRaw: 30000, victimMaxTons: 15000 })).toBe(101);
   });
 
-  it('HPFIRDST=9 ⇒ the hyperspace beam dies almost immediately', () => {
+  it('HPFIRDST=5 ⇒ the hyperspace beam dies almost immediately', () => {
     // This test used to assert LINEAR falloff, because the port ran HPFIRDST=1
     // -- the numopt FLOOR. Canon ships 9, so dp = dd^9 and the beam collapses:
     //
-    //     dist        0     4000   10000   20000+
-    //     phasrtype 1 50      19       3        0
-    //     phasrtype 10 500   190      30        0
+    //     dist         0    4000   10000   20000   30000+
+    //     phasrtype 1  50      29      11       1       0
+    //     phasrtype 10 500     290     110      10      0
+    //
+    // (HPFIRDST is 5, not the 9 this file was written against. The 9 came from
+    // GE/MSG/MBMGEMSG.MSG, an earlier partial snapshot of the option database;
+    // the shipped file is GE/REL/MBMGEMSG.MSG. The beam still dies, one sector
+    // later. @see reference/ge-upstream/PROVENANCE.md)
     //
     // The combination of the old floor and the old ceiling was the single most
     // lethal error in the port: at HPDAMMAX 200 / HPFIRDST 1, a hyperspace
     // phaser at two sectors dealt ~937 after the Mark-10 scaling -- an instant
     // kill against a 100-damage threshold -- where canon deals nothing at all.
     const pointBlank = hyperPhaserDamage({ phasrtype: 2, distRaw: 0, victimMaxTons: 0 });
-    const halfRange = hyperPhaserDamage({ phasrtype: 2, distRaw: 20_000, victimMaxTons: 0 });
+    const halfRange = hyperPhaserDamage({ phasrtype: 2, distRaw: 30_000, victimMaxTons: 0 });
     expect(halfRange).toBe(0);
-    expect(halfRange).toBeLessThan(pointBlank / 10);
+    expect(hyperPhaserDamage({ phasrtype: 2, distRaw: 20_000, victimMaxTons: 0 }))
+      .toBeLessThan(pointBlank / 10);
 
     // Still meaningful at knife range, which is the point of the weapon.
     expect(hyperPhaserDamage({ phasrtype: 2, distRaw: 4_000, victimMaxTons: 0 })).toBeGreaterThan(0);

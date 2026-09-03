@@ -220,7 +220,29 @@ export class DroidTickService implements OnModuleInit {
     // spotted someone — reacts about three times as often as one that is
     // cruising. @see GEDROIDS.C:216-227, 335, 442
     droid.tick = nextDroidTick(detected || droid.cantexit > 0 ? 1 : 0, this.random);
+    this.enforceFreeze(droid);
     droid.dirty = true;
+  }
+
+  /**
+   * DEV-ONLY: re-pin a droid that a playtester spawned with `stationary=1`.
+   *
+   * Canon is that a droid rolls a fresh drift speed the moment it detects a
+   * player — GEDROIDS.C:328-331,
+   * `if (ptr->holdcourse == 0) ptr->speed2b = rndm(999.9);` — and that is left
+   * exactly as it is. The AI runs in full, decides, chatters, shoots; this only
+   * re-zeroes the resulting velocity afterwards, and only for a droid whose key
+   * the debug spawn endpoint put in DroidSpawner's freeze registry. A droid
+   * from the normal spawn path is never in that registry, so nothing here can
+   * touch it.
+   *
+   * Why it matters: phaser damage falls off as dd^7 (PFIRDST 7, GEMAIN.H), so
+   * uncontrolled drift moves every damage figure a playtest records.
+   */
+  private enforceFreeze(droid: ShipState): void {
+    if (!this.spawner.isFrozen(droid.userid, droid.shipno)) return;
+    droid.speed2b = 0;
+    droid.speed = 0;
   }
 
   // ── Class 10: Lydorian Garbage Scow ───────────────────────────────────────
@@ -695,6 +717,8 @@ export class DroidTickService implements OnModuleInit {
     if (classNumber !== undefined) {
       this.livePopulation.get(classNumber)?.delete(userid);
     }
+    // Release any dev freeze so a recycled userid cannot inherit it.
+    this.spawner.unfreeze(userid, 1);
 
     this.logger.log(`Droid died: ${userid}`);
   }
@@ -704,6 +728,8 @@ export class DroidTickService implements OnModuleInit {
     const droid = this.shipState.get(attackerUserid, 1);
     if (!droid) return;
     droid.speed2b = this.random.next() * 5_000.0;
+    // A dev-frozen droid stays frozen even after a kill. @see enforceFreeze
+    this.enforceFreeze(droid);
     droid.dirty = true;
   }
 }

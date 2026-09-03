@@ -9,7 +9,18 @@ import { HELP_TOPICS, HELP_TOPIC_IDS } from '../../../../src/game/commands/help/
 
 describe('Help topic snapshots', () => {
   it('HELP_TOPIC_IDS contains exactly the expected topics in order', () => {
-    expect(HELP_TOPIC_IDS).toEqual(['navigation', 'combat', 'trade', 'planet', 'ship', 'comms']);
+    expect(HELP_TOPIC_IDS).toEqual([
+      'navigation',
+      'combat',
+      'trade',
+      'planet',
+      'ship',
+      // 'mai' is cmd_maint in the original table (GECMDS.C:144) and repair was
+      // undiscoverable from `hel`; these two topics close that gap.
+      'maintenance',
+      'mail',
+      'comms',
+    ]);
   });
 
   it('navigation topic body matches snapshot', () => {
@@ -34,6 +45,14 @@ describe('Help topic snapshots', () => {
 
   it('ship topic body matches snapshot', () => {
     expect(HELP_TOPICS.ship.body).toMatchSnapshot();
+  });
+
+  it('maintenance topic body matches snapshot', () => {
+    expect(HELP_TOPICS.maintenance.body).toMatchSnapshot();
+  });
+
+  it('mail topic body matches snapshot', () => {
+    expect(HELP_TOPICS.mail.body).toMatchSnapshot();
   });
 
   // Full catalog snapshot for belt-and-suspenders coverage

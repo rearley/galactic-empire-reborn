@@ -85,6 +85,10 @@ import {
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { damstr } from '../game/combat/combat-math';
+import { resolveKillSpoils } from '../game/combat/kill-resolution';
+import { isAiUserid } from '../game/commands/helpers/ai-userid';
+import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
+import { MAIL_CLASS_DISTRESS } from '../game/constants';
 
 interface SectorPayload {
   x: unknown;
@@ -231,7 +235,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userid = client.data.userid as string | undefined;
     if (!userid) return;
     try {
-      await this.presentShipEntry(client, userid);
+      await this.presentShipEntry(client, userid, { noticeShipLoss: false });
     } catch (err: unknown) {
       this.logger.error('Ship re-entry after abandon failed:', err);
     }
@@ -266,7 +270,49 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    *
    * @see specs/013-ship-management/spec.md FR-704
    */
-  private async presentShipEntry(client: Socket, userid: string): Promise<void> {
+  /**
+   * One line telling a returning captain they lost a hull while they were away.
+   *
+   * PORT-ORIGINAL, and a deliberate design call rather than a canon
+   * transcription: canon cannot reach this state at all, because `warhupa`
+   * sets GESTAT_AVAIL on hangup (GEMAIN.C:1398-1440) and a logged-off ship is
+   * therefore not in the universe to be shot. Our 24/7 world creates the
+   * situation, and the port answered it by dropping the pilot at the ship-name
+   * prompt with no explanation — three playtest personas lost a ship and only
+   * found out by inference.
+   *
+   * What canon does establish is that a pilot is never left to infer a loss:
+   * YOURDEAD (MBMGEMSG.MSG:1828-1840) is printed with `outprfge(ALWAYS,...)`,
+   * bypassing even the message filter. This is the offline equivalent, and it
+   * points at the mail that carries the detail rather than restating it.
+   *
+   * Fire-and-forget in spirit: any failure here is swallowed, because a
+   * mailbox hiccup must never keep a captain out of the game.
+   */
+  private async noticeShipLossOnEntry(client: Socket, userid: string): Promise<void> {
+    try {
+      const mail = await this.prisma.mailStat.findFirst({
+        where: { userid, class: MAIL_CLASS_DISTRESS, type: MESG_SHIPLOSS },
+        orderBy: { stamp: 'desc' },
+      });
+      if (!mail) return;
+      const killer = mail.name1 || 'an unknown assailant';
+      client.emit('event.log', {
+        category: 'combat',
+        text:
+          `** Your ship was destroyed by ${killer} in sector (${mail.int1}, ${mail.int2}) `
+          + `while you were away — see 'rea' for the report. **`,
+      });
+    } catch (err: unknown) {
+      this.logger.error(`Ship-loss notice lookup failed for ${userid}:`, err);
+    }
+  }
+
+  private async presentShipEntry(
+    client: Socket,
+    userid: string,
+    opts: { noticeShipLoss?: boolean } = {},
+  ): Promise<void> {
     // Abandoned hulls are not ships the captain can fly (FR-702). Boarding one
     // put the player behind the router's abandoned-ship gate with no way out.
     const ships = (
@@ -288,6 +334,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.disconnect(true);
         return;
       }
+      // An EMPTY fleet is the only place this notice belongs, and it is exactly
+      // the moment the round-3 persona described: killed between sessions, then
+      // dropped at "name your ship" with nothing saying why.
+      //
+      // It is also the only gate available that cannot repeat. MailStat mirrors
+      // canon's MAILSTAT struct (GEMAIN.H:531) and has no read flag, `rea` is
+      // read-only by contract, and the row survives until the 7-day purge — so
+      // a mailbox-only condition re-announced the same loss on every login for
+      // a week. Having no flyable hull is self-clearing: name one and the
+      // branch is never reached again.
+      //
+      // The cost is that a captain who loses ONE hull out of several is not
+      // told on re-entry; they still have the mail. @see docs/DECISIONS.md
+      if (opts.noticeShipLoss !== false) await this.noticeShipLossOnEntry(client, userid);
+
       // New player — go directly to ship-name prompt (no class picker)
       const onboardingState: OnboardingState = { step: 'AWAITING_NAME' };
       client.data.onboarding = onboardingState;
@@ -474,6 +535,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             // Non-fatal: score defaults to 0; kill still fires without credit.
           }
 
+          // Kill credit and cargo, through the SAME helper the combat tick
+          // uses. Canon has one killem: warhupa calls it on a mid-combat
+          // hangup (GEMAIN.C:1418) exactly as checkdam does on a normal death,
+          // and its cargo loop (GEFUNCS.C:1122-1136) does not ask how the
+          // victim died. This path used to hardcode `loot: []`, so the one
+          // death a killer had to work hardest for paid nothing.
+          const loot = attackerShip
+            ? resolveKillSpoils(ship, attackerShip, {
+                mutate: (u, n, fn) => this.shipStateService.mutate(u, n, fn),
+                maxTonsFor: (shpclass) => this.shipClassCache.getMaxTons(shpclass),
+                random: this.random,
+              })
+            : [];
+
           const destroyedEvent: CombatShipDestroyedEvent = {
             victimId: victimKey,
             attackerId: attackerShip ? shipKey(attackerShip.userid, attackerShip.shipno) : null,
@@ -481,11 +556,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             attackerShipKey: attackerShip ? shipKey(attackerShip.userid, attackerShip.shipno) : null,
             victimUserid: userid,
             attackerUserid: attackerShip ? attackerShip.userid : null,
+            // The killer's NAME, captured here while the attacker is still in
+            // memory. Everything downstream that is not this gateway — the
+            // ship-loss mail above all — has no way to resolve a shipKey
+            // afterwards, so omitting it made every offline death read
+            // "destroyed by an unknown assailant": precisely the case the mail
+            // exists for, and precisely the case canon names unconditionally
+            // (GEFUNCS.C:1116 sits AFTER the GESTAT_AUTO branch at :1110, so
+            // an AI killer is named like any other).
+            attackerName: attackerShip ? attackerShip.shipname : null,
             attackerChannel: ship.lastfired,
             weapon: null,
             sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
             tickAt: new Date(),
-            loot: [],
+            loot,
             scoreAwarded,
           };
 
@@ -981,6 +1065,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     const keyParts = event.victimShipKey.split(':');
     const victimShipno = Number(keyParts[keyParts.length - 1]);
+    // Read before the hull leaves memory a few lines below — the KILLEDBY
+    // announcement at the end of this handler needs it for an AI victim.
+    const victimShipName = this.shipNameOf(event.victimShipKey) ?? null;
     if (!isNaN(victimShipno)) {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
@@ -1071,6 +1158,47 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     this.server.emit(COMBAT_SHIP_DESTROYED, payload);
 
+    // KILLEDBY — every pilot in the galaxy hears who killed whom.
+    //
+    //     prfmsg(KILLEDBY,username(ptr),username(wptr));
+    //     outwar(FILTER,usrn,0);
+    //
+    // GEFUNCS.C:1116-1117, text at MBMGEMSG.MSG:1851. `outwar` is the
+    // galaxy-wide send, and the prfmsg sits AFTER the `wptr->status ==
+    // GESTAT_AUTO` branch at :1110 — so a Cybertron kill is announced exactly
+    // like a player one. The port implemented none of it; a kill three sectors
+    // away happened in silence, which is most of why the world read as empty.
+    //
+    // The labels are canon's `username()` (GEFUNCS.C:2596-2604): the SHIP name
+    // for a CYBORG or DROID class, the userid for anyone else.
+    //
+    // Only a SHIP is announced. Canon's prfmsg lives inside
+    // `if (who >= 0 && who < nships && who != usrn)` (GEFUNCS.C:1105), and
+    // `fireion` sets the victim's lastfired to -1 (GEFUNCS.C:1796), so a
+    // colony's ion cannons make a kill that nobody hears about. The killer's
+    // name still travels on the structured payload for the sector to render.
+    const hasKillerShip = event.attackerId !== null || event.attackerUserid !== null;
+    const killerLabel = !hasKillerShip
+      ? null
+      : event.attackerUserid && !isAiUserid(event.attackerUserid)
+        ? event.attackerUserid
+        : payload.attackerName;
+    if (killerLabel) {
+      const victimLabel = isAiUserid(event.victimUserid)
+        ? (victimShipName ?? event.victimUserid)
+        : event.victimUserid;
+      // Everyone EXCEPT the pilot who just died. Canon is
+      // `outwar(FILTER, usrn, 0)` (GEFUNCS.C:1117) where `usrn` is the victim's
+      // own channel, and outwar's loop is
+      // `if (zothusn != exclude && ingegame(zothusn))` (GEMAIN.C:1522-1523) —
+      // so the dying pilot is deliberately skipped. They get YOURDEAD instead,
+      // which is a better message and arrives a few lines below.
+      this.server.except(`user:${event.victimUserid}`).emit('event.log', {
+        category: 'combat',
+        text: formatMessage(MessageId.KILLEDBY, victimLabel, killerLabel),
+      });
+    }
+
     // Tell the pilot who just died that they SURVIVED. C prints YOURDEAD to
     // the victim before killem (GEFUNCS.C:978-987), with outprfge(ALWAYS,usrn)
     // so it bypasses the message filter — this is not flavour, it is the one
@@ -1116,7 +1244,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!socket) continue;
       socket.data.activeShipNo = undefined;
       try {
-        await this.presentShipEntry(socket, userid);
+        await this.presentShipEntry(socket, userid, { noticeShipLoss: false });
       } catch (err) {
         const stack = err instanceof Error ? err.stack : String(err);
         this.logger.error(`Post-death re-entry failed for ${userid}: ${stack}`);

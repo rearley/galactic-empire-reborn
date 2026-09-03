@@ -149,17 +149,32 @@ describe('ScanHandlerService — scan pl spy reveal (T017)', () => {
     expect(hasItemLine).toBe(true);
   });
 
-  it('non-spy-owner (bob) does NOT see item inventory lines in scan pl output', async () => {
-    const { service, ship, ctx } = makeService({ viewerUserId: 'bob', spyowner: 'alice' });
+  // Was written with viewerUserId 'bob' -- but the fixture planet is OWNED by
+  // bob, and C gives the owner the exact per-item list:
+  // `if (sameas(plptr->userid,warsptr->userid))` prints every item with qty>0
+  // (GECMDS.C:2365-2376). The test encoded the port's gap, not the game.
+  // Carol is the actual outsider: no ownership, no spy.
+  it('a stranger (carol) does NOT see item inventory lines in scan pl output', async () => {
+    const { service, ship, ctx } = makeService({ viewerUserId: 'carol', spyowner: 'alice' });
 
     const result = service.command.handler(ship, ['pl', 'Recon Base'], ctx);
     const texts = await lineTexts(result);
 
-    // Bob should see normal aggregate planet info but no item inventory block
+    // Carol should see the aggregate reconnaissance lines but no item block
     const hasItemLine = texts.some(t => /item|qty|sell|inventory/i.test(t));
     expect(hasItemLine).toBe(false);
-    // But does see at least the planet name line
+    expect(texts.some(t => /Populated/.test(t))).toBe(true);
     expect(texts.length).toBeGreaterThan(0);
+  });
+
+  it('the owner (bob) sees the per-item inventory — GECMDS.C:2365-2376', async () => {
+    const { service, ship, ctx } = makeService({ viewerUserId: 'bob', spyowner: 'alice' });
+
+    const texts = await lineTexts(service.command.handler(ship, ['pl', 'Recon Base'], ctx));
+
+    expect(texts.some(t => /Missiles/.test(t))).toBe(true);
+    // ...and NOT the outsider's reconnaissance summary
+    expect(texts.some(t => /Populated/.test(t))).toBe(false);
   });
 
   it('case-insensitive spyowner match — ALICE matches alice', async () => {

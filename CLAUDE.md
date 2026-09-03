@@ -136,9 +136,20 @@ The full original distribution is vendored, READ ONLY, at
 **Precedence when sources disagree:**
 
 1. **The C source** — `reference/ge-source/` (identical to `ge-upstream/mbmgemp/*.C`)
-2. **The `.MSG` data files** — `ge-upstream/mbmgemp/GE/MSG/`, above all
+2. **The `.MSG` data files** — `ge-upstream/mbmgemp/GE/REL/`, above all
    `MBMGESHP.MSG` (the ship class table the game loaded at boot) and
    `MBMGEMSG.MSG` (sysop options, items, neutral-zone planets)
+
+   **Use `GE/REL/`, never `GE/MSG/`.** The distribution ships three copies of
+   each `.MSG`. `GE/REL/` and the `mbmgemp/` root are byte-identical and
+   complete; `GE/MSG/MBMGEMSG.MSG` is an EARLIER snapshot missing 277 message
+   ids, nine of which the C source reads by name — `ITMPR01` (item base
+   prices), `SHLDPR01`/`PHSRPR01` (shipyard price tables), `HYPDST1/2`,
+   `CYBNEW`, `DROIDNEW`, `CYBBASEM`, `CYBLASTM`. A build cannot run against it.
+   It also disagrees on three numeric options: `PFIRDST` 7 vs a shipped **5**,
+   `HPFIRDST` 9 vs **5**, and `ITMWT13` (gold weight) 200 vs **50**. All three
+   reached our balance constants before this was caught. `MBMGESHP.MSG` is
+   identical in all three locations, so ship classes were never affected.
 3. **`reference/wiki/`** — a community transcription. Useful, and has been
    caught being wrong. Never cite it against 1 or 2.
 
@@ -170,8 +181,8 @@ the original C source** in `/reference/ge-source/` before implementation.
 | `GEPLANET.C` | Planet mechanics |
 | `GEGLOBAL.H` | Global variable declarations |
 | `reference/wiki/` | Human-readable game mechanics from the GE wiki — use alongside C source |
-| `reference/ge-upstream/GE/MSG/MBMGESHP.MSG` | **Authoritative ship class table** — 34 slots x 28 options, read by `GEMAIN.C:835-875` in ORDER |
-| `reference/ge-upstream/GE/MSG/MBMGEMSG.MSG` | Sysop option defaults and clamp bounds, item table, `S00P*` neutral-zone planets |
+| `reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG` | **Authoritative ship class table** — 34 slots x 28 options, read by `GEMAIN.C:835-875` in ORDER |
+| `reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG` | Sysop option defaults and clamp bounds, item and shipyard price tables, `S00P*` neutral-zone planets. **Not the `GE/MSG/` copy** — see the precedence note above |
 | `reference/ge-upstream/GE/DOCS/` | Original manuals and `GEREADME.DOC` changelog |
 | `reference/ge-upstream/PROVENANCE.md` | Where all of the above came from, and the precedence rules |
 

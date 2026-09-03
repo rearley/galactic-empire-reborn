@@ -12,7 +12,7 @@ import { buildScantab, Scantab } from './helpers/scantab';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
-import { ITEM_NAMES } from '../../constants/items';
+import { ITEM_NAMES, I_MEN, I_TROOPS, I_MISSL, I_TORP, I_FLUX, I_FOOD, I_FIGHTER } from '../../constants/items';
 import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
 import { scanDistanceUnits } from './helpers/scan-distance';
 import { scanShipColour } from './helpers/scan-ship-colour';
@@ -46,6 +46,58 @@ const RES_STRINGS = [
   MessageId.SCAN14, // 2 — Rich
   MessageId.SCAN15, // 3 — Abundant
 ] as const;
+
+/**
+ * The reconnaissance strings a NON-owner sees on `sca pl <n>`.
+ *
+ * These are SCAN28..SCAN34 in MBMGEMSG.MSG:3366-3390, filled from `gechrbuf`
+ * words that the C builds inline (GECMDS.C:2377-2448). They are not in
+ * `messages.ts` because that file is frozen this run and never carried these
+ * ids — see the report; they belong there.
+ *
+ * Spelling is the original's: "Sparsly" and "Moderatly" are how the shipped
+ * binary printed them (GECMDS.C:2381, 2387).
+ */
+/** Fill `%s` in a raw canon template. `formatMessage` only takes MessageIds. */
+function fmt(template: string, arg: string): string {
+  return template.replace('%s', arg);
+}
+
+const SCAN28_POPULATED = '%s Populated';
+const SCAN29_MISSILES = '%s stockpile of missiles';
+const SCAN30_TORPEDOES = '%s stockpile of torpedoes.';
+const SCAN31_NO_FIGHTERS = 'No sign of fighters anywhere.';
+const SCAN32_FIGHTERS = 'There are indications of fighters.';
+const SCAN33_FLUXPODS = '%s stockpile of fluxpods.';
+const SCAN34_FOOD = '%s stockpile of food.';
+/** SCANWRM / SCANWRM1 — MBMGEMSG.MSG:3402, 3405. */
+const SCANWRM = 'Object Class: Wormhole';
+const SCANWRM1 = 'Named: %s';
+
+/**
+ * Population band for the non-owner readout: men + troops, six bands.
+ * @see GECMDS.C:2378-2392
+ */
+function populationBand(total: bigint): string {
+  if (total === 0n) return 'Not';
+  if (total < 2500n) return 'Sparsly';
+  if (total < 10000n) return 'Lightly';
+  if (total < 100000n) return 'Moderatly';
+  if (total < 1000000n) return 'Widely';
+  return 'Heavily';
+}
+
+/**
+ * Stockpile band for the non-owner readout — the same four words for missiles,
+ * torpedoes, fluxpods and food.
+ * @see GECMDS.C:2395-2404 (and the three identical ladders that follow)
+ */
+function stockpileBand(qty: bigint): string {
+  if (qty === 0n) return 'No';
+  if (qty < 25n) return 'Small';
+  if (qty < 100n) return 'Moderate';
+  return 'Large';
+}
 
 // Resource display strings (the original uses separate text for resources vs environment)
 const RES_DISPLAY: Record<number, string> = {
@@ -710,6 +762,20 @@ export class ScanHandlerService implements OnModuleInit {
         const owner = planetOwnerLabel(p.userid);
         lines.push({ text: `  ${label}${owner}`, category: 'info' });
       }
+      // Wormholes share the planet slot space, so their numbers belong in the
+      // same list -- otherwise `sca pl 3` on a wormhole slot looks like a bug.
+      // Only VISIBLE ones: the listing is our addition (C's `sca pl` demands an
+      // argument, GECMDS.C:2300-2306), and a hidden wormhole is hidden.
+      const worms = await this.prisma.wormhole.findMany({
+        where: { xsect, ysect, visible: 1 },
+        select: { plnum: true, name: true },
+      });
+      for (const w of worms) {
+        lines.push({
+          text: `  ${w.plnum}. ${w.name || '(unnamed)'} — wormhole`,
+          category: 'info',
+        });
+      }
       lines.push({ text: 'Use "sca pl <number>" to scan a planet.', category: 'system' });
       return { lines };
     }
@@ -723,6 +789,15 @@ export class ScanHandlerService implements OnModuleInit {
     // Name arg → cross-sector lookup (deviation D8)
     if (!planet) {
       planet = this.planetService.byName(args.join(' ')) ?? null;
+    }
+
+    // A wormhole occupies a planet slot in the sector, so `sca pl <n>` can name
+    // one. C falls through to `plptr->type == PLTYPE_WORM` after the planet
+    // branch and prints class, name, bearing and distance.
+    // @see GECMDS.C:2455-2468
+    if (!planet && !isNaN(num) && String(num) === args[0]) {
+      const worm = await this.findSectorWormhole(xsect, ysect, num);
+      if (worm) return this.scanWormhole(ship, worm);
     }
 
     if (!planet) {
@@ -816,11 +891,22 @@ export class ScanHandlerService implements OnModuleInit {
       });
     }
 
-    // Spy-owner reveal — per-item inventory (D3)
-    // @see GECMDS.C:2367-2375
-    if (planetState && planetState.spyowner
-        && planetState.spyowner.toLowerCase() === ship.userid.toLowerCase()) {
-      lines.push({ text: 'Spy intel — Planet Inventory:', category: 'info' });
+    // Owner vs. everyone else. C branches on `sameas(plptr->userid,
+    // warsptr->userid)`: the owner gets the exact per-item inventory, and a
+    // stranger gets the reconnaissance summary — bands, not numbers. The port
+    // implemented neither half for the owner and none at all for the stranger,
+    // which is what made scouting pointless: nothing in `sca pl` told you
+    // whether a colony was defended.
+    // @see GECMDS.C:2365-2448
+    //
+    // The spy-owner reveal is our documented deviation (D3): a planted spy buys
+    // the owner's view.
+    const viewer = ship.userid.toLowerCase();
+    const isOwner = !!planetState?.userid && planetState.userid.toLowerCase() === viewer;
+    const isSpy = !!planetState?.spyowner && planetState.spyowner.toLowerCase() === viewer;
+
+    if (planetState && (isOwner || isSpy)) {
+      if (!isOwner) lines.push({ text: 'Spy intel — Planet Inventory:', category: 'info' });
       for (let i = 0; i < planetState.items.length; i++) {
         const it = planetState.items[i];
         if (it && it.qty > 0n) {
@@ -831,10 +917,80 @@ export class ScanHandlerService implements OnModuleInit {
           });
         }
       }
+    } else if (planetState) {
+      const qty = (i: number): bigint => planetState.items[i]?.qty ?? 0n;
+
+      lines.push({
+        text: fmt(SCAN28_POPULATED, populationBand(qty(I_MEN) + qty(I_TROOPS))),
+        category: 'info',
+      });
+      lines.push({ text: fmt(SCAN29_MISSILES, stockpileBand(qty(I_MISSL))), category: 'info' });
+      lines.push({ text: fmt(SCAN30_TORPEDOES, stockpileBand(qty(I_TORP))), category: 'info' });
+      lines.push({ text: fmt(SCAN33_FLUXPODS, stockpileBand(qty(I_FLUX))), category: 'info' });
+      lines.push({ text: fmt(SCAN34_FOOD, stockpileBand(qty(I_FOOD))), category: 'info' });
+      lines.push({
+        text: qty(I_FIGHTER) === 0n ? SCAN31_NO_FIGHTERS : SCAN32_FIGHTERS,
+        category: 'info',
+      });
     }
 
     return { lines };
   }
+  /**
+   * The wormhole occupying slot `plnum` in this sector, if any.
+   *
+   * Wormholes share the planet slot space in C (`sector.planets[]` holds both,
+   * discriminated by `type`), but our read models split them: GalaxyService's
+   * wormhole view carries no slot number and no name, so the row itself is the
+   * only place both live. Positions and names are fixed at generation, so a
+   * point read on a rare command is cheap.
+   *
+   * @see GEMAIN.H:467 GALWORM  @see GECMDS.C:2455
+   */
+  private async findSectorWormhole(
+    xsect: number,
+    ysect: number,
+    plnum: number,
+  ): Promise<{ xcoord: number; ycoord: number; name: string } | null> {
+    const row = await this.prisma.wormhole.findFirst({
+      where: { xsect, ysect, plnum },
+      select: { xcoord: true, ycoord: true, name: true },
+    });
+    return row ?? null;
+  }
+
+  /**
+   * The wormhole readout: class, optional name, bearing and distance — no
+   * environment, no resources, no inventory. C prints exactly these four
+   * messages between two rules.
+   *
+   * No `visible` gate: C's scan_pl tests only `plptr->type`, so a slot number
+   * that names a wormhole reports one whether or not the map is drawing it.
+   *
+   * @see GECMDS.C:2455-2468, MBMGEMSG.MSG:3402-3405
+   */
+  private scanWormhole(
+    ship: ShipState,
+    worm: { xcoord: number; ycoord: number; name: string },
+  ): CommandResult {
+    const lines: CommandResult['lines'] = [
+      { text: SCANWRM, category: 'info' },
+    ];
+    if (worm.name) {
+      lines.push({ text: fmt(SCANWRM1, worm.name), category: 'info' });
+    }
+    lines.push({ text: formatMessage(MessageId.SCAN_DASHES), category: 'info' });
+    const dist = Math.sqrt(
+      Math.pow(worm.xcoord - ship.xcoord, 2) + Math.pow(worm.ycoord - ship.ycoord, 2),
+    );
+    lines.push({
+      text: formatMessage(MessageId.SCAN10, relativeBearing(ship, worm), scanDistanceUnits(dist)),
+      category: 'info',
+    });
+    lines.push({ text: formatMessage(MessageId.SCAN_DASHES), category: 'info' });
+    return { lines };
+  }
+
   /**
    * The message the scanned ship receives. C always sends one of SCAN1/2/3 via
    * `outprfge(FILTER, shpnum)`, so being looked at is information the other

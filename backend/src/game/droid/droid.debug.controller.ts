@@ -21,6 +21,10 @@ export class DroidDebugController {
    * POST /debug/droid/spawn?class=31[&x=<num>&y=<num>]
    *   31=Scow, 32=Murdonian, 33=Vakory
    *
+   * `stationary=1` additionally pins the droid in place for the whole test:
+   * the freeze is re-applied after every AI pass, so range stays a controlled
+   * variable. Dev-only — the normal spawn path never sets it.
+   *
    * `x`/`y` place the droid at exact universe coordinates instead of scattering
    * it, so a playtester can put a target in front of their ship — read your
    * position with `rep nav` and spawn there. Both must be supplied together.
@@ -52,13 +56,32 @@ export class DroidDebugController {
     }
 
     // Droids normally spawn with a random drift speed (GEDROIDS.C:166), which
-    // outruns a torpedo lock in the seconds between spawning and firing.
+    // outruns a torpedo lock in the seconds between spawning and firing. Worse,
+    // canon re-rolls that speed the moment the droid detects a player
+    // (GEDROIDS.C:328-331), so zeroing it at creation alone did not survive
+    // first contact — observed drifting 149 -> 839 units over four minutes,
+    // which moves every damage figure because phaser falloff is dd^7
+    // (PFIRDST 7, GEMAIN.H). `stationary` therefore also registers the droid as
+    // frozen in DroidSpawner, and DroidTickService re-zeroes it after each AI
+    // pass. The droid AI itself is unchanged; nothing on the normal spawn path
+    // can set the flag.
     const stationary = stationaryParam === 'true' || stationaryParam === '1';
     const name = nameParam?.trim() || undefined;
     const state = this.spawner.spawn(classNumber, this.droidTick.getLivePopulation(), at, stationary, name);
     if (!state) {
       return { ok: false, reason: 'spawn returned null' };
     }
-    return { ok: true, userid: state.userid, shipno: state.shipno, classNumber, shipname: state.shipname, xcoord: state.xcoord, ycoord: state.ycoord };
+    return {
+      ok: true,
+      userid: state.userid,
+      shipno: state.shipno,
+      classNumber,
+      shipname: state.shipname,
+      xcoord: state.xcoord,
+      ycoord: state.ycoord,
+      // Echo the freeze back so a playtester can confirm the flag actually took
+      // rather than inferring it from a scan that says "Impulse".
+      frozen: this.spawner.isFrozen(state.userid, state.shipno),
+    };
   }
 }

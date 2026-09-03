@@ -10,7 +10,18 @@ import { formatMessage, MessageId } from '../messages';
 
 /**
  * Phaser/shield prices indexed by type-1 (type 1 = index 0).
- * @see GEMAIN.C phaserprice[], shieldprice[]
+ *
+ * These are SYSOP OPTIONS, not compiled constants:
+ * `shieldprice[i] = lngopt(SHLDPR01+i,0L,201228378L)` and the PHSRPR01+i
+ * equivalent, GEMAIN.C:575-591. The literal arrays at GEMAIN.C:299-341 look
+ * authoritative and are not -- they sit inside an `OMITTED 3.2c.7` comment
+ * block and are dead code, which is how SHLDPR19 came to read 250,000,000 here
+ * against a shipped 200,000,000.
+ *
+ * Defaults live in GE/REL/MBMGEMSG.MSG:1664-1812 and are pinned field by field
+ * by test/balance/upgrade-prices-canon.balance.spec.ts.
+ *
+ * @see GEMAIN.C:575-591, reference/ge-upstream/PROVENANCE.md
  */
 /**
  * cyb_class — the index of the first CYBORG entry, which bounds what `new ship`
@@ -19,23 +30,60 @@ import { formatMessage, MessageId } from '../messages';
  */
 const FIRST_CPU_CLASS = 21;
 
-const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
+export const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
   1_200_000n, 2_000_000n, 3_800_000n, 5_000_000n, 7_000_000n, 9_000_000n,
   15_000_000n, 30_000_000n, 60_000_000n, 100_000_000n, 200_000_000n];
-const SHIELD_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 250_000n, 500_000n, 750_000n, 1_100_000n,
+export const SHIELD_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 250_000n, 500_000n, 750_000n, 1_100_000n,
   1_500_000n, 2_500_000n, 4_000_000n, 6_000_000n, 8_000_000n, 10_000_000n,
-  30_000_000n, 50_000_000n, 80_000_000n, 120_000_000n, 250_000_000n];
+  30_000_000n, 50_000_000n, 80_000_000n, 120_000_000n, 200_000_000n];
 
-/** Net cost to move from currentType to newType, accounting for 2/3 trade-in. @see GECMDS.C:4664 */
-function upgradeCost(priceTable: bigint[], currentType: number, newType: number): { cost: bigint; credit: bigint } {
-  const tradeIn = currentType > 0 ? priceTable[currentType - 1] - priceTable[currentType - 1] / 3n : 0n;
-  const delta = priceTable[newType - 1] - tradeIn;
+/** The Yardmaster's quote for swapping one phaser/shield for another. */
+export interface UpgradeQuote {
+  /** What the yard allows for the unit being removed: price - price/3. */
+  tradeIn: bigint;
+  /** Credits charged for the fitting (0 on a downgrade). */
+  cost: bigint;
+  /** Credits deposited back on a downgrade, net of the fee (0 otherwise). */
+  credit: bigint;
+  /** Transaction fee withheld from a downgrade refund: credit/50. */
+  fee: bigint;
+  /** True when the net cost was under 1000 and the minimum charge applied. */
+  minCharge: boolean;
+}
+
+/**
+ * Prices an upgrade exactly as the C does, in integer arithmetic.
+ *
+ * delta = newprice - (oldprice - oldprice/3); a negative delta becomes a
+ * refund less a credit/50 transaction fee, and a positive delta under 1000 is
+ * rounded up to the 1000 C minimum install charge.
+ *
+ * @see GECMDS.C:4664-4693 (phaser), :4602-4631 (shield)
+ */
+export function quoteUpgrade(priceTable: bigint[], currentType: number, newType: number): UpgradeQuote {
+  // C guards the trade-in with `if (delta > 0) ... else delta = 0`.
+  let tradeIn = currentType > 0 ? priceTable[currentType - 1] - priceTable[currentType - 1] / 3n : 0n;
+  if (tradeIn < 0n) tradeIn = 0n;
+
+  let delta = priceTable[newType - 1] - tradeIn;
+  let credit = 0n;
+  let fee = 0n;
+  let minCharge = false;
+
   if (delta < 0n) {
-    const raw = -delta;
-    const fee = raw / 50n; // 2% fee on downgrade refund — GECMDS.C:4618
-    return { cost: 0n, credit: raw - fee };
+    credit = -delta;
+    fee = credit / 50n;
+    credit = credit - fee;
+    if (credit < 0n) credit = 0n;
+    delta = 0n;
   }
-  return { cost: delta < 1_000n ? 1_000n : delta, credit: 0n }; // min 1000 fee — GECMDS.C:4628
+
+  if (delta < 1_000n && delta > 0n) {
+    minCharge = true;
+    delta = 1_000n;
+  }
+
+  return { tradeIn, cost: delta, credit, fee, minCharge };
 }
 
 /**
@@ -251,7 +299,7 @@ export class NewShipHandlerService {
         { text: '  ----  ----------    -------------------------', category: 'system' },
       ];
       for (let t = 1; t <= classMax; t++) {
-        const { cost, credit } = upgradeCost(priceTable, currentType, t);
+        const { cost, credit } = quoteUpgrade(priceTable, currentType, t);
         const marker = t === currentType ? ' ◄' : '';
         const costStr = credit > 0n ? `-${credit.toLocaleString()} cr (refund)` : `${cost.toLocaleString()} cr`;
         lines.push({
@@ -285,17 +333,60 @@ export class NewShipHandlerService {
     const userRow = await this.prisma.user.findUnique({ where: { userid: ship.userid }, select: { cash: true } });
     const cash = userRow?.cash ?? 0n;
 
-    const { cost, credit } = upgradeCost(priceTable, currentType, newType);
+    const quote = quoteUpgrade(priceTable, currentType, newType);
+    const lines: CommandResult['lines'] = [];
 
-    if (cost > 0n && cash < cost) {
-      return { lines: [{ text: `Insufficient credits. Need ${cost.toLocaleString()} cr, have ${cash.toLocaleString()} cr.`, category: 'system' }] };
+    // Canon narrates the transaction in order, and the trade-in quote comes
+    // FIRST — it is what makes a Mark-3 phaser cost 36,666 rather than its
+    // 40,000 list price. The port printed neither line, only an invented
+    // "Phaser upgraded to type 3. Cost: ... Credits: ..." stat line, so the
+    // player could not tell where the price came from.
+    // @see GECMDS.C:4666-4670 (NEW29), :4604-4608 (NEW19)
+    if (quote.tradeIn > 0n) {
+      lines.push({
+        text: formatMessage(
+          kind === 'phaser' ? MessageId.NEW29 : MessageId.NEW19,
+          quote.tradeIn.toLocaleString(),
+        ),
+        category: 'info',
+      });
+    }
+
+    // Downgrade: the yard owes us the difference, less a credit/50 fee.
+    // @see GECMDS.C:4676-4686 (NEW28), :4614-4624 (NEW18)
+    if (quote.credit > 0n) {
+      lines.push({
+        text: formatMessage(
+          kind === 'phaser' ? MessageId.NEW28 : MessageId.NEW18,
+          quote.fee.toLocaleString(),
+          quote.credit.toLocaleString(),
+        ),
+        category: 'info',
+      });
+    }
+
+    // The 1000 C floor on an install. @see GECMDS.C:4688-4693 (NEW17)
+    if (quote.minCharge) {
+      lines.push({ text: formatMessage(MessageId.NEW17), category: 'info' });
+    }
+
+    // C tests `delta <= cash` AFTER printing the trade-in, so a captain who
+    // cannot afford the fitting still hears what the old unit was worth.
+    if (quote.cost > cash) {
+      lines.push({
+        text: `Insufficient credits. Need ${quote.cost.toLocaleString()} cr, have ${cash.toLocaleString()} cr.`,
+        category: 'system',
+      });
+      return { lines };
     }
 
     // Apply — update DB and mutate in-memory state
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: cost > 0n ? { decrement: cost } : { increment: credit } },
-    });
+    if (quote.cost > 0n || quote.credit > 0n) {
+      await this.prisma.user.update({
+        where: { userid: ship.userid },
+        data: { cash: quote.cost > 0n ? { decrement: quote.cost } : { increment: quote.credit } },
+      });
+    }
 
     this.shipStateService.mutate(ship.userid, ship.shipno, (s) => {
       if (kind === 'phaser') s.phasrtype = newType;
@@ -303,11 +394,18 @@ export class NewShipHandlerService {
       s.dirty = true;
     });
 
-    const newCash = cost > 0n ? cash - cost : cash + credit;
-    const action = credit > 0n ? `Refund: ${credit.toLocaleString()} cr.` : `Cost: ${cost.toLocaleString()} cr.`;
-    return {
-      lines: [{ text: `${kind === 'phaser' ? 'Phaser' : 'Shield'} upgraded to type ${newType}. ${action} Credits: ${newCash.toLocaleString()} cr.`, category: 'success' }],
-    };
+    // The Yardmaster's fitting report, last.
+    // @see GECMDS.C:4701 (NEW10), :4640 (NEW7)
+    lines.push({
+      text: formatMessage(
+        kind === 'phaser' ? MessageId.NEW10 : MessageId.NEW7,
+        quote.cost.toLocaleString(),
+        newType,
+      ),
+      category: 'success',
+    });
+
+    return { lines };
   }
 
   /**

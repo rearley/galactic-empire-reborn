@@ -1,26 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
-import { MailInboxService } from '../../mail/mail-inbox.service';
 import { MaintHandlerService } from './maint.handler';
-import { formatListLine } from '../../mail/mail-render';
 
 /**
- * Handles `mai` — dispatches to inbox listing (no args) or maintenance gate (args present).
+ * Handles `mai` — the canon MAINTENANCE command.
  *
- * No-arg: queries MailStat for the player, renders a numbered list ordered newest-first.
- * With-arg: delegates unchanged to MaintHandlerService (feature 014 FR-210 gate).
+ * The original command table binds the `mai` prefix to cmd_maint and nothing
+ * else (GECMDS.C:144 `{"mai", cmd_maint, 1}`); cmd_maint's body is entirely
+ * repair (GECMDS.C:4452) and its ONLY optional argv[1] is the planet trade
+ * password (GECMDS.C:4469
+ * `if (!sameas(plptr->password,"none") && margc < 2)`).
  *
- * @see GEMAIN.H:531 MAILSTAT
- * @see GEMAIN.H:220 MAIL_CLASS_* — class constants used by mail-render
- * @see specs/017-mail-inbox/contracts/commands.md §mai
+ * This port previously dispatched on argument COUNT — bare `mai` listed mail,
+ * any argument repaired — so the argument was a discriminator rather than a
+ * password, and a damaged pilot in orbit typing `mai` got a mailbox instead of
+ * a repair crew. `mai` now always repairs; the mailbox (a port original with
+ * no canon keyword) lives on `rea`.
+ *
+ * This class remains the `mai` registration seam because `maint` collides with
+ * `mai` under the original's 3-character prefix match (GECMDS.C:249 gesearch);
+ * the gate logic and messages belong to MaintHandlerService.
+ *
+ * @see GECMDS.C:144 command table entry
+ * @see GECMDS.C:4452 cmd_maint
  */
 @Injectable()
 export class MaiHandlerService {
-  constructor(
-    private readonly inbox: MailInboxService,
-    private readonly maint: MaintHandlerService,
-  ) {}
+  constructor(private readonly maint: MaintHandlerService) {}
 
   readonly command: Command = {
     keyword: 'mai',
@@ -31,25 +38,11 @@ export class MaiHandlerService {
       this.handle(ship, args, ctx),
   };
 
+  /**
+   * `mai [password]` — repair at the planet in orbit. args[0], when present,
+   * is the planet's trade password (GECMDS.C:4469-4484).
+   */
   async handle(ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> {
-    if (args.length >= 1) {
-      return this.maint.command.handler(ship, args, ctx);
-    }
-
-    const listing = await this.inbox.list(ship.userid);
-
-    if (listing.empty) {
-      return { lines: [{ text: 'You have no mail.', category: 'system' }] };
-    }
-
-    const lines: CommandResult['lines'] = [
-      { text: `You have ${listing.entries.length} message${listing.entries.length === 1 ? '' : 's'}.`, category: 'system' },
-    ];
-
-    for (const entry of listing.entries) {
-      lines.push({ text: formatListLine(entry), category: 'info' });
-    }
-
-    return { lines };
+    return (await this.maint.command.handler(ship, args, ctx)) as CommandResult;
   }
 }

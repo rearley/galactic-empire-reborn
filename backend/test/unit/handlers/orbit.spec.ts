@@ -2,7 +2,7 @@
  * T015 — OrbitHandlerService unit tests.
  */
 import { OrbitHandlerService } from '../../../src/game/commands/handlers/orbit.handler';
-import { GalaxyService } from '../../../src/game/galaxy/galaxy.service';
+import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
@@ -46,14 +46,17 @@ function makeService(planets: ReturnType<typeof makePlanet>[]) {
     }),
     get: jest.fn(),
   };
-  const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue(planets),
+  // `orb` reads the LIVE planet map now, not GalaxyService's boot snapshot --
+  // that snapshot never sees a planet named after startup, so orbiting a colony
+  // claimed this session printed "(unnamed)".
+  const planetMock = {
+    bySector: jest.fn().mockReturnValue(planets),
   };
   const svc = new OrbitHandlerService(
-    galaxyMock as unknown as GalaxyService,
     shipMock as unknown as ShipStateService,
+    planetMock as unknown as PlanetStateService,
   );
-  return { svc, shipMock, galaxyMock, mutated };
+  return { svc, shipMock, planetMock, mutated };
 }
 
 describe('OrbitHandlerService', () => {

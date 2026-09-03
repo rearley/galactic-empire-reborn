@@ -3,7 +3,7 @@
  * whole class table.
  *
  * This parses the ORIGINAL distribution's ship configuration table,
- * reference/ge-upstream/mbmgemp/GE/MSG/MBMGESHP.MSG, at test time and asserts
+ * reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG, at test time and asserts
  * that every field of every active class in our seed matches it exactly. It
  * deliberately re-implements the parse rather than importing
  * tools/extract-ship-classes.mjs, so a bug in the generator cannot hide behind
@@ -31,7 +31,7 @@ import { SHIP_CLASSES } from '../../prisma/seed/ship-classes';
 
 const MSG = resolve(
   __dirname,
-  '../../../reference/ge-upstream/mbmgemp/GE/MSG/MBMGESHP.MSG',
+  '../../../reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG',
 );
 
 /**

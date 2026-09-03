@@ -36,7 +36,7 @@ import { SYSOP_OPTIONS } from '../../src/game/config/game-config';
 
 const MSG = resolve(
   __dirname,
-  '../../../reference/ge-upstream/mbmgemp/GE/MSG/MBMGEMSG.MSG',
+  '../../../reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG',
 );
 
 /**

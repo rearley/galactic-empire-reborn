@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { AdminChange, PlanetState, planetKey } from './planet-state.types';
 import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers';
-import { applyEconomyTick } from './planet-economy';
+import { applyEconomyTick, applyNeutralZoneRestock, isNeutralZoneRestockPlanet } from './planet-economy';
 import { PlanetEconomyService } from './planet-economy.service';
 import { computeBuyOutcome, computeSellOutcome } from './planet-trade';
 import { TAXRATE_MAX } from '../commands/handlers/helpers/tax-rate';
@@ -330,11 +330,12 @@ export class PlanetStateService implements OnModuleInit {
     buyerCash: bigint,
   ): Promise<
     | { ok: true; transferred: number; unitPrice: number; totalCost: bigint }
+    // `available` is the count C prints in BUY3 — see planet-trade.ts.
+    | { ok: false; reason: 'AT_RESERVE'; available: number }
     | {
         ok: false;
         reason:
           | 'SELL_FLAG_OFF'
-          | 'AT_RESERVE'
           | 'CAPACITY_FULL'
           | 'WONT_FIT'
           | 'INSUFFICIENT_FUNDS'
@@ -557,17 +558,31 @@ export class PlanetStateService implements OnModuleInit {
         return;
       }
 
-      // Skip unowned planets — matches GEMAIN.C:2132 `plptr->userid[0] != 0` guard.
-      // Neutral-zone planets are unowned and refreshed by midnight instead.
-      if (state.userid === null) return;
+      // The GE22e restock is not conditional on the economy having run: both
+      // patch blocks sit at the top level of `plarti`'s loop, after the
+      // `multiply()` gate, and fire for the hub record on every pass.
+      // @see GEMAIN.C:2145-2178
+      const isHub = isNeutralZoneRestockPlanet(state);
 
-      // Delegate to PlanetEconomyService when wired (production); otherwise
-      // fall back to the pure tick formula (legacy unit-test path).
-      const newState = this.economy
-        ? (await this.economy.applyTick(state)).state
-        : applyEconomyTick(state);
-      // Copy mutated fields back
-      Object.assign(state, newState);
+      // Skip unowned planets — matches GEMAIN.C:2132 `plptr->userid[0] != 0` guard.
+      if (state.userid === null && !isHub) return;
+
+      if (state.userid !== null) {
+        // Delegate to PlanetEconomyService when wired (production); otherwise
+        // fall back to the pure tick formula (legacy unit-test path).
+        const newState = this.economy
+          ? (await this.economy.applyTick(state)).state
+          : applyEconomyTick(state);
+        // Copy mutated fields back
+        Object.assign(state, newState);
+      }
+
+      // ...and immediately undo the MAXPL clamp on the two trading posts, as C
+      // does on the same pass. Without this the hub sold MAXPL quantities for
+      // the whole day between midnights — 5 spies, 250 ion cannons, no gold.
+      if (isHub) {
+        Object.assign(state, applyNeutralZoneRestock(state));
+      }
 
       await this.prisma.planet.update({
         where: { xsect_ysect_plnum: { xsect: state.xsect, ysect: state.ysect, plnum: state.plnum } },

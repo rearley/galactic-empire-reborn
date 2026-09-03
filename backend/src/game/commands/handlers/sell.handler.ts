@@ -77,12 +77,16 @@ export class SellHandlerService {
     return {
       lines: [
         {
+          // Canon order is (tax, net, quantity, item) — "After the Transfer Tax
+          // of %s we have netted %s C's for our %s %s, Sir!". The port led with
+          // the quantity, so the tax was printed as the amount received.
+          // @see MBMGEMSG.MSG:4008
           text: formatMessage(
             MessageId.SELL2,
+            Number(result.fee),
+            Number(result.proceeds),
             result.transferred,
             ITEM_NAMES[itemIndex],
-            Number(result.proceeds),
-            Number(result.fee),
           ),
           category: 'success',
         },

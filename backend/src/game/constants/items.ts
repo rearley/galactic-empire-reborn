@@ -5,13 +5,17 @@
  * database, MBMGEMSG.MSG, by `node tools/extract-item-tables.mjs`, and pinned
  * by test/balance/item-tables-canon.balance.spec.ts. They previously carried
  * "@see reference/wiki/items.md" -- a summary page whose numbers are rounded,
- * and wrong: it put the ion cannon planet cap at 500_000 against canon's 250,
- * spies at 10_000 against 5, and gold's cargo weight at 0.5 against 2.
+ * and wrong: it put the ion cannon planet cap at 500_000 against canon's 250
+ * and spies at 10_000 against 5. On gold's cargo weight the wiki was RIGHT and
+ * we were wrong twice over: 0.5 tons per unit, from ITMWT13 {Weight of 100
+ * Gold: 50}. The 2 came from GE/MSG/MBMGEMSG.MSG, an earlier partial snapshot
+ * of the option database that the C source cannot even run against.
  *
- * BASEPRICE is the exception and is NOT canon-derived: `baseprice[i] =
- * numopt(ITMPR01+i,...)` was added at GEMAIN.C:569 AFTER the shipped .MSG was
- * written, so the file contains no ITMPR blocks at all and there is nothing to
- * recover. It stays wiki-sourced, and says so at its own definition.
+ * BASEPRICE used to be the exception, on the belief that ITMPR01+ post-dated
+ * the shipped .MSG. That was an artefact of reading GE/MSG/MBMGEMSG.MSG, an
+ * earlier partial snapshot. The shipped file, GE/REL/MBMGEMSG.MSG, carries all
+ * 25 ITMPR blocks, and they agree with the wiki-sourced table item for item.
+ * BASEPRICE is now canon-derived and pinned like the rest.
  *
  * @see GEMAIN.C:550-570 — the five parallel option families
  * @see GEMAIN.H:141-156
@@ -94,7 +98,7 @@ export const MAXPL: readonly number[] = Object.freeze([
  * 200-per-100 gives 2, making it four times cheaper to haul than it should be.
  */
 export const ITEM_TONS: readonly number[] = Object.freeze([
-  1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 2, 1,
+  1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 0.5, 1,
 ]);
 
 /**

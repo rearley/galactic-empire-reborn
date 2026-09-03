@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = resolve(HERE, '../reference/ge-upstream/mbmgemp/GE/MSG/MBMGEMSG.MSG')
+const SRC = resolve(HERE, '../reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG')
 
 const text = readFileSync(SRC, 'utf8')
 const out = []

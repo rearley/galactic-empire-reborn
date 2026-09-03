@@ -398,6 +398,28 @@ export enum MessageId {
   PRICE_NO_CASH = 'PRICE_NO_CASH',
   BUY7 = 'BUY7',
   BUY8 = 'BUY8',
+  /** @see MBMGEMSG.MSG:3038 BUY9 — the purchase confirmation */
+  BUY9 = 'BUY9',
+  /** @see MBMGEMSG.MSG:1851 KILLEDBY — galaxy-wide kill announcement */
+  KILLEDBY = 'KILLEDBY',
+  /** @see MBMGEMSG.MSG:1955 SPEEDIS — helm answers a speed change */
+  SPEEDIS = 'SPEEDIS',
+  /** @see MBMGEMSG.MSG:1960 SPEED0 — helm answers a full stop */
+  SPEED0 = 'SPEED0',
+  /** @see MBMGEMSG.MSG:3676 NEW7 — Yardmaster fits a shield */
+  NEW7 = 'NEW7',
+  /** @see MBMGEMSG.MSG:3690 NEW10 — Yardmaster fits a phaser */
+  NEW10 = 'NEW10',
+  /** @see MBMGEMSG.MSG:3712 NEW17 — minimum install charge */
+  NEW17 = 'NEW17',
+  /** @see MBMGEMSG.MSG:3716 NEW18 — shield downgrade refund */
+  NEW18 = 'NEW18',
+  /** @see MBMGEMSG.MSG:3720 NEW19 — trade-in credit on the old shield */
+  NEW19 = 'NEW19',
+  /** @see MBMGEMSG.MSG:3726 NEW28 — phaser downgrade refund */
+  NEW28 = 'NEW28',
+  /** @see MBMGEMSG.MSG:3731 NEW29 — trade-in credit on the old phaser */
+  NEW29 = 'NEW29',
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
   MAINT2 = 'MAINT2',
@@ -569,7 +591,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // used to have three placeholders, so the total was dropped and the UNIT
   // price was reported as the amount paid.
   [MessageId.BUY2]: '%d %s purchased at %d cr each — %d credits.',
-  [MessageId.BUY3]: "That would deplete the planet's reserve.",
+  // Canon names the number for sale. The port's old wording blamed the
+  // planet's "reserve" — a mechanic that was zero on every neutral-zone planet
+  // — and left no way to learn from inside the game that the real limit was 5.
+  // @see GECMDS.C:4381-4383, MBMGEMSG.MSG:3018
+  [MessageId.BUY3]: 'They only have %s %s available for sale, Sir!',
   [MessageId.BUY4]: 'Your cargo holds are full.',
   [MessageId.BUY5]: 'This planet is not selling that item.',
   [MessageId.BUYPAS1]: 'Trade password required.',
@@ -583,8 +609,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // sell (feature 005) — GECMDS.C:4103 cmd_sell
   [MessageId.SELLFMT]: 'Use: sell <quantity> <item>',
   [MessageId.SELL1]: 'You can only sell at the galactic market on Zygor-3.',
-  [MessageId.SELL2]: 'Sold %d %s for %d credits (fee %d).',
-  [MessageId.SELL3]: "You don't have that many %s.",
+  // Canon argument order is (tax, net, quantity, item) — the port led with the
+  // net and dropped the tax to a parenthetical. @see MBMGEMSG.MSG:3738
+  [MessageId.SELL2]: "After the Transfer Tax of %s we have netted %s C's for our %s %s, Sir!",
+  // @see MBMGEMSG.MSG:3742
+  [MessageId.SELL3]: "We don't have that many %s Sir!",
 
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
   // Same `where < 10` orbit gate as buy — see BUY1.
@@ -859,10 +888,46 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // pri (feature 014) — GECMDS.C:4284 cmd_price
   [MessageId.PRICEFMT]: 'Usage: price <qty> <item>  e.g. price 50 missiles  (bare: price lists items)',
-  [MessageId.PRICE1]: '%d %s @ %d cr ea = %d cr total',
+  // @see MBMGEMSG.MSG:3042
+  [MessageId.PRICE1]: '%s %s are going to cost %d each for a total of %s, Sir.',
   [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
   [MessageId.BUY7]: 'This planet has no owner.',
-  [MessageId.BUY8]: 'Your cargo hold cannot hold that many.',
+  // @see MBMGEMSG.MSG:3034
+  [MessageId.BUY8]: 'Sorry Sir! That would put us overweight.',
+  // @see MBMGEMSG.MSG:3038
+  [MessageId.BUY9]: '%s %s purchased at the price of %d each for a total of %s, Sir.',
+
+  // Canon names the killer on every death path — the prfmsg sits AFTER the
+  // GESTAT_AUTO branch, so an AI kill is announced exactly like a player one.
+  // @see GEFUNCS.C:1116, MBMGEMSG.MSG:1851
+  [MessageId.KILLEDBY]: "Commander %s's ship was destroyed by %s!!!",
+
+  // Helm answers the throttle. @see MBMGEMSG.MSG:1955, :1960
+  [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %d, Sir!',
+  [MessageId.SPEED0]: 'Helm reports we are at a dead stop, Sir!',
+
+  // Shipyard narration. Canon quotes the trade-in FIRST (NEW19/NEW29) and then
+  // the Yardmaster's fitting report, which is what makes an upgrade priced at
+  // 36,666 rather than 40,000 legible to the player.
+  // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3676,3690,3712,3716,3720,3726,3731
+  [MessageId.NEW19]: 'They will credit us %s for our existing used shield, Sir!',
+  [MessageId.NEW7]:
+    '***\n'
+    + 'The Yardmaster Reports: For the meager sum of %s\n'
+    + 'your ship now has a Mark-%d Shield defense system.',
+  [MessageId.NEW29]: 'They will credit us %s for our existing used phaser, Sir!',
+  [MessageId.NEW10]:
+    '***\n'
+    + 'The Yardmaster Reports: For the meager sum of %s\n'
+    + 'your ship now has a Mark-%d Phaser System.',
+  [MessageId.NEW17]:
+    "The minimum charge of 1000 C's will be charged for installation, Sir!",
+  [MessageId.NEW18]:
+    'There is no charge for the new shield and after deducting a transaction \n'
+    + "fee of %s C's %s has been deposited to your account, Sir.",
+  [MessageId.NEW28]:
+    'There is no charge for the new phaser and after deducting a transaction\n'
+    + "fee of %s C's %s has been deposited to your account, Sir.",
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
   [MessageId.MAINT2]: 'This planet requires a password for maintenance.',
