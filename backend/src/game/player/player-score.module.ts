@@ -3,6 +3,7 @@ import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PlayerScoreService } from './player-score.service';
 import { PlayerScoreRepository } from './player-score.repository';
+import { ShipLossMailService } from './ship-loss-mail.service';
 import { loadMidnightConfig } from '../midnight/midnight.config';
 
 /**
@@ -28,7 +29,8 @@ export const CHGLOSER_PERCENT = 'CHGLOSER_PERCENT' as const;
         new PlayerScoreService(events, repo, pct),
       inject: [EventEmitter2, PlayerScoreRepository, CHGLOSER_PERCENT],
     },
+    ShipLossMailService,
   ],
-  exports: [PlayerScoreService],
+  exports: [PlayerScoreService, ShipLossMailService],
 })
 export class PlayerScoreModule {}

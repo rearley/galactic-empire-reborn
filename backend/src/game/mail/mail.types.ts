@@ -22,6 +22,7 @@ export interface MailListEntry {
     | DistressSignalPayload
     | StarvationPayload
     | RevoltPayload
+    | ShipLossPayload
     | GenericPayload;
 }
 
@@ -73,6 +74,25 @@ export interface RevoltPayload {
   sectorY: number;
   /** Garrison left after the uprising. */
   troopsRemaining: bigint;
+}
+
+/**
+ * A ship destroyed while its captain was logged off.
+ *
+ * PORT-ORIGINAL. Canon has no ship-loss mail because it needs none — `warhupa`
+ * removes a hung-up ship from the universe (GEMAIN.C:1398-1440), so it cannot
+ * be shot. Our persistent world creates the event; the shape follows canon's
+ * own distress mails, which exist to report what happened to your property on
+ * the server's clock rather than yours.
+ *
+ * @see ShipLossMailService
+ */
+export interface ShipLossPayload {
+  kind: 'ship_loss';
+  /** Who destroyed it — a commander, an automaton, or an unknown assailant. */
+  killer: string;
+  sectorX: number;
+  sectorY: number;
 }
 
 export interface GenericPayload {

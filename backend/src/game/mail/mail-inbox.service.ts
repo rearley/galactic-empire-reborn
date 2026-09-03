@@ -11,10 +11,12 @@ import {
   MailListEntry,
   MailListing,
   ProductionReportPayload,
+  ShipLossPayload,
 } from './mail.types';
 import { classLabel } from './mail-render';
 import { MAIL_CLASS_DISTRESS } from '../constants';
 import { MAIL_CLASS_PRODRPT } from '../midnight/midnight.constants';
+import { MESG_SHIPLOSS } from '../player/ship-loss-mail.service';
 
 /**
  * Inbox business logic: listing, index resolution, and delete.
@@ -89,6 +91,7 @@ export class MailInboxService {
     | DistressSignalPayload
     | StarvationPayload
     | RevoltPayload
+    | ShipLossPayload
     | GenericPayload {
     if (row.class === MAIL_CLASS_PRODRPT) {
       return {
@@ -98,6 +101,16 @@ export class MailInboxService {
         debt: row.debt,
         tax: row.tax,
         itemqty: [...row.itemqty],
+      };
+    }
+    if (row.class === MAIL_CLASS_DISTRESS && row.type === MESG_SHIPLOSS) {
+      // Ship lost while the captain was away. name1 carries the killer; the
+      // sector is int1/int2. @see ShipLossMailService
+      return {
+        kind: 'ship_loss',
+        killer: row.name1,
+        sectorX: row.int1,
+        sectorY: row.int2,
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS && row.type === 30) {

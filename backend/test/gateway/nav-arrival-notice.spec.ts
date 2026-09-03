@@ -70,7 +70,12 @@ describe('GameGateway — autopilot arrival reaches the pilot', () => {
     expect(roomEmits[0].room).toBe(`user:${USERID}`);
   });
 
-  it('reminds the pilot the engines are still running', () => {
+  it('tells the pilot the engines have stopped, not to stop them', () => {
+    // The notice used to read "Cut speed with war 0 / imp 0" — an instruction,
+    // because arrival disengaged the helm and left the throttle open. At warp 9
+    // a sector takes 43 seconds to cross, so reading that and then reacting
+    // meant overshooting. The autopilot now answers stop itself.
+    // @see docs/DECISIONS.md — autopilot stops on arrival
     const { gateway, roomEmits } = build();
 
     (gateway as unknown as { handleNavArrived: (e: unknown) => void }).handleNavArrived({
@@ -78,6 +83,7 @@ describe('GameGateway — autopilot arrival reaches the pilot', () => {
     });
 
     const text = (roomEmits[0].payload as { text: string }).text;
-    expect(text).toMatch(/war 0|imp 0|speed/i);
+    expect(text).toMatch(/stop/i);
+    expect(text).not.toMatch(/war 0|imp 0/i);
   });
 });
