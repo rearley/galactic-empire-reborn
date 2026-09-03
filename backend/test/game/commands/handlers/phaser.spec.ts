@@ -400,7 +400,7 @@ describe('pha command semantics (Plan 1 T5)', () => {
       const victim = warpVictimAt(ENGAGEMENT_DIST);
       const h = makeHarness([firer, victim]);
       const res = h.handler.command.handler(firer, ['0', '0'], ctx) as CommandResult;
-      expect(res.lines.some((l) => /hit/i.test(l.text))).toBe(true);
+      expect(res.lines.some((l) => /caused .* damage|deflected/i.test(l.text))).toBe(true);
       expect(getShip(h, victim).damage).toBeGreaterThan(0);
       expect(getShip(h, firer).phasr).toBe(0);
     });

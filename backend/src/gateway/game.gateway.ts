@@ -84,6 +84,7 @@ import {
 } from '../game/planet/planet-attack.service';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
+import { damstr } from '../game/combat/combat-math';
 
 interface SectorPayload {
   x: unknown;
@@ -869,6 +870,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_HIT, enriched);
+
+    // The VICTIM also gets canon's text. C prints PHITYOU when the hull takes
+    // it and PHITDEF when the shields turn it (GECMDS.C:987-996), each with
+    // its own outprfge to the victim's channel. The structured COMBAT_HIT is
+    // our own channel and stays — but a client that renders only text saw
+    // nothing at all, and the two outcomes read identically even to one that
+    // did. damstr renders hull damage as a WORD; a deflection reports a number.
+    const deflected = (event.damageHull ?? 0) <= 0 && (event.damageShield ?? 0) > 0;
+    const attackerLabel = enriched.attackerName ?? 'an unknown assailant';
+    this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
+      category: 'combat',
+      text: deflected
+        ? formatMessage(MessageId.PHITDEF, attackerLabel, Math.round(event.damageShield ?? 0))
+        : formatMessage(MessageId.PHITYOU, attackerLabel, damstr(event.damageHull ?? 0)),
+    });
 
     // Victim may be in a DIFFERENT sector room (cross-sector phaser range), so
     // deliver directly — but only if the sector broadcast did not already
