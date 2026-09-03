@@ -88,7 +88,12 @@ socket.on('scan:render', (p) => renderScan(p));
 let lastContacts = [];
 
 function renderScan(sr) {
-  const cells = sr.grid ?? [];
+  // The payload field is `cells` (command.types.ts:101), not `grid`. Reading the
+  // wrong name rendered every scan as empty — the THIRD variant of this same
+  // mistake in one session: first no subscription to combat.hit, then listening
+  // on command:result instead of the scan:render event, now the wrong field on
+  // the right event. A harness that silently drops output manufactures bugs.
+  const cells = sr.cells ?? sr.grid ?? [];
   if (cells.length) {
     const xs = cells.map((c) => c.x);
     const ys = cells.map((c) => c.y);

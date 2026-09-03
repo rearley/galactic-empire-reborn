@@ -94,6 +94,7 @@ describe('lock → tor @ integration', () => {
     // 2) tor @ — must succeed with the same locked target
     const torRes = torp.command.handler(alice, ['@'], ctx) as CommandResult;
     expect(torRes.lines[0].text).not.toMatch(/No target locked/i);
-    expect(torRes.lines[0].text).toMatch(/Torpedo away/);
+    // Firing drops shields first and says so, so this is no longer lines[0].
+    expect(torRes.lines.some((l) => /Torpedo away/.test(l.text))).toBe(true);
   });
 });

@@ -12,6 +12,7 @@ import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
 import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WARP_THRESHOLD } from '../../constants';
 import { I_TORP } from '../../constants/items';
+import { dropShieldsForFire } from '../../combat/shield-drop';
 
 /**
  * Handles `tor <target>` — locks a torpedo onto a target ship.
@@ -162,17 +163,24 @@ export class TorpedoHandlerService {
       t.ltorpsDistance[slot] = dist;
     });
 
-    // Mutate firer — decrement ammo, drop shields, set battle-lock
+    // Shields drop, and the pilot is TOLD. C calls shielddn at GECMDS.C:1130,
+    // and shielddn prints SHLDDN (GEFUNCS.C:2419-2427). The port dropped them
+    // silently here, so a pilot who fired a torpedo was unshielded without any
+    // indication.
+    const shieldLine = dropShieldsForFire(ship, (fn) =>
+      this.shipState.mutate(ship.userid, ship.shipno, fn));
+
+    // Mutate firer — decrement ammo, set battle-lock.
     // recentlySelfFiredTorp triggers auto-shield raise on next SHIP_UPDATE tick (T024).
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.items[I_TORP] = (s.items[I_TORP] ?? 0n) - 1n;
-      s.shieldstat = 0;
       s.cantexit = FIRETICKS;
       s.recentlySelfFiredTorp = true;
     });
 
     return {
       lines: [
+        ...(shieldLine ? [shieldLine] : []),
         {
           text: `Torpedo away — locked on ${target.shipname}.`,
           category: 'combat',

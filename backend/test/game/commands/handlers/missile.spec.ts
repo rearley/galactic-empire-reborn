@@ -85,12 +85,15 @@ function makeHarness(
 
 const ctx: CommandContext = {};
 
+// NOTE: firing drops the firer's shields FIRST and says so (SHLDDN,
+// GECMDS.C:930/1130/1240 -> GEFUNCS.C:2419-2427), so the weapon's own message
+// is no longer necessarily lines[0]. These assert presence, not position.
 describe('MissileHandlerService — `mis <target> <charge>`', () => {
   it('rejects when ShipClass.hasMissile === false', () => {
     const alice = makeShip({ shpclass: 2 });
     const h = makeHarness([alice], { 2: { hasMissile: false } });
     const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIS_NOMIS));
+    expect(result.lines.some((l) => l.text === formatMessage(MessageId.MIS_NOMIS))).toBe(true);
   });
 
   it('rejects charge < 1 (NUMOOR)', () => {
@@ -111,14 +114,14 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     const alice = makeShip({ jammer: 5 });
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.JAMMER4));
+    expect(result.lines.some((l) => l.text === formatMessage(MessageId.JAMMER4))).toBe(true);
   });
 
   it('rejects when items[I_MISSL] <= 0 (MIS_NOAMMO)', () => {
     const alice = makeShip({ items: itemsWith({ [I_MISSL]: 0n }) });
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIS_NOAMMO));
+    expect(result.lines.some((l) => l.text === formatMessage(MessageId.MIS_NOAMMO))).toBe(true);
   });
 
   it('rejects when target has all MAXMISSL slots occupied (MIS_FULL)', () => {
@@ -133,7 +136,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     });
     const h = makeHarness([alice, bob]);
     const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIS_FULL));
+    expect(result.lines.some((l) => l.text === formatMessage(MessageId.MIS_FULL))).toBe(true);
     expect(MAXMISSL).toBe(3);
   });
 
@@ -173,7 +176,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['Bob', '1000'], ctx) as CommandResult;
-    expect(res.lines[0].text).toMatch(/neutral zone/i);
+    expect(res.lines.some((l) => /neutral zone/i.test(l.text))).toBe(true);
     expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(firer.cantexit).toBe(FIRETICKS);
     // No target lock allocated — firer returned early
@@ -203,7 +206,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
     const h = makeHarness([alice, bob]);
     const result = h.handler.command.handler(alice, ['Bob', '1000'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.FCBROKE));
+    expect(result.lines.some((l) => l.text === formatMessage(MessageId.FCBROKE))).toBe(true);
     expect(bob.lmisslChannel.length).toBe(0);
   });
 

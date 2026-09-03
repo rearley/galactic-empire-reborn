@@ -8,10 +8,16 @@ import { Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit } from '@ne
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
 import { ShipStateService } from './ship-state.service';
-import { ShipState } from './ship-state.types';
+import { ShipState, shipKey } from './ship-state.types';
 import { decideOverspeed, OverspeedRng } from './ship-overspeed';
 import {
   SHIP_OVERSPEED,
+} from './overspeed-events';
+import {
+  SHIP_SHIELD_CHARGE,
+  ShipShieldChargeEvent,
+} from './shield-events';
+import {
   ShipOverspeedEvent,
   overspeedMessage,
 } from './overspeed-events';
@@ -260,12 +266,29 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
         });
       } else if (ship.shieldtype > 0 && ship.shieldtype < 20) {
         const maxCharge = 40 + ship.shieldtype * 10;
+        let reachedFull = false;
+        let charging = false;
+        let percent = 0;
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.energy = Math.max(0, s.energy - s.shieldtype * SHENGUSE);
           if (s.shield < maxCharge) {
             s.shield = Math.min(maxCharge, s.shield + s.shieldtype * 3);
+            if (s.shield >= maxCharge) reachedFull = true;
+            else { charging = true; percent = Math.floor((s.shield * 100) / maxCharge); }
           }
         });
+
+        // C narrates every tick of the climb: SHLDUP on reaching full,
+        // SHLDAT with a percentage otherwise (GEFUNCS.C:2515-2523). The port
+        // charged silently, so a pilot who raised shields and warped fought
+        // believing they were protected while sitting at 0%.
+        if (reachedFull || charging) {
+          this.events?.emit(SHIP_SHIELD_CHARGE, {
+            shipId: shipKey(ship.userid, ship.shipno),
+            kind: reachedFull ? 'full' : 'charging',
+            percent: reachedFull ? 100 : percent,
+          } satisfies ShipShieldChargeEvent);
+        }
       }
     }
 

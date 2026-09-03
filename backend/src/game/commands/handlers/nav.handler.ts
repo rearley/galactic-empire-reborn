@@ -115,20 +115,31 @@ export class NavHandlerService {
         };
       }
 
-      // Already at target?
-      if (Math.floor(ship.xcoord) === xParsed && Math.floor(ship.ycoord) === yParsed) {
-        return {
-          lines: [{ text: formatMessage(MessageId.NAV_ALREADY_THERE), category: 'system' }],
-        };
-      }
+      // NO "already at target" refusal. cmd_navigate (GECMDS.C:5109-5157)
+      // validates only the argument count and the univmax bounds, then returns
+      // a bearing — including to a point inside the sector you are already in.
+      //
+      // The invented refusal was the worst onboarding cliff in the game: every
+      // new player spawns in sector (0,0) and must reach Zygor-3 at its centre
+      // to buy anything, and `nav 0 0` was the natural way to ask which way it
+      // lies. The port answered "Already at target sector." and left them with
+      // no way to find the one planet the whole opening depends on.
 
       // Auto-break orbit into normal flight. `where === 1` is the AT-WARP
       // state — parking a stopped ship there reported "In hyperspace" and left
       // it flagged as warping for the gates that care (the hyper-phaser only
       // reaches victims at `where === 1`, GECMDS.C:1045). `imp` uses 0 for the
       // same transition (GECMDS.C:512 LEAVEORB).
+      //
+      // Canon ANNOUNCES a broken orbit and resets repair progress: both real
+      // orbit-breakers do `prfmsg(LEAVEORB); where = 0; repair = 0;`
+      // (GECMDS.C:511-516 imp, :617-622 war). Leaving orbit silently meant a
+      // pilot could ask for a bearing and lose their orbit without being told.
+      let leftOrbit = false;
       if (ship.where >= 10) {
         ship.where = 0;
+        ship.repair = 0;
+        leftOrbit = true;
       }
 
       // Engage autopilot
@@ -142,8 +153,13 @@ export class NavHandlerService {
       const bearing = calcBearing(ship, tx, ty);
       const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
 
+      const lines: CommandResult['lines'] = [];
+      if (leftOrbit) {
+        lines.push({ text: formatMessage(MessageId.LEAVEORB), category: 'system' });
+      }
       return {
         lines: [
+          ...lines,
           {
             text: formatMessage(MessageId.NAV01, xParsed, yParsed, bearing, dist),
             category: 'success',
