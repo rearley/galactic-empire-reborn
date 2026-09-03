@@ -122,13 +122,20 @@ export class DroidSpawner {
       ycoord,
       damage: 0,
       energy: 50_000,
-      phasr: phasrtype, // start fully charged
+      // initshp gives every new hull a FULL phaser bank and no shield charge
+      // (GEFUNCS.C:222, :232); GEDROIDS.C:127,142-143 overrides only the TYPE
+      // fields. Seeding phasr from phasrtype left a fresh droid at 1-5 against
+      // PMINFIRE 60, so it could not fire for ~36 seconds after spawning, and
+      // seeding shield from shieldtype started it part-charged.
+      // cybertron.repository.ts already used 100; the droid spawner was the
+      // outlier.
+      phasr: 100,
       phasrtype,
       kills: 0,
       lastfired: -1,
       shieldtype,
       shieldstat: 0,
-      shield: shieldtype,
+      shield: 0,
       cloak: 0,
       degrees: 0,
       percent: 0,

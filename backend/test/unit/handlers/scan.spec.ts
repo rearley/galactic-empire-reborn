@@ -303,69 +303,52 @@ function makeWormhole(overrides: Partial<{
   };
 }
 
-// T022 — planet/wormhole projection in scan lo
-describe('T022 — scan lo: planet/wormhole projection (RED until T027+T029)', () => {
-  describe('planet-only sector', () => {
-    it('planet in range appears in scanGrid with type "planet" and char "O"', async () => {
-      const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
-      const { service } = makeServiceWithGalaxy(
-        [],
-        { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
-      );
-      await service.onModuleInit();
-      const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
-      const planetCell = result.scanRender!.cells.find(c => c.type === 'planet');
-      expect(planetCell).toBeDefined();
-      expect(planetCell!.char).toBe("P");
-    });
+// T022 — `sca lo` projects SHIPS ONLY
+describe('T022 — sca lo projects ships only, never planets', () => {
+  // `scan_lo`'s only projection loop is over ships (GECMDS.C:2686), and
+  // `map_planets()` is called exactly once in the entire source — at
+  // GECMDS.C:2634, inside `scan_se`, four lines before scan_lo begins.
+  //
+  // These cases previously asserted the opposite. In our galaxy that put
+  // roughly two thousand planet cells onto a 450-cell grid: a solid wall with
+  // the ship markers and the '*' self-cell buried inside it. `sca lo` is the
+  // first thing the welcome text tells a new player to type.
+
+  it('omits planets entirely', async () => {
+    const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
+    const { service } = makeServiceWithGalaxy(
+      [],
+      { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
+    );
+    await service.onModuleInit();
+    const ship = makeShip({ xcoord: 0, ycoord: 0 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.scanRender!.cells.some(c => c.type === 'planet')).toBe(false);
   });
 
-  describe('wormhole-only sector', () => {
-    it('visible wormhole (visible=1) in range appears with type "wormhole" and char "W"', async () => {
-      const wormhole = makeWormhole({ xcoord: 0.2, ycoord: 0.2, visible: 1 });
-      const { service } = makeServiceWithGalaxy(
-        [],
-        { getSectorPlanets: jest.fn().mockReturnValue([]), getSectorWormholes: jest.fn().mockReturnValue([wormhole]) },
-      );
-      await service.onModuleInit();
-      const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
-      const wormholeCell = result.scanRender!.cells.find(c => c.type === 'wormhole');
-      expect(wormholeCell).toBeDefined();
-      expect(wormholeCell!.char).toBe('W');
-    });
+  it('omits wormholes entirely, visible or not', async () => {
+    const wormhole = makeWormhole({ xcoord: 0.2, ycoord: 0.2, visible: 1 });
+    const { service } = makeServiceWithGalaxy(
+      [],
+      { getSectorPlanets: jest.fn().mockReturnValue([]), getSectorWormholes: jest.fn().mockReturnValue([wormhole]) },
+    );
+    await service.onModuleInit();
+    const ship = makeShip({ xcoord: 0, ycoord: 0 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.scanRender!.cells.some(c => c.type === 'wormhole')).toBe(false);
   });
 
-  describe('planet + ship + self', () => {
-    it('scanGrid contains planet, ship, and self cells simultaneously', async () => {
-      const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
-      const playerShip = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
-      const otherShip = makeShip({ userid: 'u2', shipno: 2, xcoord: 0.1, ycoord: 0, status: 0 });
-      const { service } = makeServiceWithGalaxy(
-        [playerShip, otherShip],
-        { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
-      );
-      await service.onModuleInit();
-      const result = await (service.command.handler(playerShip, ['lo'], {}) as Promise<CommandResult>);
-      expect(result.scanRender!.cells.some(c => c.type === 'planet')).toBe(true);
-      expect(result.scanRender!.cells.some(c => c.type === 'ship')).toBe(true);
-      expect(result.scanRender!.cells.some(c => c.type === 'self')).toBe(true);
-    });
-  });
-
-  describe('hidden wormhole (visible=0)', () => {
-    it('wormhole with visible=0 is omitted from scanGrid', async () => {
-      const wormhole = makeWormhole({ xcoord: 0.2, ycoord: 0.2, visible: 0 });
-      const { service } = makeServiceWithGalaxy(
-        [],
-        { getSectorPlanets: jest.fn().mockReturnValue([]), getSectorWormholes: jest.fn().mockReturnValue([wormhole]) },
-      );
-      await service.onModuleInit();
-      const ship = makeShip({ xcoord: 0, ycoord: 0 });
-      const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
-      expect(result.scanRender!.cells.some(c => c.type === 'wormhole')).toBe(false);
-    });
+  it('still shows ships and the self-cell', async () => {
+    // The grid is not empty — it carries exactly what canon puts there.
+    const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
+    const { service } = makeServiceWithGalaxy(
+      [],
+      { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
+    );
+    await service.onModuleInit();
+    const ship = makeShip({ xcoord: 0, ycoord: 0 });
+    const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    expect(result.scanRender!.cells.some(c => c.type === 'self')).toBe(true);
   });
 });
 

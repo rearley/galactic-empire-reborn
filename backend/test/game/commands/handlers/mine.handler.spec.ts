@@ -122,7 +122,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, ['0'], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
     expect(h.repo.create).not.toHaveBeenCalled();
   });
 
@@ -130,7 +130,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, ['51'], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
     expect(h.repo.create).not.toHaveBeenCalled();
   });
 

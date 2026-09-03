@@ -283,7 +283,7 @@ describe('command round-trip integration (US1)', () => {
   });
 
   // T024: scan lo with GalaxyService mock returns planet and wormhole cells
-  it('scan lo with galaxy returns planet and wormhole cells', async () => {
+  it('scan lo round-trips to the client, carrying ships and self only', async () => {
     process.env.GALAXY_SEED = '12648430';
 
     // Mock GalaxyService returning one planet and one wormhole in sector (0,0)
@@ -410,15 +410,13 @@ describe('command round-trip integration (US1)', () => {
       expect(scanEvent.cells).toBeDefined();
       expect(Array.isArray(scanEvent.cells)).toBe(true);
 
-      // Planet cell uses char 'P' (was 'O' in an earlier version of the renderer).
-      const planetCells = scanEvent.cells.filter((c) => c.type === 'planet');
-      expect(planetCells.length).toBeGreaterThan(0);
-      expect(planetCells[0].char).toBe('P');
-
-      // T024: assert at least one wormhole cell with char 'W'
-      const wormholeCells = scanEvent.cells.filter((c) => c.type === 'wormhole');
-      expect(wormholeCells.length).toBeGreaterThan(0);
-      expect(wormholeCells[0].char).toBe('W');
+      // `sca lo` carries SHIPS ONLY. scan_lo's sole projection loop is over
+      // ships (GECMDS.C:2686); map_planets() is called once in the whole
+      // source, inside scan_se (:2634). This round-trip asserts the payload
+      // reaches the client intact, not that it contains planets.
+      expect(scanEvent.cells.some((c) => c.type === 'planet')).toBe(false);
+      expect(scanEvent.cells.some((c) => c.type === 'wormhole')).toBe(false);
+      expect(scanEvent.cells.some((c) => c.type === 'self')).toBe(true);
     } finally {
       client.disconnect();
       await galaxyApp.close();

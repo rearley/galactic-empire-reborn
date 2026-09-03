@@ -430,7 +430,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.WARPSPD2]: 'Your warp drive is offline.',
   [MessageId.WARPFMT]: 'Usage: warp <speed> [course]',
   [MessageId.WARP02]: 'Speed cannot be negative.',
-  [MessageId.WARP03]: 'Speed exceeds maximum allowed by 50%.',
+  // MBMGEMSG.MSG:1910 WARP03, verbatim.
+  [MessageId.WARP03]: 'If we pushed her that fast commander the warp engines would explode!',
   [MessageId.WARP04]: 'Warning: speed exceeds rated maximum of warp %d.',
 
   // rotate — GECMDS.C:643
@@ -510,10 +511,14 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN_BEACON]: '%s broadcasts: "%s"',
 
   // orbit (feature 005) — GECMDS.C:758 cmd_orbit
-  [MessageId.ORBIT01]: 'Now in orbit around %s.',
+  // MBMGEMSG.MSG:2570 ORBIT1 carries the plnum AND the name — the number is
+  // what the player types into `sca pl <n>` and `tra`.
+  [MessageId.ORBIT01]: 'Now in orbit around planet %d, %s.',
   [MessageId.ORBITALR]: 'You are already in orbit.',
   // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
-  [MessageId.ORBIT_TOO_FAR]: 'You are too far away to enter orbit. Close on the planet first.',
+  // MBMGEMSG.MSG ORBIT2, verbatim. Canon gives no distance and we do not add
+  // one: the gravity warnings are how a pilot learns the range in situ.
+  [MessageId.ORBIT_TOO_FAR]: 'We must be much closer to establish an orbit Sir!',
   // Not in C — cmd_abandon releases the colony on the spot. Three letters
   // separated a developed colony from oblivion, with `aba`/`abo` adjacent in
   // the same command set. @see docs/DECISIONS.md
@@ -600,7 +605,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
   [MessageId.PHA_FMT]: 'Format: pha <degree -180..180> [focus 0-5]',
   [MessageId.PHA_CLOAK]: 'Cannot fire while cloaked.',
-  [MessageId.WPN_ZAP]: 'You fired inside the neutral zone! Your own weapons backfire!',
+  // MBMGEMSG.MSG:3540 ZAPHIM1, verbatim. The paraphrase dropped the Enforcer
+  // Planet, which is the ONLY in-game explanation of why the neutral zone is
+  // enforced at all — a new player otherwise has no idea what just shot them.
+  [MessageId.WPN_ZAP]:
+    'Sssssssssss.... ZAPP!!!!!\n\n'
+    + 'You are instantly blinded by an intense beam from the Enforcer Planet.',
   [MessageId.HP_NOPOW]: 'Insufficient flux energy for hyper-phaser.',
   [MessageId.HP_WAIT]: 'Hyper-phaser recharging — stand by.',
 
@@ -852,7 +862,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
-  [MessageId.NUMOOR]: 'Number out of range (%d-%d).',
+  // MBMGEMSG.MSG:1819 NUMOOR, verbatim. The paraphrase rendered a negative
+  // lower bound as "(-180-180)", which reads as a single negative number.
+  [MessageId.NUMOOR]: 'Please enter a number in the range from %d to %d.',
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
   // Blank line — GECMDS.C:282-284 warnop()
   [MessageId.FORHELP]: "Type 'help' for a list of commands.",
