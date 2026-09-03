@@ -16,6 +16,7 @@ import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { Random } from '../../../src/game/combat/random.port';
 import { I_MEN, I_TROOPS, NUMITEMS } from '../../../src/game/constants/items';
 import { MAIL_CLASS_DISTRESS } from '../../../src/game/constants';
+import { FREE_PLANET_OWNER } from '../../../src/game/planet/planet-economy';
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
   const items = Array.from({ length: NUMITEMS }, () => ({
@@ -77,7 +78,12 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     const { state: next, revolted } = await svc.applyTick(planet);
 
     expect(revolted).toBe(true);
-    expect(next.userid).toBeNull();
+    // "**Free**", not null. C writes the sentinel (GEPLANET.C:377) so the
+    // planet stays economically alive: the economy gate is `userid[0] != 0`
+    // (GEMAIN.C:2129), which the sentinel passes. Writing null froze a revolted
+    // colony forever — population never grew, never starved, and it could never
+    // recover or become worth reclaiming.
+    expect(next.userid).toBe(FREE_PLANET_OWNER);
     // applyEconomyTick may run starvation/production first — but with rate=0
     // and food=1000, troops/100 = 10 < food (1000), so no starvation. Troops
     // remain 1000 going into the revolt branch, then get divided by 2.
@@ -133,6 +139,9 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
 
     const { state: next, revolted } = await svc.applyTick(planet);
     expect(revolted).toBe(false);
+    // A NEVER-CLAIMED planet stays null. The "**Free**" sentinel marks a planet
+    // that revolted and is now ownerless-but-alive; the two are distinct, and
+    // only the revolt path writes it.
     expect(next.userid).toBeNull();
     expect(mailCreate).not.toHaveBeenCalled();
   });

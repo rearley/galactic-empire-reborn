@@ -155,6 +155,19 @@ export class PhysicsTickService implements OnModuleInit {
       });
     }
 
+    // Rotation runs ALWAYS, orbit included. `warrti2a` calls
+    // rotateship/accel/moveship/destruct with no orbit test (GEMAIN.C:2476-2483),
+    // and rotateship itself contains no reference to `where` at all
+    // (GEFUNCS.C:433-461) — the `where` gate lives only in moveship (:641, :652).
+    //
+    // Gating rotation on `where < 10` meant a ship in orbit was told "Now
+    // turning to N degrees" and then simply did not turn: the heading only
+    // applied once the pilot broke orbit. And because `rep nav` correctly omits
+    // heading while orbiting (GECMDS.C:1984-1988), there was no way to see the
+    // deferral — every `sca pl` bearing taken in orbit was measured against a
+    // stale heading.
+    this.applyRotation(ship);
+
     const inOrbitOrDocked = ship.where >= 10;
 
     if (!inOrbitOrDocked) {
@@ -168,17 +181,23 @@ export class PhysicsTickService implements OnModuleInit {
     });
   }
 
-  /** rotate → accel → move → maintenance, only when not in orbit/docked. */
-  private runConditionalBlock(ship: ShipState, ctx: TickContext): void {
+  /**
+   * Rotation — unconditional, orbit included. @see GEFUNCS.C:433-461 rotateship
+   * Tick does not debit rotation energy; that is paid by the `rotate` command.
+   */
+  private applyRotation(ship: ShipState): void {
     const maxAccel = this.shipClassCache.getMaxAcceleration(ship.shpclass);
-
-    // 1. Rotation (US2). Tick does not debit rotation energy — that's paid by `rotate`.
     const rot = rotationStep(ship.heading, ship.head2b, maxAccel);
     if (rot.newHeading !== ship.heading) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.heading = rot.newHeading;
       });
     }
+  }
+
+  /** accel → move → maintenance, only when not in orbit/docked. */
+  private runConditionalBlock(ship: ShipState, ctx: TickContext): void {
+    const maxAccel = this.shipClassCache.getMaxAcceleration(ship.shpclass);
 
     // 2. Acceleration (US1).
     const accel = accelerationStep(ship.speed, ship.speed2b, maxAccel);

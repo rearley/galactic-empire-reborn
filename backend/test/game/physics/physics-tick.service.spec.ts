@@ -155,7 +155,14 @@ describe('PhysicsTickService', () => {
       expect(ship.xcoord).toBeGreaterThan(5.0);
     });
 
-    it('ship in orbit (where>=10) skips rotate/accel/move/maintenance', () => {
+    it('ship in orbit (where>=10) skips accel/move/maintenance but STILL ROTATES', () => {
+      // `warrti2a` calls rotateship/accel/moveship/destruct with no orbit test
+      // (GEMAIN.C:2476-2483), and rotateship contains no reference to `where`
+      // at all (GEFUNCS.C:433-461) — the gate lives only in moveship (:641,
+      // :652). Gating rotation too meant an orbiting pilot was told "Now
+      // turning to N degrees" and simply did not turn, with no way to see it:
+      // `rep nav` correctly omits heading while orbiting (GECMDS.C:1984-1988),
+      // so every `sca pl` bearing taken in orbit used a stale heading.
       const ship = makeShip({
         where: 13, xcoord: 5.0, ycoord: 5.0, heading: 0, head2b: 90,
         speed: 1000, speed2b: 1000, energy: 50000, status: 1,
@@ -166,8 +173,8 @@ describe('PhysicsTickService', () => {
       expect(ship.xcoord).toBe(5.0);
       expect(ship.ycoord).toBe(5.0);
       expect(ship.speed).toBe(1000);
-      expect(ship.heading).toBe(0);
       expect(ship.energy).toBe(50000);
+      expect(ship.heading).not.toBe(0); // turning toward head2b
     });
 
     it('MOVENGMIN floor cutoff forces speed2b = 0 and the ship coasts down', () => {
@@ -211,11 +218,14 @@ describe('PhysicsTickService', () => {
       expect(ship.heading).toBe(10);
     });
 
-    it('orbit ship does not rotate', () => {
-      const ship = makeShip({ where: 12, heading: 0, head2b: 180, shpclass: 1 });
-      const h = makeHarness([ship], [{ classNumber: 1, maxAcceleration: 1000, maxWarp: 10 }]);
+    it('a ship in orbit rotates, exactly as one in open space does', () => {
+      // @see GEFUNCS.C:433-461 — rotateship has no `where` test.
+      const orbiting = makeShip({ where: 12, heading: 0, head2b: 180, shpclass: 1 });
+      const free = makeShip({ userid: 'b', where: 0, heading: 0, head2b: 180, shpclass: 1 });
+      const h = makeHarness([orbiting, free], [{ classNumber: 1, maxAcceleration: 1000, maxWarp: 10 }]);
       h.fire();
-      expect(ship.heading).toBe(0);
+      expect(orbiting.heading).not.toBe(0);
+      expect(orbiting.heading).toBe(free.heading);
     });
   });
 

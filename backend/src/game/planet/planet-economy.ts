@@ -30,8 +30,33 @@ export interface StarvationLosses {
  *
  * @see GEMAIN.C:2132
  */
+/**
+ * A planet whose population has revolted. C writes this into the owner field
+ * (`strcpy(plptr->userid,"**Free**")`, GEPLANET.C:377) rather than clearing it,
+ * so the planet keeps running: the economy gate is `userid[0] != 0`
+ * (GEMAIN.C:2129) and "**Free**" passes it.
+ *
+ * The port wrote null, which fails that gate — a revolted colony's economy
+ * froze permanently, its population never grew, never starved, and it could
+ * never recover or become worth reclaiming. It simply stopped existing as a
+ * place while remaining on the map.
+ */
+export const FREE_PLANET_OWNER = '**Free**';
+
+/** True when this planet has ever been claimed, revolted or not. */
+export function isOwnedOrFree(state: PlanetState): boolean {
+  return state.userid !== null && state.userid !== '';
+}
+
+/** True when a real player owns it — the gate for TAX and revolt, not economy. */
+export function hasRealOwner(state: PlanetState): boolean {
+  return isOwnedOrFree(state) && state.userid !== FREE_PLANET_OWNER;
+}
+
 export function shouldRunEconomy(state: PlanetState): boolean {
-  return state.userid !== null && Number(state.items[I_MEN].qty) > 0;
+  // Population and production keep running on a free planet; only tax and the
+  // revolt check need a real owner. @see GEPLANET.C:341, GEMAIN.C:2129
+  return isOwnedOrFree(state) && Number(state.items[I_MEN].qty) > 0;
 }
 
 export function applyEconomyTick(state: PlanetState): PlanetState {
@@ -144,7 +169,12 @@ export function applyEconomyTickWithLosses(state: PlanetState): { state: PlanetS
   }
 
   // Population tax levy — also on the grown figure. @see GEPLANET.C:335-338
-  tax += BigInt(Math.floor((state.taxrate / 1200) * Number(items[I_MEN].qty)));
+  // Tax accrues only for a REAL owner. A revolted planet keeps producing and
+  // feeding its people, but there is nobody left to collect from it.
+  // @see GEPLANET.C:341 — the tax branch is inside the owner test
+  if (hasRealOwner(state)) {
+    tax += BigInt(Math.floor((state.taxrate / 1200) * Number(items[I_MEN].qty)));
+  }
 
   // Revolt and check_spy deferred to feature 006 (research Decision 6)
 
