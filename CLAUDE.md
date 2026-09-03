@@ -72,23 +72,38 @@ Two types — both driven entirely by the server tick, no client involvement:
   Classes 31 (Lydorian Garbage Scow), 32 (Murdonian Transport) and 33 (Vakory
   Survey Drone). See `GEDROIDS.C`.
 
-  **The starter target is the SCOW, not the Murdonian.** This file previously
+  **The starter target is the VAKORY DRONE (33) — not the Scow, and certainly
+  not the Murdonian.** This file has now been wrong about this twice. It first
   called the Murdonian "a heavily armed freighter that serves as a PvE target
-  for new players", and the canon arithmetic says otherwise. Phaser damage is
-  divided by `1.0 + max_tons/TONFACT` with `TONFACT 15000` (GECMDS.C:962-969,
-  GEMAIN.H:102):
+  for new players"; it was then corrected to the Scow, on arithmetic computed
+  with `PFIRDST` 7 — a value taken from the stale `GE/MSG/` copy of the option
+  database. The shipped value is 5, and the answer moves again.
 
-  | | tons | divisor | phaser |
+  Phaser damage is divided by `1.0 + max_tons/TONFACT`, `TONFACT 15000`
+  (GECMDS.C:962-969, GEMAIN.H:102), and shields absorb it whole
+  (GECMDS.C:986-997 never touches `wptr->damage` in the SHIELDUP branch). What
+  decides a fight is therefore whether one shot strips more shield than the
+  target regenerates before your bank is hot again — `shieldchg` puts back
+  `shieldtype*3` per tick (GEFUNCS.C:2510) while `preload` is
+  `phasrtype * PRELOAD` (GEFUNCS.C:1031), so a Mark-1 fires every 36s and a
+  Mark-2 every 18s.
+
+  At point-blank range, focus 1, against a Mark-1 shield:
+
+  | target | tons | stock Mark-1 | with a Mark-2 |
   |---|---|---|---|
-  | Interceptor (starter) | 1,000 | 1.07 | Mark 1 |
-  | Lydorian Scow (31) | 10,000 | 1.67 | Mark 1 |
-  | Murdonian (32) | 30,000 | **3.00** | **Mark 5** |
+  | Vakory Survey Drone (33) | 100 | strips 22 vs 18 regen — **wins** | — |
+  | Lydorian Scow (31) | 10,000 | 12 vs 18 — **can never get through** | 19 vs 9 — wins |
+  | Murdonian Transport (32) | 30,000 | 6 vs 18 — hopeless | wins on shields, still out-gunned 5:1 |
 
-  A Murdonian is ~2.8x tougher on tonnage alone and out-guns a starter 5:1 —
-  roughly 4-5x net, confirmed in playtest. Worse, shields fully deflect phaser
-  damage (GECMDS.C:986-997 never touches `wptr->damage` in the SHIELDUP
-  branch), so an under-gunned attacker is in a regen stalemate, not a slow win.
-  Point new pilots at the Scow.
+  So a *stock* Interceptor cannot beat a Scow at any range or cadence, and the
+  Vakory is the only thing it can actually kill. One phaser upgrade (list
+  10,000, ~6,666 after trade-in) opens the Scow up. `hel combat` says all of
+  this in-world, without the table.
+
+  Recompute this section from the code if `PFIRDST`, `PRELOAD`, `TONFACT` or the
+  shield constants ever move — it has been wrong every time someone reasoned
+  about it from memory.
 
 ### WebSocket / Real-time
 
