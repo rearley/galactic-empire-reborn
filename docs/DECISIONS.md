@@ -2023,3 +2023,78 @@ fixed, not reproduced.
 
 **Alternatives rejected:** Reproducing it faithfully and hinting at the escape in
 the message — that documents a bug rather than fixing it.
+
+## 2026-09-03 — Ship-loss mail, and the autopilot answers stop
+
+Three questions the playtest raised that canon could not settle directly. Each
+was decided from what the surrounding code shows the original INTENDED, not
+from preference.
+
+### Ship-loss mail — implemented
+
+**Context:** A ship destroyed while its captain is logged off leaves no trace
+they can ever see. There is no canon to violate: `warhupa` sets
+`status = GESTAT_AVAIL` on hangup (GEMAIN.C:1398-1440), so a hung-up ship is not
+in the universe and cannot be shot. Our 24/7 persistent world creates the event.
+Every shipped mail type (MESG02-MESG20, MESG30) is a planet event; there is no
+ship-loss message because canon never needs one.
+
+**Decision:** Mail the victim, following the established distress-mail shape.
+Type 40, numbered outside canon's range so it can never collide.
+
+**Reason:** Canon does not say what to do about ship loss, but it says clearly
+what mail is FOR. Every distress message has the same form — *"Distress message
+from %s in Sector %d %d, <what happened>"* — covering a planet attacked
+(MESG02), starving (MESG06/07) or in revolt (MESG30). All report something that
+happened to your property on the server's clock rather than yours. A ship lost
+while you were away is exactly that shape, so this applies an existing mechanism
+rather than inventing one.
+
+**Alternatives rejected:** Removing logged-off ships from the universe per
+`warhupa` — faithful, but it contradicts the persistent world, which is a
+deliberate and documented deviation. Doing nothing — the event is invisible, and
+a player who returns to a missing ship has no way to learn what happened.
+
+### Droids near the neutral zone — no change
+
+**Context:** A playtest colonist lost four hulls in 75 minutes to droids while
+shuttling near the neutral zone, raising the question of whether the starter
+zone should be protected.
+
+**Decision:** Change nothing.
+
+**Reason:** Canon places them there deliberately. Droid spawn placement is
+clamped in a large galaxy — `xcoord = rndm(39.9) - 19.8` (GEDROIDS.C:131-140) —
+so at our UNIVMAX of 100 droids appear only within about twenty sectors of the
+origin. Cybertrons get no such clamp (`rndm(univmax*2) - univmax`,
+GECYBS.C:158) and scatter galaxy-wide. That is a designed split: droids are the
+accessible PvE content, placed where the players are, and Cybertrons are the
+roaming threat. Droids in the starter zone are the intended prey.
+
+The deaths had two other causes, both since fixed: the pilot could not read the
+fight (shield charge and drop were silent), and our own documentation pointed
+new players at the Murdonian when the tonnage arithmetic says Scow.
+
+**Alternatives rejected:** Keeping droids out of sectors adjacent to the
+neutral zone, or having them ignore zero-kill class-1 hulls — both would delete
+the new-player content canon went out of its way to position.
+
+### Autopilot stops on arrival — changed
+
+**Context:** `nav` reached its target, disengaged the helm and left the throttle
+open, so the ship sailed through its destination.
+
+**Decision:** Cut the engines on arrival (`speed2b = 0`).
+
+**Reason:** No canon precedent exists — `nav` in the original is a read-only
+bearing report (GECMDS.C:5109-5157), and `holdcourse`, whose field we borrowed,
+is AI-only and means "hold this heading for N ticks, then re-decide"
+(GECYBS.C:318, GEDROIDS.C:328). The deciding evidence was our own arrival
+message: *"Cut speed with war 0 / imp 0"* — whoever wrote it knew the ship kept
+flying and pushed the problem onto the pilot. At warp 9 a sector takes 43
+seconds to cross, so reading the notice and then reacting means overshooting. An
+autopilot exists to remove exactly that work.
+
+**Alternatives rejected:** Leaving it, on the argument that arriving under power
+is closer to flying manually. That is sophistry: the feature already removes the
+steering, and stopping is the part that matters at speed.

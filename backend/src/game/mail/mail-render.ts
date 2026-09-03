@@ -12,6 +12,7 @@ import {
   ProductionReportPayload,
   StarvationPayload,
   RevoltPayload,
+  ShipLossPayload,
 } from './mail.types';
 
 /** Returns the display label for a MailStat class value. */
@@ -41,7 +42,14 @@ export function formatDetail(entry: MailListEntry): string[] {
     `Date:   ${entry.date}`,
   ];
 
-  if (entry.payload.kind === 'revolt') {
+  if (entry.payload.kind === 'ship_loss') {
+    const p = entry.payload as ShipLossPayload;
+    lines.push(`Sector:   (${p.sectorX}, ${p.sectorY})`);
+    lines.push(
+      `Distress beacon recovered: your ship was destroyed by ${p.killer}. `
+      + 'You were not aboard to answer.',
+    );
+  } else if (entry.payload.kind === 'revolt') {
     const p = entry.payload as RevoltPayload;
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
     lines.push(

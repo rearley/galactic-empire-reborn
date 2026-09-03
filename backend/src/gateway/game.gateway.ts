@@ -1088,7 +1088,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleNavArrived(event: { userid: string; shipno: number; x: number; y: number }): void {
     this.server.to(`user:${event.userid}`).emit('event.log', {
       category: 'nav',
-      text: `Arrived at sector (${event.x}, ${event.y}) — autopilot disengaged. Cut speed with war 0 / imp 0.`,
+      text: `Arrived at sector (${event.x}, ${event.y}) — autopilot disengaged, engines answering stop.`,
     });
   }
 

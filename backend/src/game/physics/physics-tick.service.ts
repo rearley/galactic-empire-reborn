@@ -129,6 +129,21 @@ export class PhysicsTickService implements OnModuleInit {
           s.holdcourse = 0;
           s.navTargetX = null;
           s.navTargetY = null;
+          // ...and CUT THE ENGINES. Arrival used to disengage the helm and
+          // leave the throttle open, so a ship reached its destination and
+          // sailed straight through it. At warp 9 a sector takes 43 seconds to
+          // cross, so "read the arrival notice, then react" means overshooting.
+          //
+          // PORT-ORIGINAL either way: canon's `nav` is a read-only bearing
+          // report (GECMDS.C:5109-5157) and `holdcourse` is an AI-only field
+          // meaning "hold this heading for N ticks, then re-decide"
+          // (GECYBS.C:318, GEDROIDS.C:328) — it never means "arrive". With no
+          // precedent to follow, the deciding evidence was our own arrival
+          // message, which told the player to "cut speed with war 0 / imp 0":
+          // whoever wrote it knew the ship kept flying and pushed the problem
+          // onto the pilot. An autopilot exists to remove that work.
+          // @see docs/DECISIONS.md — autopilot stops on arrival
+          s.speed2b = 0;
           s.dirty = true;
         });
         this.events.emit('physics.nav-arrived', {
