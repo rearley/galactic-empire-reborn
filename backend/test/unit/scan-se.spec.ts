@@ -8,7 +8,7 @@
  *   SE-006: collision precedence self > ship > planet > mine (data-model invariant)
  *
  * T023 — Failure-mode tests for `sca se`.
- *   FE-001: `sca se` while not in flight (where >= 10) returns system line, no scanRender
+ *   FE-001: `sca se` while not in flight (where >= 10) still renders a scan
  *
  * T025 — Letter-stickiness across `sca ra` → `sca se` (shared scantab).
  *   ST-001: letter assigned in `sca ra` is preserved in follow-up `sca se`
@@ -354,26 +354,29 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
 
 // ── T023: FE-001 — failure when not in flight ─────────────────────────────────
 
-describe('T023 FE-001 — sca se: failure when not in flight (where >= 10)', () => {
-  test('where=10 (in orbit): returns system line, no scanRender', async () => {
+// Canon has NO not-in-flight gate on the grid scans: scan_ra
+// (GECMDS.C:2484), scan_se (:2580) and scan_lo (:2640) test `where`
+// nowhere. The only scan-side `where` test is scan_hy at :2737, inside
+// `#ifdef NOTHING` — dead code. The port's gate cited three spec documents
+// and no C line, and orbit is exactly where a pilot parks for minutes
+// running `pri`, `new ship` and `buy`.
+describe('T023 FE-001 — sca se: grid scans work in orbit and docked (where >= 10)', () => {
+  test('where=10 (in orbit): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, where: 10 });
     const { service } = makeService([self]);
     await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
-    expect(result.scanRender).toBeUndefined();
-    expect(result.lines).toHaveLength(1);
-    expect(result.lines[0].category).toBe('system');
+    expect(result.scanRender).toBeDefined();
   });
 
-  test('where=15 (docked): returns system line, no scanRender', async () => {
+  test('where=15 (docked): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, where: 15 });
     const { service } = makeService([self]);
     await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
-    expect(result.scanRender).toBeUndefined();
-    expect(result.lines[0].category).toBe('system');
+    expect(result.scanRender).toBeDefined();
   });
 
   test('where=0 (in flight): succeeds and has scanRender', async () => {

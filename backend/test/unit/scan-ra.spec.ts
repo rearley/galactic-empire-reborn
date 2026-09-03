@@ -303,26 +303,29 @@ describe('T017 — sca ra unit: SC-002 projection accuracy across all 9 zoom lev
 
 // ── T018: failure-mode — not in flight (where >= 10) ─────────────────────────
 
-describe('T018 — sca ra: failure when not in flight', () => {
-  test('where=10 (in orbit): returns system error, no scanRender', async () => {
+// Canon has NO not-in-flight gate on the grid scans: scan_ra
+// (GECMDS.C:2484), scan_se (:2580) and scan_lo (:2640) test `where`
+// nowhere. The only scan-side `where` test is scan_hy at :2737, inside
+// `#ifdef NOTHING` — dead code. The port's gate cited three spec documents
+// and no C line, and orbit is exactly where a pilot parks for minutes
+// running `pri`, `new ship` and `buy`.
+describe('T018 — sca ra: grid scans work in orbit and docked', () => {
+  test('where=10 (in orbit): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, where: 10 });
     const { service } = makeService([self]);
     await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
-    expect(result.scanRender).toBeUndefined();
-    expect(result.lines).toHaveLength(1);
-    expect(result.lines[0].category).toBe('system');
+    expect(result.scanRender).toBeDefined();
   });
 
-  test('where=15 (docked): returns system error, no scanRender', async () => {
+  test('where=15 (docked): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, where: 15 });
     const { service } = makeService([self]);
     await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
-    expect(result.scanRender).toBeUndefined();
-    expect(result.lines[0].category).toBe('system');
+    expect(result.scanRender).toBeDefined();
   });
 
   test('where=0 (in flight): succeeds and has scanRender', async () => {

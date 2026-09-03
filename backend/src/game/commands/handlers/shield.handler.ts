@@ -66,6 +66,12 @@ export class ShieldHandlerService {
 
     ship.shieldstat = 1;
     ship.dirty = true;
-    return { lines: [{ text: formatMessage(MessageId.SHI_UP), category: 'success' }] };
+    // SHLDCHP, not "Shields up." Canon's shieldup() is three statements and
+    // its only output is `prfmsg(SHLDCHP)` = "Shields energizing, Sir!"
+    // (GEFUNCS.C:2409-2415, MBMGEMSG.MSG:2005). The distinction is the whole
+    // point: shields take ~100 seconds to fill, and "up" tells a pilot they
+    // are protected when they are not. The charge percentages that follow are
+    // useless if the opener has already said the job is done.
+    return { lines: [{ text: formatMessage(MessageId.SHLDCHP), category: 'success' }] };
   }
 }

@@ -83,7 +83,12 @@ export class OrbitHandlerService {
     return {
       lines: [
         {
-          text: formatMessage(MessageId.ORBIT01, planet.name || `planet ${targetPlnum}`),
+          // Two slots: the NUMBER first, then the name. The number is what the
+          // pilot types into `sca pl <n>` and `tra`, which is why canon prints
+          // it (GECMDS.C:800 `prfmsg(ORBIT1,plnum,plptr->name)`). Passing one
+          // argument put the NAME in the %d slot and rendered the %s empty:
+          // "Now in orbit around planet Zygor-3, ."
+          text: formatMessage(MessageId.ORBIT01, targetPlnum, planet.name),
           category: 'success',
         },
       ],
