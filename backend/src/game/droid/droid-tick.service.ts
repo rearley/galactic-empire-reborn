@@ -444,6 +444,15 @@ export class DroidTickService implements OnModuleInit {
         victimMaxTons: this.classCache.getMaxTons(target.shpclass),
         victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
+      // C wraps the ENTIRE consequence block in `if (damage >= 1)`
+      // (GECMDS.C:975-999): below one point nothing is applied, nothing is
+      // recorded, nothing is printed. Without the gate a droid grazing a
+      // passing ship for zero damage still set `lastfired` and
+      // `cantexit = FIRETICKS` — and ship-tick zeroes `repair` whenever
+      // `cantexit > 0`, so a damaged pilot within scanner range of any droid
+      // could never finish a repair. The gate is already present in the
+      // hyper-phaser path in this same file and in the player path.
+      if (damage < 1) return;
       // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
     // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
     // raised on an empty capacitor still absorbs the next hit in full —

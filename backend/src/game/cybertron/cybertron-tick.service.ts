@@ -500,6 +500,14 @@ export class CybertronTickService implements OnModuleInit {
         victimMaxTons: this.shipClassCache.getMaxTons(target.shpclass),
         victimAtWarp: target.speed >= WARP_THRESHOLD,
       });
+      // C wraps the ENTIRE consequence block in `if (damage >= 1)`
+      // (GECMDS.C:975-999): below one point nothing is applied and nothing is
+      // printed. Without the gate a Cybertron grazing a ship for zero damage
+      // still set `lastfired` and `cantexit = FIRETICKS`, and ship-tick zeroes
+      // `repair` whenever `cantexit > 0` — so a damaged pilot in scanner range
+      // could never finish a repair.
+      if (damage < 1) return;
+
       // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
     // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
     // raised on an empty capacitor still absorbs the next hit in full —

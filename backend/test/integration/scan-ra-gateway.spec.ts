@@ -220,11 +220,15 @@ describe('T021 — sca ra 5 gateway integration', () => {
     });
   });
 
-  describe('failure path: docked (where >= 10)', () => {
+  describe('in orbit (where >= 10) — canon has no gate', () => {
+    // scan_ra (GECMDS.C:2484) and scan_se (:2580) test `where` nowhere; the
+    // only scan-side `where` test in the file is scan_hy at :2737, inside
+    // `#ifdef NOTHING`. The port's guard cited spec documents against the C,
+    // and blinded a pilot for the whole time they were parked shopping.
     let calls: EmittedCall[];
 
     beforeEach(async () => {
-      const self = makeShip({ userid: 'player1', shipno: 1, where: 10 }); // in orbit/docked
+      const self = makeShip({ userid: 'player1', shipno: 1, where: 10 });
       const scanService = await makeScanService([self]);
       const gateway = makeGateway(scanService);
 
@@ -235,19 +239,10 @@ describe('T021 — sca ra 5 gateway integration', () => {
       calls = c;
     });
 
-    it('emits only command:result — no scan:render', () => {
+    it('renders a scan just as it does in flight', () => {
       const events = calls.map(c => c.event);
       expect(events).toContain('command:result');
-      expect(events).not.toContain('scan:render');
-    });
-
-    it('emits exactly one event', () => {
-      expect(calls).toHaveLength(1);
-    });
-
-    it('command:result line category is "system"', () => {
-      const payload = calls[0].payload as { lines: Array<{ text: string; category: string }> };
-      expect(payload.lines[0].category).toBe('system');
+      expect(events).toContain('scan:render');
     });
   });
 });

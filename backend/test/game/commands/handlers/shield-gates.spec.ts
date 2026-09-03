@@ -60,10 +60,14 @@ function run(ship: ShipState, arg: string, maxShields = 3): CommandResult {
   return makeHandler(maxShields).command.handler(ship, [arg], ctx) as CommandResult;
 }
 
+// `shi up` prints SHLDCHP ("Shields energizing, Sir!"), not "Shields up.":
+// canon's shieldup() is three statements whose only output is prfmsg(SHLDCHP)
+// (GEFUNCS.C:2409-2415). Shields take ~100s to fill, so "up" would claim
+// protection the pilot does not yet have.
 describe('`shi up` gates — GECMDS.C:3114-3170', () => {
   it('raises shields when every precondition holds', () => {
     const s = makeShip();
-    expect(run(s, 'up').lines[0].text).toBe(formatMessage(MessageId.SHI_UP));
+    expect(run(s, 'up').lines[0].text).toBe(formatMessage(MessageId.SHLDCHP));
     expect(s.shieldstat).toBe(1);
   });
 

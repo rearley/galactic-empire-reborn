@@ -513,7 +513,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // orbit (feature 005) — GECMDS.C:758 cmd_orbit
   // MBMGEMSG.MSG:2570 ORBIT1 carries the plnum AND the name — the number is
   // what the player types into `sca pl <n>` and `tra`.
-  [MessageId.ORBIT01]: 'Now in orbit around planet %d, %s.',
+  [MessageId.ORBIT01]: 'We are now in stationary orbit around planet %d %s SIR!.',
   [MessageId.ORBITALR]: 'You are already in orbit.',
   // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
   // MBMGEMSG.MSG ORBIT2, verbatim. Canon gives no distance and we do not add

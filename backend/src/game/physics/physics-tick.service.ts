@@ -31,6 +31,7 @@ import {
 } from './physics-math';
 import { TELEDAM, UNIVWRAP, UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
+import { cdistance } from '../combat/combat-math';
 
 /**
  * Orchestrates the 6-second PHYSICS tick: rotates, accelerates, moves, debits
@@ -52,6 +53,14 @@ import { ShipClassCacheService } from './ship-class-cache.service';
  *      GEFUNCS.C:617-792 moveship
  * @see specs/006a-physics-tick/research.md
  */
+/**
+ * How close the autopilot must get before it calls the trip done, in raw units.
+ * 250 is the radius cmd_orbit accepts for establishing an orbit
+ * (GECMDS.C:798), and the autopilot exists to put you within orbit range of
+ * where you asked to go.
+ */
+const NAV_ARRIVAL_RANGE = 250;
+
 @Injectable()
 export class PhysicsTickService implements OnModuleInit {
   private readonly logger = new Logger(PhysicsTickService.name);
@@ -123,8 +132,23 @@ export class PhysicsTickService implements OnModuleInit {
       const targetX = ship.navTargetX;
       const targetY = ship.navTargetY;
 
-      // Arrival check: floor-based sector match
-      if (Math.floor(ship.xcoord) === targetX && Math.floor(ship.ycoord) === targetY) {
+      // Arrival is a RADIUS against the target POINT, not sector membership.
+      //
+      // The old `Math.floor(x) === targetX` test had two failures, and the
+      // second one broke onboarding outright once arrival began cutting the
+      // engines. `nav 0 0` from inside sector (0,0) — the documented way to
+      // ask which way Zygor lies — satisfied the predicate on the very first
+      // tick, so the autopilot announced arrival and stopped the ship before
+      // it had moved. Zygor sits at the centre of (0,0), so every purchase in
+      // the game sat behind an orbit the player could not reach. It also
+      // parked cross-sector arrivals at the sector EDGE rather than at the
+      // point the bearing was quoted against.
+      //
+      // cmd_navigate targets the cell centre — `tmp.xcoord = x + .50001`
+      // (GECMDS.C:5133-5136) — and 250 units is the threshold cmd_orbit uses
+      // for "close enough" (GECMDS.C:798). Same target, same radius.
+      const arrivalDist = cdistance(ship, { xcoord: targetX + 0.5, ycoord: targetY + 0.5 }) * 10_000;
+      if (arrivalDist <= NAV_ARRIVAL_RANGE) {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.holdcourse = 0;
           s.navTargetX = null;

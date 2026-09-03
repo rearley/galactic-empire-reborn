@@ -211,32 +211,51 @@ describe('PhysicsTickService — autopilot (nav holdcourse branch)', () => {
     expect(ship.navTargetY).toBeNull();
   });
 
-  it('(e) no further steering in the same tick after arrival (head2b not updated post-arrival)', () => {
-    // Place ship one tick away from arriving: set position so floor will match after one move step.
-    // We'll put it at (7.99, 5.0) heading east at warp — one tick will push it past floor=8.
+  it('(e) arrival clears the target and stops the ship, without steering again', () => {
+    // Arrival is a RADIUS against the target POINT (targetX+0.5, targetY+0.5),
+    // not sector membership. cmd_navigate targets the cell centre
+    // (GECMDS.C:5133-5136) and 250 units is cmd_orbit's "close enough"
+    // (GECMDS.C:798).
+    //
+    // This fixture used to sit at (7.99, 5.2) for target (8,5) — which is 0.59
+    // sectors from the centre point, and arrived only because the old test
+    // asked merely whether floor(x) matched. That predicate is what let
+    // `nav 0 0` "arrive" on tick one from anywhere inside the sector, cutting
+    // the engines before the ship moved.
     const ship = makeShip({
-      xcoord: 7.99, ycoord: 5.2,
+      xcoord: 8.48, ycoord: 5.5,
       heading: 90, head2b: 90,
-      speed: 5000, speed2b: 5000,
+      speed: 1000, speed2b: 1000,
       holdcourse: 1, navTargetX: 8, navTargetY: 5,
     });
     const h = makeHarness([ship]);
 
-    h.fire(); // This tick should cause arrival
+    h.fire();
 
-    // After arrival, holdcourse should be 0
-    if (ship.holdcourse === 0) {
-      // Capture head2b right at arrival — it should NOT have been updated this tick
-      // (arrival check fires first, then continue skips steering).
-      // head2b should still be 90 (the pre-tick value), not recalculated toward cleared target.
-      expect(ship.navTargetX).toBeNull();
-      expect(ship.navTargetY).toBeNull();
-    } else {
-      // Might need one more tick if position didn't cross floor yet
-      h.fire();
-      expect(ship.holdcourse).toBe(0);
-      expect(ship.navTargetX).toBeNull();
-    }
+    expect(ship.holdcourse).toBe(0);
+    expect(ship.navTargetX).toBeNull();
+    expect(ship.navTargetY).toBeNull();
+    expect(ship.speed2b).toBe(0); // engines answer stop
+  });
+
+  it('(f) does NOT arrive merely for being inside the target sector', () => {
+    // The regression that broke onboarding: Zygor sits at the centre of (0,0),
+    // and `nav 0 0` is the documented way to ask which way it lies. Under the
+    // old floor test the autopilot declared arrival on the first tick and
+    // stopped the ship where it stood.
+    const ship = makeShip({
+      xcoord: 0.05, ycoord: 0.05,      // inside sector (0,0), far from its centre
+      heading: 135, head2b: 135,
+      speed: 3000, speed2b: 3000,
+      holdcourse: 1, navTargetX: 0, navTargetY: 0,
+    });
+    const h = makeHarness([ship]);
+
+    h.fire();
+
+    expect(ship.holdcourse).toBe(1);      // still flying
+    expect(ship.navTargetX).toBe(0);
+    expect(ship.speed2b).toBe(3000);      // engines untouched
   });
 
   it('ship with holdcourse=0 is not steered by autopilot branch', () => {

@@ -177,15 +177,15 @@ export class ScanHandlerService implements OnModuleInit {
     const sub = resolveScanSubcommand(args[0]);
     if (sub === null) return this.scanHelp();
 
-    // Not-in-flight guard for the grid scan modes (ra / se / lo / lo full).
-    // Docked, in-orbit, or dead (where >= 10) → a single system-category line and
-    // NO scanRender. Text lookups (sh / pl) are unaffected.
-    // @see specs/015-scan-modes/spec.md FR-011, SC-006
-    // @see specs/015-scan-modes/data-model.md §"Invalid state"
-    // @see specs/015-scan-modes/plan.md §"On failure ... non-negotiable"
-    if ((sub === 'lo' || sub === 'ra' || sub === 'se') && ship.where >= 10) {
-      return { lines: [{ text: formatMessage(MessageId.SCAN_NOT_IN_FLIGHT), category: 'system' }] };
-    }
+    // NO not-in-flight guard. It cited three spec documents and no C line, and
+    // the C contradicts it: scan_ra (GECMDS.C:2484), scan_se (:2580) and
+    // scan_lo (:2640) test `where` nowhere. The only scan-side `where` test in
+    // the file is scan_hy at :2737, inside `#ifdef NOTHING` — dead code.
+    //
+    // reference/README.md puts the C source above spec documents, so the spec
+    // is wrong rather than the source. It mattered: orbit is exactly where a
+    // pilot parks for minutes running `pri`, `new ship` and `buy`, and this
+    // blinded them for the whole visit.
 
     if (sub === 'lo') {
       if (args[1]?.toLowerCase() === 'full') {
