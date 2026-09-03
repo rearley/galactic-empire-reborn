@@ -195,13 +195,55 @@ function Terminal(): React.JSX.Element {
       }
     };
 
+    // A Cybertron taunting you, or a droid complaining that you shot it.
+    //
+    // The server has emitted these since the AI landed and nothing has ever
+    // listened, so every one of them was dropped on the floor. That matters
+    // more than flavour: scan ranges are asymmetric — an Obliterator sees six
+    // sectors and a starter Interceptor one and a half — so the thing hunting
+    // you is routinely outside your own scanners, and canon's taunt is the
+    // only warning the game gives before it opens fire.
+    //
+    // Canon's message text is multi-line ("***\nHailing message from The X\n
+    // < ... >"); EventLog renders with `whitespace-pre-wrap`, so it survives.
+    // @see GECYBS.C:382-410 cyb_annoy, GEDROIDS.C:232-245 droid_annoy
+    const handleAiTaunt = (event: { message?: string }) => {
+      if (!event?.message) return;
+      setLogLines(prev =>
+        [...prev, { text: event.message as string, category: 'combat' as const }]
+          .slice(-MAX_LOG_ENTRIES),
+      );
+    };
+
     socket.on('combat.phaser-fired', handlePhaserFired);
     socket.on('combat.hit', handleCombatHit);
     socket.on('combat.ship-destroyed', handleShipDestroyed);
+    // Your decoy ate an incoming torpedo or missile. Canon tells the DEFENDER:
+    // the `ltorps` being walked in checktm are the weapons locked ONTO you, and
+    // `decout` is your own decoy screen, so TORDEST/MISDEST go out
+    // `outprfge(FILTER, usrn)` to the ship that was saved.
+    // @see GEFUNCS.C:1581-1594, GE/REL/MBMGEMSG.MSG TORDEST / MISDEST
+    const handleDecoyIntercept = (event: { defenderId: string; weapon: 'torpedo' | 'missile' }) => {
+      if (event.defenderId !== localShipId) return;
+      const what = event.weapon === 'missile' ? 'missile' : 'torpedo';
+      setLogLines(prev =>
+        [...prev, {
+          text: `The ${what} locked on to the decoy Sir! It has exploded destroying both!`,
+          category: 'combat' as const,
+        }].slice(-MAX_LOG_ENTRIES),
+      );
+    };
+
+    socket.on('cybertron.taunt', handleAiTaunt);
+    socket.on('droid.annoy', handleAiTaunt);
+    socket.on('combat.decoy-intercept', handleDecoyIntercept);
     return () => {
       socket.off('combat.phaser-fired', handlePhaserFired);
       socket.off('combat.hit', handleCombatHit);
       socket.off('combat.ship-destroyed', handleShipDestroyed);
+      socket.off('cybertron.taunt', handleAiTaunt);
+      socket.off('droid.annoy', handleAiTaunt);
+      socket.off('combat.decoy-intercept', handleDecoyIntercept);
     };
   }, [players, localShipId]);
 
