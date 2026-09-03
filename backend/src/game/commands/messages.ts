@@ -331,17 +331,17 @@ export enum MessageId {
   NAV_STATUS = 'NAV_STATUS',
   NAV_ARRIVED = 'NAV_ARRIVED',
   NAV_ALREADY_THERE = 'NAV_ALREADY_THERE',
-  /** @see MBMGEMSG.MSG:2633 LEAVEORB */
+  /** @see MBMGEMSG.MSG:2904 LEAVEORB */
   LEAVEORB = 'LEAVEORB',
-  /** @see MBMGEMSG.MSG:2005 SHLDCHP — shields begin charging */
+  /** @see MBMGEMSG.MSG:2276 SHLDCHP — shields begin charging */
   SHLDCHP = 'SHLDCHP',
-  /** @see MBMGEMSG.MSG:2009 SHLDUP — shields reach full charge */
+  /** @see MBMGEMSG.MSG:2280 SHLDUP — shields reach full charge */
   SHLDUP = 'SHLDUP',
-  /** @see MBMGEMSG.MSG:2014 SHLDAT — per-tick charge percentage */
+  /** @see MBMGEMSG.MSG:2285 SHLDAT — per-tick charge percentage */
   SHLDAT = 'SHLDAT',
-  /** @see MBMGEMSG.MSG:2031 SHLDDN — firing drops your shields */
+  /** @see MBMGEMSG.MSG:2302 SHLDDN — firing drops your shields */
   SHLDDN = 'SHLDDN',
-  /** @see MBMGEMSG.MSG:1828-1840 YOURDEAD — told to the pilot who just died */
+  /** @see MBMGEMSG.MSG:2099-1840 YOURDEAD — told to the pilot who just died */
   YOURDEAD = 'YOURDEAD',
   /** @see MBMGEMSG.MSG PFIRED — discharge notice to the firer */
   PFIRED = 'PFIRED',
@@ -398,27 +398,27 @@ export enum MessageId {
   PRICE_NO_CASH = 'PRICE_NO_CASH',
   BUY7 = 'BUY7',
   BUY8 = 'BUY8',
-  /** @see MBMGEMSG.MSG:3038 BUY9 — the purchase confirmation */
+  /** @see MBMGEMSG.MSG:3309 BUY9 — the purchase confirmation */
   BUY9 = 'BUY9',
-  /** @see MBMGEMSG.MSG:1851 KILLEDBY — galaxy-wide kill announcement */
+  /** @see MBMGEMSG.MSG:2122 KILLEDBY — galaxy-wide kill announcement */
   KILLEDBY = 'KILLEDBY',
-  /** @see MBMGEMSG.MSG:1955 SPEEDIS — helm answers a speed change */
+  /** @see MBMGEMSG.MSG:2226 SPEEDIS — helm answers a speed change */
   SPEEDIS = 'SPEEDIS',
-  /** @see MBMGEMSG.MSG:1960 SPEED0 — helm answers a full stop */
+  /** @see MBMGEMSG.MSG:2231 SPEED0 — helm answers a full stop */
   SPEED0 = 'SPEED0',
-  /** @see MBMGEMSG.MSG:3676 NEW7 — Yardmaster fits a shield */
+  /** @see MBMGEMSG.MSG:3946 NEW7 — Yardmaster fits a shield */
   NEW7 = 'NEW7',
-  /** @see MBMGEMSG.MSG:3690 NEW10 — Yardmaster fits a phaser */
+  /** @see MBMGEMSG.MSG:3960 NEW10 — Yardmaster fits a phaser */
   NEW10 = 'NEW10',
-  /** @see MBMGEMSG.MSG:3712 NEW17 — minimum install charge */
+  /** @see MBMGEMSG.MSG:3982 NEW17 — minimum install charge */
   NEW17 = 'NEW17',
-  /** @see MBMGEMSG.MSG:3716 NEW18 — shield downgrade refund */
+  /** @see MBMGEMSG.MSG:3986 NEW18 — shield downgrade refund */
   NEW18 = 'NEW18',
-  /** @see MBMGEMSG.MSG:3720 NEW19 — trade-in credit on the old shield */
+  /** @see MBMGEMSG.MSG:3990 NEW19 — trade-in credit on the old shield */
   NEW19 = 'NEW19',
-  /** @see MBMGEMSG.MSG:3726 NEW28 — phaser downgrade refund */
+  /** @see MBMGEMSG.MSG:3996 NEW28 — phaser downgrade refund */
   NEW28 = 'NEW28',
-  /** @see MBMGEMSG.MSG:3731 NEW29 — trade-in credit on the old phaser */
+  /** @see MBMGEMSG.MSG:4001 NEW29 — trade-in credit on the old phaser */
   NEW29 = 'NEW29',
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
@@ -462,7 +462,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.WARPSPD2]: 'Your warp drive is offline.',
   [MessageId.WARPFMT]: 'Usage: warp <speed> [course]',
   [MessageId.WARP02]: 'Speed cannot be negative.',
-  // MBMGEMSG.MSG:1910 WARP03, verbatim.
+  // MBMGEMSG.MSG:2181 WARP03, verbatim.
   [MessageId.WARP03]: 'If we pushed her that fast commander the warp engines would explode!',
   [MessageId.WARP04]: 'Warning: speed exceeds rated maximum of warp %d.',
 
@@ -543,7 +543,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN_BEACON]: '%s broadcasts: "%s"',
 
   // orbit (feature 005) — GECMDS.C:758 cmd_orbit
-  // MBMGEMSG.MSG:2570 ORBIT1 carries the plnum AND the name — the number is
+  // MBMGEMSG.MSG:2840 ORBIT1 carries the plnum AND the name — the number is
   // what the player types into `sca pl <n>` and `tra`.
   [MessageId.ORBIT01]: 'We are now in stationary orbit around planet %d %s SIR!.',
   [MessageId.ORBITALR]: 'You are already in orbit.',
@@ -594,7 +594,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // Canon names the number for sale. The port's old wording blamed the
   // planet's "reserve" — a mechanic that was zero on every neutral-zone planet
   // — and left no way to learn from inside the game that the real limit was 5.
-  // @see GECMDS.C:4381-4383, MBMGEMSG.MSG:3018
+  // @see GECMDS.C:4380-4381, MBMGEMSG.MSG:3289
   [MessageId.BUY3]: 'They only have %s %s available for sale, Sir!',
   [MessageId.BUY4]: 'Your cargo holds are full.',
   [MessageId.BUY5]: 'This planet is not selling that item.',
@@ -610,9 +610,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SELLFMT]: 'Use: sell <quantity> <item>',
   [MessageId.SELL1]: 'You can only sell at the galactic market on Zygor-3.',
   // Canon argument order is (tax, net, quantity, item) — the port led with the
-  // net and dropped the tax to a parenthetical. @see MBMGEMSG.MSG:3738
+  // net and dropped the tax to a parenthetical. @see MBMGEMSG.MSG:4008
   [MessageId.SELL2]: "After the Transfer Tax of %s we have netted %s C's for our %s %s, Sir!",
-  // @see MBMGEMSG.MSG:3742
+  // @see MBMGEMSG.MSG:4012
   [MessageId.SELL3]: "We don't have that many %s Sir!",
 
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
@@ -644,7 +644,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
   [MessageId.PHA_FMT]: 'Format: pha <degree -180..180> [focus 0-5]',
   [MessageId.PHA_CLOAK]: 'Cannot fire while cloaked.',
-  // MBMGEMSG.MSG:3540 ZAPHIM1, verbatim. The paraphrase dropped the Enforcer
+  // MBMGEMSG.MSG:3810 ZAPHIM1, verbatim. The paraphrase dropped the Enforcer
   // Planet, which is the ONLY in-game explanation of why the neutral zone is
   // enforced at all — a new player otherwise has no idea what just shot them.
   [MessageId.WPN_ZAP]:
@@ -888,28 +888,32 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // pri (feature 014) — GECMDS.C:4284 cmd_price
   [MessageId.PRICEFMT]: 'Usage: price <qty> <item>  e.g. price 50 missiles  (bare: price lists items)',
-  // @see MBMGEMSG.MSG:3042
+  // @see MBMGEMSG.MSG:3313
   [MessageId.PRICE1]: '%s %s are going to cost %d each for a total of %s, Sir.',
   [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
   [MessageId.BUY7]: 'This planet has no owner.',
-  // @see MBMGEMSG.MSG:3034
+  // @see MBMGEMSG.MSG:3305
   [MessageId.BUY8]: 'Sorry Sir! That would put us overweight.',
-  // @see MBMGEMSG.MSG:3038
+  // @see MBMGEMSG.MSG:3309
   [MessageId.BUY9]: '%s %s purchased at the price of %d each for a total of %s, Sir.',
 
   // Canon names the killer on every death path — the prfmsg sits AFTER the
   // GESTAT_AUTO branch, so an AI kill is announced exactly like a player one.
-  // @see GEFUNCS.C:1116, MBMGEMSG.MSG:1851
+  // @see GEFUNCS.C:1116, MBMGEMSG.MSG:2122
   [MessageId.KILLEDBY]: "Commander %s's ship was destroyed by %s!!!",
 
-  // Helm answers the throttle. @see MBMGEMSG.MSG:1955, :1960
-  [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %d, Sir!',
+  // Helm answers the throttle. @see MBMGEMSG.MSG:2120, :1960
+  // The second slot is %s, not canon's %d, so the hundredths keep their
+  // leading zero -- "warp 9 point 05", not "warp 9 point 5". Canon's own two
+  // %d slots are fed showarp(), which returns a STRING ("9.05"): a varargs bug
+  // that printed garbage in the shipped game.
+  [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %s, Sir!',
   [MessageId.SPEED0]: 'Helm reports we are at a dead stop, Sir!',
 
   // Shipyard narration. Canon quotes the trade-in FIRST (NEW19/NEW29) and then
   // the Yardmaster's fitting report, which is what makes an upgrade priced at
   // 36,666 rather than 40,000 legible to the player.
-  // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3676,3690,3712,3716,3720,3726,3731
+  // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3946,3960,3982,3986,3990,3996,4001
   [MessageId.NEW19]: 'They will credit us %s for our existing used shield, Sir!',
   [MessageId.NEW7]:
     '***\n'
@@ -947,7 +951,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // shared
   [MessageId.HLBROKE]: 'Helm controls are inoperative.',
-  // MBMGEMSG.MSG:1819 NUMOOR, verbatim. The paraphrase rendered a negative
+  // MBMGEMSG.MSG:2090 NUMOOR, verbatim. The paraphrase rendered a negative
   // lower bound as "(-180-180)", which reads as a single negative number.
   [MessageId.NUMOOR]: 'Please enter a number in the range from %d to %d.',
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',

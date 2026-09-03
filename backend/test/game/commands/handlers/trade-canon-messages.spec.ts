@@ -12,12 +12,12 @@
  *                                                                 MBMGEMSG.MSG:4008
  *
  * BUY9 is the purchase confirmation `buy` prints (GECMDS.C:4353-4361); PRICE1
- * is the identical quote `pri` prints instead (GECMDS.C:4367). BUY3 carries
- * `avail` — the number actually for sale (GECMDS.C:4381-4383) — which the port
+ * is the identical quote `pri` prints instead (GECMDS.C:4368). BUY3 carries
+ * `avail` — the number actually for sale (GECMDS.C:4380-4381) — which the port
  * dropped in favour of blaming the planet's "reserve", a field that is zero on
  * every neutral-zone planet and unreadable from inside the game.
  *
- * Every chkweight failure is BUY8 in C (GECMDS.C:4326); the port answered a
+ * Every chkweight failure is BUY8 in C (GECMDS.C:4328); the port answered a
  * completely full hold with BUY4, which canon reserves for "They are not
  * selling their %s, Sir!".
  */

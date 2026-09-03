@@ -30,7 +30,7 @@ export type BuyOutcome =
        * `avail` — what the planet will actually sell right now. C prints it:
        * `sprintf(gechrbuf,"%ld",avail); prfmsg(BUY3,gechrbuf,item_name[item]);`
        * Never negative: a stock below the reserve is simply nothing for sale.
-       * @see GECMDS.C:4381-4383
+       * @see GECMDS.C:4380-4381
        */
       available: number;
     }

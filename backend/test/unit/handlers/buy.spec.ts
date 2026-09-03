@@ -108,7 +108,7 @@ describe('BuyHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY5));
   });
 
-  // BUY3 names the count for sale, as C does (GECMDS.C:4381-4383). The
+  // BUY3 names the count for sale, as C does (GECMDS.C:4380-4381). The
   // argument-free form printed a paraphrase that blamed the planet's reserve.
   it('returns BUY3 naming the available count when AT_RESERVE', async () => {
     const { svc } = makeService(makePlanetState(), { ok: false, reason: 'AT_RESERVE', available: 3 });
@@ -116,7 +116,7 @@ describe('BuyHandlerService', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.BUY3, 3, ITEM_NAMES[I_FOOD]));
   });
 
-  // Every chkweight failure is BUY8 in C (GECMDS.C:4326); BUY4 there is
+  // Every chkweight failure is BUY8 in C (GECMDS.C:4328); BUY4 there is
   // "They are not selling their %s, Sir!", a different refusal entirely.
   it('returns BUY8 when CAPACITY_FULL', async () => {
     const { svc } = makeService(makePlanetState(), { ok: false, reason: 'CAPACITY_FULL' });

@@ -5,7 +5,8 @@ import { shipKey } from './ship-state.types';
  * Sentinel for "no channel" / "nobody has fired on me".
  *
  * C seeds a fresh hull with `tmpshp.lastfired = -1` (GEFUNCS.C:226) and resets
- * to -1 whenever the recorded firer leaves (GEFUNCS.C:1224-1225, 1746, 1797).
+ * to -1 whenever the recorded firer DIES (GEFUNCS.C:1224-1225, 1746, 1797);
+ * doing it on logout as well is port-original — see ShipStateService.leave.
  */
 export const NO_CHANNEL = -1;
 
@@ -38,7 +39,7 @@ export const CYBMINE_NONE = 255;
  * Channels are session-scoped and recycled, exactly as C's terminal slots are.
  * That is why `release` scrubs the channel from every ship that still refers to
  * it — without it a recycled number would silently re-point old grudges at the
- * new occupant. C does the same thing on the way out (GEFUNCS.C:1224).
+ * new occupant. C does this on death (GEFUNCS.C:1224), not on logout.
  */
 @Injectable()
 export class ShipChannelRegistry {

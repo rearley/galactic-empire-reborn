@@ -45,7 +45,8 @@ export class DroidSpawner {
    * `if (ptr->holdcourse == 0) ptr->speed2b = rndm(999.9);`. That is correct
    * behaviour for the game and is not changed. But it made the playtest
    * override useless: a droid asked to hold still drifted 149 -> 839 units over
-   * four minutes, and because phaser falloff is dd^7 (PFIRDST 7, GEMAIN.H) that
+   * four minutes, and because phaser falloff is dd^PFIRDST (a sysop option,
+   * shipped at 5: MBMGEMSG.MSG:417, read at GEMAIN.C:493) that
    * silently moved every damage number we measured.
    *
    * A droid whose key is in here is re-zeroed by DroidTickService after the AI

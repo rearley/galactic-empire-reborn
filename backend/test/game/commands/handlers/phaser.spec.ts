@@ -25,7 +25,7 @@ import { FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRES
  * absorption, subsystem damage, cantexit -- none of which care about magnitude,
  * but all of which need the shot to actually land. They used to place the
  * victim a full sector away, which worked only because the port ran PFIRDST=3.
- * Canon ships PFIRDST=7 (GEMAIN.C:495), and the falloff is brutal: a
+ * Canon ships PFIRDST=5 (MBMGEMSG.MSG:417, read at GEMAIN.C:493), and the falloff is steep: a
  * phasrtype-1 phaser deals 34 at point-blank, 7 at half a sector, and 0 by a
  * sector and a half. At one sector these fixtures silently became zero-damage
  * shots and the assertions had nothing to observe.

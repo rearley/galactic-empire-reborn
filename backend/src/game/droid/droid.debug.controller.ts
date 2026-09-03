@@ -60,8 +60,9 @@ export class DroidDebugController {
     // canon re-rolls that speed the moment the droid detects a player
     // (GEDROIDS.C:328-331), so zeroing it at creation alone did not survive
     // first contact — observed drifting 149 -> 839 units over four minutes,
-    // which moves every damage figure because phaser falloff is dd^7
-    // (PFIRDST 7, GEMAIN.H). `stationary` therefore also registers the droid as
+    // which moves every damage figure because phaser falloff is dd^PFIRDST
+    // (a sysop option, shipped at 5: MBMGEMSG.MSG:417, read at GEMAIN.C:493).
+    // `stationary` therefore also registers the droid as
     // frozen in DroidSpawner, and DroidTickService re-zeroes it after each AI
     // pass. The droid AI itself is unchanged; nothing on the normal spawn path
     // can set the flag.

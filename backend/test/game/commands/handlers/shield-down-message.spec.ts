@@ -12,7 +12,7 @@
  *   wptr->shieldstat = SHIELDDN;
  *   }
  *                                     GEFUNCS.C:2419-2427
- *   SHLDDN text                       MBMGEMSG.MSG:2031
+ *   SHLDDN text                       MBMGEMSG.MSG:2302
  *
  * The port printed SHI_DN ("Shields down.") instead — an invention, and an
  * inconsistency inside one command: the sibling branch already prints canon's

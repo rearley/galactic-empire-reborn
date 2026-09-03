@@ -56,11 +56,11 @@ export class MaintHandlerService {
       }
     }
 
-    // Canon's MAINT5 (MBMGEMSG.MSG:3578) quotes only the repair duration and
+    // Canon's MAINT5 (MBMGEMSG.MSG:3848) quotes only the repair duration and
     // never the fee, so the charge lands silently — an original defect, not a
     // design choice: three accidental `mai` calls cost 7,500 cr with no price
     // ever shown. We keep MAINT_OK verbatim and add the receipt.
-    // @see GECMDS.C:4500 `price = 200;`  GECMDS.C:4505 `price = 2500;`
+    // @see GECMDS.C:4498 `price = 200;`  GECMDS.C:4504 `price = 2500;`
     return {
       lines: [
         { text: formatMessage(MessageId.MAINT_OK, result.repairAmt), category: 'success' },

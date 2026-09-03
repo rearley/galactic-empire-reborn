@@ -1,7 +1,7 @@
 /**
  * Disconnect (rage-quit) kill must be resolved EXACTLY like any other death.
  *
- * Canon: GEMAIN.C:1418 `warhupa` calls the same `killem()` as `checkdam`, and
+ * Canon: GEMAIN.C:1420 `warhupa` calls the same `killem()` as `checkdam`, and
  * `killem`'s cargo loop (GEFUNCS.C:1122-1136) and its
  * `prfmsg(KILLEDBY,username(ptr),username(wptr))` (GEFUNCS.C:1116) are
  * unconditional on how the victim died. The port hand-built the event on the

@@ -284,8 +284,8 @@ Two findings, one seed bug.
 - **Fix:** run the loop body for all slots; keep only the production computation gated on `rate`. The spec's own pseudocode (`specs/005-planet-system/data-model.md:207-218`) has it unconditional.
 
 ### 5.2 Zero-population planets still run the economy tick
-- **Port:** `planet-tick.service.ts:57` filters `p.userid !== null`; `planet-state.service.ts:462` comments the guard as matching `GEMAIN.C:2132` but checks ownership only. Troop starvation (`planet-economy.ts:50-54`), gold conversion (`:72-74`) and tax (`:105`) all run first.
-- **C:** `GEMAIN.C:2132` — `if (plptr->items[0].qty > 0 && plptr->userid[0] != 0)` skips the planet entirely.
+- **Port:** `planet-tick.service.ts:57` filters `p.userid !== null`; `planet-state.service.ts:462` comments the guard as matching `GEMAIN.C:2130` but checks ownership only. Troop starvation (`planet-economy.ts:50-54`), gold conversion (`:72-74`) and tax (`:105`) all run first.
+- **C:** `GEMAIN.C:2130` — `if (plptr->items[0].qty > 0 && plptr->userid[0] != 0)` skips the planet entirely.
 - **Effect:** a depopulated but garrisoned world bleeds 1/8 of its troops per tick; in C it stays frozen and defended.
 - **Fix:** add the `men > 0` condition.
 

@@ -1477,7 +1477,13 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 
 ---
 
-## 2026-05-08 — `mai` keyword dispatcher pattern (feature 017)
+## 2026-05-08 — `mai` keyword dispatcher pattern (feature 017) — SUPERSEDED 2026-09-03
+
+> **Superseded.** `mai` is the maintenance command and nothing else; the mailbox
+> moved to `rea`. See "2026-09-03 — `mai` is maintenance, `rea` is the mailbox"
+> at the end of this file. The reasoning below stands as a record of why the
+> split existed, not as current behaviour.
+
 
 **Context**: The `mai` keyword was previously an alias on `MaintHandlerService` (feature 014). Feature 017 adds inbox listing to `mai` (no-arg form), requiring the keyword to do different things depending on whether args are present.
 
@@ -2172,3 +2178,80 @@ before the shot that hit them.
 Canon prints PHITYOU and nothing more, and the attacker's name — which PHITYOU
 already carries — is the whole of what canon offers. Adding an explanation line
 would be a port invention on a case canon deliberately leaves bare.
+
+
+## 2026-09-03 — `mai` is maintenance, `rea` is the mailbox
+
+**Context:** Round-3 playtest. A pilot in orbit at Zygor with a hull at 98%
+damage and shields destroyed typed `mai` and got a mail listing; nothing
+repaired. Adding ANY argument routed to maintenance instead — `mai 1`, `mai
+none` and `mai repair` all worked, because the argument was never parsed, only
+counted. `hel` listed neither command and `hel mai` answered "Unknown help
+topic". They found repair by reading the C source.
+
+**Decision:** `mai` always performs maintenance, taking an optional planet
+PASSWORD. The mailbox listing moves to bare `rea`; `rea <n>` still reads one
+message.
+
+**Reason:** Canon is not ambiguous. `GECMDS.C:144` is `{"mai", cmd_maint, 1}`,
+and `cmd_maint`'s only optional `argv[1]` is the planet password
+(GECMDS.C:4477-4479). There is no mail command anywhere in canon's table,
+because MajorBBS mail lived outside the game — so the mailbox is port-original
+and has no claim on a canon keyword. `rea` is likewise not a canon keyword and
+was already half the mailbox, which makes it the honest home for the other half.
+
+**Alternatives rejected:** Keeping the arg-count split and documenting it. The
+split is what produced the bug: the discriminator was an argument the command
+also legitimately takes, so `mai <password>` — the canon invocation — was the
+one form guaranteed to do the wrong thing.
+
+## 2026-09-03 — Three port-original lines the canon does not have
+
+**Context:** Three small pieces of narration added during the round-3 fix pass
+have no canon equivalent, and CLAUDE.md requires deliberate deviations to be
+written down rather than left as code comments.
+
+**Decision:** Keep all three; record them here.
+
+1. **The maintenance receipt.** Canon prints MAINT5 with the repair queue length
+   and never says what it charged (GECMDS.C:4516-4518), so three accidental
+   `mai` calls cost a playtester 7,500 credits with no indication. We add one
+   line naming the charge.
+2. **The nav helm line.** Canon's `cmd_navigate` emits exactly one message,
+   NAV01 (GECMDS.C:5154). Ours adds that the helm is coming onto course,
+   because our `nav` — unlike canon's — engages an autopilot that turns the
+   ship, which is why an identical second `nav` from a standstill answered with
+   a different bearing.
+3. **The ship-loss notice on re-entry.** Canon cannot reach this state at all:
+   `warhupa` sets GESTAT_AVAIL on hangup (GEMAIN.C:1434), so an offline ship is
+   not in the universe and cannot be killed. Our world keeps flying, so a pilot
+   can be destroyed between sessions and needs telling.
+
+**Reason:** Each covers a gap our own deviations created, or an omission that
+cost a real playtester real credits. None changes a number.
+
+**Alternatives rejected:** Adding a shield percentage to the deflection line —
+a fourth invention, on a case canon deliberately leaves bare. `sca sh` already
+reports shield state and is now named in `hel combat`.
+
+## 2026-09-03 — Scrubbing `lastfired` on logout is ours, not canon's
+
+**Context:** `ShipStateService.leave` clears every `lastfired` pointing at a
+freed channel, citing GEFUNCS.C:1224-1225 as canon doing the same. It is not:
+those lines are inside `killem` and clear references to a ship that just DIED,
+so a corpse cannot award points. `warhupa` scrubs nothing on a clean disconnect
+(GEMAIN.C:1410-1432).
+
+**Decision:** Keep the scrub. Correct the citation and record the cost.
+
+**Reason:** Our channel recycling is denser than canon's, so a stale `lastfired`
+pointing at a freed channel would hand an old grudge — and its kill credit — to
+whoever came in next. Canon lives with that; under "we fix bugs, not just go
+with the flow", we do not.
+
+**Cost, stated plainly:** a killer who logs off in the same tick as their
+victim's death becomes unattributable, and the ship-loss mail falls back to "an
+unknown assailant". Closing that properly means carrying the attacker's NAME on
+the victim's state at the moment damage lands, rather than re-resolving a
+channel later. Not done; it is a narrow window and the rest of the attribution
+path was rewritten this session.

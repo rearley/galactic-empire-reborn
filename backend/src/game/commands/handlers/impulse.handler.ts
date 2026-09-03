@@ -62,20 +62,30 @@ export const impulseCommand: Command = {
       ship.navTargetY = null;
     }
 
-    // Leave orbit on engine fire — GECMDS.C:512 LEAVEORB
-    if (ship.where >= 10) ship.where = 0;
+    const lines: Array<{ text: string; category: string }> = [];
+
+    // Leave orbit on engine fire — canon does three things here, not one:
+    // `refresh(); prfmsg(LEAVEORB); where = 0; repair = 0;`
+    // (GECMDS.C:512-517). The port zeroed `where` silently and kept the repair
+    // queue, so a ship could buy a 2,500-credit repair at Zygor and carry it
+    // away, healing 3 damage a second in deep space.
+    if (ship.where >= 10) {
+      ship.where = 0;
+      ship.repair = 0;
+      lines.push({ text: formatMessage(MessageId.LEAVEORB), category: 'system' });
+    }
 
     ship.percent = value;
     ship.speed2b = 1000.0 * (value / 100.0);
     if (course.setHeading) ship.head2b = deg;
     ship.dirty = true;
 
-    return {
-      lines: [
-        value === 0
-          ? { text: formatMessage(MessageId.ENGSTOP), category: 'success' }
-          : { text: formatMessage(MessageId.ENGFIRE, deg), category: 'success' },
-      ],
-    };
+    lines.push(
+      value === 0
+        ? { text: formatMessage(MessageId.ENGSTOP), category: 'success' }
+        : { text: formatMessage(MessageId.ENGFIRE, deg), category: 'success' },
+    );
+
+    return { lines } as CommandResult;
   },
 };

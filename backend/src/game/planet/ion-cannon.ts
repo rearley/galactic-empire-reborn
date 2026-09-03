@@ -12,7 +12,7 @@ export interface IonCannonHit {
   shieldKnock: number;
   /**
    * `ptr->lastfired = -1` — a pilot killed by a planet's guns hands the kill
-   * to nobody. @see GEFUNCS.C:1796
+   * to nobody. @see GEFUNCS.C:1797
    */
   clearsKillCredit: true;
 }

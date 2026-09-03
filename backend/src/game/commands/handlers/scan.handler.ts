@@ -50,7 +50,7 @@ const RES_STRINGS = [
 /**
  * The reconnaissance strings a NON-owner sees on `sca pl <n>`.
  *
- * These are SCAN28..SCAN34 in MBMGEMSG.MSG:3366-3390, filled from `gechrbuf`
+ * These are SCAN28..SCAN34 in MBMGEMSG.MSG:3637-3390, filled from `gechrbuf`
  * words that the C builds inline (GECMDS.C:2377-2448). They are not in
  * `messages.ts` because that file is frozen this run and never carried these
  * ids — see the report; they belong there.
@@ -70,7 +70,12 @@ const SCAN31_NO_FIGHTERS = 'No sign of fighters anywhere.';
 const SCAN32_FIGHTERS = 'There are indications of fighters.';
 const SCAN33_FLUXPODS = '%s stockpile of fluxpods.';
 const SCAN34_FOOD = '%s stockpile of food.';
-/** SCANWRM / SCANWRM1 — MBMGEMSG.MSG:3402, 3405. */
+/**
+ * SCANWRM / SCANWRM1 — GE/REL/MBMGEMSG.MSG:3676, 3676.
+ *
+ * Canon indents both with a leading space; we drop it to match the SCAN08/09/10
+ * siblings above, which the port already renders unindented.
+ */
 const SCANWRM = 'Object Class: Wormhole';
 const SCANWRM1 = 'Named: %s';
 
@@ -765,7 +770,7 @@ export class ScanHandlerService implements OnModuleInit {
       // Wormholes share the planet slot space, so their numbers belong in the
       // same list -- otherwise `sca pl 3` on a wormhole slot looks like a bug.
       // Only VISIBLE ones: the listing is our addition (C's `sca pl` demands an
-      // argument, GECMDS.C:2300-2306), and a hidden wormhole is hidden.
+      // argument, GECMDS.C:2303-2309), and a hidden wormhole is hidden.
       const worms = await this.prisma.wormhole.findMany({
         where: { xsect, ysect, visible: 1 },
         select: { plnum: true, name: true },
@@ -967,7 +972,7 @@ export class ScanHandlerService implements OnModuleInit {
    * No `visible` gate: C's scan_pl tests only `plptr->type`, so a slot number
    * that names a wormhole reports one whether or not the map is drawing it.
    *
-   * @see GECMDS.C:2455-2468, MBMGEMSG.MSG:3402-3405
+   * @see GECMDS.C:2455-2468, MBMGEMSG.MSG:3673-3676
    */
   private scanWormhole(
     ship: ShipState,

@@ -22,7 +22,7 @@ export function classLabel(klass: number): string {
   return 'Message';
 }
 
-/** Renders a single list-view row for `mai`. */
+/** Renders a single list-view row for `rea`. */
 export function formatListLine(entry: MailListEntry): string {
   const idx = entry.index.toString().padStart(3);
   const label = entry.classLabel.padEnd(18);

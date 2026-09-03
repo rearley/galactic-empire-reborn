@@ -6,7 +6,7 @@
  *     outwar(FILTER,usrn,0);
  * `outwar` sends it to every pilot in the game. The prfmsg sits AFTER the
  * `if (wptr->status == GESTAT_AUTO)` branch at :1110, so an AI kill is
- * announced exactly like a player one. Text: MBMGEMSG.MSG:1851.
+ * announced exactly like a player one. Text: MBMGEMSG.MSG:2122.
  *
  * `username()` (GEFUNCS.C:2596-2604) returns the SHIP name for a CYBORG or
  * DROID class and the USERID for everyone else — so the labels differ by who

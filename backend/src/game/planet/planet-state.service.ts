@@ -564,7 +564,7 @@ export class PlanetStateService implements OnModuleInit {
       // @see GEMAIN.C:2145-2178
       const isHub = isNeutralZoneRestockPlanet(state);
 
-      // Skip unowned planets — matches GEMAIN.C:2132 `plptr->userid[0] != 0` guard.
+      // Skip unowned planets — matches GEMAIN.C:2130 `plptr->userid[0] != 0` guard.
       if (state.userid === null && !isHub) return;
 
       if (state.userid !== null) {

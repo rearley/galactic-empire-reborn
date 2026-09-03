@@ -47,7 +47,7 @@ function buildMocks(
 
 describe('T044 — PlanetTickService all-planets-per-tick', () => {
   // Owned AND populated: the sweep skips zero-population worlds outright
-  // (GEMAIN.C:2132), so slot 0 (I_MEN) has to be non-zero here.
+  // (GEMAIN.C:2130), so slot 0 (I_MEN) has to be non-zero here.
   const populated = () => Array.from({ length: 14 }, () => ({ qty: 1000n }));
   const fakePlanets = [
     { xsect: 1, ysect: 0, plnum: 1, userid: 'owner', items: populated() },

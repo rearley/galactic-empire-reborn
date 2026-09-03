@@ -79,7 +79,7 @@ describe('applyEconomyTick', () => {
     // The conversion happens before the production loop, so compare against
     // what the loop's tfact decay leaves of a planet holding no gold.
     // (A zero-population planet is no longer a useful isolation trick — C
-    // never runs multiply() on one at all, GEMAIN.C:2132.)
+    // never runs multiply() on one at all, GEMAIN.C:2130.)
     const withGold = makePlanet();
     withGold.items[I_GOLD].qty = 100n;
     const withoutGold = makePlanet();

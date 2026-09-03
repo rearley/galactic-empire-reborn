@@ -60,8 +60,18 @@ export class ShipStateService implements OnModuleInit {
    *
    * Channels are recycled, so a stale `lastfired` left pointing at a freed one
    * would silently transfer an old grudge — and its kill credit — to whoever
-   * came in next. C clears it the same way when a user drops
-   * (GEFUNCS.C:1224-1225).
+   * came in next.
+   *
+   * PORT-ORIGINAL. This used to cite GEFUNCS.C:1224-1225 as canon doing the
+   * same on logout; it does not. Those two lines are inside `killem` and clear
+   * references to a ship that just DIED, so a corpse cannot award points.
+   * `warhupa` scrubs nothing on a clean disconnect (GEMAIN.C:1410-1432) — canon
+   * simply lives with the mis-attribution. We do not, because our channel
+   * recycling is denser.
+   *
+   * The cost is narrow and real: a killer who logs off in the same tick as
+   * their victim's death becomes unattributable, and the ship-loss mail falls
+   * back to "an unknown assailant". @see docs/DECISIONS.md
    */
   private leave(userid: string, shipno: number): void {
     const departing = this.map.get(shipKey(userid, shipno));

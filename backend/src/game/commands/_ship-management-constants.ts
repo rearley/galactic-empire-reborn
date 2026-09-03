@@ -9,7 +9,7 @@ export const COUNTDOWN = 20 as const;
 /** @see GECMDS.C:4499 — maintenance cost at a friendly planet */
 export const MAINT_COST_NORMAL = 200 as const;
 
-/** @see GECMDS.C:4505 — maintenance cost at Zygor neutral-zone planet */
+/** @see GECMDS.C:4504 — maintenance cost at Zygor neutral-zone planet */
 export const MAINT_COST_NEUTRAL = 2500 as const;
 
 /** @see GEFUNCS.C:1717 — cloak state after cmd_cloak("on") */

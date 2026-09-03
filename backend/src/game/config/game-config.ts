@@ -130,7 +130,7 @@ export const SYSOP_OPTIONS = {
   MDAMMAX: { min: 1, max: 100, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:511', implemented: true },
   IDAMMAX: { min: 1, max: 100, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:512', implemented: true },
   MNDAMMAX: { min: 1, max: 200, default: 75, canonDefault: 75, cReference: 'GEMAIN.C:513', implemented: true, constant: 'MINEDAMMAX' },
-  REPAIRRT: { min: 1, max: 50, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:514', implemented: false },
+  REPAIRRT: { min: 1, max: 50, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:514', implemented: true },
   TOOCLOSE: { min: 1, max: 32000, default: 2500, canonDefault: 2500, cReference: 'GEMAIN.C:517', implemented: false },
   CLENGUSE: { min: 1, max: 32000, default: 7500, canonDefault: 7500, cReference: 'GEMAIN.C:519', implemented: false },
   STRTCASH: { min: 1, max: 32000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:521', implemented: true, constant: 'START_CASH' },

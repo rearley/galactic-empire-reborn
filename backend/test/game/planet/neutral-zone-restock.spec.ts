@@ -4,7 +4,7 @@
  * In C both patch blocks sit inside `plarti`'s continuous planet loop, on the
  * same pass and immediately AFTER `multiply()` has run for that record
  * (GEMAIN.C:2145-2178). So the storage clamp `multiply` applies —
- * `if (qty > maxpl[i] * fact) qty = maxpl[i] * fact` (GEPLANET.C:328-331) — is
+ * `if (qty > maxpl[i] * fact) qty = maxpl[i] * fact` (GEPLANET.C:328-332) — is
  * undone the moment it happens, and the hub always holds 1,032,000 of every
  * item it sells.
  *

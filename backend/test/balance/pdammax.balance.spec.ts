@@ -36,7 +36,7 @@
  * This file asserts the resulting SHAPE, which is what a retune could break
  * without any single value looking wrong.
  *
- * @see GEMAIN.C:494 numopt(PDAMMAX,1,200) / GEMAIN.C:495 numopt(PFIRDST,1,20)
+ * @see GEMAIN.C:494 numopt(PDAMMAX,1,200) / GEMAIN.C:493 numopt(PFIRDST,1,20)
  * @see GEFUNCS.C:2077-2087 pdamage
  */
 

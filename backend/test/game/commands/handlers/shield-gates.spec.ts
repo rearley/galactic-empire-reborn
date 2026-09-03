@@ -16,7 +16,7 @@
  *
  * `shi down` has none of these gates — shielddn() is called directly, and its
  * only output is prfmsg(SHLDDN) = "Shields are now down, Sir!"
- * (GEFUNCS.C:2419-2427, MBMGEMSG.MSG:2031).
+ * (GEFUNCS.C:2419-2427, MBMGEMSG.MSG:2302).
  */
 
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';

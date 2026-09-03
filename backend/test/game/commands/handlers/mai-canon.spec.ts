@@ -10,10 +10,10 @@
  * nothing, so a crippled pilot in orbit could not find the repair command.
  * The mailbox is a port original with no canon keyword, so it moves to `rea`.
  *
- * The 2,500 cr / 200 cr charge was also silent: MAINT5 (MBMGEMSG.MSG:3578)
+ * The 2,500 cr / 200 cr charge was also silent: MAINT5 (MBMGEMSG.MSG:3848)
  * quotes only the repair duration, never the fee. That is an original defect
  * (a charge with no confirmation), not a design choice, so we print the fee.
- * Prices: GECMDS.C:4500 `price = 200;` and GECMDS.C:4505 `price = 2500;`.
+ * Prices: GECMDS.C:4498 `price = 200;` and GECMDS.C:4504 `price = 2500;`.
  */
 
 import { MaiHandlerService } from '../../../../src/game/commands/handlers/mai.handler';

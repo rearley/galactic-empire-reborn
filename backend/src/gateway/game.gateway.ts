@@ -83,6 +83,7 @@ import {
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
+import { SHIP_SPEED_REPORT, ShipSpeedReportEvent } from '../game/physics/speed-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { damstr } from '../game/combat/combat-math';
 import { resolveKillSpoils } from '../game/combat/kill-resolution';
@@ -282,7 +283,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * found out by inference.
    *
    * What canon does establish is that a pilot is never left to infer a loss:
-   * YOURDEAD (MBMGEMSG.MSG:1828-1840) is printed with `outprfge(ALWAYS,...)`,
+   * YOURDEAD (MBMGEMSG.MSG:2099-2111) is printed with `outprfge(ALWAYS,...)`,
    * bypassing even the message filter. This is the offline equivalent, and it
    * points at the mail that carries the detail rather than restating it.
    *
@@ -537,7 +538,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
           // Kill credit and cargo, through the SAME helper the combat tick
           // uses. Canon has one killem: warhupa calls it on a mid-combat
-          // hangup (GEMAIN.C:1418) exactly as checkdam does on a normal death,
+          // hangup (GEMAIN.C:1420) exactly as checkdam does on a normal death,
           // and its cargo loop (GEFUNCS.C:1122-1136) does not ask how the
           // victim died. This path used to hardcode `loot: []`, so the one
           // death a killer had to work hardest for paid nothing.
@@ -1163,7 +1164,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     //     prfmsg(KILLEDBY,username(ptr),username(wptr));
     //     outwar(FILTER,usrn,0);
     //
-    // GEFUNCS.C:1116-1117, text at MBMGEMSG.MSG:1851. `outwar` is the
+    // GEFUNCS.C:1116-1117, text at MBMGEMSG.MSG:2122. `outwar` is the
     // galaxy-wide send, and the prfmsg sits AFTER the `wptr->status ==
     // GESTAT_AUTO` branch at :1110 — so a Cybertron kill is announced exactly
     // like a player one. The port implemented none of it; a kill three sectors
@@ -1174,7 +1175,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     //
     // Only a SHIP is announced. Canon's prfmsg lives inside
     // `if (who >= 0 && who < nships && who != usrn)` (GEFUNCS.C:1105), and
-    // `fireion` sets the victim's lastfired to -1 (GEFUNCS.C:1796), so a
+    // `fireion` sets the victim's lastfired to -1 (GEFUNCS.C:1797), so a
     // colony's ion cannons make a kill that nobody hears about. The killer's
     // name still travels on the structured payload for the sector to render.
     const hasKillerShip = event.attackerId !== null || event.attackerUserid !== null;
@@ -1206,7 +1207,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // freighter picked them up, and that they are back at Zygor with a
     // replacement waiting. The port printed a bare destruction notice, so
     // losing a hull read as the end of the run rather than a setback.
-    // @see MBMGEMSG.MSG:1828-1840
+    // @see MBMGEMSG.MSG:2099-2111
     this.server.to(`user:${event.victimUserid}`).emit('event.log', {
       category: 'combat',
       text: formatMessage(MessageId.YOURDEAD),
@@ -1367,6 +1368,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ? formatMessage(MessageId.SHLDUP)
         : formatMessage(MessageId.SHLDAT, event.percent),
     });
+  }
+
+  /**
+   * The helm answering the throttle — SPEEDIS, or SPEED0 on a dead stop.
+   *
+   * `showarp` renders speed as "%.2f" warp factors (GEFUNCS.C:2681), so the
+   * fraction is hundredths and is zero-padded; SPEEDIS's own "%d point %d"
+   * cannot be taken literally because canon feeds it showarp's STRING, which is
+   * a varargs bug. @see src/game/physics/speed-events.ts
+   */
+  @OnEvent(SHIP_SPEED_REPORT)
+  handleShipSpeedReport(event: ShipSpeedReportEvent): void {
+    const warp = event.speed / 1000;
+    const text = event.speed <= 0
+      ? formatMessage(MessageId.SPEED0)
+      : formatMessage(
+        MessageId.SPEEDIS,
+        Math.floor(warp),
+        String(Math.round((warp - Math.floor(warp)) * 100)).padStart(2, '0'),
+      );
+    this.server.to(`user:${event.userid}`).emit('event.log', { category: 'system', text });
   }
 
   @OnEvent(PHYSICS_GRAVITY)
