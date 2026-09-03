@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RANDOM, Random } from '../combat/random.port';
 import { I_MEN, I_TROOPS, I_SPY } from '../constants/items';
 import { MAIL_CLASS_DISTRESS } from '../constants';
+import { MAIL_CLASS_PRODRPT } from '../midnight/midnight.constants';
+import { PRODUCTION_CAP_MAIL_TYPES, PRODUCTION_CAP_TOPIC } from '../mail/production-cap';
 
 /** MailStat.type for the two starvation notices. @see GEPLANET.C:211, :246 */
 const MESG06 = 6 as const;
@@ -14,7 +16,7 @@ const MESG30 = 30 as const;
 const MESG_SPYC1 = 31 as const;
 /** SPYC2 — to the planet's owner: we caught a spy. @see GEPLANET.C:134 */
 const MESG_SPYC2 = 32 as const;
-import { applyEconomyTickWithLosses, FREE_PLANET_OWNER } from './planet-economy';
+import { applyEconomyTickWithLosses, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
 /**
@@ -56,7 +58,7 @@ export class PlanetEconomyService {
    * never block the tick.
    */
   async applyTick(state: PlanetState): Promise<{ state: PlanetState; revolted: boolean }> {
-    const { state: next, starved } = applyEconomyTickWithLosses(state);
+    const { state: next, starved, capped } = applyEconomyTickWithLosses(state);
 
     // GEPLANET.C:211/246 — starvation mails the owner. Silent starvation meant a
     // colony could dwindle away with no notice reaching the player at all.
@@ -66,6 +68,11 @@ export class PlanetEconomyService {
       }
       if (starved.men > 0) {
         this.mailStarvation(next, 'COLONISTS STARVED', MESG07, starved.men);
+      }
+      // GEPLANET.C:313-326 — every slot that just topped out gets its own
+      // MESG08+i notice, class MAIL_CLASS_PRODRPT, long1 = the ceiling.
+      for (const hit of capped) {
+        this.mailProductionCap(next, hit);
       }
     }
 
@@ -175,6 +182,36 @@ export class PlanetEconomyService {
     }
   }
 
+  /**
+   * A storage ceiling was reached — canon's MESG08+i. Fire-and-forget, exactly
+   * like the starvation notices: a failed insert must not stall the tick.
+   *
+   * The recipient is `plptr->userid` verbatim, "**Free**" included; the
+   * midnight purge sweeps `*`-prefixed recipients (GEMAIN.C:1195-1196), so a
+   * revolted colony's notices clean themselves up.
+   *
+   * @see GEPLANET.C:313-326
+   */
+  private mailProductionCap(planet: PlanetState, hit: ProductionCapHit): void {
+    const owner = planet.userid;
+    if (owner === null) return;
+    void this
+      .insertDistressMail(
+        owner,
+        PRODUCTION_CAP_TOPIC,
+        PRODUCTION_CAP_MAIL_TYPES[hit.item],
+        planet.name,
+        planet.xsect,
+        planet.ysect,
+        hit.cap,
+        MAIL_CLASS_PRODRPT,
+      )
+      .catch((err: unknown) => {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Production-cap mail failed for ${owner} re ${planet.name}: ${stack}`);
+      });
+  }
+
   private mailStarvation(planet: PlanetState, topic: string, type: number, lost: number): void {
     const owner = planet.userid;
     if (owner === null) return;
@@ -200,11 +237,12 @@ export class PlanetEconomyService {
     xsect: number,
     ysect: number,
     count: number,
+    klass: number = MAIL_CLASS_DISTRESS,
   ): Promise<void> {
     await this.prisma.mailStat.create({
       data: {
         userid,
-        class: MAIL_CLASS_DISTRESS,
+        class: klass,
         msgno: this.nextMsgno(),
         type,
         stamp: Math.floor(Date.now() / 1000),

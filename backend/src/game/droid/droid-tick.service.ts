@@ -21,7 +21,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { MineRegistry } from '../combat/mine.registry';
-import { MineRepository } from '../combat/mine.repository';
+import { MineRepository, MineTableFullError } from '../combat/mine.repository';
 import { Random, RANDOM } from '../combat/random.port';
 import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
@@ -620,17 +620,26 @@ export class DroidTickService implements OnModuleInit {
   private layMine(droid: ShipState): void {
     const mineCount = Number(droid.items[I_MINE] ?? 0n);
     if (mineCount <= 0) return;
-    droid.items = [...droid.items] as typeof droid.items;
-    droid.items[I_MINE] = BigInt(mineCount - 1);
 
+    // Spend the mine only once the slot is actually taken. C's `--ptr->items[I_MINE]`
+    // sits inside laymine's free-slot branch and a refusal costs nothing
+    // (GECMDS.C:1809-1814). Decrementing first was harmless while the galaxy
+    // table had no cap; wiring NUMMINES made the refusal reachable, and a droid
+    // in a full galaxy would have burned its whole magazine laying nothing.
     void this.mineRepo.create({
       channel: droid.shipno,
       timer: 100,
       xcoord: droid.xcoord,
       ycoord: droid.ycoord,
       deployedBy: droid.userid,
-    }).then((mine) => this.mineRegistry.add({ ...mine, deployedBy: droid.userid }))
-      .catch((err: unknown) => this.logger.error('Droid mine lay failed:', err));
+    }).then((mine) => {
+      droid.items = [...droid.items] as typeof droid.items;
+      droid.items[I_MINE] = BigInt(Number(droid.items[I_MINE] ?? 0n) - 1);
+      this.mineRegistry.add({ ...mine, deployedBy: droid.userid });
+    }).catch((err: unknown) => {
+      if (err instanceof MineTableFullError) return; // canon: no slot, no mine spent
+      this.logger.error('Droid mine lay failed:', err);
+    });
   }
 
   /** Deploy jammer. @see GEDROIDS.C:515 jam — sets jammer=JAMTIME */

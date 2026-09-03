@@ -42,6 +42,7 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
   hasMine: true,
   hasZipper: false,
   hasCloak: false,
+  hasDecoy: false,
   noClaim: 0,
   tough: 0,
   cybLowestClassAttacks: 0,

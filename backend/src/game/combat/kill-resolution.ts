@@ -1,6 +1,7 @@
 import { ShipState } from '../ship/ship-state.types';
 import { I_TROOPS, ITEM_TONS, NUMITEMS } from '../constants/items';
 import { Random } from './random.port';
+import { NO_CHANNEL } from '../ship/ship-channel.registry';
 
 /** One item stack that moved from the victim's hold to the killer's. */
 export interface LootTransfer {
@@ -84,4 +85,56 @@ export function resolveKillSpoils(
     }
   }
   return loot;
+}
+
+/**
+ * The name of whoever last landed damage on `victim`, or null if nobody can be
+ * named honestly.
+ *
+ * `lastfired` alone is not enough. `ShipStateService.leave()` scrubs it back to
+ * NO_CHANNEL whenever the channel it points at is recycled, so a killer who
+ * logged off in the same tick as the kill left no trace and the ship-loss mail
+ * read "an unknown assailant". `lastfiredBy` is recorded at damage time and
+ * survives that scrub — but it must only be trusted while it still describes
+ * `lastfired`:
+ *
+ *   • recorded channel === `lastfired`  — the ordinary case, attacker still in
+ *     the game (or removed later this tick, which is why the name is read off
+ *     the state rather than re-resolved);
+ *   • `lastfired` is NO_CHANNEL and the recorded channel is no longer held by
+ *     any ship — the scrub case, the one this exists for.
+ *
+ * Everything else names nobody, and the fallback must honour the SAME guards
+ * as the live lookup it stands in for — otherwise it replaces "an unknown
+ * assailant" with a specific accusation that is false, which is worse than the
+ * bug it fixes:
+ *
+ *   • A SELF-KILL names nobody. Canon's guard is `who != usrn`, and its comment
+ *     is the 12/19/91 fix "to prevent a player from being awarded points for
+ *     killing himself" (GEFUNCS.C:1100-1105). `findActiveAttackerByChannel`
+ *     already refuses this; without `victimChannel` here the fallback happily
+ *     named the victim as their own killer.
+ *   • A PLANET's ion cannons name nobody. `fireion` sets `ptr->lastfired = -1`
+ *     (GEFUNCS.C:1797) while the ship that last shot you is still flying, so
+ *     crediting that pilot for a colony's kill is a fresh lie. The live-channel
+ *     test catches that while the shooter is in the game; the ion path also
+ *     clears `lastfiredBy`, which is the only thing that catches it once the
+ *     shooter has logged off too.
+ *
+ * @see GEFUNCS.C:1100-1105 killem — canon reads lastfired, range-checks it, and
+ *      refuses the victim's own channel
+ * @see GEFUNCS.C:1224-1225 — canon's only scrub, on death
+ */
+export function attackerNameFromLastFired(
+  victim: Pick<ShipState, 'lastfired' | 'lastfiredBy'>,
+  isChannelHeld: (channel: number) => boolean,
+  victimChannel?: number,
+): string | null {
+  const recorded = victim.lastfiredBy;
+  if (recorded === undefined) return null;
+  // `who != usrn` — a pilot is never their own killer.
+  if (victimChannel !== undefined && recorded.channel === victimChannel) return null;
+  if (recorded.channel === victim.lastfired) return recorded.name;
+  if (victim.lastfired === NO_CHANNEL && !isChannelHeld(recorded.channel)) return recorded.name;
+  return null;
 }

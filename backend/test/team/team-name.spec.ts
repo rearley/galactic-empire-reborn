@@ -44,8 +44,10 @@ describe('validateName', () => {
     expect(validateName('a'.repeat(30))).toBeNull();
   });
 
-  it('returns name_too_long for 31-char name', () => {
-    expect(validateName('a'.repeat(31))).toBe('name_too_long');
+  it('never refuses a long name -- canon truncates', () => {
+    // `strncpy(teamtab[i].teamname, margv[3], 30)` (GECMDS.C:5521, :5750).
+    // parseTeaArgs does the truncation; nothing downstream rejects.
+    expect(validateName('a'.repeat(31))).toBeNull();
   });
 });
 
@@ -58,8 +60,12 @@ describe('validatePassword', () => {
     expect(validatePassword('x')).toBeNull();
   });
 
-  it('returns password_too_long for 9-char password', () => {
-    expect(validatePassword('123456789')).toBe('password_too_long');
+  it('does not refuse a long password here -- the create path truncates', () => {
+    // Canon's create is `strncpy(tmp.password, margv[4], 10)` (GECMDS.C:5518).
+    // The ONE place canon does refuse is `newpass`, which checks
+    // `strlen(margv[3]) > 10` and answers TEAMBPSS (GECMDS.C:5702-5706); that
+    // check lives in TeamService.newPassword, not here.
+    expect(validatePassword('123456789')).toBeNull();
   });
 
   it('returns password_has_space for password with space (≤ 8 chars)', () => {

@@ -3,14 +3,32 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { CLOAK_ENERGY_USE } from '../cloak.config';
 import { CLOAK_RAMP_INIT } from '../_ship-management-constants';
+
+/**
+ * CLOK1, in the shipped table's own words. `MessageId.CLOAK_HYPERSPACE` carries
+ * a paraphrase ("Cannot cloak while in hyperspace."), and `messages.ts` is not
+ * this agent's to edit, so the canon string is declared locally — the same
+ * pattern as SCANWRM in scan.handler.ts.
+ *
+ * @see GE/REL/MBMGEMSG.MSG:2381
+ */
+export const CLOK1 = 'We cannot operate the Cloaking device in hyperspace Sir!';
+
+/**
+ * CLOK01 — this hull has no cloaking device at all.
+ * @see GECMDS.C:3192-3197, GE/REL/MBMGEMSG.MSG CLOK01
+ */
+export const CLOK01 = 'HAHA! A cloaking system on this tub? Sorry Sir!';
 
 /**
  * Handles `cloak <on|off>` — toggles the cloaking device.
  *
  * On `cloak on`:
- *  - Rejects if already cloaked, damaged, hyperspace, or insufficient energy.
+ *  - Rejects if already cloaked, damaged, or insufficient energy (hyperspace is
+ *    gated ahead of the on/off dispatch, per GECMDS.C:3207).
  *  - Sets cloak = CLOAK_RAMP_INIT (1) and debits CLOAK_ENERGY_USE.
  *  - ShipManagementTickService ramps to 2 then 10 over two physics ticks.
  *
@@ -26,6 +44,7 @@ export class CloakHandlerService {
   constructor(
     private readonly shipState: ShipStateService,
     @Inject(CLOAK_ENERGY_USE) private readonly cloakEnergyUse: number,
+    private readonly shipClassCache: ShipClassCacheService,
   ) {}
 
   readonly command: Command = {
@@ -39,6 +58,24 @@ export class CloakHandlerService {
 
   private handle(ship: ShipState, args: string[]): CommandResult {
     const sub = args[0]?.toLowerCase() ?? '';
+
+    // No cloaking device on this hull. This is the FIRST check in cmd_cloak —
+    // `if (shipclass[warsptr->shpclass].max_cloak == 0) { prfmsg(CLOK01); return; }`
+    // (GECMDS.C:3192-3197) — ahead of the hyperspace gate, and it was missing.
+    // A captain in a hull with no cloak got the on/off machinery's answers
+    // instead of being told the ship has no such device.
+    if (!this.shipClassCache.getHasCloak(ship.shpclass)) {
+      return { lines: [{ text: CLOK01, category: 'system' }] };
+    }
+
+    // Hyperspace is checked ONCE, ahead of the on/off dispatch (GECMDS.C:3207),
+    // so it covers `cloak off` as well and outranks CLOKDAM/CLOKCOM/CLOKPWR.
+    // The port checked it only on the `on` branch and only third, so a captain
+    // in hyperspace typing `clo off` was told the device was "already down" —
+    // true, but silent about the reason, which is the thing they needed.
+    if (ship.where === 1) {
+      return { lines: [{ text: CLOK1, category: 'system' }] };
+    }
 
     if (sub === 'on') {
       return this.handleOn(ship);
@@ -54,9 +91,6 @@ export class CloakHandlerService {
     }
     if (ship.cloak > 0) {
       return { lines: [{ text: formatMessage(MessageId.CLOAK_ALREADY_ON), category: 'system' }] };
-    }
-    if (ship.where === 1) {
-      return { lines: [{ text: formatMessage(MessageId.CLOAK_HYPERSPACE), category: 'system' }] };
     }
     if (ship.energy <= this.cloakEnergyUse) {
       return { lines: [{ text: formatMessage(MessageId.CLOAK_NO_ENERGY), category: 'system' }] };

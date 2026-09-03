@@ -9,6 +9,33 @@
 >
 > Current audit: `CANON_AUDIT_2026-09.md`. Index: `README.md`.
 
+> ## VALUE RE-CHECK 2026-09-03 — all eight sourceRefs CONFIRMED
+>
+> Every `sourceRef` and every numeric claim in the table below has been re-read
+> against `reference/ge-source/` and the **shipped**
+> `reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG` (never `GE/MSG/`, an
+> earlier partial snapshot — see `reference/ge-upstream/PROVENANCE.md`).
+> **Nothing here is wrong.** This document is short and mostly cites C line
+> numbers rather than data-file values, which is why it survived intact where
+> the two larger audits did not.
+>
+> | id | claim | verdict |
+> |---|---|---|
+> | F-001 | `GEFUNCS.C:1956` is `randamage` | **CONFIRMED** — `:1956` is `void FUNC randamage(ptr,usrn)` |
+> | F-002 | `GEFUNCS.C:1031` is the `phasrtype * PRELOAD` reload | **CONFIRMED** — `:1031` `preload = (double)(ptr->phasrtype * PRELOAD);` |
+> | F-003 | `GEMAIN.H:473` is the wormhole visible flag | **CONFIRMED** — `:473` `int visible;` |
+> | F-004 | `GECMDS.C:2138` | **CONFIRMED** — `:2138` `void FUNC cmd_scan()`. Disposition n/a; `scan lo` full-panel remains a declared port enhancement |
+> | F-005 | `GEFUNCS.C:808-816` beacon, gated `gernd()%10 == 0` | **CONFIRMED** exactly, including the 1-in-10 gate at `:811` |
+> | F-006 | `GECMDS.C:5197-5201` is the four-entry `set` option table | **CONFIRMED** — `#define NUMOPTS 4` at `:5196`, `scannames/scanhome/scanfull/filter` at `:5198-5201`; index mapping `GEMAIN.H:233-236` |
+> | F-007 | `ENGYMAX` is 65000, not 50000 | **CONFIRMED** — `GEMAIN.H:90` `#define ENGYMAX 65000U` |
+> | F-008 | manual smoke tests | **UNVERIFIABLE** (no canon claim to check) |
+>
+> One addition, not a correction: F-006's `filter` option is the single line by
+> which the shipped `MBMGEHLP.MSG` differs from the stale copy (`GE/REL/…:961`,
+> *"filters out 80% of the battle messages"*). The 80% is prose — `outprfge`
+> (`GEMAIN.C:2547-2576`) suppresses `FILTER`-class messages outright — so it is
+> not a constant anyone should implement.
+
 **Schema**: Each finding has id, sourceRef, tsModule, severity, disposition, testRef, notes.
 
 | id | sourceRef | tsModule | severity | disposition | testRef | notes |

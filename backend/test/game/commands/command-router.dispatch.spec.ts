@@ -94,7 +94,7 @@ function buildRouter() {
 
   const router = new CommandRouterService();
 
-  router.register(new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT).command);
+  router.register(new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT, { getHasCloak: () => true } as never).command);
   router.register(new MaintHandlerService(mockMaintService).command);
   router.register(new TransferHandlerService(mockShipState, {} as any).command);
   router.register(new JettisonHandlerService(mockShipState).command);

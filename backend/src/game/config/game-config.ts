@@ -41,7 +41,19 @@
  *
  * `implemented: false` marks an option that is declared here — so its bounds
  * are recorded and the gap is visible — but does not yet back any gameplay
- * constant. Their defaults are provisional.
+ * constant. Their defaults are provisional, and each carries a `note` saying
+ * why nothing reads it.
+ *
+ * That flag WAS unreliable. An audit on 2026-09-03 walked every option back to
+ * a real reference in src/ and found 14 of the 24 then marked `false` were
+ * fully wired: PLODDS/WORMODDS (galaxy.config.ts), TEAMMAX (team.service.ts),
+ * PLATTRF1/F2/F3 and PLATTRT1/T2 (planet-attack.service.ts), MAILDAYS and
+ * CHGLOSER (midnight.config.ts), TOOCLOSE and CYBGOLD (cybertron.config.ts),
+ * CLENGUSE (cloak.config.ts) and SCRBONUS (player-score.service.ts). None was
+ * marked `true` while dead. The old guard was a count of wired options, which
+ * cannot catch that: the total never moved. It is now a NAMED list plus a
+ * scan of the comment-stripped source tree for each option's constant.
+ * @see test/unit/config/game-config.spec.ts
  *
  * @see reference/ge-source/GEMAIN.C:459-524
  * @see backend/config/game.config.json — the values actually in force
@@ -76,17 +88,20 @@ export interface SysopOption {
 
 export const SYSOP_OPTIONS = {
   MAXPLRS: { min: 1, max: 256, default: 30, canonDefault: 30, cReference: 'GEMAIN.C:459', implemented: true },
-  FREEBIES: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:460', implemented: false },
-  MAXLIST: { min: 3, max: 50, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:461', implemented: false },
+  FREEBIES: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:460', implemented: false,
+    note: 'No consumer. C uses it to hand out free items at signup (GEMAIN.C:460); the port has no equivalent giveaway path.' },
+  MAXLIST: { min: 3, max: 50, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:461', implemented: false,
+    note: 'No consumer. Caps the length of the ros/who listings in C; our listings are not truncated.' },
   MAXSHIPS: { min: 1, max: 50, default: 8, canonDefault: 8, cReference: 'GEMAIN.C:462', implemented: true },
   SE100DAM: { min: 1, max: 101, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:463', implemented: true },
-  SHOWOPT: { min: 0, max: 5, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:464', implemented: false },
+  SHOWOPT: { min: 0, max: 5, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:464', implemented: false,
+    note: 'No consumer. Selects which sysop stats the C menu displays — an operator UI we do not have.' },
   MAXPLNTS: { min: 1, max: 256, default: 20, canonDefault: 20, cReference: 'GEMAIN.C:468', implemented: true },
   NUMSHIPS: { min: 1, max: 500, default: 30, canonDefault: 30, cReference: 'GEMAIN.C:470', implemented: false,
     note: 'Not enforced: in C this only SIZES the ship array (nships = nterms + numships, GEMAIN.C:697). There is no runtime gate on it, so adding one would be an invention rather than a port.' },
   MAXDROID: { min: 0, max: 500, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:471', implemented: true },
-  PLODDS: { min: 1, max: 20, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:472', implemented: false },
-  WORMODDS: { min: 1, max: 100, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:473', implemented: false },
+  PLODDS: { min: 1, max: 20, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:472', implemented: true },
+  WORMODDS: { min: 1, max: 100, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:473', implemented: true },
   // Half-extent of the universe square: sectors run -UNIVMAX..+UNIVMAX on
   // both axes, so the galaxy is (2*UNIVMAX+1)^2 sectors with the neutral zone
   // at its centre.
@@ -100,14 +115,15 @@ export const SYSOP_OPTIONS = {
   // absolute, so UNIVMAX and scanRange must be chosen together.
   // @see docs/DECISIONS.md
   UNIVMAX: { min: 10, max: 32767, default: 300, canonDefault: 300, cReference: 'GEMAIN.C:474', implemented: true },
-  S00PLNUM: { min: 3, max: 9, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:476', implemented: false },
+  S00PLNUM: { min: 3, max: 9, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:476', implemented: false,
+    note: 'No consumer. src/game/galaxy/s00.ts hard-codes S00_PLNUM = 5 as a fixed fixture, so the option cannot vary it.' },
   // lngopt, not numopt, and stored in MINUTES: GEMAIN.C:469 multiplies by 60.
   // ynopt, so 0/1. GEMAIN.C:475 univwrap = ynopt(UNIVWRAP); canon ships NO.
   UNIVWRAP: { min: 0, max: 1, default: 0, canonDefault: 0, cReference: 'GEMAIN.C:475', implemented: true, constant: 'UNIVWRAP' },
   PLANTOCK: { min: 1, max: 32760, default: 360, canonDefault: 360, cReference: 'GEMAIN.C:469', implemented: true, constant: 'PLANTOCK_SECONDS' },
   MAXPLSE: { min: 1, max: 9, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLSE' },
   TEAMBONU: { min: 0, max: 32000, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:478', implemented: true },
-  TEAMMAX: { min: 0, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:479', implemented: false },
+  TEAMMAX: { min: 0, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:479', implemented: true },
   // 5, not 9. The 9 came from GE/MSG/MBMGEMSG.MSG, an earlier partial snapshot;
   // the shipped file is GE/REL/MBMGEMSG.MSG. @see reference/ge-upstream/PROVENANCE.md
   HPFIRDST: { min: 1, max: 20, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:491', implemented: true },
@@ -118,10 +134,10 @@ export const SYSOP_OPTIONS = {
   PFIRDST: { min: 1, max: 20, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:493', implemented: true },
   PDAMMAX: { min: 1, max: 200, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:494', implemented: true },
   JAMTIME: { min: 1, max: 10, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:496', implemented: true },
-  MAILDAYS: { min: 1, max: 7, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:497', implemented: false },
+  MAILDAYS: { min: 1, max: 7, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:497', implemented: true },
   TORPSPED: { min: 1, max: 10000, default: 2441, canonDefault: 2441, cReference: 'GEMAIN.C:498', implemented: true },
   MISLSPED: { min: 1, max: 10000, default: 1212, canonDefault: 1212, cReference: 'GEMAIN.C:499', implemented: true },
-  NUMMINES: { min: 1, max: 200, default: 12, canonDefault: 12, cReference: 'GEMAIN.C:501', implemented: false },
+  NUMMINES: { min: 1, max: 200, default: 12, canonDefault: 12, cReference: 'GEMAIN.C:501', implemented: true },
   USRMINES: { min: 1, max: 200, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:502', implemented: true, constant: 'USERMINES' },
   DECODDS: { min: 1, max: 20, default: 11, canonDefault: 11, cReference: 'GEMAIN.C:504', implemented: true },
   TORFACT: { min: 1, max: 50, default: 40, canonDefault: 40, cReference: 'GEMAIN.C:506', implemented: true },
@@ -130,27 +146,31 @@ export const SYSOP_OPTIONS = {
   MDAMMAX: { min: 1, max: 100, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:511', implemented: true },
   IDAMMAX: { min: 1, max: 100, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:512', implemented: true },
   MNDAMMAX: { min: 1, max: 200, default: 75, canonDefault: 75, cReference: 'GEMAIN.C:513', implemented: true, constant: 'MINEDAMMAX' },
-  REPAIRRT: { min: 1, max: 50, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:514', implemented: true },
-  TOOCLOSE: { min: 1, max: 32000, default: 2500, canonDefault: 2500, cReference: 'GEMAIN.C:517', implemented: false },
-  CLENGUSE: { min: 1, max: 32000, default: 7500, canonDefault: 7500, cReference: 'GEMAIN.C:519', implemented: false },
+  REPAIRRT: { min: 1, max: 50, default: 6, canonDefault: 6, cReference: 'GEMAIN.C:514', implemented: true, constant: 'REPAIRRATE' },
+  TOOCLOSE: { min: 1, max: 32000, default: 2500, canonDefault: 2500, cReference: 'GEMAIN.C:517', implemented: true },
+  CLENGUSE: { min: 1, max: 32000, default: 7500, canonDefault: 7500, cReference: 'GEMAIN.C:519', implemented: true },
   STRTCASH: { min: 1, max: 32000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:521', implemented: true, constant: 'START_CASH' },
-  MAXPLREC: { min: 10, max: 32767, default: 32767, canonDefault: 32767, cReference: 'GEMAIN.C:524', implemented: false },
-  CYBGOLD: { min: 0, max: 32000, default: 1200, canonDefault: 1200, cReference: 'GEMAIN.C:527', implemented: false },
+  MAXPLREC: { min: 10, max: 32767, default: 32767, canonDefault: 32767, cReference: 'GEMAIN.C:524', implemented: false,
+    note: 'No consumer. Sizes the C player-record file; Postgres has no equivalent preallocation.' },
+  CYBGOLD: { min: 0, max: 32000, default: 1200, canonDefault: 1200, cReference: 'GEMAIN.C:527', implemented: true },
   // Recovered 2026-09-03: these read canonDefault null on the belief that no
   // shipped value existed. It did — we were reading GE/MSG, which has no
   // HYPDST blocks. GE/REL:512, :522.
-  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:529', implemented: false },
-  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:530', implemented: false },
-  PLATTRF1: { min: 5, max: 1000, default: 18, canonDefault: 18, cReference: 'GEMAIN.C:532', implemented: false },
-  PLATTRF2: { min: 5, max: 1000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:535', implemented: false },
-  PLATTRF3: { min: 5, max: 1000, default: 55, canonDefault: 55, cReference: 'GEMAIN.C:539', implemented: false },
-  PLATTRT1: { min: 5, max: 1000, default: 125, canonDefault: 125, cReference: 'GEMAIN.C:543', implemented: false },
-  PLATTRT2: { min: 5, max: 1000, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:547', implemented: false },
+  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:529', implemented: false,
+    note: 'No consumer. cybertron.config.ts hard-codes hyperdist1: 25 (the same number) rather than reading this option, so a sysop tune has no effect.' },
+  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:530', implemented: false,
+    note: 'No consumer. cybertron.config.ts hard-codes hyperdist2: 10 rather than reading this option.' },
+  PLATTRF1: { min: 5, max: 1000, default: 18, canonDefault: 18, cReference: 'GEMAIN.C:532', implemented: true },
+  PLATTRF2: { min: 5, max: 1000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:535', implemented: true },
+  PLATTRF3: { min: 5, max: 1000, default: 55, canonDefault: 55, cReference: 'GEMAIN.C:539', implemented: true },
+  PLATTRT1: { min: 5, max: 1000, default: 125, canonDefault: 125, cReference: 'GEMAIN.C:543', implemented: true },
+  PLATTRT2: { min: 5, max: 1000, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:547', implemented: true },
   PHATOWRP: { min: 0, max: 100, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:598', implemented: true },
   MISENGFC: { min: 1, max: 2000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:600', implemented: true },
-  SCRBONUS: { min: 0, max: 32700, default: 1000, canonDefault: 1000, cReference: 'GEMAIN.C:602', implemented: false },
-  SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: false },
-  CHGLOSER: { min: 0, max: 100, default: 2, canonDefault: 2, cReference: 'GEMAIN.C:605', implemented: false },} as const satisfies Record<string, SysopOption>;
+  SCRBONUS: { min: 0, max: 32700, default: 1000, canonDefault: 1000, cReference: 'GEMAIN.C:602', implemented: true },
+  SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: false,
+    note: 'No consumer. src/game/player/score.config.ts reads its own SCORE_F2 env var and defaults to 100, not to this option (canon 35), so the shipped score_f2 is not in force. Wiring it means editing score.config.ts.' },
+  CHGLOSER: { min: 0, max: 100, default: 2, canonDefault: 2, cReference: 'GEMAIN.C:605', implemented: true },} as const satisfies Record<string, SysopOption>;
 
 export type SysopOptionName = keyof typeof SYSOP_OPTIONS;
 export type GameConfig = Record<SysopOptionName, number>;

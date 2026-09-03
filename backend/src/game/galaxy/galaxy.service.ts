@@ -209,7 +209,7 @@ export class GalaxyService implements OnModuleInit {
   ): Promise<void> {
     const rng = new Rng(cfg.seed);
 
-    // Origin sector (0,0) — hand-authored s00 fixture
+    // Origin sector (0,0) — generated s00 fixture, @see tools/extract-s00.mjs
     await this.generateOrigin(tx, rng);
 
     // All remaining sectors in row-major y,x order
@@ -245,7 +245,7 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * Build item arrays for Zygor-3 (S00 index 0) — all items available (GE22e patch).
+   * Build item arrays for Zygor (s00 type 1) — all items available (GE22e patch).
    * @see GEMAIN.C:2147-2160 GE22e "Updating Zygor" midnight patch
    */
   private static s00ItemsPlan1(): {
@@ -263,7 +263,7 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * Build item arrays for S00 index 1 — troops, men, food.
+   * Build item arrays for Tahanian Station (s00 type 2) — troops, men, food.
    * @see GEPLANET.C:746-754 build_plan_2
    */
   private static s00ItemsPlan2(): {
@@ -285,14 +285,23 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * Insert the origin sector (0,0) from the frozen s00 fixture.
-   * plnum 1 (Zygor-3) gets weapons inventory; plnum 2 gets troops/men/food.
-   * @see GEPLANET.C:670-727 build_plan_1
-   * @see GEPLANET.C:729-755 build_plan_2
+   * Insert the origin sector (0,0) from the generated s00 fixture.
+   *
+   * Dispatch is on the entry's `type`, exactly as GEPLANET.C:503-528 does it:
+   * 1 -> build_plan_1 (Zygor, the weapons hub), 2 -> build_plan_2 (Tahanian
+   * Station, troops/men/food), 3 -> build_worm (a wormhole portal, written to
+   * the Wormhole table rather than Planet), anything else -> build_other (a
+   * bare planet with no stock, which is the Enforcer Planet).
+   *
+   * @see GEPLANET.C:497-528 the dispatch
+   * @see GEPLANET.C:665-727 build_plan_1
+   * @see GEPLANET.C:730-766 build_plan_2
+   * @see GEPLANET.C:771-796 build_other
+   * @see GEPLANET.C:800-839 build_worm
    */
   private async generateOrigin(
     tx: Prisma.TransactionClient,
-    _rng: Rng,
+    rng: Rng,
   ): Promise<void> {
     await tx.sector.create({
       data: { xsect: 0, ysect: 0, plnum: 0, type: SECTYPE_NORMAL, numplan: S00_PLNUM },
@@ -304,9 +313,42 @@ export class GalaxyService implements OnModuleInit {
       const xcoord = 0 + entry.xcoord;
       const ycoord = 0 + entry.ycoord;
 
-      // S00 index 0 → Zygor-3 weapons hub; index 1 → troops/men/food hub
-      const items = i === 0 ? GalaxyService.s00ItemsPlan1()
-                 : i === 1 ? GalaxyService.s00ItemsPlan2()
+      // type 3 → a wormhole portal, not a planet. @see GEPLANET.C:517-520
+      if (entry.type === 3) {
+        // build_worm draws a destination anywhere in the universe
+        // (GEPLANET.C:823-824 rndm(univmax*2)-univmax). Kept grid-bounded and
+        // self-loop-free to match the rest of the generator.
+        // @see specs/004-galaxy-generator/research.md Decision 5
+        let destX: number, destY: number;
+        do {
+          destX = Math.floor(rng.next() * UNIVERSE_SIDE) - UNIVMAX;
+          destY = Math.floor(rng.next() * UNIVERSE_SIDE) - UNIVMAX;
+        } while (destX === 0 && destY === 0);
+
+        await tx.wormhole.create({
+          data: {
+            xsect: 0,
+            ysect: 0,
+            plnum,
+            type: PLTYPE_WORM,
+            xcoord,
+            ycoord,
+            // build_worm sets worm.visible = 1 — GEPLANET.C:822
+            visible: 1,
+            destXcoord: destX + 0.5,
+            destYcoord: destY + 0.5,
+            // build_worm copies the fixture name — GEPLANET.C:806
+            name: entry.name,
+          },
+        });
+        continue;
+      }
+
+      // type 1 → Zygor weapons hub; type 2 → Tahanian Station troops/men/food;
+      // anything else (the Enforcer Planet, type 0) is built bare by
+      // build_other, which sets no items at all. @see GEPLANET.C:771-796
+      const items = entry.type === 1 ? GalaxyService.s00ItemsPlan1()
+                 : entry.type === 2 ? GalaxyService.s00ItemsPlan2()
                  : {
                      itemsQty: new Array(NUMITEMS).fill(0n),
                      itemsSell: new Array(NUMITEMS).fill(0),

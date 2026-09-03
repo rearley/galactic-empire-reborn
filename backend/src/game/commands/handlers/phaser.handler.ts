@@ -272,6 +272,9 @@ export class PhaserHandlerService {
           // @see GEFUNCS.C:2459-2462
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          // Name the firer here, where the damage lands, so a channel scrub on
+          // logout cannot erase the attribution. @see attackerNameFromLastFired
+          v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
@@ -280,6 +283,7 @@ export class PhaserHandlerService {
         this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
           v.damage = v.damage + hullDamage;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
           v.cantexit = FIRETICKS;
         });
       }
@@ -448,6 +452,7 @@ export class PhaserHandlerService {
       this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
         v.damage = v.damage + damage;
         v.lastfired = ship.channel ?? NO_CHANNEL;
+        v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
         if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
       });

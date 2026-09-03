@@ -402,7 +402,13 @@ describe('Balance regression constants', () => {
     expect(MAX_TEAMNAME_LENGTH).toBe(30);
   });
 
-  it('MAX_TEAM_PASSWORD_LENGTH === 8 (FR-011a deviation from original 10)', () => {
-    expect(MAX_TEAM_PASSWORD_LENGTH).toBe(8);
+  it('MAX_TEAM_PASSWORD_LENGTH === 10, the canon field width', () => {
+    // Was 8, as "FR-011a, documented deviation from original 10". The entry it
+    // pointed at (DECISIONS.md, 2026-05-08) justifies auto-assigned teamcodes
+    // and a single password, and says nothing about the length -- so the cap
+    // was written down but never argued for, which is not the same as a
+    // documented deviation. Canon is `password[11]` (GEMAIN.H:650) filled by
+    // `strncpy(tmp.password, margv[4], 10)` (GECMDS.C:5518).
+    expect(MAX_TEAM_PASSWORD_LENGTH).toBe(10);
   });
 });

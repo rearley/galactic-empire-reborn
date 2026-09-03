@@ -65,9 +65,11 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     const excluded: string[] = [];
     (gateway as unknown as { server: unknown }).server = {
       emit: (event: string, payload: unknown) => { globalEmits.push({ event, payload }); },
-      except: (room: string) => ({
+      except: (rooms: string | string[]) => ({
         emit: (event: string, payload: unknown) => {
-          excluded.push(room);
+          // except() now also carries the MSG_FILTER opt-outs canon's
+          // outwar(FILTER, ...) honours, so it takes a list.
+          excluded.push(...(Array.isArray(rooms) ? rooms : [rooms]));
           globalEmits.push({ event, payload });
         },
       }),

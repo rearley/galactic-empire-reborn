@@ -3,7 +3,7 @@
  * @see GECMDS.C:3188 cmd_cloak
  * @see contracts/commands.md §cloak
  */
-import { CloakHandlerService } from '../../../../src/game/commands/handlers/cloak.handler';
+import { CloakHandlerService, CLOK1 } from '../../../../src/game/commands/handlers/cloak.handler';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../../src/game/commands/command.types';
@@ -47,7 +47,7 @@ function makeService(shipState?: Partial<ShipState>) {
     ),
   } as unknown as ShipStateService;
 
-  const handler = new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT);
+  const handler = new CloakHandlerService(mockShipState, CLOAK_ENERGY_USE_DEFAULT, { getHasCloak: () => true } as never);
   const ctx: CommandContext = {};
   return { handler, state, mockShipState, mutated, ctx };
 }
@@ -101,10 +101,13 @@ describe('CloakHandlerService', () => {
       expect(result.lines[0].text).toBe(formatMessage(MessageId.CLOAK_DAMAGED));
     });
 
-    it('hyperspace (where == 1) → CLOAK_HYPERSPACE', () => {
+    // The gate itself moved ahead of the on/off dispatch and now uses the
+    // shipped CLOK1 wording; see cloak-hyperspace-gate.spec.ts.
+    // @see GECMDS.C:3207-3212, GE/REL/MBMGEMSG.MSG:2381
+    it('hyperspace (where == 1) → CLOK1', () => {
       const { handler, state, ctx } = makeService({ cloak: 0, where: 1 });
       const result = handler.command.handler(state, ['on'], ctx) as { lines: { text: string }[] };
-      expect(result.lines[0].text).toBe(formatMessage(MessageId.CLOAK_HYPERSPACE));
+      expect(result.lines[0].text).toBe(CLOK1);
     });
 
     it('insufficient energy → CLOAK_NO_ENERGY', () => {

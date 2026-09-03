@@ -1,4 +1,4 @@
-import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
+import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, MOVENGMIN, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -338,6 +338,67 @@ export function missileShieldDrain(
 ): number {
   const adjusted = Math.floor(charge * damageScale(victimDamageFactor));
   return Math.floor(Math.floor(adjusted / 999) * (rand.next() * 0.5 + 0.5));
+}
+
+/**
+ * Flux drawn from the neutron pile to launch a missile of the given charge.
+ *
+ *   eng_flu = energy/misengfc;      // GECMDS.C:1278
+ *
+ * `energy` there is the charge argument (`unsigned`) and `misengfc` an `int`,
+ * so this is C integer division and it TRUNCATES. The port was subtracting the
+ * fractional quotient, which is not what a pilot is billed in the original.
+ *
+ * The truncation is load-bearing at the bottom of the range: with the shipped
+ * `misengfc` of 100 (GE/REL/MBMGEMSG.MSG:349) any charge of 1..99 costs zero
+ * flux, and the MISSHRT gate below is skipped entirely for it (`eng_flu > 0`).
+ * A dry pile can still fling low-charge missiles forever. That is canon.
+ *
+ * @see GECMDS.C:1278
+ */
+export function missileFluxCost(charge: number, misengfc: number): number {
+  if (misengfc <= 0) return 0;
+  return Math.trunc(charge / misengfc);
+}
+
+/**
+ * The MISSHRT gate: is the pile too shallow for this shot?
+ *
+ *   if (eng_flu > 0 && eng_flu >= (warsptr->energy+MOVENGMIN))   GECMDS.C:1280
+ *
+ * Note the PLUS. `energy` is a `double` (GEMAIN.H:334), so this is not an
+ * overflow artefact — the shot is allowed to leave the pile up to MOVENGMIN-1
+ * in the red, and `warsptr->energy -= eng_flu` at GECMDS.C:1314 duly takes it
+ * there. Reading it as the more obvious `- MOVENGMIN` (keep a movement reserve)
+ * would make missiles strictly harder to fire than the original allows, so the
+ * `+` is reproduced verbatim. It is a leniency, not a defect: nothing wraps,
+ * and the passive recharge climbs the pile back out.
+ *
+ * @see GECMDS.C:1280  @see GEMAIN.H:77 MOVENGMIN
+ */
+export function missileFluxShort(fluxCost: number, energy: number): boolean {
+  return fluxCost > 0 && fluxCost >= energy + MOVENGMIN;
+}
+
+/**
+ * The warp band at or above which crossing it shakes off every missile that is
+ * tracking you — rolled fresh on each band crossing:
+ *
+ *   if ((ptr->speed + accelrate)/1000 >= (4 + gernd()%4))   GEFUNCS.C:506
+ *
+ * i.e. a uniform 4..7. On a hit, every `lmissl[i].distance` on the ACCELERATING
+ * ship is zeroed and MISSL2 is printed to it ("The missile tracking us has lost
+ * lockon and self destructed Sir!", GE/REL/MBMGEMSG.MSG:2630).
+ *
+ * This is a property of the acceleration path (GEFUNCS.C:499-522), not of the
+ * missile command — the ship that escapes is the TARGET, and it escapes by
+ * accelerating, not by firing. This helper is the canon roll for whoever wires
+ * the acceleration step; it is not called from the weapon handlers.
+ *
+ * @see GEFUNCS.C:504-521
+ */
+export function missileShakeWarp(rand: Random): number {
+  return 4 + Math.floor(rand.next() * 4);
 }
 
 /**

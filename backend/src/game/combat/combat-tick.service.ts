@@ -52,7 +52,7 @@ import {
   CombatShipDestroyedEvent,
 } from './combat-events';
 import { applyRandamageAndEmit } from './randamage.apply';
-import { LootTransfer, resolveKillSpoils } from './kill-resolution';
+import { attackerNameFromLastFired, LootTransfer, resolveKillSpoils } from './kill-resolution';
 import {
   AiFireEventForInvariants,
   CombatEventForInvariants,
@@ -216,6 +216,10 @@ export class CombatTickService implements OnModuleInit {
     const attackerSnapshot = new Map<string, {
       userid: string | null; shipKey: string | null; shipname: string | null;
     }>();
+    // Channels held by a ship still in the game, taken before any removal.
+    // A recorded name is only trusted for a channel nobody holds any more.
+    const liveChannels = new Set<number>();
+    for (const s of ships) if (s.channel !== undefined) liveChannels.add(s.channel);
     for (const ship of ships) {
       if (ship.damage < 100) continue;
       if (ship.status !== 1 && ship.status !== 2) continue;
@@ -228,7 +232,15 @@ export class CombatTickService implements OnModuleInit {
         // gateway — the ship-loss mail, for one — has no way to resolve a
         // shipKey afterwards. Leaving it unset made every mail read "destroyed
         // by an unknown assailant", including kills by a named Cybertron.
-        shipname: attacker ? attacker.shipname : null,
+        //
+        // The fallback is the killer who LOGGED OFF in the same tick. leave()
+        // has already scrubbed the victim's `lastfired` by then, so no channel
+        // lookup can name them — `lastfiredBy`, recorded when the damage
+        // landed, is the only surviving evidence.
+        // @see attackerNameFromLastFired
+        shipname: attacker
+          ? attacker.shipname
+          : attackerNameFromLastFired(ship, (c) => liveChannels.has(c), ship.channel),
       });
     }
 
@@ -399,6 +411,11 @@ export class CombatTickService implements OnModuleInit {
     // to anyone who had just raised shields.
     const shieldUp = ship.shieldstat === 1;
         const channel = mine.channel;
+        // The layer's NAME, captured while they are still in the map. A mine
+        // outlives its owner's session, so this is exactly the case a later
+        // channel re-resolve cannot answer. @see attackerNameFromLastFired
+        const mineOwnerName =
+          this.shipState.findAllShips().find((m) => m.channel === channel)?.shipname ?? null;
         let hullDamage = damage;
         let shieldConsumed = 0;
         if (shieldUp) {
@@ -417,12 +434,14 @@ export class CombatTickService implements OnModuleInit {
           // @see GEFUNCS.C:2459-2462
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
             v.lastfired = channel;
+            v.lastfiredBy = mineOwnerName === null ? undefined : { channel, name: mineOwnerName };
           });
           shieldConsumed = r.shieldConsumed;
         } else {
           this.shipState.mutate(ship.userid, ship.shipno, (v) => {
             v.damage = v.damage + hullDamage;
             v.lastfired = channel;
+            v.lastfiredBy = mineOwnerName === null ? undefined : { channel, name: mineOwnerName };
           });
         }
 
@@ -702,6 +721,11 @@ export class CombatTickService implements OnModuleInit {
         ? rollMissileHullDamage(this.random, dmgMax, damageFactor, shieldUp)
         : rollProjectileHullDamage(this.random, dmgMax, damageFactor, shieldUp);
     let shieldConsumed = 0;
+    // The firer's NAME, read now rather than re-resolved at kill time: a
+    // torpedo in flight can outlive its firer's session, and the channel scrub
+    // in ShipStateService.leave() would leave nothing behind to look up.
+    const firerName =
+      this.findShipByChannel(attackerChannel, carrier)?.shipname ?? null;
     if (shieldUp) {
       // Torpedo drain is an independent 10..29 roll in C, NOT the hull damage;
       // a missile instead drains in proportion to the charge it carried.
@@ -719,6 +743,7 @@ export class CombatTickService implements OnModuleInit {
           // @see GEFUNCS.C:2459-2462
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
         v.lastfired = attackerChannel;
+        v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
         v.cantexit = FIRETICKS;
       });
       shieldConsumed = r.shieldConsumed;
@@ -726,6 +751,7 @@ export class CombatTickService implements OnModuleInit {
       this.shipState.mutate(carrier.userid, carrier.shipno, (v) => {
         v.damage = v.damage + hullDamage;
         v.lastfired = attackerChannel;
+        v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
         v.cantexit = FIRETICKS;
       });
     }

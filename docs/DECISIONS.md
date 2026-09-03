@@ -2255,3 +2255,459 @@ unknown assailant". Closing that properly means carrying the attacker's NAME on
 the victim's state at the moment damage lands, rather than re-resolving a
 channel later. Not done; it is a narrow window and the rest of the attribution
 path was rewritten this session.
+
+## 2026-09-03 — NUMMINES is a galaxy-wide mine table, enforced in MineRegistry
+
+**Context:** `NUMMINES` (canon default 12) was declared in `SYSOP_OPTIONS` but
+read by nothing. The port enforced only the per-user `USRMINES` cap (3), so
+five captains could field fifteen live mines where the original allows twelve
+in the entire universe. The original allocates ONE mine table for the whole
+game — `nummines = numopt(NUMMINES,1,200)` (GEMAIN.C:501), `mines =
+(MINE *)alcmem(n=nummines*sizeof(MINE))` (GEMAIN.C:754) — and every mine
+operation walks `i<nummines` over it.
+
+**Decision:** `MineRegistry` now carries a fixed `capacity` read from the
+resolved config at module load, exposes `isFull()`, and `add()` returns
+`false` without inserting when every slot is taken. `MineRepository.create()`
+consults the registry and rejects with `MineTableFullError` *before* writing
+the row. `hydrate()` is deliberately exempt: a sysop who lowers NUMMINES
+between boots must not silently lose mines already on the board — the table
+simply refuses new ones until it drains.
+
+**Reason:** `laymine()` (GECMDS.C:1785-1819) checks the per-user cap first and
+then scans for a free slot, returning 0 on either failure. The load-bearing
+half of that contract is what does NOT happen on failure: `--ptr->items[I_MINE]`
+and `cantexit = FIRETICKS` both live inside the success branch
+(GECMDS.C:1809-1814). Refusing at the persistence boundary, before the row
+exists, preserves exactly that — the caller's post-create side effects never
+run.
+
+**Deviation declared:** the failure MESSAGE is not yet canon. The original
+prints MINE2, "The mine launcher is temporarly jammed, Sir!"
+(GECMDS.C:1779, GE/REL/MBMGEMSG.MSG:5814), for both the per-user cap and the
+table-full case. Our per-user cap already returns `MIN_FULL`; the table-full
+case surfaces as the gateway's generic "Internal error processing command."
+line, because rendering `MIN_FULL` requires a `catch` in
+`src/game/commands/handlers/mine.handler.ts`, which was outside this session's
+ownership. The mechanic is correct and side-effect-free; only the wording is
+wrong.
+
+**Alternatives rejected:** enforcing inside `MineRegistry.add()` alone — the
+handler creates the DB row *before* calling `add()`, so a silent refusal there
+would leave an orphaned row and a spent mine. Enforcing in the handler — the
+correct home for the message, but the file was not ours to edit, and putting
+the budget only there would leave the droid and Cybertron mine-laying paths
+unbounded.
+
+## 2026-09-03 — The `implemented` flag is verified against the source tree
+
+**Context:** `SYSOP_OPTIONS.implemented` is load-bearing: it is how a later
+session decides whether a mechanic exists. It was guarded only by
+`expect(wired.length).toBe(29)` in `test/unit/config/game-config.spec.ts`. An
+audit found 14 of the 24 options marked `false` were in fact fully wired, and
+the count test could not have caught any of it — flipping a flag in one
+direction and forgetting another leaves the total unchanged, and a stale
+`false` never moves it at all.
+
+**Decision:** the count assertion is replaced by (a) an explicit NAMED list of
+the nine unwired options, (b) a requirement that every unwired option carry a
+`note` explaining what reads it in C and why nothing reads it here, and (c) a
+structural test that walks `src/**/*.ts`, strips block and line comments, and
+requires a real word-boundary reference to each option's constant — present for
+every option marked implemented, absent for every option marked not. Options
+whose constant is renamed on the way out of `constants.ts` now declare it
+(`REPAIRRT → REPAIRRATE`) so the scan can find them.
+
+**Reason:** a hand-maintained number is not a test of the property it claims to
+protect. Stripping comments matters: `SCRFACT` and `S00PLNUM` are both named in
+prose next to the hard-coded values that displaced them, and an un-stripped
+scan would have called them wired.
+
+**Alternatives rejected:** deleting the flag — it is the only record of which
+canon knobs are inert, and the audit's value came from having it. A ts-morph or
+TypeScript-compiler reference graph — more precise, but a much heavier
+dependency for a check a regex over stripped source already performs
+correctly; the test was verified to fail when a flag is flipped either way.
+
+## 2026-09-03 — `lastfiredBy`: the killer's name is recorded when the damage lands
+
+**Context:** two known gaps recorded earlier today, both now closed.
+
+The first: a killer who logged off in the same tick as the kill went unnamed,
+and the ship-loss mail read "destroyed by an unknown assailant" — a visible lie
+in a message a player reads. `ShipStateService.leave()` scrubs every `lastfired`
+pointing at a channel it is recycling. That scrub is port-original and right on
+its own terms: our channels are recycled far more densely than canon's `usrnum`,
+and a stale pointer hands an old grudge and its kill credit to the next
+occupant. Canon scrubs only on DEATH (`GEFUNCS.C:1224-1225`, inside `killem`);
+`warhupa` scrubs nothing on a clean disconnect (`GEMAIN.C:1410-1432`) and simply
+lives with the mis-attribution. But the scrub also destroyed the only evidence
+kill resolution had, because attribution re-resolved a channel at kill time.
+
+The second: KILLEDBY was broadcast to every connected client. Canon sends it
+with `outwar(FILTER, usrn, 0)` (`GEFUNCS.C:1117`), and FILTER is not decoration
+— `outwar` hands it to `outprfge`, which drops the message for any recipient
+with the option set: `if (class == FILTER && (warusroff(shpno)->options
+[MSG_FILTER] == TRUE)) { clrprf(); return; }` (`GEMAIN.C:2562-2567`). Compare
+`ALWAYS` at `GEMAIN.C:2557-2561`, which bypasses the check — the class YOURDEAD
+and CHGLSR go out with. `MSG_FILTER` is option index 3 (`GEMAIN.H:236`).
+
+**Decision:** every weapon that writes `lastfired` now also writes
+`lastfiredBy = { channel, name }` on the victim, at the moment the damage lands.
+The field is in-memory only and never persisted — it exists to survive a channel
+scrub within a session, not a restart. `leave()` keeps scrubbing `lastfired` and
+deliberately leaves `lastfiredBy` alone. A single reader,
+`attackerNameFromLastFired` (`kill-resolution.ts`), decides when the recorded
+name may be used: when the recorded channel still IS `lastfired`, or when
+`lastfired` is NO_CHANNEL and nobody holds the recorded channel any more. Both
+kill paths — the combat tick and the gateway's disconnect kill — fall back to it.
+
+Separately, the KILLEDBY emit now excludes `user:<id>` rooms for every ship in
+the map whose `msgFilter` is set, alongside the victim's own room. That is a
+restoration of canon, not a deviation.
+
+**Reason:** carrying the name forward is the only way to keep both properties.
+Re-resolving the channel later cannot work once the channel is gone, and
+dropping the scrub to make it work would restore the mis-attribution bug the
+scrub exists to prevent.
+
+**Alternatives rejected:** deferring the scrub by a tick — it makes correctness
+depend on tick ordering, and a channel reissued inside that window still points
+somewhere wrong. Persisting `lastfiredBy` — the whole grudge is session-scoped;
+after a restart no channel means anything and the field would be a stale name
+with no way to invalidate it. Trusting the recorded name whenever `lastfired` is
+NO_CHANNEL — that mis-names a live pilot for a colony's kill, because `fireion`
+sets `ptr->lastfired = -1` (`GEFUNCS.C:1797`) while the ship that last shot you
+is still flying; the occupancy check is what separates the two cases.
+
+---
+
+## 2026-09-03 — The neutral zone is generated from the shipped `S00P*` blocks
+
+**Context:** Feature 004's "Decision 3 — Neutral-zone `s00` table authored in code"
+(above, dated 2026-05-02) rested on the premise that "the `.MSG` binary asset is not
+present in `/reference/ge-source/`" and that the layout was therefore only recoverable
+from the wiki. That premise is now false: `reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG`
+is the shipped sysop option database, and it carries the whole table — `S00PLNUM` plus
+`S00P1DEF..S00P9RES`, eight options per planet, read by GEMAIN.C:909-930 (`#define NPL 8`
+at GEMAIN.C:905).
+
+The hand-authored fixture was wrong in every field. It held five invented planets
+(Zygor-3, Nexus Prime, Caldor IV, Minera, Draconis) at invented coordinates against six
+shipped ones (Zygor, Tahanian Station, Enforcer Planet, Kayriez Portal, Lydorian Portal,
+Tryklon Portal); it declared `S00_PLNUM = 5` against a shipped `S00PLNUM` of 6
+(MBMGEMSG.MSG:550); it contained no wormhole portals at all, though three of the six
+shipped entries are `type: 3`, which GEPLANET.C:517-520 dispatches to `build_worm`; and
+it carried an invented environment legend — "0=Earth-like, 1=Arid, 2=Toxic, 3=Frozen" —
+that ran backwards. `env` is a quality grade, not a biome: GECMDS.C:2337-2348 prints the
+same four messages for `enviorn` and for `resource`, and MBMGEMSG.MSG:3570-3585 makes
+them Poor / Marginal / Good / Very Good. GEPLANET.C:280 confirms the direction —
+production scales with `(enviorn + resource + 2) * .25`, so 3 is the best grade, not the
+worst. Under the old legend Zygor, the starter hub the original ships at env 3 / res 3,
+was recorded as env 0 "Inferno-like".
+
+**Decision:** `backend/src/game/galaxy/s00.ts` is now GENERATED by
+`tools/extract-s00.mjs` from `GE/REL/MBMGEMSG.MSG` and pinned field by field by
+`backend/test/balance/s00-canon.balance.spec.ts`, which re-parses the original itself
+rather than importing the generator. `GalaxyService.generateOrigin` dispatches on each
+entry's `type` exactly as GEPLANET.C:503-528 does — 1 → the Zygor weapons hub, 2 → the
+Tahanian Station troops/men/food hub, 3 → a `Wormhole` row, anything else → a bare
+planet — instead of the array-index dispatch it used before. This supersedes feature
+004's Decision 3.
+
+**Reason:** Hand-transcription is what produced the scanRange drift and the sysop-option
+re-baseline, and it produced this too. The canon is on disk; generating from it and
+pinning with a test that re-reads it is the only form that cannot rot.
+
+**Deviations retained, both pre-existing:**
+- **Owner.** The shipped `S00P*OWN` is `*EMPIRE*` on all six. The fixture stores
+  `NEUTRAL_ZONE_OWNER` (`**neutral**`) instead, because this port resolves `userid`
+  through a real `User` table where C only ever printed the string; the sentinel cannot
+  collide with a `usr_<hex>` id. The balance test asserts BOTH sides of that mapping, so
+  a change to either is caught.
+- **Portal destinations.** GEPLANET.C:823-824 draws `rndm(univmax*2)-univmax`, which may
+  land on the origin sector itself. The three neutral-zone portals use the same
+  grid-bounded, self-loop-free draw as every other wormhole in the port
+  (specs/004-galaxy-generator/research.md Decision 5), so a portal cannot dump a pilot
+  back where they started.
+
+**Alternatives rejected:** Correcting the six entries by hand in `s00.ts` — faster, and
+exactly the method that produced the five wrong ones. Making `S00PLNUM` a live sysop
+option so an operator can vary the count — the option is still `implemented: false` in
+`game-config.ts` because the fixture is fixed; now that the fixture matches the shipped
+default of 6 the flag is at least honest, and wiring it up is a separate change in
+another owner's file.
+
+## 2026-09-03 — AI annoyance messages come from canon, generated not transcribed
+
+**Context:** `cyb_annoy` and `droid_annoy` were both partially ported. The plumbing
+existed — a taunt event, a gateway listener that correctly addresses the taunted pilot,
+a 1-in-N gate for droids — but the message TEXT on both sides was invented by an earlier
+session (`taunt-pool.ts` had thirteen made-up lines; `droid-message-pool.ts` had twenty).
+Worse, `cyb_annoy` was wired to only two of its five call sites, at one fixed rate, with
+no notion of the per-class message families that release 3.2e introduced.
+
+The reason this went unnoticed is a source-precedence trap. `GE/MSG/MBMGEMSG.MSG` is a
+pre-3.2d snapshot carrying only a generic `CYBMSG1..19` set; the shipped 3.2e release is
+`GE/REL/MBMGEMSG.MSG`, and only that copy has the `CYBBASEM..CYBLASTM` block of thirteen
+16-message families plus `DRDMSG*`/`DRDHLP*`. Reading the stale copy makes the feature
+look like it does not exist.
+
+**Decision:**
+1. `tools/extract-ai-taunts.mjs` parses `GE/REL/MBMGEMSG.MSG` and emits two generated
+   modules — `backend/src/game/cybertron/cyb-taunt-catalog.generated.ts` (208 messages,
+   keyed by class 21..33) and `backend/src/game/droid/droid-annoy-catalog.generated.ts`
+   (25 messages, keyed by mnemonic). `backend/test/balance/ai-taunt-canon.balance.spec.ts`
+   re-parses the original independently and compares character for character.
+2. `cyb_annoy` now fires from all five canon call sites with their own odds and message
+   bands: 1-in-60 over M1..M4 approaching (GECYBS.C:769), 1-in-30 over M5..M8 braking
+   (GECYBS.C:782, 801), 1-in-20 over M9..M12 declining (GECYBS.C:300), 1-in-20 over
+   M13..M16 attacking (GECYBS.C:295). The hyperwarp band is silent, as in canon.
+3. Each Cybertron draws from its own class family via C's flat stride of 16. The <NONE>
+   slots 26..30 still own a message block, which is exactly why the stride is flat.
+
+**Reason:** The project rule is that canon is generated and pinned, never hand-typed —
+hand-transcription is what produced the scanRange drift. Two hundred and eight strings is
+well past the point where a human diff is trustworthy.
+
+**Index basis, stated because this repo has had index-basis bugs:** C computes
+`base = CYBBASEM + (shpclass - cyb_class) * 16` on a 0-based `shpclass` where `cyb_class`
+is the 0-based index of the first CYBORG slot. Our `classNumber` is 1-based and the first
+CYBORG slot is 21 (MBMGESHP.MSG `S21TYPE {..CYBORG}`). The DIFFERENCE is identical in both
+bases, so there is no off-by-one correction — the arithmetic transfers unchanged.
+
+**Deviations from canon, deliberate:**
+- The taunt payload carries a `band` field (`APPROACH`/`BRAKE`/`DECLINE`/`ATTACK`) that
+  canon has no equivalent of. It is observability only; the gateway forwards the payload
+  wholesale and nothing branches on it.
+- `DRDMSG7..DRDMSG10` exist in the message file but no `droid_annoy` call site references
+  them. They are generated into the catalogue but not exposed in any droid pool, matching
+  the shipped game's behaviour rather than the file's contents.
+- Message bodies are stored with the literal `***` banner and interior newlines kept, and
+  trailing whitespace and surrounding blank lines dropped — the same normalisation
+  `src/game/commands/messages.ts` already applies to canon strings (see `NEW7`, `NEW10`).
+
+**Alternatives rejected:** Keeping the invented text and only fixing the call sites — the
+invented lines are generic, and the whole point of the 3.2e change was that a Cybertron
+Base Star does not talk like a Sarten Attack Drone. Hand-transcribing the 208 messages —
+see above.
+
+## 2026-09-03 — MISSHRT reproduces C's `energy + MOVENGMIN` verbatim, overdraft and all
+
+**Context:** `cmd_missl` gates the shot on the neutron flux pile:
+
+```c
+eng_flu = energy/misengfc;                                    /* GECMDS.C:1278 */
+if (eng_flu > 0 && eng_flu >= (warsptr->energy+MOVENGMIN))    /* GECMDS.C:1280 */
+    { prfmsg(MISSHRT); ... return; }
+```
+
+The port had no such gate. Implementing it forces a call on the `+`: the obvious
+reading of the intent ("keep MOVENGMIN in reserve for the engines") is `-`, and
+the shipped source says `+`, which does the opposite — it lets the shot leave the
+pile up to `MOVENGMIN-1` in the red, and `warsptr->energy -= eng_flu`
+(GECMDS.C:1314) duly takes it there.
+
+**Decision:** Reproduce the `+` exactly. `missileFluxShort()` in
+`backend/src/game/combat/combat-math.ts` returns
+`fluxCost > 0 && fluxCost >= energy + MOVENGMIN`.
+
+**Reason:** It is a design leniency, not a defect. `WARSHP.energy` is a `double`
+(GEMAIN.H:334), so nothing wraps or overflows at negative values; the passive
+recharge (GEFUNCS.C:1290-1300) climbs the pile back out; and the failure mode of
+`ptr->energy < MOVENGMIN` is only that the ship stops accelerating (GEFUNCS.C:786,
+MOVE4). Flipping the sign would make missiles strictly harder to fire than the
+original permits — a balance change with no canon support. The related
+`eng_flu > 0` short-circuit is kept for the same reason: with the shipped
+`misengfc` of 100 (GE/REL/MBMGEMSG.MSG:349) any charge of 1..99 truncates to zero
+flux and is never refused, however empty the pile.
+
+**Alternatives rejected:** Reading `+` as a typo for `-` — that is exactly the
+"our version is better balanced" case CLAUDE.md forbids. Clamping `energy` at 0
+after the debit — invents a floor the C does not have and would silently change
+how long a drained ship takes to recover.
+
+**Not implemented, and out of this change's file ownership:** the canon rule at
+GEFUNCS.C:504-521, where a ship crossing a warp band at or above `4 + gernd()%4`
+zeroes every `lmissl[i].distance` tracking it and prints MISSL2
+(GE/REL/MBMGEMSG.MSG:2630). That belongs to the acceleration step
+(`physics-tick.service.ts` / `physics-math.ts`), not to any weapon command — the
+ship that escapes is the missile's TARGET, and it escapes by accelerating rather
+than by firing. The canon roll is available as `missileShakeWarp(rand)` in
+`combat-math.ts`, tested, and deliberately not called from anywhere yet.
+
+## 2026-09-03 — CLOK3 ion trail: canon logic implemented, delivery left behind a seam
+
+**Context:** `cmd_impulse` has two canon behaviours the port never had. The
+first, IMPULSE1 (GECMDS.C:495-500, GE/REL/MBMGEMSG.MSG:2900), is a pure gate and
+is now implemented. The second, CLOK3 (GECMDS.C:524-546,
+GE/REL/MBMGEMSG.MSG:2390-2392), is a cloaked ship leaking its bearing to every
+captain in the game who is inside HALF of their own class's `scanrange` and is
+not running a jammer. That audience is neither the sector nor the acting
+captain, so it cannot be expressed as one `broadcasts` room, and computing it
+needs the live ship list plus the ship-class `scanrange` table. `impulseCommand`
+is a plain `Command` const with no injected services, and turning it into a
+provider means editing `commands.module.ts` — outside this change's ownership.
+
+**Decision:** Implement the trigger, audience and bearing exactly, as the
+exported pure function `cloakIonTrailReports()` in `impulse.handler.ts`, and
+have the handler call it through a module-level registration seam,
+`setIonTrailObserverSource()`. With no source installed the handler emits
+nothing, which is what the port did before. Wiring is one call in
+`commands.module.ts` once a `scanrange`-bearing observer list is available.
+
+**Reason:** Getting the audience wrong is worse than not shipping it. CLOK3 is
+a survival mechanic on both sides — sending it to the sector would leak a
+cloaked ship to captains canon leaves blind, and sending it to the mover would
+tell them they had been detected, which canon never does. The logic is the part
+that is easy to get wrong and easy to pin with tests; the delivery is
+mechanical. Declaring the gap beats shipping a plausible-looking wrong audience.
+
+**Deviation declared:** until the seam is wired, a cloaked player opening the
+throttle leaks nothing. This is a known, deliberate absence, not a claim of
+fidelity.
+
+**Alternatives rejected:** Broadcasting CLOK3 to the sector room — wrong
+audience in both directions, and cheap to mistake for correct. Adding an
+observer-list field to `CommandContext` — `command.types.ts` is shared and
+under concurrent edit this run. Reproducing the comment's "+- 10" slop instead
+of the code's `gernd()%20 - 10` (which is -10..+9) — the comment is not canon,
+the code is, and the asymmetry has no gameplay consequence.
+
+**Also left unfixed, and outside this change's reach:** CLOK2, the de-cloak
+warning, is delivered by `outrange(FILTER,&coord)` (GEMAIN.C:2621-2642) — every
+player-class ship with `1 < distance*10000 < scanrange`, full range, no jammer
+check. `cloak.handler.ts` still broadcasts it to the sector room with the
+invented string `'%s has decloaked.'` rather than CLOK2's
+"Sensors indicate a ship de-cloaking nearby Sir!" (GE/REL/MBMGEMSG.MSG:2385).
+Fixing it needs the same class-`scanrange` lookup as CLOK3.
+
+**Canon strings declared locally rather than in `messages.ts`:** `IMPULSE1` and
+`CLOK3` in `impulse.handler.ts`, `CLOK1` in `cloak.handler.ts`. `messages.ts`
+was frozen for this run; its `IMPULSE1` entry ("You cannot use impulse engines
+in hyperspace.") and `CLOAK_HYPERSPACE` entry ("Cannot cloak while in
+hyperspace.") are paraphrases and should be replaced with the shipped wording
+when that file is next opened, at which point these locals fold back in.
+
+## 2026-09-03 — Production-cap notice (MESG08+i) fires on the crossing only
+
+**Context:** GEPLANET.C:313-326 mails the planet owner when a stock reaches its
+ceiling: `if (plptr->items[i].qty <= max && temp >= max)` → `mail.class =
+MAIL_CLASS_PRODRPT; mail.type = MESG08+i; mail.long1 = max`. `max` is
+`(long)(maxpl[i]*fact)` (GEPLANET.C:295-297), and the very next statement clamps
+the stock to it (GEPLANET.C:328-331). The port clamped silently and mailed
+nothing, so a colony's factories shut down with no notice to the owner.
+
+The notice belongs to `multiply()`, which runs from `plarti` — one planet per
+kick, the whole galaxy in `PLANTOCK` (GEMAIN.C:2135, GEMAIN.C:656; PLANTOCK
+default 360 minutes, GE/REL/MBMGEMSG.MSG:215). It is *not* a midnight event.
+Our `PlanetTickService` already paces the economy the same way, so the notice is
+sent from `PlanetEconomyService.applyTick` alongside the MESG06/MESG07
+starvation mails.
+
+**Decision:** Implement MESG08+i with canon's class, item mapping, recipient,
+`long1` and cadence, but test the left-hand side with `<` where C has `<=`.
+
+**Reason:** With `<=`, the test is true again on every subsequent pass, because
+the stock was clamped to exactly `max`. A colony parked at its ceiling therefore
+re-mails the identical notice once per PLANTOCK sweep, per capped slot — up to
+14 messages every pass, against a 3-day retention window (MAILDAYS, GEMAIN.C:497).
+The condition's own shape — a lower bound on the old value and an upper bound on
+the new one — says the author meant "was below, now at or over"; `<=` is a
+defect in an edge-trigger, not a design choice, since nothing about the game is
+served by repeating a notice the player cannot act on. `<` is that edge trigger:
+one notice per crossing, and a fresh one if the ceiling rises (it moves with
+`fact`) and is reached again.
+
+**Alternatives rejected:**
+- *Reproduce `<=` faithfully.* Makes the inbox unusable, which is the one thing
+  `mai`/`rea` exist for. Project rule: we do not reproduce defects.
+- *Suppress with a per-planet "already warned" flag.* Needs new persistent
+  state, and gets the "ceiling rose, then was reached again" case wrong.
+- *Move the notice to the midnight job.* Quieter, but wrong: it would decouple
+  the message from the clamp that causes it and from canon's `plarti` cadence.
+
+## 2026-09-03 — MailStat.type numbers for MESG19A and MESG19B
+
+**Context:** `MESG08+i` spans fourteen ids: MESG08..MESG19 for item slots 0-11,
+then MESG19A (gold) and MESG19B (spies) — GE/REL/MBMGEMSG.MSG:4079-4176. Canon's
+message compiler numbers them consecutively, so MESG19A/MESG19B occupy the two
+slots immediately before MESG20. This port instead uses each message's *label*
+number as `MailStat.type` (MESG06→6, MESG07→7, MESG30→30, MESG20→20), and
+MESG19A/MESG19B have no numeric label to take.
+
+**Decision:** Slots 0-11 take 8..19. Gold and spies take 190 and 191, declared
+in `backend/src/game/mail/production-cap.ts`.
+
+**Reason:** Continuing the run would put gold at 20, colliding with MESG20, the
+nightly production report, which shares the same `MAIL_CLASS_PRODRPT` and is
+already written to disk. `type` is a local discriminator with no wire or save
+compatibility to the original, so the collision matters and the exact integers
+do not.
+
+**Alternatives rejected:**
+- *Renumber MESG20 to 22, the canon-consistent value.* Orphans every production
+  report already in the database.
+- *Give cap notices their own mail class.* Contradicts GEPLANET.C:317, which
+  explicitly sets `MAIL_CLASS_PRODRPT`.
+
+---
+
+## 2026-09-03 — `tea` gains members/kick/newpass/newname; founder password is generated, not chosen
+
+**Context**: `GECMDS.C:5277 cmd_team` accepts nine sub-verbs. The port shipped only
+`create` / `list` / `leave` / bare-join (see the 2026-05-06 entry). The four founder-gated
+administration verbs — `members` (GECMDS.C:5565), `kick` (GECMDS.C:5614), `newpass`
+(GECMDS.C:5682) and `newname` (GECMDS.C:5724) — were missing outright, and all three of
+kick/newpass/newname authenticate against `teamtab[i].secret`, the founder password. The
+2026-05-08 entry had removed the `secret`/`password` distinction, so there was nothing left
+to authenticate against.
+
+**Decision**:
+1. Implement `members`, `kick`, `newpass`, `newname` with the canon `MBMGEMSG.MSG` strings
+   (transcribed into `backend/src/game/team/team-messages.ts` with per-line citations).
+2. Re-introduce the founder password, but **generated** at `tea create` rather than chosen:
+   8 characters from an unambiguous alphabet, stored in the existing `Team.secret` column
+   and displayed once using canon's TEAMCRT wording, including its "write this down, you
+   will not be able to display it again" warning (GE/REL/MBMGEMSG.MSG:5866).
+3. Add canon's verb spellings as aliases of the port's: `start`→`create`, `score`→`list`,
+   `unjoin`→`leave`, and an explicit `join` keyword alongside the bare `tea <name> <pw>`.
+4. `newname` also enforces name uniqueness, which canon's `newname` does not.
+5. `dumpitout` (GECMDS.C:5766) is **not** implemented.
+
+**Reason**:
+- (2) is the minimum that makes the founder-gated verbs meaningful without a schema change:
+  `Team.secret` already exists and is already written (as `''`). Generating it removes the
+  original's out-of-band coordination burden, which is the same reasoning the 2026-05-08
+  entry used to auto-assign the teamcode. Canon itself treats the founder password as
+  write-once and undisplayable, so a generated one loses nothing.
+- (4) is a bug fix, not a deviation from a design choice: `start` explicitly refuses a
+  duplicate team name (GECMDS.C:5536) and `newname` writes the same field without
+  re-checking. Two verbs disagreeing about the same invariant is an oversight, and this
+  port's `LOWER(teamname)` unique index would have thrown a raw P2002 at the player anyway.
+- (5) `dumpitout` prints every team's join password *and* founder secret to any player who
+  types it, with no sysop gate — it is leftover debug scaffolding (it also falls through to
+  `badfmt(TEAMFMT)` afterwards, so it was never a finished verb). Reproducing it would
+  hand every player every team's credentials. Defect, not design.
+
+**Deviations introduced (declared)**:
+- Founder password is server-generated, not player-chosen (canon: `team start` takes it as
+  an argument, GECMDS.C:5517).
+- TEAMBPSS is rendered as "8 characters or less" rather than canon's "10", because this
+  port caps team passwords at 8 (2026-05-08 entry, FR-011a). Its shipped typo "loo long"
+  is also corrected to "too long" (GE/REL/MBMGEMSG.MSG:5936).
+- The kick notification carries canon's topic ("Team Membership Revoked", GECMDS.C:5652)
+  but not TEAMKYOU's body text, because the inbox renderer has no payload shape for it and
+  `mail.types.ts` / `mail-render.ts` are outside this change's scope.
+- Canon never sets `mail.class` on the kick path, so the port picks `MAIL_CLASS_MAXOUT` (2,
+  GEMAIN.H:221) — the one canon class with no other producer here, so the notice is not
+  mis-rendered as a distress signal or a production report.
+- Teams created before this change have `secret = ''`; the founder gate treats an empty
+  secret as unmatched, so their founders cannot use kick/newpass/newname.
+
+**Alternatives rejected**: Asking the player for the founder password at `create` time
+(ambiguous to parse — team names may contain spaces, and canon dodges this only by putting
+the name last after a fixed-arity prefix). Authenticating on founder *userid* instead of a
+password (needs a new `Team.founder` column and therefore a migration). Reusing
+`MAIL_CLASS_DISTRESS` for the kick notice (renders as an attack, naming the kicker as an
+attacking ship).

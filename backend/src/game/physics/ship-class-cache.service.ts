@@ -26,6 +26,7 @@ export interface ShipClassEntry {
   hasMine: boolean;
   hasZipper: boolean;
   hasCloak: boolean;
+  hasDecoy: boolean;
   noClaim: number;
   tough: number;
   cybLowestClassAttacks: number;
@@ -66,6 +67,7 @@ export class ShipClassCacheService implements OnModuleInit {
         hasMine: true,
         hasZipper: true,
         hasCloak: true,
+        hasDecoy: true,
         noClaim: true,
         tough: true,
         cybLowestClassAttacks: true,
@@ -91,6 +93,7 @@ export class ShipClassCacheService implements OnModuleInit {
         hasMine: row.hasMine,
         hasZipper: row.hasZipper,
         hasCloak: row.hasCloak,
+        hasDecoy: row.hasDecoy,
         noClaim: row.noClaim,
         tough: row.tough,
         cybLowestClassAttacks: row.cybLowestClassAttacks,
@@ -164,6 +167,16 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).hasCloak;
   }
 
+  /**
+   * Does this hull carry a decoy launcher at all?
+   * `if (!shipclass[warsptr->shpclass].has_decoy) { prfmsg(DECOY0); return; }`
+   * is the FIRST thing cmd_decoy does (GECMDS.C:1545-1550), and it was missing,
+   * so any class could launch decoys it was carrying only as cargo.
+   */
+  getHasDecoy(classNumber: number): boolean {
+    return this.entry(classNumber).hasDecoy;
+  }
+
   /** Synchronous lookup. Throws if the class is not in the cache. @see GEMAIN.H shipclass[].max_points */
   getPoints(classNumber: number): number {
     return this.entry(classNumber).points;
@@ -202,6 +215,7 @@ export class ShipClassCacheService implements OnModuleInit {
       hasMine: false,
       hasZipper: false,
       hasCloak: false,
+      hasDecoy: false,
       noClaim: 3,
       tough: 0,
       cybLowestClassAttacks: 0,

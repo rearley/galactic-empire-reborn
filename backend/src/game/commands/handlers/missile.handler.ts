@@ -7,7 +7,7 @@ import { ShipStateService } from '../../ship/ship-state.service';
 import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
-import { cdistance, lockFact } from '../../combat/combat-math';
+import { cdistance, lockFact, missileFluxCost, missileFluxShort } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
@@ -15,6 +15,17 @@ import { I_MISSL } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
 
 const MISSILE_CHARGE_MIN = 1;
+
+/**
+ * MISSHRT — the flux pile is too shallow for the requested charge.
+ *
+ * Not in messages.ts; defined here with its canon text, the way scan.handler
+ * carries SCANWRM.
+ *
+ * @see GE/REL/MBMGEMSG.MSG:3735
+ * @see GECMDS.C:1280-1285
+ */
+const MISSHRT = 'Sorry Sir! There is not that much energy in our neutron flux pile.';
 
 
 /**
@@ -35,7 +46,7 @@ const MISSILE_CHARGE_MIN = 1;
  *   target.lmisslChannel[slot]  = firer.channel
  *   target.lmisslDistance[slot] = floor(cdistance × 10000 + 20)
  *   target.lmisslEnergy[slot]   = charge
- *   firer.energy               -= charge / MISENGFC
+ *   firer.energy               -= trunc(charge / MISENGFC)
  *   firer.items[I_MISSL]       -= 1n
  *   firer.cantexit              = FIRETICKS
  *
@@ -127,6 +138,26 @@ export class MissileHandlerService {
       };
     }
 
+    // 4a. MISSHRT — the neutron flux pile. C computes the flux draw with
+    // INTEGER division and gates on it before it ever looks for a target:
+    //
+    //   eng_flu = energy/misengfc;                                GECMDS.C:1278
+    //   if (eng_flu > 0 && eng_flu >= (warsptr->energy+MOVENGMIN)) GECMDS.C:1280
+    //       prfmsg(MISSHRT);
+    //
+    // The port had no gate at all here and billed the fractional quotient. Both
+    // are fixed together: `fluxCost` below is the same value the debit uses, so
+    // what you are refused for is exactly what you would have paid.
+    const fluxCost = missileFluxCost(charge, MISENGFC);
+    if (missileFluxShort(fluxCost, ship.energy)) {
+      return {
+        lines: [
+          ...(shieldLine ? [shieldLine] : []),
+          { text: MISSHRT, category: 'system' },
+        ],
+      };
+    }
+
     // 4b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
     if (isInNeutralZone(ship)) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
@@ -196,7 +227,8 @@ export class MissileHandlerService {
 
     // Mutate firer — debit energy + ammo, set battle-lock.
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      s.energy = s.energy - charge / MISENGFC;
+      // The truncated flux draw, not `charge / MISENGFC`. @see GECMDS.C:1278, :1314
+      s.energy = s.energy - fluxCost;
       s.items[I_MISSL] = (s.items[I_MISSL] ?? 0n) - 1n;
       s.cantexit = FIRETICKS;
     });

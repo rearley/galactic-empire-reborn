@@ -373,7 +373,13 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.damage = s.damage + hit.hullDamage;
       // `ptr->lastfired = -1` — killed by a planet, credited to nobody.
+      // The recorded NAME has to go with it. `lastfiredBy` survives a channel
+      // scrub on purpose, so leaving it set here meant: shooter hits you,
+      // shooter logs off, a colony's ion cannons finish you, and the ship-loss
+      // mail credits the pilot with a kill the planet made.
+      // @see GEFUNCS.C:1797 fireion, kill-resolution.ts attackerNameFromLastFired
       s.lastfired = -1;
+      s.lastfiredBy = undefined;
       if (shieldsUp && hit.shieldKnock > 0) {
         const r = shieldhit(s.shield, s.shieldtype, hit.shieldKnock);
         s.shield = r.newCharge;

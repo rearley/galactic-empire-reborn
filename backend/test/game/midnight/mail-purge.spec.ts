@@ -153,7 +153,11 @@ describe('US3 — mail purge (T024)', () => {
     expect(remaining).toHaveLength(3);
   });
 
-  it('configurable retention: MIDNIGHT_MAILDAYS=14 keeps 8–13-day-old mail', async () => {
+  // MAILDAYS is `numopt(MAILDAYS,1,7)` (GEMAIN.C:497) and the option declares
+  // its own bounds, `N 1 7` (GE/REL/MBMGEMSG.MSG:449). This test used to set 14
+  // and assert 8- and 13-day-old mail survived — it was pinning a retention
+  // window the original refuses. 14 clamps to 7.
+  it('configurable retention: MIDNIGHT_MAILDAYS=14 clamps to canon max 7', async () => {
     const originalMaildays = process.env['MIDNIGHT_MAILDAYS'];
     process.env['MIDNIGHT_MAILDAYS'] = '14';
 
@@ -170,16 +174,18 @@ describe('US3 — mail purge (T024)', () => {
       await testPrisma.mailStat.createMany({
         data: [
           mailRow(15, 'alice', 1, 40), // 15 days — deleted
-          mailRow(13, 'alice', 1, 41), // 13 days — kept (< 14)
-          mailRow(8, 'alice', 1, 42),  // 8 days — kept
-          mailRow(1, 'alice', 1, 43),  // 1 day — kept
+          mailRow(13, 'alice', 1, 41), // 13 days — deleted (14 clamps to 7)
+          mailRow(8, 'alice', 1, 42),  // 8 days  — deleted
+          mailRow(6, 'alice', 1, 43),  // 6 days  — kept (< 7)
+          mailRow(1, 'alice', 1, 44),  // 1 day   — kept
         ],
       });
 
       await testService.run();
 
       const remaining = await testPrisma.mailStat.findMany({ where: { userid: 'alice' } });
-      expect(remaining).toHaveLength(3);
+      expect(remaining).toHaveLength(2);
+      expect(remaining.every((m) => m.stamp >= daysAgoStamp(7))).toBe(true);
     } finally {
       if (originalMaildays === undefined) {
         delete process.env['MIDNIGHT_MAILDAYS'];
