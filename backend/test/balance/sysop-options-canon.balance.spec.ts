@@ -62,8 +62,15 @@ const DEVIATIONS: Record<string, { value: number; reason: string }> = {
   },
 };
 
-/** Options MBMGEMSG.MSG does not declare; canonDefault is null for these. */
-const NOT_IN_MSG = ['HYPDST1', 'HYPDST2'];
+/**
+ * Options MBMGEMSG.MSG does not declare; canonDefault is null for these.
+ *
+ * Empty, and it should stay that way. It held HYPDST1/HYPDST2 until
+ * 2026-09-03, when it turned out we were reading GE/MSG/MBMGEMSG.MSG -- an
+ * earlier partial snapshot with no HYPDST blocks. The shipped file declares
+ * both (GE/REL:512, :522). Before adding a name here, check the OTHER copy.
+ */
+const NOT_IN_MSG: string[] = [];
 
 function parseMsgDefaults(): Map<string, number> {
   const text = readFileSync(MSG, 'utf8');

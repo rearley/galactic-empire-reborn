@@ -136,8 +136,11 @@ export const SYSOP_OPTIONS = {
   STRTCASH: { min: 1, max: 32000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:521', implemented: true, constant: 'START_CASH' },
   MAXPLREC: { min: 10, max: 32767, default: 32767, canonDefault: 32767, cReference: 'GEMAIN.C:524', implemented: false },
   CYBGOLD: { min: 0, max: 32000, default: 1200, canonDefault: 1200, cReference: 'GEMAIN.C:527', implemented: false },
-  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: null, cReference: 'GEMAIN.C:529', implemented: false },
-  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: null, cReference: 'GEMAIN.C:530', implemented: false },
+  // Recovered 2026-09-03: these read canonDefault null on the belief that no
+  // shipped value existed. It did — we were reading GE/MSG, which has no
+  // HYPDST blocks. GE/REL:512, :522.
+  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:529', implemented: false },
+  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:530', implemented: false },
   PLATTRF1: { min: 5, max: 1000, default: 18, canonDefault: 18, cReference: 'GEMAIN.C:532', implemented: false },
   PLATTRF2: { min: 5, max: 1000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:535', implemented: false },
   PLATTRF3: { min: 5, max: 1000, default: 55, canonDefault: 55, cReference: 'GEMAIN.C:539', implemented: false },
