@@ -73,13 +73,22 @@ describe('canon source provenance', () => {
       .not.toBe(md5(join(UPSTREAM, 'GE/REL/MBMGEMSG.MSG')));
   });
 
-  it('no source or test file reads GE/MSG/MBMGEMSG.MSG', () => {
-    const offenders = sourceFiles().filter((f) =>
-      /GE\/MSG\/MBMGEMSG\.MSG/.test(readFileSync(f, 'utf8'))
-        // A comment warning people off the file is the point, not a violation.
-        && !/never read|do not read|NOT the .GE\/MSG|stale|earlier partial|pre-3\.2d/i
-          .test(readFileSync(f, 'utf8')),
-    );
+  it.each([
+    ['GE/MSG/MBMGEMSG.MSG', /GE\/MSG\/MBMGEMSG\.MSG/],
+    // GE/REL2 is a SECOND, differently-tuned instance of the module -- a sysop
+    // could run two games side by side off its own MBMG2*.DAT files. Of the 60
+    // sysop options it shares with the standard release, 33 have different
+    // values (CYBGOLD 1200 -> 25, HPDAMMAX 50 -> 35, CLENGUSE 7500 -> 2600,
+    // DECODDS 11 -> 8). Nothing inside the file marks it as an alternate, so a
+    // value lifted from it looks exactly like canon and is not.
+    ['GE/REL2/MBMG2*.MSG', /MBMG2[A-Z]*\.MSG/],
+  ])('no source or test file reads %s', (_label, pattern) => {
+    const offenders = sourceFiles().filter((f) => {
+      const text = readFileSync(f, 'utf8');
+      // A comment warning people off the file is the point, not a violation.
+      const isWarning = /never read|do not read|NOT canon|stale|earlier partial|pre-3\.2d|differently-tuned/i.test(text);
+      return pattern.test(text) && !isWarning;
+    });
     expect(offenders.map((f) => f.slice(REPO.length + 1))).toEqual([]);
   });
 
