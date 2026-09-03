@@ -153,6 +153,7 @@ AppModule (app.module.ts)
   │     ├── MailInboxRepository — Prisma queries on MailStat; findByUserid (stamp DESC, msgno DESC, class DESC); deleteOne (returns false on P2025)
   │     ├── MailInboxService — list(userid)/resolveIndex(userid,index)/deleteByIndex(userid,index); R3 sender resolution (ShipStateService → raw dtime → "(system)"); R5 re-query per call
   │     └── mail-render.ts — pure functions classLabel/formatListLine/formatDetail; no DI
+  │           (the listing is reached by bare `rea`; `mai` is maintenance, per canon)
   ├── TeamModule (game/team/) — exports TeamService, TeamRepository
   │     ├── TeamRepository — Prisma queries on Team/User: findByNameLower (case-insensitive name lookup),
   │     │                     insertTeam (creates row with teamcount=1/teamscore=0/secret=""/flag=0),

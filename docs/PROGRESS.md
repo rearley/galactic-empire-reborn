@@ -2560,3 +2560,86 @@ human. Then the remaining audit phases.
   implementation was already faithful.
 - Earlier audit docs (`FIDELITY_AUDIT.md`, `020-audit-findings.md`) predate the
   distribution; their value claims need re-checking, their logic claims stand.
+
+---
+
+## 2026-09-03 — Round-3 playtest fixes, and the wrong `.MSG`
+
+**Completed:**
+
+Round 3 sent six personas out and four came back before the API failed under
+them. No verification stage ran, so every finding arrived as one persona's
+unchecked word; a second pass re-derived each against the C source before
+anything was changed.
+
+The headline was a three-way disagreement about whether the autopilot worked at
+all — two personas reported clean warp-9 arrivals, one reported the ship
+ping-ponging across the target forever. Both were right. A tick moves
+`speed * 10000 / COORD_SCALE` raw units against a fixed 250-unit arrival shell,
+so any remaining distance in `(250, travel - 250)` stepped clean over it. Warp 1
+is the only speed slow enough to always land inside. Arrival now also fires when
+this tick's travel *reaches* the target, and truncates that final leg.
+
+Chasing one of the fixes turned up something larger: **we had been reading the
+wrong copy of `MBMGEMSG.MSG`.** The distribution ships three. `GE/REL/` and the
+root are identical and complete; `GE/MSG/` — the one `CLAUDE.md` named as
+authoritative — is an earlier snapshot missing 277 ids, nine of which the C
+source reads by name, so a build cannot run against it. Of the 179 sysop options
+both define, three disagree, and all three had reached our constants: `PFIRDST`
+7 → **5**, `HPFIRDST` 9 → **5**, and gold's cargo weight 2 → **0.5** tons.
+`PFIRDST` is the phaser range-falloff exponent, so it moved every damage figure
+in the game: at 1.5 sectors a Mark-10 goes from 26 to 48. `MBMGESHP.MSG` is
+identical in all three locations, so ship classes were never affected.
+
+Two consequences followed. `BASEPRICE` was marked "not canon-derived, nothing to
+recover", with a test pinning that claim — the `ITMPR` blocks exist, and the
+wiki table matches them item for item, so it is generated and pinned now.
+`SHIELD_PRICE` ended at 250,000,000 against a shipped 200,000,000, transcribed
+from `GEMAIN.C:299-341`, which looks authoritative and is dead code inside an
+`OMITTED 3.2c.7` comment.
+
+Fixed from the playtest: ship-loss mail losing the killer's name whenever the
+victim was offline (the one case the mail exists for); `KILLEDBY` never
+implemented, so every kill in the galaxy happened in silence; the disconnect
+kill awarding no cargo; `mai` opening the mailbox instead of repairing (canon
+binds it to `cmd_maint` and has no mail command at all — the mailbox moved to
+`rea`); Zygor's stock decaying to `MAXPL` between midnights, so the shop sold 5
+spies and 0 gold for most of every day; the paraphrased buy/price/sell family;
+`new phaser`/`new shield` hiding the trade-in that explains the price; `nav`
+undocking you for asking a bearing; `shi down` printing invented text with the
+canon string sitting unused in the catalogue; `sca pl` missing both the wormhole
+branch and the entire non-owner reconnaissance block; `orb` reading the
+boot-time galaxy snapshot.
+
+Four more came out of verifying those: canon's passive hull repair
+(`REPAIRRT`, 0.6 damage a minute) was not implemented at all; the helm never
+answered the throttle (`SPEEDIS`/`SPEED0`); `war`/`imp` broke orbit silently and
+carried the paid repair queue away with them; and `flush()` cleared its dirty
+flag after awaiting Postgres, dropping any mutation that landed mid-write.
+
+**Tests:** 4,439 across 415 suites, all passing. New: nav arrival at warp 5 and
+warp 9, the flush race, passive hull repair, helm speed reports, LEAVEORB on
+both engine commands, KILLEDBY (including the victim exclusion), disconnect-kill
+spoils, the re-entry notice not repeating, and shipyard prices pinned to the
+`.MSG`. Every `MBMGEMSG.MSG:<line>` citation in the repo is now checked
+mechanically to resolve to the id it names.
+
+**Decisions made:** Six in `DECISIONS.md`. Three findings were *rejected* on
+canon rather than fixed — `rep nav` hiding heading in orbit (three deliberate
+branches at `GECMDS.C:1965-1990`), droid "unprovoked" fire (canon's `firep`
+sweeps every ship in the arc, and so does ours), and adding a shield reading to
+the deflection line.
+
+**Next:** Round 4, on a reset world. `PFIRDST` alone invalidates every damage
+observation from rounds 1-3.
+
+**Known issues:**
+- A killer who logs off in the same tick as their victim's death is
+  unattributable, and the mail says "an unknown assailant". Closing it means
+  carrying the attacker's name on the victim's state at the moment damage lands.
+- `MBMGEHLP.MSG` also differs between `GE/MSG/` and `GE/REL/`. Only help text,
+  so nothing numeric depends on it, but it has not been diffed.
+- The design question round 3 raised is still open: a *stock* Interceptor
+  mathematically cannot break a Lydorian Scow's shields. That arithmetic was
+  computed at `PFIRDST` 7 and needs redoing at 5.
+- `SCRBONUS` still unimplemented (see the previous entry).

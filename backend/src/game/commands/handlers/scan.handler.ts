@@ -937,6 +937,16 @@ export class ScanHandlerService implements OnModuleInit {
         text: qty(I_FIGHTER) === 0n ? SCAN31_NO_FIGHTERS : SCAN32_FIGHTERS,
         category: 'info',
       });
+    } else {
+      // Neither branch is reachable without live planet state — ownership
+      // itself is read from it — so say so rather than returning a header with
+      // nothing under it. In practice both lookup paths now come from
+      // PlanetStateService, so this is a "should not happen" that reports
+      // itself instead of looking like an undefended colony.
+      lines.push({
+        text: 'Sensors cannot resolve that planet right now, Sir!',
+        category: 'system',
+      });
     }
 
     return { lines };
