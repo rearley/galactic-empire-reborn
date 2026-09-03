@@ -258,6 +258,63 @@ describe('PhysicsTickService — autopilot (nav holdcourse branch)', () => {
     expect(ship.speed2b).toBe(3000);      // engines untouched
   });
 
+  it('(g) arrives at warp 5 even when a whole tick straddles the arrival shell', () => {
+    // Round-3 playtest, persona `newcomer`: `nav 0 0` + `war 5` never arrived.
+    // The ship ping-ponged across the target forever, flipping 180 degrees
+    // every tick while `rep nav` kept reporting warp 5.
+    //
+    // The arithmetic: a tick moves `speed * 10000 / COORD_SCALE` raw units —
+    // 769 at warp 5, 1385 at warp 9 — while the arrival shell is 250. Whenever
+    // the remaining distance lands in (250, travel-250) the ship steps clean
+    // over the shell, re-points at the target it just passed, and repeats.
+    // Warp 1 moves 154 units and so always lands inside the shell, which is
+    // why the bug reads as "autopilot only works at warp 1".
+    //
+    // 0.04 sectors = 400 units out: outside the shell, and 769-400 = 369 units
+    // past it on the far side — outside the shell there too.
+    const ship = makeShip({
+      xcoord: 8.46, ycoord: 5.5,
+      heading: 90, head2b: 90,
+      speed: 5000, speed2b: 5000,
+      holdcourse: 1, navTargetX: 8, navTargetY: 5,
+    });
+    const h = makeHarness([ship]);
+
+    for (let i = 0; i < 20; i++) {
+      h.fire();
+      if (ship.holdcourse === 0) break;
+    }
+
+    expect(ship.holdcourse).toBe(0);
+    expect(ship.speed2b).toBe(0);
+    expect(h.capturedNavArrived).toHaveLength(1);
+    // And it stops close enough to actually orbit what it flew to.
+    const dist = Math.hypot(ship.xcoord - 8.5, ship.ycoord - 5.5) * 10_000;
+    expect(dist).toBeLessThanOrEqual(250);
+  });
+
+  it('(h) arrives at warp 9 from a full sector away', () => {
+    // 1385 units a tick; the shell is 250. Without a final-leg test this
+    // arrives only by luck of phase, which is exactly why two personas
+    // reported warp 9 working and one reported it never working.
+    const ship = makeShip({
+      xcoord: 5.5, ycoord: 5.5,
+      heading: 90, head2b: 90,
+      speed: 9000, speed2b: 9000,
+      holdcourse: 1, navTargetX: 8, navTargetY: 5,
+    });
+    const h = makeHarness([ship]);
+
+    for (let i = 0; i < 60; i++) {
+      h.fire();
+      if (ship.holdcourse === 0) break;
+    }
+
+    expect(ship.holdcourse).toBe(0);
+    const dist = Math.hypot(ship.xcoord - 8.5, ship.ycoord - 5.5) * 10_000;
+    expect(dist).toBeLessThanOrEqual(250);
+  });
+
   it('ship with holdcourse=0 is not steered by autopilot branch', () => {
     const ship = makeShip({
       xcoord: 5.0, ycoord: 5.0, heading: 0, head2b: 0,

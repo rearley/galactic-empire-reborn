@@ -4,7 +4,7 @@ import { applySectorChangeEffects } from './sector-change';
 import { GalaxyService } from '../galaxy/galaxy.service';
 import { Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { MOVENGMIN, MOVENGUSE } from '../constants';
+import { COORD_SCALE, MOVENGMIN, MOVENGUSE } from '../constants';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
@@ -147,9 +147,36 @@ export class PhysicsTickService implements OnModuleInit {
       // cmd_navigate targets the cell centre — `tmp.xcoord = x + .50001`
       // (GECMDS.C:5133-5136) — and 250 units is the threshold cmd_orbit uses
       // for "close enough" (GECMDS.C:798). Same target, same radius.
-      const arrivalDist = cdistance(ship, { xcoord: targetX + 0.5, ycoord: targetY + 0.5 }) * 10_000;
-      if (arrivalDist <= NAV_ARRIVAL_RANGE) {
+      const tgtX = targetX + 0.5;
+      const tgtY = targetY + 0.5;
+      const arrivalDist = cdistance(ship, { xcoord: tgtX, ycoord: tgtY }) * 10_000;
+
+      // ...but a fixed shell alone cannot catch a ship that is faster than the
+      // shell is wide. A tick moves `speed * 10000 / COORD_SCALE` raw units —
+      // 154 at warp 1, 769 at warp 5, 1385 at warp 9 — against a 250-unit
+      // shell. Whenever the remaining distance lands in (250, travel - 250)
+      // the ship steps clean over the target, re-points at the thing it just
+      // passed, and does it again: a 180-degree flip every six seconds,
+      // forever, with `rep nav` still reporting warp 5. Round-3 playtest saw
+      // exactly that, and saw the same trip arrive first try at warp 1 —
+      // which is simply the one speed slow enough to always land inside.
+      //
+      // So the real test is whether this tick's travel *reaches* the target,
+      // not whether the ship is already sitting on it.
+      const perTickTravel = (ship.speed * 10_000) / COORD_SCALE;
+      const finalLeg = arrivalDist > NAV_ARRIVAL_RANGE && arrivalDist <= perTickTravel;
+
+      if (arrivalDist <= NAV_ARRIVAL_RANGE || finalLeg) {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+          // On the final leg, fly the remainder rather than a whole tick. The
+          // ship is already pointed at the target and would have covered more
+          // ground than this; truncating the last step is the only way to end
+          // up within orbit range of a place you asked to be taken to, and it
+          // never moves the ship further than the physics already would.
+          if (finalLeg) {
+            s.xcoord = tgtX;
+            s.ycoord = tgtY;
+          }
           s.holdcourse = 0;
           s.navTargetX = null;
           s.navTargetY = null;
@@ -181,10 +208,8 @@ export class PhysicsTickService implements OnModuleInit {
       }
 
       // Steer: update head2b to point toward target cell center
-      const tx = targetX + 0.5;
-      const ty = targetY + 0.5;
-      const dx = tx - ship.xcoord;
-      const dy = ty - ship.ycoord;
+      const dx = tgtX - ship.xcoord;
+      const dy = tgtY - ship.ycoord;
       // Use atan2(dx, -dy) to correctly map to the position-integration coordinate
       // system where heading=0 is north (y-decreasing). Positive dy (target south)
       // must produce a bearing >90° so that cos(bearing)<0 and y increases (southward).

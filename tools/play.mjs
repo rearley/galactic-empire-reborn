@@ -159,7 +159,7 @@ for (const raw of script.split('\n')) {
   // bearing. Firing at a hard-coded `pha 0` is why four kill tests failed: the
   // target sits wherever it sits, and reading its bearing off the scan is the
   // whole point of the scan. This is what a player does.
-  const e = /^engage(?:\s+(\d+))?$/i.exec(line);
+  const e = /^engage(?:\s+(\d+))?(?:\s+(\d+|tight))?$/i.exec(line);
   if (e) {
     const maxDist = Number(e[1] ?? 15000);
     out('>>', 'sca lo full');
@@ -169,7 +169,10 @@ for (const raw of script.split('\n')) {
       .filter((c) => typeof c.bearing === 'number' && c.distance <= maxDist)
       .sort((a, b) => a.distance - b.distance)[0];
     if (!target) { out('..', `engage: no contact within ${maxDist}`); continue; }
-    const cmd = `pha ${target.bearing} 5`;
+    // focus: second directive arg; `tight` (or GE_ENGAGE_FOCUS=tight) uses the
+    // one-argument form, which is focus 1 — the strong, narrow beam.
+    const focus = e[2] ?? process.env.GE_ENGAGE_FOCUS ?? '5';
+    const cmd = focus === 'tight' || focus === '1' ? `pha ${target.bearing}` : `pha ${target.bearing} ${focus}`;
     out('..', `engage: ${target.letter} at ${target.distance} bearing ${target.bearing}`);
     out('>>', cmd);
     socket.emit('command', { input: cmd });
