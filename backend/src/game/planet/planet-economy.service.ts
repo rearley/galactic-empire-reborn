@@ -14,7 +14,7 @@ const MESG30 = 30 as const;
 const MESG_SPYC1 = 31 as const;
 /** SPYC2 — to the planet's owner: we caught a spy. @see GEPLANET.C:134 */
 const MESG_SPYC2 = 32 as const;
-import { applyEconomyTickWithLosses } from './planet-economy';
+import { applyEconomyTickWithLosses, FREE_PLANET_OWNER } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
 /**
@@ -127,7 +127,9 @@ export class PlanetEconomyService {
     this.logger.log(`Revolt on ${planetName} (${xsect},${ysect}) — ${oldOwner} ousted; troops ${troops} -> ${newTroops}`);
 
     return {
-      state: { ...next, items, userid: null },
+      // "**Free**", not null. C keeps the planet economically alive after a
+      // revolt (GEPLANET.C:377); writing null froze it forever.
+      state: { ...next, items, userid: FREE_PLANET_OWNER },
       revolted: true,
     };
   }
