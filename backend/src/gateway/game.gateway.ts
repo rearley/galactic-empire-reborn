@@ -1083,6 +1083,45 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       category: 'combat',
       text: formatMessage(MessageId.YOURDEAD),
     });
+
+    // ...and put them somewhere they can play again. The hull row is gone but
+    // the socket still holds its shipno, so every subsequent command —
+    // `rep`, `mai`, even `hel` — short-circuited to "No active ship." until
+    // the player reconnected.
+    //
+    // Canon does not leave the session in limbo: checkdam prints YOURDEAD,
+    // calls killem, then resets `user[usrn].substt = 0` (GEFUNCS.C:999-1004),
+    // returning the captain to a state they can act from — which is the whole
+    // point of YOURDEAD telling them a freighter dropped them at Zygor.
+    //
+    // presentShipEntry is the same recovery `abandon` already uses, and its
+    // own docstring records why it exists: "without it an abandoned captain sat
+    // at a session that answered 'No active ship.' to everything." Death is
+    // the same situation and never called it.
+    void this.recoverAfterDeath(event.victimUserid);
+  }
+
+  /**
+   * Re-seat a captain whose ship has just been destroyed: another hull if they
+   * have one, otherwise onboarding and the free starter at Zygor.
+   * Fire-and-forget — a failure here must not disturb the combat tick.
+   */
+  private async recoverAfterDeath(userid: string): Promise<void> {
+    // Defensive throughout: many unit tests supply a minimal server double
+    // (just `emit`/`to`), and a death must never throw inside the combat tick.
+    const room = this.server?.sockets?.adapter?.rooms?.get(`user:${userid}`);
+    if (!room) return;
+    for (const socketId of room) {
+      const socket = this.server.sockets.sockets?.get(socketId);
+      if (!socket) continue;
+      socket.data.activeShipNo = undefined;
+      try {
+        await this.presentShipEntry(socket, userid);
+      } catch (err) {
+        const stack = err instanceof Error ? err.stack : String(err);
+        this.logger.error(`Post-death re-entry failed for ${userid}: ${stack}`);
+      }
+    }
   }
 
   /** Planet-attack owner alert — emitted from PlanetAttackService.callForHelp. @see GECMDS.C:3952 call_4_help */
