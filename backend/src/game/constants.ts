@@ -165,14 +165,14 @@ export const MAXPLSE = GAME_CONFIG.MAXPLSE;
 /**
  * Planet frequency: a sector gets objects when `gernd()%plodds == 0`
  * (GEPLANET.C:484), so roughly one sector in PLODDS is populated.
- * @see GEMAIN.C:475 plodds = numopt(PLODDS,1,20)
+ * @see GEMAIN.C:472 plodds = numopt(PLODDS,1,20)
  */
 export const PLODDS = GAME_CONFIG.PLODDS;
 
 /**
  * Wormhole frequency: an object slot becomes a wormhole rather than a planet
  * when `gernd()%wormodds == 0` (GEPLANET.C:548).
- * @see GEMAIN.C:476 wormodds = numopt(WORMODDS,1,100)
+ * @see GEMAIN.C:473 wormodds = numopt(WORMODDS,1,100)
  */
 export const WORMODDS = GAME_CONFIG.WORMODDS;
 

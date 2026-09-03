@@ -45,11 +45,22 @@ describe('GameGateway — a Cybertron taunt reaches the pilot it is aimed at', (
       mockRandom,
       { emit: jest.fn(), on: jest.fn() } as never,
     );
+    // The taunt goes out as ONE emit chained over two rooms (`.to(a).to(b)`),
+    // because two separate emits double-delivered to a target standing in the
+    // taunter's sector. The double must therefore model the chain, and record
+    // one entry PER ROOM so these assertions keep their meaning.
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),
-      to: (room: string) => ({
-        emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },
-      }),
+      to: function chain(room: string) {
+        const rooms = [room];
+        const node = {
+          to: (r: string) => { rooms.push(r); return node; },
+          emit: (event: string, payload: unknown) => {
+            for (const r of rooms) roomEmits.push({ room: r, event, payload });
+          },
+        };
+        return node;
+      },
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, roomEmits };

@@ -2506,7 +2506,7 @@ The port had no such gate. Implementing it forces a call on the `+`: the obvious
 reading of the intent ("keep MOVENGMIN in reserve for the engines") is `-`, and
 the shipped source says `+`, which does the opposite — it lets the shot leave the
 pile up to `MOVENGMIN-1` in the red, and `warsptr->energy -= eng_flu`
-(GECMDS.C:1314) duly takes it there.
+(GECMDS.C:1312) duly takes it there.
 
 **Decision:** Reproduce the `+` exactly. `missileFluxShort()` in
 `backend/src/game/combat/combat-math.ts` returns
@@ -2711,3 +2711,55 @@ the name last after a fixed-arity prefix). Authenticating on founder *userid* in
 password (needs a new `Team.founder` column and therefore a migration). Reusing
 `MAIL_CLASS_DISTRESS` for the kick notice (renders as an attack, naming the kicker as an
 attacking ship).
+
+## 2026-09-03 — Team password cap returns to canon's 10
+
+**Context:** `MAX_TEAM_PASSWORD_LENGTH` was 8, pinned by a balance test labelled
+"FR-011a — documented deviation from original 10". The entry it pointed at
+(2026-05-08, `mai` keyword era) justifies auto-assigned teamcodes and collapsing
+`secret`/`password` into one column, and says nothing whatever about length.
+
+**Decision:** 10, matching canon. `create` truncates; `newpass` refuses.
+
+**Reason:** Written down is not the same as argued for. The project rule allows a
+deviation that is deliberate, recorded AND justified by something other than "we
+could not find the canonical value" — this one had a record with no argument in
+it, and the effect was that a password a 1994 player could set was an error here.
+Canon is `char password[11]` (GEMAIN.H:650) filled by
+`strncpy(tmp.password, margv[4], 10)` (GECMDS.C:5518).
+
+**Canon is inconsistent between the two paths, and that is reproduced rather
+than smoothed over:** team CREATE truncates via `strncpy` and never complains,
+while `newpass` explicitly checks `strlen(margv[3]) > 10` and answers TEAMBPSS
+(GECMDS.C:5702-5706). Names truncate on both paths (`strncpy(..., 30)`,
+GECMDS.C:5521, :5750) and are never refused for length.
+
+**Alternatives rejected:** Keeping 8 and writing a real justification for it. No
+justification exists — nothing about a web client makes a 9-character password
+harder than an 8-character one.
+
+## 2026-09-03 — Two AI-narration routing bugs, and a guard for the class
+
+**Context:** Fixing the Cybertron taunts surfaced two delivery defects that
+every existing test missed, because they all assert what is emitted and none
+assert where.
+
+**Decision:** One chained emit for the taunt; `user:<userid>` for the droid
+annoy; a test that compares room-name namespaces built against namespaces joined.
+
+**Reason:** Socket.io de-duplicates across rooms within a single `.emit()` but
+not across two calls, so `to(user).emit()` followed by `to(sector).emit()` sent
+every taunt twice to a target standing in the taunter's own sector — which is
+where a Cybertron does its taunting, so it was the ordinary case. Separately,
+`handleDroidAnnoy` addressed `to:<userid>:<shipno>`, a namespace nothing has
+ever joined; it survived only because a droid is usually in its victim's sector
+and the sector copy carried it.
+
+The guard scans every `` `prefix:${...}` `` template in the gateway, not only
+the ones written inline in a `.to(...)` — its first version did the latter and
+missed the very bug it was written for, because the dead room was assigned to a
+`const` first. Verified by planting the old name and watching it fail.
+
+**Alternatives rejected:** Asserting exact room strings per handler. That pins
+the current addressing rather than the invariant, and would not have caught a
+namespace nobody joins.

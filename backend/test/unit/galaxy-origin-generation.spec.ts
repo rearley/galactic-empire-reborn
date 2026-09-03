@@ -73,7 +73,7 @@ describe('origin sector generation dispatches on s00 type', () => {
   it('portals are visible and point somewhere other than the origin', async () => {
     const rows = await generate();
     for (const w of rows.wormholes) {
-      // build_worm sets worm.visible = 1 — GEPLANET.C:820
+      // build_worm sets worm.visible = 1 — GEPLANET.C:822
       expect(w.visible).toBe(1);
       expect([w.destXcoord, w.destYcoord]).not.toEqual([0.5, 0.5]);
     }
