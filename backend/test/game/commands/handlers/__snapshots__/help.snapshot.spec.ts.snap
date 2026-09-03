@@ -2,7 +2,7 @@
 
 exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
 [
-  "Combat  (nothing may fire inside the neutral zone)",
+  "Combat",
   "  pha <deg> [focus]      — fire phasers along a relative bearing",
   "  loc <target>           — lock on a ship by name",
   "  tor <target>           — fire a torpedo at a locked target",
@@ -13,9 +13,32 @@ exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
   "  zip                    — zipper",
   "  flu                    — burn a flux pod to refill energy",
   "  shi up|dn              — raise or lower shields",
+  "  sca sh <letter>        — read a target: hull damage AND shield state",
   "  fre <A|B|C> <n|hail>   — tune a radio channel",
   "  sen <A|B|C> <message>  — transmit on a channel",
   "  att <amount> <troops|fighters> — attack the planet you orbit",
+  "",
+  "PHASERS",
+  "focus is 0-5; bare "pha <deg>" fires at focus 1. Focus widens the beam",
+  "and thins it: the beam covers focus+2 degrees either side of your",
+  "bearing, and each hit lands (1 - focus/11) squared of full damage.",
+  "Focus 0 is the tight, hardest-hitting shot; focus 5 sprays 7 degrees",
+  "for about a third of the damage.",
+  "Phasers need 60 charge to fire and gain 10 charge per 6-second tick, so",
+  "a fired bank is cold for about 36 seconds.",
+  "Firing DROPS YOUR OWN SHIELDS first - you are bare while you shoot.",
+  "Shields deflect phaser fire completely: against a shielded target that",
+  "out-tonnages you, you can burn a whole magazine and land no damage at",
+  "all. Read the target first with "sca sh <letter>" - it reports shield",
+  "state as well as hull damage - and do not start a fight you cannot",
+  "finish.",
+  "",
+  "WHERE YOU MAY FIGHT",
+  "Nothing may fire inside the neutral zone, which is sector 0,0 - and",
+  "sector 0,0 is exactly where the Zygor shipyard and the trading posts",
+  "sit. A shot fired there never reaches the target: the Enforcer zaps YOU",
+  "for 10% damage, every time.",
+  "Leave sector 0,0 before you pick a fight. Everywhere else is fair game.",
 ]
 `;
 
@@ -28,7 +51,7 @@ exports[`Help topic snapshots comms topic body matches snapshot 1`] = `
   "  ros [all]              — score roster (only pilots who have scored)",
   "  fre <A|B|C> <n|hail>   — tune a radio channel",
   "  sen <A|B|C> <message>  — transmit on a channel",
-  "  mai                    — list your mail (reports, attack notices)",
+  "  rea                    — list your mail (reports, attack notices)",
   "  rea <n>                — read message n",
   "  del <n>                — delete message n",
   "  tea                    — show the team you are on",
@@ -44,7 +67,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
 {
   "combat": {
     "body": [
-      "Combat  (nothing may fire inside the neutral zone)",
+      "Combat",
       "  pha <deg> [focus]      — fire phasers along a relative bearing",
       "  loc <target>           — lock on a ship by name",
       "  tor <target>           — fire a torpedo at a locked target",
@@ -55,9 +78,32 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  zip                    — zipper",
       "  flu                    — burn a flux pod to refill energy",
       "  shi up|dn              — raise or lower shields",
+      "  sca sh <letter>        — read a target: hull damage AND shield state",
       "  fre <A|B|C> <n|hail>   — tune a radio channel",
       "  sen <A|B|C> <message>  — transmit on a channel",
       "  att <amount> <troops|fighters> — attack the planet you orbit",
+      "",
+      "PHASERS",
+      "focus is 0-5; bare "pha <deg>" fires at focus 1. Focus widens the beam",
+      "and thins it: the beam covers focus+2 degrees either side of your",
+      "bearing, and each hit lands (1 - focus/11) squared of full damage.",
+      "Focus 0 is the tight, hardest-hitting shot; focus 5 sprays 7 degrees",
+      "for about a third of the damage.",
+      "Phasers need 60 charge to fire and gain 10 charge per 6-second tick, so",
+      "a fired bank is cold for about 36 seconds.",
+      "Firing DROPS YOUR OWN SHIELDS first - you are bare while you shoot.",
+      "Shields deflect phaser fire completely: against a shielded target that",
+      "out-tonnages you, you can burn a whole magazine and land no damage at",
+      "all. Read the target first with "sca sh <letter>" - it reports shield",
+      "state as well as hull damage - and do not start a fight you cannot",
+      "finish.",
+      "",
+      "WHERE YOU MAY FIGHT",
+      "Nothing may fire inside the neutral zone, which is sector 0,0 - and",
+      "sector 0,0 is exactly where the Zygor shipyard and the trading posts",
+      "sit. A shot fired there never reaches the target: the Enforcer zaps YOU",
+      "for 10% damage, every time.",
+      "Leave sector 0,0 before you pick a fight. Everywhere else is fair game.",
     ],
     "title": "Combat",
   },
@@ -70,7 +116,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  ros [all]              — score roster (only pilots who have scored)",
       "  fre <A|B|C> <n|hail>   — tune a radio channel",
       "  sen <A|B|C> <message>  — transmit on a channel",
-      "  mai                    — list your mail (reports, attack notices)",
+      "  rea                    — list your mail (reports, attack notices)",
       "  rea <n>                — read message n",
       "  del <n>                — delete message n",
       "  tea                    — show the team you are on",
@@ -81,6 +127,36 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  cls                    — clear the event log",
     ],
     "title": "Comms & Fleet",
+  },
+  "mail": {
+    "body": [
+      "Mail",
+      "  rea                — list your messages (reports, attack notices)",
+      "  rea <n>            — read message n",
+      "  del <n>            — delete message n",
+      "",
+      "Note that "mai" is NOT mail: it is the maintenance and repair command.",
+    ],
+    "title": "Mail",
+  },
+  "maintenance": {
+    "body": [
+      "Maintenance & Repair",
+      "  mai [password]     — hire a repair crew at the planet you are orbiting",
+      "  set auto-repair on — hire one automatically whenever you take damage",
+      "  rep sys            — current hull damage and repair progress",
+      "",
+      "Hull damage never heals on its own. To clear it, orbit an inhabited",
+      "planet (25,000 population or more) and type "mai". If the planet is not",
+      "yours and its owner set a trade password, pass it: "mai <password>".",
+      "Repairs cost 200 credits at an ordinary planet and 2,500 credits at",
+      "Zygor in the neutral zone, which is the only repair depot there - the",
+      "Enforcer planet has none.",
+      "One visit queues a repair of roughly a third of your damage, so heavy",
+      "damage takes a few visits.",
+      "No crew will board a ship still locked in combat - break off first.",
+    ],
+    "title": "Maintenance & Repair",
   },
   "navigation": {
     "body": [
@@ -124,7 +200,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "Ship",
       "  rep <nav|sys|inv|cargo|wpns|acc>  — ship status report",
       "  clo on|off         — toggle cloak",
-      "  maint <password>   — repair at the planet you orbit (costs credits)",
+      "  mai [password]     — repair hull damage in orbit (see "hel maintenance")",
       "  set <auto-shield|auto-repair|scannames|scanhome> <on|off>",
       "  new ship <class>   — buy a hull at Zygor (from orbit)",
       "  new phaser <type>  — upgrade phasers",
@@ -152,6 +228,36 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
     "title": "Trade",
   },
 }
+`;
+
+exports[`Help topic snapshots mail topic body matches snapshot 1`] = `
+[
+  "Mail",
+  "  rea                — list your messages (reports, attack notices)",
+  "  rea <n>            — read message n",
+  "  del <n>            — delete message n",
+  "",
+  "Note that "mai" is NOT mail: it is the maintenance and repair command.",
+]
+`;
+
+exports[`Help topic snapshots maintenance topic body matches snapshot 1`] = `
+[
+  "Maintenance & Repair",
+  "  mai [password]     — hire a repair crew at the planet you are orbiting",
+  "  set auto-repair on — hire one automatically whenever you take damage",
+  "  rep sys            — current hull damage and repair progress",
+  "",
+  "Hull damage never heals on its own. To clear it, orbit an inhabited",
+  "planet (25,000 population or more) and type "mai". If the planet is not",
+  "yours and its owner set a trade password, pass it: "mai <password>".",
+  "Repairs cost 200 credits at an ordinary planet and 2,500 credits at",
+  "Zygor in the neutral zone, which is the only repair depot there - the",
+  "Enforcer planet has none.",
+  "One visit queues a repair of roughly a third of your damage, so heavy",
+  "damage takes a few visits.",
+  "No crew will board a ship still locked in combat - break off first.",
+]
 `;
 
 exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
@@ -196,7 +302,7 @@ exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
   "Ship",
   "  rep <nav|sys|inv|cargo|wpns|acc>  — ship status report",
   "  clo on|off         — toggle cloak",
-  "  maint <password>   — repair at the planet you orbit (costs credits)",
+  "  mai [password]     — repair hull damage in orbit (see "hel maintenance")",
   "  set <auto-shield|auto-repair|scannames|scanhome> <on|off>",
   "  new ship <class>   — buy a hull at Zygor (from orbit)",
   "  new phaser <type>  — upgrade phasers",

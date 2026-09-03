@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = resolve(HERE, '../reference/ge-upstream/mbmgemp/GE/MSG/MBMGESHP.MSG')
+const SRC = resolve(HERE, '../reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG')
 
 /** Mnemonic -> [our seed field name, kind]. Order MUST match GEMAIN.C:838-869. */
 const FIELDS = [
@@ -118,7 +118,7 @@ function emitTs(rows) {
  * Regenerate with:  node tools/extract-ship-classes.mjs --ts
  *
  * Every value is read verbatim from the original distribution's ship
- * configuration table, reference/ge-upstream/mbmgemp/GE/MSG/MBMGESHP.MSG,
+ * configuration table, reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG,
  * which is the file the original game itself loaded at boot. No value here is
  * normalized, rounded or editorially adjusted; where a field looks unused for a
  * given class it is still canon's value, because the fields the game ignores

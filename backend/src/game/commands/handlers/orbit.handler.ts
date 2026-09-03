@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { GalaxyService } from '../../galaxy/galaxy.service';
 import { ShipStateService } from '../../ship/ship-state.service';
+import { PlanetStateService } from '../../planet/planet-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -13,8 +13,8 @@ import { canEnterOrbit } from './helpers/orbit-range';
 @Injectable()
 export class OrbitHandlerService {
   constructor(
-    private readonly galaxyService: GalaxyService,
     private readonly shipService: ShipStateService,
+    private readonly planetService: PlanetStateService,
   ) {}
 
   get command(): Command {
@@ -35,7 +35,13 @@ export class OrbitHandlerService {
 
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
+    // LIVE planet state, not GalaxyService's read-model. That model hydrates
+    // once at boot and is never refreshed, so a planet claimed and named during
+    // this session still orbited as "(unnamed)" and the picker listed a name
+    // nobody had used for hours. `sca pl` was moved off it for the same reason;
+    // `orb` was missed. Positions are identical in both (they are fixed at
+    // generation), so only the mutable fields — name, owner — change.
+    const planets = this.planetService.bySector(xsect, ysect);
 
     if (planets.length === 0) {
       return { lines: [{ text: formatMessage(MessageId.ORBITNO), category: 'system' }] };

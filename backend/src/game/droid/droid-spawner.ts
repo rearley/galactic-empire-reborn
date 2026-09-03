@@ -36,6 +36,35 @@ export class DroidSpawner {
   /** Monotonic counter for allocating unique @Droid-<n> userids. Wraps at 9999. */
   private nextSlotIndex = 1;
 
+  /**
+   * DEV-ONLY freeze registry, keyed by shipKey(userid, shipno).
+   *
+   * `stationary` used to be a creation-time-only tweak: the spawner set
+   * `speed2b = 0` and the droid AI then rolled a fresh drift speed the instant
+   * it saw a player — canon, GEDROIDS.C:328-331
+   * `if (ptr->holdcourse == 0) ptr->speed2b = rndm(999.9);`. That is correct
+   * behaviour for the game and is not changed. But it made the playtest
+   * override useless: a droid asked to hold still drifted 149 -> 839 units over
+   * four minutes, and because phaser falloff is dd^7 (PFIRDST 7, GEMAIN.H) that
+   * silently moved every damage number we measured.
+   *
+   * A droid whose key is in here is re-zeroed by DroidTickService after the AI
+   * has run, so range is a controlled variable. Only the explicit
+   * `stationary === true` argument — reachable solely from the debug spawn
+   * endpoint — puts a key in; the normal spawn path always clears it.
+   */
+  private readonly frozen = new Set<string>();
+
+  /** DEV-ONLY: is this droid pinned in place for a playtest? */
+  isFrozen(userid: string, shipno: number): boolean {
+    return this.frozen.has(shipKey(userid, shipno));
+  }
+
+  /** DEV-ONLY: release a freeze (called when the droid dies, so keys cannot leak). */
+  unfreeze(userid: string, shipno: number): void {
+    this.frozen.delete(shipKey(userid, shipno));
+  }
+
   constructor(
     private readonly shipState: ShipStateService,
     private readonly classCache: ShipClassCacheService,
@@ -179,6 +208,15 @@ export class DroidSpawner {
       dirty: false,
       isEphemeral: true,
     };
+
+    // Userids are recycled (allocateUserid wraps at 9999), so a normal spawn
+    // must actively CLEAR any stale freeze on the key it just claimed —
+    // otherwise a dev-frozen slot could silently pin a later live droid.
+    if (stationary === true) {
+      this.frozen.add(shipKey(userid, shipno));
+    } else {
+      this.frozen.delete(shipKey(userid, shipno));
+    }
 
     this.shipState.loadShip(state);
 

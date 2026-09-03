@@ -321,7 +321,17 @@ export class MidnightRepository {
    * Reset neutral-zone planet inventories and randomize markup.
    * Zygor-3 (plnum=1) gets all 14 items at 1032000; Nexus Prime (plnum=2) gets troops/men/food.
    * Purchases never deplete stock (neutral() check in buy()), so this is cosmetic but faithful.
-   * @see GEMAIN.C:2147-2175 GE22e patch — "Updating Zygor" / "Updating T-station"
+   *
+   * NOT the primary restock any more. In C the GE22e patch lives inside the
+   * continuous `plarti` planet loop and fires on the same pass, immediately
+   * after `multiply()` has clamped the hub's stock to MAXPL — see
+   * `applyNeutralZoneRestock`, called from `PlanetStateService.runEconomicTickFor`.
+   * Restoring only here left the shop selling MAXPL quantities for the whole
+   * day between midnights. This remains as the boot-state guarantee for a
+   * server that has been down (and it writes Postgres, which the in-memory map
+   * re-reads on MIDNIGHT_COMPLETED).
+   *
+   * @see GEMAIN.C:2145-2178 GE22e patch — "Updating Zygor" / "Updating T-station"
    */
   async refreshNeutralZone(tx: TxClient): Promise<void> {
     // Zygor-3: all items — markup = baseprice*2 + rand()%baseprice  @see GEMAIN.C:2154

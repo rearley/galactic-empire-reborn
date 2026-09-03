@@ -435,15 +435,25 @@ export class ShipStateService implements OnModuleInit {
       if (state.isEphemeral) continue; // FR-002: Droid ships have no DB row
       if (!state.dirty) continue;
       attempted++;
+      // Clear the flag BEFORE awaiting, and build the payload before that.
+      // A ship mutates every physics tick, and clearing `dirty` after the await
+      // erased any mutation that landed while the write was in flight: the row
+      // kept the position the in-flight update carried, and nothing was queued
+      // to correct it. A ship that keeps moving self-heals on its next
+      // mutation; one that stops, disconnects or is evicted inside that window
+      // persists a stale position. Clearing first is strictly safer — a
+      // concurrent mutation re-raises the flag and is picked up next sweep.
+      const data = stateToPrismaUpdate(state);
+      state.dirty = false;
       try {
         await this.prisma.ship.update({
           where: { userid_shipno: { userid: state.userid, shipno: state.shipno } },
-          data: stateToPrismaUpdate(state),
+          data,
         });
-        state.dirty = false;
         this.lastFlushedAt.set(shipKey(state.userid, state.shipno), Date.now());
       } catch (err: unknown) {
         failed++;
+        state.dirty = true;
         this.logger.error(
           `Flush failed for ${shipKey(state.userid, state.shipno)}:`,
           err,

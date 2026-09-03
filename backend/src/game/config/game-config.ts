@@ -108,9 +108,14 @@ export const SYSOP_OPTIONS = {
   MAXPLSE: { min: 1, max: 9, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:477', implemented: true, constant: 'MAXPLSE' },
   TEAMBONU: { min: 0, max: 32000, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:478', implemented: true },
   TEAMMAX: { min: 0, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:479', implemented: false },
-  HPFIRDST: { min: 1, max: 20, default: 9, canonDefault: 9, cReference: 'GEMAIN.C:491', implemented: true },
+  // 5, not 9. The 9 came from GE/MSG/MBMGEMSG.MSG, an earlier partial snapshot;
+  // the shipped file is GE/REL/MBMGEMSG.MSG. @see reference/ge-upstream/PROVENANCE.md
+  HPFIRDST: { min: 1, max: 20, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:491', implemented: true },
   HPDAMMAX: { min: 1, max: 200, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:492', implemented: true },
-  PFIRDST: { min: 1, max: 20, default: 7, canonDefault: 7, cReference: 'GEMAIN.C:493', implemented: true },
+  // 5, not 7 — same stale-copy story as HPFIRDST. This is the exponent in the
+  // dd^factor range falloff (GEFUNCS.C:2080-2087), so it is the single number
+  // that decides how fast phaser damage dies with distance.
+  PFIRDST: { min: 1, max: 20, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:493', implemented: true },
   PDAMMAX: { min: 1, max: 200, default: 50, canonDefault: 50, cReference: 'GEMAIN.C:494', implemented: true },
   JAMTIME: { min: 1, max: 10, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:496', implemented: true },
   MAILDAYS: { min: 1, max: 7, default: 3, canonDefault: 3, cReference: 'GEMAIN.C:497', implemented: false },

@@ -42,7 +42,11 @@ describe('recovery after death', () => {
       .recoverAfterDeath('alice');
 
     expect(socket.data.activeShipNo).toBeUndefined();
-    expect(gw.presentShipEntry as jest.Mock).toHaveBeenCalledWith(socket, 'alice');
+    // A captain who was online for the death has already had YOURDEAD, so
+    // re-entry suppresses the "destroyed while you were away" notice.
+    expect(gw.presentShipEntry as jest.Mock).toHaveBeenCalledWith(socket, 'alice', {
+      noticeShipLoss: false,
+    });
   });
 
   it('does nothing when the captain has no live socket', async () => {

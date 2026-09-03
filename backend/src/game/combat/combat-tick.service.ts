@@ -21,7 +21,6 @@ import {
   PENGUSE,
   USEENERGY_RESERVE,
 } from '../constants';
-import { I_TROOPS, ITEM_TONS, NUMITEMS } from '../constants/items';
 import { MineRegistry, MineState } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { RANDOM, Random } from './random.port';
@@ -53,6 +52,7 @@ import {
   CombatShipDestroyedEvent,
 } from './combat-events';
 import { applyRandamageAndEmit } from './randamage.apply';
+import { LootTransfer, resolveKillSpoils } from './kill-resolution';
 import {
   AiFireEventForInvariants,
   CombatEventForInvariants,
@@ -243,42 +243,17 @@ export class CombatTickService implements OnModuleInit {
         const snapshot = attackerSnapshot.get(shipKey(victim.userid, victim.shipno));
         const attacker = this.findActiveAttackerByChannel(attackerChannel, victim);
 
-        const loot: Array<{ itemIndex: number; amount: bigint }> = [];
-
-        if (attacker) {
-          this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
-            a.kills += 1;
-          });
-
-          // Cargo transfer — GEFUNCS.C:killem (1122-1136).
-          // Loop starts at 1 (skips I_MEN=0); I_TROOPS=8 skipped explicitly.
-          let maxTons = 5000;
-          try { maxTons = this.shipClassCache.getMaxTons(attacker.shpclass); } catch { /* fallback */ }
-
-          let usedTons = 0;
-          for (let i = 0; i < NUMITEMS; i++) {
-            usedTons += Number(attacker.items[i] ?? 0n) * ITEM_TONS[i];
-          }
-
-          for (let i = 1; i < NUMITEMS; i++) {
-            if (i === I_TROOPS) continue;
-            const victimAmt = victim.items[i] ?? 0n;
-            if (victimAmt <= 0n) continue;
-
-            const divisor = BigInt(Math.floor(this.random.next() * 5) + 1);
-            const amt = victimAmt / divisor;
-            if (amt <= 0n) continue;
-
-            const neededTons = Number(amt) * ITEM_TONS[i];
-            if (neededTons <= maxTons - usedTons) {
-              this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
-                a.items[i] = (a.items[i] ?? 0n) + amt;
-              });
-              usedTons += neededTons;
-              loot.push({ itemIndex: i, amount: amt });
-            }
-          }
-        }
+        // Canon's killem does the kill credit and the cargo transfer in one
+        // place, and so do we now: the gateway's disconnect kill calls the
+        // same helper instead of shipping an empty hold.
+        // @see GEFUNCS.C:1116-1136, GEMAIN.C:1418
+        const loot: LootTransfer[] = attacker
+          ? resolveKillSpoils(victim, attacker, {
+              mutate: (userid, shipno, fn) => this.shipState.mutate(userid, shipno, fn),
+              maxTonsFor: (shpclass) => this.shipClassCache.getMaxTons(shpclass),
+              random: this.random,
+            })
+          : [];
 
         // Score points for this kill — GEFUNCS.C:killem (1145).
         let scoreAwarded = 0;

@@ -41,7 +41,14 @@ export class ShieldHandlerService {
     if (sub === 'dn' || sub === 'down') {
       ship.shieldstat = 0;
       ship.dirty = true;
-      return { lines: [{ text: formatMessage(MessageId.SHI_DN), category: 'success' }] };
+      // SHLDDN, not "Shields down." — canon's shielddn() is three statements
+      // and its only output is `prfmsg(SHLDDN)` = "Shields are now down, Sir!"
+      // (GEFUNCS.C:2419-2427, MBMGEMSG.MSG:2031), sent FILTER exactly as
+      // shieldup sends SHLDCHP. The port's invented string also split one
+      // event into two wordings: combat already prints SHLDDN when firing
+      // drops your shields (combat/shield-drop.ts), so the same thing read
+      // differently depending on whether you asked for it.
+      return { lines: [{ text: formatMessage(MessageId.SHLDDN), category: 'success' }] };
     }
 
     if (sub !== 'up') {

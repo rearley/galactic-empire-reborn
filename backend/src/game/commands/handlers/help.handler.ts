@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { HELP_TOPICS, HELP_TOPIC_IDS, HelpTopicId } from '../help/help-topics';
+import { HELP_TOPICS, HELP_TOPIC_ALIASES, HELP_TOPIC_IDS, HelpTopicId } from '../help/help-topics';
 import { ShipState } from '../../ship/ship-state.types';
 
 /**
  * Handles `hel` / `?` — topic-group help.
- * No-arg form lists the five topic IDs.
+ * No-arg form lists every topic ID.
  * Single-arg form returns the topic body lines.
  * Unknown topic returns HEL_UNKNOWN.
  *
@@ -26,7 +26,10 @@ export class HelpHandlerService {
           lines: [{ text: formatMessage(MessageId.HELFMT, topicList), category: 'info' }],
         };
       }
-      const topicKey = args[0].toLowerCase() as HelpTopicId;
+      // A pilot looking for repair types `hel mai`, not `hel maintenance`.
+      // Answering "Unknown help topic" there is what kept maintenance hidden.
+      const raw = args[0].toLowerCase();
+      const topicKey = (HELP_TOPIC_ALIASES[raw] ?? raw) as HelpTopicId;
       const topic = HELP_TOPICS[topicKey];
       if (!topic) {
         return {

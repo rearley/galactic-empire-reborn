@@ -119,10 +119,20 @@ export class PriceHandlerService {
     });
 
     if (!outcome.ok) {
+      // BUY3 carries `avail`, the count C prints. @see GECMDS.C:4381-4383
+      if (outcome.reason === 'AT_RESERVE') {
+        return {
+          lines: [
+            {
+              text: formatMessage(MessageId.BUY3, outcome.available, ITEM_NAMES[itemIndex]),
+              category: 'system',
+            },
+          ],
+        };
+      }
       const msg =
         outcome.reason === 'SELL_FLAG_OFF' ? MessageId.BUY5
         : outcome.reason === 'CAPACITY_FULL' || outcome.reason === 'WONT_FIT' ? MessageId.BUY8
-        : outcome.reason === 'AT_RESERVE' ? MessageId.BUY3
         : MessageId.PRICE_NO_CASH;
       return { lines: [{ text: formatMessage(msg), category: 'system' }] };
     }

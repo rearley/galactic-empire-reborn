@@ -25,10 +25,19 @@ export type BuyOutcome =
   | { ok: true; transferred: number; unitPrice: number; totalCost: bigint; mutatePlanet: boolean }
   | {
       ok: false;
+      reason: 'AT_RESERVE';
+      /**
+       * `avail` — what the planet will actually sell right now. C prints it:
+       * `sprintf(gechrbuf,"%ld",avail); prfmsg(BUY3,gechrbuf,item_name[item]);`
+       * Never negative: a stock below the reserve is simply nothing for sale.
+       * @see GECMDS.C:4381-4383
+       */
+      available: number;
+    }
+  | {
+      ok: false;
       reason:
         | 'SELL_FLAG_OFF'
-        /** Planet has none, or not enough, for sale above its reserve (C: BUY3). */
-        | 'AT_RESERVE'
         /** No free tonnage at all (C: chkweight with an empty hold). */
         | 'CAPACITY_FULL'
         /** Some room, but not enough for the whole order (C: BUY8). */
@@ -111,7 +120,7 @@ export function computeBuyOutcome(input: BuyInput): BuyOutcome {
       ? Number(item.qty)
       : Number(item.qty) - item.reserve;
   if (available <= 0 || available < requestedQty) {
-    return { ok: false, reason: 'AT_RESERVE' };
+    return { ok: false, reason: 'AT_RESERVE', available: Math.max(0, available) };
   }
 
   // 4. price

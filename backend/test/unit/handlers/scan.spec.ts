@@ -371,7 +371,17 @@ describe('T049 — scan pl: beacon line', () => {
       getSectorWormholes: jest.fn().mockReturnValue([]),
       findPlanetByName: jest.fn().mockReturnValue(planet),
     };
-    const planetServiceMock = { get: jest.fn().mockReturnValue(beaconState),
+    // The live-state stub needs the fields scanPl actually reads now: the
+    // non-owner reconnaissance block (GECMDS.C:2377-2448) reads `items`, so a
+    // bare `{ beacon }` object is no longer a valid PlanetState stand-in.
+    const liveState = beaconState === null ? null : {
+      ...planet,
+      ...beaconState,
+      items: Array.from({ length: 14 }, () => ({
+        qty: 0n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+      })),
+    };
+    const planetServiceMock = { get: jest.fn().mockReturnValue(liveState),
       bySector: jest.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
       byName: jest.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
     const service = new ScanHandlerService(
