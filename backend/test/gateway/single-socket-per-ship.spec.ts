@@ -104,6 +104,9 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
     (gateway as unknown as { server: unknown }).server = {
+      // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
+      // (GEFUNCS.C:978-987), so the double needs a to().
+      to: jest.fn(() => ({ emit: jest.fn() })),
       emit: serverEmitMock,
       sockets: {
         sockets: {

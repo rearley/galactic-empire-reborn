@@ -122,6 +122,9 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
       mockEvents as never,
     );
     (gw as unknown as { server: unknown }).server = {
+      // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
+      // (GEFUNCS.C:978-987), so the double needs a to().
+      to: jest.fn(() => ({ emit: jest.fn() })),
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };

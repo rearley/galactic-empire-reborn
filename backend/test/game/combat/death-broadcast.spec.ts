@@ -64,7 +64,13 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     // `attackerName` is added by the gateway: it names the planet when a kill
     // has no attacking ship (an ion-cannon kill), and is null otherwise.
     expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, { ...event, attackerName: null });
-    expect(toMock).not.toHaveBeenCalled();
+    // The DESTRUCTION notice stays galaxy-wide and unfiltered. The only
+    // targeted emit is YOURDEAD to the victim, which C sends with
+    // outprfge(ALWAYS,usrn) — it tells them they escaped and are back at
+    // Zygor, and it is addressed to them alone.
+    // @see GEFUNCS.C:978-987, MBMGEMSG.MSG:1828-1840
+    expect(toMock).toHaveBeenCalledTimes(1);
+    expect(toMock).toHaveBeenCalledWith('user:b');
   });
 
   it('payload is forwarded intact, plus the planet-kill attribution field', () => {

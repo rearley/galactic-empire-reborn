@@ -127,8 +127,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       mockRandom,
       mockEvents as never,
     );
-    (gateway as unknown as { server: unknown }).server = {
-      emit: serverEmitMock,
+    (gateway as unknown as { server: unknown }).server = { to: () => ({ emit: () => undefined }), emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };
 

@@ -156,21 +156,29 @@ describe('NavHandlerService — NAVFMT rejection', () => {
 });
 
 // ---------------------------------------------------------------------------
-// NAV_ALREADY_THERE short-circuit
+// Navigating to the sector you are already in
 // ---------------------------------------------------------------------------
 
-describe('NavHandlerService — NAV_ALREADY_THERE', () => {
-  it('floor(xcoord) === x AND floor(ycoord) === y → NAV_ALREADY_THERE, no state change', () => {
-    const { handler, state, mockShipState, ctx } = makeService({
+describe('NavHandlerService — target inside the current sector', () => {
+  it('returns a bearing rather than refusing', () => {
+    // cmd_navigate (GECMDS.C:5109-5157) validates only the argument count and
+    // the univmax bounds; it has no "already there" branch and happily returns
+    // a bearing to a point inside your own sector.
+    //
+    // The refusal this replaces was the worst onboarding cliff in the game.
+    // Every player spawns at a random point in sector (0,0) and must reach
+    // Zygor-3 at its centre to buy anything at all, and `nav 0 0` is the
+    // obvious way to ask which way that is. Answering "Already at target
+    // sector." left a newcomer with no way to find the one planet the entire
+    // opening depends on.
+    const { handler, state, ctx } = makeService({
       xcoord: 7.4, ycoord: 3.9,
       holdcourse: 0, navTargetX: null, navTargetY: null,
     });
     const result = handler.command.handler(state, ['7', '3'], ctx) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.NAV_ALREADY_THERE));
-    expect(mockShipState.mutate).not.toHaveBeenCalled();
-    expect(state.holdcourse).toBe(0);
-    expect(state.navTargetX).toBeNull();
-    expect(state.navTargetY).toBeNull();
+    expect(result.lines.some((l) => /bearing/i.test(l.text))).toBe(true);
+    expect(state.navTargetX).toBe(7);
+    expect(state.navTargetY).toBe(3);
   });
 
   it('floor(xcoord) === x but floor(ycoord) !== y → NOT already there', () => {

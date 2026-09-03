@@ -12,6 +12,7 @@ import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip } from '../helpers/find-ship';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
+import { dropShieldsForFire } from '../../combat/shield-drop';
 
 const MISSILE_CHARGE_MIN = 1;
 
@@ -106,10 +107,24 @@ export class MissileHandlerService {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }
 
+    // Shields drop BEFORE the ammo check. C is explicit about the ordering:
+    // `if (shieldstat == SHIELDUP) shielddn(...)` at GECMDS.C:1240-1243, then
+    // the NOMISSL bail at :1245-1250. So a dry fire still costs you your
+    // shields. The port had no shield drop on this path at all — the only one
+    // of the three weapons missing it — and the ammo check came first, which
+    // would have hidden it even once added.
+    const shieldLine = dropShieldsForFire(ship, (fn) =>
+      this.shipState.mutate(ship.userid, ship.shipno, fn));
+
     // 4. Ammo
     const ammo = ship.items[I_MISSL] ?? 0n;
     if (ammo <= 0n) {
-      return { lines: [{ text: formatMessage(MessageId.MIS_NOAMMO), category: 'system' }] };
+      return {
+        lines: [
+          ...(shieldLine ? [shieldLine] : []),
+          { text: formatMessage(MessageId.MIS_NOAMMO), category: 'system' },
+        ],
+      };
     }
 
     // 4b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
@@ -118,7 +133,12 @@ export class MissileHandlerService {
         s.damage = s.damage + SE100DAM;
         s.cantexit = FIRETICKS;
       });
-      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+      return {
+        lines: [
+          ...(shieldLine ? [shieldLine] : []),
+          { text: formatMessage(MessageId.WPN_ZAP), category: 'combat' },
+        ],
+      };
     }
 
     // 5. Target lookup

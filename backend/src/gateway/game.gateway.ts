@@ -82,6 +82,8 @@ import {
   ATTACK_OWNER_ALERT_EVENT,
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
+import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
+import { formatMessage, MessageId } from '../game/commands/messages';
 
 interface SectorPayload {
   x: unknown;
@@ -1043,6 +1045,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       loot: event.loot.map(l => ({ itemIndex: l.itemIndex, amount: l.amount.toString() })),
     };
     this.server.emit(COMBAT_SHIP_DESTROYED, payload);
+
+    // Tell the pilot who just died that they SURVIVED. C prints YOURDEAD to
+    // the victim before killem (GEFUNCS.C:978-987), with outprfge(ALWAYS,usrn)
+    // so it bypasses the message filter — this is not flavour, it is the one
+    // message that tells a player they escaped, that a Galactic Command
+    // freighter picked them up, and that they are back at Zygor with a
+    // replacement waiting. The port printed a bare destruction notice, so
+    // losing a hull read as the end of the run rather than a setback.
+    // @see MBMGEMSG.MSG:1828-1840
+    this.server.to(`user:${event.victimUserid}`).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(MessageId.YOURDEAD),
+    });
   }
 
   /** Planet-attack owner alert — emitted from PlanetAttackService.callForHelp. @see GECMDS.C:3952 call_4_help */
@@ -1144,6 +1159,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
       category: 'combat',
       text: `** You strike the galactic perimeter. All way comes off and the hull takes ${event.damage} damage. **`,
+    });
+  }
+
+  /**
+   * Shield charge narration — SHLDAT each tick while charging, SHLDUP at full
+   * (GEFUNCS.C:2515-2523). Captain's own socket only; C uses
+   * `outprfge(FILTER,usrn)`, not a sector broadcast.
+   */
+  @OnEvent(SHIP_SHIELD_CHARGE)
+  handleShipShieldCharge(event: ShipShieldChargeEvent): void {
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'system',
+      text: event.kind === 'full'
+        ? formatMessage(MessageId.SHLDUP)
+        : formatMessage(MessageId.SHLDAT, event.percent),
     });
   }
 

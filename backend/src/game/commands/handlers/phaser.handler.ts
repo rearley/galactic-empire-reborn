@@ -39,6 +39,7 @@ import {
   GESTAT_AUTO,
 } from '../../constants';
 import { CombatTickService } from '../../combat/combat-tick.service';
+import { dropShieldsForFire } from '../../combat/shield-drop';
 
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
@@ -154,6 +155,12 @@ export class PhaserHandlerService {
     // Current phaser charge feeds the damage formula (phasr/100 scaling).
     const phasrCharge = ship.phasr;
 
+    // Shields drop FIRST — C does this at GECMDS.C:930-933, before the
+    // PMINFIRE gate and before the neutral-zone return, so firing costs your
+    // shields even when the shot never leaves the ship.
+    const shieldLine = dropShieldsForFire(ship, (fn) =>
+      this.shipState.mutate(ship.userid, ship.shipno, fn));
+
     // 6. Neutral-zone self-zap (GECMDS.C:937-941 zaphim): firer backfires.
     // This must execute BEFORE emitting COMBAT_PHASER_FIRED so that no fired
     // event leaks when the beam never actually leaves the ship.
@@ -173,7 +180,12 @@ export class PhaserHandlerService {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;
       });
-      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+      return {
+        lines: [
+          ...(shieldLine ? [shieldLine] : []),
+          { text: formatMessage(MessageId.WPN_ZAP), category: 'combat' },
+        ],
+      };
     }
 
     // Emit fired event. `bearing`/`percent` carry the relative degree/focus.
@@ -302,16 +314,14 @@ export class PhaserHandlerService {
       lines.push({ text: 'Phasers fired — no targets in arc.', category: 'combat' });
     }
 
-    // Full discharge of the firer (GECMDS.C:1006).
-    // C-008: firer's shields drop for the battle-lock window — mirrors C `shielddn`
-    // called before fire in GECMDS.C:firep 930-933. No auto-raise flag exists for
-    // phaser (unlike `recentlySelfFiredTorp` for torpedoes), so re-raise is manual.
+    // Full discharge of the firer (GECMDS.C:1006). The shield drop is NOT here
+    // — C performs it before the charge gate, so it is handled above.
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.phasr = 0;
       s.cantexit = FIRETICKS;
-      s.shieldstat = 0;
     });
 
+    if (shieldLine) lines.unshift(shieldLine);
     return { lines };
   }
 

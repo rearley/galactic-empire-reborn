@@ -331,6 +331,18 @@ export enum MessageId {
   NAV_STATUS = 'NAV_STATUS',
   NAV_ARRIVED = 'NAV_ARRIVED',
   NAV_ALREADY_THERE = 'NAV_ALREADY_THERE',
+  /** @see MBMGEMSG.MSG:2633 LEAVEORB */
+  LEAVEORB = 'LEAVEORB',
+  /** @see MBMGEMSG.MSG:2005 SHLDCHP — shields begin charging */
+  SHLDCHP = 'SHLDCHP',
+  /** @see MBMGEMSG.MSG:2009 SHLDUP — shields reach full charge */
+  SHLDUP = 'SHLDUP',
+  /** @see MBMGEMSG.MSG:2014 SHLDAT — per-tick charge percentage */
+  SHLDAT = 'SHLDAT',
+  /** @see MBMGEMSG.MSG:2031 SHLDDN — firing drops your shields */
+  SHLDDN = 'SHLDDN',
+  /** @see MBMGEMSG.MSG:1828-1840 YOURDEAD — told to the pilot who just died */
+  YOURDEAD = 'YOURDEAD',
 
   // spy (feature 016) — GECMDS.C cmd_spy
   SPY1 = 'SPY1',
@@ -763,6 +775,17 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.NAV_STATUS]: 'Autopilot active — target (%s,%s), distance %s, bearing %s.',
   [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',
   [MessageId.NAV_ALREADY_THERE]: 'Already at target sector.',
+  [MessageId.LEAVEORB]: 'Leaving orbit, Sir!',
+  [MessageId.SHLDCHP]: 'Shields energizing, Sir!',
+  [MessageId.SHLDUP]: 'Shields are now fully charged, Sir!',
+  [MessageId.SHLDAT]: 'Shields are at %d percent charge, Sir!',
+  [MessageId.SHLDDN]: 'Shields are now down, Sir!',
+  [MessageId.YOURDEAD]:
+    'WARNING! WARNING! WARNING! WARNING!\n'
+    + 'Damage control reports severe structural damage in critical systems!\n\n'
+    + 'Your private shuttle is waiting Sir!\n\n'
+    + 'You escape safely and are picked up by a Galactic Command Freighter\n'
+    + 'and transported back to their next stop, Zygor!',
 
   // spy (feature 016) — GECMDS.C cmd_spy
   [MessageId.SPY1]: 'You must be in orbit of a planet to plant a spy.',
