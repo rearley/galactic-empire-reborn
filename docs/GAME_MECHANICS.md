@@ -2108,7 +2108,7 @@ Flags are persisted immediately via `ShipStateService.mutate` (ship flags) or a 
 
 **Source**: GECMDS.C:4452 `cmd_maint`
 
-**Syntax**: `maint` (alias: `mai`)
+**Syntax**: `mai [password]` (alias: `maint`)
 
 Gates (canonical order): FR-206 not in orbit, FR-207 uninhabited/pop<25000, FR-208 combat-locked, FR-209 NZ non-Zygor, FR-204 no damage, FR-205 insufficient cash.
 
@@ -2266,7 +2266,7 @@ Player in orbit of an enemy planet (`where >= 10`, not self-owned, not neutral z
 
 Players receive mail in their `MailStat` inbox when planets are attacked (distress signals, class 1) or produce resources at midnight (production reports, class 3). Mail is accessed via three commands:
 
-- **`mai`** — Lists all messages in newest-first order (stamp DESC, msgno DESC, class DESC). With an argument, delegates to maintenance gate (feature 014 FR-210 preserved).
+- **`rea`** (no argument) — Lists all messages in newest-first order (stamp DESC, msgno DESC, class DESC). `mai` used to do this and no longer does: canon binds `mai` to `cmd_maint` (`GECMDS.C:144`) and has no mail command at all, so the mailbox has no claim on that keyword. @see docs/DECISIONS.md 2026-09-03.
 - **`rea <index>`** — Reads the class-specific detail for message at 1-based index. Production reports show planet/cash/debt/tax/14-item table. Distress signals show attacker/planet/sector. Read-only.
 - **`del <index>`** — Hard-deletes the message at 1-based index. Indices are re-resolved on each call (R5) — `del 2` twice against a 3-row inbox removes two different rows.
 
@@ -2407,3 +2407,65 @@ surviving spy has a 1-in-10 chance per tick of mailing its master a report on a
 random stocked item, with accuracy `50 + rndm(48)`. The port reveals spy intel
 through `sca pl` instead, which is a deliberate deviation; the periodic mailed
 report is not implemented.
+
+---
+
+## Passive hull repair (`REPAIRRT`)
+
+Every ship sheds a little hull damage on every 6-second physics tick, whether or
+not it has paid for a repair, and whether or not it is in combat.
+
+`checkdam` ends with:
+
+```c
+if (ptr->damage > 0.0)
+    ptr->damage = ptr->damage - repairrate;
+else
+    ptr->damage = 0.0;
+```
+
+`repairrate` is `numopt(REPAIRRT,1,50) / 100.0` (`GEMAIN.C:514-515`), shipped at
+6 — so **0.06 damage per tick, 0.6 per minute**. A hull at 100% is clean after
+roughly two and three-quarter hours of flying.
+
+This is not the repair `mai` buys. That is `repairship` (`GEFUNCS.C:390`), which
+clears 3 damage a second from a queue, aborts if the ship is in combat
+(`cantexit > 0`, `GEFUNCS.C:397`), and restores seven fields on completion. The
+two run on the same pass, in that order (`GEMAIN.C:2257` then `:2267`), so a
+ship working through a paid repair also gets the passive trickle.
+
+The port had no `repairrate` at all until 2026-09-03: damage only ever fell
+inside the paid repair. That made a mauled pilot with no credits permanently
+crippled, which canon never intended — a round-3 playtester finished a fight at
+98% hull with 2,503 credits and no way back.
+
+- `@see GEFUNCS.C:1009-1010` — the subtraction, at the end of `checkdam`
+- `@see GEMAIN.C:514-515` — `repairrate = REPAIRRT / 100`
+- `@see GEMAIN.C:2267` — `checkdam` on the TICKTIME pass
+- Implemented in `ship-tick.service.ts` `processRestorativeTick`, step 3
+
+## Helm speed reports (`SPEEDIS` / `SPEED0`)
+
+`accel()` reports the tick on which the ship actually *reaches* the speed it was
+ordered to — not when the order is given. Both directions snap:
+
+```c
+if (absol(ptr->speed - ptr->speed2b) <= accelrate)
+    { ptr->speed = ptr->speed2b; prfmsg(SPEEDIS, showarp(ptr->speed)); }
+```
+
+and on the deceleration side the same snap prints `SPEEDIS` if the resulting
+speed is above zero, `SPEED0` if it is a dead stop. Both go out
+`outprfge(FILTER, usrn)` — the captain's own socket, not the sector.
+
+**A canon bug we do not reproduce.** `SPEEDIS` is
+`"Helm reports speed is now warp %d point %d, Sir!"` — two integer slots — and
+canon passes it `showarp()`, which returns a *string* (`"5.00"`). The shipped
+game printed garbage here. We keep the sentence and give it the two numbers it
+plainly wants, with the fraction zero-padded the way `showarp`'s own `"%.2f"`
+formats it: "warp 9 point 05", not "warp 9 point 5".
+
+- `@see GEFUNCS.C:487-489, :543-553` — the two emit sites
+- `@see GEFUNCS.C:2674-2685` — `showarp`
+- Implemented as `SHIP_SPEED_REPORT` in `physics/speed-events.ts`, rendered by
+  `GameGateway.handleShipSpeedReport`
