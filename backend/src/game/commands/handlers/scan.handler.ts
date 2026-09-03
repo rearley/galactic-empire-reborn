@@ -262,31 +262,19 @@ export class ScanHandlerService implements OnModuleInit {
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Project planets within long-range scan across all nearby sectors
+    // NO PLANETS. `scan_lo`'s only projection loop is over ships
+    // (GECMDS.C:2686 `for (othusn=0; othusn < nships; othusn++)`), and
+    // `map_planets()` is called exactly once in the whole source — at
+    // GECMDS.C:2634, inside `scan_se`, four lines before scan_lo even begins.
+    // Planets are deliberately absent from the long-range overview.
+    //
+    // Drawing them put roughly two thousand 'P' cells onto a 450-cell grid in
+    // our galaxy: a solid wall of planets with the ship markers and the '*'
+    // self-cell buried inside it. `sca lo` is the first thing the welcome text
+    // tells a new player to type, and it rendered as noise.
+    // `sca se` is the mode that shows planets, and it still does.
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const sectorRadius = Math.ceil(projectionRange / 10000);
-
-    for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
-      for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        // Universe bounds, not the display grid: sectors run -UNIVMAX..+UNIVMAX
-        // with the origin at the centre. The old 0..MAXX test skipped every
-        // western and southern sector and probed columns past the edge.
-        if (sx < -UNIVMAX || sx > UNIVMAX || sy < -UNIVMAX || sy > UNIVMAX) continue;
-        for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
-          const cell = projectRangeCell(ship, planet, projectionRange);
-          if (!cell) continue;
-          // 'P' for all planets — plnum is per-sector so using it across sectors creates duplicates
-          grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
-        }
-        for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
-          if (!wormhole.visible) continue;
-          const cell = projectRangeCell(ship, wormhole, projectionRange);
-          if (!cell) continue;
-          grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
-        }
-      }
-    }
 
     // 4. Self-cell — GECMDS.C:2721 map[MAXY/2][MAXX/2] = '*'
     grid.push({
@@ -343,30 +331,10 @@ export class ScanHandlerService implements OnModuleInit {
       grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
     }
 
-    // 2. Planets and wormholes within long-range scan across all nearby sectors
+    // NO PLANETS — same as `sca lo`. See the note there: map_planets() belongs
+    // to scan_se alone (GECMDS.C:2634), and scan_lo projects ships only.
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    const sectorRadius = Math.ceil(projectionRange / 10000);
-
-    for (let sx = xsect - sectorRadius; sx <= xsect + sectorRadius; sx++) {
-      for (let sy = ysect - sectorRadius; sy <= ysect + sectorRadius; sy++) {
-        // Universe bounds, not the display grid: sectors run -UNIVMAX..+UNIVMAX
-        // with the origin at the centre. The old 0..MAXX test skipped every
-        // western and southern sector and probed columns past the edge.
-        if (sx < -UNIVMAX || sx > UNIVMAX || sy < -UNIVMAX || sy > UNIVMAX) continue;
-        for (const planet of this.galaxyService.getSectorPlanets(sx, sy)) {
-          const cell = projectRangeCell(ship, planet, projectionRange);
-          if (!cell) continue;
-          grid.push({ x: cell.x, y: cell.y, type: 'planet', char: 'P' });
-        }
-        for (const wormhole of this.galaxyService.getSectorWormholes(sx, sy)) {
-          if (!wormhole.visible) continue;
-          const cell = projectRangeCell(ship, wormhole, projectionRange);
-          if (!cell) continue;
-          grid.push({ x: cell.x, y: cell.y, type: 'wormhole', char: 'W' });
-        }
-      }
-    }
 
     // 4. Self-cell
     grid.push({

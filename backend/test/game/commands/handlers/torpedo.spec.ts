@@ -181,7 +181,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['Bob'], ctx) as CommandResult;
-    expect(res.lines[0].text).toMatch(/neutral zone/i);
+    expect(res.lines[0].text).toMatch(/Enforcer Planet/i);
     expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(firer.cantexit).toBe(FIRETICKS);
     // No target lock allocated — firer returned early

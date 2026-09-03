@@ -100,14 +100,14 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '0'], ctx) as CommandResult;
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
   });
 
   it('rejects charge > 50000 (NUMOOR)', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '50001'], ctx) as CommandResult;
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
   });
 
   it('rejects with JAMMER4 when firer.jammer > 0', () => {
@@ -176,7 +176,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['Bob', '1000'], ctx) as CommandResult;
-    expect(res.lines.some((l) => /neutral zone/i.test(l.text))).toBe(true);
+    expect(res.lines.some((l) => /Enforcer Planet/i.test(l.text))).toBe(true);
     expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(firer.cantexit).toBe(FIRETICKS);
     // No target lock allocated — firer returned early

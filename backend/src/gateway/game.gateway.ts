@@ -869,11 +869,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_HIT, enriched);
-    // Victim may be in a different sector room (cross-sector phaser range) — deliver directly.
+
+    // Victim may be in a DIFFERENT sector room (cross-sector phaser range), so
+    // deliver directly — but only if the sector broadcast did not already
+    // reach them. C prints PHITYOU exactly once per hit
+    // (GECMDS.C:989-990), and the unconditional direct emit meant a victim
+    // standing in the attacker's own sector saw every hit on them twice. The
+    // damage was applied once; only the notification doubled, which reads as
+    // taking twice the fire you actually took.
     const victimSocketId = this.registry.getSocketId(event.victimId);
     if (victimSocketId) {
       const victimSocket = this.server.sockets.sockets.get(victimSocketId);
-      victimSocket?.emit(COMBAT_HIT, enriched);
+      if (victimSocket && !victimSocket.rooms.has(room)) {
+        victimSocket.emit(COMBAT_HIT, enriched);
+      }
     }
   }
 

@@ -161,7 +161,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['400', '0'], ctx) as CommandResult;
     expect(result.lines[0].category).toBe('system');
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
     expect(alice.dirty).toBe(false);
   });
 
@@ -170,7 +170,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['90', '6'], ctx) as CommandResult;
     expect(result.lines[0].category).toBe('system');
-    expect(result.lines[0].text).toContain('out of range');
+    expect(result.lines[0].text).toContain('range from');
     expect(alice.dirty).toBe(false);
   });
 

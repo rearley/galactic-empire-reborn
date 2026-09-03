@@ -158,9 +158,13 @@ describe('T014 — spawn placement: Murdonian Transport (class 32)', () => {
     }
   });
 
-  it('phasr starts fully charged (=== phasrtype)', () => {
+  it('phasr starts at 100 — a full bank, not the phaser TYPE', () => {
+    // initshp sets phasr = 100 and shield = 0 on every new hull
+    // (GEFUNCS.C:222, :232); GEDROIDS.C:127,142-143 overrides only the TYPE
+    // fields. Seeding the bank from the type left a fresh droid at 1-5 against
+    // PMINFIRE 60 — unable to fire for ~36 seconds after spawning.
     for (const s of results) {
-      expect(s.phasr).toBe(s.phasrtype);
+      expect(s.phasr).toBe(100);
     }
   });
 
@@ -170,9 +174,9 @@ describe('T014 — spawn placement: Murdonian Transport (class 32)', () => {
     }
   });
 
-  it('shield starts at shieldtype (fully charged)', () => {
+  it('shield starts at 0 — shields charge from empty, as they do for a player', () => {
     for (const s of results) {
-      expect(s.shield).toBe(s.shieldtype);
+      expect(s.shield).toBe(0);
     }
   });
 });

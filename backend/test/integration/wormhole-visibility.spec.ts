@@ -73,27 +73,20 @@ function makeService(wormholes: GalaxyWormholeView[], scanRange = 20000) {
 
 describe('T020 — wormhole visibility gate', () => {
   describe('scan lo', () => {
-    it('hidden wormhole (visible=false) does NOT appear in scan grid', async () => {
-      const hidden: GalaxyWormholeView = {
-        xcoord: 5.5, ycoord: 5.6, visible: false,
-      };
-      const { svc } = makeService([hidden]);
-      await svc.onModuleInit();
-      const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
-      const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
-      expect(wCells).toHaveLength(0);
-    });
-
-    it('visible wormhole (visible=true) appears as W cell in scan grid', async () => {
-      const visible: GalaxyWormholeView = {
-        xcoord: 5.5, ycoord: 5.6, visible: true,
-      };
-      const { svc } = makeService([visible]);
-      await svc.onModuleInit();
-      const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
-      const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
-      expect(wCells.length).toBeGreaterThan(0);
-      expect(wCells[0].char).toBe('W');
+    // The visibility GATE is exercised under `sca se` below, which is the mode
+    // canon populates with planets and wormholes (map_planets, GECMDS.C:2634).
+    // `scan_lo` projects ships only (:2686), so there is no wormhole cell there
+    // to be visible or hidden. These two cases previously asserted that a
+    // visible wormhole DOES appear in the long-range grid, which is the
+    // behaviour that buried the whole display under planet markers.
+    it('shows no wormhole cells at all, visible or hidden', async () => {
+      for (const visible of [true, false]) {
+        const w: GalaxyWormholeView = { xcoord: 5.5, ycoord: 5.6, visible };
+        const { svc } = makeService([w]);
+        await svc.onModuleInit();
+        const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
+        expect(result.scanRender!.cells.filter((c) => c.type === 'wormhole')).toHaveLength(0);
+      }
     });
   });
 

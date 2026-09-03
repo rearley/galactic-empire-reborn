@@ -12,6 +12,13 @@ import { formatMessage, MessageId } from '../messages';
  * Phaser/shield prices indexed by type-1 (type 1 = index 0).
  * @see GEMAIN.C phaserprice[], shieldprice[]
  */
+/**
+ * cyb_class — the index of the first CYBORG entry, which bounds what `new ship`
+ * may list or sell. GEMAIN.C:881-882 computes it; in the shipped table the
+ * first CYBORG is class 21.
+ */
+const FIRST_CPU_CLASS = 21;
+
 const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
   1_200_000n, 2_000_000n, 3_800_000n, 5_000_000n, 7_000_000n, 9_000_000n,
   15_000_000n, 30_000_000n, 60_000_000n, 100_000_000n, 200_000_000n];
@@ -95,7 +102,14 @@ export class NewShipHandlerService {
 
   private async listClasses(): Promise<CommandResult> {
     const classes = await this.prisma.shipClass.findMany({
-      where: { category: 'PLAYER' },
+      // C bounds BOTH the listing and the purchase at cyb_class — the index of
+      // the first CYBORG class, which is 21 (GECMDS.C:378 `for (i=0;i<cyb_class;++i)`
+      // and :4562-4566 `type >= 0 && type < cyb_class && ... == CLASSTYPE_USER`).
+      // Filtering on category alone let the Sysopian Death Star (class 41,
+      // 32M credits, warp 255, 100M tons) be advertised to every pilot from day
+      // one and bought by anyone rich enough. It is admin-only in the original
+      // and unreachable through this command.
+      where: { category: 'PLAYER', classNumber: { lt: FIRST_CPU_CLASS } },
       orderBy: { classNumber: 'asc' },
     });
 
@@ -137,7 +151,7 @@ export class NewShipHandlerService {
       where: { classNumber },
     });
 
-    if (!shipClass || shipClass.category !== 'PLAYER') {
+    if (!shipClass || shipClass.category !== 'PLAYER' || shipClass.classNumber >= FIRST_CPU_CLASS) {
       return {
         lines: [{ text: "Invalid ship class. Type 'new ship' to see available classes.", category: 'system' }],
       };
