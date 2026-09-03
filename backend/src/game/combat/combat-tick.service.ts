@@ -213,7 +213,9 @@ export class CombatTickService implements OnModuleInit {
     // where ship A is removed first, making ship B's attacker lookup return null
     // even though both were alive at the start of kill resolution.
     // @see specs/019-physics-polish/spec.md §Plan-Phase Decisions
-    const attackerSnapshot = new Map<string, { userid: string | null; shipKey: string | null }>();
+    const attackerSnapshot = new Map<string, {
+      userid: string | null; shipKey: string | null; shipname: string | null;
+    }>();
     for (const ship of ships) {
       if (ship.damage < 100) continue;
       if (ship.status !== 1 && ship.status !== 2) continue;
@@ -221,6 +223,12 @@ export class CombatTickService implements OnModuleInit {
       attackerSnapshot.set(shipKey(ship.userid, ship.shipno), {
         userid: attacker ? attacker.userid : null,
         shipKey: attacker ? shipKey(attacker.userid, attacker.shipno) : null,
+        // The NAME has to be captured here too. It is read off the attacker
+        // before removeFromGame, and anything downstream that is not the
+        // gateway — the ship-loss mail, for one — has no way to resolve a
+        // shipKey afterwards. Leaving it unset made every mail read "destroyed
+        // by an unknown assailant", including kills by a named Cybertron.
+        shipname: attacker ? attacker.shipname : null,
       });
     }
 
@@ -287,6 +295,7 @@ export class CombatTickService implements OnModuleInit {
           attackerShipKey: snapshotAttackerShipKey,
           victimUserid: victim.userid,
           attackerUserid: snapshotAttackerUserid,
+          attackerName: snapshot?.shipname ?? null,
           attackerChannel,
           // Weapon type is not separately tracked at kill time; the per-hit
           // events emitted earlier this tick carry the weapon. Leave null.
