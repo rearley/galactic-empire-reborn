@@ -300,6 +300,19 @@ export class PhysicsTickService implements OnModuleInit {
           s.speed = 0;
           s.speed2b = 0;
           s.damage = s.damage + TELEDAM;
+
+          // ...and drops you out of hyperspace. C does NOT, and that is an
+          // oversight rather than a design: telezip zeroes speed and speed2b
+          // and never calls hyperspace(ptr,usrn,0), while the only exit
+          // transition (GEFUNCS.C:537-539) requires `speed/1000 >= 1` — which
+          // is now impossible. A ship that strikes the perimeter at warp is
+          // left flagged as being IN hyperspace at a dead stop, permanently,
+          // and every `where === 1` gate treats it as still warping. The
+          // escape in the original is to `war 1` and then `war 0` again, which
+          // no player would ever deduce.
+          // Fixed per the standing rule that the original's defects are not
+          // reproduced. @see docs/DECISIONS.md
+          if (s.where === 1) s.where = 0;
         }
       });
 
