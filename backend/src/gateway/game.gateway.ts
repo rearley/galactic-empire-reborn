@@ -90,6 +90,7 @@ import {
   ShipSpeedReportEvent,
 } from '../game/physics/speed-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
+import { showarp } from '../game/ship/showarp';
 import { damstr } from '../game/combat/combat-math';
 import { attackerNameFromLastFired, resolveKillSpoils } from '../game/combat/kill-resolution';
 import { isAiUserid } from '../game/commands/helpers/ai-userid';
@@ -1431,14 +1432,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(SHIP_SPEED_REPORT)
   handleShipSpeedReport(event: ShipSpeedReportEvent): void {
-    const warp = event.speed / 1000;
+    // SPEEDIS {***\nHelm reports speed is now Warp %s, Sir!} takes ONE arg —
+    // canon's showarp figure. The port split the number and printed "warp 10
+    // point 00", a form nothing else in the game uses. @see GEFUNCS.C:2674
     const text = event.speed <= 0
       ? formatMessage(MessageId.SPEED0)
-      : formatMessage(
-        MessageId.SPEEDIS,
-        Math.floor(warp),
-        String(Math.round((warp - Math.floor(warp)) * 100)).padStart(2, '0'),
-      );
+      : formatMessage(MessageId.SPEEDIS, showarp(event.speed));
     this.server.to(`user:${event.userid}`).emit('event.log', { category: 'system', text });
   }
 

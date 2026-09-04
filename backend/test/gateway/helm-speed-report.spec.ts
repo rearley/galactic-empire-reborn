@@ -34,13 +34,15 @@ function build() {
 
 describe('helm speed report', () => {
   it('reports a whole warp factor', () => {
-    expect(build().fire(5000).text).toBe('Helm reports speed is now warp 5 point 00, Sir!');
+    // SPEEDIS {***\nHelm reports speed is now Warp %s, Sir!} — ONE slot, filled
+    // with canon's showarp figure. The port split it into "warp 5 point 00",
+    // a form nothing else in the game uses.
+    expect(build().fire(5000).text).toBe('***\nHelm reports speed is now Warp 5.00, Sir!');
   });
 
   it('keeps the leading zero on the hundredths', () => {
-    // showarp formats "%.2f" (GEFUNCS.C:2681), so 9.05 is "point 05" — the
-    // reason this slot is %s and not canon's (varargs-broken) %d.
-    expect(build().fire(9050).text).toBe('Helm reports speed is now warp 9 point 05, Sir!');
+    // showarp formats "%.2f" (GEFUNCS.C:2681), so 9050 reads 9.05 not 9.5.
+    expect(build().fire(9050).text).toBe('***\nHelm reports speed is now Warp 9.05, Sir!');
   });
 
   it('reports a dead stop with SPEED0, not warp 0', () => {

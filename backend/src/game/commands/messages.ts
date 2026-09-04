@@ -513,9 +513,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP08]: CANON_MESSAGES.REP08,
   [MessageId.REP32]: CANON_MESSAGES.REP32,
   [MessageId.REP09]: CANON_MESSAGES.REP09,
-  [MessageId.REP10]: 'Shields: %s at %d%%.',
-  [MessageId.REP11]: 'Shields: down.',
-  [MessageId.REP11B]: 'Shields: destroyed.',
+  [MessageId.REP10]: CANON_MESSAGES.REP10,
+  [MessageId.REP11]: CANON_MESSAGES.REP11,
+  [MessageId.REP11B]: CANON_MESSAGES.REP11B,
   [MessageId.REP14]: CANON_MESSAGES.REP14,
   // rep sys subsystem lines — GECMDS.C:2041-2050
   [MessageId.REP15]: CANON_MESSAGES.REP15,
@@ -525,7 +525,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP18A]: CANON_MESSAGES.REP18A,
   [MessageId.REP24A]: CANON_MESSAGES.REP24A,
   [MessageId.REP23]: CANON_MESSAGES.REP23,
-  [MessageId.REP24]: 'Phasors: none.',
+  [MessageId.REP24]: CANON_MESSAGES.REP24,
   [MessageId.REP12]: CANON_MESSAGES.REP12,
   [MessageId.REP13]: CANON_MESSAGES.REP13,
   // rep acc — GECMDS.C:2074
@@ -550,7 +550,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN_DASHES]: '-----------------',
   [MessageId.SCAN09]: CANON_MESSAGES.SCAN09,
   // Sent to the ship that was just scanned. @see GECMDS.C:2261-2280
-  [MessageId.SCAN1]: 'You are being scanned by %s.',
+  [MessageId.SCAN1]: CANON_MESSAGES.SCAN1,
   [MessageId.SCAN2]: CANON_MESSAGES.SCAN2,
   [MessageId.SCAN3]: CANON_MESSAGES.SCAN3,
   [MessageId.SCAN10]: CANON_MESSAGES.SCAN10,
@@ -619,13 +619,17 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // Four arguments are passed (qty, item, unit price, total) — the template
   // used to have three placeholders, so the total was dropped and the UNIT
   // price was reported as the amount paid.
-  [MessageId.BUY2]: '%d %s purchased at %d cr each — %d credits.',
+  // BUY2 is canon's INSUFFICIENT FUNDS message, not a purchase confirmation.
+  // Ours carried a duplicate of the confirmation text — which BUY9 already
+  // holds, verbatim and correctly wired — and nothing referenced it, so the
+  // wrong meaning sat unused behind a canon id. Restored to what canon says.
+  [MessageId.BUY2]: CANON_MESSAGES.BUY2,
   // Canon names the number for sale. The port's old wording blamed the
   // planet's "reserve" — a mechanic that was zero on every neutral-zone planet
   // — and left no way to learn from inside the game that the real limit was 5.
   // @see GECMDS.C:4380-4381, MBMGEMSG.MSG:3289
   [MessageId.BUY3]: 'They only have %s %s available for sale, Sir!',
-  [MessageId.BUY4]: 'Your cargo holds are full.',
+  [MessageId.BUY4]: CANON_MESSAGES.BUY4,
   [MessageId.BUY5]: CANON_MESSAGES.BUY5,
   [MessageId.BUYPAS1]: CANON_MESSAGES.BUYPAS1,
   [MessageId.BUYPAS3]: CANON_MESSAGES.BUYPAS3,
@@ -870,7 +874,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
   // canonical `aba` — colony abandonment (GECMDS.C:3420)
   [MessageId.ABAN01]: CANON_MESSAGES.ABAN01,
-  [MessageId.ABAN02]: 'You have abandoned %s. It is no longer yours.',
+  [MessageId.ABAN02]: CANON_MESSAGES.ABAN02,
   [MessageId.ABAN03]: CANON_MESSAGES.ABAN03,
 
   // nav (feature 016) — GECMDS.C:5120 cmd_navigate
@@ -915,7 +919,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SPY0B]: CANON_MESSAGES.SPY0B,
   [MessageId.SPY0C]: CANON_MESSAGES.SPY0C,
   [MessageId.SPYM0]: CANON_MESSAGES.SPYM0,
-  [MessageId.SPYM1]: 'Spy successfully planted on %s.',
+  [MessageId.SPYM1]: CANON_MESSAGES.SPYM1,
 
   // hel (feature 016) — GECMDS.C cmd_help
   // Topic list is passed in from HELP_TOPIC_IDS — hardcoding it here meant a
@@ -958,7 +962,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // @see MBMGEMSG.MSG:3305
   [MessageId.BUY8]: 'Sorry Sir! That would put us overweight.',
   // @see MBMGEMSG.MSG:3309
-  [MessageId.BUY9]: '%s %s purchased at the price of %d each for a total of %s, Sir.',
+  [MessageId.BUY9]: CANON_MESSAGES.BUY9,
 
   // Canon names the killer on every death path — the prfmsg sits AFTER the
   // GESTAT_AUTO branch, so an AI kill is announced exactly like a player one.
@@ -970,7 +974,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // leading zero -- "warp 9 point 05", not "warp 9 point 5". Canon's own two
   // %d slots are fed showarp(), which returns a STRING ("9.05"): a varargs bug
   // that printed garbage in the shipped game.
-  [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %s, Sir!',
+  [MessageId.SPEEDIS]: CANON_MESSAGES.SPEEDIS,
   [MessageId.SPEED0]: CANON_MESSAGES.SPEED0,
   // @see GE/REL/MBMGEMSG.MSG:2630
   [MessageId.MISSL2]: CANON_MESSAGES.MISSL2,
@@ -981,21 +985,21 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3946,3960,3982,3986,3990,3996,4001
   [MessageId.NEW19]: 'They will credit us %s for our existing used shield, Sir!',
   [MessageId.NEW7]:
-    '***\n'
+    CANON_MESSAGES.NEW7
     + 'The Yardmaster Reports: For the meager sum of %s\n'
     + 'your ship now has a Mark-%d Shield defense system.',
   [MessageId.NEW29]: 'They will credit us %s for our existing used phaser, Sir!',
   [MessageId.NEW10]:
-    '***\n'
+    CANON_MESSAGES.NEW10
     + 'The Yardmaster Reports: For the meager sum of %s\n'
     + 'your ship now has a Mark-%d Phaser System.',
   [MessageId.NEW17]:
     "The minimum charge of 1000 C's will be charged for installation, Sir!",
   [MessageId.NEW18]:
-    'There is no charge for the new shield and after deducting a transaction \n'
+    CANON_MESSAGES.NEW18
     + "fee of %s C's %s has been deposited to your account, Sir.",
   [MessageId.NEW28]:
-    'There is no charge for the new phaser and after deducting a transaction\n'
+    CANON_MESSAGES.NEW28
     + "fee of %s C's %s has been deposited to your account, Sir.",
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
