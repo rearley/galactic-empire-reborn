@@ -22,13 +22,13 @@ import { ShipChannelRegistry, NO_CHANNEL } from './ship-channel.registry';
  */
 export const FLUSH_FAILURE_ALARM = 'SHIP FLUSH FAILING';
 
-/** Consecutive all-failed sweeps before the alarm is raised once. */
+/** Consecutive sweeps containing at least one failure before alarming once. */
 export const FLUSH_FAILURE_THRESHOLD = 10;
 
 @Injectable()
 export class ShipStateService implements OnModuleInit {
   private readonly logger = new Logger(ShipStateService.name);
-  /** Consecutive sweeps in which every dirty ship failed to flush. */
+  /** Consecutive sweeps in which at least one dirty ship failed to flush. */
   private consecutiveFlushFailures = 0;
   private readonly map = new Map<string, ShipState>();
   /**
@@ -489,12 +489,19 @@ export class ShipStateService implements OnModuleInit {
     // the only trace was one log line among thousands. A run of consecutive
     // all-failed sweeps means the durable store has stopped keeping up, which
     // deserves saying once, loudly, rather than another line of noise.
-    if (attempted > 0 && failed === attempted) {
+    // The condition was `failed === attempted` — every dirty ship — and that
+    // is how the `userKills` outage stayed silent for four hours and 34,772
+    // failed writes: the field is only written when a captain boards an
+    // EXISTING hull, so brand-new ships flushed fine, every sweep was a
+    // partial failure, and the counter reset each time. A fault that hits some
+    // ships every sweep is not less serious than one that hits all of them.
+    if (attempted > 0 && failed > 0) {
       this.consecutiveFlushFailures++;
       if (this.consecutiveFlushFailures === FLUSH_FAILURE_THRESHOLD) {
         this.logger.error(
-          `${FLUSH_FAILURE_ALARM}: ${FLUSH_FAILURE_THRESHOLD} consecutive flush sweeps have failed for every dirty ship — ` +
-            'ship state is NOT being persisted and will be lost on restart.',
+          `${FLUSH_FAILURE_ALARM}: ${FLUSH_FAILURE_THRESHOLD} consecutive flush sweeps have failed for at least one dirty ship ` +
+            `(${failed} of ${attempted} failed this sweep) — that ship's state is NOT being persisted ` +
+            'and will be lost on restart.',
         );
       }
     } else if (attempted > 0) {
