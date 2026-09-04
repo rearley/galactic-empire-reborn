@@ -111,7 +111,7 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
             <div key={row.letter} data-testid={`side-panel-row-${row.letter}`}>
               <span className="text-yellow-400">{row.letter}</span>
               {' '}
-              {row.distance}pc
+              {row.distance}
               {' '}
               Brg:{row.bearing}
               {' '}

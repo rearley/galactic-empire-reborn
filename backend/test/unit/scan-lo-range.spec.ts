@@ -78,14 +78,15 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
   //   Scantab gate still 10 sectors (100000/10000) — only ships within 10 sectors
   //   are KNOWN, but planets/wormholes are projected up to the wider radius.
 
-  it('header reports projectionRange in parsecs (multiplier × scanRange / 10000)', async () => {
+  it('header reports the RAW projectionRange under SCAN24', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 100_000);
     await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
-    // 100000 * 3 / 10000 = 30 pc
-    expect(result.scanRender!.header).toContain('Range: 30pc');
+    // SCAN24 prints the RAW range: 100000 x 3 = 300000. Canon divides by
+    // 10 000 only AFTER printing (GECMDS.C:2516 then :2521), and has no 'pc'.
+    expect(result.scanRender!.header).toContain('Range Scan Dist:300000');
   });
 
   it('Interceptor sees a ship 9 sectors away in scan lo (within scantab gate, well within projection)', async () => {
@@ -100,14 +101,14 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
     expect(shipCells.length).toBe(1);
   });
 
-  it('large scanRange projects proportionally (500_000 → 150pc at 3×)', async () => {
+  it('large scanRange projects proportionally (500_000 -> 1.5m raw at 3x)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 500_000);
     await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
-    // 500000 * 3 / 10000 = 150 pc
-    expect(result.scanRender!.header).toContain('Range: 150pc');
+    // 500000 x 3 = 1500000 raw.
+    expect(result.scanRender!.header).toContain('Range Scan Dist:1500000');
   });
 
   it('self-cell at centre (15, 7)', async () => {

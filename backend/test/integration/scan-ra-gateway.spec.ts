@@ -159,8 +159,8 @@ describe('T021 — sca ra 5 gateway integration', () => {
     it('command:result carries exactly one info-category line with the header text', () => {
       expect(commandResultPayload.lines).toHaveLength(1);
       expect(commandResultPayload.lines[0].category).toBe('info');
-      expect(commandResultPayload.lines[0].text).toMatch(/^Range: /);
-      expect(commandResultPayload.lines[0].text).toContain('— Sector 10,7');
+      expect(commandResultPayload.lines[0].text).toMatch(/^ {3}Range Scan Dist:/);
+      expect(commandResultPayload.lines[0].text).toContain('(s:10 7)');
     });
 
     it('scan:render kind is "ra"', () => {

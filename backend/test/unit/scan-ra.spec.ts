@@ -5,7 +5,7 @@
  *   Self-cell `*` at centre (15, 7)
  *   Level coercion: 0 | >9 | non-numeric | missing → 1
  *   Letter stickiness across consecutive `sca ra` calls
- *   Header format: "Range: <r> — Sector <x>,<y>"
+ *   Header format: SCAN24 — "   Range Scan Dist:<r> (s:<x> <y>)"
  *
  * T017 — SC-002: three ships at known coords appear within ±1 grid cell
  *   of algebraic expectation across all 9 zoom levels.
@@ -181,15 +181,15 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     expect(rMissing.scanRender!.header).toBe(r1.scanRender!.header);
   });
 
-  test('header format: "Range: <r> — Sector <x>,<y>"', async () => {
+  test('header format: SCAN24 "   Range Scan Dist:<r> (s:<x> <y>)"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 10.7, ycoord: 5.2 });
     const result = await (service.command.handler(self, ['ra', '3'], {}) as Promise<CommandResult>);
     const header = result.scanRender!.header;
-    // Must match pattern "Range: <number> — Sector <xsect>,<ysect>"
+    // SCAN24 — @see GE/REL/MBMGEMSG.MSG:3621
     const xsect = Math.floor(10.7); // 10
     const ysect = Math.floor(5.2);  // 5
-    expect(header).toMatch(/^Range: /);
-    expect(header).toContain(`— Sector ${xsect},${ysect}`);
+    expect(header).toMatch(/^ {3}Range Scan Dist:\d+ /);
+    expect(header).toContain(`(s:${xsect} ${ysect})`);
   });
 
   test('AI ship (status=GESTAT_AUTO) gets colour "ai"', async () => {

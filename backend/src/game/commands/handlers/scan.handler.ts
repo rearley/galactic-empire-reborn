@@ -362,7 +362,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
 
-    const header = `Range: ${projectionRange / 10000}pc — Sector ${xsect},${ysect}`;
+    const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
     return {
       lines: [{ text: header, category: 'info' }],
       scanRender: { kind: 'lo', mode, cells: grid, header },
@@ -445,7 +445,7 @@ export class ScanHandlerService implements OnModuleInit {
     });
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-    const header = `Range: ${projectionRange / 10000}pc — Sector ${xsect},${ysect}`;
+    const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
 
     return {
       lines: [{ text: header, category: 'info' }],
@@ -535,9 +535,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
-    // Header shows raw effective range to preserve the C-source "Range: %ld" format
-    // (GECMDS.C:2515 SCAN24 — spr("%ld",(long)range) where range is still raw at that point).
-    const header = `Range: ${Math.round(effectiveRangeRaw)} — Sector ${xsect},${ysect}`;
+    const header = formatMessage(MessageId.SCAN24, Math.round(effectiveRangeRaw), xsect, ysect);
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
 
@@ -588,8 +586,14 @@ export class ScanHandlerService implements OnModuleInit {
     };
 
     // Use a Map keyed by "${x},${y}" so later writes overwrite earlier ones.
-    // Build order: wormholes first, mines, then planets, ships, self — giving
-    // self the highest precedence.
+    //
+    // Canon's order, and it is not the intuitive one (GECMDS.C:2598-2634):
+    //   mines '.'  ->  ships (letter)  ->  self '*'  ->  map_planets()
+    // `map_planets()` is called LAST, four lines before printmap(), so a
+    // planet overwrites a ship and even your own '*'. That reads wrong until
+    // you notice that a planet sharing your cell means you are on top of it,
+    // which `rep` and `orb` already tell you. Wormholes are ours and sit at
+    // the bottom. @see docs/DECISIONS.md
     const cellMap = new Map<string, ScanCell>();
 
     const put = (cell: ScanCell) => {
@@ -626,14 +630,6 @@ export class ScanHandlerService implements OnModuleInit {
         const { x, y } = project(wh.xcoord, wh.ycoord);
         put({ x, y, type: 'wormhole', char: 'W' });
       }
-
-      // 2. Planets in this sector
-      const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
-      for (const planet of planets) {
-        const { x, y } = project(planet.xcoord, planet.ycoord);
-        const char = String(planet.plnum % 10);
-        put({ x, y, type: 'planet', char, colour: 'planet' });
-      }
     }
 
     // 3. Other ships in this sector (from scantab for letter assignment)
@@ -648,14 +644,26 @@ export class ScanHandlerService implements OnModuleInit {
       put({ x, y, type: 'ship', char: entry.letter, colour });
     }
 
-    // 4. Self — highest precedence, always at its projected position
+    // 4. Self — GECMDS.C:2629-2632
     const selfPos = project(ship.xcoord, ship.ycoord);
     put({ x: selfPos.x, y: selfPos.y, type: 'self', char: '*', colour: 'self' });
+
+    // 5. Planets LAST — `map_planets()` at GECMDS.C:2634, after the self-cell.
+    // The glyph is the planet's index WITHIN THE SECTOR: `'1' + i`, so the
+    // first planet here is '1' whatever its id. MAXPLANETS is 9 (GEMAIN.H:119),
+    // so it never runs past '9'.
+    if (inGalaxy) {
+      const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
+      for (const planet of planets) {
+        const { x, y } = project(planet.xcoord, planet.ycoord);
+        put({ x, y, type: 'planet', char: String(planet.plnum), colour: 'planet' });
+      }
+    }
 
     const cells: ScanCell[] = Array.from(cellMap.values());
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-    const header = `Sector ${xsect},${ysect}`;
+    const header = formatMessage(MessageId.SCAN25, xsect, ysect);
 
     return {
       lines: [{ text: header, category: 'info' }],

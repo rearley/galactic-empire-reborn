@@ -96,6 +96,26 @@ async function makeService(ships: ShipState[], mines: MineState[], scanRange = 1
 
 type ScanCells = Array<{ x: number; y: number; type: string; char: string }>;
 
+/** A service whose sector holds one planet sitting exactly on the ship. */
+async function makeServiceWithPlanet(ship: ShipState) {
+  const planet = {
+    id: 1, xsect: 5, ysect: 5, plnum: 1,
+    xcoord: ship.xcoord, ycoord: ship.ycoord, name: 'Zygor',
+  } as unknown as import('@prisma/client').Planet;
+  const service = new ScanHandlerService(
+    { findAllShips: () => [ship], findByName: () => undefined, findByUserid: () => [] } as unknown as ShipStateService,
+    { shipClass: { findMany: async () => [{ classNumber: 1, scanRange: 100_000 }] } } as unknown as PrismaService,
+    {
+      getSectorPlanets: () => [planet], getSectorWormholes: () => [],
+      findPlanetByName: () => null, getMeta: () => undefined, onModuleInit: () => undefined,
+    } as unknown as GalaxyService,
+    { get: () => undefined } as unknown as PlanetStateService,
+    new MineRegistry(),
+  );
+  await service.onModuleInit();
+  return service;
+}
+
 const run = async (service: ScanHandlerService, ship: ShipState, args: string[]): Promise<ScanCells> => {
   const result = await (service.command.handler(ship, args, {} as never) as Promise<{
     scanRender?: { cells: ScanCells };
@@ -148,6 +168,25 @@ describe('mines on the scan', () => {
     const cells = await run(service, ship, ['se']);
     const atCell = cells.filter((c) => c.x === cells.find((k) => k.type === 'ship')?.x);
     expect(atCell.some((c) => c.type === 'mine')).toBe(false);
+  });
+
+  /**
+   * Canon calls `map_planets()` LAST — GECMDS.C:2634, four lines before
+   * printmap() and after the self-cell is written at :2631. So a planet
+   * sharing your cell covers your own '*'. It reads wrong until you notice
+   * that a planet on your cell means you are on top of it, which `rep` and
+   * `orb` already tell you. The port drew planets early and gave self the top
+   * slot; this pins canon's order so it cannot quietly drift back.
+   */
+  it('lets a planet cover even the self-cell, as map_planets() does', async () => {
+    const ship = makeShip({ xcoord: 5.5, ycoord: 5.5 });
+    const service = await makeServiceWithPlanet(ship);
+
+    const cells = await run(service, ship, ['se']);
+    const centre = cells.find((c) => c.type === 'self');
+
+    expect(centre).toBeUndefined();
+    expect(cells.find((c) => c.type === 'planet')?.char).toBe('1');
   });
 
   it('draws mines on `sca lo` too — GECMDS.C:2529', async () => {

@@ -5,7 +5,9 @@
  *   SE-003: planet digit assignment matches GEPLANET indexing (plnum % 10 → '1'..'9')
  *   SE-004: empty sector returns only self-cell `*`
  *   SE-005: mine glyph `.` — cell renders as mine type
- *   SE-006: collision precedence self > ship > planet > mine (data-model invariant)
+ *   SE-006: collision precedence. Canon's build order is mines -> ships ->
+ *   self -> map_planets(), so a PLANET is drawn last and covers even the '*'
+ *   (GECMDS.C:2598-2634). Self still beats ships and mines.
  *
  * T023 — Failure-mode tests for `sca se`.
  *   FE-001: `sca se` while not in flight (where >= 10) still renders a scan
@@ -260,9 +262,9 @@ describe('T022 SE-004 — empty sector returns only self-cell `*`', () => {
   });
 });
 
-// ── T022: SE-006 — cell collision precedence self > ship > planet > mine ──────
+// ── T022: SE-006 — cell collision precedence: planet > self > ship > mine ────
 
-describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine', () => {
+describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine', () => {
   test('self overwrites ship at same grid cell', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     // Place another ship at the exact same coords as self
@@ -332,7 +334,9 @@ describe('T022 SE-006 — cell collision precedence: self > ship > planet > mine
     await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
-    expect(result.scanRender!.header).toBe('Sector 5,7');
+    // SCAN25 — the sector scan is always 1x and carries no range.
+    // @see GE/REL/MBMGEMSG.MSG:3625
+    expect(result.scanRender!.header).toBe('   Sector Scan mag:1x (s:5 7)');
   });
 
   test('mode is "overwrite" when scanHome=true', async () => {
