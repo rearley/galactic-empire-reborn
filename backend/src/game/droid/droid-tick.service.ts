@@ -65,7 +65,7 @@ import {
   CombatHitEvent,
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
-import { cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
+import { aiCanHitTarget, cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
@@ -458,6 +458,14 @@ export class DroidTickService implements OnModuleInit {
         maxRange: scanRangeGate / 10_000,
       });
     }
+    // firep's per-victim gate: a ship in hyperspace is unreachable unless the
+    // shooter carries a Mark-PHATOWRP phaser or better
+    // (GECMDS.C:949, `wptr->where != 1 || ptr->phasrtype >= phatowrp`).
+    // The player's handler enforced this and the AI paths did not, so any
+    // droid or Cybertron could shoot a player in transit — shields down on
+    // entry, `sca` refused, nothing to fire back with.
+    if (!aiCanHitTarget({ phasrtype: droid.phasrtype, targetWhere: target.where })) return;
+
     if (lineOfFire(droid, target, bearing, 0)) {
       const damage = phaserDamage({
         phasrtype: droid.phasrtype,

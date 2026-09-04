@@ -286,10 +286,12 @@ describe('command round-trip (planet) integration (T066)', () => {
   // -------------------------------------------------------------------------
   // T066-4: alias "orb" dispatches to orbit handler (not UNKNOWN_CMD / REPFMT)
   // -------------------------------------------------------------------------
-  it('alias "orb" dispatches to orbit handler (not UNKNOWN_CMD)', () => {
+  it('alias "orb" dispatches to orbit handler (not UNKNOWN_CMD)', async () => {
     const ship = shipService.get(USERID, SHIPNO)!;
 
-    const result = commandRouter.dispatch('orb', ship, {}) as CommandResult;
+    // `orb` is async now: it may have to ask the DB whether a named slot is a
+    // wormhole, which canon refuses with ORBIT0 (GECMDS.C:791-793).
+    const result = await commandRouter.dispatch('orb', ship, {}) as CommandResult;
 
     // Should NOT be an unknown-command error
     const unknownText = formatMessage(MessageId.UNKNOWN_CMD);

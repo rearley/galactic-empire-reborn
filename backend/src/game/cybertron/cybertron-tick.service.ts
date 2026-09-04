@@ -46,6 +46,7 @@ import {
   cdistance,
   inScanRange,
   lineOfFire,
+  aiCanHitTarget,
   phaserDamage,
   shieldhit,
 } from '../combat/combat-math';
@@ -516,6 +517,14 @@ export class CybertronTickService implements OnModuleInit {
     }
 
     const dist = cdistance(ship, target);
+    // firep's per-victim gate: a ship in hyperspace is unreachable unless the
+    // shooter carries a Mark-PHATOWRP phaser or better
+    // (GECMDS.C:949, `wptr->where != 1 || ptr->phasrtype >= phatowrp`).
+    // The player's handler enforced this and the AI paths did not, so any
+    // droid or Cybertron could shoot a player in transit — shields down on
+    // entry, `sca` refused, nothing to fire back with.
+    if (!aiCanHitTarget({ phasrtype: ship.phasrtype, targetWhere: target.where })) return;
+
     if (lineOfFire(ship, target, bearing, 0)) {
       const damage = phaserDamage({
         phasrtype: ship.phasrtype,

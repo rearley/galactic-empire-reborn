@@ -1,4 +1,4 @@
-import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, MOVENGMIN, PDAMMAX, PFIRDST, PHABIAS, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
+import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, MOVENGMIN, PDAMMAX, PFIRDST, PHABIAS, PHATOWRP, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -603,4 +603,26 @@ export function damstr(damagePct: number): string {
   if (damagePct < 50) return 'moderate';
   if (damagePct < 75) return 'heavy';
   return 'severe';
+}
+
+
+/**
+ * firep's per-victim reachability gate.
+ *
+ *     if (ingegame(othusn) && (wptr->where != 1 || ptr->phasrtype >= phatowrp))
+ *
+ * (GECMDS.C:949.) A ship in hyperspace is untouchable unless the shooter
+ * carries a Mark-`phatowrp` phaser or better — 5 in the shipped configuration.
+ * This is what makes "jump to warp to break contact" work, and it is why
+ * shields collapsing on hyperspace entry is survivable.
+ *
+ * The player's phaser handler enforced this; the droid and Cybertron paths did
+ * not, so any AI with any phaser could shoot a player in transit, where shields
+ * are down, `sca` is refused and nothing can be returned.
+ *
+ * Note it gates on `where`, the hyperspace FLAG, not on a speed threshold —
+ * `victimAtWarp` in `phaserDamage` is a damage halving and not a permission.
+ */
+export function aiCanHitTarget(args: { phasrtype: number; targetWhere: number }): boolean {
+  return args.targetWhere !== 1 || args.phasrtype >= PHATOWRP;
 }
