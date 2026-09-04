@@ -51,6 +51,14 @@ export function resolveKillSpoils(
   // ++(wuptr->kills) — GEFUNCS.C:1118.
   deps.mutate(attacker.userid, attacker.shipno, (a) => {
     a.kills += 1;
+    // Canon has ONE counter and `chkcyb` reads it live (GECYBS.C:441, :524).
+    // This port splits it into per-hull Ship.kills and cumulative User.kills,
+    // and `userKills` caches the latter. Bump the cache in step with the row
+    // PlayerScoreRepository increments, or the Cybertron difficulty gates only
+    // move when a captain logs out and back in. Undefined means an AI killer,
+    // which has no User row — leave it undefined so escalationKills falls back
+    // to Ship.kills. @see ShipState.userKills
+    if (a.userKills != null) a.userKills += 1;
   });
 
   let maxTons = DEFAULT_MAX_TONS;
