@@ -121,7 +121,7 @@ export class MineHandlerService {
     });
 
     return {
-      lines: [{ text: formatMessage(MessageId.MIN_DEPLOYED), category: 'combat' }],
+      lines: [{ text: formatMessage(MessageId.MIN_DEPLOYED, timer), category: 'combat' }],
     };
   }
 }

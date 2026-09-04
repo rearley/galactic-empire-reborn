@@ -228,7 +228,7 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
     return result.scanRender!.sidePanel!;
   }
 
-  it('fixture 1: stopped ship (speed=0) → speedDisplay "Stopped"', async () => {
+  it('fixture 1: stopped ship (speed=0) → speedDisplay "0.00" (canon showarp)', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const stopped = makeOther(
       { userid: 'u2', shipno: 1 },
@@ -237,10 +237,10 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
     );
     const rows = await getRows(player, [stopped]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].speedDisplay).toBe('Stopped');
+    expect(rows[0].speedDisplay).toBe('0.00');
   });
 
-  it('fixture 2: impulse ship (speed=500) → speedDisplay "Impulse"', async () => {
+  it('fixture 2: impulse ship (speed=500) → speedDisplay "0.50" (canon showarp)', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const impulseShip = makeOther(
       { userid: 'u2', shipno: 1 },
@@ -249,10 +249,10 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
     );
     const rows = await getRows(player, [impulseShip]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].speedDisplay).toBe('Impulse');
+    expect(rows[0].speedDisplay).toBe('0.50');
   });
 
-  it('fixture 3: warp ship (speed=4500) → speedDisplay "Warp 4.5"', async () => {
+  it('fixture 3: warp ship (speed=4500) → speedDisplay "4.50" (canon showarp)', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const warpShip = makeOther(
       { userid: 'u2', shipno: 1 },
@@ -261,7 +261,7 @@ describe('T027 — sca lo full: side-panel row field correctness', () => {
     );
     const rows = await getRows(player, [warpShip]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].speedDisplay).toBe('Warp 4.5');
+    expect(rows[0].speedDisplay).toBe('4.50');
   });
 
   it('row fields: distance is a non-negative integer (parsecs)', async () => {
@@ -422,25 +422,32 @@ describe('T027 — sca lo full: side-panel ordering', () => {
 });
 
 // ---------------------------------------------------------------------------
-// T027g — warp 1.0 boundary (speed=1000) → 'Warp 1.0'
+// T027g — warp 1.0 boundary (speed=1000) → '1.00'
 // ---------------------------------------------------------------------------
 
-describe('T027 — showarpDisplay edge cases', () => {
-  it('speed=999 (below warp threshold) → "Impulse"', async () => {
+/**
+ * Canon's `showarp` (GEFUNCS.C:2674) returns the BARE figure — "0.00",
+ * "5.20", or "Hyper" above warp 99.999 — because the caller supplies the word:
+ * the side panel sits under a "Speed" column and SCAN04 reads "Speed: Warp %s".
+ * Stopped/Impulse/Warp X.Y was the port's own wording and it also lost
+ * precision: "Impulse" covered everything from 1 to 999.
+ */
+describe('T027 — showarp edge cases', () => {
+  it('speed=999 (below warp threshold) → "1.00" — showarp rounds, it does not bucket', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const other = makeOther({ userid: 'u2', shipno: 1 }, { xcoord: 5.1, ycoord: 5 }, { speed: 999 });
     const { service } = makeService([player, other]);
     await service.onModuleInit();
     const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
-    expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('Impulse');
+    expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('1.00');
   });
 
-  it('speed=1000 (exact warp threshold) → "Warp 1.0"', async () => {
+  it('speed=1000 (exact warp threshold) → "1.00"', async () => {
     const player = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5 });
     const other = makeOther({ userid: 'u2', shipno: 1 }, { xcoord: 5.1, ycoord: 5 }, { speed: 1000 });
     const { service } = makeService([player, other]);
     await service.onModuleInit();
     const result = await (service.command.handler(player, ['lo', 'full'], {}) as Promise<CommandResult>);
-    expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('Warp 1.0');
+    expect(result.scanRender!.sidePanel![0].speedDisplay).toBe('1.00');
   });
 });

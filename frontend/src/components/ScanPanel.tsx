@@ -107,18 +107,29 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
           className="font-mono text-xs text-gray-300 mt-1"
           data-testid="scan-card-side-panel"
         >
+          {/*
+            * Canon's printmapfull table (GECMDS.C:3056-3075), under the column
+            * labels PLUSFULL carries (MBMGEMSG.MSG:3683):
+            *
+            *   prf("  %c  %s   %4d    %4d    %s\r", letter, dist, bearing, heading, showarp(speed))
+            *   ... and when SCANNAMES is set, the NAME on its own line:
+            *   prf("     %s\r", username(...))
+            *
+            * The port ran it together as "A 14741 Brg:112 Hdg:-99 Warp 7.5
+            * Cybertron 42478" — one long string per contact, which does not
+            * scan down a column and wrapped unpredictably. Fixed widths, and
+            * the name below its row where canon puts it.
+            *
+            * `Heading` is the RECIPROCAL bearing (where you are from HIM), so
+            * a value near zero means his nose is on you.
+            */}
+          <div className="text-gray-500">{' Shp Distance Bearing Heading Speed'}</div>
           {event.sidePanel.map((row) => (
             <div key={row.letter} data-testid={`side-panel-row-${row.letter}`}>
+              <span>{'  '}</span>
               <span className="text-yellow-400">{row.letter}</span>
-              {' '}
-              {row.distance}
-              {' '}
-              Brg:{row.bearing}
-              {' '}
-              Hdg:{row.heading}
-              {' '}
-              {row.speedDisplay}
-              {row.name != null ? ` ${row.name}` : ''}
+              {`  ${String(row.distance).padStart(6)}   ${String(row.bearing).padStart(4)}    ${String(row.heading).padStart(4)}    ${row.speedDisplay}`}
+              {row.name != null ? <div>{`     ${row.name}`}</div> : null}
             </div>
           ))}
         </div>
