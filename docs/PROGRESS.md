@@ -2704,8 +2704,17 @@ the refusal message is MINE2, "the mine launcher is temporarly jammed".
 
 With 24 Cybertrons each rolling 1-in-5 on the flee branch, plus droids, the AI
 could plausibly hold most of the twelve slots and a player typing `mine` would
-meet MINE2 every time. Canon has the identical dynamic, but canon was not
-running 24 Cybertrons against six players — the ratio is ours, not Murdock's.
+meet MINE2 every time.
+
+**Correction, 2026-09-04.** An earlier version of this note said the population
+was ours. It is not: `S21MAKE`-`S25MAKE` are 10/5/1/6/2 = 24, and our config
+matches field for field. The Cybertron count is Murdock's.
+
+What is ours is the PLAYER count. Canon's `MAXPLRS` is 30, so the original's
+design point is 24 Cybertrons against up to 30 captains — all contending for the
+same twelve mine slots. Our playtests run six players, which is a test artifact,
+not a setting. So mines were always meant to be scarce and contested, and MINE2
+is closer to normal than to broken. Measure before concluding otherwise.
 
 Mitigations already in place, all canon:
 - a Cybertron fuse is 10 ticks, about a minute, then the slot frees
@@ -2716,6 +2725,6 @@ Mitigations already in place, all canon:
 **Measure before tuning.** The numbers that would settle it: mine-table
 occupancy sampled over a session, the share held by AI versus players, and how
 often a player's `mine` command is refused. Added to the observer's brief for
-the next round. If it does crowd players out, the honest levers are the AI's
-lay probability or the Cybertron population — NOT `NUMMINES`, which is canon
-and structural.
+the next round. If it does crowd players out at a REALISTIC player count, the honest lever is
+the AI's lay probability. NOT `NUMMINES`, which is canon and structural, and not
+the Cybertron population, which is canon too.
