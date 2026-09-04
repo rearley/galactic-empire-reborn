@@ -19,6 +19,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
 
@@ -67,6 +68,7 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
     prismaMock as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
+    new MineRegistry(),
   );
 }
 

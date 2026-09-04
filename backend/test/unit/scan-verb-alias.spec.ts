@@ -13,10 +13,12 @@
  */
 
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { MineRegistry } from '../../src/game/combat/mine.registry';
 
 describe('scan command verbs', () => {
   const service = new ScanHandlerService(
     {} as never, {} as never, {} as never, {} as never,
+    new MineRegistry(),
   );
 
   const registered = [

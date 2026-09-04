@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
+import { MineRegistry, MINE_SLOT_FREE } from '../../combat/mine.registry';
 import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -156,6 +157,13 @@ export class ScanHandlerService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly galaxyService: GalaxyService,
     private readonly planetService: PlanetStateService,
+    /**
+     * Deliberately NOT `@Optional()`. An optional dependency that nothing
+     * provides resolves to undefined and the feature silently does nothing —
+     * which is exactly how the physics tick's RANDOM went missing and the
+     * missile shake never fired once in the live game.
+     */
+    private readonly mineRegistry: MineRegistry,
   ) {}
 
   /**
@@ -306,6 +314,17 @@ export class ScanHandlerService implements OnModuleInit {
     this.setScantab(ship.userid, ship.shipno, newScantab);
 
     const grid: ScanCell[] = [];
+
+    // 0. Live mines, projected the same way ships are and with NO sector
+    // filter — `scan_lo` tests only `mptr->channel != 255` and lets the grid
+    // bounds do the rest. Pushed first so a ship or the self-cell drawn later
+    // takes the cell. @see GECMDS.C:2529-2545
+    for (const mine of this.mineRegistry.getAll()) {
+      if (mine.channel === MINE_SLOT_FREE) continue;
+      const cell = projectRangeCell(ship, { xcoord: mine.xcoord, ycoord: mine.ycoord }, projectionRange);
+      if (!cell) continue;
+      grid.push({ x: cell.x, y: cell.y, type: 'mine', char: '.' });
+    }
 
     // 1. Project all in-range ships via scantab — GECMDS.C:2700-2720
     // Deviation D1: char = entry.letter ('A'..'Z') not '+' / '='
@@ -587,7 +606,19 @@ export class ScanHandlerService implements OnModuleInit {
     const inGalaxy =
       xsect >= -UNIVMAX && xsect <= UNIVMAX && ysect >= -UNIVMAX && ysect <= UNIVMAX;
 
-    // 1. Visible wormholes in this sector — lowest precedence
+    // 0. Live mines in THIS sector — canon draws them before anything else,
+    // so a ship or the '*' standing on the same cell covers them.
+    //   if (mptr->channel != 255 && (x==xsect && y==ysect)) map[y][x] = '.';
+    // There is no ownership or detection gate: a live mine is drawn for
+    // everyone, the ship that laid it included. @see GECMDS.C:2598-2609
+    for (const mine of this.mineRegistry.getAll()) {
+      if (mine.channel === MINE_SLOT_FREE) continue;
+      if (Math.floor(mine.xcoord) !== xsect || Math.floor(mine.ycoord) !== ysect) continue;
+      const { x, y } = project(mine.xcoord, mine.ycoord);
+      put({ x, y, type: 'mine', char: '.' });
+    }
+
+    // 1. Visible wormholes in this sector
     if (inGalaxy) {
       const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
       for (const wh of wormholes) {

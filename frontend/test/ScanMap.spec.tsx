@@ -91,13 +91,14 @@ describe('ScanMap', () => {
     expect(screen.queryByTestId('cell-ship-3-3')).toBeNull();
   });
 
-  // T014: 30×15 empty grid shows '.' for empty cells (FR-012, FR-014)
+  // T014: 30x15 empty grid. Canon clears to ' ' and uses '.' for a live MINE
+  // (GECMDS.C:2978 vs :2607) — an empty cell must not wear the mine glyph.
   it('empty cells render "." character — not a blank (FR-014)', () => {
     render(<ScanMap cells={[]} />);
     const map = screen.getByTestId('scan-map');
     const rows = map.querySelectorAll('div');
-    // First span in first row should be '.' (empty cell)
-    expect(rows[0].querySelectorAll('span')[0].textContent).toBe('.');
+    // First span in first row is an empty cell — a space, never '.'
+    expect(rows[0].querySelectorAll('span')[0].textContent).toBe(' ');
   });
 
   // T014: overlap priority — self > ship (FR-015)

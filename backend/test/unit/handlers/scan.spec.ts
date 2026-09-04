@@ -1,4 +1,5 @@
 import { CommandResult } from '../../../src/game/commands/command.types';
+import { MineRegistry } from '../../../src/game/combat/mine.registry';
 import { ScanHandlerService } from '../../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
@@ -59,6 +60,7 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
     prismaMock as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
+    new MineRegistry(),
   );
   return { service, shipServiceMock, prismaMock, galaxyMock };
 }
@@ -265,6 +267,7 @@ function makeServiceWithGalaxy(
     prismaMock as unknown as PrismaService,
     fullGalaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
+    new MineRegistry(),
   );
   return { service, shipServiceMock, prismaMock, galaxyMock: fullGalaxyMock };
 }
@@ -389,7 +392,8 @@ describe('T049 — scan pl: beacon line', () => {
       prismaMock as unknown as PrismaService,
       galaxyMock as unknown as GalaxyService,
       planetServiceMock as unknown as PlanetStateService,
-    );
+    new MineRegistry(),
+  );
     return { service };
   }
 

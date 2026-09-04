@@ -16,6 +16,7 @@ import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { GalaxyService } from '../../../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
+import { MineRegistry } from '../../../../src/game/combat/mine.registry';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
@@ -91,7 +92,9 @@ function makeService(planet: PlanetState, wormholes: unknown[] = []) {
     },
   } as unknown as PrismaService;
 
-  return new ScanHandlerService(mockShipService, mockPrisma, mockGalaxyService, mockPlanetService);
+  return new ScanHandlerService(mockShipService, mockPrisma, mockGalaxyService, mockPlanetService,
+    new MineRegistry(),
+  );
 }
 
 async function scan(service: ScanHandlerService, ship: ShipState, args: string[]): Promise<string> {
