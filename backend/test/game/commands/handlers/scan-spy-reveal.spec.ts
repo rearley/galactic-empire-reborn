@@ -9,6 +9,7 @@ import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { GalaxyService } from '../../../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
+import { MineRegistry } from '../../../../src/game/combat/mine.registry';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
@@ -119,6 +120,7 @@ function makeService(opts: {
     mockPrisma,
     mockGalaxyService,
     mockPlanetService,
+    new MineRegistry(),
   );
 
   const ship = makeShip({ userid: viewerUserId, xcoord: 10.5, ycoord: 7.5 });

@@ -34,7 +34,11 @@ interface ScanMapProps {
  * Renders the 30×15 range-scan character grid.
  * Clears on `physics.sector-transition` when the local ship transitions (FR-013).
  * Resolves overlapping cells by priority: self > ship > planet > wormhole > mine (FR-015).
- * Empty positions render '.' (FR-014).
+ * Empty positions render a SPACE. Canon's `clearmap()` fills the grid with
+ * ' ' (GECMDS.C:2978) and reserves '.' for a live MINE (GECMDS.C:2607, :2542).
+ * This rendered '.' for empty, so once mines were drawn they were invisible
+ * against the background — and the port had papered over that by inventing a
+ * "Mine detected — bearing ..." line where canon has MINE6.
  *
  * @see GEMAIN.H:121 MAXX=30
  * @see GEMAIN.H:122 MAXY=15
@@ -80,7 +84,7 @@ export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Eleme
     const cols: React.JSX.Element[] = [];
     for (let x = 0; x < SCAN_GRID_WIDTH; x++) {
       const cell = cellMap.get(`${x}:${y}`);
-      const char = cell ? cell.char : '.';
+      const char = cell ? cell.char : ' ';
       const className = cell ? (CELL_CLASS[cell.type] ?? 'text-gray-400') : 'text-gray-600';
       cols.push(
         <span

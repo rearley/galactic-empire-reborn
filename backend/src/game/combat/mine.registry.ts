@@ -23,6 +23,13 @@ const NUMMINES: number = resolveGameConfig().NUMMINES;
  * on combat-module boot; mutated by the combat tick and persisted back
  * when state changes (deployment, sweep cadence, expiry).
  */
+/**
+ * A mine slot with no live mine in it. Canon tests `mptr->channel != 255`
+ * everywhere it walks the table — the scan maps, the sweep, and the blast
+ * pass. @see GECMDS.C:2530, :2603
+ */
+export const MINE_SLOT_FREE = 255;
+
 export interface MineState {
   id: number;
   channel: number;

@@ -22,6 +22,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
@@ -97,6 +98,7 @@ async function makeScanService(ships: ShipState[], scanRange = 50_000) {
     prismaMock as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
+    new MineRegistry(),
   );
   await service.onModuleInit();
   return service;

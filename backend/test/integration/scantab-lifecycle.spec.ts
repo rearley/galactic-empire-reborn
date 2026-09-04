@@ -13,6 +13,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { buildScantab, Scantab } from '../../src/game/commands/handlers/helpers/scantab';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 
@@ -76,7 +77,9 @@ describe('ScanHandlerService — scantab lifecycle', () => {
       get: () => null,
     } as unknown as PlanetStateService;
 
-    service = new ScanHandlerService(shipService, prisma, galaxyService, planetService);
+    service = new ScanHandlerService(shipService, prisma, galaxyService, planetService,
+    new MineRegistry(),
+  );
   });
 
   it('clearScantab on a non-existent key is a no-op (does not throw)', () => {

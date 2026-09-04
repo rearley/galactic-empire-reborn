@@ -23,6 +23,7 @@
  */
 
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
@@ -77,6 +78,7 @@ function makeBoundedService(ships: ShipState[]) {
     { shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]) } } as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
     { get: jest.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
+    new MineRegistry(),
   );
   return { service, galaxyMock };
 }
