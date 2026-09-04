@@ -196,6 +196,18 @@ export interface ShipState {
   isEphemeral?: boolean;
 
   /**
+   * The player's display handle, cached from User.username.
+   *
+   * Canon's `username()` returns `ptr->userid` for a player (GEFUNCS.C:2596),
+   * and in the original that WAS the login handle. Ours is a synthetic key, so
+   * the handle is carried separately and `displayName()` reads it.
+   *
+   * Hydrated at boot and at board time exactly as `teamcode` is; NOT persisted
+   * on Ship. @see display-name.ts
+   */
+  username?: string;
+
+  /**
    * Denormalised team affiliation cached from User.teamcode.
    * Hydrated at boot from User.teamcode; rewritten synchronously by the `tea`
    * command alongside the User row.

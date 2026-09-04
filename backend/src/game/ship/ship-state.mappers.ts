@@ -115,6 +115,9 @@ const IN_MEMORY_ONLY = [
   'lastfiredBy',
   // Set by a gravity collision so the mail names the body, not a person.
   'deathCause',
+  // The player's display handle, cached from User.username so public messages
+  // can name a captain without leaking the account key. @see display-name.ts
+  'username',
   // The pilot's CUMULATIVE kills, read from User at board time to drive
   // Cybertron escalation. Ship.kills is per-hull and is a real column.
   'userKills',
