@@ -67,11 +67,18 @@ describe('Cybertron spawn — topspeed', () => {
     expect(created[0]?.topspeed).toBe(6);
   });
 
-  it('never spawns a Cybertron that cannot move', async () => {
-    // The invariant, stated plainly: topspeed 0 means every speed2b order in
-    // cybLives evaluates to 0 and the ship is furniture.
+  it('allows zero for the Base Star, which canon ships immobile', async () => {
+    // S23WARP {Maximum Warp: 0} and S23ACCEL 0 — class 23 is a fortress, not a
+    // hunter. A blunt `topspeed > 0` guard here would refuse to spawn one, so
+    // the real invariant ("the slot carries THIS class's maxWarp") is asserted
+    // where the slot is built, not here.
     const { repo, created } = build();
-    await repo.createSpawn(slot());
-    expect(created[0]?.topspeed).not.toBe(0);
+    await repo.createSpawn(slot({ classNumber: 23, userid: 'Cybrg-3', shipno: 3, topspeed: 0 }));
+    expect(created[0]?.topspeed).toBe(0);
+  });
+
+  it('rejects a nonsense value that could not have come from a class', async () => {
+    const { repo } = build();
+    await expect(repo.createSpawn(slot({ topspeed: -1 }))).rejects.toThrow(/topspeed/);
   });
 });

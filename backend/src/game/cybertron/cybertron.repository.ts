@@ -110,15 +110,21 @@ export class CybertronRepository {
    * @see GECYBS.C:148-185 cyb_init — ship row construction
    */
   async createSpawn(slot: SpawnSlotInit): Promise<void> {
-    // A Cybertron with no top speed is furniture: every speed order in
-    // `cybLives` derives from it, so the ship rotates on the spot forever and
-    // the whole AI silently does nothing. That was the live state of all 24
-    // Cybertrons through round 4, and nothing caught it — so it fails loudly
-    // here rather than shipping a motionless hunter.
-    if (!(slot.topspeed > 0)) {
+    // `topspeed` must be the CLASS's max warp, and the caller is the only one
+    // that knows it. It is a required field so omitting it cannot silently
+    // fall through to Prisma's `@default(0)`, which is how all 24 Cybertrons
+    // in the round-4 galaxy ended up motionless.
+    //
+    // Zero is NOT rejected here, because zero is legal: canon ships the
+    // Cybertron Base Star (class 23) with `S23WARP {Maximum Warp: 0}` and
+    // `Maximum Acceleration: 0` — it is a fortress, immobile by design. A
+    // `topspeed > 0` guard would have refused to spawn one. The invariant that
+    // actually matters, "the slot carries this class's maxWarp", is asserted
+    // where the slot is built (spawn-fill-timing.spec.ts).
+    if (!Number.isInteger(slot.topspeed) || slot.topspeed < 0) {
       throw new Error(
         `Cybertron ${slot.userid}:${slot.shipno} (class ${slot.classNumber}) `
-        + `spawned with topspeed ${slot.topspeed} — it would never move.`,
+        + `spawned with topspeed ${slot.topspeed}.`,
       );
     }
     const cash = this.clampCybertronCash(BigInt(slot.loadout.gold));
