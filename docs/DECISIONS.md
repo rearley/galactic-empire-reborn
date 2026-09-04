@@ -2869,3 +2869,41 @@ single tick. It cannot function at speed.
 
 **Alternatives rejected:** Widening the warning bands so they work at warp. That
 invents a number to paper over a check canon does not run at all.
+
+## 2026-09-04 — Three of the four revolt findings were canon; one was wrong
+
+**Context:** Round 5 filed four P2 defects around planet revolt. Checked against
+the C source, only one is real.
+
+**REJECTED — `**Free**` ownership is canon.** `GEPLANET.C:377` does
+`strcpy(plptr->userid,"**Free**")` on revolt, and the claim menu is gated on
+`plptr->userid[0] == 0` (GECMDS.C:3485). `'*'` is not `0`, so a revolted world
+is unclaimable via `adm` in the ORIGINAL too. Abandon is the only path that
+truly clears ownership. Ours behaves identically. No change.
+
+**REJECTED — a stale `User.planets` is canon.** Canon only ever INCREMENTS it,
+at `GEMAIN.C:2911`, on claim. Nothing decrements it on revolt or abandon.
+`gemidnighta` zeroes the counter (`tmpusr.planets = 0`, :1109) and re-increments
+while walking owned worlds (:1139) — a nightly zero-and-recount, which is
+exactly what our midnight does. The count is stale until the next night in the
+original as well. No change.
+
+**REJECTED — the Vakory drone does exist.** The finding said a player scanned
+~15 sectors over three hours and never saw a class-33. The ship-loss mail says
+otherwise: Vakory drones killed TEN players this round — SD-82144 four times,
+SD-8220 three, SD-8269 twice, SD-8259 once — more than any other AI in the
+galaxy. `DROID_MAX_PER_CLASS` is 2, matching canon's `S31MAKE`/`S32MAKE`/
+`S33MAKE` of 2. The observation was wrong, and it is worth noting the "starter
+target" is currently the single most lethal thing in the game by kill count.
+
+**ACCEPTED — our help omits what canon's help says.** `MBMGEHLP.MSG:214` states
+plainly that troops *"defend your planet from outside attacks and prevent
+domestic revolts"*, and the surrounding block covers food, fighters and ion
+cannons. Our `hel planet` listed the verbs and none of the consequences.
+
+**Decision:** Restore the substance of that block to `hel planet`.
+
+**Reason:** This is not coaching a player on tactics — the owner's standing rule
+is that players should learn what works, as the AI does. It is text the original
+ships, which we had dropped. Omitting canon's own documentation is a fidelity
+gap, not a difficulty setting.
