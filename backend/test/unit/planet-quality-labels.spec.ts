@@ -7,12 +7,18 @@ import { formatMessage, MessageId } from '../../src/game/commands/messages';
  * The survey's words have to agree with the maths behind them.
  *
  * Production scales with `(enviorn + resource + 2) * 0.25` (GEPLANET.C:281), so
- * a HIGHER value is a BETTER world on both axes. Resources read that way already
- * — Barren(0) … Abundant(3) — but the environment table ran the other way, with
- * `enviorn` 0 labelled "Earth-like" and 3 "Inferno-like". A pilot comparing two
- * planets would take the worse one every time, and I did exactly that during a
- * playtest: I called an "Earth-like / Abundant" world the best draw of the
- * sector when its environment was in fact the worst grade there is.
+ * a HIGHER value is a BETTER world on both axes. The environment table once ran
+ * the other way, with `enviorn` 0 labelled "Earth-like" and 3 "Inferno-like",
+ * so a pilot comparing two planets would take the worse one every time — and I
+ * did exactly that in a playtest, calling an "Earth-like / Abundant" world the
+ * best draw of the sector when its environment was the worst grade there is.
+ *
+ * The ordering is what matters, and canon's own labels have it: SCAN12..SCAN15
+ * are Poor, Marginal, Good, Very Good. They are deliberately axis-NEUTRAL
+ * because canon reuses one table for both environment and resources
+ * (GECMDS.C:2338-2356), which is precisely why our evocative
+ * "Inferno-like/Toxic/Hostile/Earth-like" could never have been right: those
+ * words are meaningless applied to a resource grade.
  */
 function makePlanet(enviorn: number, resource: number): PlanetState {
   return {
@@ -47,11 +53,11 @@ describe('planet survey labels match the production they describe', () => {
   });
 
   it('names the WORST environment as the least hospitable', () => {
-    expect(formatMessage(MessageId.SCAN12)).toBe('Inferno-like');
+    expect(formatMessage(MessageId.SCAN12)).toBe('Poor');
   });
 
   it('names the BEST environment as the most hospitable', () => {
-    expect(formatMessage(MessageId.SCAN15)).toBe('Earth-like');
+    expect(formatMessage(MessageId.SCAN15)).toBe('Very Good');
   });
 
   it('keeps the resource scale running from worst to best', () => {

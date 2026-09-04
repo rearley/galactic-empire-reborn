@@ -138,11 +138,19 @@ describe('loadGameConfig', () => {
       path.join(SRC, 'game', 'config', 'game-config.ts'),
     ];
 
+    /**
+     * Generated canon DATA is not a live reference. `canon-messages.generated.ts`
+     * carries all 834 ids from MBMGEMSG.MSG, and canon's option names (SHOWOPT,
+     * PLTVCASH ...) are message ids in that file too — so a bare string match
+     * there reads as "the option is used" when it is only quoted.
+     */
+    const isGenerated = (f: string) => f.endsWith('.generated.ts');
+
     function walk(dir: string, out: string[] = []): string[] {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) walk(full, out);
-        else if (e.name.endsWith('.ts') && !EXCLUDED.includes(full)) out.push(full);
+        else if (e.name.endsWith('.ts') && !EXCLUDED.includes(full) && !isGenerated(full)) out.push(full);
       }
       return out;
     }

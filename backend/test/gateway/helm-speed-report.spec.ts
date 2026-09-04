@@ -44,7 +44,9 @@ describe('helm speed report', () => {
   });
 
   it('reports a dead stop with SPEED0, not warp 0', () => {
-    expect(build().fire(0).text).toBe('Helm reports we are at a dead stop, Sir!');
+    // Canon's SPEED0 opens with its own *** banner, the same attention marker
+    // MINE6 and the Cybertron taunts use. @see GE/REL/MBMGEMSG.MSG
+    expect(build().fire(0).text).toBe('***\nHelm reports we are at a dead stop, Sir!');
   });
 
   it('goes only to the captain who gave the order', () => {

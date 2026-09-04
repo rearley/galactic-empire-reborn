@@ -69,7 +69,8 @@ describe('ReportHandlerService', () => {
       await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 0 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
-      expect(texts.some(t => t.startsWith('In sector'))).toBe(true);
+      // REP05 {Navigating SS# %d %d}
+      expect(texts.some(t => t.startsWith('Navigating SS#'))).toBe(true);
     });
 
     it('where==1 returns REP02 (in hyperspace)', async () => {
@@ -77,7 +78,8 @@ describe('ReportHandlerService', () => {
       await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 1 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
-      expect(texts.some(t => t.startsWith('In hyperspace'))).toBe(true);
+      // REP02 {Nav Hyperspace (SS# %d %d)}
+      expect(texts.some(t => t.startsWith('Nav Hyperspace'))).toBe(true);
     });
 
     it('where>=10 returns REP08 (in orbit)', async () => {
@@ -85,7 +87,8 @@ describe('ReportHandlerService', () => {
       await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 15 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
-      expect(texts.some(t => t.startsWith('Orbiting planet'))).toBe(true);
+      // REP08 {Orbiting Planet........  %d SS# %d  %d}
+      expect(texts.some(t => t.startsWith('Orbiting Planet'))).toBe(true);
     });
 
     it('always includes REP32 position line', async () => {
@@ -93,7 +96,8 @@ describe('ReportHandlerService', () => {
       await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
-      expect(texts.some(t => t.startsWith('Position:'))).toBe(true);
+      // REP32 {Galactic Pos. Xsect:%d Ysect:%d}
+      expect(texts.some(t => t.startsWith('Galactic Pos.'))).toBe(true);
     });
   });
 
@@ -110,7 +114,8 @@ describe('ReportHandlerService', () => {
       const { service } = makeService();
       await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['sys'], {}) as Promise<CommandResult>);
-      const energyLine = result.lines.find(l => l.text.startsWith('Energy:'));
+      // REP09 {Neutron Flux............ %u} — canon calls it flux, not energy.
+      const energyLine = result.lines.find(l => l.text.startsWith('Neutron Flux'));
       expect(energyLine?.category).toBe('info');
     });
 

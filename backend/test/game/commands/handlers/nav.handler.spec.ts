@@ -191,9 +191,11 @@ describe('NavHandlerService — engagement happy path', () => {
   it('emits NAV01 message on success', () => {
     const { handler, state, ctx } = makeService({ xcoord: 5.0, ycoord: 5.0 });
     const result = handler.command.handler(state, ['10', '8'], ctx) as { lines: { text: string }[] };
-    // Canon's NAV01 verbatim: "Sector %d %d is bearing %d, distance %s."
-    // It sets no course and does not mention speed.
-    expect(result.lines[0].text).toMatch(/^Sector 10 8 is bearing -?\d+, distance \d+\.$/);
+    // Canon's NAV01 verbatim, banner included:
+    //   "***\nSector %d %d is bearing %d, distance %s."
+    // It sets no course and does not mention speed. The *** is canon's own
+    // attention marker, the same one MINE6 and the Cybertron taunts open with.
+    expect(result.lines[0].text).toMatch(/^\*\*\*\nSector 10 8 is bearing -?\d+, distance \d+\.$/);
     expect(result.lines[0].text).toContain('10');
     expect(result.lines[0].text).toContain('8');
   });
