@@ -610,6 +610,12 @@ export class CombatTickService implements OnModuleInit {
     for (let i = 0; i < MAXMISSL; i++) {
       const ch = carrier.lmisslChannel[i];
       if (ch === undefined || ch === 255) continue;
+      // Canon's liveness test is DISTANCE, not the channel:
+      // `for (i=0,mptr=ptr->lmissl;i<MAXMISSL;++i,++mptr) if (mptr->distance > 0)`
+      // (GEFUNCS.C:1611-1613). Guarding only on the channel meant anything that
+      // zeroed a distance -- the warp shake, for one -- left a slot that was
+      // still walked, went negative, and detonated.
+      if ((carrier.lmisslDistance[i] ?? 0) <= 0) continue;
 
       if (!carrierIngame) {
         this.clearMisslSlot(carrier, i);
