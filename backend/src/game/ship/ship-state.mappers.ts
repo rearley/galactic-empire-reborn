@@ -77,36 +77,90 @@ export function prismaShipToState(row: Ship): ShipState {
 }
 
 /**
+ * ShipState keys that Prisma would reject, derived from the schema itself.
+ *
+ * `stateToPrismaUpdate` returns its object straight to Prisma, so ONE
+ * in-memory-only field left in the payload makes EVERY flush throw — and the
+ * caller logs and swallows it, so the only symptom is that ships silently stop
+ * being saved. This has now bitten the port six times (maxTons, maxWarp,
+ * channel, lockKey, then lastfiredBy / deathCause / userKills together), each
+ * time because the strip-list was hand-maintained and the guarding test used a
+ * hand-written fixture that simply omitted the new field.
+ *
+ * So the list is no longer trusted to be complete — it is CHECKED. Add a field
+ * to ShipState that has no Ship column and leave it out of IN_MEMORY_ONLY, and
+ * `_everyInMemoryFieldIsListed` below fails to compile, naming the field.
+ */
+type ShipColumnName = keyof typeof Prisma.ShipScalarFieldEnum;
+type InMemoryOnlyKey = Exclude<keyof ShipState, ShipColumnName>;
+
+const IN_MEMORY_ONLY = [
+  'dirty',
+  'isEphemeral',
+  'teamcode',
+  'scanNames',
+  'scanHome',
+  'scanFull',
+  'msgFilter',
+  'recentlyWarpedExit',
+  'recentlySelfFiredTorp',
+  'maxTons',
+  'maxWarp',
+  // Resolved lock target written by `loc`; the DB column `lock` holds the
+  // target's channel, this is the "userid:shipno" key used to re-find it.
+  'lockKey',
+  // Assigned on entry to the world, released on exit.
+  'channel',
+  // Who last damaged this ship, so the loss mail can name them.
+  'lastfiredBy',
+  // Set by a gravity collision so the mail names the body, not a person.
+  'deathCause',
+  // The pilot's CUMULATIVE kills, read from User at board time to drive
+  // Cybertron escalation. Ship.kills is per-hull and is a real column.
+  'userKills',
+] as const satisfies readonly InMemoryOnlyKey[];
+
+/**
+ * Compile-time exhaustiveness guard. If this line errors, the type in the
+ * message names a ShipState field with no Ship column that is missing from
+ * IN_MEMORY_ONLY above — add it there, or add a migration giving it a column.
+ */
+type UnlistedInMemoryKey = Exclude<InMemoryOnlyKey, (typeof IN_MEMORY_ONLY)[number]>;
+const _everyInMemoryFieldIsListed: [UnlistedInMemoryKey] extends [never]
+  ? true
+  : ['ShipState field missing from IN_MEMORY_ONLY:', UnlistedInMemoryKey] = true;
+void _everyInMemoryFieldIsListed;
+
+/**
+ * Real Ship columns that are nonetheless never written by a tick flush.
+ * These DO have columns, so the guard above cannot catch them; they are
+ * excluded deliberately and each needs its reason.
+ */
+const NOT_FLUSHED = [
+  // Set at creation and at death only, never by a tick flush.
+  'status',
+  // Part of the where-key, not updatable data.
+  'userid',
+  'shipno',
+] as const satisfies readonly ShipColumnName[];
+
+const EXCLUDED_FROM_FLUSH = new Set<string>([...IN_MEMORY_ONLY, ...NOT_FLUSHED]);
+
+/**
+ * The in-memory-only ShipState fields, exported so tests can assert that a
+ * state carrying every one of them still flushes clean. @see test/unit/ship-flush-columns.spec.ts
+ */
+export const IN_MEMORY_ONLY_SHIP_FIELDS: readonly string[] = IN_MEMORY_ONLY;
+
+/**
  * Converts a live ShipState back to a Prisma update payload.
  * Strips the dirty flag and in-memory-only fields that have no DB column.
  * @see ShipState.dirty
  */
 export function stateToPrismaUpdate(state: ShipState): Prisma.ShipUpdateInput {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const {
-    dirty, isEphemeral, teamcode, scanNames, scanHome, scanFull, msgFilter,
-    // status: set at creation/death only, never via tick flush
-    status,
-    // userid/shipno: part of the where key, not updatable data
-    userid, shipno,
-    // in-memory only flags — no DB columns
-    recentlyWarpedExit,
-    recentlySelfFiredTorp,
-    maxTons,
-    maxWarp,
-    // Resolved lock target, written by `loc`. The DB column is `lock` (the
-    // target's channel); this is the "userid:shipno" key used to re-find the
-    // ship in memory. Leaving it in scope made every flush for any pilot who
-    // had locked a target throw `Unknown argument 'lockKey'` — silently, so
-    // their ship simply stopped being saved. @see test/unit/ship-flush-columns.spec.ts
-    lockKey,
-    // channel: assigned on entry to the world and released on exit, so it has
-    // no DB column. This function returns `...rest` straight to Prisma, so any
-    // in-memory-only field left in scope makes EVERY flush throw — and the
-    // caller logs and swallows it, so the only symptom is that nothing is ever
-    // persisted again. @see ship-channel.registry.ts
-    channel,
-    ...rest
-  } = state;
-  return rest;
+  const update: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(state)) {
+    if (!EXCLUDED_FROM_FLUSH.has(key)) update[key] = value;
+  }
+  return update as Prisma.ShipUpdateInput;
 }
