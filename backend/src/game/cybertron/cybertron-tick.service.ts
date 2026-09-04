@@ -10,7 +10,7 @@ import { NO_CHANNEL, CYBMINE_NONE } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
 import { MineRegistry } from '../combat/mine.registry';
-import { MineRepository } from '../combat/mine.repository';
+import { MineRepository, MineTableFullError } from '../combat/mine.repository';
 import { CybertronRepository } from './cybertron.repository';
 import { buildCybertronClassConfigs, bootSeedEnabled } from './cybertron.config';
 import type { CybertronClassConfig } from './cybertron.config';
@@ -92,6 +92,13 @@ import { CombatTickService } from '../combat/combat-tick.service';
  * @see GECYBS.C:198 cyb_lives — per-ship AI state machine
  * @see specs/007-cybertron-ai/plan.md R-1 (tick ordering), R-2 (spawn cadence)
  */
+/**
+ * Fuse a Cybertron sets on a mine it drops while breaking away: `laymine(ptr,
+ * usrn, 10)` (GECYBS.C:315). Droids use a much longer fuse — this one is a
+ * hazard dropped behind something fleeing, not a persistent minefield.
+ */
+const CYB_MINE_TIMER = 10;
+
 @Injectable()
 export class CybertronTickService implements OnModuleInit {
   private readonly logger = new Logger(CybertronTickService.name);
@@ -281,9 +288,7 @@ export class CybertronTickService implements OnModuleInit {
       // Jammed: mine the area and pick random heading (@see GECYBS.C:308-319)
       const cls = this.shipClassCache.get(ship.shpclass);
       if (cls?.hasMine && Number(ship.items[I_MINE]) > 0 && Math.floor(this.random.next() * 5) === 0) {
-        // Mine lay — US4 full impl; decrement inventory only for now
-        ship.items = [...ship.items] as typeof ship.items;
-        ship.items[I_MINE] = BigInt(Math.max(0, Number(ship.items[I_MINE]) - 1));
+        this.layMine(ship);
       }
       ship.speed2b = topSpeed + this.random.next() * 3000.0;
       ship.holdcourse = Math.floor(this.random.next() * 7) + 2;
@@ -352,8 +357,7 @@ export class CybertronTickService implements OnModuleInit {
       const cls = this.shipClassCache.get(ship.shpclass);
       let dirty = false;
       if (cls?.hasMine && Number(ship.items[I_MINE]) > 0 && Math.floor(this.random.next() * 5) === 0) {
-        ship.items = [...ship.items] as typeof ship.items;
-        ship.items[I_MINE] = BigInt(Math.max(0, Number(ship.items[I_MINE]) - 1));
+        this.layMine(ship);
         dirty = true;
       }
       if (cls?.hasJammer && Number(ship.items[I_JAMMER]) > 0 && Math.floor(this.random.next() * 100) === 0) {
@@ -903,6 +907,46 @@ export class CybertronTickService implements OnModuleInit {
    * How many Cybertrons currently hold this channel as their target — C's
    * `nc` loop. @see GECYBS.C:365-370
    */
+  /**
+   * Drop a neutron mine where the ship is standing.
+   *
+   * `laymine(ptr, usrn, 10)` — GECYBS.C:315, reached from the branch whose own
+   * comment is "as long as they can't see ... the other player must be trying
+   * to get away.... might as well mine the area". `laymine` itself claims a
+   * free slot, sets `cantexit = FIRETICKS`, writes the LAYER's channel and the
+   * ship's coordinates, and decrements `items[I_MINE]` inside the success
+   * branch — a refused lay costs nothing (GECMDS.C:1805-1818).
+   *
+   * This was a stub: it spent the mine and produced nothing, so a Cybertron
+   * burned its magazine over a session and left an empty galaxy behind it,
+   * while droids laid real ones. The channel matters as much as the mine — a
+   * mine kill sets the victim's `lastfired` to it, which is how the ship-loss
+   * mail can name who left it there.
+   */
+  private layMine(ship: ShipState): void {
+    if (!this.mineRepo || !this.mineRegistry) return;
+
+    const channel = ship.channel ?? CYBMINE_NONE;
+    void this.mineRepo.create({
+      channel,
+      timer: CYB_MINE_TIMER,
+      xcoord: ship.xcoord,
+      ycoord: ship.ycoord,
+      deployedBy: ship.userid,
+    }).then((mine) => {
+      // Spend the mine only once the slot is actually taken.
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.items = [...s.items] as typeof s.items;
+        s.items[I_MINE] = BigInt(Math.max(0, Number(s.items[I_MINE]) - 1));
+        s.cantexit = FIRETICKS;
+      });
+      this.mineRegistry?.add({ ...mine, deployedBy: ship.userid });
+    }).catch((err: unknown) => {
+      if (err instanceof MineTableFullError) return; // canon: no slot, no mine spent
+      this.logger.error('Cybertron mine lay failed:', err);
+    });
+  }
+
   private countClaims(targetChannel: number): number {
     let count = 0;
     for (const s of this.shipState.findAllShips()) {
