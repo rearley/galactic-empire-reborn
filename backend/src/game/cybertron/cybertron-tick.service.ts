@@ -78,6 +78,7 @@ import {
   notClaimed,
   shouldTaunt,
   creditsAreOwed,
+  escalationKills,
 } from './cyb-decisions';
 import { pickTaunt, bandName, CYB_ANNOY_BANDS, type CybAnnoyBand } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
@@ -415,7 +416,7 @@ export class CybertronTickService implements OnModuleInit {
       // Warp-fire path: both ships in hyperwarp, gebemean, range < 30000 (@see GECYBS.C:263-272)
       if (ship.where === 1 && target.where === 1) {
         const targetCls = this.shipClassCache.get(target.shpclass);
-        const mean = gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random);
+        const mean = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
         // `ddist < (tooclose+rndm(tooclose)) || cybs_can_att || wptr->cantexit > 0
         //  || ptr->cantexit > 0` — the random widening and the attacker's own
         // battle-lock were both missing. @see GECYBS.C:270-273
@@ -590,13 +591,13 @@ export class CybertronTickService implements OnModuleInit {
     const cls = this.shipClassCache.get(ship.shpclass);
 
     // Evaluate gebemean once — reused for phaser gate and torpedo-count roll (@see GECYBS.C:514,527)
-    const mean = gebemean(tough, target.kills, CYB_BE_NICE, CYBSLO, this.random);
+    const mean = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
     if (ship.phasr >= PMINFIRE && mean && !cybwhoops(ship.cybskill, this.random)) {
       this.cybFirePhaser(ship, target, ctx);
     }
 
     const torpCount = rollTorpedoCount(
-      tough, target.kills, cls?.hasTorpedo ?? false, mean, CYB_BE_EASY, this.random,
+      tough, escalationKills(target), cls?.hasTorpedo ?? false, mean, CYB_BE_EASY, this.random,
     );
     for (let i = 0; i < torpCount && i < MAXTORPS; i++) {
       // Refill one torp slot before launching (@see GECYBS.C:534)

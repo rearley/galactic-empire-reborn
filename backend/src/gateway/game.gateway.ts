@@ -419,8 +419,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true } });
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
+        // Cumulative captain kills, so a veteran boarding a fresh hull keeps
+        // the Cybertron standing they earned. @see GECYBS.C:441, :524
+        if (userRow?.kills != null) state.userKills = userRow.kills;
         state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
         state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
         state.scanFull = (userRow?.options?.[2] ?? 0) === 1;
