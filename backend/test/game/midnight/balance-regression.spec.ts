@@ -51,17 +51,24 @@ describe('midnight balance regression (SC-006)', () => {
    * 201,228,378 is the `lngopt` MAX BOUND shared by seven sysop options
    * (GEMAIN.C:557-596), not a value. Pinned as one it made PLTVCASH a ~201x
    * multiplier on banked cash and PLTVDIV large enough to truncate every
-   * stockpile to zero. These now hold chosen sysop values, env-overridable,
-   * and the regression guard is that they stay in the range where C's
-   * expressions are actually divisions.
+   * stockpile to zero.
+   *
+   * Both are now the CANON values, read off the sysop option file:
+   *   PLTVCASH {The point value of each 1,000,000 : 10}   MBMGEMSG.MSG:1831
+   *   PLTVDIV  {The divisor for each ITMVLnn : 10000}     MBMGEMSG.MSG:1823
+   *
+   * PLTVDIV was already right by luck. PLTVCASH was 1,000 — a chosen value
+   * paying one hundred times canon — under a DECISIONS.md entry whose stated
+   * reason was that the shipped values "are not in the source ... which we do
+   * not have". Vendoring the full distribution the next day made that false.
    * @see test/game/midnight/planet-value-scale.spec.ts
    */
-  it('PLTVCASH is a divisor, not the lngopt ceiling', () => {
-    expect(PLTVCASH).toBe(1_000);
-    expect(Math.floor(1_000_000 / PLTVCASH)).toBeGreaterThan(0);
+  it('PLTVCASH is canon 10, one point per 100,000 credits banked', () => {
+    expect(PLTVCASH).toBe(10);
+    expect(Math.floor(1_000_000 / PLTVCASH)).toBe(100_000);
   });
 
-  it('PLTVDIV is a divisor, not the lngopt ceiling', () => {
+  it('PLTVDIV is canon 10,000, not the lngopt ceiling', () => {
     expect(PLTVDIV).toBe(10_000);
     expect(PLTVDIV).toBeLessThan(201_228_378);
   });

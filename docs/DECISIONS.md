@@ -72,6 +72,7 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-08-31 — Ship channels: this port's `usrnum`](#2026-08-31-ship-channels-this-ports-usrnum)
 - [2026-08-31 — `sca pl` reads live planet state, not the boot-time read model](#2026-08-31-sca-pl-reads-live-planet-state-not-the-boot-time-read-model)
 - [2026-09-01 — Droids stay out of the neutral zone](#2026-09-01-droids-stay-out-of-the-neutral-zone)
+- [2026-09-04 — PLTVCASH restored to canon](#2026-09-04--pltvcash-restored-to-canon-supersedes-the-entry-below)
 - [2026-09-04 — The wormhole 'W' on the sector scan is ours](#2026-09-04--the-wormhole-w-on-the-sector-scan-is-ours)
 - [2026-09-04 — Planet precedence on `sca se` follows canon, planets last](#2026-09-04--planet-precedence-on-sca-se-follows-canon-planets-last)
 - [2026-09-01 — PLTVCASH and PLTVDIV are chosen sysop values](#2026-09-01-pltvcash-and-pltvdiv-are-chosen-sysop-values)
@@ -1639,7 +1640,29 @@ usually watching. This is the same reasoning already recorded for Cybertrons.
 Spawning droids anywhere but making them passive inside the zone — more moving
 parts for the same outcome.
 
-## 2026-09-01 — PLTVCASH and PLTVDIV are chosen sysop values
+## 2026-09-04 — PLTVCASH restored to canon (supersedes the entry below)
+**Context:** The 2026-09-01 entry chose PLTVCASH = 1000 because "the original's
+shipped values are not in the source — they came from the sysop's option file,
+which we do not have". That was true when written. It stopped being true on
+2026-09-02, when the full 3.2e distribution was vendored: `GE/REL/MBMGEMSG.MSG`
+IS that option file, and it says
+`PLTVCASH {The point value of each 1,000,000 : 10}` (line 1831).
+**Decision:** PLTVCASH = **10**, canon. PLTVDIV stays 10000, which the same
+file confirms was already right.
+**Reason:** The project rule allows deviations only when justified by something
+other than "we could not find the canonical value". Ours was justified by
+exactly that, so it expired the moment the value was found. At 1000 we paid one
+point per 1,000 credits banked; canon pays one per 100,000 — we were awarding a
+hundred times canon for the same planet.
+**Consequence:** Planet scores earned under the old constant are not comparable
+with new ones. Applied ahead of a world reset for that reason.
+**Alternatives rejected:** Keeping 1000 as a deliberate deviation — the round-6
+report argued the colony route is under-rewarded and this looks like support for
+that, but we were already paying 100x and it still read as thin, so the score
+multiplier is not what makes colonies unattractive. Changing it would have been
+tuning the wrong number, and away from canon.
+
+## 2026-09-01 — PLTVCASH and PLTVDIV are chosen sysop values (SUPERSEDED 2026-09-04)
 **Context:** Both were pinned to 201,228,378, which is the `lngopt` MAX BOUND
 shared by seven sysop options (GEMAIN.C:557-596), not a value. C's own
 expression proves it: `(cash+tax)/(1000000L/pltvcash)` divides by zero at that

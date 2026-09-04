@@ -45,6 +45,19 @@ export const MAILDAYS_DEFAULT: number = CANON_MAILDAYS;
  * Planet cash-value divisor. Scoring credits `(cash + tax) / (1000000 /
  * PLTVCASH)`, so 1000 means one point per 1000 credits banked.
  *
+ * CANON IS 10: `PLTVCASH {The point value of each 1,000,000 : 10}`
+ * (GE/REL/MBMGEMSG.MSG:1831), so a planet scores one point per 100,000
+ * credits banked. We ran 1,000 — one point per 1,000 — paying ONE HUNDRED
+ * TIMES canon for the same balance.
+ *
+ * The DECISIONS.md entry choosing 1,000 justified it as "the original's
+ * shipped values are not in the source — they came from the sysop's option
+ * file, which we do not have". That was true on 2026-09-01 and stopped being
+ * true on 2026-09-02, when the full distribution was vendored: GE/REL/
+ * MBMGEMSG.MSG IS that option file. A deviation justified by "we could not
+ * find the canonical value" is exactly the kind the project rules disallow
+ * once the value is found.
+ *
  * This was pinned to 201,228,378, which is NOT a value — it is the `lngopt`
  * MAX BOUND, the third argument, and the same number is the ceiling for maxpl,
  * weight, value, manhours, phaserprice and shieldprice (GEMAIN.C:557-596).
@@ -58,7 +71,7 @@ export const MAILDAYS_DEFAULT: number = CANON_MAILDAYS;
  *
  * @see GEMAIN.C:593 lngopt(PLTVCASH, 0L, 201228378L)  @see GEMAIN.C:1352
  */
-export const PLTVCASH: number = clampOption(process.env['PLTVCASH'], 1_000, 1, 1_000_000);
+export const PLTVCASH: number = clampOption(process.env['PLTVCASH'], 10, 1, 1_000_000);
 
 /**
  * Planet item-value divisor: `v += value[i] * (qty[i] / PLTVDIV)`.
