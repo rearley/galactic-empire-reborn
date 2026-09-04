@@ -92,15 +92,15 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     // First line: abbreviated bearing/distance still present
     expect(text).toContain('EnemyShip');
     expect(text).toContain('class');
-    expect(text).toContain('bearing');
+    expect(text).toContain('Bearing:');
 
     // Intel lines: damage, shields, kills
     expect(text).toContain('moderate');
-    expect(text).toContain('Shields: up');
+    expect(text).toContain('Shields: UP');
     expect(text).toContain('Kills: 7');
   });
 
-  it('shows "Shields: down" when shieldstat is 0', async () => {
+  it('shows "Shields: DOWN" when shieldstat is 0', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0, where: 0 });
     const target = makeShip({
       userid: 'enemy', shipno: 2, shipname: 'DownTarget',
@@ -112,10 +112,10 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
 
     const result = await svc.command.handler(self, ['sh', 'DownTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
-    expect(text).toContain('Shields: down');
+    expect(text).toContain('Shields: DOWN');
   });
 
-  it('shows "Shields: damaged" when shieldstat is 3 (SHIELDDM)', async () => {
+  it('shows "Shields: DOWN" for a DAMAGED shield — canon has only UP/DOWN here', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0, where: 0 });
     const target = makeShip({
       userid: 'enemy', shipno: 2, shipname: 'DamagedShields',
@@ -127,7 +127,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
 
     const result = await svc.command.handler(self, ['sh', 'DamagedShields'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
-    expect(text).toContain('Shields: damaged');
+    expect(text).toContain('Shields: DOWN');
     expect(text).toContain('Kills: 2');
   });
 
@@ -146,7 +146,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
 
     // Abbreviated line still present
     expect(text).toContain('WarpTarget');
-    expect(text).toContain('bearing');
+    expect(text).toContain('Bearing:');
 
     // NO intel when target at warp
     expect(text).not.toContain('moderate');
@@ -168,7 +168,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
     const text = result.lines.map((l) => l.text).join('\n');
 
     expect(text).toContain('SteadyTarget');
-    expect(text).toContain('bearing');
+    expect(text).toContain('Bearing:');
 
     // NO intel when scanner at warp
     expect(text).not.toContain('light');
@@ -191,7 +191,7 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
 
     // Intel SHOULD appear for orbiting ships
     expect(text).toContain('heavy');
-    expect(text).toContain('Shields: down');
+    expect(text).toContain('Shields: DOWN');
     expect(text).toContain('Kills: 1');
   });
 });
