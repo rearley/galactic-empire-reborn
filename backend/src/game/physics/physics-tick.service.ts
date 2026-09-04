@@ -68,6 +68,9 @@ import { RANDOM, Random, gernd } from '../combat/random.port';
  */
 const NAV_ARRIVAL_RANGE = 250;
 
+/** Empty projectile slot — C's `channel == 255`. @see GEFUNCS.C:1611-1613 */
+const NO_CHANNEL_SLOT = 255;
+
 @Injectable()
 export class PhysicsTickService implements OnModuleInit {
   private readonly logger = new Logger(PhysicsTickService.name);
@@ -319,7 +322,18 @@ export class PhysicsTickService implements OnModuleInit {
           let count = 0;
           this.shipState.mutate(ship.userid, ship.shipno, (s) => {
             for (let i = 0; i < s.lmisslDistance.length; i++) {
-              if (s.lmisslDistance[i] > 0) { s.lmisslDistance[i] = 0; count++; }
+              if (s.lmisslDistance[i] > 0) {
+                // Free the WHOLE slot. Zeroing distance alone announced the
+                // kill and did not deliver it: CombatTickService walks each
+                // slot by CHANNEL, so a channel left set is still processed,
+                // `newDist = 0 - MISLSPED` goes negative, and the missile
+                // detonates at full stored charge one tick later. The player
+                // was told they had shaken it off and was then hit by it.
+                s.lmisslDistance[i] = 0;
+                s.lmisslChannel[i] = NO_CHANNEL_SLOT;
+                s.lmisslEnergy[i] = 0;
+                count++;
+              }
             }
           });
           if (count > 0) {

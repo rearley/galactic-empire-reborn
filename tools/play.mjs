@@ -133,6 +133,35 @@ socket.on('combat.miss', (p) =>
 socket.on('combat.subsystem-damaged', (p) =>
   out('><', `SUBSYSTEM ${p.subsystem ?? '?'} damaged`));
 
+// ── Catch-all ────────────────────────────────────────────────────────────────
+//
+// The harness was STRUCTURALLY BLIND to three mechanics it was being used to
+// test. It subscribed to thirteen events and to none of `cybertron.taunt`,
+// `droid.annoy` or `combat.decoy-intercept`, so four rounds of playtesting
+// reported silence from features that were firing correctly the whole time.
+// That is a worse failure than a missing feature: it manufactures false
+// negatives, and we acted on several.
+//
+// Naming the three would fix today and leave tomorrow's event just as invisible,
+// so anything without an explicit handler is printed rather than dropped. A
+// noisy line is cheap; a silently discarded one costs a round.
+const HANDLED = new Set([
+  'connect', 'disconnect', 'connect_error', 'error', 'reconnect_attempt',
+  'command:result', 'scan:render', 'event.log', 'message.send',
+  'combat.ship-destroyed', 'combat.hit', 'combat.miss', 'combat.subsystem-damaged',
+  'prompt:ship-name', 'prompt:ship-select',
+]);
+
+socket.onAny((event, payload) => {
+  if (HANDLED.has(event)) return;
+  const text = payload && typeof payload === 'object' && typeof payload.message === 'string'
+    ? payload.message
+    : payload && typeof payload === 'object' && typeof payload.text === 'string'
+      ? payload.text
+      : JSON.stringify(payload ?? null);
+  out('**', `[${event}] ${text}`);
+});
+
 socket.on('prompt:ship-name', () => {
   out('..', `naming ship ${shipName}`);
   socket.emit('prompt:reply', { value: shipName });
