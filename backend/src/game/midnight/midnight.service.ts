@@ -127,7 +127,7 @@ export class MidnightService implements OnApplicationBootstrap {
         const usersUpdated = await this.repo.resetUserAccumulators(tx);
 
         this.logger.log('midnight: phase 2 — process owned planets');
-        const { planetsProcessed, mailReportsCreated } = await this.repo.processOwnedPlanets(tx);
+        const { planetsProcessed, mailReportsCreated } = await this.repo.processOwnedPlanets(tx, today);
 
         this.logger.log('midnight: phase 3 — purge mail');
         const mailDeleted = await this.repo.purgeMail(tx, this.config.mailDays);

@@ -9,6 +9,7 @@
  */
 
 import { MAIL_CLASS_PRODRPT, MESG20 } from './midnight.constants';
+import { UNIVMAX } from '../constants';
 
 export interface ProductionPlanet {
   userid: string;
@@ -65,4 +66,43 @@ export function buildProductionMailStat(planet: ProductionPlanet, msgno: bigint)
     tax: planet.tax,
     itemqty: [...planet.itemsQty],
   };
+}
+
+
+/**
+ * A deterministic message number for one planet's production report on one day.
+ *
+ * This used to be `Date.now() + loopIndex`, so a second midnight run for the
+ * same day inserted a whole fresh set of reports. Five nights in round 5 left
+ * one player with 36 copies of the same report, burying their real distress
+ * mail — and it broke the project's own rule that running midnight twice must
+ * produce identical results.
+ *
+ * The key is the day ordinal times a stride, plus the planet's own identity.
+ * The loop index is NOT usable as identity: the phase-2 planet query carries no
+ * `orderBy`, so row order is not stable between runs.
+ *
+ * Layout, and why:
+ *   msgno = dayOrdinal * PLANET_KEY_STRIDE + planetKey
+ *   planetKey = ((xsect + UNIVMAX) * SPAN + (ysect + UNIVMAX)) * 16 + plnum
+ *
+ * Multiplying the x offset by SPAN (not adding) keeps (3,-7) and (-7,3)
+ * distinct. The stride exceeds every possible planetKey, so msgno stays
+ * strictly increasing across days — which the mailbox depends on, since it
+ * lists by msgno DESC and yesterday's last planet must not outrank today's
+ * first.
+ *
+ * @see GEMAIN.C:1120-1170 phase-2 planet walk
+ */
+const SPAN = UNIVMAX * 2 + 1;
+const PLANET_KEY_STRIDE = BigInt(SPAN * SPAN * 16);
+
+export function productionMailMsgno(
+  runDate: Date,
+  planet: { xsect: number; ysect: number; plnum: number },
+): bigint {
+  const dayOrdinal = BigInt(Math.floor(runDate.getTime() / 86_400_000));
+  const cell = (planet.xsect + UNIVMAX) * SPAN + (planet.ysect + UNIVMAX);
+  const planetKey = BigInt(cell * 16 + planet.plnum);
+  return dayOrdinal * PLANET_KEY_STRIDE + planetKey;
 }

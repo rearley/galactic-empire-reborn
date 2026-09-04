@@ -2763,3 +2763,41 @@ missed the very bug it was written for, because the dead room was assigned to a
 **Alternatives rejected:** Asserting exact room strings per handler. That pins
 the current addressing rather than the invariant, and would not have caught a
 namespace nobody joins.
+
+## 2026-09-04 — Midnight no longer re-mails production reports
+
+**Context:** `specs/009-midnight-job` FR-003 required the midnight pass to be
+idempotent, then carved out an exception: *"the only legitimate difference is
+duplicate production-report mail rows from the second run"*. The message number
+was `Date.now() + loopIndex`, so every run inserted a fresh set.
+
+Round 5 fired five nights through the real admin endpoint. One player finished
+holding **36 copies of the same production report**, with their genuine
+distress mail buried underneath it.
+
+**Decision:** Derive the message number from the run date and the planet's own
+identity, and insert with `skipDuplicates`. A same-day re-run now collides on
+the primary key and inserts nothing. FR-003's carve-out is struck.
+
+**Reason:** The carve-out had no justification attached — it recorded the
+behaviour rather than arguing for it — and it contradicted CLAUDE.md, which
+requires flatly that running the midnight job twice produce identical results.
+Where a spec and CLAUDE.md disagree and the spec gives no reason, CLAUDE.md
+wins. The observed cost settles it: mail is how the original told you your
+empire was working, and a mailbox that buries a distress signal under 36 copies
+of the same report is worse than one that sends nothing.
+
+Canon cannot arbitrate. `gemidnighta` runs once per calendar day, so a second
+same-day pass is a situation the original cannot reach.
+
+**Note on the key.** The loop index was not usable as identity — the phase-2
+planet query carries no `orderBy`, so row order is not stable between runs. The
+key is `dayOrdinal * stride + planetKey`, with the x offset MULTIPLIED by the
+span rather than added so that (3,-7) and (-7,3) stay distinct, and the stride
+larger than any planetKey so message numbers keep increasing across days. The
+mailbox lists by msgno DESC, so yesterday's last planet must not outrank
+today's first.
+
+**Alternatives rejected:** Blocking a same-day re-run outright at the admin
+endpoint. That would have removed the ability to simulate multiple days in a
+playtest, which is the thing that found this.
