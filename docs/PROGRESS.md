@@ -2643,3 +2643,51 @@ observation from rounds 1-3.
   mathematically cannot break a Lydorian Scow's shields. That arithmetic was
   computed at `PFIRDST` 7 and needs redoing at 5.
 - `SCRBONUS` still unimplemented (see the previous entry).
+
+---
+
+## Backlog — raised by the owner 2026-09-04, not yet started
+
+Two items to take up after the round-6 playtest. Recorded here so they survive
+the conversation.
+
+### 1. In-game help should follow canon's structure, not ours
+
+`MBMGEHLP.MSG` ships **61 help entries**; we have **8**.
+
+Canon's shape is one entry PER COMMAND — `HLPPHA`, `HLPWAR`, `HLPORB`,
+`HLPBUY`, `HLPSCA` … reached through a name table at `GECMDS.C:184-220` that
+maps `phaser` → `HLPPHA`, `navigate` → `HLPNAV` and so on — PLUS a set of
+concept pages a command name would never reach:
+
+    HLPSTART   HLPSTRAT   HLPGALXY   HLPSCORE   HLPCYBER
+    HLPWORM    HLPSECTR   HLPNAVIG   HLPPLANT   HLPBATTL
+    HLPBATT2   HLPBATT3   HLPPLAN2   HLPPLAN3   HLPCLS1-3
+    HLPINDEX   HLPNEW2
+
+Ours are eight thematic groups — navigation, combat, trade, planet, ship,
+maintenance, mail, comms — written from scratch. A player typing `hel phaser`,
+which the original answers, gets nothing here.
+
+Worth noting the standing rule while doing this: `MBMGEHLP.MSG` states design
+INTENT and is never authoritative for a NUMBER — the shipped configuration
+frequently contradicts it (the help says twice that Cybertrons will not attack
+an Interceptor unprovoked, while `S21LATK {0}` pursues every class). So follow
+canon's STRUCTURE and its prose, and check every figure against the C source
+and `GE/REL/MBMGESHP.MSG` before repeating it.
+
+Part of this is already done and can serve as the pattern: `hel planet` now
+carries canon's colony-upkeep block (food / troops / fighters / ion cannon)
+restored from `MBMGEHLP.MSG:205-228`.
+
+### 2. Scan and display formats, from the original
+
+The owner is content with what we have but wants to revisit whether the ASCII
+scan output, and the display conventions generally, should follow the original's
+rather than our own. Sources: `GECMDS.C` `cmd_scan` and its `SCAN*` messages,
+the `.MSG` layout strings, `reference/wiki/`, and `MBMGEGRF.C` — one of the four
+C files we did not originally have, which governs the display paths.
+
+Not a fidelity bug and not urgent. A deliberate deviation to be discussed and
+then either adopted or written into `docs/DECISIONS.md` as a considered choice
+rather than an accident.
