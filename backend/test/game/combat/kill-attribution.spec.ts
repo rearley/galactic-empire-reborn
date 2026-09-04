@@ -187,3 +187,38 @@ describe('CombatTickService — kill attribution (T053, FR-026)', () => {
     expect(bystander.kills).toBe(0);
   });
 });
+
+/**
+ * A collision names the body, and does so through kill resolution.
+ *
+ * The physics tick records `deathCause` on the ship; kill resolution is what
+ * turns that into an event the mail can read. A test that builds the event by
+ * hand proves the mail end and leaves THIS join uncovered — which is exactly
+ * where every previous version of this bug lived, so it is asserted here.
+ *
+ * Canon credits nobody for a collision: `ptr->damage = 101.0` (GEFUNCS.C:887)
+ * sets no `lastfired`, and killem's attribution block is guarded on
+ * `who >= 0` (:1105). We credit nobody either — we just say what happened
+ * instead of inventing "an unknown assailant".
+ */
+describe('CombatTickService — a collision is attributed to the body', () => {
+  it('emits weapon "gravity" and names the planet, ignoring a stale lastfiredBy', async () => {
+    const victim = makeShip({
+      userid: 'usr_v', shipno: 1, channel: 3, damage: 101,
+      // Shot at earlier, then flew into a planet. The planet killed them.
+      lastfired: -1,
+      lastfiredBy: { channel: 9, name: 'Trans-Gal #2128' },
+      deathCause: { kind: 'gravity', what: 'planet 1' },
+    });
+    const h = await makeHarness([victim]);
+    const destroyedEvents: CombatShipDestroyedEvent[] = [];
+    h.events.on(COMBAT_SHIP_DESTROYED, (e: CombatShipDestroyedEvent) => destroyedEvents.push(e));
+
+    h.fire();
+
+    expect(destroyedEvents).toHaveLength(1);
+    expect(destroyedEvents[0].weapon).toBe('gravity');
+    expect(destroyedEvents[0].attackerName).toBe('planet 1');
+    expect(destroyedEvents[0].attackerUserid).toBeNull();
+  });
+});

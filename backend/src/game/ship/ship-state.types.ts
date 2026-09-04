@@ -67,6 +67,17 @@ export interface ShipState {
    * still describes `lastfired`. @see attackerNameFromLastFired
    */
   lastfiredBy?: { channel: number; name: string };
+
+  /**
+   * What ended this ship, when it was not another captain. In-memory only,
+   * never persisted — it lives just long enough for kill resolution to read it.
+   *
+   * Canon credits nobody for a collision (GEFUNCS.C:887 sets damage 101 and no
+   * `lastfired`; killem's attribution is guarded on `who >= 0` at :1105), and
+   * neither do we. But the port's ship-loss mail has to say SOMETHING, and
+   * "an unknown assailant" invents an enemy out of a fact the server knew.
+   */
+  deathCause?: { kind: 'gravity'; what: string };
   shieldtype: number;
   shieldstat: number;
   shield: number;

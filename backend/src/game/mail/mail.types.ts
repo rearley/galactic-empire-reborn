@@ -113,6 +113,21 @@ export interface ShipLossPayload {
   killer: string;
   sectorX: number;
   sectorY: number;
+  /**
+   * What ended the ship, when it was not another captain.
+   *
+   * Canon credits nobody for a collision — `ptr->damage = 101.0`
+   * (GEFUNCS.C:887) sets no `lastfired`, and killem's attribution block is
+   * guarded on `who >= 0` (GEFUNCS.C:1105). But the port's mail has to SAY
+   * something, and saying "an unknown assailant" for a pilot who flew into a
+   * planet invents an enemy out of a fact the server knew exactly.
+   *
+   * Absent for an ordinary ship-vs-ship kill, where `killer` is the answer.
+   * Self-destruct is NOT listed: the `des` countdown is not implemented (it
+   * survives only as a comment in ship-tick.service.ts), so a branch for it
+   * would be unreachable code with a passing test implying coverage.
+   */
+  cause?: 'gravity';
 }
 
 export interface GenericPayload {

@@ -26,6 +26,12 @@ import { isAiUserid } from '../commands/helpers/ai-userid';
  * @see docs/DECISIONS.md — ship-loss mail
  */
 export const MESG_SHIPLOSS = 40 as const;
+/**
+ * A ship lost to a collision rather than to an enemy. A distinct message type
+ * because MailStat has no field for a cause and `type` is the one that is free
+ * — the inbox maps it back when it renders. @see mail-inbox.service.ts
+ */
+export const MESG_SHIPLOSS_GRAVITY = 41 as const;
 
 /**
  * Mails a player when one of their ships is destroyed.
@@ -65,7 +71,7 @@ export class ShipLossMailService implements OnModuleInit {
           userid: event.victimUserid,
           class: MAIL_CLASS_DISTRESS,
           msgno: this.nextMsgno(),
-          type: MESG_SHIPLOSS,
+          type: event.weapon === 'gravity' ? MESG_SHIPLOSS_GRAVITY : MESG_SHIPLOSS,
           stamp: Math.floor(Date.now() / 1000),
           topic: 'SHIP LOST',
           // A planet distress puts the PLANET in name1; this puts the killer
