@@ -525,7 +525,7 @@ export class CybertronTickService implements OnModuleInit {
     // the cone, bystanders and other AI included (`ingegame()` is TRUE for
     // GESTAT_AUTO). `target` only decides where the Cybertron is POINTING.
     // @see GECMDS.C:946-1004
-    const victims = selectPhaserVictims({
+    const { victims } = selectPhaserVictims({
       firer: ship,
       allShips: this.shipState.findAllShips(),
       degree: (ship.heading + ship.degrees) % 360,
