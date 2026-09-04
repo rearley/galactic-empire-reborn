@@ -78,6 +78,19 @@ export enum MessageId {
   SCAN24 = 'SCAN24',
   /** @see GE/REL/MBMGEMSG.MSG:3625 SCAN25 — sector-scan header, no range */
   SCAN25 = 'SCAN25',
+  // `sca sh` — the full intelligence report. @see GECMDS.C:2226-2258
+  SCAN01 = 'SCAN01',
+  SCAN01A = 'SCAN01A',
+  SCAN02 = 'SCAN02',
+  SCAN02A = 'SCAN02A',
+  SCAN03 = 'SCAN03',
+  SCAN03A = 'SCAN03A',
+  SCAN04 = 'SCAN04',
+  SCAN04A = 'SCAN04A',
+  SCAN05 = 'SCAN05',
+  SCAN06 = 'SCAN06',
+  SCAN07 = 'SCAN07',
+  SCAN07A = 'SCAN07A',
   SCAN08 = 'SCAN08',
   SCAN_DASHES = 'SCAN_DASHES',
   SCAN09 = 'SCAN09',
@@ -689,6 +702,19 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MINE6]: '***\nWARNING! WARNING!\nSensors indicate a neutron mine bearing %s, distance %s.',
   // Canon prints the raw range and no unit: `spr("%ld",(long)range)` while
   // `range` is still in coordinate units (GECMDS.C:2516, :2673).
+  // @see GE/REL/MBMGEMSG.MSG:3506-3547
+  [MessageId.SCAN01]: 'Scanning The %s',
+  [MessageId.SCAN01A]: 'Ship Class: %s',
+  [MessageId.SCAN02]: 'Commanded by: %s',
+  [MessageId.SCAN02A]: 'Alliance: %s',
+  [MessageId.SCAN03]: 'Bearing: %s Heading: %s Dist: %s',
+  [MessageId.SCAN03A]: 'Galactic Heading: %s Sect: %s %s',
+  [MessageId.SCAN04]: 'Speed: Warp %s',
+  [MessageId.SCAN04A]: 'Size: %sm long by %sm wide',
+  [MessageId.SCAN05]: 'Damage: %s damage',
+  [MessageId.SCAN06]: 'Shields: UP',
+  [MessageId.SCAN07]: 'Shields: DOWN',
+  [MessageId.SCAN07A]: 'Registered Kills: %s',
   [MessageId.SCAN24]: '   Range Scan Dist:%s (s:%s %s)',
   // The sector scan is always 1x and carries no range at all.
   [MessageId.SCAN25]: '   Sector Scan mag:1x (s:%s %s)',

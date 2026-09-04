@@ -26,6 +26,18 @@ import { scanShipColour } from './helpers/scan-ship-colour';
  *
  * @see GECMDS.C:3019 printmapfull — speed formatting
  */
+/**
+ * Canon's `showarp` — the bare figure, no unit word.
+ *   0 -> "0.00";  > warp 99.999 -> "Hyper";  else "%.2f" of speed/1000.
+ * The messages that use it supply the word: `SCAN04 {Speed: Warp %s`.
+ * @see GEFUNCS.C:2674
+ */
+export function showarp(speed: number): string {
+  if (speed === 0) return '0.00';
+  if (speed / 1000 > 99.999) return 'Hyper';
+  return (speed / 1000).toFixed(2);
+}
+
 function showarpDisplay(speed: number): string {
   if (speed === 0) return 'Stopped';
   if (speed < 1000) return 'Impulse';
@@ -143,7 +155,7 @@ function relativeBearing(
 @Injectable()
 export class ScanHandlerService implements OnModuleInit {
   private readonly logger = new Logger(ScanHandlerService.name);
-  private readonly classCache = new Map<number, { scanRange: number }>();
+  private readonly classCache = new Map<number, { scanRange: number; typeName: string; maxTons: number }>();
 
   /**
    * Per-player scantab state — keyed by `${userid}#${shipno}`.
@@ -202,10 +214,14 @@ export class ScanHandlerService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({
-      select: { classNumber: true, scanRange: true },
+      select: { classNumber: true, scanRange: true, typeName: true, maxTons: true },
     });
     for (const cls of classes) {
-      this.classCache.set(cls.classNumber, { scanRange: cls.scanRange });
+      this.classCache.set(cls.classNumber, {
+        scanRange: cls.scanRange,
+        typeName: cls.typeName,
+        maxTons: cls.maxTons,
+      });
     }
     this.logger.log(`Cached ${this.classCache.size} ship class scan ranges`);
   }
@@ -744,36 +760,61 @@ export class ScanHandlerService implements OnModuleInit {
       };
     }
     const bearing = relativeBearing(ship, target);
-    const ltr = target.status === 1 ? '+' : '=';
+    // SCAN03's second field is the RECIPROCAL bearing — where I am from HIM,
+    // using HIS heading (GECMDS.C:2223). Near zero means his nose is on you.
+    const reciprocal = Math.round(cbearing(target, ship, target.heading));
+    const targetClass = this.classCache.get(target.shpclass);
+    const maxTons = targetClass?.maxTons ?? 0;
 
     // C tells the scanned ship it was looked at, every time — reconnaissance
     // is never silent. @see GECMDS.C:2261-2280
     const announcement = this.buildScanAnnouncement(ship, target);
-    const briefLine: CommandResult['lines'][number] = {
-      text: `${ltr} ${target.shipname} — class ${target.shpclass}, range ${dist.toFixed(1)}, bearing ${bearing}.`,
-      category: 'info',
-    };
 
-    // S-008: reveal damage/shields/kills intel when NEITHER ship is at warp.
-    // GECMDS.C:2244-2256: gate is `warsptr->where != 1 && wptr->where != 1`.
-    // where === 1 is hyperspace/at-warp; orbit (>= 10) and normal (0) DO reveal intel.
+    // Canon's report, in canon's order. @see GECMDS.C:2226-2258
+    const lines: CommandResult['lines'] = [
+      { text: formatMessage(MessageId.SCAN01, target.shipname), category: 'info' },
+      { text: formatMessage(MessageId.SCAN01A, targetClass?.typeName ?? `class ${target.shpclass}`), category: 'info' },
+      { text: formatMessage(MessageId.SCAN02, target.userid), category: 'info' },
+    ];
+    // `if (warusroff(shpnum)->teamcode > 0)` — omitted entirely for a loner.
+    if ((target.teamcode ?? 0n) > 0n) {
+      lines.push({ text: formatMessage(MessageId.SCAN02A, String(target.teamcode)), category: 'info' });
+    }
+    lines.push(
+      { text: formatMessage(MessageId.SCAN03, bearing, reciprocal, Math.round(dist * 10000)), category: 'info' },
+      {
+        text: formatMessage(
+          MessageId.SCAN03A, Math.round(target.heading),
+          Math.floor(target.xcoord), Math.floor(target.ycoord),
+        ),
+        category: 'info',
+      },
+      // The field that decides whether a fight is possible at all: above 999 a
+      // torpedo cannot lock, and a target in hyperspace needs a Mark-PHATOWRP
+      // phaser to touch. The port omitted it, and a pilot burned several
+      // minutes shooting at a drone doing warp 5 with no way to know.
+      { text: formatMessage(MessageId.SCAN04, showarp(target.speed)), category: 'info' },
+      // `len = tons/32, wid = tons/96` — GECMDS.C:2240-2242
+      {
+        text: formatMessage(MessageId.SCAN04A, Math.trunc(maxTons / 32), Math.trunc(maxTons / 96)),
+        category: 'info',
+      },
+    );
+
+    // S-008: damage/shields/kills only when NEITHER ship is in hyperspace.
+    // @see GECMDS.C:2244-2256 `warsptr->where != 1 && wptr->where != 1`
     if (ship.where !== 1 && target.where !== 1) {
-      const dmgLabel = `Damage: ${damstr(target.damage)}`;
-      const shieldLabel =
-        target.shieldstat === 1 ? 'Shields: up' :
-        target.shieldstat === 3 ? 'Shields: damaged' :
-        'Shields: down';
-      const killsLabel = `Kills: ${target.kills}`;
-      return {
-        lines: [
-          briefLine,
-          { text: `${dmgLabel}  ${shieldLabel}  ${killsLabel}`, category: 'info' },
-        ],
-        broadcasts: announcement,
-      };
+      lines.push(
+        { text: formatMessage(MessageId.SCAN05, damstr(target.damage)), category: 'info' },
+        {
+          text: formatMessage(target.shieldstat === 1 ? MessageId.SCAN06 : MessageId.SCAN07),
+          category: 'info',
+        },
+        { text: formatMessage(MessageId.SCAN07A, target.kills), category: 'info' },
+      );
     }
 
-    return { lines: [briefLine], broadcasts: announcement };
+    return { lines, broadcasts: announcement };
   }
 
   /**
