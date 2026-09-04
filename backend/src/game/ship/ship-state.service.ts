@@ -93,13 +93,14 @@ export class ShipStateService implements OnModuleInit {
 
   /**
    * Hydrates the in-memory map from Postgres and registers the SHIP_UPDATE flush subscriber.
-   * Joins User.teamcode so ShipState.teamcode is populated from boot.
+   * Joins User.teamcode and User.kills so ShipState.teamcode and
+   * ShipState.userKills are populated from boot.
    * @see GEMAIN.C boot sequence — ships loaded before game loop starts
    * @see specs/012-social-commands/data-model.md §ShipState.teamcode
    */
   async onModuleInit(): Promise<void> {
     const [rows, classes] = await Promise.all([
-      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true } } } }),
+      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true, kills: true } } } }),
       this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true, maxTons: true } }),
     ]);
     const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));
@@ -108,6 +109,10 @@ export class ShipStateService implements OnModuleInit {
     for (const row of rows) {
       const state = prismaShipToState(row);
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
+      // Cumulative captain kills — what the Cybertron escalation gates read.
+      // Ship.kills is per-hull and resets on every replacement.
+      // @see GECYBS.C:441, :524; ShipState.userKills
+      if (row.user?.kills != null) state.userKills = row.user.kills;
       state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
       state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
       state.scanFull = (row.user?.options?.[2] ?? 0) === 1;

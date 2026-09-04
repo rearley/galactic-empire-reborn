@@ -395,3 +395,19 @@ export function shouldTaunt(rand: Random, odds: number): boolean {
 export function creditsAreOwed(userid: string): boolean {
   return userid.startsWith('Cybrg-');
 }
+
+
+/**
+ * The kill count the escalation gates read.
+ *
+ * Canon reads the USER record on both — `warusroff(usrn)->kills > CYB_BE_NICE`
+ * (GECYBS.C:441) and `warusroff(zothusn)->kills < CYB_BE_EASY` (:524) — not the
+ * ship's. The port passed `ship.kills`, which resets on every new hull, so a
+ * counter that has to reach 30 and then 60 was wiped every time a player died.
+ *
+ * Falls back to the hull count only when there is no captain behind it: AI
+ * ships have no User row, and `Ship.kills` is the only counter they have.
+ */
+export function escalationKills(ship: { kills: number; userKills?: number }): number {
+  return ship.userKills ?? ship.kills;
+}

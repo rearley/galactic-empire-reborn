@@ -205,6 +205,21 @@ export interface ShipState {
   teamcode?: bigint;
 
   /**
+   * Denormalised CUMULATIVE kill count cached from User.kills.
+   *
+   * `Ship.kills` (WARSHP.kills, GEMAIN.H:339) is per-hull and starts at zero on
+   * every replacement. Canon's Cybertron escalation reads the USER's counter --
+   * `warusroff(usrn)->kills > CYB_BE_NICE` (GECYBS.C:441) and
+   * `warusroff(zothusn)->kills < CYB_BE_EASY` (:524) -- which is WARUSR.kills
+   * (GEMAIN.H:298) and survives losing a ship.
+   *
+   * Hydrated at boot from User.kills, exactly as `teamcode` is. NOT persisted
+   * on Ship; re-derived on every hydrate. Undefined for AI ships, which have no
+   * User row.
+   */
+  userKills?: number;
+
+  /**
    * Transient auto-shield trigger — set when the ship exits warp (hyperspace=exit).
    * Consumed and cleared by ShipTickService.processShip on the next SHIP_UPDATE tick.
    * In-memory only, no schema impact.
