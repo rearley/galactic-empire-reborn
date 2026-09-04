@@ -20,6 +20,12 @@ import { ShipChannelRegistry, NO_CHANNEL } from './ship-channel.registry';
  * Marker in the escalated log line, so an operator (or a log alert) can match
  * on one string rather than on prose.
  */
+/**
+ * An empty torpedo/missile tracking slot. Canon tests `channel == 255`
+ * wherever it walks those arrays. @see GEFUNCS.C:1750-1775 cleartm
+ */
+const NO_CHANNEL_SLOT = 255;
+
 export const FLUSH_FAILURE_ALARM = 'SHIP FLUSH FAILING';
 
 /** Consecutive sweeps containing at least one failure before alarming once. */
@@ -88,6 +94,34 @@ export class ShipStateService implements OnModuleInit {
       // ship's name, and the freed channel it belonged to, so a kill this tick
       // can still say who did it.
       if (s.lastfired === freed) s.lastfired = NO_CHANNEL;
+
+      // cleartm(usrn) — a departing ship takes its ordnance with it. Canon runs
+      // this on every clean hangup (GEMAIN.C:1427) and it walks EVERY other
+      // ship clearing slots that carry the leaver's channel
+      // (GEFUNCS.C:1750-1775). Projectile slots live on the VICTIM keyed by the
+      // FIRER's channel, so without this a pilot could fire a volley, log off,
+      // and still get the kill.
+      //
+      // The sharper half is channel RECYCLING: `acquire` hands out the lowest
+      // free number, so an orphaned slot still holding channel 25 becomes the
+      // property of the next pilot given 25 — a newcomer who never fired gets
+      // credited. That is the same bug already fixed for `lastfired` directly
+      // above, one field over.
+      for (let i = 0; i < s.ltorpsChannel.length; i++) {
+        if (s.ltorpsChannel[i] === freed) {
+          s.ltorpsChannel[i] = NO_CHANNEL_SLOT;
+          s.ltorpsDistance[i] = 0;
+          s.dirty = true;
+        }
+      }
+      for (let i = 0; i < s.lmisslChannel.length; i++) {
+        if (s.lmisslChannel[i] === freed) {
+          s.lmisslChannel[i] = NO_CHANNEL_SLOT;
+          s.lmisslDistance[i] = 0;
+          s.lmisslEnergy[i] = 0;
+          s.dirty = true;
+        }
+      }
     }
   }
 
