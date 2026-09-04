@@ -419,8 +419,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true } });
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true, username: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
+        if (userRow?.username) state.username = userRow.username;
         // Cumulative captain kills, so a veteran boarding a fresh hull keeps
         // the Cybertron standing they earned. @see GECYBS.C:441, :524
         if (userRow?.kills != null) state.userKills = userRow.kills;
@@ -1073,6 +1074,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  /**
+   * A player's display handle, or null. Canon's `username()` names a player by
+   * their handle and an AI by its hull; ours caches the handle on ShipState.
+   * @see GEFUNCS.C:2596, src/game/ship/display-name.ts
+   */
+  private handleOf(shipKeyStr: string | null): string | null {
+    if (!shipKeyStr) return null;
+    const idx = shipKeyStr.lastIndexOf(':');
+    if (idx < 0) return null;
+    const ship = this.shipStateService.get(shipKeyStr.slice(0, idx), Number(shipKeyStr.slice(idx + 1)));
+    return ship?.username ?? null;
+  }
+
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     const keyParts = event.victimShipKey.split(':');
@@ -1080,6 +1094,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Read before the hull leaves memory a few lines below — the KILLEDBY
     // announcement at the end of this handler needs it for an AI victim.
     const victimShipName = this.shipNameOf(event.victimShipKey) ?? null;
+    // Same reason: canon's `username()` names a PLAYER by their handle
+    // (GEFUNCS.C:2596), and ours lives on ShipState.username. Capture it before
+    // the hull is evicted or the broadcast falls back to the account key —
+    // which is what a pilot saw: "destroyed by usr_27523ed6401c4e990dd98be2!!!"
+    const victimHandle = this.handleOf(event.victimShipKey);
     if (!isNaN(victimShipno)) {
       this.scanHandler.clearScantab(event.victimUserid, victimShipno);
     }
@@ -1193,12 +1212,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const killerLabel = !hasKillerShip
       ? null
       : event.attackerUserid && !isAiUserid(event.attackerUserid)
-        ? event.attackerUserid
+        ? (this.handleOf(event.attackerShipKey) ?? event.attackerUserid)
         : payload.attackerName;
     if (killerLabel) {
       const victimLabel = isAiUserid(event.victimUserid)
         ? (victimShipName ?? event.victimUserid)
-        : event.victimUserid;
+        : (victimHandle ?? event.victimUserid);
       // Everyone EXCEPT the pilot who just died, and except anyone who asked
       // not to hear it. Canon is `outwar(FILTER, usrn, 0)` (GEFUNCS.C:1117),
       // and both halves of that call matter:
