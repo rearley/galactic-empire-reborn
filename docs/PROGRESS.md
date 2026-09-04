@@ -2691,3 +2691,31 @@ C files we did not originally have, which governs the display paths.
 Not a fidelity bug and not urgent. A deliberate deviation to be discussed and
 then either adopted or written into `docs/DECISIONS.md` as a considered choice
 rather than an accident.
+
+### 3. Open question — does AI mine-laying crowd players out?
+
+Raised by the owner 2026-09-04, immediately after Cybertron mine-laying was
+implemented. Not a defect; a balance question that needs measuring first.
+
+`mines` is a single global table sized by `NUMMINES` (12) — `alcmem(nummines *
+sizeof(MINE))`, GEMAIN.C:754 — shared by every player, droid and Cybertron.
+`laymine` scans it for a free slot and returns 0 if there is none, which is why
+the refusal message is MINE2, "the mine launcher is temporarly jammed".
+
+With 24 Cybertrons each rolling 1-in-5 on the flee branch, plus droids, the AI
+could plausibly hold most of the twelve slots and a player typing `mine` would
+meet MINE2 every time. Canon has the identical dynamic, but canon was not
+running 24 Cybertrons against six players — the ratio is ours, not Murdock's.
+
+Mitigations already in place, all canon:
+- a Cybertron fuse is 10 ticks, about a minute, then the slot frees
+  (`laymine(ptr,usrn,10)`, GECYBS.C:315; the stomp at GEFUNCS.C:1491)
+- droids use a much longer fuse, so THEY are the ones that accumulate
+- the lay is gated behind a specific behavioural branch, not every tick
+
+**Measure before tuning.** The numbers that would settle it: mine-table
+occupancy sampled over a session, the share held by AI versus players, and how
+often a player's `mine` command is refused. Added to the observer's brief for
+the next round. If it does crowd players out, the honest levers are the AI's
+lay probability or the Cybertron population — NOT `NUMMINES`, which is canon
+and structural.
