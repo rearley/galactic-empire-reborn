@@ -5,6 +5,43 @@
  */
 import { PHASER_PRICE, SHIELD_PRICE, FIRST_CPU_CLASS } from '../handlers/new-ship.handler';
 import { SHIP_CLASSES } from '../../../../prisma/seed/ship-classes';
+import { CANON_HELP } from './canon-help.generated';
+
+/**
+ * Canon's per-command help pages, mapped to the verb a player types.
+ *
+ * 45 of canon's 61 entries document exactly one command, which is why MINFMT
+ * says "Type HELP MINE for the correct usage". The text is GENERATED from
+ * MBMGEHLP.MSG by tools/extract-help.mjs rather than paraphrased — canon's
+ * pages carry detail no summary keeps, like WHY you would use a narrow phaser
+ * spread or what happens to a lock as ship letters shuffle.
+ *
+ * Numbers in these pages are NOT authoritative: canon's help states design
+ * intent and MBMGEMSG.MSG is the source of truth. HLPNEW2 gets the Mark-19
+ * shield price wrong, which is why `newprice` is computed instead.
+ *
+ * Commands the port does not implement are simply absent from this map.
+ */
+const CANON_COMMAND_PAGES: Readonly<Record<string, string>> = Object.freeze({
+  abandon: 'HLPABA', abort: 'HLPABO', att: 'HLPATT', buy: 'HLPBUY',
+  cloak: 'HLPCLO', dec: 'HLPDEC', destruct: 'HLPDES', flu: 'HLPFLU',
+  fre: 'HLPFRE', hyp: 'HLPHYP', imp: 'HLPIMP', jam: 'HLPJAM',
+  jettison: 'HLPJET', loc: 'HLPLOC', mai: 'HLPMAI', min: 'HLPMIN',
+  mis: 'HLPMIS', nav: 'HLPNAV', new: 'HLPNEW', orb: 'HLPORB',
+  pha: 'HLPPHA', pln: 'HLPPLA', pri: 'HLPPRI', ren: 'HLPREN',
+  rep: 'HLPREP', ros: 'HLPROS', rot: 'HLPROT', sca: 'HLPSCA',
+  sel: 'HLPSEL', sen: 'HLPSEN', set: 'HLPSET', shi: 'HLPSHI',
+  spy: 'HLPSPY', tea: 'HLPTEA', tor: 'HLPTOR', tra: 'HLPTRA',
+  war: 'HLPWAR', zip: 'HLPZIP',
+});
+
+/** Canon's concept pages — the topics HELP INDEX lists separately. */
+const CANON_CONCEPT_PAGES: Readonly<Record<string, string>> = Object.freeze({
+  starting: 'HLPSTART', galaxy: 'HLPGALXY', sector: 'HLPSECTR',
+  communicate: 'HLPCOMMU', moving: 'HLPNAVIG', planets: 'HLPPLANT',
+  strategy: 'HLPSTRAT', battle: 'HLPBATTL', cybertron: 'HLPCYBER',
+  scoring: 'HLPSCORE', wormholes: 'HLPWORM',
+});
 
 export type HelpTopicId =
   | 'newprice'
@@ -420,6 +457,28 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
     body: CLASS_TABLE_BODY,
   },
 });
+
+/**
+ * Canon's page for a typed word, or null.
+ *
+ * Checked BEFORE the thematic topics, because canon's per-command page is the
+ * better answer: a player who typed `hel mine` while being hunted got our
+ * entire combat topic and had to find the one relevant line in it. Canon hands
+ * them the mine page, fuse range included.
+ *
+ * Three-character prefixes, because that is how the router matches commands
+ * (GECMDS.C:249 gesearch) — `hel torpedo`, `hel torp` and `hel tor` are the
+ * same question.
+ */
+export function canonHelpPage(query: string): ReadonlyArray<string> | null {
+  const q = query.toLowerCase();
+  const id =
+    CANON_COMMAND_PAGES[q] ??
+    CANON_CONCEPT_PAGES[q] ??
+    CANON_COMMAND_PAGES[q.slice(0, 3)];
+  if (!id) return null;
+  return CANON_HELP[id] ?? null;
+}
 
 export const HELP_TOPIC_IDS: ReadonlyArray<HelpTopicId> = Object.freeze(
   Object.keys(HELP_TOPICS) as HelpTopicId[],

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { HELP_TOPICS, HELP_TOPIC_ALIASES, HELP_TOPIC_IDS, HelpTopicId } from '../help/help-topics';
+import { HELP_TOPICS, HELP_TOPIC_ALIASES, HELP_TOPIC_IDS, HelpTopicId, canonHelpPage } from '../help/help-topics';
 import { ShipState } from '../../ship/ship-state.types';
 
 /**
@@ -29,6 +29,16 @@ export class HelpHandlerService {
       // A pilot looking for repair types `hel mai`, not `hel maintenance`.
       // Answering "Unknown help topic" there is what kept maintenance hidden.
       const raw = args[0].toLowerCase();
+
+      // Canon's own page first. 45 of its 61 entries document ONE command, and
+      // that page answers the question a player actually asked — `hel mine`
+      // should return the mine page, not the whole combat topic.
+      // @see MBMGEHLP.MSG, tools/extract-help.mjs
+      const canon = canonHelpPage(raw);
+      if (canon) {
+        return { lines: canon.map((line) => ({ text: line, category: 'info' as const })) };
+      }
+
       const topicKey = (HELP_TOPIC_ALIASES[raw] ?? raw) as HelpTopicId;
       const topic = HELP_TOPICS[topicKey];
       if (!topic) {
