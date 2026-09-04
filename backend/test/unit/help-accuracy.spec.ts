@@ -67,6 +67,13 @@ describe('help text matches the commands it documents', () => {
       for (const line of HELP_TOPICS[topic].body) {
         // Command lines are indented; the topic title is not.
         if (!line.startsWith('  ')) continue;
+        // A command line names a VERB, and every verb in this game is
+        // lowercase. Indented prose and the price tables added for
+        // `hel newprice` / `hel class` start with a capital or a digit, so
+        // this keeps the guard pointed at command definitions instead of
+        // flagging "Your old unit is traded in..." as an unknown command.
+        const first = line.trimStart()[0] ?? '';
+        if (first < 'a' || first > 'z') continue;
         const verb = line.trim().split(/[\s<]/)[0].toLowerCase();
         if (!verb || !/^[a-z]+$/.test(verb)) continue;
         if (!KNOWN_VERBS.has(verb.slice(0, 3))) unknown.push(`${topic}: ${verb}`);
