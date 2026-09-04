@@ -998,6 +998,8 @@ export class CybertronTickService implements OnModuleInit {
       ycoord,
       phasrtype: clsEntry?.maxPhaser ?? 1,
       shieldtype: clsEntry?.maxShields ?? 1,
+      // Without this the hull cannot move at all — see SpawnSlotInit.topspeed.
+      topspeed: clsEntry?.maxWarp ?? 1,
       loadout,
       cybskill,
       tick,

@@ -16,6 +16,16 @@ export interface SpawnSlotInit {
   ycoord: number;
   phasrtype: number;
   shieldtype: number;
+  /**
+   * The class's max warp. REQUIRED, and not defaulted, on purpose.
+   *
+   * Prisma declares `topspeed Int @default(0)` and this field was simply never
+   * written, so every Cybertron ever spawned had topspeed 0 — and every speed
+   * order in `cybLives` is derived from it, so all 24 in a live galaxy sat
+   * motionless for the whole of round 4. Canon assigns it at ship creation,
+   * `tmpshp.topspeed = shipclass[tmpshp.shpclass].max_warp` (GEFUNCS.C:278).
+   */
+  topspeed: number;
   loadout: CybertronLoadout;
   cybskill: number;
   tick: number;
@@ -100,6 +110,17 @@ export class CybertronRepository {
    * @see GECYBS.C:148-185 cyb_init — ship row construction
    */
   async createSpawn(slot: SpawnSlotInit): Promise<void> {
+    // A Cybertron with no top speed is furniture: every speed order in
+    // `cybLives` derives from it, so the ship rotates on the spot forever and
+    // the whole AI silently does nothing. That was the live state of all 24
+    // Cybertrons through round 4, and nothing caught it — so it fails loudly
+    // here rather than shipping a motionless hunter.
+    if (!(slot.topspeed > 0)) {
+      throw new Error(
+        `Cybertron ${slot.userid}:${slot.shipno} (class ${slot.classNumber}) `
+        + `spawned with topspeed ${slot.topspeed} — it would never move.`,
+      );
+    }
     const cash = this.clampCybertronCash(BigInt(slot.loadout.gold));
 
     await this.prisma.$transaction(async (tx) => {
@@ -123,6 +144,7 @@ export class CybertronRepository {
         phasr: 100,
         phasrtype: slot.phasrtype,
         shieldtype: slot.shieldtype,
+        topspeed: slot.topspeed,
         cybmine: 255,
         cybskill: slot.cybskill,
         tick: slot.tick,

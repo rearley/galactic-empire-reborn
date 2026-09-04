@@ -41,11 +41,13 @@ async function buildHarness(seed = 1) {
     setClass: (n: number, e: ReturnType<ShipClassCacheService['get']>) => classCache.set(n, e),
   } as unknown as ShipClassCacheService & { setClass: (n: number, e: unknown) => void };
 
-  const createdSpawns: Array<{ classNumber: number; userid: string; shipno: number }> = [];
+  const createdSpawns: Array<{ classNumber: number; userid: string; shipno: number; topspeed: number }> = [];
   const repository = {
     hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
-      createdSpawns.push({ classNumber: slot.classNumber, userid: slot.userid, shipno: slot.shipno });
+    createSpawn: jest.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number; topspeed: number }) => {
+      createdSpawns.push({
+        classNumber: slot.classNumber, userid: slot.userid, shipno: slot.shipno, topspeed: slot.topspeed,
+      });
       const ship: ShipState = {
         userid: slot.userid, shipno: slot.shipno, shipname: `Cybrg-${slot.shipno}`,
         shpclass: slot.classNumber, status: 2, tick: slot.tick,
@@ -104,7 +106,7 @@ async function buildHarness(seed = 1) {
     }
   }
 
-  return { shipMap, createdSpawns, fireTick };
+  return { shipMap, createdSpawns, fireTick, classCache };
 }
 
 // ─── T020c: spawn-fill timing ─────────────────────────────────────────────────
@@ -173,5 +175,31 @@ describe('T020c (SC-001) — spawn-fill: all AI classes reach tot_to_create with
 
     expect(class24Count).toBe(CYBERTRON_CLASS_DEFAULTS[24].tot_to_create); // 6
     expect(class25Count).toBe(CYBERTRON_CLASS_DEFAULTS[25].tot_to_create); // 2
+  });
+});
+
+
+/**
+ * The slot the tick service BUILDS must carry a usable top speed.
+ *
+ * The repository throws on topspeed <= 0, but nothing exercised that path with
+ * a real repository, so a caller passing 0 shipped happily — which is exactly
+ * what happened: `shipData` never wrote the field, all 24 Cybertrons in the
+ * round-4 galaxy had topspeed 0, and every one of them sat motionless for the
+ * entire session while the AI ran normally around them.
+ *
+ * @see GEFUNCS.C:278 tmpshp.topspeed = shipclass[tmpshp.shpclass].max_warp
+ */
+describe('spawned Cybertrons can move', () => {
+  it('passes the class max warp into every spawn slot', async () => {
+    const { createdSpawns, fireTick, classCache } = await buildHarness(1);
+    await fireTick(150);
+
+    expect(createdSpawns.length).toBeGreaterThan(0);
+    for (const s of createdSpawns) {
+      const expected = classCache.get(s.classNumber)?.maxWarp;
+      expect([s.classNumber, s.topspeed]).toEqual([s.classNumber, expected]);
+      expect(s.topspeed).toBeGreaterThan(0);
+    }
   });
 });

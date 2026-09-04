@@ -132,6 +132,7 @@ function makeSpawnSlot(userid: string, shipno: number): SpawnSlotInit {
     userid,
     shipno,
     classNumber: 21,
+    topspeed: 8,
     shipname: `Cybrg-spawn-${shipno}${shipno}`,
     xcoord: 5.0,
     ycoord: 5.0,
