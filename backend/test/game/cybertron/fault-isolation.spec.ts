@@ -73,7 +73,7 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
         emulate: 0,
         minesnear: 0,
         lock: 0,
-        topspeed: 8000,
+        topspeed: 8,
         warncntr: 0,
         navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
@@ -88,6 +88,7 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
       userid: 'Cybrg-bad',
       shipno: 999,
       shipname: 'Bad',
+      // domain-ok: no such class — this test proves one bad ship cannot abort the batch
       shpclass: 999, // not in class cache — will throw on getMaxPhaser
     };
     ships.push(badShip);
