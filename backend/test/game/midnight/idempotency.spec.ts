@@ -1,6 +1,7 @@
 /**
  * T028 — Idempotency: running MidnightService.run() twice produces identical
- * User/Team state and exactly doubles MailStat row count.
+ * User/Team state and, since 2026-09-04, does NOT re-mail the production
+ * reports — the message number is derived from the run date and the planet.
  *
  * SC-003 / FR-003: The only divergence on a second run is duplicate MailStat
  * rows from phase 2 (explicitly accepted per spec).
@@ -104,7 +105,7 @@ describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {
     expect(bob2.rospos).toBe(bob1.rospos);
   });
 
-  it('MailStat row count exactly doubles on second run (FR-003)', async () => {
+  it('MailStat row count is UNCHANGED by a second run (FR-003, amended)', async () => {
     await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
     await prisma.planet.create({
       data: {
@@ -128,7 +129,10 @@ describe('idempotency — two runs on same fixture (SC-003/FR-003)', () => {
 
     await service.run();
     const afterRun2 = await prisma.mailStat.count();
-    expect(afterRun2).toBe(2);
+    // Was `toBe(2)`. The message number is now the run date plus the planet's
+    // own identity, so a same-day re-run collides on the primary key and
+    // inserts nothing. @see productionMailMsgno
+    expect(afterRun2).toBe(1);
   });
 
   it('Team state is identical on second run', async () => {

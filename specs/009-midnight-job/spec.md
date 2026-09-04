@@ -254,7 +254,7 @@ applied to the Droid (which has no persisted user record).
   per source; teams beyond the cap are not scored.
 - Two midnight invocations fire close together (clock anomaly, manual
   re-trigger) — second invocation produces identical end state and produces
-  a second batch of production-report mail (FR-003).
+  NO additional mail (FR-003, amended 2026-09-04).
 - Mail purge runs against a database with no mail — completes silently with
   zero deletions.
 - A team has exactly one member whose score is zero — team score = `TEAMBONU
@@ -288,8 +288,15 @@ applied to the Droid (which has no persisted user record).
   on success so subsequent self-heal logic does not re-run.
 - **FR-003**: The midnight pass MUST be idempotent — running it twice in
   succession against the same starting state MUST produce equivalent end
-  state on the user, planet, mail, and team data (the only legitimate
-  difference is duplicate production-report mail rows from the second run).
+  state on the user, planet, mail, and team data. **Amended 2026-09-04:** this
+  requirement used to carve out "duplicate production-report mail rows from the
+  second run" as legitimate. It is not. The carve-out had no stated
+  justification, it contradicted CLAUDE.md's flat requirement that two runs
+  produce identical results, and round 5 showed the cost — five nights left one
+  player holding 36 copies of the same report with their real distress mail
+  buried underneath. Production-report message numbers are now derived from the
+  run date and the planet, so a re-run collides on the primary key and inserts
+  nothing.
 - **FR-004**: The midnight pass MUST run inside a single database
   transaction so partial failure rolls back cleanly.
 - **FR-004a**: The midnight pass MUST acquire a Postgres advisory lock

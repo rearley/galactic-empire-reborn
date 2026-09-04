@@ -12,7 +12,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { valuePlanet } from './value-pl';
-import { buildProductionMailStat } from './mailstat-builder';
+import { buildProductionMailStat, productionMailMsgno } from './mailstat-builder';
 import { PLTVCASH, PLTVDIV, TEAMBONU } from './midnight.constants';
 import { PLTYPE_PLNT } from '../constants';
 import { BASEPRICE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
@@ -67,7 +67,10 @@ export class MidnightRepository {
    *
    * @see GEMAIN.C:1120-1170 — phase-2 planet walk
    */
-  async processOwnedPlanets(tx: TxClient): Promise<{ planetsProcessed: number; mailReportsCreated: number }> {
+  async processOwnedPlanets(
+    tx: TxClient,
+    runDate: Date = new Date(),
+  ): Promise<{ planetsProcessed: number; mailReportsCreated: number }> {
     const planets = await tx.planet.findMany({
       where: {
         type: PLTYPE_PLNT,
@@ -90,7 +93,6 @@ export class MidnightRepository {
 
     let planetsProcessed = 0;
     const mailRows: ReturnType<typeof buildProductionMailStat>[] = [];
-    const nowMs = BigInt(Date.now());
 
     for (let i = 0; i < planets.length; i++) {
       const planet = planets[i];
@@ -118,8 +120,10 @@ export class MidnightRepository {
         plscore: existing.plscore + plScore,
       });
 
-      // Build MailStat row (insert later in batch)
-      const msgno = nowMs + BigInt(i);
+      // Build MailStat row (insert later in batch).
+      // The message number is derived from the DAY and the PLANET, not the
+      // clock, so re-running a night collides on the primary key and inserts
+      // nothing. @see productionMailMsgno
       mailRows.push(buildProductionMailStat(
         {
           userid: uid,
@@ -131,7 +135,7 @@ export class MidnightRepository {
           tax: planet.tax,
           itemsQty: planet.itemsQty,
         },
-        msgno,
+        productionMailMsgno(runDate, planet),
       ));
       planetsProcessed++;
     }
@@ -153,7 +157,13 @@ export class MidnightRepository {
     // Batch MailStat inserts in chunks to avoid parameter limits
     const MAIL_BATCH = 50;
     for (let i = 0; i < mailRows.length; i += MAIL_BATCH) {
-      await tx.mailStat.createMany({ data: mailRows.slice(i, i + MAIL_BATCH) });
+      // skipDuplicates makes a same-day re-run a no-op rather than a second
+      // set of reports. Five nights of testing left one player holding 36
+      // copies of the same report, with their real distress mail underneath.
+      await tx.mailStat.createMany({
+        data: mailRows.slice(i, i + MAIL_BATCH),
+        skipDuplicates: true,
+      });
     }
 
     return { planetsProcessed, mailReportsCreated: mailRows.length };
