@@ -18,6 +18,7 @@ import {
   withinArc,
 } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
+import { selectPhaserVictims } from '../../combat/firep';
 import {
   COMBAT_HIT,
   COMBAT_MISS,
@@ -216,34 +217,20 @@ export class PhaserHandlerService {
       category: 'combat',
     });
 
-    for (const candidate of allShips) {
-      // Skip self
-      if (candidate.userid === ship.userid && candidate.shipno === ship.shipno) continue;
-      // Skip not ingame
-      if (candidate.status !== 1 && candidate.status !== 2) continue;
+    // One shared `firep` selection, used by the AI path too: canon has exactly
+    // one of these and the port's two copies had already drifted apart once.
+    // @see src/game/combat/firep.ts, GECMDS.C:946-1004
+    const selected = selectPhaserVictims({
+      firer: ship,
+      allShips,
+      degree,
+      focus,
+      phasrCharge,
+      scanRange,
+      maxTonsFor: (c) => this.shipClassCache.getMaxTons(c),
+    });
 
-      const victimAtWarp = candidate.speed >= WARP_THRESHOLD;
-      // Victim-at-warp gate: only hit a warping victim if phasrtype >= PHATOWRP (GECMDS.C:949).
-      if (victimAtWarp && ship.phasrtype < PHATOWRP) continue;
-      // Victims inside the neutral zone are immune (GECMDS.C:951).
-      if (isInNeutralZone(candidate)) continue;
-      // C-001 audit 022: phasers must not reach beyond the firer's scanner range.
-      // @see GECMDS.C:946-1004 firep  @see specs/022-fidelity-audit-v2/findings.md C-001
-      if (!inScanRange(ship, candidate, scanRange)) continue;
-      if (!lineOfFire(ship, candidate, degree, focus)) continue;
-
-      const distRaw = cdistance(ship, candidate) * 10000;
-      const damage = phaserDamage({
-        phasrtype: ship.phasrtype,
-        phasr: phasrCharge,
-        distRaw,
-        focus,
-        victimMaxTons: this.shipClassCache.getMaxTons(candidate.shpclass),
-        victimAtWarp,
-      });
-      // C: `if (damage >= 1)` gates the hit.
-      if (damage < 1) continue;
-
+    for (const { victim: candidate, damage } of selected) {
       // A hit on a Cybertron makes you its target, overriding whatever it was
       // chasing and the noClaim rules. Without this, PvE was pure proximity:
       // you could not pull one off a teammate, and one you shot ignored you.

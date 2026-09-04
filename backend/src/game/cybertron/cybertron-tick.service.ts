@@ -60,6 +60,7 @@ import {
   CombatShipDestroyedEvent,
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
+import { selectPhaserVictims } from '../combat/firep';
 import {
   CYBERTRON_SCORED_KILL,
   CybertronScoredKillEvent,
@@ -520,63 +521,62 @@ export class CybertronTickService implements OnModuleInit {
       });
     }
 
-    const dist = cdistance(ship, target);
-    // firep's per-victim gate: a ship in hyperspace is unreachable unless the
-    // shooter carries a Mark-PHATOWRP phaser or better
-    // (GECMDS.C:949, `wptr->where != 1 || ptr->phasrtype >= phatowrp`).
-    // The player's handler enforced this and the AI paths did not, so any
-    // droid or Cybertron could shoot a player in transit — shields down on
-    // entry, `sca` refused, nothing to fire back with.
-    if (!aiCanHitTarget({ phasrtype: ship.phasrtype, targetWhere: target.where })) return;
+    // firep sweeps the ARC, not a target: one discharge reaches every ship in
+    // the cone, bystanders and other AI included (`ingegame()` is TRUE for
+    // GESTAT_AUTO). `target` only decides where the Cybertron is POINTING.
+    // @see GECMDS.C:946-1004
+    const victims = selectPhaserVictims({
+      firer: ship,
+      allShips: this.shipState.findAllShips(),
+      degree: (ship.heading + ship.degrees) % 360,
+      focus: ship.percent,
+      phasrCharge: ship.phasr,
+      scanRange: scanRangeGate,
+      maxTonsFor: (c) => this.shipClassCache.getMaxTons(c),
+    });
 
-    if (lineOfFire(ship, target, bearing, 0)) {
-      const damage = phaserDamage({
-        phasrtype: ship.phasrtype,
-        phasr: ship.phasr,
-        distRaw: dist * 10000,
-        focus: 0,
-        victimMaxTons: this.shipClassCache.getMaxTons(target.shpclass),
-        victimAtWarp: target.speed >= WARP_THRESHOLD,
-      });
-      // C wraps the ENTIRE consequence block in `if (damage >= 1)`
-      // (GECMDS.C:975-999): below one point nothing is applied and nothing is
-      // printed. Without the gate a Cybertron grazing a ship for zero damage
-      // still set `lastfired` and `cantexit = FIRETICKS`, and ship-tick zeroes
-      // `repair` whenever `cantexit > 0` — so a damaged pilot in scanner range
-      // could never finish a repair.
-      if (damage < 1) return;
+    for (const { victim, damage } of victims) {
+      // A hit on an AI makes it turn on the shooter, overriding whatever it was
+      // chasing — this is what turns stray fire into a fight rather than silent
+      // chip damage. @see GECMDS.C:980-981
+      if (victim.status === GESTAT_AUTO) {
+        this.shipState.mutate(victim.userid, victim.shipno, (v) => {
+          v.cybmine = ship.channel ?? NO_CHANNEL;
+        });
+      }
 
-      // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
-    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
-    // raised on an empty capacitor still absorbs the next hit in full —
-    // and blows on it. Requiring charge > 0 here handed full hull damage
-    // to anyone who had just raised shields.
-    const shieldUp = target.shieldstat === 1;
+      const shieldUp = victim.shieldstat === 1;
       let hullDamage = damage;
       let shieldConsumed = 0;
 
       if (shieldUp) {
-        const result = shieldhit(target.shield, target.shieldtype, damage);
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
+        const result = shieldhit(victim.shield, victim.shieldtype, damage);
+        this.shipState.mutate(victim.userid, victim.shipno, (v) => {
           v.shield = result.newCharge;
           // @see GEFUNCS.C:2459-2462 — SHIELDDM, not plain "down".
           if (result.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          // Name the firer where the damage lands: a channel scrub on logout
+          // would otherwise leave the loss mail with nobody to blame. The AI
+          // path never set this, so a player killed by a Cybertron got
+          // "an unknown assailant". @see attackerNameFromLastFired
+          v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
         shieldConsumed = result.shieldConsumed;
       } else {
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
+        this.shipState.mutate(victim.userid, victim.shipno, (v) => {
           v.damage = v.damage + hullDamage;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
           v.cantexit = FIRETICKS;
         });
       }
 
       const hitEvent: CombatHitEvent = {
         attackerId,
-        victimId: shipKey(target.userid, target.shipno),
+        victimId: shipKey(victim.userid, victim.shipno),
         weapon: 'phaser',
         damageHull: hullDamage,
         damageShield: shieldConsumed,
@@ -585,8 +585,8 @@ export class CybertronTickService implements OnModuleInit {
       };
       this.events.emit(COMBAT_HIT, hitEvent);
 
-      // @see GEFUNCS.C:randamage — called after every Cybertron phaser hit (GECYBS.C → GECMDS.C:999)
-      applyRandamageAndEmit(this.random, this.events, this.shipClassCache, target, sector, tickAt);
+      // @see GEFUNCS.C:randamage — after every phaser hit (GECMDS.C:999)
+      applyRandamageAndEmit(this.random, this.events, this.shipClassCache, victim, sector, tickAt);
     }
 
     ship.phasr = 0;

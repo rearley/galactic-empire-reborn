@@ -59,12 +59,31 @@ describe('firep\'s hyperspace gate applies to the AI too', () => {
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-describe('both AI fire paths call it', () => {
-  it.each([
-    ['src/game/droid/droid-tick.service.ts', 'droids'],
-    ['src/game/cybertron/cybertron-tick.service.ts', 'Cybertrons'],
-  ])('%s (%s)', (path) => {
-    const text = readFileSync(resolve(__dirname, '../../..', path), 'utf8');
+describe('both AI fire paths are gated', () => {
+  it('droids call the helper directly', () => {
+    const text = readFileSync(
+      resolve(__dirname, '../../..', 'src/game/droid/droid-tick.service.ts'), 'utf8');
     expect(text).toMatch(/(?<![\w$])aiCanHitTarget\s*\(/);
+  });
+
+  /**
+   * Cybertrons no longer call the helper by name. Their phaser now goes through
+   * the shared `firep` selection, which applies the same rule inline for every
+   * ship in the arc — canon's `wptr->where != 1 || ptr->phasrtype >= phatowrp`
+   * (GECMDS.C:949). Asserting the wiring rather than the identifier: the path
+   * must reach the shared selection, and that selection must carry the gate.
+   * The BEHAVIOUR is pinned in test/game/cybertron/ai-fire-arc.spec.ts.
+   */
+  it('Cybertrons go through the shared firep selection', () => {
+    const text = readFileSync(
+      resolve(__dirname, '../../..', 'src/game/cybertron/cybertron-tick.service.ts'), 'utf8');
+    expect(text).toMatch(/(?<![\w$])selectPhaserVictims\s*\(/);
+  });
+
+  it('and that selection gates on the hyperspace flag', () => {
+    const text = readFileSync(
+      resolve(__dirname, '../../..', 'src/game/combat/firep.ts'), 'utf8');
+    expect(text).toMatch(/where === 1/);
+    expect(text).toMatch(/PHATOWRP/);
   });
 });

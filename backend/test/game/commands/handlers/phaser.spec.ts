@@ -379,8 +379,13 @@ describe('pha command semantics (Plan 1 T5)', () => {
     // gate disabled, a starter Interceptor's Mark-1 could shoot a ship that had
     // jumped to warp, and "run away" did not work for anyone.
 
+    // `where: 1` goes WITH the speed. Canon's gate reads `wptr->where`
+    // (GECMDS.C:949), not the raw speed, and the physics tick flips the flag
+    // exactly at WARP_THRESHOLD — so a fixture carrying warp speed and
+    // `where: 0` describes a ship that cannot exist. Both phaser paths now
+    // share one selection (combat/firep.ts) and both read `where`.
     const warpVictimAt = (dist: number) =>
-      makeShip({ userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - dist, speed: 2000, damage: 0 });
+      makeShip({ userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - dist, speed: 2000, where: 1, damage: 0 });
 
     it('a below-threshold phaser cannot touch a victim at warp', () => {
       expect(PHATOWRP).toBeGreaterThan(1);
@@ -411,7 +416,10 @@ describe('pha command semantics (Plan 1 T5)', () => {
           userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: PHATOWRP,
         });
         const victim = makeShip({
-          userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed, damage: 0,
+          userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed,
+          // The hyperspace flag rides with the speed — see warpVictimAt above.
+          where: speed >= 1000 ? 1 : 0,
+          damage: 0,
         });
         const h = makeHarness([firer, victim]);
         h.handler.command.handler(firer, ['0', '0'], ctx);
