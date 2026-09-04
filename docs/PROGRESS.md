@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 64 entries.
+Append-only, **newest at the bottom**. 65 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 64 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-04 (evening) — the owner played, and it found what the suite could not](#2026-09-04-evening--the-owner-played-and-it-found-what-the-suite-could-not)
 - [2026-09-04 — round 6, and the fix that broke persistence](#2026-09-04-round-6-and-the-fix-that-broke-persistence)
 - [2026-09-02 — the full original distribution, and a canon re-baseline](#2026-09-02-the-full-original-distribution-and-a-canon-re-baseline)
 - [2026-09-02 — fourth playtest: five personas in one shared world](#2026-09-02-fourth-playtest-five-personas-in-one-shared-world)
@@ -2795,3 +2796,59 @@ Both verified by mutation.
 - Owner's backlog unchanged: canon-shaped help (61 entries vs our 8) and scan/UI
   display formats, both to discuss before changing. `set scannames` defaulting on
   belongs to that conversation.
+
+---
+
+## 2026-09-04 (evening) — the owner played, and it found what the suite could not
+
+**Completed:** A live session by the project owner produced more real defects in
+three hours than the 4,800-test suite had surfaced all week. Every item below
+was found by playing, not by testing.
+
+1. **`sca sh` printed one line and no SPEED.** Canon's is a ten-line report
+   (GECMDS.C:2226-2258) and speed is the field that decides whether a fight is
+   even possible: above 999 a torpedo cannot lock, and a target in hyperspace
+   needs a Mark-PHATOWRP phaser. The owner spent minutes shooting a drone doing
+   warp 5 with nothing in the game able to say it was moving. Restored in full,
+   including SCAN03's reciprocal bearing ("is his nose on me?").
+2. **"Phasers fired — no targets in arc" when the target was dead ahead.** It
+   was excluded by the hyperspace gate, not the arc. Canon prints no summary at
+   all here; ours was invented, and an invented line that states something false
+   is worse than canon's silence.
+3. **Mines were never drawn on any scan** — `type: 'mine'` appeared nowhere in
+   the backend, while two comments described a mine layer and its precedence.
+   And the frontend filled empty cells with `.`, which is canon's MINE glyph, so
+   the two bugs hid each other.
+4. **`hel mine` said "Unknown help topic".** Canon has 61 help pages and 45
+   document one command each — which is why MINFMT says "Type HELP MINE for the
+   correct usage". All 61 are now generated from MBMGEHLP.MSG by
+   tools/extract-help.mjs and pinned by a test that re-reads the original.
+   Plus `hel newprice` / `hel class`, computed from the option data because
+   HLPNEW2 gets the Mark-19 shield price wrong.
+5. **The galaxy announced a player's account key** — "destroyed by
+   usr_27523ed6...". Canon's `username()` names AI by hull and players by their
+   handle; ours printed the synthetic primary key.
+6. **`cleartm` was missing.** A departing ship's in-flight torpedoes stayed in
+   their victims' slots, and since channels are recycled, an orphaned slot
+   became the property of the next pilot handed that channel number.
+7. Scan headers (SCAN24/SCAN25), the `pc` unit that meant two things 10,000x
+   apart, `MINE6`, `MINE3`'s fuse, the side-panel table, and `showarp`.
+8. **PLTVCASH restored to canon's 10** — we were paying 100x. Its DECISIONS.md
+   justification was "the shipped values ... we do not have", which expired the
+   day the distribution was vendored.
+
+**Tests:** 4,812 backend / 465 suites; 165 frontend / 22 files.
+
+**Settled, not changed:** 22 of 24 Cybertrons sit at warp. That is canon, not a
+side effect of the afternoon's pursuit fix — idle wander is
+`speed2b = rndm(d_topspeed)` (GECYBS.C:473) and a uniform roll to a topspeed in
+the thousands lands sub-warp only 6.7-12.5% of the time. Expected ~2.4
+reachable of 24; measured 2. Cybertrons are the predator, not the prey; droids
+are the prey, and the Lydorian Scow is hard-capped at 999.9 so it can never run.
+
+**Known issues / next:**
+- The remaining canon-vs-port message sweep. Four invented messages were found
+  one at a time in play; a systematic pass over MBMGEMSG.MSG would be cheaper.
+- Canon's help pages are now shipped verbatim, but pages describing commands we
+  implement differently are not yet reconciled.
+- AI mine crowding, and the unexplained Obliterator kill — both want a playtest.
