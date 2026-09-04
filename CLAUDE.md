@@ -55,7 +55,20 @@ Postgres is the durable store — flushed async, not on every tick.
 
 ### Galaxy
 
-- 30x15 sector grid (`MAXX=30`, `MAXY=15` from `GEMAIN.H`)
+- **`MAXX=30` / `MAXY=15` are NOT the size of the galaxy.** They are the
+  character dimensions of the ASCII scan map — `map[MAXY][MAXX]`, centred with
+  `map[MAXY/2][MAXX/2] = '*'` (`GECMDS.C:2569`), with the scan's range divided
+  across them as `xfactor = range/(MAXX-1.0)` (`GECMDS.C:2526-2527`). They are a
+  viewport, and they never move.
+- The galaxy is a square running `-UNIVMAX..+UNIVMAX` on both axes
+  (`univmax = numopt(UNIVMAX,10,32767)`, `GEMAIN.C:474`). Canon's default is
+  **300**; we deploy at **100** — a deliberate, documented deviation, see
+  `docs/DECISIONS.md`.
+- Anything expressed in sectors that must stay proportional to the world —
+  scan projection above all — is therefore **coupled to `UNIVMAX`** and has to
+  move with it. Reading `MAXX`/`MAXY` as the galaxy is a mistake this project
+  has now made three times: it once capped every weapon gate at 7.5 sectors,
+  and in round 6 it produced three false defect reports in a single session.
 - Ships use floating-point x/y coordinates within the universe (`COORD` struct)
 - Procedurally generated on first boot — not converted from original Btrieve `.DAT` files
 - Must include: neutral zone at origin, wormholes, varied sector types, planet placement
