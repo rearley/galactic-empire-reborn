@@ -80,7 +80,7 @@ describe('MineHandlerService — `min`', () => {
     const h = makeHarness([alice]);
 
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_DEPLOYED));
+    expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
 
     expect(h.repo.create).toHaveBeenCalledWith({
       channel: 7,

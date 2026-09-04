@@ -38,6 +38,11 @@ export function showarp(speed: number): string {
   return (speed / 1000).toFixed(2);
 }
 
+/**
+ * The port's own Stopped/Impulse/Warp wording. Canon's side panel uses
+ * `showarp` (GECMDS.C:3061), which is why this is no longer called from the
+ * scan row — kept only for callers that genuinely want the prose form.
+ */
 function showarpDisplay(speed: number): string {
   if (speed === 0) return 'Stopped';
   if (speed < 1000) return 'Impulse';
@@ -452,7 +457,7 @@ export class ScanHandlerService implements OnModuleInit {
         bearing: entry.bearing,
         // Already relative and signed from scantab; see its `heading` docs.
         heading: entry.heading,
-        speedDisplay: showarpDisplay(entry.speed),
+        speedDisplay: showarp(entry.speed),
       };
       if (ship.scanNames && other) {
         row.name = other.shipname;

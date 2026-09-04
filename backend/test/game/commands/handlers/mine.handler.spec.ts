@@ -114,7 +114,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 12, ycoord: 34 });
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, ['45'], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_DEPLOYED));
+    expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
     expect(h.repo.create).toHaveBeenCalledWith(expect.objectContaining({ timer: 45 }));
   });
 
@@ -138,7 +138,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 12, ycoord: 34 });
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_DEPLOYED));
+    expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
     expect(h.repo.create).toHaveBeenCalledWith(expect.objectContaining({ timer: 30 }));
   });
 
@@ -159,7 +159,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const h = makeHarness([alice]);
 
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_DEPLOYED));
+    expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
 
     expect(h.repo.create).toHaveBeenCalledWith({
       channel: 7,

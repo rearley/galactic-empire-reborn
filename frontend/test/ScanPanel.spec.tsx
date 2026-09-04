@@ -1,3 +1,6 @@
+// Canon's side-panel row is a FIXED-WIDTH table under the PLUSFULL column
+// labels (GECMDS.C:3061, MBMGEMSG.MSG:3683) — "  A     120     45     270",
+// not "A 120 Brg:45 Hdg:270". The Brg:/Hdg: labels were ours.
 // Canon's side-panel row prints the raw distance with NO unit:
 // `prf("  %c  %s   %4d    %4d    %s\r", ...)` with spr("%ld",(long)dist)
 // (GECMDS.C:3061). 'pc' was ours, and it labelled raw coordinate units as
@@ -246,8 +249,8 @@ describe('ScanPanel', () => {
 
     const rowA = screen.getByTestId('side-panel-row-A');
     expect(rowA.textContent).toContain('120');
-    expect(rowA.textContent).toContain('Brg:45');
-    expect(rowA.textContent).toContain('Hdg:270');
+    expect(rowA.textContent).toMatch(/\s45\s/);
+    expect(rowA.textContent).toMatch(/\s270\s/);
     expect(rowA.textContent).toContain('Warp 4.5');
     expect(rowA.textContent).toContain('Avenger');
   });
@@ -287,8 +290,8 @@ describe('ScanPanel', () => {
 
     const rowA = screen.getByTestId('side-panel-row-A');
     expect(rowA.textContent).toContain('42');
-    expect(rowA.textContent).toContain('Brg:90');
-    expect(rowA.textContent).toContain('Hdg:0');
+    expect(rowA.textContent).toMatch(/\s90\s/);
+    expect(rowA.textContent).toMatch(/\s0\s/);
     expect(rowA.textContent).toContain('Warp 2.0');
     expect(rowA.textContent).toContain('Avenger');
 

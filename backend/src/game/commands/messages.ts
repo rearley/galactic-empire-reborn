@@ -209,6 +209,7 @@ export enum MessageId {
   MIN_FULL = 'MIN_FULL',
   /** @see GE/REL/MBMGEMSG.MSG:5814 MINE2 — the galaxy mine table is full */
   MIN_JAMMED = 'MIN_JAMMED',
+  /** @see GE/REL/MBMGEMSG.MSG:5810 MINE3 — reports the fuse it was set to */
   MIN_DEPLOYED = 'MIN_DEPLOYED',
   ZIP_NOAMMO = 'ZIP_NOAMMO',
   ZIP_SWEPT = 'ZIP_SWEPT',
@@ -727,7 +728,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // and returns 0 (GECMDS.C:1772-1780). Distinct from MIN_FULL, which is the
   // per-captain USRMINES cap. @see GE/REL/MBMGEMSG.MSG:5814
   [MessageId.MIN_JAMMED]: 'The mine launcher is temporarly jammed, Sir!',
-  [MessageId.MIN_DEPLOYED]: 'Mine deployed.',
+  // Canon names the fuse, and the fuse is the whole point of the command:
+  // `min <1-50>` in centocks, ~5 seconds each. Our bare "Mine deployed."
+  // withheld the one number that makes the choice meaningful — a player
+  // seeding an escape path could not tell a 5-second fuse from a 4-minute one.
+  [MessageId.MIN_DEPLOYED]: 'Neutron Mine launched. Detonation in %s centocks!',
   [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
   [MessageId.ZIP_SWEPT]: 'Mines swept.',
   [MessageId.DEC_NOAMMO]: 'No decoys in cargo.',
