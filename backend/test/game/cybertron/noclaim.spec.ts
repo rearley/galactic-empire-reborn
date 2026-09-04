@@ -63,7 +63,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
     minesnear: 0,
     lock: 0,
     holdcourse: 0,
-    topspeed: 8000,
+    topspeed: 8,
     warncntr: 0,
     navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,

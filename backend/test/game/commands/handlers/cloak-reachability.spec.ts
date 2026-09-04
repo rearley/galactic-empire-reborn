@@ -46,7 +46,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
     firecntl: 0, destruct: 0, status: 1, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8000, warncntr: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
     navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
@@ -212,7 +212,7 @@ describe('cloak reachability — cybertron-tick.service.ts:268 (scan loop skips 
     // Cybertron with no current target (cybmine=255)
     const cyb = makeShip({
       userid: 'cyb1', shipno: 101, shpclass: 21,
-      status: 2, cybmine: 255, xcoord: 5, ycoord: 5, topspeed: 8000,
+      status: 2, cybmine: 255, xcoord: 5, ycoord: 5, topspeed: 8,
     });
     // Cloaked player ship — the only target in the world
     const player = makeShip({
@@ -246,7 +246,7 @@ describe('cloak reachability — cybertron-tick.service.ts:494 (current target c
     // Cybertron already has this player locked (cybmine = player.shipno = 1)
     const cyb = makeShip({
       userid: 'cyb1', shipno: 101, shpclass: 21,
-      status: 2, cybmine: player.shipno, holdcourse: 0, xcoord: 5, ycoord: 5, topspeed: 8000,
+      status: 2, cybmine: player.shipno, holdcourse: 0, xcoord: 5, ycoord: 5, topspeed: 8,
     });
 
     addShip(cyb);
@@ -270,7 +270,7 @@ describe('cloak reachability — cybertron-tick.service.ts:513 (acquisition scan
 
     const cyb = makeShip({
       userid: 'cyb1', shipno: 101, shpclass: 21,
-      status: 2, cybmine: 255, xcoord: 5, ycoord: 5, topspeed: 8000,
+      status: 2, cybmine: 255, xcoord: 5, ycoord: 5, topspeed: 8,
     });
     // Cloaked player — should be skipped
     const cloakedPlayer = makeShip({

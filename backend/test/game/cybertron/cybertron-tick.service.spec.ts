@@ -70,7 +70,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
     minesnear: 0,
     lock: 0,
     holdcourse: 0,
-    topspeed: 8000,
+    topspeed: 8,
     warncntr: 0,
     navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
@@ -486,6 +486,7 @@ describe('T039 — Zipper branch lives in cyb_attack (GECYBS.C:541-557)', () => 
     });
 
     const cyb = makeShip({
+      // domain-ok: no such class — exercises the unknown-class path
       userid: 'Cybrg-201', shipno: 201, shpclass: 99, status: 2,
       xcoord: 5, ycoord: 5, cybmine: 1, tick: 1, cybupdate: 100, holdcourse: 0,
       where: 0, phasr: 100, minesnear: 1,

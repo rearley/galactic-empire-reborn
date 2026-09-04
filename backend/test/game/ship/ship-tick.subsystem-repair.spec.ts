@@ -193,10 +193,10 @@ describe('subsystem repair — cantexit independence', () => {
 
 describe('subsystem repair — positive cloak guard', () => {
   it('active (positive) cloak is NOT touched by subsystem repair', () => {
-    const ship = makeShip({ cloak: 50, tactical: 0, helm: 0, firecntl: 0, shieldstat: 0 });
+    const ship = makeShip({ cloak: 10, tactical: 0, helm: 0, firecntl: 0, shieldstat: 0 });
     const { fireTick } = makeHarness(ship);
     fireTick();
-    expect(ship.cloak).toBe(50); // repair must only lift NEGATIVE cloak
+    expect(ship.cloak).toBe(10); // repair must only lift NEGATIVE cloak
   });
 });
 

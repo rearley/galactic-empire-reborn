@@ -79,6 +79,6 @@ describe('Cybertron spawn — topspeed', () => {
 
   it('rejects a nonsense value that could not have come from a class', async () => {
     const { repo } = build();
-    await expect(repo.createSpawn(slot({ topspeed: -1 }))).rejects.toThrow(/topspeed/);
+    await expect(repo.createSpawn(slot({ /* domain-ok: impossible by construction — that is what is being rejected */ topspeed: -1 }))).rejects.toThrow(/topspeed/);
   });
 });
