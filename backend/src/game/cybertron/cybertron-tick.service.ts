@@ -846,7 +846,12 @@ export class CybertronTickService implements OnModuleInit {
     // Detect hyperwarp exit (where: 1→0) for shield restore (@see R-9, T031)
     const prevWhere = ship.where;
 
-    const band = pickPursuitBand(dist, hyperdist1, hyperdist2, prevWhere, classMaxShields, topSpeed, this.random);
+    // The target's own motion decides the combat band: canon matches a runner
+    // that has gone to hyperspace rather than crawling at 990. @see GECYBS.C:793-796
+    const band = pickPursuitBand(
+      dist, hyperdist1, hyperdist2, prevWhere, classMaxShields, topSpeed, this.random,
+      { where: target.where, speed2b: target.speed2b },
+    );
 
     // cyb_annoy in the pursuit ladder. C taunts in three of the four bands and
     // says nothing while actually in hyperwarp:

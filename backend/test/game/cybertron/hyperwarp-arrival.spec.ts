@@ -46,7 +46,7 @@ function simulatePursuit(
     let nextWhere: number;
 
     if (useHyperwarp) {
-      const band = pickPursuitBand(distance, hyperdist1, hyperdist2, where, classMaxShields, topSpeed, rand);
+      const band = pickPursuitBand(distance, hyperdist1, hyperdist2, where, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
       desiredSpeed = band.desiredSpeed;
       nextWhere = band.where;
     } else {

@@ -117,7 +117,7 @@ describe('pickPursuitBand (T014)', () => {
 
   it('hyperwarp band: distance >= hyperdist1 → where=1, speed=distance*2000, shield=0', () => {
     const dist = hyperdist1 + 5; // 30
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(1);
     expect(result.desiredSpeed).toBeCloseTo(dist * 2000.0);
     expect(result.shield).toBe(0);
@@ -125,13 +125,13 @@ describe('pickPursuitBand (T014)', () => {
   });
 
   it('hyperwarp band: exactly at hyperdist1 boundary', () => {
-    const result = pickPursuitBand(hyperdist1, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(hyperdist1, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(1);
   });
 
   it('brake band: hyperdist2 ≤ distance < hyperdist1 → where=0, desiredSpeed=topSpeed', () => {
     const dist = 15; // between 10 and 25
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(0);
     expect(result.desiredSpeed).toBe(topSpeed);
   });
@@ -141,35 +141,35 @@ describe('pickPursuitBand (T014)', () => {
     // two close bands do. The charge restore on hyperwarp exit is the port's
     // own R-9 decision and stays.
     const dist = 15;
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 1, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 1, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.raiseShields).toBe(false);
     expect(result.shield).toBe(classMaxShields);
   });
 
   it('close band: 3.0 < distance < hyperdist2 → where=0, desiredSpeed=topSpeed', () => {
     const dist = 6;
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(0);
     expect(result.desiredSpeed).toBe(topSpeed);
   });
 
   it('combat band: distance ≤ 3.0 → where=0', () => {
     const dist = 2.0;
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(0);
     expect(result.desiredSpeed).toBe(990.0); // dist > 0.5
   });
 
   it('combat band: distance ≤ 0.5 → desiredSpeed is random < 500', () => {
     const dist = 0.3;
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.desiredSpeed).toBeGreaterThanOrEqual(0);
     expect(result.desiredSpeed).toBeLessThan(500);
   });
 
   it('threshold ordering: no band leaks (d=10 should be brake, not close)', () => {
     const dist = 10; // exactly hyperdist2
-    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand);
+    const result = pickPursuitBand(dist, hyperdist1, hyperdist2, 0, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
     expect(result.where).toBe(0);
     expect(result.desiredSpeed).toBe(topSpeed); // brake band
   });

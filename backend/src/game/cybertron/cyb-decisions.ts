@@ -102,6 +102,12 @@ export function pickPursuitBand(
   classMaxShields: number,
   topSpeed: number,
   rand: Random,
+  /**
+   * The target's own motion. Canon's combat band reads `wptr->where` and
+   * `wptr->speed2b` to decide whether it is chasing or closing.
+   * @see GECYBS.C:793-796
+   */
+  target: { where: number; speed2b: number },
 ): PursuitBand {
   if (distance >= hyperdist1) {
     // Hyperwarp band — 20x speed, shields down. C snaps `ptr->speed` straight
@@ -142,8 +148,25 @@ export function pickPursuitBand(
     };
   }
   // Combat band — distance <= 3.0; @see GECYBS.C:789-803
+  //
+  //   if (wptr->where == 1)
+  //       ptr->speed2b = ((wptr->speed2b > d_topspeed) ? d_topspeed : (wptr->speed2b*1.25));
+  //   else
+  //       ptr->speed2b = ((low_dist > .5) ? 990.0 : rndm(500.0));
+  //
+  // The port had only the `else`, so a Cybertron in contact crawled at a flat
+  // 990 whatever the target did — and a player at warp is `where == 1` moving
+  // thousands of units a tick, so running away always worked. The 1.25 makes
+  // the pursuer a quarter faster than its prey, bounded by its own top speed;
+  // that bound is what keeps a slow hull from teleporting after a fast one.
+  const chasingIntoHyperspace = target.where === 1;
+  const desiredSpeed = chasingIntoHyperspace
+    ? Math.min(target.speed2b * 1.25, topSpeed)
+    : distance > 0.5
+      ? 990.0
+      : rand.next() * 500.0;
   return {
-    desiredSpeed: distance > 0.5 ? 990.0 : rand.next() * 500.0,
+    desiredSpeed,
     speedClamp: topSpeed,
     where: 0,
     shield: currentWhere === 1 ? classMaxShields : undefined,
