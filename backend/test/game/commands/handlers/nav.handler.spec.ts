@@ -57,23 +57,7 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
 // ---------------------------------------------------------------------------
 
 describe('NavHandlerService — status form (no args)', () => {
-  it('holdcourse === 0 → returns NAV_INACTIVE message', () => {
-    const { handler, state, ctx } = makeService({ holdcourse: 0 });
-    const result = handler.command.handler(state, [], ctx) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.NAV_INACTIVE));
-  });
 
-  it('holdcourse > 0 → returns NAV_STATUS message with target, distance, bearing', () => {
-    const { handler, state, ctx } = makeService({
-      holdcourse: 1,
-      xcoord: 5.0, ycoord: 5.0,
-      navTargetX: 10, navTargetY: 8,
-    });
-    const result = handler.command.handler(state, [], ctx) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toContain('Autopilot active');
-    expect(result.lines[0].text).toContain('10');
-    expect(result.lines[0].text).toContain('8');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -177,8 +161,6 @@ describe('NavHandlerService — target inside the current sector', () => {
     });
     const result = handler.command.handler(state, ['7', '3'], ctx) as { lines: { text: string }[] };
     expect(result.lines.some((l) => /bearing/i.test(l.text))).toBe(true);
-    expect(state.navTargetX).toBe(7);
-    expect(state.navTargetY).toBe(3);
   });
 
   it('floor(xcoord) === x but floor(ycoord) !== y → NOT already there', () => {
@@ -193,40 +175,29 @@ describe('NavHandlerService — target inside the current sector', () => {
 // ---------------------------------------------------------------------------
 
 describe('NavHandlerService — engagement happy path', () => {
-  it('sets navTargetX, navTargetY, holdcourse=1 on success', () => {
-    const { handler, state, ctx } = makeService({ xcoord: 5.0, ycoord: 5.0 });
-    handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.navTargetX).toBe(10);
-    expect(state.navTargetY).toBe(8);
-    expect(state.holdcourse).toBe(1);
-  });
 
-  it('sets dirty=true on success', () => {
+  it('writes NOTHING to the ship — it is a read-only report', () => {
+    // cmd_navigate computes and prints. It touches no field, which is why
+    // asking for a bearing can no longer undock you, cancel a turn, or leave a
+    // course behind for the tick to fly. @see GECMDS.C:5109-5156
     const { handler, state, ctx } = makeService({ xcoord: 5.0, ycoord: 5.0, dirty: false });
+    const snap = (o: object) =>
+      JSON.stringify(o, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+    const before = snap(state);
     handler.command.handler(state, ['10', '8'], ctx);
-    expect(state.dirty).toBe(true);
+    expect(snap(state)).toBe(before);
   });
 
   it('emits NAV01 message on success', () => {
     const { handler, state, ctx } = makeService({ xcoord: 5.0, ycoord: 5.0 });
     const result = handler.command.handler(state, ['10', '8'], ctx) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toContain('Course set for');
+    // Canon's NAV01 verbatim: "Sector %d %d is bearing %d, distance %s."
+    // It sets no course and does not mention speed.
+    expect(result.lines[0].text).toMatch(/^Sector 10 8 is bearing -?\d+, distance \d+\.$/);
     expect(result.lines[0].text).toContain('10');
     expect(result.lines[0].text).toContain('8');
   });
 
-  it('silent target replace while active (re-issuing replaces target without error)', () => {
-    const { handler, state, ctx } = makeService({
-      xcoord: 5.0, ycoord: 5.0,
-      holdcourse: 1, navTargetX: 3, navTargetY: 3,
-    });
-    const result = handler.command.handler(state, ['9', '7'], ctx) as { lines: { text: string }[] };
-    expect(state.navTargetX).toBe(9);
-    expect(state.navTargetY).toBe(7);
-    expect(state.holdcourse).toBe(1);
-    // No error message — first line should be success
-    expect(result.lines[0].text).toContain('Course set for');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -253,9 +224,6 @@ describe('NavHandlerService — nav never breaks orbit', () => {
     handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(13);
     expect(state.repair).toBe(42);
-    expect(state.holdcourse).toBe(1);
-    expect(state.navTargetX).toBe(10);
-    expect(state.navTargetY).toBe(8);
   });
 
   it('in orbit → no LEAVEORB line is emitted', () => {
@@ -292,36 +260,8 @@ describe('NavHandlerService — explains the shrinking bearing', () => {
    * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
    * arithmetic was right both times; nothing told the pilot why.
    */
-  it('non-zero bearing → explains that the helm is swinging onto course', () => {
-    const { handler, state, ctx } = makeService({
-      xcoord: 5.0, ycoord: 5.0, heading: 0,
-    });
-    const res = handler.command.handler(state, ['10', '8'], ctx) as { lines: { text: string }[] };
-    const text = res.lines.map((l) => l.text).join('\n');
-    expect(text).toMatch(/relative to our (present|current) heading/i);
-    expect(text).toMatch(/onto course/i);
-  });
 
-  it('bearing already 0 → reports we are on course, not a turn in progress', () => {
-    // Target due east of (5,5); heading 90 already points at it.
-    const { handler, state, ctx } = makeService({
-      xcoord: 5.0, ycoord: 5.5, heading: 90,
-    });
-    const res = handler.command.handler(state, ['20', '5'], ctx) as { lines: { text: string }[] };
-    const text = res.lines.map((l) => l.text).join('\n');
-    expect(text).toMatch(/on course/i);
-    expect(text).not.toMatch(/swinging|coming onto course/i);
-  });
 
-  it('repeating the same nav while already on course says "already"', () => {
-    const { handler, state, ctx } = makeService({
-      xcoord: 5.0, ycoord: 5.5, heading: 90,
-      holdcourse: 1, navTargetX: 20, navTargetY: 5,
-    });
-    const res = handler.command.handler(state, ['20', '5'], ctx) as { lines: { text: string }[] };
-    const text = res.lines.map((l) => l.text).join('\n');
-    expect(text).toMatch(/already on course/i);
-  });
 });
 
 // ---------------------------------------------------------------------------

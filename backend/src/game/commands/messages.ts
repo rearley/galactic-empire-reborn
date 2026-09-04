@@ -827,7 +827,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // C's cmd_navigate only reports bearing and distance; this port also turns the
   // ship. Neither sets speed, and saying so matters: pilots engaged "autopilot"
   // and sat still waiting to arrive.
-  [MessageId.NAV01]: 'Course set for (%s,%s), bearing %s, distance %s. Set speed with war/imp.',
+  // Canon's text, verbatim. It sets no course and does not mention speed,
+  // because cmd_navigate is a read-only bearing report — the autopilot the old
+  // wording described was a port invention and has been withdrawn.
+  // @see GECMDS.C:5154, GE/REL/MBMGEMSG.MSG NAV01
+  [MessageId.NAV01]: 'Sector %s %s is bearing %s, distance %s.',
   [MessageId.NAV_INACTIVE]: 'Autopilot inactive.',
   [MessageId.NAV_STATUS]: 'Autopilot active — target (%s,%s), distance %s, bearing %s.',
   [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',

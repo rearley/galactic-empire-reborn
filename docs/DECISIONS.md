@@ -2801,3 +2801,71 @@ today's first.
 **Alternatives rejected:** Blocking a same-day re-run outright at the admin
 endpoint. That would have removed the ability to simulate multiple days in a
 playtest, which is the thing that found this.
+
+## 2026-09-04 — The autopilot is withdrawn
+
+**Context:** `nav` in this port engaged an autopilot: it stored a target, the
+physics tick steered `head2b` onto it every tick, and arrival cut the engines.
+Canon's `cmd_navigate` is argument validation, `cdistance`, `cbearing`,
+`prfmsg(NAV01)`, return (GECMDS.C:5109-5156). It never steers, never moves,
+never holds a course.
+
+**Decision:** Remove it. `nav` is a read-only bearing report, and NAV01 carries
+the shipped text — *"Sector %d %d is bearing %d, distance %s."* — instead of the
+invented *"Course set for… Set speed with war/imp."*
+
+**Reason:** It was the most defect-prone thing in the codebase. Six fixes in its
+short life: an arrival test on sector membership that broke onboarding, a fixed
+250-unit arrival shell that made arrival impossible above warp 1, undocking a
+captain who only asked for a bearing, a bare speed order cancelling a turn in
+progress, `war`/`imp` misreporting the course, and finally plotting courses
+straight through planets — which killed two round-5 players three times between
+them, each obeying the instruction the game had just given them.
+
+The recorded justification was *"An autopilot exists to remove exactly that
+work"*. That is a UX preference, not a defence against the classic, and the
+project's rule is that port-original behaviour must be defensible against the
+classic or go.
+
+Nothing is lost. `warp <speed> [course]` already takes a relative course, so the
+canon loop is intact and is one command longer: `nav 5 5` reports the bearing,
+`war 9 <bearing>` flies it, the pilot watches and stops. Steering is gameplay,
+and a planet you fly into is then your own error — which is exactly the
+relationship canon has with its own lethal gravity.
+
+`holdcourse` stays on ShipState. It is canon's field, meaning "hold this heading
+for N ticks, then re-decide", and it belongs to the AI (GECYBS.C:318,
+GEDROIDS.C:328).
+
+**Alternatives rejected:** Teaching the autopilot to route around planets. That
+is more invented behaviour layered on invented behaviour, and every previous
+layer has cost us a defect.
+
+## 2026-09-04 — Gravity is gated on normal space and player ships
+
+**Context:** Round 5, two players flew into planets at warp — three deaths — and
+the owner's recollection of the original was that planets were never a hazard at
+warp. They were right.
+
+**Decision:** Call `gravity()` only when `where === 0 && status === GESTAT_USER`.
+
+**Reason:** That is canon, exactly:
+
+    /* Cybertrons ignore gravity */
+    if (ptr->where == 0 && ptr->status == GESTAT_USER)
+        gravity(ptr,usrn);
+
+(GEFUNCS.C:794-795.) `where == 1` is hyperspace, i.e. at warp — canon does not
+run the check there, so a warping ship cannot fly into a planet. The port called
+`gravity()` on every move with neither condition, while citing those exact
+lines. Two divergences from one missing `if`: players killed by planets at warp,
+and AI ships subject to a pull the comment above the line explicitly exempts
+them from.
+
+The arithmetic says why canon skips it: the warning ladder is 250 units deep
+(GRAVITY1 at 250, GRAVITY2 at 50, GRAVITY3 at 25) against 1,385 units of travel
+per tick at warp 9, so all three warnings and the kill threshold fall inside a
+single tick. It cannot function at speed.
+
+**Alternatives rejected:** Widening the warning bands so they work at warp. That
+invents a number to paper over a check canon does not run at all.

@@ -59,30 +59,15 @@ export function resolveEngineCourse(
     return { deg, setHeading: true, releaseAutopilot: true };
   }
 
-  const flying =
-    ship.holdcourse > 0 && ship.navTargetX !== null && ship.navTargetY !== null;
-
   // A turn already ordered by `rot` is a steering order in progress. Writing
   // `heading + 0` over it froze the ship part-way round, so "point at the
-  // planet, then engage" silently did not work. Same rule as the autopilot
-  // below: only a NAMED course takes the helm.
-  if (!flying && Math.round(ship.head2b) !== Math.round(ship.heading)) {
+  // planet, then engage" silently did not work.
+  if (Math.round(ship.head2b) !== Math.round(ship.heading)) {
     return {
       deg: Math.round((ship.head2b + 360) % 360) % 360,
       setHeading: false,
       releaseAutopilot: false,
     };
-  }
-
-  if (flying) {
-    // Sector centre, matching what `nav` steers toward.
-    const deg = bearingTo(
-      ship.xcoord,
-      ship.ycoord,
-      (ship.navTargetX as number) + 0.5,
-      (ship.navTargetY as number) + 0.5,
-    );
-    return { deg, setHeading: false, releaseAutopilot: false };
   }
 
   const deg = Math.round((ship.heading + 360) % 360) % 360;
