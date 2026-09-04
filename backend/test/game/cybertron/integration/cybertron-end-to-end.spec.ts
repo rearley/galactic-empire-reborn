@@ -107,6 +107,9 @@ async function buildHarness(seed = 77) {
   const classCache = new Map<number, unknown>();
   const shipClassCache = {
     get: (n: number) => classCache.get(n),
+    // Canon dispatches AI behaviour by CLASS (GEMAIN.C:878-895); a droid never
+    // runs cyb_lives. These harnesses only ever hold CYBORG classes.
+    getCategory: (n: number) => (classCache.has(n) ? 'CPU_COMBATIVE' : undefined),
     getMaxPhaser: (n: number) => {
       const cls = classCache.get(n) as { maxPhaser?: number } | undefined;
       return cls?.maxPhaser ?? 1;

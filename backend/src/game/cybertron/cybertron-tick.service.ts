@@ -31,6 +31,7 @@ import {
   CYBSLO,
   UNIVMAX,
   SHIELDDM,
+  GESTAT_AUTO,
 } from '../constants';
 import {
   CYBERTRON_EVENT,
@@ -194,8 +195,31 @@ export class CybertronTickService implements OnModuleInit {
    * consulted — capping the decrement as well as the activation, as the port
    * used to, meant a Cybertron behind a busy queue never acted at all.
    */
+  /**
+   * The ships this service is responsible for: CYBORG classes only.
+   *
+   * Canon binds one behaviour per CLASS at boot and dispatches through it —
+   * `shipclass[i].tick_func = cyb_lives` for CLASSTYPE_CYBORG,
+   * `= droid_lives` for CLASSTYPE_DROID (GEMAIN.C:878-895), called as
+   * `(*(shipclass[wptr->shpclass].tick_func))(wptr,zothusn)` (:2418-2419).
+   * A droid never runs cyb_lives.
+   *
+   * This filtered on `status === 2`, and droids spawn with `GESTAT_AUTO` (=2)
+   * into the same map — so every droid ran the Cybertron brain on top of its
+   * own, two services fought over one `tick` countdown, and droids took
+   * `cybmine` claims that canon droids never take (the field does not appear
+   * in GEDROIDS.C). With `noClaim` 1 for an Interceptor, a single droid claim
+   * locked all 24 Cybertrons out of that player.
+   */
+  private selectAiShips(): ShipState[] {
+    return this.shipState
+      .findAllShips()
+      .filter((s) => s.status === GESTAT_AUTO
+        && this.shipClassCache.getCategory(s.shpclass) === 'CPU_COMBATIVE');
+  }
+
   private onAiTick(ctx: TickContext): void {
-    const ships = this.shipState.findAllShips().filter((s) => s.status === 2);
+    const ships = this.selectAiShips();
 
     const due: ShipState[] = [];
     for (const ship of ships) {

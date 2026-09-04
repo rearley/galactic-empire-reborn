@@ -152,6 +152,9 @@ function buildCybertronHarness() {
   const classMap = new Map<number, unknown>();
   const shipClassCache = {
     get: (n: number) => classMap.get(n),
+    // Canon dispatches AI behaviour by CLASS (GEMAIN.C:878-895, :2418-2419);
+    // every AI hull in this harness is a Cybertron.
+    getCategory: (n: number) => (classMap.has(n) ? 'CPU_COMBATIVE' : undefined),
   } as unknown as ShipClassCacheService;
 
   const cybClass = {

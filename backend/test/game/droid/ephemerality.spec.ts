@@ -58,7 +58,7 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
   maxAcceleration: 1200, maxWarp: 8, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
-  tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50, canAttackPlanet: false, damageFactor: 100, typeName: 'Droid', shipNameTemplate: '',
+  tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50, canAttackPlanet: false, damageFactor: 100, typeName: 'Droid', category: 'CPU_DROID', shipNameTemplate: '',
 };
 
 // ─── Shared harness builder ───────────────────────────────────────────────────
