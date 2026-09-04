@@ -3,6 +3,18 @@ import { cdistance, inScanRange, lineOfFire, phaserDamage } from './combat-math'
 import { isInNeutralZone } from './neutral-zone';
 import { PHATOWRP } from '../constants';
 
+/**
+ * What a discharge found. `victims` is what it hit; `unreachableAtWarp` counts
+ * ships that WERE inside the cone and were excluded only by the hyperspace
+ * gate, so a caller can say something true instead of "no targets in arc".
+ * Canon prints no summary at all here — that line is this port's — but an
+ * invented line that states something false is worse than canon's silence.
+ */
+export interface PhaserSweep {
+  victims: PhaserVictim[];
+  unreachableAtWarp: number;
+}
+
 /** One ship the discharge reached, and what it took. */
 export interface PhaserVictim {
   victim: ShipState;
@@ -47,9 +59,10 @@ export function selectPhaserVictims(args: {
   phasrCharge: number;
   scanRange: number;
   maxTonsFor: (shpclass: number) => number;
-}): PhaserVictim[] {
+}): PhaserSweep {
   const { firer, allShips, degree, focus, phasrCharge, scanRange, maxTonsFor } = args;
   const victims: PhaserVictim[] = [];
+  let unreachableAtWarp = 0;
 
   for (const candidate of allShips) {
     // othusn != usrn
@@ -61,7 +74,7 @@ export function selectPhaserVictims(args: {
     // speed: the two coincide because the hyperspace transition fires exactly
     // at WARP_THRESHOLD (physics-math.ts), but `where` is what the C reads.
     const victimAtWarp = candidate.where === 1;
-    if (victimAtWarp && firer.phasrtype < PHATOWRP) continue;
+    const outOfReachAtWarp = victimAtWarp && firer.phasrtype < PHATOWRP;
 
     // !neutral(&wptr->coord)
     if (isInNeutralZone(candidate)) continue;
@@ -71,6 +84,13 @@ export function selectPhaserVictims(args: {
 
     // smallest(heading,deg) < ptr->percent + PHABIAS
     if (!lineOfFire(firer, candidate, degree, focus)) continue;
+
+    // Counted only AFTER the arc test, so this means "you were aimed at it and
+    // the beam could not reach it", not "it exists somewhere at warp".
+    if (outOfReachAtWarp) {
+      unreachableAtWarp++;
+      continue;
+    }
 
     const damage = phaserDamage({
       phasrtype: firer.phasrtype,
@@ -88,5 +108,5 @@ export function selectPhaserVictims(args: {
     victims.push({ victim: candidate, damage });
   }
 
-  return victims;
+  return { victims, unreachableAtWarp };
 }

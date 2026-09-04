@@ -220,7 +220,7 @@ export class PhaserHandlerService {
     // One shared `firep` selection, used by the AI path too: canon has exactly
     // one of these and the port's two copies had already drifted apart once.
     // @see src/game/combat/firep.ts, GECMDS.C:946-1004
-    const selected = selectPhaserVictims({
+    const sweep = selectPhaserVictims({
       firer: ship,
       allShips,
       degree,
@@ -230,7 +230,7 @@ export class PhaserHandlerService {
       maxTonsFor: (c) => this.shipClassCache.getMaxTons(c),
     });
 
-    for (const { victim: candidate, damage } of selected) {
+    for (const { victim: candidate, damage } of sweep.victims) {
       // A hit on a Cybertron makes you its target, overriding whatever it was
       // chasing and the noClaim rules. Without this, PvE was pure proximity:
       // you could not pull one off a teammate, and one you shot ignored you.
@@ -321,7 +321,15 @@ export class PhaserHandlerService {
         tickAt,
       };
       this.events.emit(COMBAT_MISS, missEvent);
-      lines.push({ text: 'Phasers fired — no targets in arc.', category: 'combat' });
+      // Canon prints nothing here; this summary is ours. Say something TRUE:
+      // a ship that was inside the cone and excluded only by the hyperspace
+      // gate is not an empty arc. @see GECMDS.C:949, test/game/combat/phaser-no-hit-reason.spec.ts
+      lines.push({
+        text: sweep.unreachableAtWarp > 0
+          ? 'Phasers fired — the beam passes through a ship at warp.'
+          : 'Phasers fired — no targets in arc.',
+        category: 'combat',
+      });
     }
 
     // Full discharge of the firer (GECMDS.C:1006). The shield drop is NOT here
