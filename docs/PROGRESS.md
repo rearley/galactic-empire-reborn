@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 63 entries.
+Append-only, **newest at the bottom**. 64 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 63 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-04 — round 6, and the fix that broke persistence](#2026-09-04-round-6-and-the-fix-that-broke-persistence)
 - [2026-09-02 — the full original distribution, and a canon re-baseline](#2026-09-02-the-full-original-distribution-and-a-canon-re-baseline)
 - [2026-09-02 — fourth playtest: five personas in one shared world](#2026-09-02-fourth-playtest-five-personas-in-one-shared-world)
 - [2026-09-01 — third playtest: two pilots, a colony, a freighter and a siege](#2026-09-01-third-playtest-two-pilots-a-colony-a-freighter-and-a-siege)
@@ -2728,3 +2729,69 @@ often a player's `mine` command is refused. Added to the observer's brief for
 the next round. If it does crowd players out at a REALISTIC player count, the honest lever is
 the AI's lay probability. NOT `NUMMINES`, which is canon and structural, and not
 the Cybertron population, which is canon too.
+
+---
+
+## 2026-09-04 — round 6, and the fix that broke persistence
+
+**Completed:** Round 6 ran on a freshly reset world — four pilots (~11h combined),
+an instrument observer taking 311 DB snapshots, and a timekeeper firing five
+midnight passes. Five fixes came out of it.
+
+1. **Three in-memory fields were breaking every ship flush.** `userKills` and
+   `lastfiredBy` (added by yesterday's escalation and ship-loss-mail fixes) plus
+   `deathCause` have no `Ship` column and were not stripped, so `stateToPrismaUpdate`
+   handed Prisma unknown arguments and every flush threw — 34,772 failed writes in
+   one uptime. `userKills` is written only when a captain boards an EXISTING hull,
+   so new ships persisted and every returning player silently did not. Three pilots
+   lost purchased upgrades on reconnect; credits live on `User` and goods on `Ship`,
+   so an account could only ratchet downward.
+   The strip-list is now **derived and compile-checked** rather than hand-maintained:
+   an exhaustiveness assertion fails the build naming any ShipState field that has no
+   column and is not listed. This was the sixth instance (maxTons, maxWarp, channel,
+   lockKey, now these three) and every one had the same cause — a hand-written list
+   guarded by a hand-written fixture that omitted the new field.
+2. **Cybertron escalation was inert.** `ShipState.userKills` cached `User.kills` at
+   boot and board time only, so a captain's kills rose in Postgres while the number
+   the AI reads stayed frozen at login. `CYB_BE_NICE` is 30, so the gates could only
+   ever reach someone who logged out and back in. Now bumped in `resolveKillSpoils`,
+   the shared seam both kill paths run through, matching canon's single live counter
+   (`++(wuptr->kills)`, GEFUNCS.C:1118, read by `chkcyb` at GECYBS.C:441/:524).
+3. **The flush alarm slept through the whole outage.** It fired only when *every*
+   dirty ship failed; two brand-new hulls flushed fine, so every sweep was a partial
+   failure and the counter reset each time. Now alarms on a run of sweeps each
+   containing at least one failure. Every prior test here used a single ship, which
+   is exactly why the distinction never surfaced.
+4. **Running away was a guaranteed escape.** Canon's combat band matches a target
+   that has gone to hyperspace — `speed2b * 1.25`, capped at the pursuer's top speed
+   (GECYBS.C:793-796). The port had only the `else` branch, a flat 990, so an
+   Interceptor at warp could never be caught; one pilot measured the range *opening*
+   by 2,189 units across two chases. The 990 crawl against a target in normal space
+   is the other branch and IS canon — unchanged.
+5. **CLAUDE.md called `MAXX`/`MAXY` the size of the galaxy.** They are the ASCII scan
+   map's dimensions (`map[MAXY/2][MAXX/2]`, GECMDS.C:2569); the galaxy is
+   `±UNIVMAX`. The wrong line produced three false defect reports in one session.
+
+**Tests:** 4,696 / 453 suites. Two new guards are structural rather than
+example-based: the flush strip-list is checked by the compiler, and
+`pickPursuitBand`'s target parameter is **required** so omitting it at the call
+site fails the build — a default would have reproduced the exact bug being fixed.
+Both verified by mutation.
+
+**Decisions made:** No new deviations. Every change moves toward canon.
+
+**Known issues / not done:**
+- **The AI converts to a kill only against a stationary or cornered target.** The
+  Cyberquad's engagement gate is `S22SRNG 1000` = 0.1 sectors, which is canon, so
+  after a 13-minute hyperwarp approach it still needs ~16 minutes of crawl to open
+  fire. The arithmetic is canon's; whether a hostile that slow reads as menace is a
+  design question, and it exists because we deploy `UNIVMAX` at 100 while scan
+  ranges stayed absolute. Measure before tuning.
+- **The missile-shake fix cannot be verified in play.** Every AI class is
+  `S**MISL {Has Missile Capability? NO}` in canon, so "a Cybertron will oblige" was
+  impossible — an error in the round-6 brief, not a game defect. It needs two
+  players in missile-capable hulls, or it stays a unit test.
+- Colony route economics (`PLTVDIV` / kill award) unexamined.
+- Owner's backlog unchanged: canon-shaped help (61 entries vs our 8) and scan/UI
+  display formats, both to discuss before changing. `set scannames` defaulting on
+  belongs to that conversation.
