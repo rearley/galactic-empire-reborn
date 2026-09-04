@@ -91,6 +91,40 @@ describe('ShipStateService flush failure escalation', () => {
     expect(alarm.toLowerCase()).toContain('not being persisted');
   });
 
+  /**
+   * Round 6: 34,772 flushes threw over four hours and this alarm never fired.
+   * The condition was `failed === attempted` — EVERY dirty ship — and the world
+   * held two brand-new hulls that flushed fine, because the field that poisoned
+   * the payload (`userKills`) is only written when a captain boards an existing
+   * ship. So every sweep was a partial failure, the counter reset every time,
+   * and the one safeguard against a silent total outage stayed quiet while
+   * three pilots lost everything they had bought.
+   *
+   * A fault that hits some ships forever is not less serious than one that hits
+   * all of them. Every test above this used a single ship, which is why the
+   * distinction never showed up.
+   */
+  it('alarms when a fault hits only SOME ships, sweep after sweep', async () => {
+    const update = jest.fn(({ where }: { where: { userid_shipno: { userid: string } } }) =>
+      where.userid_shipno.userid === 'doomed'
+        ? Promise.reject(new Error('Unknown argument `userKills`'))
+        : Promise.resolve({}),
+    );
+    const { svc, errors } = build(update as unknown as jest.Mock);
+    const doomed = makeShip({ userid: 'doomed', shipno: 1 });
+    const healthy = makeShip({ userid: 'healthy', shipno: 1 });
+    svc.loadShip(doomed);
+    svc.loadShip(healthy);
+
+    for (let i = 0; i < 12; i++) {
+      doomed.dirty = true;
+      healthy.dirty = true;
+      await (svc as unknown as { flush(): Promise<void> }).flush();
+    }
+
+    expect(errors.filter((e) => e.includes(FLUSH_FAILURE_ALARM))).toHaveLength(1);
+  });
+
   it('resets once flushes succeed again, so a later fault re-alarms', async () => {
     const update = jest.fn().mockRejectedValue(new Error('boom'));
     const { svc, errors } = build(update);
