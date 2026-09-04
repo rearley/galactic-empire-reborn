@@ -18,7 +18,7 @@ import { capItemIndexForType } from './production-cap';
 import { classLabel } from './mail-render';
 import { MAIL_CLASS_DISTRESS } from '../constants';
 import { MAIL_CLASS_PRODRPT } from '../midnight/midnight.constants';
-import { MESG_SHIPLOSS } from '../player/ship-loss-mail.service';
+import { MESG_SHIPLOSS, MESG_SHIPLOSS_GRAVITY } from '../player/ship-loss-mail.service';
 
 /**
  * Inbox business logic: listing, index resolution, and delete.
@@ -119,14 +119,17 @@ export class MailInboxService {
         itemqty: [...row.itemqty],
       };
     }
-    if (row.class === MAIL_CLASS_DISTRESS && row.type === MESG_SHIPLOSS) {
-      // Ship lost while the captain was away. name1 carries the killer; the
-      // sector is int1/int2. @see ShipLossMailService
+    if (row.class === MAIL_CLASS_DISTRESS
+      && (row.type === MESG_SHIPLOSS || row.type === MESG_SHIPLOSS_GRAVITY)) {
+      // Ship lost. name1 carries the killer — or, for a collision, the body it
+      // was flown into; the sector is int1/int2. MailStat has no field for a
+      // cause, so the TYPE carries it. @see ShipLossMailService
       return {
         kind: 'ship_loss',
         killer: row.name1,
         sectorX: row.int1,
         sectorY: row.int2,
+        ...(row.type === MESG_SHIPLOSS_GRAVITY ? { cause: 'gravity' as const } : {}),
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS && row.type === 30) {

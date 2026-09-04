@@ -485,6 +485,14 @@ export class PhysicsTickService implements OnModuleInit {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         if (event.effect!.kind === 'crash') {
           s.damage = event.effect!.damage;
+          // Record WHAT killed them. Kill resolution runs later and sees only a
+          // damage figure with no attacker, which is indistinguishable from a
+          // killer who logged off — and the mail then told a pilot who had
+          // flown into a planet that "an unknown assailant" got them.
+          s.deathCause = {
+            kind: 'gravity',
+            what: event.isWormhole ? `wormhole ${event.plnum}` : `planet ${event.plnum}`,
+          };
           return;
         }
         const w = event.effect as { destination: { xcoord: number; ycoord: number }; damage: number };

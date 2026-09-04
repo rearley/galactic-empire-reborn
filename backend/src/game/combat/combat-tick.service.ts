@@ -238,9 +238,14 @@ export class CombatTickService implements OnModuleInit {
         // lookup can name them — `lastfiredBy`, recorded when the damage
         // landed, is the only surviving evidence.
         // @see attackerNameFromLastFired
-        shipname: attacker
-          ? attacker.shipname
-          : attackerNameFromLastFired(ship, (c) => liveChannels.has(c), ship.channel),
+        // A collision names the body, not a person: `deathCause` is set by the
+        // physics tick and outranks any stale `lastfiredBy`, because a pilot
+        // who was shot at and then flew into a planet was killed by the planet.
+        shipname: ship.deathCause
+          ? ship.deathCause.what
+          : attacker
+            ? attacker.shipname
+            : attackerNameFromLastFired(ship, (c) => liveChannels.has(c), ship.channel),
       });
     }
 
@@ -292,7 +297,10 @@ export class CombatTickService implements OnModuleInit {
           // victim is reset to when its firer leaves the game. The gateway
           // names the planet, because it holds the actual evidence — a
           // recorded ion hit. @see planet-kill.ts
-          weapon: null,
+          //
+          // A COLLISION is the one cause we can name here, because the physics
+          // tick recorded it on the ship this same tick.
+          weapon: victim.deathCause?.kind === 'gravity' ? 'gravity' : null,
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,
           loot,

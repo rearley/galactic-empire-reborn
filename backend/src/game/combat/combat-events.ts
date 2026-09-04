@@ -111,11 +111,11 @@ export interface CombatShipDestroyedEvent {
    * indistinguishable from a self-destruct (both null, weapon null).
    * @see planet-kill.ts, GEFUNCS.C:1797 fireion
    */
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | null;
+  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity' | null;
   /**
-   * Who to name as the killer when no attacking SHIP resolves — the planet,
-   * for an ion kill. Null for ordinary ship-vs-ship kills, where the client
-   * resolves the name from `attackerId`.
+   * Who or WHAT to name when no attacking SHIP resolves — the planet, for an
+   * ion kill or a collision. Null for ordinary ship-vs-ship kills, where the
+   * client resolves the name from `attackerId`.
    */
   attackerName?: string | null;
   sector: { x: number; y: number };
