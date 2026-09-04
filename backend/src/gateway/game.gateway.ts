@@ -1367,7 +1367,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCombatMineWarning(event: CombatMineWarningEvent): void {
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
-      text: `** Mine detected — bearing ${event.bearing}, range ${event.distance}. **`,
+      text: formatMessage(MessageId.MINE6, event.bearing, event.distance),
     });
   }
 

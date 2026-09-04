@@ -72,6 +72,8 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-08-31 — Ship channels: this port's `usrnum`](#2026-08-31-ship-channels-this-ports-usrnum)
 - [2026-08-31 — `sca pl` reads live planet state, not the boot-time read model](#2026-08-31-sca-pl-reads-live-planet-state-not-the-boot-time-read-model)
 - [2026-09-01 — Droids stay out of the neutral zone](#2026-09-01-droids-stay-out-of-the-neutral-zone)
+- [2026-09-04 — The wormhole 'W' on the sector scan is ours](#2026-09-04--the-wormhole-w-on-the-sector-scan-is-ours)
+- [2026-09-04 — Planet precedence on `sca se` follows canon, planets last](#2026-09-04--planet-precedence-on-sca-se-follows-canon-planets-last)
 - [2026-09-01 — PLTVCASH and PLTVDIV are chosen sysop values](#2026-09-01-pltvcash-and-pltvdiv-are-chosen-sysop-values)
 - [2026-09-01 — Fix the original's bugs rather than reproduce them](#2026-09-01-fix-the-originals-bugs-rather-than-reproduce-them)
 - [2026-09-01 — Confirm before abandoning a colony or a hull](#2026-09-01-confirm-before-abandoning-a-colony-or-a-hull)
@@ -2907,3 +2909,32 @@ cannons. Our `hel planet` listed the verbs and none of the consequences.
 is that players should learn what works, as the AI does. It is text the original
 ships, which we had dropped. Omitting canon's own documentation is a fidelity
 gap, not a difficulty setting.
+
+## 2026-09-04 — The wormhole 'W' on the sector scan is ours
+**Context:** `sca se` draws a 'W' for each visible wormhole. Canon draws no
+such marker: `scan_se` plots mines ('.'), ships (letters), self ('*') and
+planets ('1'+i), and nothing else (GECMDS.C:2598-2634). Reviewing the scan
+display turned this up as undocumented drift — exactly what the fidelity rules
+exist to catch.
+**Decision:** Keep the 'W', and record it here.
+**Reason:** A wormhole is navigationally significant and otherwise invisible —
+`orb` on one answers "You can't do that to a wormhole!!!", so a pilot can find
+them only by trial. Canon's players had the printed manual and a decade of
+folklore; ours have the screen. This is a deliberate accessibility deviation,
+not a lost value.
+**Alternatives rejected:** Dropping it for strict fidelity — it makes wormholes
+undiscoverable in a port with no manual. Adding a `sca wh` mode instead — more
+surface for the same information, and it would still be an invention.
+
+## 2026-09-04 — Planet precedence on `sca se` follows canon, planets last
+**Context:** The port drew planets early and gave the self-cell '*' the highest
+precedence. Canon calls `map_planets()` LAST — GECMDS.C:2634, after the ships
+loop and after the self-cell is written at :2631 — so a planet overwrites a
+ship and even your own marker.
+**Decision:** Adopt canon's order: mines -> ships -> self -> planets.
+**Reason:** It reads wrong until you notice that a planet sharing your cell
+means you are on top of it, which `rep` and `orb` both already tell you. The
+rule is that canon wins where we merely find its behaviour surprising.
+**Alternatives rejected:** Keeping self on top as a usability call — that is a
+preference, not a defect in canon, and it was never written down. If it proves
+genuinely confusing in play it can come back HERE as a justified deviation.

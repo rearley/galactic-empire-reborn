@@ -72,6 +72,12 @@ export enum MessageId {
   // scan pl — planet status block (feature 004)
   // @see specs/004-galaxy-generator/contracts/scan-projection.md §"Message catalogue additions"
   NO_SUCH_PLANET = 'NO_SUCH_PLANET',
+  /** @see GE/REL/MBMGEMSG.MSG:5829 MINE6 — neutron mine proximity warning */
+  MINE6 = 'MINE6',
+  /** @see GE/REL/MBMGEMSG.MSG:3621 SCAN24 — range-scan header, RAW distance */
+  SCAN24 = 'SCAN24',
+  /** @see GE/REL/MBMGEMSG.MSG:3625 SCAN25 — sector-scan header, no range */
+  SCAN25 = 'SCAN25',
   SCAN08 = 'SCAN08',
   SCAN_DASHES = 'SCAN_DASHES',
   SCAN09 = 'SCAN09',
@@ -677,6 +683,15 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
 
   // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
+  // Canon has BOTH the '.' on the scan map and this warning; only the port's
+  // wording was invented. The `***` banner is canon's own attention marker,
+  // the same one the Cybertron taunts open with.
+  [MessageId.MINE6]: '***\nWARNING! WARNING!\nSensors indicate a neutron mine bearing %s, distance %s.',
+  // Canon prints the raw range and no unit: `spr("%ld",(long)range)` while
+  // `range` is still in coordinate units (GECMDS.C:2516, :2673).
+  [MessageId.SCAN24]: '   Range Scan Dist:%s (s:%s %s)',
+  // The sector scan is always 1x and carries no range at all.
+  [MessageId.SCAN25]: '   Sector Scan mag:1x (s:%s %s)',
   [MessageId.MIN_NOMINE]: 'No mine launcher mounted.',
   [MessageId.MIN_CLOAK]: 'Cannot lay mines while cloaked.',
   [MessageId.MIN_NEUTRAL]: 'Cannot lay mines in the neutral zone.',

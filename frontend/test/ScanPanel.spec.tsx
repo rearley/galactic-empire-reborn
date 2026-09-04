@@ -1,3 +1,7 @@
+// Canon's side-panel row prints the raw distance with NO unit:
+// `prf("  %c  %s   %4d    %4d    %s\r", ...)` with spr("%ld",(long)dist)
+// (GECMDS.C:3061). 'pc' was ours, and it labelled raw coordinate units as
+// parsecs while the header used it for sectors — the same suffix 10 000x apart.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { ScanPanel } from '../src/components/ScanPanel';
@@ -241,7 +245,7 @@ describe('ScanPanel', () => {
     expect(screen.getByTestId('side-panel-row-B')).toBeDefined();
 
     const rowA = screen.getByTestId('side-panel-row-A');
-    expect(rowA.textContent).toContain('120pc');
+    expect(rowA.textContent).toContain('120');
     expect(rowA.textContent).toContain('Brg:45');
     expect(rowA.textContent).toContain('Hdg:270');
     expect(rowA.textContent).toContain('Warp 4.5');
@@ -282,14 +286,14 @@ describe('ScanPanel', () => {
     expect(screen.getByTestId('scan-card-side-panel')).toBeDefined();
 
     const rowA = screen.getByTestId('side-panel-row-A');
-    expect(rowA.textContent).toContain('42pc');
+    expect(rowA.textContent).toContain('42');
     expect(rowA.textContent).toContain('Brg:90');
     expect(rowA.textContent).toContain('Hdg:0');
     expect(rowA.textContent).toContain('Warp 2.0');
     expect(rowA.textContent).toContain('Avenger');
 
     const rowB = screen.getByTestId('side-panel-row-B');
-    expect(rowB.textContent).toContain('88pc');
+    expect(rowB.textContent).toContain('88');
     expect(rowB.textContent).toContain('Stopped');
     // No name field on rowB
     expect(rowB.textContent).not.toContain('Avenger');

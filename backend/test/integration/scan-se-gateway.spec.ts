@@ -162,7 +162,7 @@ describe('T026 — sca se gateway integration', () => {
     it('command:result carries exactly one info-category line with the header text', () => {
       expect(commandResultPayload.lines).toHaveLength(1);
       expect(commandResultPayload.lines[0].category).toBe('info');
-      expect(commandResultPayload.lines[0].text).toBe(`Sector ${XSECT},${YSECT}`);
+      expect(commandResultPayload.lines[0].text).toBe(`   Sector Scan mag:1x (s:${XSECT} ${YSECT})`);
     });
 
     it('scan:render kind is "se"', () => {
@@ -216,8 +216,9 @@ describe('T026 — sca se gateway integration', () => {
       expect(scanRenderPayload.header).toBe(commandResultPayload.lines[0].text);
     });
 
-    it('header is "Sector <xsect>,<ysect>"', () => {
-      expect(scanRenderPayload.header).toBe(`Sector ${XSECT},${YSECT}`);
+    it('header is SCAN25 "   Sector Scan mag:1x (s:<x> <y>)"', () => {
+      // SCAN25 — @see GE/REL/MBMGEMSG.MSG:3625
+      expect(scanRenderPayload.header).toBe(`   Sector Scan mag:1x (s:${XSECT} ${YSECT})`);
     });
   });
 
