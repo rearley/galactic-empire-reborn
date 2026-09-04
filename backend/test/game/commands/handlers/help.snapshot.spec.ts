@@ -20,6 +20,13 @@ describe('Help topic snapshots', () => {
       'maintenance',
       'mail',
       'comms',
+      // Canon's HELP NEW signposts both of these by name (MBMGEHLP.MSG:788):
+      // "For pricing on ships type HELP CLASS, for phasers and shields type
+      // HELP NEWPRICE." Both tables are GENERATED from the shipped price data,
+      // not transcribed from HLPNEW2 — which disagrees with SHLDPR19 on the
+      // Mark-19 shield. @see test/unit/help-price-tables.spec.ts
+      'newprice',
+      'class',
     ]);
   });
 

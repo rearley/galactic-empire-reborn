@@ -3,8 +3,12 @@
  *
  * @see GECMDS.C cmd_help
  */
+import { PHASER_PRICE, SHIELD_PRICE, FIRST_CPU_CLASS } from '../handlers/new-ship.handler';
+import { SHIP_CLASSES } from '../../../../prisma/seed/ship-classes';
 
 export type HelpTopicId =
+  | 'newprice'
+  | 'class'
   | 'navigation'
   | 'combat'
   | 'trade'
@@ -19,6 +23,16 @@ export type HelpTopicId =
  * "Unknown help topic" is how the repair command stayed undiscoverable.
  */
 export const HELP_TOPIC_ALIASES: Readonly<Record<string, HelpTopicId>> = Object.freeze({
+  // Canon's HLPNEW signposts both of these by name: "For pricing on ships type
+  // HELP CLASS, for phasers and shields type HELP NEWPRICE."
+  prices: 'newprice',
+  price: 'newprice',
+  newprices: 'newprice',
+  phaserprice: 'newprice',
+  shieldprice: 'newprice',
+  classes: 'class',
+  ships: 'class',
+  shipclass: 'class',
   mai: 'maintenance',
   maint: 'maintenance',
   repair: 'maintenance',
@@ -33,6 +47,95 @@ export const HELP_TOPIC_ALIASES: Readonly<Record<string, HelpTopicId>> = Object.
   shield: 'combat',
   shields: 'combat',
 });
+
+
+/**
+ * Canon ships two price tables a player can read in-game, and signposts them
+ * from HELP NEW itself:
+ *
+ *   "For pricing on ships type HELP CLASS, for phasers and shields type
+ *    HELP NEWPRICE."   -- MBMGEHLP.MSG:788
+ *
+ * HLPNEW2 is the phaser/shield table. It is TRANSCRIBED here from neither that
+ * file nor from memory: it is GENERATED from PHASER_PRICE / SHIELD_PRICE, which
+ * are the values the shipyard actually charges and are pinned field-by-field
+ * against MBMGEMSG.MSG's PHSRPR01-19 / SHLDPR01-19.
+ *
+ * That distinction is not pedantry. `HLPNEW2` says a Mark-19 shield costs
+ * 250.0m; `SHLDPR19` says 200000000. The help text and the shipped
+ * configuration disagree, and per the project's precedence rules the option
+ * file wins — in-game help states design intent and is never authoritative for
+ * a number. Copying the table by hand would have imported a known-wrong price
+ * into the one place a player goes to check.
+ */
+function money(v: bigint): string {
+  const n = Number(v);
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `${m % 1 === 0 ? m.toFixed(1) : m.toFixed(1)}m`;
+  }
+  return `${n / 1000}k`;
+}
+
+function priceTableBody(): string[] {
+  const rows: string[] = [
+    'Phaser and Shield Prices',
+    '',
+    '  Mark    Shields      Phasers',
+    '  ----    -------      -------',
+  ];
+  for (let i = 0; i < SHIELD_PRICE.length; i++) {
+    const mark = String(i + 1).padEnd(4);
+    rows.push(`  ${mark}  ${money(SHIELD_PRICE[i]).padStart(8)}  ${money(PHASER_PRICE[i]).padStart(11)}`);
+  }
+  rows.push(
+    '',
+    '  Buy at Zygor-3 in sector 0 0, in orbit:  new phaser <mark>',
+    '                                          new shield <mark>',
+    '  Your old unit is traded in for two thirds of what it lists at,',
+    '  So an upgrade costs far less than the sticker price.',
+    '  Type `new phaser` or `new shield` with no mark to see YOUR net cost.',
+  );
+  return rows;
+}
+
+/**
+ * The ship table canon's HELP CLASS shows, generated from the seed rather than
+ * transcribed. `SHIP_CLASSES` is produced by tools/extract-ship-classes.mjs
+ * from MBMGESHP.MSG and verified field-by-field by
+ * test/balance/ship-class-canon.balance.spec.ts, so this cannot drift from the
+ * hulls the shipyard actually sells.
+ *
+ * Only hulls `new ship` will actually SELL appear, using the same bound the
+ * handler uses: `type < cyb_class && max_type == CLASSTYPE_USER`
+ * (GECMDS.C:4564). Category alone is not enough — the Sysopian Death Star is
+ * category PLAYER at class 41 and had already leaked into the purchase list
+ * once before that bound was added.
+ */
+const CLASS_TABLE_BODY: string[] = (() => {
+  const rows: string[] = [
+    'Ship Classes',
+    '',
+    '  #  Class             Price   Phas  Shld     Cargo  Warp',
+    '  -  -----             -----   ----  ----     -----  ----',
+  ];
+  for (const c of SHIP_CLASSES) {
+    if (c.category !== 'PLAYER' || c.classNumber >= FIRST_CPU_CLASS) continue;
+    rows.push(
+      `  ${String(c.classNumber).padEnd(2)} ${c.typeName.padEnd(17)} ` +
+      `${money(c.maxPrice).padStart(6)}  ${String(c.maxPhaser).padStart(4)}  ` +
+      `${String(c.maxShields).padStart(4)}  ${c.maxTons.toLocaleString().padStart(8)}  ` +
+      `${String(c.maxWarp).padStart(4)}`,
+    );
+  }
+  rows.push(
+    '',
+    '  Buy at Zygor-3 in sector 0 0, in orbit:  new ship <#>',
+    '  Phas/Shld are the highest marks that hull will mount — see HEL NEWPRICE.',
+    '  Cargo is tonnage; a torpedo is 3 tons, a fighter 15, gold 50.',
+  );
+  return rows;
+})();
 
 export interface HelpTopic {
   readonly title: string;
@@ -238,6 +341,14 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  tea leave              — leave your team',
       '  cls                    — clear the event log',
     ],
+  },
+  newprice: {
+    title: 'Phaser and Shield Prices',
+    body: priceTableBody(),
+  },
+  class: {
+    title: 'Ship Classes',
+    body: CLASS_TABLE_BODY,
   },
 });
 

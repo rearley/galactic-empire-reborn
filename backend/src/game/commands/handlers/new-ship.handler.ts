@@ -28,7 +28,7 @@ import { formatMessage, MessageId } from '../messages';
  * may list or sell. GEMAIN.C:881-882 computes it; in the shipped table the
  * first CYBORG is class 21.
  */
-const FIRST_CPU_CLASS = 21;
+export const FIRST_CPU_CLASS = 21;
 
 export const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
   1_200_000n, 2_000_000n, 3_800_000n, 5_000_000n, 7_000_000n, 9_000_000n,
