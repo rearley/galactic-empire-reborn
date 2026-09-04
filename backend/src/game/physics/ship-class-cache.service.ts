@@ -40,6 +40,8 @@ export interface ShipClassEntry {
   damageFactor: number;
   /** Human-readable ship class name (e.g. "Scout", "Destroyer"). Used in the ship-select menu. */
   typeName: string;
+  /** 'PLAYER' | 'CPU_COMBATIVE' | 'CPU_DROID' — canon's `max_type`. */
+  category: string;
   /** Canon SNAME: the display-name PREFIX for automatons. @see MBMGESHP.MSG SxxSNAME */
   shipNameTemplate: string;
 }
@@ -76,6 +78,7 @@ export class ShipClassCacheService implements OnModuleInit {
         canAttackPlanet: true,
         damageFactor: true,
         typeName: true,
+        category: true,
         shipNameTemplate: true,
       },
     });
@@ -102,6 +105,7 @@ export class ShipClassCacheService implements OnModuleInit {
         canAttackPlanet: row.canAttackPlanet,
         damageFactor: row.damageFactor,
         typeName: row.typeName,
+        category: row.category,
         shipNameTemplate: row.shipNameTemplate,
       });
     }
@@ -191,6 +195,16 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.cache.get(classNumber)?.typeName;
   }
 
+  /**
+   * 'PLAYER' | 'CPU_COMBATIVE' | 'CPU_DROID' — canon's `max_type`, and the
+   * thing that decides WHICH brain a ship runs. Canon binds one tick_func per
+   * class at boot (GEMAIN.C:878-895) and calls it by class (:2418-2419), so a
+   * droid never runs Cybertron code.
+   */
+  getCategory(classNumber: number): string | undefined {
+    return this.cache.get(classNumber)?.category;
+  }
+
   private entry(classNumber: number): ShipClassEntry {
     const entry = this.cache.get(classNumber);
     if (!entry) throw new Error(`ShipClass ${classNumber} not in cache`);
@@ -224,6 +238,7 @@ export class ShipClassCacheService implements OnModuleInit {
       canAttackPlanet: true,
       damageFactor: 100,
       typeName: '',
+      category: 'PLAYER',
       shipNameTemplate: '',
       ...entry,
     });

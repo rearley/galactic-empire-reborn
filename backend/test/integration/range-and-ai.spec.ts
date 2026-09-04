@@ -108,6 +108,9 @@ function buildCybertronHarness(seed = 42) {
   for (const c of SHIP_CLASSES) classCache.set(c.classNumber, classCacheEntry(c) as never);
   const shipClassCache = {
     get: (n: number) => classCache.get(n),
+    // Canon dispatches AI behaviour by CLASS (GEMAIN.C:878-895); a droid never
+    // runs cyb_lives. These harnesses only ever hold CYBORG classes.
+    getCategory: (n: number) => (classCache.has(n) ? 'CPU_COMBATIVE' : undefined),
     // cybFirePhaser now feeds victimMaxTons into phaserDamage — the production
     // ShipClassCacheService exposes getMaxTons; the fake must too or cybLives throws.
     getMaxTons: (n: number) => (classCache.get(n) as { maxTons: number })?.maxTons ?? 5000,

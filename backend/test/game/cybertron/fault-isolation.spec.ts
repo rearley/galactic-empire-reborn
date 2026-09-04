@@ -107,6 +107,9 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
     } as unknown as ShipStateService;
 
     const shipClassCache = {
+      // 999 is the deliberately-unknown class; everything else here is a
+      // Cybertron. Canon dispatches by class (GEMAIN.C:878-895).
+      getCategory: (n: number) => (n === 999 ? undefined : 'CPU_COMBATIVE'),
       get: (n: number) => {
         if (n === 999) return undefined; // bad ship — class not found
         return {

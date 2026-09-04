@@ -41,7 +41,8 @@ const TRANSPORT_CLASS_ENTRY: ShipClassEntry = {
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
   tough: 0, cybLowestClassAttacks: 0, cybCanAttack: false, points: 50,
   canAttackPlanet: false, damageFactor: 100,
-  typeName: 'Murdonian Transport', shipNameTemplate: 'Trans-Gal #',
+  typeName: 'Murdonian Transport',
+  category: 'CPU_DROID', shipNameTemplate: 'Trans-Gal #',
 };
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
