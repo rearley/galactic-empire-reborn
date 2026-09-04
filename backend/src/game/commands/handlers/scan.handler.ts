@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { showarp } from '../../ship/showarp';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
@@ -26,17 +27,6 @@ import { scanShipColour } from './helpers/scan-ship-colour';
  *
  * @see GECMDS.C:3019 printmapfull — speed formatting
  */
-/**
- * Canon's `showarp` — the bare figure, no unit word.
- *   0 -> "0.00";  > warp 99.999 -> "Hyper";  else "%.2f" of speed/1000.
- * The messages that use it supply the word: `SCAN04 {Speed: Warp %s`.
- * @see GEFUNCS.C:2674
- */
-export function showarp(speed: number): string {
-  if (speed === 0) return '0.00';
-  if (speed / 1000 > 99.999) return 'Hyper';
-  return (speed / 1000).toFixed(2);
-}
 
 /**
  * The port's own Stopped/Impulse/Warp wording. Canon's side panel uses
