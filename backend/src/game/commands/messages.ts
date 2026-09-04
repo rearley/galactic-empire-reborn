@@ -94,6 +94,8 @@ export enum MessageId {
   ORBIT01 = 'ORBIT01',
   ORBITALR = 'ORBITALR',
   ORBITNO = 'ORBITNO',
+  /** @see GE/REL/MBMGEMSG.MSG ORBIT0 — you cannot orbit a wormhole */
+  ORBIT0 = 'ORBIT0',
   ORBITPK = 'ORBITPK',
   ORBIT_TOO_FAR = 'ORBIT_TOO_FAR',
   ABAN_CONFIRM_PLANET = 'ABAN_CONFIRM_PLANET',
@@ -550,6 +552,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // MBMGEMSG.MSG:2840 ORBIT1 carries the plnum AND the name — the number is
   // what the player types into `sca pl <n>` and `tra`.
   [MessageId.ORBIT01]: 'We are now in stationary orbit around planet %d %s SIR!.',
+  // Canon's own words. @see GECMDS.C:791-793, GE/REL/MBMGEMSG.MSG ORBIT0
+  [MessageId.ORBIT0]: "You can't do that to a wormhole!!!",
   [MessageId.ORBITALR]: 'You are already in orbit.',
   // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
   // MBMGEMSG.MSG ORBIT2, verbatim. Canon gives no distance and we do not add

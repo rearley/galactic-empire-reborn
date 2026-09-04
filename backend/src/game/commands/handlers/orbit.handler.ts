@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -15,7 +16,17 @@ export class OrbitHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
     private readonly planetService: PlanetStateService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** Does `plnum` name a wormhole in this sector? @see GECMDS.C:791-793 */
+  private async isSectorWormhole(xsect: number, ysect: number, plnum: number): Promise<boolean> {
+    const row = await this.prisma.wormhole.findFirst({
+      where: { xsect, ysect, plnum },
+      select: { plnum: true },
+    });
+    return row !== null;
+  }
 
   get command(): Command {
     return {
@@ -23,12 +34,12 @@ export class OrbitHandlerService {
       aliases: ['orb'],
       minArgs: 0,
       argMissingMessage: '',
-      handler: (ship: ShipState, args: string[], ctx: CommandContext): CommandResult =>
+      handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
         this.handle(ship, args, ctx),
     };
   }
 
-  private handle(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     if (ship.where >= 10) {
       return { lines: [{ text: formatMessage(MessageId.ORBITALR), category: 'system' }] };
     }
@@ -60,6 +71,17 @@ export class OrbitHandlerService {
         };
       }
       const choice = parseInt(arg, 10);
+      // Wormholes share the planet slot space, and `sca pl` numbers them in
+      // the same run — so `orb 4` on a three-planet sector is a captain naming
+      // the wormhole they were just shown. Canon answers that specifically:
+      // `if (plptr->type == PLTYPE_WORM) { prfmsg(ORBIT0); return; }`
+      // (GECMDS.C:791-793). We searched planets only, found nothing, and
+      // re-prompted as though no argument had been given.
+      if (Number.isFinite(choice) && !planets.some((p) => p.plnum === choice)
+        && await this.isSectorWormhole(xsect, ysect, choice)) {
+        return { lines: [{ text: formatMessage(MessageId.ORBIT0), category: 'system' }] };
+      }
+
       const found = planets.find((p) => p.plnum === choice);
       if (!found) {
         const list = planets.map((p) => `${p.plnum}: ${p.name || '(unnamed)'}`).join(', ');

@@ -59,26 +59,26 @@ function makeService(planets: PlanetState[]) {
   const mockPlanets = {
     bySector: jest.fn().mockReturnValue(planets),
   } as unknown as PlanetStateService;
-  return new OrbitHandlerService(mockShips, mockPlanets);
+  return new OrbitHandlerService(mockShips, mockPlanets, { wormhole: { findFirst: async () => null } } as never);
 }
 
 const ctx: CommandContext = {};
 const texts = (r: CommandResult): string => r.lines.map((l) => l.text).join('\n');
 
 describe('orb — reads live planet state, not the boot snapshot', () => {
-  it('names a planet renamed during this session', () => {
+  it('names a planet renamed during this session', async () => {
     const service = makeService([planetState({ name: 'New Hope' })]);
-    const r = service.command.handler(makeShip(), [], ctx) as CommandResult;
+    const r = await service.command.handler(makeShip(), [], ctx) as CommandResult;
     expect(texts(r)).toContain('New Hope');
     expect(texts(r)).not.toContain('(unnamed)');
   });
 
-  it('uses live names in the multi-planet picker', () => {
+  it('uses live names in the multi-planet picker', async () => {
     const service = makeService([
       planetState({ plnum: 1, name: 'New Hope' }),
       planetState({ plnum: 2, name: 'Anchorage', xcoord: 10.9, ycoord: 7.9 }),
     ]);
-    const r = service.command.handler(makeShip(), [], ctx) as CommandResult;
+    const r = await service.command.handler(makeShip(), [], ctx) as CommandResult;
     expect(texts(r)).toContain('New Hope');
     expect(texts(r)).toContain('Anchorage');
   });
