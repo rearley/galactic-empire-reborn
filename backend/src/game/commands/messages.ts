@@ -673,33 +673,33 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP_CARGO_NONE]: '(no items aboard)',
 
   // phaser (feature 006b) — GECMDS.C:cmd_phasor
-  [MessageId.PHA_NOPHAS]: 'No phaser class mounted.',
-  [MessageId.PHA_NOPOW]: 'Insufficient phaser charge.',
-  [MessageId.PHA_FMT]: 'Format: pha <degree -180..180> [focus 0-5]',
-  [MessageId.PHA_CLOAK]: 'Cannot fire while cloaked.',
+  [MessageId.PHA_NOPHAS]: CANON_MESSAGES.PHASER0,
+  [MessageId.PHA_NOPOW]: CANON_MESSAGES.PHANONE,
+  [MessageId.PHA_FMT]: CANON_MESSAGES.PHAFMT,
+  [MessageId.PHA_CLOAK]: CANON_MESSAGES.PCLOKUP,
   // MBMGEMSG.MSG:3810 ZAPHIM1, verbatim. The paraphrase dropped the Enforcer
   // Planet, which is the ONLY in-game explanation of why the neutral zone is
   // enforced at all — a new player otherwise has no idea what just shot them.
   [MessageId.WPN_ZAP]:
     'Sssssssssss.... ZAPP!!!!!\n\n'
     + 'You are instantly blinded by an intense beam from the Enforcer Planet.',
-  [MessageId.HP_NOPOW]: 'Insufficient flux energy for hyper-phaser.',
-  [MessageId.HP_WAIT]: 'Hyper-phaser recharging — stand by.',
+  [MessageId.HP_NOPOW]: CANON_MESSAGES.PHANONE,
+  [MessageId.HP_WAIT]: CANON_MESSAGES.HPWAIT,
 
   // torpedo (feature 006b)
-  [MessageId.TOR_NOTOR]: 'No torpedo launcher mounted.',
-  [MessageId.TOR_WARP]: 'Cannot fire torpedoes at warp speed.',
-  [MessageId.TOR_CLOAK]: 'Cannot fire while cloaked.',
-  [MessageId.TOR_NOAMMO]: 'No torpedoes in cargo.',
+  [MessageId.TOR_NOTOR]: CANON_MESSAGES.TORP3,
+  [MessageId.TOR_WARP]: CANON_MESSAGES.TORP2,
+  [MessageId.TOR_CLOAK]: CANON_MESSAGES.PCLOKUP,
+  [MessageId.TOR_NOAMMO]: CANON_MESSAGES.NOTORPS,
   [MessageId.TOR_FULL]: 'Target already has maximum torpedoes incoming.',
-  [MessageId.TOR_FMT]: 'Format: tor <target>',
+  [MessageId.TOR_FMT]: CANON_MESSAGES.NOSHIP,
 
   // missile (feature 006b)
-  [MessageId.MIS_NOMIS]: 'No missile launcher mounted.',
-  [MessageId.MIS_CLOAK]: 'Cannot fire while cloaked.',
-  [MessageId.MIS_NOAMMO]: 'No missiles in cargo.',
+  [MessageId.MIS_NOMIS]: CANON_MESSAGES.MISS01,
+  [MessageId.MIS_CLOAK]: CANON_MESSAGES.PCLOKUP,
+  [MessageId.MIS_NOAMMO]: CANON_MESSAGES.NOMISSL,
   [MessageId.MIS_FULL]: 'Target already has maximum missiles incoming.',
-  [MessageId.MIS_FMT]: 'Format: mis <target> <charge>',
+  [MessageId.MIS_FMT]: CANON_MESSAGES.MISFMT,
 
   // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
   // Canon has BOTH the '.' on the scan map and this warning; only the port's
@@ -724,15 +724,15 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN24]: '   Range Scan Dist:%s (s:%s %s)',
   // The sector scan is always 1x and carries no range at all.
   [MessageId.SCAN25]: '   Sector Scan mag:1x (s:%s %s)',
-  [MessageId.MIN_NOMINE]: 'No mine launcher mounted.',
-  [MessageId.MIN_CLOAK]: 'Cannot lay mines while cloaked.',
-  [MessageId.MIN_NEUTRAL]: 'Cannot lay mines in the neutral zone.',
-  [MessageId.MIN_NOAMMO]: 'No mines in cargo.',
-  [MessageId.MIN_FULL]: 'Your mine limit is deployed.',
+  [MessageId.MIN_NOMINE]: CANON_MESSAGES.MINE0,
+  [MessageId.MIN_CLOAK]: CANON_MESSAGES.PCLOKUP,
+  [MessageId.MIN_NEUTRAL]: CANON_MESSAGES.MINE7,
+  [MessageId.MIN_NOAMMO]: CANON_MESSAGES.MINE1,
+  [MessageId.MIN_FULL]: CANON_MESSAGES.MINE2,
   // Canon's answer when `laymine` finds no free slot in the galaxy-wide table
   // and returns 0 (GECMDS.C:1772-1780). Distinct from MIN_FULL, which is the
   // per-captain USRMINES cap. @see GE/REL/MBMGEMSG.MSG:5814
-  [MessageId.MIN_JAMMED]: 'The mine launcher is temporarly jammed, Sir!',
+  [MessageId.MIN_JAMMED]: CANON_MESSAGES.MINE2,
   // Canon names the fuse, and the fuse is the whole point of the command:
   // `min <1-50>` in centocks, ~5 seconds each. Our bare "Mine deployed."
   // withheld the one number that makes the choice meaningful — a player
