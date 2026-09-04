@@ -178,7 +178,8 @@ describe('sca pl <n> — wormhole branch (GECMDS.C:2455-2468)', () => {
     expect(text).toContain('Object Class: Wormhole');
     expect(text).toContain('Named: Sagan Rift');
     expect(text).toMatch(/Bearing:\s*-?\d+/);
-    expect(text).toMatch(/Distance:\s*\d+/);
+    // SCAN10 {Bearing: %d Dist: %s} — canon abbreviates it.
+    expect(text).toMatch(/Dist:\s*\d+/);
   });
 
   it('omits the name line for an unnamed wormhole', async () => {

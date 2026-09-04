@@ -1,3 +1,4 @@
+import { CANON_MESSAGES } from './canon-messages.generated';
 /**
  * Original-game response strings, reconstructed from wiki and prfmsg() call signatures.
  * Source ledger: specs/003-ship-commands/contracts/messages.md
@@ -478,90 +479,90 @@ export enum MessageId {
  */
 const MESSAGE_STRINGS: Record<MessageId, string> = {
   // impulse — GECMDS.C:482
-  [MessageId.IMPFMT]: 'Usage: impulse <0-99> [course]',
-  [MessageId.IMPULSE1]: 'You cannot use impulse engines in hyperspace.',
-  [MessageId.ENGFIRE]: 'Engines fired, new course %u degrees.',
+  [MessageId.IMPFMT]: CANON_MESSAGES.IMPFMT,
+  [MessageId.IMPULSE1]: CANON_MESSAGES.IMPULSE1,
+  [MessageId.ENGFIRE]: CANON_MESSAGES.ENGFIRE,
   [MessageId.ENGSTOP]: 'Engines cut. Coasting to a stop.',
 
   // warp — GECMDS.C:561
-  [MessageId.WARP01]: 'Your ship has no warp drive.',
-  [MessageId.WARPSPD2]: 'Your warp drive is offline.',
-  [MessageId.WARPFMT]: 'Usage: warp <speed> [course]',
-  [MessageId.WARP02]: 'Speed cannot be negative.',
+  [MessageId.WARP01]: CANON_MESSAGES.WARP01,
+  [MessageId.WARPSPD2]: CANON_MESSAGES.WARPSPD2,
+  [MessageId.WARPFMT]: CANON_MESSAGES.WARPFMT,
+  [MessageId.WARP02]: CANON_MESSAGES.WARP02,
   // MBMGEMSG.MSG:2181 WARP03, verbatim.
-  [MessageId.WARP03]: 'If we pushed her that fast commander the warp engines would explode!',
-  [MessageId.WARP04]: 'Warning: speed exceeds rated maximum of warp %d.',
+  [MessageId.WARP03]: CANON_MESSAGES.WARP03,
+  [MessageId.WARP04]: CANON_MESSAGES.WARP04,
 
   // rotate — GECMDS.C:643
-  [MessageId.ROTFMT]: 'Usage: rotate <-180..180>',
-  [MessageId.NOWTURN]: 'Now turning to %u degrees.',
-  [MessageId.NOROTPW]: 'Insufficient power to rotate.',
-  [MessageId.CANTROT]: 'Cannot rotate while reversing.',
+  [MessageId.ROTFMT]: CANON_MESSAGES.ROTFMT,
+  [MessageId.NOWTURN]: CANON_MESSAGES.NOWTURN,
+  [MessageId.NOROTPW]: CANON_MESSAGES.NOROTPW,
+  [MessageId.CANTROT]: CANON_MESSAGES.CANTROT,
 
   // report — GECMDS.C:1946
-  [MessageId.REPFMT]: 'Usage: report <nav|sys|inv|cargo|wpns|acc>',
-  [MessageId.REP01]: '%s — %s',
-  [MessageId.DASHES]: '--------------------------------',
-  [MessageId.REP35]: 'Navigation:',
-  [MessageId.REP02]: 'In hyperspace at sector (%d, %d).',
-  [MessageId.REP03]: 'Speed: %s',
-  [MessageId.REP04]: 'Heading: %d degrees.',
-  [MessageId.REP05]: 'In sector (%d, %d).',
-  [MessageId.REP06]: 'Speed: %s',
-  [MessageId.REP07]: 'Heading: %d degrees.',
-  [MessageId.REP08]: 'Orbiting planet %d in sector (%d, %d).',
-  [MessageId.REP32]: 'Position: sector (%d, %d) intra (%d, %d).',
-  [MessageId.REP09]: 'Energy: %u units.',
+  [MessageId.REPFMT]: CANON_MESSAGES.REPFMT,
+  [MessageId.REP01]: CANON_MESSAGES.REP01,
+  [MessageId.DASHES]: CANON_MESSAGES.DASHES,
+  [MessageId.REP35]: CANON_MESSAGES.REP35,
+  [MessageId.REP02]: CANON_MESSAGES.REP02,
+  [MessageId.REP03]: CANON_MESSAGES.REP03,
+  [MessageId.REP04]: CANON_MESSAGES.REP04,
+  [MessageId.REP05]: CANON_MESSAGES.REP05,
+  [MessageId.REP06]: CANON_MESSAGES.REP06,
+  [MessageId.REP07]: CANON_MESSAGES.REP07,
+  [MessageId.REP08]: CANON_MESSAGES.REP08,
+  [MessageId.REP32]: CANON_MESSAGES.REP32,
+  [MessageId.REP09]: CANON_MESSAGES.REP09,
   [MessageId.REP10]: 'Shields: %s at %d%%.',
   [MessageId.REP11]: 'Shields: down.',
   [MessageId.REP11B]: 'Shields: destroyed.',
-  [MessageId.REP14]: 'Damage: %s',
+  [MessageId.REP14]: CANON_MESSAGES.REP14,
   // rep sys subsystem lines — GECMDS.C:2041-2050
-  [MessageId.REP15]: 'Shields are damaged and cannot be raised.',
-  [MessageId.REP16]: 'Helm control is damaged.',
-  [MessageId.REP17]: 'Cloaking device is damaged.',
-  [MessageId.REP18]: 'Tactical systems are damaged.',
-  [MessageId.REP18A]: 'Repairs in progress — %d ticks remaining.',
-  [MessageId.REP24A]: 'Frequencies: %d / %d / %d.',
-  [MessageId.REP23]: 'Phasors: %s.',
+  [MessageId.REP15]: CANON_MESSAGES.REP15,
+  [MessageId.REP16]: CANON_MESSAGES.REP16,
+  [MessageId.REP17]: CANON_MESSAGES.REP17,
+  [MessageId.REP18]: CANON_MESSAGES.REP18,
+  [MessageId.REP18A]: CANON_MESSAGES.REP18A,
+  [MessageId.REP24A]: CANON_MESSAGES.REP24A,
+  [MessageId.REP23]: CANON_MESSAGES.REP23,
   [MessageId.REP24]: 'Phasors: none.',
-  [MessageId.REP12]: 'Cloak: active.',
-  [MessageId.REP13]: 'Cloak: inactive.',
+  [MessageId.REP12]: CANON_MESSAGES.REP12,
+  [MessageId.REP13]: CANON_MESSAGES.REP13,
   // rep acc — GECMDS.C:2074
-  [MessageId.REP25]: 'Account:',
-  [MessageId.REP26]: 'Planets: none.',
-  [MessageId.REP27]: 'Planets owned: %d.',
-  [MessageId.REP28]: 'Credits: %s',
-  [MessageId.REP30]: 'Score: %s',
-  [MessageId.REP31]: 'Kills: %d.',
+  [MessageId.REP25]: CANON_MESSAGES.REP25,
+  [MessageId.REP26]: CANON_MESSAGES.REP26,
+  [MessageId.REP27]: CANON_MESSAGES.REP27,
+  [MessageId.REP28]: CANON_MESSAGES.REP28,
+  [MessageId.REP30]: CANON_MESSAGES.REP30,
+  [MessageId.REP31]: CANON_MESSAGES.REP31,
   [MessageId.REP31A]: 'Team: %s',
 
   // scan — GECMDS.C:2138
-  [MessageId.SCANFMT]: 'Usage: scan <mode>  (sh/pl/ra/se/lo)',
-  [MessageId.TABROKE]: 'Tactical computer is offline.',
-  [MessageId.JAMMER4]: 'Cannot scan while jammer is active.',
+  [MessageId.SCANFMT]: CANON_MESSAGES.SCANFMT,
+  [MessageId.TABROKE]: CANON_MESSAGES.TABROKE,
+  [MessageId.JAMMER4]: CANON_MESSAGES.JAMMER4,
   [MessageId.SCAN_NOT_IN_FLIGHT]: 'You must be in flight to use that scan mode.',
 
   // scan pl — planet status block (feature 004)
   // @see GECMDS.C:2316 (no-planet path); GECMDS.C:2326-2356 (planet status block)
   [MessageId.NO_SUCH_PLANET]: 'No planet by that name.',
-  [MessageId.SCAN08]: 'Planet #%d: %s',
+  [MessageId.SCAN08]: CANON_MESSAGES.SCAN08,
   [MessageId.SCAN_DASHES]: '-----------------',
-  [MessageId.SCAN09]: 'Owned by: %s',
+  [MessageId.SCAN09]: CANON_MESSAGES.SCAN09,
   // Sent to the ship that was just scanned. @see GECMDS.C:2261-2280
   [MessageId.SCAN1]: 'You are being scanned by %s.',
-  [MessageId.SCAN2]: 'Your ship is being scanned from bearing %d, beyond your own scanners.',
-  [MessageId.SCAN3]: 'An unidentified vessel is scanning you from bearing %d.',
-  [MessageId.SCAN10]: 'Bearing: %d   Distance: %s',
-  [MessageId.SCAN11]: 'Environment: ',
+  [MessageId.SCAN2]: CANON_MESSAGES.SCAN2,
+  [MessageId.SCAN3]: CANON_MESSAGES.SCAN3,
+  [MessageId.SCAN10]: CANON_MESSAGES.SCAN10,
+  [MessageId.SCAN11]: CANON_MESSAGES.SCAN11,
   // Worst to best, matching the index they are looked up by: production scales
   // with (enviorn + resource + 2) * 0.25 (GEPLANET.C:281), so grade 3 is the
   // best world. These read the other way round until 2026-08-31, which had
   // pilots picking the least productive planet on the board.
-  [MessageId.SCAN12]: 'Inferno-like',
-  [MessageId.SCAN13]: 'Toxic',
-  [MessageId.SCAN14]: 'Hostile',
-  [MessageId.SCAN15]: 'Earth-like',
+  [MessageId.SCAN12]: CANON_MESSAGES.SCAN12,
+  [MessageId.SCAN13]: CANON_MESSAGES.SCAN13,
+  [MessageId.SCAN14]: CANON_MESSAGES.SCAN14,
+  [MessageId.SCAN15]: CANON_MESSAGES.SCAN15,
   [MessageId.SCAN16]: 'Resources: ',
   [MessageId.SCAN_LOCATED_IN]: 'Located in sector (%d,%d).',
 
@@ -609,12 +610,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.LAND_PASSFAIL]: 'Landing refused — incorrect password.',
 
   // buy (feature 005) — GECMDS.C:4201 cmd_buy
-  [MessageId.BUYFMT]: 'Use: buy <quantity> <item>',
+  [MessageId.BUYFMT]: CANON_MESSAGES.BUYFMT,
   // The gate is `where < 10`, i.e. NOT IN ORBIT — identical to C's cmd_buy
   // (GECMDS.C:4212). Orbit is sufficient; landing is not required. The previous
   // wording said "landed" and sent playtesters hunting for a landing step that
   // does not gate trade.
-  [MessageId.BUY1]: 'You must be in orbit around a planet to buy goods.',
+  [MessageId.BUY1]: CANON_MESSAGES.BUY1,
   // Four arguments are passed (qty, item, unit price, total) — the template
   // used to have three placeholders, so the total was dropped and the UNIT
   // price was reported as the amount paid.
@@ -625,18 +626,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // @see GECMDS.C:4380-4381, MBMGEMSG.MSG:3289
   [MessageId.BUY3]: 'They only have %s %s available for sale, Sir!',
   [MessageId.BUY4]: 'Your cargo holds are full.',
-  [MessageId.BUY5]: 'This planet is not selling that item.',
-  [MessageId.BUYPAS1]: 'Trade password required.',
-  [MessageId.BUYPAS3]: 'This planet trades only with its team.',
-  [MessageId.BUYPAS4]: 'Welcome, fellow team-mate.',
+  [MessageId.BUY5]: CANON_MESSAGES.BUY5,
+  [MessageId.BUYPAS1]: CANON_MESSAGES.BUYPAS1,
+  [MessageId.BUYPAS3]: CANON_MESSAGES.BUYPAS3,
+  [MessageId.BUYPAS4]: CANON_MESSAGES.BUYPAS4,
 
   // multi-ship (feature 030) — ship creation/selection
   [MessageId.NEW_FLEET_FULL]: 'Your fleet is full — you cannot own more ships.',
   [MessageId.SHIP_SELECT_HEADER]: 'Choose your ship:',
 
   // sell (feature 005) — GECMDS.C:4103 cmd_sell
-  [MessageId.SELLFMT]: 'Use: sell <quantity> <item>',
-  [MessageId.SELL1]: 'You can only sell at the galactic market on Zygor-3.',
+  [MessageId.SELLFMT]: CANON_MESSAGES.SELLFMT,
+  [MessageId.SELL1]: CANON_MESSAGES.SELL1,
   // Canon argument order is (tax, net, quantity, item) — the port led with the
   // net and dropped the tax to a parenthetical. @see MBMGEMSG.MSG:4008
   [MessageId.SELL2]: "After the Transfer Tax of %s we have netted %s C's for our %s %s, Sir!",
@@ -748,18 +749,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.LOC_NOTFOUND]: 'No such ship in range.',
   [MessageId.LOC_LOCKED]: 'Target locked.',
   [MessageId.LOC_FMT]: 'Format: loc <target>',
-  [MessageId.NOLOCK]: 'No target locked.',
+  [MessageId.NOLOCK]: CANON_MESSAGES.NOLOCK,
 
   // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
   [MessageId.SHI_UP]: 'Shields up.',
   [MessageId.SHI_DN]: 'Shields down.',
   [MessageId.SHI_FMT]: 'Format: shi up|dn',
   // cmd_shields gates, GECMDS.C:3114-3170
-  [MessageId.SHIELD0]: 'This ship carries no shield generator.',
-  [MessageId.SHLD1]: 'Shields cannot be operated in hyperspace.',
-  [MessageId.SHLD2]: 'You have no shields installed.',
-  [MessageId.SHNOPWR]: 'Insufficient power to raise shields.',
-  [MessageId.SHNORPR]: 'Your shields are damaged and must be repaired first.',
+  [MessageId.SHIELD0]: CANON_MESSAGES.SHIELD0,
+  [MessageId.SHLD1]: CANON_MESSAGES.SHLD1,
+  [MessageId.SHLD2]: CANON_MESSAGES.SHLD2,
+  [MessageId.SHNOPWR]: CANON_MESSAGES.SHNOPWR,
+  [MessageId.SHNORPR]: CANON_MESSAGES.SHNORPR,
 
   // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
   [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
@@ -868,12 +869,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABANDON_SECTOR]: '%s has been abandoned by its captain.',
   [MessageId.ABANDON_NO_SHIP]: 'You have no active ship. Please create one.',
   // canonical `aba` — colony abandonment (GECMDS.C:3420)
-  [MessageId.ABAN01]: 'You must be in orbit around a planet to abandon it.',
+  [MessageId.ABAN01]: CANON_MESSAGES.ABAN01,
   [MessageId.ABAN02]: 'You have abandoned %s. It is no longer yours.',
-  [MessageId.ABAN03]: 'That planet is not yours to abandon.',
+  [MessageId.ABAN03]: CANON_MESSAGES.ABAN03,
 
   // nav (feature 016) — GECMDS.C:5120 cmd_navigate
-  [MessageId.NAVFMT]: 'Usage: nav <x> <y>',
+  [MessageId.NAVFMT]: CANON_MESSAGES.NAVFMT,
   // C's cmd_navigate only reports bearing and distance; this port also turns the
   // ship. Neither sets speed, and saying so matters: pilots engaged "autopilot"
   // and sat still waiting to arrive.
@@ -881,15 +882,15 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // because cmd_navigate is a read-only bearing report — the autopilot the old
   // wording described was a port invention and has been withdrawn.
   // @see GECMDS.C:5154, GE/REL/MBMGEMSG.MSG NAV01
-  [MessageId.NAV01]: 'Sector %s %s is bearing %s, distance %s.',
+  [MessageId.NAV01]: CANON_MESSAGES.NAV01,
   [MessageId.NAV_INACTIVE]: 'Autopilot inactive.',
   [MessageId.NAV_STATUS]: 'Autopilot active — target (%s,%s), distance %s, bearing %s.',
   [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',
   [MessageId.NAV_ALREADY_THERE]: 'Already at target sector.',
-  [MessageId.LEAVEORB]: 'Leaving orbit, Sir!',
+  [MessageId.LEAVEORB]: CANON_MESSAGES.LEAVEORB,
   [MessageId.SHLDCHP]: 'Shields energizing, Sir!',
-  [MessageId.SHLDUP]: 'Shields are now fully charged, Sir!',
-  [MessageId.SHLDAT]: 'Shields are at %d percent charge, Sir!',
+  [MessageId.SHLDUP]: CANON_MESSAGES.SHLDUP,
+  [MessageId.SHLDAT]: CANON_MESSAGES.SHLDAT,
   [MessageId.SHLDDN]: 'Shields are now down, Sir!',
   // Canon combat narration. Note the asymmetry, which is canon's own: a hull
   // hit reports damage as a WORD via damstr (%s), while a DEFLECTED hit
@@ -902,18 +903,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PDEFLECT]: "Sensors indicate our phasers were deflected by Commander %s's shields!",
   [MessageId.PHITDEF]: "Phaser hit from Commander %s's ship, magnitude %d, was deflected by the shields, Sir!",
   [MessageId.YOURDEAD]:
-    'WARNING! WARNING! WARNING! WARNING!\n'
+    CANON_MESSAGES.YOURDEAD
     + 'Damage control reports severe structural damage in critical systems!\n\n'
     + 'Your private shuttle is waiting Sir!\n\n'
     + 'You escape safely and are picked up by a Galactic Command Freighter\n'
     + 'and transported back to their next stop, Zygor!',
 
   // spy (feature 016) — GECMDS.C cmd_spy
-  [MessageId.SPY1]: 'You must be in orbit of a planet to plant a spy.',
-  [MessageId.SPY0]: 'You already own this planet.',
-  [MessageId.SPY0B]: 'You cannot plant a spy on a wormhole.',
-  [MessageId.SPY0C]: 'Spies cannot operate in the neutral zone.',
-  [MessageId.SPYM0]: 'You have no spy equipment aboard.',
+  [MessageId.SPY1]: CANON_MESSAGES.SPY1,
+  [MessageId.SPY0]: CANON_MESSAGES.SPY0,
+  [MessageId.SPY0B]: CANON_MESSAGES.SPY0B,
+  [MessageId.SPY0C]: CANON_MESSAGES.SPY0C,
+  [MessageId.SPYM0]: CANON_MESSAGES.SPYM0,
   [MessageId.SPYM1]: 'Spy successfully planted on %s.',
 
   // hel (feature 016) — GECMDS.C cmd_help
@@ -949,11 +950,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PLN_ROW]: '%-20s  (%2d,%2d)  #%3d',
 
   // pri (feature 014) — GECMDS.C:4284 cmd_price
-  [MessageId.PRICEFMT]: 'Usage: price <qty> <item>  e.g. price 50 missiles  (bare: price lists items)',
+  [MessageId.PRICEFMT]: CANON_MESSAGES.PRICEFMT,
   // @see MBMGEMSG.MSG:3313
   [MessageId.PRICE1]: '%s %s are going to cost %d each for a total of %s, Sir.',
   [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
-  [MessageId.BUY7]: 'This planet has no owner.',
+  [MessageId.BUY7]: CANON_MESSAGES.BUY7,
   // @see MBMGEMSG.MSG:3305
   [MessageId.BUY8]: 'Sorry Sir! That would put us overweight.',
   // @see MBMGEMSG.MSG:3309
@@ -970,9 +971,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // %d slots are fed showarp(), which returns a STRING ("9.05"): a varargs bug
   // that printed garbage in the shipped game.
   [MessageId.SPEEDIS]: 'Helm reports speed is now warp %d point %s, Sir!',
-  [MessageId.SPEED0]: 'Helm reports we are at a dead stop, Sir!',
+  [MessageId.SPEED0]: CANON_MESSAGES.SPEED0,
   // @see GE/REL/MBMGEMSG.MSG:2630
-  [MessageId.MISSL2]: 'The missile tracking us has lost lockon and self destructed Sir!',
+  [MessageId.MISSL2]: CANON_MESSAGES.MISSL2,
 
   // Shipyard narration. Canon quotes the trade-in FIRST (NEW19/NEW29) and then
   // the Yardmaster's fitting report, which is what makes an upgrade priced at
@@ -998,23 +999,23 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
     + "fee of %s C's %s has been deposited to your account, Sir.",
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
-  [MessageId.MAINT2]: 'This planet requires a password for maintenance.',
-  [MessageId.MAINT3]: 'Incorrect maintenance password.',
+  [MessageId.MAINT2]: CANON_MESSAGES.MAINT2,
+  [MessageId.MAINT3]: CANON_MESSAGES.MAINT3,
 
   // distress mail types (feature 014) — research.md D3
-  [MessageId.MESG02]: '%s in sector (%d,%d) was attacked by %d troops from %s (cmdr %s); defenders held.',
-  [MessageId.MESG03]: '%s in sector (%d,%d) was overrun by %d troops from %s (cmdr %s); planet lost.',
-  [MessageId.MESG04]: '%s in sector (%d,%d) was attacked by %d fighters from %s (cmdr %s); defenders held.',
-  [MessageId.MESG05]: '%s in sector (%d,%d) was overrun by %d fighters from %s (cmdr %s); planet lost.',
+  [MessageId.MESG02]: CANON_MESSAGES.MESG02,
+  [MessageId.MESG03]: CANON_MESSAGES.MESG03,
+  [MessageId.MESG04]: CANON_MESSAGES.MESG04,
+  [MessageId.MESG05]: CANON_MESSAGES.MESG05,
 
   // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
   [MessageId.LOCK_FAIL]: 'Cannot get a firing lock — target too distant or evading.',
   [MessageId.LOCK_NEUTRAL]: 'Fire control refuses: target is in the neutral zone.',
   // fire control damaged gate — GECMDS.C:1346-1351 lockon
-  [MessageId.FCBROKE]: 'Fire control is damaged — cannot lock.',
+  [MessageId.FCBROKE]: CANON_MESSAGES.FCBROKE,
 
   // shared
-  [MessageId.HLBROKE]: 'Helm controls are inoperative.',
+  [MessageId.HLBROKE]: CANON_MESSAGES.HLBROKE,
   // MBMGEMSG.MSG:2090 NUMOOR, verbatim. The paraphrase rendered a negative
   // lower bound as "(-180-180)", which reads as a single negative number.
   [MessageId.NUMOOR]: 'Please enter a number in the range from %d to %d.',
@@ -1029,6 +1030,27 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
  *
  * @param id    The message identifier.
  * @param args  Replacement values in left-to-right placeholder order.
+ */
+/**
+ * Canon's own wording, for every message where the port had invented its own.
+ *
+ * A sweep of MBMGEMSG.MSG found only 26 of our 325 strings matching canon and
+ * 108 differing — systematically, with canon's in-world voice flattened into
+ * modern UI text:
+ *
+ *   canon: "Warp Drive? On this tub? Sorry Sir!"
+ *   ours : "Your ship has no warp drive."
+ *   canon: "Sir, we cannot rotate while we are moving!!"
+ *   ours : "Cannot rotate while reversing."
+ *
+ * The voice is not decoration; it is most of what the game feels like, and it
+ * was replaced one convenience at a time. The 93 whose printf arity already
+ * matched now read straight from the generated table, so they cannot drift
+ * again. The remaining 15 differ in argument COUNT and need their call sites
+ * looked at individually — they are listed in docs/PROGRESS.md.
+ *
+ * @see tools/extract-messages.mjs
+ * @see test/balance/message-canon.balance.spec.ts
  */
 export function formatMessage(id: MessageId, ...args: Array<string | number>): string {
   let result = MESSAGE_STRINGS[id];
