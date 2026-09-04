@@ -36,20 +36,18 @@ describe('resolveEngineCourse', () => {
     expect(r.deg).toBe(60);
   });
 
-  it('reports the autopilot course, not the stale heading, on a bare speed order', () => {
-    // Autopilot bound for the centre of sector (4,4) from (4.4, 3.5): mostly
-    // south, slightly east.
-    const r = resolveEngineCourse(
-      { ...AT_ORIGIN, holdcourse: 1, navTargetX: 4, navTargetY: 4 },
-      false,
-      0,
-    );
-    expect(r.deg).toBe(174);
+  it('keeps a turn already ordered by `rot` on a bare speed order', () => {
+    // "Point at the planet with `rot`, then engage" — writing `heading + 0`
+    // over an in-progress turn froze the ship part-way round. This is the
+    // surviving half of the old autopilot branch; the autopilot itself was
+    // withdrawn on 2026-09-04 (canon's `nav` never steers).
+    const r = resolveEngineCourse({ ...AT_ORIGIN, head2b: 200 }, false, 0);
+    expect(r.deg).toBe(200);
     expect(r.setHeading).toBe(false);
     expect(r.releaseAutopilot).toBe(false);
   });
 
-  it('leaves the helm to the pilot when no autopilot is engaged', () => {
+  it('holds the present heading when no turn is in progress', () => {
     const r = resolveEngineCourse(AT_ORIGIN, false, 0);
     expect(r.deg).toBe(132);
     expect(r.setHeading).toBe(true);

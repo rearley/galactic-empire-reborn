@@ -4,7 +4,7 @@ import { applySectorChangeEffects } from './sector-change';
 import { GalaxyService } from '../galaxy/galaxy.service';
 import { Inject, Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { COORD_SCALE, MOVENGMIN, MOVENGUSE } from '../constants';
+import { COORD_SCALE, GESTAT_USER, MOVENGMIN, MOVENGUSE } from '../constants';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
@@ -139,99 +139,20 @@ export class PhysicsTickService implements OnModuleInit {
     // Destroyed/removed ships are skipped entirely (FR-001).
     // (No `destroyed` flag exists on ShipState today; reserved for future combat work.)
 
-    // Autopilot bearing update — runs before rotation step, even for in-orbit ships
-    // (handler auto-breaks orbit, but guard here for safety).
-    if (ship.holdcourse > 0 && ship.navTargetX !== null && ship.navTargetY !== null) {
-      // Store coords before mutation clears them
-      const targetX = ship.navTargetX;
-      const targetY = ship.navTargetY;
-
-      // Arrival is a RADIUS against the target POINT, not sector membership.
-      //
-      // The old `Math.floor(x) === targetX` test had two failures, and the
-      // second one broke onboarding outright once arrival began cutting the
-      // engines. `nav 0 0` from inside sector (0,0) — the documented way to
-      // ask which way Zygor lies — satisfied the predicate on the very first
-      // tick, so the autopilot announced arrival and stopped the ship before
-      // it had moved. Zygor sits at the centre of (0,0), so every purchase in
-      // the game sat behind an orbit the player could not reach. It also
-      // parked cross-sector arrivals at the sector EDGE rather than at the
-      // point the bearing was quoted against.
-      //
-      // cmd_navigate targets the cell centre — `tmp.xcoord = x + .50001`
-      // (GECMDS.C:5133-5136) — and 250 units is the threshold cmd_orbit uses
-      // for "close enough" (GECMDS.C:798). Same target, same radius.
-      const tgtX = targetX + 0.5;
-      const tgtY = targetY + 0.5;
-      const arrivalDist = cdistance(ship, { xcoord: tgtX, ycoord: tgtY }) * 10_000;
-
-      // ...but a fixed shell alone cannot catch a ship that is faster than the
-      // shell is wide. A tick moves `speed * 10000 / COORD_SCALE` raw units —
-      // 154 at warp 1, 769 at warp 5, 1385 at warp 9 — against a 250-unit
-      // shell. Whenever the remaining distance lands in (250, travel - 250)
-      // the ship steps clean over the target, re-points at the thing it just
-      // passed, and does it again: a 180-degree flip every six seconds,
-      // forever, with `rep nav` still reporting warp 5. Round-3 playtest saw
-      // exactly that, and saw the same trip arrive first try at warp 1 —
-      // which is simply the one speed slow enough to always land inside.
-      //
-      // So the real test is whether this tick's travel *reaches* the target,
-      // not whether the ship is already sitting on it.
-      const perTickTravel = (ship.speed * 10_000) / COORD_SCALE;
-      const finalLeg = arrivalDist > NAV_ARRIVAL_RANGE && arrivalDist <= perTickTravel;
-
-      if (arrivalDist <= NAV_ARRIVAL_RANGE || finalLeg) {
-        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          // On the final leg, fly the remainder rather than a whole tick. The
-          // ship is already pointed at the target and would have covered more
-          // ground than this; truncating the last step is the only way to end
-          // up within orbit range of a place you asked to be taken to, and it
-          // never moves the ship further than the physics already would.
-          if (finalLeg) {
-            s.xcoord = tgtX;
-            s.ycoord = tgtY;
-          }
-          s.holdcourse = 0;
-          s.navTargetX = null;
-          s.navTargetY = null;
-          // ...and CUT THE ENGINES. Arrival used to disengage the helm and
-          // leave the throttle open, so a ship reached its destination and
-          // sailed straight through it. At warp 9 a sector takes 43 seconds to
-          // cross, so "read the arrival notice, then react" means overshooting.
-          //
-          // PORT-ORIGINAL either way: canon's `nav` is a read-only bearing
-          // report (GECMDS.C:5109-5157) and `holdcourse` is an AI-only field
-          // meaning "hold this heading for N ticks, then re-decide"
-          // (GECYBS.C:318, GEDROIDS.C:328) — it never means "arrive". With no
-          // precedent to follow, the deciding evidence was our own arrival
-          // message, which told the player to "cut speed with war 0 / imp 0":
-          // whoever wrote it knew the ship kept flying and pushed the problem
-          // onto the pilot. An autopilot exists to remove that work.
-          // @see docs/DECISIONS.md — autopilot stops on arrival
-          s.speed2b = 0;
-          s.dirty = true;
-        });
-        this.events.emit('physics.nav-arrived', {
-          userid: ship.userid,
-          shipno: ship.shipno,
-          x: targetX,
-          y: targetY,
-        });
-        // Skip remaining physics for this tick on arrival
-        return;
-      }
-
-      // Steer: update head2b to point toward target cell center
-      const dx = tgtX - ship.xcoord;
-      const dy = tgtY - ship.ycoord;
-      // Use atan2(dx, -dy) to correctly map to the position-integration coordinate
-      // system where heading=0 is north (y-decreasing). Positive dy (target south)
-      // must produce a bearing >90° so that cos(bearing)<0 and y increases (southward).
-      const newHead2b = Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360);
-      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        s.head2b = newHead2b;
-      });
-    }
+    // NO AUTOPILOT. `nav` in canon is a read-only bearing report — cmd_navigate
+    // is argument validation, cdistance, cbearing, prfmsg(NAV01), return
+    // (GECMDS.C:5109-5156). It never steers, never moves, never holds a course.
+    //
+    // The port had one, and it generated six defects of its own: an arrival
+    // test on sector membership that broke onboarding, a fixed arrival shell
+    // that made arrival impossible above warp 1, undocking a captain who only
+    // asked for a bearing, a bare speed order cancelling a turn, war/imp lying
+    // about the course, and finally plotting courses through planets. It was
+    // withdrawn on 2026-09-04. @see docs/DECISIONS.md
+    //
+    // `holdcourse` is an AI-only field in canon meaning "hold this heading for
+    // N ticks, then re-decide" (GECYBS.C:318, GEDROIDS.C:328) and is left to
+    // the AI, which is what it is for.
 
     // Rotation runs ALWAYS, orbit included. `warrti2a` calls
     // rotateship/accel/moveship/destruct with no orbit test (GEMAIN.C:2476-2483),
@@ -458,8 +379,24 @@ export class PhysicsTickService implements OnModuleInit {
         });
       }
 
-      // C calls gravity() from moveship on every move (GEFUNCS.C:794-795).
-      this.applyGravity(ship, postSector, ctx);
+      // C calls gravity() from moveship under BOTH of these conditions:
+      //
+      //     /* Cybertrons ignore gravity */
+      //     if (ptr->where == 0 && ptr->status == GESTAT_USER)
+      //         gravity(ptr,usrn);
+      //
+      // (GEFUNCS.C:794-795.) `where == 0` is normal space; `where == 1` is
+      // hyperspace, i.e. at warp — so canon never runs this check while you are
+      // warping, and you CANNOT fly into a planet at warp. This code cited
+      // those exact lines while implementing only the call.
+      //
+      // It cost two players three deaths in round 5, and the warning ladder
+      // cannot rescue them: 250/50/25 units deep against 1,385 units of travel
+      // per tick at warp 9, so all three bands and the kill threshold fall
+      // inside one tick. That is why canon does not run it there.
+      if (ship.where === 0 && ship.status === GESTAT_USER) {
+        this.applyGravity(ship, postSector, ctx);
+      }
 
       if (xWrapped || yWrapped) {
         const axis = xWrapped && yWrapped ? 'both' : xWrapped ? 'x' : 'y';

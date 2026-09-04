@@ -57,35 +57,8 @@ export class NavHandlerService {
     argMissingMessage: formatMessage(MessageId.NAVFMT),
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
       // Status form — no args
-      if (args.length === 0) {
-        if (ship.holdcourse === 0) {
-          return {
-            lines: [{ text: formatMessage(MessageId.NAV_INACTIVE), category: 'system' }],
-          };
-        }
-
-        // Active autopilot — show status
-        const tx = (ship.navTargetX ?? 0) + 0.5;
-        const ty = (ship.navTargetY ?? 0) + 0.5;
-        const bearing = calcBearing(ship, tx, ty);
-        const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
-
-        return {
-          lines: [
-            {
-              text: formatMessage(
-                MessageId.NAV_STATUS,
-                ship.navTargetX ?? 0,
-                ship.navTargetY ?? 0,
-                dist,
-                bearing,
-              ),
-              category: 'system',
-            },
-          ],
-        };
-      }
-
+      // NO BARE FORM. Canon's cmd_navigate validates the argument count and
+      // returns; there is no autopilot to report the status of.
       // Engage form — must have exactly 2 args
       if (args.length !== 2) {
         return {
@@ -137,38 +110,10 @@ export class NavHandlerService {
       // back and finish trading. The autopilot course is a documented deviation
       // (docs/DECISIONS.md, feature 016 D1) and stays; the undocking does not.
 
-      // Was this exact target already engaged? Read it BEFORE overwriting.
-      const alreadyEngaged =
-        ship.holdcourse === 1 &&
-        ship.navTargetX === xParsed &&
-        ship.navTargetY === yParsed;
-
-      // Engage autopilot
-      ship.navTargetX = xParsed;
-      ship.navTargetY = yParsed;
-      ship.holdcourse = 1;
-      ship.dirty = true;
-
       const tx = xParsed + 0.5;
       const ty = yParsed + 0.5;
       const bearing = calcBearing(ship, tx, ty);
       const dist = Math.floor(cdistance(ship, { xcoord: tx, ycoord: ty }) * 10000);
-
-      // NAV01's bearing is RELATIVE to the hull's present heading
-      // (GECMDS.C:5142-5155 passes warsptr->heading to cbearing). Our physics
-      // tick steers head2b onto the autopilot course every tick, so an
-      // identical `nav 0 0` seconds later prints a smaller number — bearing 131
-      // and then bearing 0, with no rotate issued in between. The arithmetic
-      // was right both times; nothing said why, and it landed on a new pilot's
-      // very first navigation attempt.
-      const helm =
-        bearing === 0
-          ? alreadyEngaged
-            ? 'Helm reports we are already on course, Sir!'
-            : 'Helm reports we are on course, Sir!'
-          : 'Bearing is relative to our present heading, Sir — the helm is ' +
-            'swinging onto course, so a repeat nav will read a smaller bearing ' +
-            'until it reads 0.';
 
       return {
         lines: [
@@ -176,7 +121,6 @@ export class NavHandlerService {
             text: formatMessage(MessageId.NAV01, xParsed, yParsed, bearing, dist),
             category: 'success',
           },
-          { text: helm, category: 'system' },
         ],
       };
     },
