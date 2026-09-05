@@ -2972,3 +2972,16 @@ receipt line, and the roster printing `username` rather than the synthetic
   and HLPTRA says "from your ship to a newly established planet, or from a
   planet to your ship". It is left working, undecided.
 - AI mine crowding, and the unexplained Obliterator kill — still want a playtest.
+  - **CLOSED 2026-09-05.** Mine crowding was two canon defects, not a balance
+    dial — the AI was never bound by the USRMINES per-layer cap, and droid mines
+    burned a fuse of 100 against canon's 10. Both fixed and deployed; see the
+    RESOLVED annotation under "Open question — does AI mine-laying crowd players
+    out?" above. The Obliterator kill was closed by the owner as not worth
+    chasing.
+- **Ship-to-ship `transfer` ruled in, 2026-09-05.** Kept on the owner's call and
+  recorded as a deliberate deviation in `docs/DECISIONS.md` D1, which was itself
+  wrong on two counts and has been amended. The ~60 invented strings stay for
+  the same reason: they serve port-only features canon has no text for.
+- **Still open:** `hel transfer` serves canon's HLPTRA, which describes the
+  planet legs only and so contradicts the shipped ship-to-ship feature. Ranked
+  low by the owner.
