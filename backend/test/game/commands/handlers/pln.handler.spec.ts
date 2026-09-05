@@ -74,16 +74,20 @@ describe('PlnHandlerService — listing (T032)', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.PLN_HEADER));
   });
 
-  it('row format matches %-20s  (xx,yy)  #zzz pattern', async () => {
+  it("row matches canon's prf: %-20s %5d %5d  %d", async () => {
     const { handler } = makeHandler([
       { name: 'My Planet', xsect: 5, ysect: 10, plnum: 3 },
     ]);
     const ship = makeShip();
     const result = await handler.command.handler(ship, [], {}) as Lines;
     const row = result.lines[1].text;
-    expect(row).toContain('My Planet');
-    expect(row).toContain('( 5,10)');
-    expect(row).toContain('#  3');
+    // cmd_planet writes the row inline rather than through the MSG file:
+    //   prf("%-20s %5d %5d  %d \r", name, xsect, ysect, plnum)
+    // Its columns are what line up under PLAMSG1's heading, "Planet Name
+    // sector planet". The port's "( 5,10)  #  3" shape did not.
+    // 20-wide name, then %5d %5d and the plain plnum: 9 chars of name padded
+    // to 20, a separator space, then '    5'.
+    expect(row).toBe('My Planet            ' + '    5' + '    10' + '  3 ');
   });
 
   it('planet name padded to 20 chars', async () => {

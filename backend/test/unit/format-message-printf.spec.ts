@@ -51,10 +51,11 @@ describe('formatMessage speaks canon printf', () => {
   });
 
   it('left-justifies when the - flag is present', () => {
-    // PLN_ROW is '%-20s  (%2d,%2d)  #%3d'.
+    // PLN_ROW is canon's '%-20s %5d %5d  %d ' — a left-justified name column
+    // followed by right-justified coordinates.
     const out = fmt(MessageId.PLN_ROW, 'Aurora', 5, 6, 1);
-    expect(out.startsWith('Aurora              ')).toBe(true);
-    expect(out).toContain('( 5, 6)');
+    expect(out.startsWith('Aurora              ')).toBe(true);  // padded to 20
+    expect(out).toContain('    5');                             // width 5, right
   });
 
   it('leaves %% as a literal percent and consumes no argument', () => {

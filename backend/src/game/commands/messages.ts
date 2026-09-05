@@ -991,9 +991,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ATT_GROUND_AA]: CANON_MESSAGES.ATTACKF8,
 
   // pln (feature 014) — GECMDS.C cmd_pln
-  [MessageId.PLN_HEADER]: 'PLANETS  YOU  OWN:',
-  [MessageId.PLN_NONE]: 'You do not own any planets.',
-  [MessageId.PLN_ROW]: '%-20s  (%2d,%2d)  #%3d',
+  [MessageId.PLN_HEADER]: CANON_MESSAGES.PLAMSG1,
+  [MessageId.PLN_NONE]: CANON_MESSAGES.PLAMSG2,
+  [MessageId.PLN_ROW]: '%-20s %5d %5d  %d ', // GECMDS.C:cmd_planet prf — canon's row, inline in the C rather than the MSG file
 
   // pri (feature 014) — GECMDS.C:4284 cmd_price
   [MessageId.PRICEFMT]: CANON_MESSAGES.PRICEFMT,

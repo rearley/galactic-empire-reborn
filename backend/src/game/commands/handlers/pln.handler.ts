@@ -36,11 +36,15 @@ export class PlnHandlerService {
 
     const lines = [{ text: formatMessage(MessageId.PLN_HEADER), category: 'success' as const }];
     for (const row of rows) {
-      const name = row.name.padEnd(20).slice(0, 20);
-      const xs = String(row.xsect).padStart(2);
-      const ys = String(row.ysect).padStart(2);
-      const pl = String(row.plnum).padStart(3);
-      lines.push({ text: `${name}  (${xs},${ys})  #${pl}`, category: 'success' as const });
+      // cmd_planet writes the row with a raw prf rather than a message id:
+      //   prf("%-20s %5d %5d  %d \r", name, xsect, ysect, plnum)
+      // That is still canon, and the columns it produces line up under
+      // PLAMSG1's "Planet Name         sector planet" heading. The port's own
+      // "(x,y) #nnn" shape did not.
+      lines.push({
+        text: formatMessage(MessageId.PLN_ROW, row.name.slice(0, 20), row.xsect, row.ysect, row.plnum),
+        category: 'success' as const,
+      });
     }
 
     return { lines };
