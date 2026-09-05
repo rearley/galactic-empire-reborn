@@ -306,10 +306,14 @@ export const MAXSHIPS = GAME_CONFIG.MAXSHIPS;
  * original. That inflates planet-derived score against combat-derived score,
  * which is the exact ratio version 3.2c retuned.
  *
- * Deployed at 120 minutes: four times slower than the port was running, three
- * times faster than canon. Six-hour ticks suit a BBS people dialled into for
- * hours, not a web game with daily logins.
- * @see docs/DECISIONS.md — PLANTOCK deploys at 120
+ * Now deployed at canon's 360. The 120-minute compromise was argued as "six-
+ * hour ticks suit a BBS, not a web game with daily logins" — but that reasoning
+ * assumes a SHORT game. This is a persistent 24/7 world, and the owner's first
+ * real colony run showed why the faster tick is wrong for it: two stocked
+ * worlds produced roughly 320,000 credits a day off a 250,000 investment and a
+ * handful of small fights. Wealth that compounds that fast in real days makes
+ * the mid game trivial, which is the opposite of what a long-running world
+ * needs. @see docs/DECISIONS.md — PLANTOCK restored to canon
  */
 export const PLANTOCK_SECONDS = GAME_CONFIG.PLANTOCK * 60;
 

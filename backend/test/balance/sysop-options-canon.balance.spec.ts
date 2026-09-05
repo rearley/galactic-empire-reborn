@@ -52,14 +52,6 @@ const DEVIATIONS: Record<string, { value: number; reason: string }> = {
       'players they would never meet. Scan ranges are absolute, so galaxy size ' +
       'and scanner reach must be chosen together. See docs/DECISIONS.md.',
   },
-  PLANTOCK: {
-    value: 120,
-    reason:
-      'Canon 360 minutes is a six-hour production cycle, which suits a BBS ' +
-      'people dialled into for hours rather than a web game with daily logins. ' +
-      '120 is 3x canon speed and 4x slower than the port was running. ' +
-      'See docs/DECISIONS.md.',
-  },
 };
 
 /**
