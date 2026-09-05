@@ -15,7 +15,9 @@ running as a modern 24/7 persistent web game.
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS
 - **Database**: PostgreSQL 16+
 - **Real-time**: Socket.io via @nestjs/platform-socket.io
-- **Scheduling**: @nestjs/schedule (@Interval for ticks, @Cron for midnight)
+- **Scheduling**: raw `setInterval` in `TickService` lifecycle hooks for the two
+  game heartbeats; @nestjs/schedule (`@Cron`) for midnight only. See
+  `docs/DECISIONS.md` 2026-05-01.
 - **Testing**: Jest (backend), Vitest (frontend)
 - **Deployment**: Docker + Docker Compose (Hetzner CPX32)
 - **Dev methodology**: Spec-Driven Development via spec-kit (github/spec-kit)
@@ -45,12 +47,13 @@ Postgres is the durable store — flushed async, not on every tick.
 
 ### Tick Engine
 
-- **Physics tick**: 6 seconds (`@Interval(6000)`) — moves ships, processes
+- **Physics tick**: 6 seconds (`setInterval(…, 6000)` in `TickService`) — moves ships, processes
   combat, updates mines, decoys, torpedoes, missiles
-- **Ship update tick**: 1 second (`@Interval(1000)`) — energy regen, shield
+- **Ship update tick**: 1 second (`setInterval(…, 1000)`) — energy regen, shield
   updates, repair progress, minor state changes
 - **Midnight job**: `@Cron('0 0 * * *')` — recalculate scores, send planet
-  production reports to players, purge mail older than 7 days, rebuild team
+  production reports to players, purge mail older than 3 days (`MAILDAYS`,
+  GEMAIN.C:497 — 7 is the clamp ceiling, not the default), rebuild team
   scores. Must be idempotent and wrapped in a Postgres transaction.
 
 ### Galaxy
@@ -101,13 +104,17 @@ Two types — both driven entirely by the server tick, no client involvement:
   `phasrtype * PRELOAD` (GEFUNCS.C:1031), so a Mark-1 fires every 36s and a
   Mark-2 every 18s.
 
-  At point-blank range, focus 1, against a Mark-1 shield:
+  At point-blank range, focus 1. Note the targets do NOT all carry the same
+  shield: the Scow and the Vakory are Mark-1 (`S31SHLD 1`, `S33SHLD 1`) but the
+  Murdonian is Mark-2 (`S32SHLD 2`, MBMGESHP.MSG:7146), and `shieldchg` puts
+  back `type*3` per tick — so the Murdonian regenerates twice as fast as the
+  other two, and a table that assumes one shield for all three understates it.
 
-  | target | tons | stock Mark-1 | with a Mark-2 |
-  |---|---|---|---|
-  | Vakory Survey Drone (33) | 100 | strips 22 vs 18 regen — **wins** | — |
-  | Lydorian Scow (31) | 10,000 | 12 vs 18 — **can never get through** | 19 vs 9 — wins |
-  | Murdonian Transport (32) | 30,000 | 6 vs 18 — hopeless | wins on shields, still out-gunned 5:1 |
+  | target | tons | shield | stock Mark-1 | with a Mark-2 |
+  |---|---|---|---|---|
+  | Vakory Survey Drone (33) | 100 | Mk-1 | strips 22 vs 18 regen — **wins** | — |
+  | Lydorian Scow (31) | 10,000 | Mk-1 | 12 vs 18 — **can never get through** | 19 vs 9 — wins |
+  | Murdonian Transport (32) | 30,000 | **Mk-2** | 6 vs 36 — hopeless | 9 vs 18 — still cannot strip it, and out-gunned 5:1 |
 
   So a *stock* Interceptor cannot beat a Scow at any range or cadence, and the
   Vakory is the only thing it can actually kill. One phaser upgrade (list
@@ -132,14 +139,17 @@ Two types — both driven entirely by the server tick, no client involvement:
 backend/src/
   game/
     tick/           ← TickService — drives the 1s and 6s game loops
-    ship/           ← ShipService — in-memory state Map + async DB flush
-    planet/         ← PlanetService
-    combat/         ← CombatService (phasors, torps, missiles, mines)
+    ship/           ← ShipStateService — in-memory state Map + async DB flush;
+                      ShipTickService, MaintenanceService, ShipChannelRegistry
+    planet/         ← PlanetStateService, PlanetEconomyService,
+                      PlanetTickService, PlanetAttackService
+    combat/         ← CombatTickService (phasors, torps, missiles, mines),
+                      MineRegistry, MineRepository
     galaxy/         ← GalaxyService + procedural generator
-    commands/       ← CommandService — routes player text input to handlers
-    ai/
-      cybertron/    ← CybertronService
-      droid/        ← DroidService
+    commands/       ← CommandRouterService — routes player text input to
+                      handlers in commands/handlers/
+    cybertron/      ← CybertronTickService + CybertronRepository
+    droid/          ← DroidTickService + DroidSpawner
     midnight/       ← MidnightService — nightly maintenance cron
   gateway/          ← GameGateway (WebSocket, Socket.io)
   auth/             ← Player authentication
@@ -212,7 +222,7 @@ the original C source** in `/reference/ge-source/` before implementation.
 | `reference/wiki/` | Human-readable game mechanics from the GE wiki — use alongside C source |
 | `reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG` | **Authoritative ship class table** — 34 slots x 28 options, read by `GEMAIN.C:835-875` in ORDER |
 | `reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG` | Sysop option defaults and clamp bounds, item and shipyard price tables, `S00P*` neutral-zone planets. **Not the `GE/MSG/` copy** — see the precedence note above |
-| `reference/ge-upstream/GE/DOCS/` | Original manuals and `GEREADME.DOC` changelog |
+| `reference/ge-upstream/mbmgemp/GE/DOCS/` | Original manuals and `GEREADME.DOC` changelog |
 | `reference/ge-upstream/PROVENANCE.md` | Where all of the above came from, and the precedence rules |
 
 **Preserve balance constants from `GEMAIN.H` exactly** unless there is a
@@ -225,8 +235,8 @@ documented reason to deviate. Key constants include:
 #define ROTAMT      20      // Degrees rotation per tick
 #define ACCENGAMT  120      // Acceleration energy usage
 #define PRELOAD     10      // Phasor reload rate per tick
-#define MAXX        30      // Galaxy width (sectors)
-#define MAXY        15      // Galaxy height (sectors)
+#define MAXX        30      // Scan-map width in CHARACTERS (viewport, not the galaxy)
+#define MAXY        15      // Scan-map height in CHARACTERS (viewport, not the galaxy)
 #define MAXTORPS     3      // Max locked torpedoes
 #define MAXMISSL     3      // Max locked missiles
 #define CYB_BE_NICE 30      // Kills before Cybertrons get tough
@@ -352,8 +362,9 @@ parallel agents). They are complementary, not competing.
 **Planned feature sequence:**
 1. `001-prisma-schema` — DB schema from GEMAIN.H structs
 2. `002-tick-engine` — NestJS game loop + GameGateway skeleton
-3. `003-ship-commands` — CommandService + basic commands (scan, report, rotate, impulse, warp)
-4. `004-galaxy-generator` — Procedural 30x15 galaxy + sector types
+3. `003-ship-commands` — CommandRouterService + basic commands (scan, report, rotate, impulse, warp)
+4. `004-galaxy-generator` — Procedural `-UNIVMAX..+UNIVMAX` galaxy (201x201 at our
+   UNIVMAX=100) + sector types
 5. `005-planet-system` — Planet mechanics, orbit, buy/sell, colonization
 6. `006-combat` — Phasors first, then torpedoes, missiles, mines
 7. `007-cybertron-ai` — Persistent Cybertron behavior
@@ -382,15 +393,16 @@ Plain text module map. Keep it current — no diagrams needed. Example:
 ```
 GameGateway (gateway/)
   └── receives player commands via Socket.io
-  └── routes to CommandService
+  └── routes to CommandRouterService
   └── broadcasts tick events to sector rooms
 
 TickService (game/tick/)
   └── drives 1s ship update tick
   └── drives 6s physics tick
-  └── calls ShipService, CombatService, CybertronService, DroidService
+  └── subscribers act on it: ShipTickService, CombatTickService,
+      CybertronTickService, DroidTickService
 
-ShipService (game/ship/)
+ShipStateService (game/ship/)
   └── owns in-memory Map<shipId, ShipState>
   └── flushes to Postgres async every 30s or on significant state change
   └── source of truth for all active ship state

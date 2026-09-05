@@ -38,7 +38,7 @@ and ship classes were never affected by any of this.
 | path | what it is |
 |---|---|
 | `ge-source/*.C`, `*.H` | The nine files the port was originally written against. **Byte-identical** to `ge-upstream/mbmgemp/*.C` — either path is fine, and existing citations use `ge-source/`. |
-| `ge-upstream/mbmgemp/*.C`, `*.H` | The same nine, plus four we did not originally have: `GELIB.C`, `SECURE.C`, `MBMGEGRF.C`, `GESAMPLE.C`. |
+| `ge-upstream/mbmgemp/*.C`, `*.H` | The same nine, plus five we did not originally have: `GELIB.C`, `SECURE.C`, `SECURE.H`, `MBMGEGRF.C`, `GESAMPLE.C`. |
 | `ge-upstream/mbmgecvt/` | A data-conversion utility, not the game. Not canon for gameplay. |
 | `ge-upstream/mbmgemap/` | A galaxy-map printing utility. Not canon for gameplay. |
 | `ge-upstream/register/` | Registration/licensing code. Irrelevant to gameplay. |
