@@ -1,4 +1,5 @@
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { LockHandlerService } from '../../../../src/game/commands/handlers/lock.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
@@ -45,7 +46,9 @@ function makeHarness(ships: ShipState[], scanRange = 100_000_000) {
     maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000,
     scanRange, maxTons: 5000,
   } as never);
-  return new LockHandlerService(shipState, cache);
+  return new LockHandlerService(shipState, cache,
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
 }
 
 const ctx: CommandContext = {};

@@ -34,6 +34,12 @@ export function findShip(
   contextShip: ShipState,
   allShips: ShipState[],
   scanRange: number,
+  /**
+   * The caller's scan table — `sca lo`/`ra`/`se` letter assignments. Canon
+   * addresses ships by LETTER and nothing else. Optional so callers without a
+   * scan table (and older tests) still resolve by name.
+   */
+  scantab?: ReadonlyArray<{ shipKey: string; letter: string }>,
 ): FindShipResult {
   const trimmed = query.trim();
   if (trimmed.length === 0) {
@@ -71,7 +77,41 @@ export function findShip(
     return { ok: true, ship: target };
   }
 
-  // Otherwise prefix-match against the active roster, in range.
+  // Canon resolves a ship by its SCAN LETTER, and only that:
+  //
+  //   letter = toupper(*ptr);
+  //   for (i=0;i<NOSCANTAB;++i)
+  //       if (scantab[usrnum].ship[i].letter == letter) { shpnum = ...; break; }
+  //
+  // — GECMDS.C:1473-1487 findshp. It reads ONE character, which is why "Bravo"
+  // and "B" are the same query. This helper had no letter branch at all, so
+  // `loc B` answered "No such ship: B." while `sca sh B` worked, because
+  // `sca sh` grew its own letter lookup and the shared helper never did. The
+  // same miss broke `tor B` and `mis B`.
+  if (scantab && scantab.length > 0) {
+    const letter = trimmed[0].toUpperCase();
+    const selfKey = shipKey(contextShip.userid, contextShip.shipno);
+    const entry = scantab.find((e) => e.letter === letter);
+    if (entry) {
+      const target = allShips.find(
+        (s) => `${s.userid}#${s.shipno}` === entry.shipKey || shipKey(s.userid, s.shipno) === entry.shipKey,
+      );
+      if (
+        isIngame(target) &&
+        shipKey(target.userid, target.shipno) !== selfKey &&
+        inScanRange(contextShip, target, scanRange)
+      ) {
+        return { ok: true, ship: target };
+      }
+      // A letter that resolves to nothing usable is a miss, not a fall-through
+      // to a name search: canon returns -1 here.
+      return { ok: false, message: `No such ship: ${trimmed}.` };
+    }
+  }
+
+  // Name matching is OURS, kept as a fallback: a name is more use than a
+  // letter when the scan table is stale, and canon never had to type in a
+  // browser. Canon would have returned -1 above.
   const needle = trimmed.toLowerCase();
   for (const candidate of allShips) {
     if (!isIngame(candidate)) continue;

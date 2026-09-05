@@ -27,6 +27,9 @@ describe('Help topic snapshots', () => {
       // Mark-19 shield. @see test/unit/help-price-tables.spec.ts
       'newprice',
       'class',
+      // Port-original — canon kept function keys in the TERMINAL, so there is
+      // no canon page for this one. @see src/game/commands/fkeys.ts
+      'fkeys',
     ]);
   });
 

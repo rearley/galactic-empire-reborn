@@ -1,4 +1,5 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
 import { MissileHandlerService } from '../../../../src/game/commands/handlers/missile.handler';
 import { DecoyHandlerService } from '../../../../src/game/commands/handlers/decoy.handler';
@@ -64,7 +65,8 @@ function makeMissileHandler(ships: ShipState[]): MissileHandlerService {
   } as never);
   return new MissileHandlerService(
     makeShipState(ships), cache, new EventEmitter2(), new Mulberry32Adapter(42),
-  );
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
 }
 
 const ctx: CommandContext = {};

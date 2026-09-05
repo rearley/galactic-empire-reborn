@@ -5,6 +5,7 @@
  * must be observable to `tor @`.
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { CommandContext, CommandResult } from '../../../../src/game/commands/command.types';
 import { LockHandlerService } from '../../../../src/game/commands/handlers/lock.handler';
 import { TorpedoHandlerService } from '../../../../src/game/commands/handlers/torpedo.handler';
@@ -83,8 +84,12 @@ describe('lock → tor @ integration', () => {
       scanRange: 100_000_000, maxTons: 5000, hasTorpedo: true, hasMissile: true,
     } as never);
 
-    const lock = new LockHandlerService(shipState, cache);
-    const torp = new TorpedoHandlerService(shipState, cache, new EventEmitter2(), new Mulberry32Adapter(1));
+    const lock = new LockHandlerService(shipState, cache,
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
+    const torp = new TorpedoHandlerService(shipState, cache, new EventEmitter2(), new Mulberry32Adapter(1),
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
 
     // 1) loc Murdonian
     const lockRes = lock.command.handler(alice, ['Murdonian'], ctx) as CommandResult;

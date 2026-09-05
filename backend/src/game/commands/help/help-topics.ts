@@ -55,6 +55,7 @@ const CANON_CONCEPT_PAGES: Readonly<Record<string, readonly string[]>> = Object.
 });
 
 export type HelpTopicId =
+  | 'fkeys'
   | 'newprice'
   | 'class'
   | 'navigation'
@@ -142,6 +143,11 @@ export const HELP_TOPIC_ALIASES: Readonly<Record<string, HelpTopicId>> = Object.
   who: 'comms',
   fre: 'comms',
   freq: 'comms',
+  fset: 'fkeys',
+  fkey: 'fkeys',
+  functionkeys: 'fkeys',
+  macro: 'fkeys',
+  macros: 'fkeys',
   prices: 'newprice',
   price: 'newprice',
   newprices: 'newprice',
@@ -466,6 +472,31 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
   class: {
     title: 'Ship Classes',
     body: CLASS_TABLE_BODY,
+  },
+  fkeys: {
+    title: 'Function Keys',
+    body: [
+      'Function Keys',
+      '  fset f1 <command>  — bind f1 to a command',
+      '  fset f1            — clear f1',
+      '  fset               — list what is bound',
+      '  f1 .. f12          — run the bound command',
+      '',
+      'Examples:',
+      '  fset f1 pha 0 0        fire dead ahead, tightest focus',
+      '  fset f2 tor @          torpedo the locked target',
+      '  fset f3 sca lo full    scan with the contact table',
+      '  fset f4 shi up',
+      '',
+      'Bindings belong to YOU, not the ship, so they follow you when you',
+      'switch hulls with `x`. What you have bound is shown in the F Key Map',
+      'panel.',
+      '',
+      'This is not part of the original game. On a BBS you bound function',
+      'keys in your terminal program and it transmitted the text for you; a',
+      'browser cannot reliably claim F1-F12, so here you type the name',
+      'instead. A binding cannot point at another binding.',
+    ],
   },
 });
 

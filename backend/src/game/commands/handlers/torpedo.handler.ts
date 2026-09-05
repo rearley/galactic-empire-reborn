@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ScanHandlerService } from './scan.handler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -49,6 +50,9 @@ export class TorpedoHandlerService {
     private readonly shipClassCache: ShipClassCacheService,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    // Canon resolves a target by SCAN LETTER (GECMDS.C:1473-1487), so this
+    // needs the table `sca` builds. @see ScanHandlerService.lettersFor
+    private readonly scanHandler: ScanHandlerService,
   ) {
     void this.events;
     void this.random;
@@ -114,7 +118,7 @@ export class TorpedoHandlerService {
     // 6. Target lookup
     const allShips = this.shipState.findAllShips();
     const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
-    const found = findShip(args[0] ?? '', ship, allShips, scanRange);
+    const found = findShip(args[0] ?? '', ship, allShips, scanRange, this.scanHandler.lettersFor(ship.userid, ship.shipno));
     if (!found.ok) {
       return { lines: [{ text: found.message, category: 'system' }] };
     }
