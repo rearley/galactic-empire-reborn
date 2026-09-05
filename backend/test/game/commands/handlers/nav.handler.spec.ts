@@ -28,7 +28,6 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 1, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...overrides,
@@ -157,16 +156,19 @@ describe('NavHandlerService — target inside the current sector', () => {
     // opening depends on.
     const { handler, state, ctx } = makeService({
       xcoord: 7.4, ycoord: 3.9,
-      holdcourse: 0, navTargetX: null, navTargetY: null,
-    });
+      holdcourse: 0, });
     const result = handler.command.handler(state, ['7', '3'], ctx) as { lines: { text: string }[] };
     expect(result.lines.some((l) => /bearing/i.test(l.text))).toBe(true);
   });
 
-  it('floor(xcoord) === x but floor(ycoord) !== y → NOT already there', () => {
+  it('answers with a bearing even for the sector the ship is already in', () => {
+    // cmd_navigate validates argument count and univmax bounds, then reports —
+    // there is no "already there" case to refuse. The old assertion said the
+    // answer was NOT the invented refusal; now that the refusal is gone, say
+    // what the answer IS.
     const { handler, state, ctx } = makeService({ xcoord: 7.4, ycoord: 3.9 });
-    const result = handler.command.handler(state, ['7', '4'], ctx) as { lines: { text: string }[] };
-    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.NAV_ALREADY_THERE));
+    const result = handler.command.handler(state, ['7', '3'], ctx) as { lines: { text: string }[] };
+    expect(result.lines[0].text).toMatch(/Sector 7 3 is bearing -?\d+, distance \d+\./);
   });
 });
 

@@ -50,7 +50,6 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     firecntl: 0, destruct: 0, status: 1, cybmine: 255,
     cybskill: 10, cybupdate: 50, tick: 1, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
-    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
     ...over,

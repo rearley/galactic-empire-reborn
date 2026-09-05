@@ -106,16 +106,11 @@ export class WarpHandlerService {
 
       const currentWarp = Math.round(ship.speed / 1000);
 
-      // `deg = normal(heading + degrees)` — a RELATIVE turn, as impulse does,
-      // except while `nav`'s autopilot has the helm. @see helpers/engine-course
+      // `deg = normal(heading + degrees)` — a RELATIVE turn, as impulse does.
+      // @see helpers/engine-course
       const course = resolveEngineCourse(ship, courseGiven, courseResult.value);
       const deg = course.deg;
 
-      if (course.releaseAutopilot && ship.holdcourse > 0) {
-        ship.holdcourse = 0;
-        ship.navTargetX = null;
-        ship.navTargetY = null;
-      }
 
       ship.speed2b = 1000.0 * speed;
       if (course.setHeading) ship.head2b = deg;

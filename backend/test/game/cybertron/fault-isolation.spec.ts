@@ -75,7 +75,6 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
         lock: 0,
         topspeed: 8,
         warncntr: 0,
-        navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
         shipname: `Healthy-${i}`,
         dirty: false,

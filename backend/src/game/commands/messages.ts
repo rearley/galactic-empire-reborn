@@ -360,10 +360,6 @@ export enum MessageId {
   // nav (feature 016) — GECMDS.C:5120 cmd_navigate
   NAVFMT = 'NAVFMT',
   NAV01 = 'NAV01',
-  NAV_INACTIVE = 'NAV_INACTIVE',
-  NAV_STATUS = 'NAV_STATUS',
-  NAV_ARRIVED = 'NAV_ARRIVED',
-  NAV_ALREADY_THERE = 'NAV_ALREADY_THERE',
   /** @see MBMGEMSG.MSG:2904 LEAVEORB */
   LEAVEORB = 'LEAVEORB',
   /** @see MBMGEMSG.MSG:2276 SHLDCHP — shields begin charging */
@@ -922,10 +918,6 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // wording described was a port invention and has been withdrawn.
   // @see GECMDS.C:5154, GE/REL/MBMGEMSG.MSG NAV01
   [MessageId.NAV01]: CANON_MESSAGES.NAV01,
-  [MessageId.NAV_INACTIVE]: 'Autopilot inactive.',
-  [MessageId.NAV_STATUS]: 'Autopilot active — target (%s,%s), distance %s, bearing %s.',
-  [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',
-  [MessageId.NAV_ALREADY_THERE]: 'Already at target sector.',
   [MessageId.LEAVEORB]: CANON_MESSAGES.LEAVEORB,
   [MessageId.SHLDCHP]: CANON_MESSAGES.SHLDCHP,
   [MessageId.SHLDUP]: CANON_MESSAGES.SHLDUP,

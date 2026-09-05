@@ -1429,20 +1429,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Autopilot arrival. The physics tick disengages `holdcourse` and emits this
-   * on the internal bus; nothing forwarded it to a socket, so a pilot who set a
-   * course simply stopped being steered — no word that they had arrived, and no
-   * reason to cut the engines before flying out the far side.
-   */
-  @OnEvent('physics.nav-arrived')
-  handleNavArrived(event: { userid: string; shipno: number; x: number; y: number }): void {
-    this.server.to(`user:${event.userid}`).emit('event.log', {
-      category: 'nav',
-      text: `Arrived at sector (${event.x}, ${event.y}) — autopilot disengaged, engines answering stop.`,
-    });
-  }
-
-  /**
    * Gravity-well proximity. C prints GRAVITY1/2/3 for a planet and
    * GRAVWRM1/2/3 for a wormhole as you close on it (GEFUNCS.C:855-885); the
    * innermost band is where the physics tick writes the hull off or throws you
