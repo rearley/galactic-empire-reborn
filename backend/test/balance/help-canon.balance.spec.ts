@@ -16,7 +16,11 @@ const MSG = resolve(__dirname, '../../..', 'reference/ge-upstream/mbmgemp/GE/REL
 
 /** The extractor's logic, re-implemented here so the test cannot share a bug. */
 function parse(raw: string): Map<string, string[]> {
-  const stripped = raw.replace(/\x1b?\[[0-9;]*[A-Za-z]/g, '');
+  // The ESC is REQUIRED. This spec used to re-implement the extractor's own
+  // `\x1b?` bug, so it computed its "expected" with the same fault and blessed
+  // the corruption it existed to catch: `attack [tro/fig]` was pinned as
+  // `attack ro/fig]`.
+  const stripped = raw.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
   const out = new Map<string, string[]>();
   const re = /^(HLP[A-Z0-9]*)\s*\{([\s\S]*?)^[ \t]*\}[ \t]*T/gm;
   let m: RegExpExecArray | null;
@@ -53,7 +57,9 @@ d('generated help matches the shipped MBMGEHLP.MSG', () => {
     for (const lines of Object.values(CANON_HELP)) {
       for (const line of lines) {
         expect(line).not.toMatch(/\x1b/);
-        expect(line).not.toMatch(/\[[0-9;]*m/);
+        // Anchored on ESC. Unanchored, this matched any `[m...` in the prose —
+        // it fired on canon's own `buy [<number>] [men/tro/...]` usage line.
+        expect(line).not.toMatch(/\x1b\[[0-9;]*m/);
       }
     }
   });
