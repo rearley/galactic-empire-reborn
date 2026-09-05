@@ -188,7 +188,25 @@ export class AdminHandlerService {
       return { lines: [{ text: formatMessage(MessageId.ADM_INVALID), category: 'system' }] };
     }
 
-    return { lines: [{ text: formatMessage(MessageId.ADM_OK), category: 'success' }] };
+    // Canon answers a rate change with the budget state, not a bare OK: it
+    // says when your figure was cut to fit (ADMEN2FA) and how much effort is
+    // still unassigned (ADMEN2FB). @see GEMAIN.C:3550-3565
+    const lines: CommandResult['lines'] = [
+      { text: formatMessage(MessageId.ADM_OK), category: 'success' },
+    ];
+    if (result.rateClamp) {
+      const { clamped, value, unassigned } = result.rateClamp;
+      if (clamped) {
+        lines.push({
+          text: formatMessage(MessageId.ADMEN2FA, ITEM_NAMES[change.type === 'rate' ? change.itemIndex : 0] ?? '', value),
+          category: 'system',
+        });
+      }
+      if (unassigned > 0) {
+        lines.push({ text: formatMessage(MessageId.ADMEN2FB, unassigned), category: 'system' });
+      }
+    }
+    return { lines };
   }
 
   /**

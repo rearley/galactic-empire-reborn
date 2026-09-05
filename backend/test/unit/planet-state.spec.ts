@@ -11,9 +11,13 @@ import { NUMITEMS, I_FOOD, I_MEN } from '../../src/game/constants/items';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
+  // Rates share ONE 100% budget (GEMAIN.C:3539-3560), so `rate: 10` on all 14
+  // items described a 140% colony that canon would refuse to create — and any
+  // rate set against it clamped to 0. Start at zero; tests that care set their
+  // own. @see src/game/planet/rate-budget.ts
   const items = Array.from({ length: NUMITEMS }, (_, i) => ({
     qty: 1000n,
-    rate: 10,
+    rate: 0,
     sell: true,
     reserve: 0,
     markup2a: 5,
@@ -420,7 +424,9 @@ describe('PlanetStateService — applyAdminChange()', () => {
   it('sets item rate', async () => {
     const { svc } = await setup();
     const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'rate', itemIndex: I_FOOD, value: 25 });
-    expect(result).toEqual({ ok: true });
+    // A rate change now reports the shared-budget state alongside ok, so the
+    // caller can print ADMEN2FA/ADMEN2FB. @see rate-budget.ts, GEMAIN.C:3550
+    expect(result).toMatchObject({ ok: true });
     expect(svc.get(1, 1, 1)?.items[I_FOOD].rate).toBe(25);
   });
 

@@ -53,6 +53,9 @@ export enum MessageId {
   REP18A = 'REP18A',
   REP24A = 'REP24A',
   /** @see GEMAIN.C:2859 mnu_fightsub — the `x` exit and its refusal */
+  /** @see GEMAIN.C:3550 update_items — the shared 100% production budget */
+  ADMEN2FA = 'ADMEN2FA',
+  ADMEN2FB = 'ADMEN2FB',
   CANTEXT = 'CANTEXT',
   EXIWAR2 = 'EXIWAR2',
   REP23 = 'REP23',
@@ -539,6 +542,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP18]: CANON_MESSAGES.REP18,
   [MessageId.REP18A]: CANON_MESSAGES.REP18A,
   [MessageId.REP24A]: CANON_MESSAGES.REP24A,
+  [MessageId.ADMEN2FA]: CANON_MESSAGES.ADMEN2FA,
+  [MessageId.ADMEN2FB]: CANON_MESSAGES.ADMEN2FB,
   [MessageId.CANTEXT]: CANON_MESSAGES.CANTEXT,
   [MessageId.EXIWAR2]: CANON_MESSAGES.EXIWAR2,
   [MessageId.REP23]: CANON_MESSAGES.REP23,
