@@ -61,7 +61,7 @@ an index from mechanic to original source.
 - [cmd_pln — list owned planets (feature 014)](#cmd_pln-list-owned-planets-feature-014)
 - [cmd_pri — price quote (feature 014)](#cmd_pri-price-quote-feature-014)
 - [cmd_maint — planet password gate (feature 014, deferred from 013)](#cmd_maint-planet-password-gate-feature-014-deferred-from-013)
-- [Autopilot (nav \<x\> \<y\>) (feature 016)](#autopilot-nav-x-y-feature-016)
+- [Navigation (nav \<x\> \<y\>)](#navigation-nav-x-y)
 - [Spy (spy) (feature 016)](#spy-spy-feature-016)
 - [Help (hel / ?) (feature 016)](#help-hel-feature-016)
 - [Clear Screen (cls) (feature 016)](#clear-screen-cls-feature-016)
@@ -2224,13 +2224,23 @@ Inserted between FR-209 (NZ non-Zygor) and FR-204 (no damage) in canonical sourc
 
 ---
 
-## Autopilot (nav \<x\> \<y\>) (feature 016)
+## Navigation (nav \<x\> \<y\>)
 
-**Source**: GECMDS.C:5109 `cmd_navigate` (deviation: original was a one-shot bearing-report command; this port uses `holdcourse` for persistent steering — see DECISIONS.md D1 2026-05-07)
+**Source**: GECMDS.C:5109 `cmd_navigate`
 
-Player issues `nav <x> <y>` to set an autopilot destination. The command validates coordinates against `UNIVMAX=15`, sets `holdcourse=1`, `navTargetX`, `navTargetY` on the ship. On each 6-second physics tick, `PhysicsTickService` recomputes `head2b` toward the target cell center (`+0.5` offset), using the existing rotation step to steer. Arrival is detected when `Math.floor(xcoord) === navTargetX && Math.floor(ycoord) === navTargetY`; on arrival, `holdcourse`/`navTargetX`/`navTargetY` are cleared and `NAV_ARRIVED` is emitted to the player's socket room.
+`nav <x> <y>` is a REPORT, not an autopilot. It validates the argument count and
+that both coordinates lie within `-UNIVMAX..+UNIVMAX`, then prints NAV01 —
+`"Sector %d %d is bearing %d, distance %s."` — and returns. It steers nothing,
+breaks no orbit, and has no "already there" refusal: canon answers for the
+sector you are standing in like any other.
 
-Manual `rot`, `imp`, or `war` silently disengages autopilot (`holdcourse=0`, targets cleared, no event).
+The bearing is `cbearing(from, to, heading)`, SIGNED and relative to the ship's
+current heading, and the distance is `cdistance * 10000`.
+
+The port once layered an autopilot on top of this, steering via `holdcourse` and
+two `navTargetX/Y` columns. That was removed on 2026-09-05, along with the
+columns, because `holdcourse` is a DROID field in canon — GEDROIDS.C and
+GECYBS.C set it as a wander/evade timer and no player path touches it.
 
 ---
 

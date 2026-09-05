@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 65 entries.
+Append-only, **newest at the bottom**. 66 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 65 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-05 — the systematic message sweep, and midnight moved to ET](#2026-09-05--the-systematic-message-sweep-and-midnight-moved-to-et)
 - [2026-09-04 (evening) — the owner played, and it found what the suite could not](#2026-09-04-evening--the-owner-played-and-it-found-what-the-suite-could-not)
 - [2026-09-04 — round 6, and the fix that broke persistence](#2026-09-04-round-6-and-the-fix-that-broke-persistence)
 - [2026-09-02 — the full original distribution, and a canon re-baseline](#2026-09-02-the-full-original-distribution-and-a-canon-re-baseline)
@@ -2852,3 +2853,93 @@ are the prey, and the Lydorian Scow is hard-capped at 999.9 so it can never run.
 - Canon's help pages are now shipped verbatim, but pages describing commands we
   implement differently are not yet reconciled.
 - AI mine crowding, and the unexplained Obliterator kill — both want a playtest.
+
+## 2026-09-05 — the systematic message sweep, and midnight moved to ET
+
+The previous entry's "next" asked for a systematic pass over `MBMGEMSG.MSG`
+rather than finding invented messages one at a time in play. This was it.
+
+**Completed:**
+
+1. **Midnight runs at ET.** One constant, `GAME_TIMEZONE`
+   (`src/game/midnight/midnight-time.ts`, `America/New_York`, env-overridable),
+   drives both the cron's firing time and the calendar date the run is filed
+   under. Those are one decision, not two settings: the date is the idempotency
+   key the boot self-heal reads, so a cron in ET against a UTC-computed date
+   agrees most of the time and disagrees either side of the boundary, silently
+   skipping or doubling a midnight. The host stays UTC deliberately — the zone
+   is passed to `@Cron` so the schedule survives redeployment anywhere.
+
+2. **`formatMessage` did not know `%c`.** It survived into output verbatim, so
+   every LOCK3/LOCK5, PHITDEF and RADSET printed a literal `%c` where the ship
+   letter belonged. Width flags were parsed and discarded too, so `ROS_ROW` and
+   `PLN_ROW` columns never aligned. Now speaks C's printf: flags, width,
+   precision, length modifiers, and `%c`.
+
+3. **Ground combat reported casualties inverted.** ATTACKM2 is "our troops
+   killed %s, and suffered losses of %s" and canon passes kill2 (theirs) before
+   kill1 (ours) — GECMDS.C:3693. The port passed ours first, so a rout read as a
+   victory. ATTACKF2 had the same shape and the same bug. The assault narration
+   also gained its opening line, the ATTACKM7/M8 pair, and the closing
+   ATTACK8/ATTACK9 verdict, and lost two invented lines that double-counted the
+   same casualties.
+
+4. **36 rows had a canon id as key and retyped text as value.** Sixteen had
+   drifted: `FORHELP` said the wrong thing outright; PHITDEF had lost its `%c`;
+   PHITYOU/KILLEDBY/NUMOOR had lost their `***` banner; REP31A/SCAN16 had
+   gained or lost leading whitespace, which is column alignment.
+   `test/balance/no-transcribed-canon.balance.spec.ts` now fails the build on
+   the next one, in both directions.
+
+5. **Self-destruct told the whole sector every tick.** SELFD2 is
+   `outprfge(usrn)` — the pilot's number — while SELFD2A/2B/2C are `outrange` at
+   10, 5 and 2, and canon prints both, not either. The port had one if/else
+   chain on a single sector broadcast, so neighbours watched the countdown and
+   the pilot lost the number at 10/5/2.
+
+6. **Autopilot leftovers removed.** `resolveEngineCourse` had already stopped
+   reading the nav target; what remained was two persisted `Ship` columns
+   nothing wrote, four invented message ids for unreachable states, a gateway
+   handler for an event nothing emits, and `holdcourse` clearing in
+   `rot`/`war`/`imp`. `holdcourse` is a DROID field in canon (GEDROIDS.C,
+   GECYBS.C) — no player path sets it, so those handlers cleared something never
+   set. Migration `20260905134143_drop_autopilot_nav_target`.
+
+7. **`ros` is canon**: ROSTER2 heading, canon's `prf` row, no Rank and no Team
+   (which also removed a `TeamRepository` query on every invocation). The cap
+   now comes from `MAXLIST`, whose note claimed "no consumer... our listings are
+   not truncated" — untrue twice: they were truncated, at 20, where canon's
+   default is 10.
+
+8. Also canon: `pln` (PLAMSG1/2 and the inline `prf` row), `fre`/`sen` (which
+   were the last handlers building output from inline template strings — canon
+   has a message for every branch of both, and BADCOM belongs to `send`, not
+   `fre`), `adm claim` (ADMENU1B names four things; the port's line had one and
+   two tests asserted the three resulting holes), `wit`, `mai`, `tra`'s planet
+   legs, INVCMD and NEW16.
+
+9. **A missing shop could abort midnight.** `refreshNeutralZone` used `update`
+   on two fixed coordinates, so a galaxy without a neutral zone threw inside the
+   nightly `$transaction` and rolled back scoring, production and mail.
+
+**Tests:** 4,886 backend / 475 suites; 160 frontend / 22 files. Four autopilot
+specs deleted — they tested removed behaviour and could only be kept by
+restoring the columns.
+
+**Decisions made:** invented text is replaced with canon; where canon has no
+string for a branch, the BRANCH goes rather than getting new prose. That removed
+`mai`'s undamaged-ship refusal (canon has no damage gate and charges regardless)
+and `destruct`'s "already in progress" (canon restarts the timer). Both were
+confirmed as wanted. Kept deliberately: `abandon`'s confirmation prompt, `mai`'s
+receipt line, and the roster printing `username` rather than the synthetic
+`userid`.
+
+**Known issues / next:**
+- ~60 invented strings remain, nearly all for port-only features canon has no
+  text for: ship-to-ship `transfer`, `who`, `set`, `dat`, the scan additions and
+  the help index.
+- **Ship-to-ship `transfer` is not canon at all** — confirmed three ways: the
+  command table has only `tra`, `cmd_transfer` branches on `up`/`down` alone,
+  and HLPTRA says "from your ship to a newly established planet, or from a
+  planet to your ship". It is left working, undecided.
+- AI mine crowding, and the unexplained Obliterator kill — still want a playtest.

@@ -11,6 +11,8 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-05 — Invented text is replaced with canon; a branch canon lacks is deleted, not reworded](#2026-09-05--invented-text-is-replaced-with-canon-a-branch-canon-lacks-is-deleted-not-reworded)
+- [2026-09-05 — Midnight maintenance runs on a named game timezone, not the host's](#2026-09-05--midnight-maintenance-runs-on-a-named-game-timezone-not-the-hosts)
 - [2026-08-31 — the autopilot survives a speed order](#2026-08-31-the-autopilot-survives-a-speed-order)
 - [2026-08-31 — debug endpoints fail closed, and are never reachable from the web server](#2026-08-31-debug-endpoints-fail-closed-and-are-never-reachable-from-the-web-server)
 - [2026-08-31 — `aba` goes back to meaning colony abandonment; scuttling moves to `aba ship`](#2026-08-31-aba-goes-back-to-meaning-colony-abandonment-scuttling-moves-to-aba-ship)
@@ -130,6 +132,8 @@ universe bounds.
 ---
 
 ## 2026-08-31 — the autopilot survives a speed order
+
+> **REVERSED 2026-09-05** along with the autopilot itself. See D1 below.
 
 **Context**: `nav <x> <y>` sets a course and holds it (`holdcourse`), and the physics tick re-aims
 the ship at the target each tick. It sets no speed — C's `cmd_navigate` is a pure calculator, so
@@ -1446,6 +1450,15 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 ---
 
 ## 2026-05-07 — D1: holdcourse boolean reuse for player autopilot (feature 016)
+
+> **REVERSED 2026-09-05.** The autopilot is gone and so are both columns
+> (migration `20260905134143_drop_autopilot_nav_target`). The premise below —
+> "without adding a new DB column" — was not met: it added two. And reusing
+> `holdcourse` was the wrong field to borrow: it is a DROID timer in canon,
+> set by GEDROIDS.C and GECYBS.C for wander and evade, and no player path
+> touches it. `nav` is now what `cmd_navigate` is, a bearing report.
+> The entry is kept because the log is append-only. See also the 2026-08-31
+> entry above, which patched this feature and is reversed with it.
 
 **Context**: `cmd_navigate` in the original GE was a one-shot bearing-report command. We needed a way to persist autopilot state between physics ticks without adding a new DB column.
 
@@ -3009,3 +3022,30 @@ midnight, invisible until scores are wrong.
 works, but makes correctness depend on deploy configuration that nothing tests,
 and silently changes every other date in the process. Leaving it UTC — the
 maintenance window then lands mid-session.
+
+## 2026-09-05 — Invented text is replaced with canon; a branch canon lacks is deleted, not reworded
+**Context:** A systematic pass over `MBMGEMSG.MSG` found 349 canon message ids
+the port never wired, and 128 places where it answered in prose of its own.
+Some of those places were branches canon does not have at all, so there was no
+canon string to swap in.
+**Decision:** Where canon has a string, use it. Where canon has no string
+because it has no such branch, remove the BRANCH rather than keep the invented
+line. Where a branch is genuinely port-original (a feature canon lacks), leave
+its text alone rather than force a canon string onto a different meaning.
+**Reason:** An invented refusal is not a neutral convenience — it changes what
+the game does. `mai` refused to service an undamaged ship; canon has no damage
+gate and charges regardless (GECMDS.C:cmd_maint), so the refusal was a rule the
+original never had. `destruct` refused to restart a countdown; canon assigns
+`destruct = COUNTDOWN` unconditionally, so the refusal made a countdown
+impossible to extend. Rewording those to sound more canonical would have kept
+the wrong behaviour behind better prose.
+**Alternatives rejected:** Keeping every branch and inventing canon-sounding
+text for it — that is how the port acquired 128 of these. Deleting port-original
+features to avoid having any non-canon strings at all — too far; ship-to-ship
+`transfer`, `who`, `set`, `dat`, `nav`'s scan additions and the help index are
+useful and are left as they are, flagged rather than removed.
+**Kept as deliberate deviations:** `abandon`'s confirmation prompt (canon
+un-claims immediately), `mai`'s receipt line (canon quotes the repair duration
+and never the fee, so repeated calls bill in silence), and the roster printing
+`username` rather than the synthetic `usr_<hex>` `userid`.
+
