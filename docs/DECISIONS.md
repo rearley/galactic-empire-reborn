@@ -3138,7 +3138,7 @@ and never the fee, so repeated calls bill in silence), and the roster printing
 
 
 ## 2026-09-05 — The canon audit is closed; its conclusion, kept
-**Context:** `docs/CANON_AUDIT_2026-09.md` was a 15-agent adversarial audit run
+**Context:** CANON_AUDIT_2026-09.md (deleted; in git history) was a 15-agent adversarial audit run
 on 2026-09-02 against the full original distribution — 98 findings, a ranked
 work order, and seven decisions put to the owner. Every one of those is now
 settled, so the file was a closed deliverable being indexed as "current".
@@ -3185,7 +3185,7 @@ about the `s00` table, about item base prices, and about the sysop options
 themselves — each time licensing an invented value. A confident sentence
 explaining why canon is unavailable is this project's most reliable warning sign.
 
-**Alternatives rejected:** keeping the file with a CLOSED banner — it is 883
+**Alternatives rejected:** keeping that file with a CLOSED banner — it is 883
 lines indexed as the current divergence list, and a stale snapshot read as
 current is the exact failure this audit round existed to fix. It remains in git
 history.

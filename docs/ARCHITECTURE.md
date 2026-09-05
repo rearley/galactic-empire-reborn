@@ -417,7 +417,10 @@ PlanetModule (game/planet/)
 
 `CommandsModule` imports `PlanetModule`, adding:
 - `OrbitHandlerService` (orbit/orb) — resolves sector planets via GalaxyService; auto-orbits single planet; pick-list for multi; sets ship.where = 10+plnum
-- `LandHandlerService` (land/lan) — claims unowned planet (name validation 1–19 printable ASCII); password-checks other-owned planets (none/team/exact)
+- `AdminHandlerService` (admin/adm) — `adm claim` claims an unowned planet (name validation 1-19
+  printable ASCII) and password-checks other-owned planets (none/team/exact); the rest of the
+  planet administration menu lives here too. There is no `land`/`lan` command, in this port or in
+  canon's command table (GECMDS.C:120-171).
 - `BuyHandlerService` (buy) — password gate; cargo capacity check; calls planetService.buy(); credits ship cargo + debits user.cash
 - `SellHandlerService` (sell) — neutral-zone plnum=1 gate; calls planetService.sell(); credits user.cash
 - `AdminHandlerService` (admin/adm) — owner-only; dispatches rate/markup/sellflag/reserve/tax/beacon/password changes
