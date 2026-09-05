@@ -1,8 +1,18 @@
 # Data Model
 
-Plain-English description of the 12 persisted entities and their relationships.
+Plain-English description of the 12 persisted entities and what they MEAN.
 For column-level citations back to the original C source, see
 `specs/001-prisma-schema/data-model.md`.
+
+> **`backend/prisma/schema.prisma` is the source of truth for every column** —
+> its name, type, nullability, default and index. This file explains intent; it
+> does not re-list the schema, and where it names a field it may be behind.
+> A 2026-09-05 audit found 13 discrepancies here, every one of them a restated
+> schema fact that had gone stale (`MAXSHIPS=10` where canon and the code say 8,
+> `username @unique` where the constraint is a raw `LOWER()` index, a `Team.flag`
+> column nothing writes, "450 sector rows" for a galaxy that has 40,401).
+> If you need the shape, read the schema. @see `docs/README.md` — single source
+> of truth.
 
 ## User
 
@@ -113,154 +123,23 @@ The scantab is rebuilt on every `scan lo`, `scan ra`, `scan se`, or `scan lo ful
 
 ## ScanRenderEvent wire payload (feature 015)
 
-The `scan:render` Socket.io event carries a `ScanRenderEvent` object emitted as a unicast
-to the issuing socket only (never broadcast):
+The `scan:render` Socket.io event is a UNICAST to the issuing socket, never a broadcast.
 
-```ts
-interface ScanRenderEvent {
-  kind:       'ra' | 'se' | 'lo' | 'lo-full';
-  mode:       'overwrite' | 'append';  // 'overwrite' when User.options[1] (SCANHOME) is on
-  cells:      ScanCell[];              // SPARSE — only occupied cells, not 450
-  header:     string;                  // the scan's own heading line
-  sidePanel?: SidePanelRow[];          // present only when kind === 'lo-full'
-}
+**The shape is declared in `backend/src/game/commands/command.types.ts`** (`ScanRenderEvent`,
+`ScanCell`, `SidePanelRow`), mirrored for the client in
+`frontend/src/hooks/useScanRender.ts`. It is deliberately NOT restated here: the copy that
+used to live in this section had drifted on four field names and one shape — it called the
+scan kind `mode`, called the cell list `grid`, described it as a dense 450-cell array when it
+is sparse, and gave `SidePanelRow.speed` as a number when it is a preformatted string.
 
-interface ScanCell {
-  x:       number;   // 0-29
-  y:       number;   // 0-14
-  type:    'ship' | 'planet' | 'mine' | 'self' | 'wormhole';
-  char:    string;   // display character: '*', 'A'-'Z', 'O', 'W', '1'-'9', '.'
-  colour?: 'self' | 'human' | 'ai' | 'planet';   // optional; there is no 'empty'
-}
+The two things worth saying that the type cannot:
 
-interface SidePanelRow {
-  letter:   string;   // 'A'-'Z'
-  distance: number;   // parsecs (cdistance × 10000)
-  bearing:  number;   // degrees 0-359
-  heading:  number;   // target ship heading degrees
-  speedDisplay: string;   // 'Warp 4.5' | 'Impulse' | 'Stopped'
-  name?:    string;   // only present when SCANNAMES = on (User.options[0] === 1)
-}
-```
+- **`cells` is sparse.** Only occupied positions are sent — ships, planets, mines and the self
+  marker — inside the 30×15 scan viewport. The client draws the empty space.
+- **`mode` is the SCANHOME option**, `User.options[1]`: `'overwrite'` homes the cursor and
+  replaces the last card, `'append'` adds one.
 
-The frontend `useScanRender` hook subscribes to `scan:render` and maintains a `ScanCard[]`.
-When `mode === 'overwrite'`, the hook replaces the last card (SCANHOME mode). Otherwise
-it appends a new card (capped at a display limit). `ScanPanel` renders the most-recent card.
-
-## Sector
-
-One cell of the universe square, which runs `-UNIVMAX..+UNIVMAX` on both axes
-(`MAXX`/`MAXY` are the scan VIEWPORT, not the galaxy), identified by
-`(xsect, ysect)`. Records the sector type and the count of planetary objects
-inside it. Source: `GALSECT` in `GEMAIN.H`. The galaxy generator seeds 450
-rows on first boot.
-
-## Planet
-
-A colonizable body inside a sector, identified by `(xsect, ysect, plnum)`.
-Multiple planets can share the same sector coordinates with different `plnum`
-values. Holds environment, resources, economy (cash/debt/tax as `BigInt`),
-taxes, ownership (`userid`, no FK), a 75-char beacon message, and a 14-slot
-economy inventory — each slot has quantity, rate, sell-flag, reserve, and
-two running-total fields, all stored as parallel native arrays. Source:
-`GALPLNT` + `ITEM` in `GEMAIN.H`.
-
-## Wormhole
-
-A teleport link inside a sector, identified by `(xsect, ysect, plnum)`. Stores
-both the origin coordinate and a destination coordinate, a visibility flag, and
-a name. Destinations are generated inside the universe square (the schema imposes no bound;
-validation is a runtime concern). Source: `GALWORM` in `GEMAIN.H`.
-
-## Team
-
-An alliance faction, identified by a `BigInt teamcode`. Holds a team name,
-member count, cumulative score, password, secret pass-phrase, and a flag.
-Capacity is at least `MAXTEAMS=50`. Source: `TEAM` in `GEMAIN.H`. Players
-reference teams via `User.teamcode` (no enforced FK — original tolerance).
-
-**Feature 018 additions**:
-- `Team_teamname_lower_key` — `CREATE UNIQUE INDEX ON "Team" (LOWER("teamname")) WHERE "teamcount" >= 0`
-  (migration `20260508003817_team_name_unique_lower`). Enforces case-insensitive team name uniqueness
-  at the DB level. The `WHERE teamcount >= 0` predicate is always true (column default 0, never negative)
-  and is present to allow future refinement (e.g. exclude soft-deleted teams via `flag != 1`).
-- `Team.secret` — remains in schema but is unused by feature 018; stored as `""` on creation.
-- `Team.flag` — remains in schema (canon's TEAM.flag) but NOTHING writes it. Disbandment is
-  recorded in the dedicated `removed Boolean` column by the midnight job.
-- `Team.teamcount` — maintained by midnight job; **NOT** read by `tea list` (FR-023 requires live
-  `GROUP BY teamcode` on `User` table instead of this denormalised counter).
-
-## Mail
-
-A standard message in a player's inbox, identified by `(userid, class, msgno)`.
-The `class` discriminates the mail type (values 1–5 per `GEMAIN.H`: distress,
-maxout, production-report, gamestats, plstats). Carries string fields, three
-integer and three `BigInt` payload fields. Source: `MAIL` in `GEMAIN.H`.
-
-**Relations**: belongs to one User (FK enforced).
-
-## MailStat
-
-A structured production-report variant of mail, identified by the same
-`(userid, class, msgno)` composite key as Mail. The two are separate models
-because their field shapes differ significantly — MailStat has a 14-element
-`BigInt[]` item-quantity array (`itemqty`) plus cash/debt/tax fields, and no
-free-text `string1`/`name2`/`long1-3` fields that Mail has. Source: `MAILSTAT`
-in `GEMAIN.H`.
-
-**Relations**: belongs to one User (FK enforced).
-
-## ShipClass
-
-A static stat sheet for one ship class number. 18 rows seeded at startup: 10
-player classes (Interceptor through Sysopian Death Star) and 8 CPU classes
-(5 Cybertron/Sarten combatives, 3 droids). Every column maps to a stat in the
-wiki tables (`reference/wiki/player-ships.md`, `reference/wiki/cpu-ships.md`).
-Used by combat math, purchase logic, AI, and the scan display. The field
-`WARSHP.shpclass` resolves to exactly one ShipClass row.
-
-## GalaxyMeta
-
-A singleton row (id always 1, enforced by a `CHECK (id=1)` DB constraint) that signals
-a complete, valid galaxy generation. Its presence is the idempotency probe checked by
-`GalaxyService.onModuleInit()` — if a `GalaxyMeta` row exists the generator skips
-regeneration entirely. The fields `seed`, `plodds`, `wormodds`, and `maxplanets` capture
-the exact generation parameters used, providing a complete audit trail of how the current
-galaxy was produced.
-
-The `Sector`, `Planet`, and `Wormhole` tables are populated by `GalaxyService.onModuleInit()`
-on first boot within a single Postgres transaction that also writes the `GalaxyMeta` row.
-They are no longer empty placeholder tables — after first boot all (2·UNIVMAX+1)² sector
-rows exist (40,401 at the deployed UNIVMAX=100),
-and every planet and wormhole that was generated is present and queryable.
-
-## Planet (in-memory PlanetState — feature 005)
-
-The `Planet` Prisma row is loaded once on boot by `PlanetStateService.onModuleInit()` and held in a `Map<planetKey, PlanetState>`. `planetKey(xsect, ysect, plnum)` returns `"xsect,ysect,plnum"`.
-
-The parallel `items*` columns in Postgres (`itemsQty BigInt[]`, `itemsRate Int[]`, `itemsSell Int[]`, `itemsReserve BigInt[]`, `itemsMarkup2a Int[]`, `itemsSold2a BigInt[]`) are projected into a `PlanetItem[14]` array inside `PlanetState`. Each element:
-
-```ts
-interface PlanetItem {
-  qty:      bigint;   // items[i].qty    — current stock
-  rate:     number;   // items[i].rate   — per-tick production rate (set by admin)
-  sell:     boolean;  // items[i].sell   — whether pilots can buy this item (0/1 in DB)
-  reserve:  bigint;   // items[i].reserve — qty below which selling is refused
-  markup2a: number;   // items[i].markup2a — non-owner price (set by admin)
-  sold2a:   bigint;   // items[i].sold2a — running total sold (BigInt accumulator)
-}
-```
-
-`prismaPlanetToState(row)` explodes the six parallel arrays into `PlanetItem[14]`. `stateToPrismaUpdate(state)` reassembles them back into `Prisma.PlanetUpdateInput`.
-
-No migration was required for this feature — the `Planet` model already had all columns from feature 001.
-
-### Item constants (`backend/src/game/constants/items.ts`)
-
-`NUMITEMS = 14`. Item indices:
-
-| Const | Value | Name |
-|-------|-------|------|
+-------|-------|------|
 | `I_MEN` | 0 | Men |
 | `I_FOOD` | 5 | Food Cases |
 | `I_GOLD` | 12 | Gold |

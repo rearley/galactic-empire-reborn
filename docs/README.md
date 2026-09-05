@@ -7,24 +7,49 @@ Start here. Each file below has one job; this page says which.
 | Question | Go to |
 |----------|-------|
 | **What is the canon value of X?** | Don't read a doc — run an extractor. `reference/README.md` has the three commands. |
+| **What does the code do today?** | Don't read a doc — read the code. The table below says which file owns each kind of fact. |
 | How does mechanic X work, and where is it in the C? | `GAME_MECHANICS.md` — one section per mechanic, each citing its C source |
 | Why is the code like this? | `DECISIONS.md` — dated decisions with context, reasoning and rejected alternatives |
 | Where does module X live, what does it own? | `ARCHITECTURE.md` |
-| What fields does entity X have? | `DATA_MODEL.md` |
+| What fields does entity X have? | `DATA_MODEL.md`, but `prisma/schema.prisma` is the truth |
 | What's been built, and what broke along the way? | `PROGRESS.md` — append-only session log, newest at the **bottom** |
-| Where does the port still diverge from the original? | `CANON_AUDIT_2026-09.md` — the current audit, 98 findings |
-| What did earlier audits find? | `FIDELITY_AUDIT.md`, `020-audit-findings.md` — **superseded**, see below |
 
-## The audit trail, in order
+## Single source of truth
 
-1. `FIDELITY_AUDIT.md` and `020-audit-findings.md` — earlier passes, done before
-   the full original distribution was available. Their conclusions were drawn
-   from the nine C files and the wiki, so anything they say about a **value**
-   should be re-checked against `reference/ge-upstream/`. Their findings about
-   **logic** still stand.
-2. `CANON_AUDIT_2026-09.md` — current. A 15-agent adversarial audit against the
-   full distribution, every finding independently re-verified. Section 5 is the
-   ranked work order; the appendix lists all 98 findings by area.
+A 2026-09-05 audit of every doc against the code found 115 real discrepancies.
+**Almost every one was a doc restating a fact that already lives somewhere
+authoritative** — 13 in `DATA_MODEL.md` restating the Prisma schema, 13 in
+`ARCHITECTURE.md` restating the `src/` tree, and a long tail of constants
+restating `.MSG` values. Prose copies of a machine-readable fact go stale in
+exactly the way canon transcriptions do.
+
+So: **docs point, they do not restate.** For each kind of fact there is one
+owner, and a doc that repeats it is a bug waiting to happen.
+
+| Kind of fact | Lives in | Docs may |
+|---|---|---|
+| A canon value (option, ship class, item table, message) | `reference/ge-upstream/mbmgemp/GE/REL/*.MSG`, via `tools/extract-*.mjs` | cite it with a `file:line`, never retype it |
+| A canon algorithm | `reference/ge-source/*.C` | cite `FILE.C:line`, quote at most a line or two |
+| A DB column | `backend/prisma/schema.prisma` | describe what it MEANS; never re-list types and defaults |
+| A wire event shape | `backend/src/game/commands/command.types.ts` | name the event; never re-declare the interface |
+| A module, class or file path | the `src/` tree itself | describe responsibility; keep names current or omit them |
+| A tuned deviation | `backend/config/game.config.json` + a `DECISIONS.md` entry | explain the reasoning |
+
+If a doc needs a number to make its point, cite where the number lives. If it
+needs to be exact, there is a balance spec for that — a test re-reads the
+original and fails on drift, which no paragraph can do.
+
+## The audit trail
+
+All three audit reports are closed and have been removed; they remain in git
+history. `FIDELITY_AUDIT.md` and `020-audit-findings.md` were superseded by the
+full distribution arriving on 2026-09-02, and every finding in both is fixed.
+`CANON_AUDIT_2026-09.md` — the 15-agent adversarial audit, 98 findings and seven
+owner decisions — is closed in full; its durable conclusion is preserved as the
+2026-09-05 entry in `DECISIONS.md`, because the conclusion outlives the findings.
+
+`PROGRESS.md` still refers to all three by name. That is correct: it is an
+append-only log and those entries record what was true when written.
 
 ## The two rules that generated most of this project's bugs
 
