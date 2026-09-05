@@ -84,7 +84,7 @@ export class TransferHandlerService {
 
     return {
       lines: [{
-        text: formatMessage(MessageId.TRAN_DOWN_OK, qty, ITEM_NAMES[itemIndex], planet.name),
+        text: formatMessage(MessageId.TRAN_DOWN_OK, qty, ITEM_NAMES[itemIndex]),
         category: 'success',
       }],
     };
@@ -142,7 +142,7 @@ export class TransferHandlerService {
 
     return {
       lines: [{
-        text: formatMessage(MessageId.TRAN_UP_OK, qty, ITEM_NAMES[itemIndex], planet.name),
+        text: formatMessage(MessageId.TRAN_UP_OK, qty, ITEM_NAMES[itemIndex]),
         category: 'success',
       }],
     };

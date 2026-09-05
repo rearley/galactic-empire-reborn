@@ -162,10 +162,20 @@ export class AttackHandlerService {
     }
 
     // Convert narration to CommandResult lines.
-    const lines = outcome.outcome.narration.map((text, idx) => ({
+    const lines = outcome.outcome.narration.map((text) => ({
       text,
-      category: (idx < outcome.outcome.narration.length - 1 ? 'combat' : 'success') as 'combat' | 'success',
+      category: 'combat' as const,
     }));
+
+    // cmd_attack closes on the verdict, and it belongs to the COMMAND rather
+    // than to either resolver: both attack_men and attack_fig return `won` and
+    // cmd_attack prints ATTACK8 or ATTACK9 from it (GECMDS.C:3571-3580,
+    // 3597-3606). The port had no closing line at all, so a raid that took the
+    // planet read the same as one that bounced off it.
+    lines.push({
+      text: formatMessage(outcome.outcome.won === 1 ? MessageId.ATT_WON : MessageId.ATT_STANDOFF),
+      category: 'combat' as const,
+    });
 
     return { lines };
   }
