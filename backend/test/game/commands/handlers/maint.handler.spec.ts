@@ -110,11 +110,16 @@ describe('MaintHandlerService — rejection paths (T016 regression)', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT_NZ));
   });
 
-  it('no-damage → MAINT_NO_DAMAGE', async () => {
-    const { handler } = makeService({ ok: false, reason: 'no-damage' });
+  it('an undamaged ship is repaired anyway, because canon has no such gate', async () => {
+    // cmd_maint's guards are orbit, password, facility, combat lock and cash —
+    // there is no damage check (GECMDS.C:cmd_maint). It computes
+    // `repair = damage/3 + 1` unconditionally, so an undamaged ship pays and
+    // gets a one-centock job. The port added a refusal with invented text,
+    // which is a kindness canon does not extend.
+    const { handler } = makeService({ ok: true, repairAmt: 1, price: 200n });
     const ship = makeShip({ where: 10, damage: 0 });
     const result = await handler.command.handler(ship, [], {}) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT_NO_DAMAGE));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT_OK, 1));
   });
 
   it('insufficient-cash → MAINT_NO_CASH', async () => {

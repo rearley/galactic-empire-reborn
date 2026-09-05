@@ -128,14 +128,13 @@ describe('MaintHandlerService — password gate ordering (T046)', () => {
     expect(result.lines[0].text).not.toBe(formatMessage(MessageId.MAINT2));
   });
 
-  it('password gate fires before FR-204 (no damage)', async () => {
-    // MaintenanceService returns password-required (password check runs before
-    // damage check inside evaluateGates — verified in maintenance.service.spec.ts T014).
-    // Handler must route to MAINT2, not MAINT_NO_DAMAGE.
+  it('asks for the password even when the ship is undamaged', async () => {
+    // The damage gate is gone — canon never had one — so this now says only
+    // that an undamaged ship still meets the password check rather than
+    // slipping past it.
     const { handler } = makeService({ ok: false, reason: 'password-required' });
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 0 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MAINT2));
-    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.MAINT_NO_DAMAGE));
   });
 });

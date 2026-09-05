@@ -47,8 +47,6 @@ export class MaintHandlerService {
           return { lines: [{ text: formatMessage(MessageId.MAINT2), category: 'system' }] };
         case 'wrong-password':
           return { lines: [{ text: formatMessage(MessageId.MAINT3), category: 'system' }] };
-        case 'no-damage':
-          return { lines: [{ text: formatMessage(MessageId.MAINT_NO_DAMAGE), category: 'system' }] };
         case 'insufficient-cash':
           return { lines: [{ text: formatMessage(MessageId.MAINT_NO_CASH), category: 'system' }] };
         default:

@@ -302,7 +302,6 @@ export enum MessageId {
   MAINT_NO_FACILITY = 'MAINT_NO_FACILITY',
   MAINT_COMBAT = 'MAINT_COMBAT',
   MAINT_NZ = 'MAINT_NZ',
-  MAINT_NO_DAMAGE = 'MAINT_NO_DAMAGE',
   MAINT_NO_CASH = 'MAINT_NO_CASH',
   MAINT_OK = 'MAINT_OK',
 
@@ -666,7 +665,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.BUYPAS4]: CANON_MESSAGES.BUYPAS4,
 
   // multi-ship (feature 030) — ship creation/selection
-  [MessageId.NEW_FLEET_FULL]: 'Your fleet is full — you cannot own more ships.',
+  [MessageId.NEW_FLEET_FULL]: CANON_MESSAGES.NEW16,
   [MessageId.SHIP_SELECT_HEADER]: 'Choose your ship:',
 
   // sell (feature 005) — GECMDS.C:4103 cmd_sell
@@ -858,7 +857,6 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MAINT_NO_FACILITY]: CANON_MESSAGES.MAINT8,
   [MessageId.MAINT_COMBAT]: CANON_MESSAGES.MAINT9,
   [MessageId.MAINT_NZ]: CANON_MESSAGES.MAINT4,
-  [MessageId.MAINT_NO_DAMAGE]: 'No maintenance is needed.',
   [MessageId.MAINT_NO_CASH]: CANON_MESSAGES.MAINT6,
   [MessageId.MAINT_OK]: CANON_MESSAGES.MAINT5,
 
@@ -1064,7 +1062,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // MBMGEMSG.MSG:2090 NUMOOR, verbatim. The paraphrase rendered a negative
   // lower bound as "(-180-180)", which reads as a single negative number.
   [MessageId.NUMOOR]: CANON_MESSAGES.NUMOOR,
-  [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
+  [MessageId.UNKNOWN_CMD]: CANON_MESSAGES.INVCMD,
   // Blank line — GECMDS.C:282-284 warnop()
   [MessageId.FORHELP]: CANON_MESSAGES.FORHELP,
   [MessageId.SHIP_ABANDONED]: 'Your ship has been abandoned. Please create a new ship.',

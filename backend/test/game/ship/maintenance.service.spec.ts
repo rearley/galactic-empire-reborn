@@ -228,14 +228,18 @@ describe('MaintenanceService — FR-210 password gate', () => {
 // FR-204: must have damage
 // ---------------------------------------------------------------------------
 
-describe('MaintenanceService — FR-204 damage gate', () => {
-  it('returns no-damage when damage === 0', async () => {
+describe('MaintenanceService — there is no damage gate', () => {
+  it('lets an undamaged ship through, as cmd_maint does', async () => {
+    // cmd_maint gates on orbit, password, facility, combat lock and cash, and
+    // nothing else. It then computes `repair = damage/3 + 1` unconditionally,
+    // so zero damage buys a one-centock job at full price. FR-204 was the
+    // port's own kindness, and its refusal text was invented too.
     const { svc } = makeService();
     const result = await svc.evaluateGates(makeShip({ damage: 0 }));
-    expect(result).toEqual({ ok: false, reason: 'no-damage' });
+    expect(result.ok).toBe(true);
   });
 
-  it('passes damage gate when damage > 0', async () => {
+  it('passes an ordinary damaged ship as well', async () => {
     const { svc } = makeService();
     const result = await svc.evaluateGates(makeShip({ damage: 1 }));
     expect(result.ok).toBe(true);

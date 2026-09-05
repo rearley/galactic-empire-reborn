@@ -40,7 +40,7 @@ describe('who dispatch integration', () => {
   it('unknown keyword falls through to UNKNOWN_CMD', () => {
     const router = buildRouter([]);
     const result = router.dispatch('xyz', makeShip(), ctx) as import('../../../src/game/commands/command.types').CommandResult;
-    expect(result.lines[0].text).toMatch(/unknown command/i);
+    expect(result.lines[0].text).toMatch(/Sorry Sir, I don't understand the command!/i);
   });
 
   it('who with two registry ships returns header + 2 info rows', async () => {
