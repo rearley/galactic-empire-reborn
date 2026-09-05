@@ -530,6 +530,14 @@ export const MINE_TIMER_MIN = 1 as const;
 export const MINE_TIMER_MAX = 50 as const;
 
 /**
+ * Fuse an AI ship sets on a mine it drops while breaking away. Canon passes
+ * the literal 10 at every AI call site — droids at GEDROIDS.C:512, Cybertrons
+ * at GECYBS.C:315 and :632 — so both families leave the same short-lived
+ * hazard behind them rather than a persistent minefield.
+ */
+export const AI_MINE_TIMER = 10 as const;
+
+/**
  * Universe half-extent — coordinates valid in [-UNIVMAX, +UNIVMAX].
  * @see GEGLOBAL.H:134 univmax
  */

@@ -21,7 +21,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { MineRegistry } from '../combat/mine.registry';
-import { MineRepository, MineTableFullError } from '../combat/mine.repository';
+import { MineRepository, MineRefusedError } from '../combat/mine.repository';
 import { Random, RANDOM } from '../combat/random.port';
 import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
@@ -42,6 +42,7 @@ import {
   MAXTORPS,
   WARP_THRESHOLD,
   SHIELDDM,
+  AI_MINE_TIMER,
 } from '../constants';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import { buildDroidConfig } from './droid.config';
@@ -636,7 +637,10 @@ export class DroidTickService implements OnModuleInit {
     // in a full galaxy would have burned its whole magazine laying nothing.
     void this.mineRepo.create({
       channel: droid.shipno,
-      timer: 100,
+      // Canon's droid fuse is 10, the same short hazard a Cybertron drops:
+      // `laymine(ptr,usrn,10)` at GEDROIDS.C:512. Ours was 100 — ten times
+      // the slot occupancy per mine, in a twelve-slot galaxy-wide table.
+      timer: AI_MINE_TIMER,
       xcoord: droid.xcoord,
       ycoord: droid.ycoord,
       deployedBy: droid.userid,
@@ -645,7 +649,7 @@ export class DroidTickService implements OnModuleInit {
       droid.items[I_MINE] = BigInt(Number(droid.items[I_MINE] ?? 0n) - 1);
       this.mineRegistry.add({ ...mine, deployedBy: droid.userid });
     }).catch((err: unknown) => {
-      if (err instanceof MineTableFullError) return; // canon: no slot, no mine spent
+      if (err instanceof MineRefusedError) return; // canon: laymine returned 0, nothing spent
       this.logger.error('Droid mine lay failed:', err);
     });
   }
