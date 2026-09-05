@@ -58,7 +58,17 @@ describe('GameGateway combat broadcasts', () => {
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
   });
 
-  it('broadcasts COMBAT_PHASER_FIRED to sector room', () => {
+  /**
+   * Canon prints PFIRED with `outprfge(FILTER, usrn)` — the FIRER's own
+   * channel (GECMDS.C:943-944). Only the HIT is public.
+   *
+   * Broadcasting the discharge to the sector filled a player's log with
+   * "Cybrg-203 fires phasers!" and nothing else, because most AI shots miss or
+   * fall under the `damage >= 1` gate and correctly emit nothing further. The
+   * owner watched two of them land no damage and asked why there was "nothing
+   * about if hit, or anything" — there was nothing to say, and canon says it.
+   */
+  it('sends COMBAT_PHASER_FIRED to the FIRER, not the sector', () => {
     const event: CombatPhaserFiredEvent = {
       shipId: 'a:1',
       bearing: 90,
@@ -68,8 +78,14 @@ describe('GameGateway combat broadcasts', () => {
       tickAt: new Date(),
     };
     gateway.handleCombatPhaserFired(event);
-    expect(toMock).toHaveBeenCalledWith('sector:5:7');
-    expect(emitMock).toHaveBeenCalledWith(COMBAT_PHASER_FIRED, event);
+    expect(toMock).toHaveBeenCalledWith('user:a');
+    expect(toMock).not.toHaveBeenCalledWith('sector:5:7');
+    // Enriched with the hull name — AI are absent from the client roster, so
+    // an unenriched event renders as the userid. @see GEFUNCS.C:2596 username
+    expect(emitMock).toHaveBeenCalledWith(
+      COMBAT_PHASER_FIRED,
+      expect.objectContaining({ shipId: 'a:1' }),
+    );
   });
 
   it('broadcasts COMBAT_HIT to sector room', () => {
