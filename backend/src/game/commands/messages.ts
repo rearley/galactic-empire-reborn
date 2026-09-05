@@ -812,8 +812,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.DAT_NOT_FOUND]: 'Ship not found.',
 
   // ros (feature 012) — GECMDS.C:5276 cmd_geroster
-  [MessageId.ROS_HEADER]: '  Rank  UserID                Score      Kills  Planets  Population',
-  [MessageId.ROS_ROW]: ' %4s  %s %10s  %5s  %5s  %10s',
+  [MessageId.ROS_HEADER]: CANON_MESSAGES.ROSTER2,
+  [MessageId.ROS_ROW]: '%-30s%11s%5d%3d%s', // GECMDS.C:4045 prf — canon's row, inline in the C rather than the MSG file
 
   // sen (feature 012) — GECMDS.C:1825 cmd_send
   [MessageId.MSG_USAGE_SEN]: CANON_MESSAGES.SNDFMT,

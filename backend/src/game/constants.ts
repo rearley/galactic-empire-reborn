@@ -296,6 +296,15 @@ export const START_CASH_CREDITS = BigInt(GAME_CONFIG.STRTCASH) * 1000n;
 export const MAXSHIPS = GAME_CONFIG.MAXSHIPS;
 
 /**
+ * Entries shown in the roster (env MAXLIST, 3-50).
+ *
+ * cmd_geroster reads it into `j` and prints it into the ROSTER2 heading, so the
+ * list and the "Top %d" line cannot disagree. `ros all` overrides it with 200.
+ * @see GEMAIN.C:461 numopt(MAXLIST,3,50)  GECMDS.C:4020-4028
+ */
+export const MAXLIST = GAME_CONFIG.MAXLIST;
+
+/**
  * How long one full sweep of the planet table takes, in seconds.
  *
  *   plantock = lngopt(PLANTOCK,1,32760) * 60L;      GEMAIN.C:469
