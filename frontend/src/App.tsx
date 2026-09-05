@@ -67,6 +67,16 @@ function Terminal(): React.JSX.Element {
     }
   }, [lastResult]);
 
+  // Function-key bindings for the F KEY MAP panel. Sent on board and again
+  // after every `fset`, so the panel is populated at login rather than only
+  // once you change something. @see src/game/commands/fkeys.ts
+  const [fkeys, setFkeys] = useState<string[]>([]);
+  useEffect(() => {
+    const handleFkeys = (e: { fkeys: string[] }) => setFkeys(e.fkeys ?? []);
+    socket.on('fkeys.snapshot', handleFkeys);
+    return () => { socket.off('fkeys.snapshot', handleFkeys); };
+  }, []);
+
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
       setScanCells(event.cells as ScanCell[]);
@@ -315,7 +325,7 @@ function Terminal(): React.JSX.Element {
 
         {/* Side: player-list panel (FR-002, FR-016..FR-018) */}
         <div className="w-48 flex-shrink-0">
-          <PlayerListPanel players={players} />
+          <PlayerListPanel players={players} fkeys={fkeys} />
         </div>
       </div>
 

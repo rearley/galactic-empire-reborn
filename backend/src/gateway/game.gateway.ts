@@ -487,9 +487,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true, username: true } });
+        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true, username: true, fkeys: true } });
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
         if (userRow?.username) state.username = userRow.username;
+        if (userRow?.fkeys) state.fkeys = userRow.fkeys;
         // Cumulative captain kills, so a veteran boarding a fresh hull keeps
         // the Cybertron standing they earned. @see GECYBS.C:441, :524
         if (userRow?.kills != null) state.userKills = userRow.kills;
@@ -540,6 +541,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       lines: [{ text: `Welcome aboard, ${activeShip.shipname}.`, category: 'system' }],
     });
     client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
+    // The F Key Map panel needs the captain's bindings at login, not just
+    // after an `fset`. @see src/game/commands/fkeys.ts
+    client.emit('fkeys.snapshot', { fkeys: this.shipStateService.get(userid, activeShip.shipno)?.fkeys ?? [] });
 
     const sectorX = Math.floor(activeShip.xcoord);
     const sectorY = Math.floor(activeShip.ycoord);
@@ -845,6 +849,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           ],
         });
         client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
+    // The F Key Map panel needs the captain's bindings at login, not just
+    // after an `fset`. @see src/game/commands/fkeys.ts
+        client.emit('fkeys.snapshot', { fkeys: state.fkeys ?? [] });
 
         const connectedPlayer: ConnectedPlayer = {
           shipId,
@@ -1808,10 +1815,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (result.expectFollowup !== undefined) {
       client.data.pendingFollowup = result.expectFollowup;
     }
+    if (result.fkeys) client.emit('fkeys.snapshot', { fkeys: result.fkeys });
+
     if (result.scanRender) {
-      client.emit('command:result', {
-        lines: [{ text: result.scanRender.header, category: 'info' }],
-      });
+      // Send the handler's OWN lines, not a synthesised header. This used to
+      // rebuild `[{ text: scanRender.header }]` unconditionally, which quietly
+      // undid the de-duplication done in the handler: `sca lo full` returns no
+      // line precisely because its SCAN DATA card already shows the header,
+      // and the gateway put it back. The other scan modes carry their header
+      // in `lines` already, so passing them through is correct for all four.
+      // Destructured out, not set to undefined: spreading with an explicit
+      // `undefined` leaves the KEY present, and the contract is that
+      // command:result carries no render payload.
+      const { scanRender: _render, ...withoutRender } = result;
+      void _render;
+      client.emit('command:result', withoutRender);
       client.emit('scan:render', result.scanRender);
     } else {
       client.emit('command:result', result);

@@ -29,6 +29,7 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../../src/app.module';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipTickService } from '../../src/game/ship/ship-tick.service';
+import { TickService } from '../../src/game/tick/tick.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants';
@@ -61,8 +62,7 @@ describe('ion cannons (real services, no mocks)', () => {
   let ships: ShipStateService;
   let planets: PlanetStateService;
   let shipTick: ShipTickService;
-  let armedPlnum: number | null = null;
-  let px = 0, py = 0;
+  const PX = 3, PY = 3, PLNUM = 1;
 
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false });
@@ -71,20 +71,14 @@ describe('ion cannons (real services, no mocks)', () => {
     planets = app.get(PlanetStateService);
     shipTick = app.get(ShipTickService);
 
-    // Arm a real planet from the generated galaxy — no fixture stand-in, so the
-    // lookup fireIon does (by sector + plnum) is the one under test.
-    for (let x = 1; x <= 6 && armedPlnum === null; x++) {
-      for (let y = 1; y <= 6 && armedPlnum === null; y++) {
-        for (let n = 1; n <= 4; n++) {
-          const p = planets.get(x, y, n);
-          if (p) {
-            p.items[I_ION].qty = 50n;
-            armedPlnum = n; px = x; py = y;
-            break;
-          }
-        }
-      }
-    }
+    // Stop the live heartbeats. Booting the real AppModule starts raw
+    // setInterval timers (tick.service.ts:53-84) that keep running while this
+    // suite executes, rehydrating the planet map and ticking ships underneath
+    // it. That made the suite pass alone and fail in a full run — the longer
+    // wall clock simply gave a timer time to fire. We drive the tick by hand
+    // here, so the scheduler is not merely unnecessary, it is the race.
+    app.get(TickService).onModuleDestroy();
+
   }, 30000);
 
   afterAll(async () => { await app?.close(); }, 15000);
@@ -103,20 +97,50 @@ describe('ion cannons (real services, no mocks)', () => {
       .processRestorativeTick(ship);
   }
 
+  /**
+   * Our OWN planet, inserted into the live map.
+   *
+   * This borrowed a planet from the generated galaxy and was flaky in a full
+   * run: the map was empty by the time the later cases ran, so `planets.get`
+   * returned undefined. Whatever empties it, depending on galaxy state that
+   * another suite can change is the wrong coupling for a test about fireIon —
+   * the planet is a fixture here, and everything else (the service, the tick,
+   * the damage maths) stays real.
+   */
+  function armedPlanet(): { xcoord: number; ycoord: number; items: Array<{ qty: bigint }> } {
+    const key = `${PX}:${PY}:${PLNUM}`;
+    const map = (planets as unknown as { map: Map<string, unknown> }).map;
+    let p = planets.get(PX, PY, PLNUM) as unknown as { items: Array<{ qty: bigint }> } | undefined;
+    if (!p) {
+      p = {
+        xsect: PX, ysect: PY, plnum: PLNUM, type: 2,
+        xcoord: PX + 0.5, ycoord: PY + 0.5,
+        userid: 'ion-owner', name: 'Testbed', enviorn: 2, resource: 2,
+        cash: 0n, debt: 0n, tax: 0n, taxrate: 0, warnings: 0, password: '',
+        lastattack: '', beacon: '', spyowner: '', technology: 0, teamcode: 0n,
+        items: Array.from({ length: NUMITEMS }, () => ({
+          qty: 0n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+        })),
+      } as unknown as { items: Array<{ qty: bigint }> };
+      map.set(key, p);
+    }
+    p.items[I_ION].qty = 50n;
+    return p as { xcoord: number; ycoord: number; items: Array<{ qty: bigint }> };
+  }
+
   function orbiting(over: Partial<ShipState> = {}): ShipState {
-    const p = planets.get(px, py, armedPlnum!)!;
+    const p = armedPlanet();
     const s = makeShip({
       xcoord: p.xcoord, ycoord: p.ycoord,
-      where: 10 + armedPlnum!,
+      where: 10 + PLNUM,
       ...over,
     });
     ships.loadShip(s);
     return s;
   }
 
-  it('found a planet to arm', () => {
-    expect(armedPlnum).not.toBeNull();
-    expect(Number(planets.get(px, py, armedPlnum!)!.items[I_ION].qty)).toBe(50);
+  it('has an armed planet to shoot with', () => {
+    expect(Number(armedPlanet().items[I_ION].qty)).toBe(50);
   });
 
   it('does NOT fire on a ship merely sitting in orbit', () => {
@@ -139,13 +163,13 @@ describe('ion cannons (real services, no mocks)', () => {
 
   it('DOES fire on the ship that attacked it', () => {
     // `att` sets hostile = where (GECMDS.C:3568), which is 10 + plnum.
-    const s = orbiting({ userid: 'raider', hostile: 10 + armedPlnum! });
+    const s = orbiting({ userid: 'raider', hostile: 10 + PLNUM });
     for (let i = 0; i < 20; i++) runTick(s);
     expect(s.damage).toBeGreaterThan(0);
   });
 
   it('credits the kill to nobody — a planet is not an attacker', () => {
-    const s = orbiting({ userid: 'raider2', hostile: 10 + armedPlnum!, lastfired: 7 });
+    const s = orbiting({ userid: 'raider2', hostile: 10 + PLNUM, lastfired: 7 });
     for (let i = 0; i < 5; i++) runTick(s);
     // `ptr->lastfired = -1` (GEFUNCS.C:1797): the ship-loss mail must not name
     // whoever shot you last before the colony finished the job.
@@ -154,8 +178,8 @@ describe('ion cannons (real services, no mocks)', () => {
   });
 
   it('stops once the raider pulls away — checkdist drops the mark', () => {
-    const p = planets.get(px, py, armedPlnum!)!;
-    const s = orbiting({ userid: 'fleeing', hostile: 10 + armedPlnum! });
+    const p = armedPlanet();
+    const s = orbiting({ userid: 'fleeing', hostile: 10 + PLNUM });
     // More than HOSTILE_RANGE (1000 raw = 0.1 sectors) away, but still in the
     // SAME sector: fireIon looks the planet up by floor(coord), so a ship that
     // leaves the sector fails the lookup and returns BEFORE the checkdist
@@ -173,9 +197,9 @@ describe('ion cannons (real services, no mocks)', () => {
   });
 
   it('a raider with shields up takes a scratch instead of a killing blow', () => {
-    const bare = orbiting({ userid: 'bare', hostile: 10 + armedPlnum!, shieldstat: 0 });
+    const bare = orbiting({ userid: 'bare', hostile: 10 + PLNUM, shieldstat: 0 });
     const guarded = orbiting({
-      userid: 'guarded', shipno: 2, hostile: 10 + armedPlnum!,
+      userid: 'guarded', shipno: 2, hostile: 10 + PLNUM,
       shieldstat: 1, shield: 50, shieldtype: 1,
     });
     // ONE hit each. Over many ticks the guarded ship's shield BLOWS, after

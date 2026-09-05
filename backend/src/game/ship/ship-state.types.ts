@@ -196,6 +196,17 @@ export interface ShipState {
   isEphemeral?: boolean;
 
   /**
+   * Function-key command bindings, f1..f12 at indices 0..11, cached from
+   * User.fkeys.
+   *
+   * PORT-ORIGINAL: canon kept this in the TERMINAL, not the game. Hydrated at
+   * boot and at board time like `username` and `teamcode`; NOT persisted on
+   * Ship — the binding belongs to the captain, not the hull, so it follows
+   * them across ships. @see src/game/commands/fkeys.ts
+   */
+  fkeys?: string[];
+
+  /**
    * The player's display handle, cached from User.username.
    *
    * Canon's `username()` returns `ptr->userid` for a player (GEFUNCS.C:2596),
