@@ -42,12 +42,13 @@ describe('formatMessage speaks canon printf', () => {
   });
 
   it('pads a %Nd field on the left, so columns line up', () => {
-    // ROS_ROW is ' %4s  %s %10s  %5s  %5s  %10s' — the roster, which is columns
+    // ROS_ROW is canon's '%-30s%11s%5d%3d%s' — the roster, which is columns
     // and nothing else. The widths were parsed and thrown away, so every row
     // rendered ragged however carefully the string was written.
-    const out = fmt(MessageId.ROS_ROW, 1, 'alice', 100, 2, 3, 4);
-    expect(out).toContain('   1');   // width 4, right-aligned
-    expect(out).toContain('       100'); // width 10
+    const out = fmt(MessageId.ROS_ROW, 'alice', '100', 2, 3, ' 0.000m');
+    expect(out.startsWith('alice'.padEnd(30))).toBe(true); // %-30s
+    expect(out).toContain('        100');                  // %11s, right
+    expect(out).toContain('    2');                        // %5d, right
   });
 
   it('left-justifies when the - flag is present', () => {

@@ -115,7 +115,7 @@ describe('loadGameConfig', () => {
       .map(([n]) => n)
       .sort();
     expect(unwired).toEqual([
-      'FREEBIES', 'HYPDST1', 'HYPDST2', 'MAXLIST', 'MAXPLREC',
+      'FREEBIES', 'HYPDST1', 'HYPDST2', 'MAXPLREC',
       'NUMSHIPS', 'S00PLNUM', 'SCRFACT', 'SHOWOPT',
     ]);
   });

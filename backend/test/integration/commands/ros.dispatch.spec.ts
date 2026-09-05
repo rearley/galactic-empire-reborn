@@ -34,7 +34,7 @@ function buildRouter(users: Array<{ userid: string; score: bigint; kills: number
   const prismaMock = {
     user: { findMany: jest.fn().mockResolvedValue(users) },
   } as unknown as PrismaService;
-  const handler = new RosHandlerService(prismaMock, emptyTeamRepo);
+  const handler = new RosHandlerService(prismaMock);
   const router = new CommandRouterService();
   router.register(handler.command);
   return router;
@@ -50,7 +50,8 @@ describe('ros dispatch integration', () => {
     const result = await router.dispatch('ros', makeShip(), ctx);
     const header = result.lines[0];
     expect(header.category).toBe('system');
-    expect(header.text).toMatch(/Rank/i);
+    // ROSTER2, not the port's invented column heading. @see GECMDS.C:4028
+    expect(header.text).toMatch(/Top \d+ Roster List/);
     const rows = result.lines.filter((l) => l.category === 'info');
     expect(rows).toHaveLength(2);
     expect(rows[0].text).toContain('admiral');
@@ -58,7 +59,7 @@ describe('ros dispatch integration', () => {
 
   it('ros all passes to Prisma with all cap', async () => {
     const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-    const handler = new RosHandlerService(prismaMock, emptyTeamRepo);
+    const handler = new RosHandlerService(prismaMock);
     const router = new CommandRouterService();
     router.register(handler.command);
     await router.dispatch('ros all', makeShip(), ctx);
