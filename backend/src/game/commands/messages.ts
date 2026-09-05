@@ -614,7 +614,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ABAN_CANCELLED]: 'Left as it is.',
   [MessageId.TRAN_NO_ROOM]: "%s does not have room for that.",
   // C's ADMENU2D — the pool cannot cover the amount asked for.
-  [MessageId.WTHDR_TOO_MUCH]: 'The tax pool only holds %d credits.',
+  [MessageId.WTHDR_TOO_MUCH]: CANON_MESSAGES.ADMENU2D,
   [MessageId.WTHDR_FMT]: 'Usage: wit [amount]  (no amount withdraws everything)',
   // Bare `pri` on a planet offering nothing. Distinct from BUY5, which is the
   // item-scoped "that item is not for sale" answer to `pri <qty> <item>`.
@@ -624,9 +624,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // land (feature 005)
   [MessageId.LAND_NOT_ORBIT]: CANON_MESSAGES.ADMIN1,
-  [MessageId.LAND_NAME_PROMPT]: 'What would you like to name this planet? (Up to 19 characters.)',
+  [MessageId.LAND_NAME_PROMPT]: CANON_MESSAGES.ADMENU1A,
   [MessageId.LAND_INVALID_NAME]: 'That is not a valid planet name.',
-  [MessageId.LAND_CLAIMED]: 'You have claimed %s. It is now your planet.',
+  [MessageId.LAND_CLAIMED]: CANON_MESSAGES.ADMENU1B,
   // Per-player planet cap. @see GECMDS.C:3487 waruptr->planets >= max_plnts
   [MessageId.LAND_PLANET_LIMIT]: CANON_MESSAGES.ADMIN4,
   // Nothing in sector 0,0 is claimable — it holds the trade hub.
@@ -680,17 +680,17 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // C's ADMENU1 — `adm` on an unclaimed planet you orbit offers it to you,
   // then ADMENU1A asks for a name. @see GEMAIN.C:2899 mnu_admenu1
   [MessageId.ADM_CLAIM_OFFER]: CANON_MESSAGES.ADMENU1,
-  [MessageId.ADM_CLAIM_DECLINED]: 'You leave it as you found it.',
+  [MessageId.ADM_CLAIM_DECLINED]: CANON_MESSAGES.ADMIN3,
   [MessageId.ADM_MENU]: CANON_MESSAGES.ADMENU2,
   [MessageId.ADM_INVALID]: 'Invalid value.',
   [MessageId.ADM_OK]: 'Setting saved.',
 
   // withdraw (feature 005)
   // Same `where < 10` orbit gate as buy — see BUY1.
-  [MessageId.WTHDR_NOT_LANDED]: 'You must be in orbit around your planet to withdraw taxes.',
+  [MessageId.WTHDR_NOT_LANDED]: CANON_MESSAGES.ADMIN1,
   [MessageId.WTHDR_NOT_OWNER]: CANON_MESSAGES.ADMIN2,
-  [MessageId.WTHDR_OK]: 'Withdrew %d credits from planet tax pool.',
-  [MessageId.WTHDR_NONE]: 'There are no taxes to withdraw.',
+  [MessageId.WTHDR_OK]: CANON_MESSAGES.ADMENU2C,
+  [MessageId.WTHDR_NONE]: CANON_MESSAGES.ADMENU2D,
 
   // report cargo (feature 005)
   [MessageId.REP_CARGO_LINE]: '%6d %s',

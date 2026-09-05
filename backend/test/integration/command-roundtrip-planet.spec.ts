@@ -262,7 +262,7 @@ describe('command round-trip (planet) integration (T066)', () => {
     const result = (await commandRouter.dispatch('adm claim Aurora', shipInOrbit, {})) as CommandResult;
 
     // Args are now passed with original casing preserved (keyword is lowercased, args are not).
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'Aurora'));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 1, 'Aurora', 'u1', 'Enterprise'));
     expect(result.lines[0].category).toBe('success');
 
     void ship; // referenced to keep lint happy

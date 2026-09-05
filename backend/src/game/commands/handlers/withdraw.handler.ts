@@ -48,7 +48,7 @@ export class WithdrawHandlerService {
     const requested = parseWithdrawAmount(args[0], state.tax);
     if (!requested.ok) {
       const msg = requested.reason === 'TOO_MUCH'
-        ? formatMessage(MessageId.WTHDR_TOO_MUCH, Number(state.tax))
+        ? formatMessage(MessageId.WTHDR_TOO_MUCH)
         : formatMessage(MessageId.WTHDR_FMT);
       return { lines: [{ text: msg, category: 'system' }] };
     }

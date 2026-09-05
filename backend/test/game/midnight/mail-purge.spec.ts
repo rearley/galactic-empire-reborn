@@ -62,8 +62,19 @@ beforeEach(async () => {
   await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
 });
 
+/**
+ * A stamp `days` old, nudged one minute INSIDE the window.
+ *
+ * purgeMail deletes `stamp < now - mailDays*86400` and computes its own
+ * `now` — later than this one by however long the fixture insert and the
+ * service call take. A row placed exactly ON the boundary therefore sat on the
+ * losing side of a strict comparison whenever the wall clock advanced a single
+ * second between the two, which made "preserves mail within retention window"
+ * fail at random. The minute keeps the boundary case meaningful (it is still
+ * the oldest mail that must survive) without racing the clock.
+ */
 function daysAgoStamp(days: number): number {
-  return Math.floor(Date.now() / 1000) - days * 86_400;
+  return Math.floor(Date.now() / 1000) - days * 86_400 + 60;
 }
 
 function mailRow(ageInDays: number, recipient = 'alice', classNum = 1, msgnoOffset = 0) {
