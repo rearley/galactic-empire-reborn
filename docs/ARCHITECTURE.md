@@ -1,7 +1,16 @@
 # Architecture
 
-Current module map as of feature 019-physics-polish.
+Module map — what each part OWNS and how the pieces talk to each other.
 Updated at the end of every implement session per CLAUDE.md.
+
+> **The `src/` tree is the source of truth for names and paths.** This file
+> explains responsibility and data flow; it is not an inventory. A 2026-09-05
+> audit found 13 discrepancies here, almost all of them names that had moved on
+> — six service classes that no longer exist, an `ai/` directory that never did,
+> an onboarding state machine describing a class picker the game does not have,
+> and a canon-extraction diagram naming the FORBIDDEN `GE/MSG/` copy as its
+> source. Where a name here disagrees with the tree, the tree wins.
+> @see `docs/README.md` — single source of truth.
 
 ## Repository layout
 
@@ -9,12 +18,12 @@ Updated at the end of every implement session per CLAUDE.md.
 galactic-empire-reborn/
   backend/
     prisma/
-      schema.prisma          ← Prisma schema (10 models + MidnightRun, all C structs mapped)
+      schema.prisma          ← Prisma schema — THE source of truth for every column
       migrations/            ← Versioned migration files (never edit after creation)
       seed/
         ship-classes.ts      ← GENERATED from canon — see "Canon pipeline" below
     src/                     ← NestJS application (see module map below)
-    test/                    ← Jest test suite (396 suites / 4282 tests)
+    test/                    ← Jest test suite (run it for the count; a number here only rots)
     config/
       game.config.json       ← DEVIATIONS ONLY; defaults come from canon
     package.json             ← Backend deps + db:up/db:down/db:reset/test scripts

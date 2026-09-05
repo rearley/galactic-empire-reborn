@@ -3136,3 +3136,56 @@ un-claims immediately), `mai`'s receipt line (canon quotes the repair duration
 and never the fee, so repeated calls bill in silence), and the roster printing
 `username` rather than the synthetic `usr_<hex>` `userid`.
 
+
+## 2026-09-05 — The canon audit is closed; its conclusion, kept
+**Context:** `docs/CANON_AUDIT_2026-09.md` was a 15-agent adversarial audit run
+on 2026-09-02 against the full original distribution — 98 findings, a ranked
+work order, and seven decisions put to the owner. Every one of those is now
+settled, so the file was a closed deliverable being indexed as "current".
+A 2026-09-05 documentation audit confirmed all 76 of its appendix findings
+resolved in code, and all seven owner decisions closed:
+
+- **D1 UNIVMAX** — 100 kept, deviation recorded. Its coupled item,
+  `SCAN_LO_PROJECTION_MULTIPLIER`, stays at 3 *because* it is coupled: 3 at
+  UNIVMAX 100, 10 at canon's 300, pinned by `scan-projection-ratio.balance.spec.ts`.
+- **D2 PLANTOCK** — restored to canon 360.
+- **D3 UNIVWRAP** — implemented, defaulting to canon NO; `TELEDAM` is applied at
+  `physics-tick.service.ts:358` rather than being a pinned number nothing read.
+- **D4 "men don't eat"** — fixed; `planet-economy.ts:129` debits `floor(men/100)`.
+- **D5 gold base price** — 1000, from `ITMPR13`, generated and pinned.
+- **D6 admin hull** — both the listing and the purchase are gated on
+  `FIRST_CPU_CLASS` (`new-ship.handler.ts:165, 207`).
+- **D7 the five caps** — all at canon: MAXPLNTS 20, MAXPLRS 30, MAXSHIPS 8,
+  MAILDAYS 3, TOOCLOSE 2500.
+
+**Decision:** Delete the file. Keep its conclusion here, because the conclusion
+outlives the findings.
+
+**The conclusion:** *the port was structurally faithful and numerically wrong.*
+The algorithms survived scrutiny almost everywhere — `pdamage`, firep tonnage
+scaling, the shield-drain asymmetry, the mine cubic falloff, the production loop
+and its two traps, the starvation ladder, the buy/sell gate order, the kill-score
+split, `valuePlanet`, the bearing family, the whole 18-row ship-class table. What
+was broken was the TUNING LAYER, and it had a single root cause:
+
+> `game-config.ts` stated that canon's defaults "are not part of the reference
+> source, so there is nothing to recover." **That was factually false.**
+> `MBMGEMSG.MSG` carries the shipped default inside the `{}` of every option
+> block.
+
+Believing it, the port picked the `numopt()` clamp **ceiling** (TDAMMAX 100,
+MDAMMAX 100, HPDAMMAX 200, JAMTIME 10, USRMINES 200, MAXPLNTS 256) or **floor**
+(PFIRDST 1, HPFIRDST 1, TORFACT 1, MISFACT 1, PLATTR* 0.05) — about 35 of 51
+options wrong, each defensibly inside its bounds and none of them canon.
+
+**Reason to keep this and not the findings:** the findings are closed and the
+tests now hold them. The failure MODE is what recurs. It reappeared three more
+times in the 2026-09-05 doc audit — the same "not in the reference source" claim
+about the `s00` table, about item base prices, and about the sysop options
+themselves — each time licensing an invented value. A confident sentence
+explaining why canon is unavailable is this project's most reliable warning sign.
+
+**Alternatives rejected:** keeping the file with a CLOSED banner — it is 883
+lines indexed as the current divergence list, and a stale snapshot read as
+current is the exact failure this audit round existed to fix. It remains in git
+history.
