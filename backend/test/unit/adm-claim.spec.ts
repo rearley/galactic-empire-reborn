@@ -85,7 +85,12 @@ describe('adm on an unclaimed planet — C\'s claim flow', () => {
     const r = await svc.command.handler(makeShip(), ['claim', 'New', 'Terra'], {}) as
       { lines: { text: string }[] };
     expect(claim).toHaveBeenCalledWith(3, 4, 1, 'usr_me', 'New Terra');
-    expect(r.lines[0].text).toBe(formatMessage(MessageId.LAND_CLAIMED, 'New Terra'));
+    // ADMENU1B names four things: planet number, new name, commander, ship
+    // (GEMAIN.C:2966-2970). Passing only the name left three holes in the
+    // declaration — "planet New Terra to be named  ... Commander of The ."
+    expect(r.lines[0].text).toBe(
+      formatMessage(MessageId.LAND_CLAIMED, 1, 'New Terra', 'usr_me', 'Probe'),
+    );
   });
 
   it('walks away when you decline', async () => {

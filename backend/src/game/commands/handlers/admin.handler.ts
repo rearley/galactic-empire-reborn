@@ -266,8 +266,22 @@ export class AdminHandlerService {
       return { lines: [{ text, category: 'system' }] };
     }
 
+    // ADMENU1B is the declaration itself, and canon names all four things:
+    // the planet's number, its new name, the commander, and the ship it was
+    // claimed from (GEMAIN.C:2966-2970). The port's line had only the name.
     return {
-      lines: [{ text: formatMessage(MessageId.LAND_CLAIMED, name), category: 'success' }],
+      lines: [
+        {
+          text: formatMessage(
+            MessageId.LAND_CLAIMED,
+            state.plnum,
+            name,
+            ship.username ?? ship.userid,
+            ship.shipname,
+          ),
+          category: 'success',
+        },
+      ],
     };
   }
 
