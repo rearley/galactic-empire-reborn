@@ -34,6 +34,12 @@ function triggerScanRender(payload: ScanRenderEvent): void {
   socketListeners.get('scan:render')?.forEach((h) => h(payload));
 }
 
+/**
+ * A READOUT-producing scan. SCAN DATA now cards only modes that return a
+ * sidePanel: `sca se` and plain `sca lo` return cells alone, and with the grid
+ * moved to SECTOR MAP those posted an empty header. `sca lo full` and `sca ra`
+ * are the modes with a table, so the base fixture carries one.
+ */
 const baseScanEvent: ScanRenderEvent = {
   kind: 'lo',
   mode: 'overwrite',
@@ -41,7 +47,10 @@ const baseScanEvent: ScanRenderEvent = {
     { x: 5, y: 3, type: 'self', char: '*', colour: 'self' },
     { x: 10, y: 7, type: 'ship', char: 'A', colour: 'human' },
   ],
-  header: 'Range: 450 — Sector 5,7',
+  header: '   Range Scan Dist:450 (s:5 7)',
+  sidePanel: [
+    { letter: 'A', distance: 450, bearing: 45, heading: 270, speedDisplay: '4.50' },
+  ],
 };
 
 /**

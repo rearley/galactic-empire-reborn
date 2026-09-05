@@ -66,7 +66,7 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
       {/* Side panel legend — stacked below grid when present */}
       {event.sidePanel != null && event.sidePanel.length > 0 && (
         <div
-          className="font-mono text-xs text-gray-300 mt-1"
+          className="font-mono text-xs text-gray-300 mt-1 whitespace-pre"
           data-testid="scan-card-side-panel"
         >
           {/*
@@ -147,7 +147,17 @@ export function ScanPanel(): React.JSX.Element {
           className="overflow-auto bg-black p-1"
           data-testid="scan-panel"
         >
-          {cards.slice().reverse().map((card, idx) => (
+          {/*
+            * Only scans that produce a READOUT get a card. `sca se` and plain
+            * `sca lo` return cells and no sidePanel, so with the grid moved to
+            * SECTOR MAP they had nothing left to render and posted an empty
+            * header — three of them stacked up in the owner's screenshot.
+            * Their feedback is the map itself plus the command line in the log.
+            *
+            * Tested on `!= null`, not on length: a readout mode that finds
+            * NOTHING should still say so rather than vanish.
+            */}
+          {cards.slice().reverse().filter((c) => c.sidePanel != null).map((card, idx) => (
             <ScanCard key={idx} event={card} />
           ))}
         </div>
