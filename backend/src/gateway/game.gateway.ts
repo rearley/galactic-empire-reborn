@@ -143,6 +143,44 @@ function useridOf(shipKey: string): string {
   return parts.slice(0, -1).join(':');
 }
 
+
+/**
+ * Canon prints a different message for each weapon that hits you, and only the
+ * phaser one names the attacker:
+ *
+ *   phaser   PHITYOU / PHITDEF  "Phaser hit from Commander %s's ship..."
+ *   torpedo  THIT2   / THIT1    "We have taken a hit from a torpedo, Sir!"
+ *   missile  MHIT2   / MHIT1    "...hit by a hyper-missile carrying a %s charge"
+ *   mine     MINE4              "ZZzzzzzsssssssssttttt! BOOOOOOM!"
+ *
+ * The port routed every COMBAT_HIT through PHITYOU, so a pilot who tripped his
+ * OWN mine was told "Phaser hit from Commander an unknown assailant's ship,
+ * caused no damage, Sir!" — wrong weapon, and an attacker canon never claims
+ * for a mine. @see GEFUNCS.C:1560, :1644, GECMDS.C:987-996
+ */
+function hitText(
+  event: CombatHitEvent,
+  deflected: boolean,
+  attackerLabel: string,
+): string {
+  const hull = damstr(event.damageHull ?? 0);
+  switch (event.weapon) {
+    case 'torpedo':
+      return formatMessage(deflected ? MessageId.THIT1 : MessageId.THIT2);
+    case 'missile':
+      return formatMessage(deflected ? MessageId.MHIT1 : MessageId.MHIT2, hull);
+    case 'mine':
+      // MINE4 wants bearing and distance; the blast is at the victim, so the
+      // reading is zero on both — canon's own laymine blast reports from where
+      // the mine was, and we do not carry that on the hit event yet.
+      return formatMessage(MessageId.MINE4, 0, 0, hull);
+    default:
+      return deflected
+        ? formatMessage(MessageId.PHITDEF, attackerLabel, Math.round(event.damageShield ?? 0))
+        : formatMessage(MessageId.PHITYOU, attackerLabel, hull);
+  }
+}
+
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -979,9 +1017,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const attackerLabel = enriched.attackerName ?? 'an unknown assailant';
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
-      text: deflected
-        ? formatMessage(MessageId.PHITDEF, attackerLabel, Math.round(event.damageShield ?? 0))
-        : formatMessage(MessageId.PHITYOU, attackerLabel, damstr(event.damageHull ?? 0)),
+      text: hitText(event, deflected, attackerLabel),
     });
 
     // Victim may be in a DIFFERENT sector room (cross-sector phaser range), so

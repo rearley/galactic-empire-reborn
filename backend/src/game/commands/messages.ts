@@ -373,6 +373,18 @@ export enum MessageId {
   /** @see MBMGEMSG.MSG PHITHIM — to the firer, damage dealt to an unshielded victim */
   PHITHIM = 'PHITHIM',
   /** @see MBMGEMSG.MSG PHITYOU — to the victim, damage taken */
+  /**
+   * Canon prints a DIFFERENT message per weapon when you are hit. PHITYOU is
+   * the phaser one only — `firep` (GECMDS.C:987-996). The port routed every
+   * COMBAT_HIT through it, so a mine blast announced itself as "Phaser hit
+   * from Commander an unknown assailant's ship" — the wrong weapon AND an
+   * attacker canon never claims for a mine.
+   */
+  THIT1 = 'THIT1',
+  THIT2 = 'THIT2',
+  MHIT1 = 'MHIT1',
+  MHIT2 = 'MHIT2',
+  MINE4 = 'MINE4',
   PHITYOU = 'PHITYOU',
   /** @see MBMGEMSG.MSG PDEFLECT — to the firer, the beam was turned by shields */
   PDEFLECT = 'PDEFLECT',
@@ -737,6 +749,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // `min <1-50>` in centocks, ~5 seconds each. Our bare "Mine deployed."
   // withheld the one number that makes the choice meaningful — a player
   // seeding an escape path could not tell a 5-second fuse from a 4-minute one.
+  [MessageId.THIT1]: CANON_MESSAGES.THIT1,
+  [MessageId.THIT2]: CANON_MESSAGES.THIT2,
+  [MessageId.MHIT1]: CANON_MESSAGES.MHIT1,
+  [MessageId.MHIT2]: CANON_MESSAGES.MHIT2,
+  [MessageId.MINE4]: CANON_MESSAGES.MINE4,
   [MessageId.MIN_DEPLOYED]: 'Neutron Mine launched. Detonation in %s centocks!',
   [MessageId.ZIP_NOAMMO]: CANON_MESSAGES.ZIPPER1,
   [MessageId.ZIP_SWEPT]: CANON_MESSAGES.ZIPPER2,
