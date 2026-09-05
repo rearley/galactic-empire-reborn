@@ -597,12 +597,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
 
   // land (feature 005)
-  [MessageId.LAND_NOT_ORBIT]: 'You must enter orbit first.',
+  [MessageId.LAND_NOT_ORBIT]: CANON_MESSAGES.ADMIN1,
   [MessageId.LAND_NAME_PROMPT]: 'What would you like to name this planet? (Up to 19 characters.)',
   [MessageId.LAND_INVALID_NAME]: 'That is not a valid planet name.',
   [MessageId.LAND_CLAIMED]: 'You have claimed %s. It is now your planet.',
   // Per-player planet cap. @see GECMDS.C:3487 waruptr->planets >= max_plnts
-  [MessageId.LAND_PLANET_LIMIT]: 'You already hold the maximum of %s planets.',
+  [MessageId.LAND_PLANET_LIMIT]: CANON_MESSAGES.ADMIN4,
   // Nothing in sector 0,0 is claimable — it holds the trade hub.
   [MessageId.LAND_NEUTRAL_ZONE]: 'Neutral zone planets cannot be claimed.',
   [MessageId.LAND_OK]: 'You have landed on %s.',
@@ -650,20 +650,20 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
   // Same `where < 10` orbit gate as buy — see BUY1.
-  [MessageId.ADM_NOT_LANDED]: 'You must be in orbit around your planet to administer it.',
-  [MessageId.ADM_NOT_OWNER]: 'You are not the owner of this planet.',
+  [MessageId.ADM_NOT_LANDED]: CANON_MESSAGES.ADMIN1,
+  [MessageId.ADM_NOT_OWNER]: CANON_MESSAGES.ADMIN2,
   // C's ADMENU1 — `adm` on an unclaimed planet you orbit offers it to you,
   // then ADMENU1A asks for a name. @see GEMAIN.C:2899 mnu_admenu1
-  [MessageId.ADM_CLAIM_OFFER]: 'This planet is unclaimed. Do you wish to claim it? (yes/no)',
+  [MessageId.ADM_CLAIM_OFFER]: CANON_MESSAGES.ADMENU1,
   [MessageId.ADM_CLAIM_DECLINED]: 'You leave it as you found it.',
-  [MessageId.ADM_MENU]: 'Admin options: rate, markup, sellflag, reserve, tax, beacon, password',
+  [MessageId.ADM_MENU]: CANON_MESSAGES.ADMENU2,
   [MessageId.ADM_INVALID]: 'Invalid value.',
   [MessageId.ADM_OK]: 'Setting saved.',
 
   // withdraw (feature 005)
   // Same `where < 10` orbit gate as buy — see BUY1.
   [MessageId.WTHDR_NOT_LANDED]: 'You must be in orbit around your planet to withdraw taxes.',
-  [MessageId.WTHDR_NOT_OWNER]: 'You are not the owner of this planet.',
+  [MessageId.WTHDR_NOT_OWNER]: CANON_MESSAGES.ADMIN2,
   [MessageId.WTHDR_OK]: 'Withdrew %d credits from planet tax pool.',
   [MessageId.WTHDR_NONE]: 'There are no taxes to withdraw.',
 

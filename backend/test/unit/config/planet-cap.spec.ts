@@ -76,7 +76,11 @@ describe('the refusal reaches the player', () => {
 
     const text = result.lines.map((l) => l.text).join(' ');
     expect(text).toBe(formatMessage(MessageId.LAND_PLANET_LIMIT, String(MAXPLNTS)));
-    expect(text).not.toMatch(/claimed/i);
+    // The refusal must not be the SUCCESS line. Guarding on the word "claimed"
+    // was too blunt once canon's wording arrived: ADMIN4 is a refusal and says
+    // "We have already claimed the maximum planets permited by law."
+    expect(text).not.toMatch(/you (?:have )?claimed/i);
+    expect(text).toMatch(/maximum planets/i);
   });
 });
 
