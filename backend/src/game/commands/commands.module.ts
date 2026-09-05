@@ -9,6 +9,7 @@ import { fluxCommand } from './handlers/flux.handler';
 import { LockHandlerService } from './handlers/lock.handler';
 import { WarpHandlerService } from './handlers/warp.handler';
 import { ScanHandlerService } from './handlers/scan.handler';
+import { ExitHandlerService } from './handlers/exit.handler';
 import { ReportHandlerService } from './handlers/report.handler';
 import { OrbitHandlerService } from './handlers/orbit.handler';
 import { BuyHandlerService } from './handlers/buy.handler';
@@ -73,6 +74,7 @@ import { MailModule } from '../mail/mail.module';
   providers: [
     CommandRouterService,
     ScanHandlerService,
+    ExitHandlerService,
     ReportHandlerService,
     OrbitHandlerService,
     BuyHandlerService,
@@ -130,6 +132,7 @@ import { MailModule } from '../mail/mail.module';
 export class CommandsModule implements OnModuleInit {
   constructor(
     private readonly commandRouter: CommandRouterService,
+    private readonly exitHandler: ExitHandlerService,
     private readonly scanHandler: ScanHandlerService,
     private readonly reportHandler: ReportHandlerService,
     private readonly orbitHandler: OrbitHandlerService,
@@ -198,6 +201,7 @@ export class CommandsModule implements OnModuleInit {
       ),
     );
 
+    this.commandRouter.register(this.exitHandler.command);
     this.commandRouter.register(rotateCommand);
     this.commandRouter.register(impulseCommand);
     this.commandRouter.register(this.warpHandler.command);

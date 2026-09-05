@@ -23,6 +23,13 @@ export interface CommandResult {
    * @see specs/015-scan-modes/contracts/scan-render.md §1
    */
   scanRender?: ScanRenderEvent;
+  /**
+   * Set by `x`: the pilot has left the game. The gateway unboards the ship —
+   * which flushes it and runs cleartm — and returns the client to the ship
+   * selection, which is how a SECOND hull is reached. Canon's exit drops you
+   * to the main menu for exactly that reason. @see GEMAIN.C:2859 mnu_fightsub
+   */
+  exitGame?: boolean;
   /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
   broadcasts?: Array<{
     room: string;
