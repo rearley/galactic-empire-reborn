@@ -134,7 +134,7 @@ export class ShipStateService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     const [rows, classes] = await Promise.all([
-      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true, kills: true, username: true } } } }),
+      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true, kills: true, username: true, fkeys: true } } } }),
       this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true, maxTons: true } }),
     ]);
     const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));
@@ -145,6 +145,7 @@ export class ShipStateService implements OnModuleInit {
       if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
       // Canon names a player by their handle, not the account key. @see display-name.ts
       if (row.user?.username) state.username = row.user.username;
+      if (row.user?.fkeys) state.fkeys = row.user.fkeys;
       // Cumulative captain kills — what the Cybertron escalation gates read.
       // Ship.kills is per-hull and resets on every replacement.
       // @see GECYBS.C:441, :524; ShipState.userKills

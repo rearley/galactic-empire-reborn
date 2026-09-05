@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from './command.types';
 import { formatMessage, MessageId } from './messages';
 import { ShipState } from '../ship/ship-state.types';
+import { expandFkey } from './fkeys';
 import { SHIP_STATUS_ABANDONED } from './_ship-management-constants';
 
 /**
@@ -74,7 +75,16 @@ export class CommandRouterService {
       return { lines: [{ text: formatMessage(MessageId.FORHELP), category: 'system' }] };
     }
 
-    const tokens = trimmed.split(/\s+/);
+    // A bound function key expands to the command it holds, BEFORE anything
+    // else looks at the input — so `f1` behaves exactly as if the stored text
+    // had been typed, including its own arg-count and abandoned-ship checks.
+    // Bindings cannot chain (parseFsetArgs refuses a slot as a target), so one
+    // expansion is enough and there is no recursion to bound.
+    // @see fkeys.ts — PORT-ORIGINAL, canon had this in the terminal
+    const expanded = expandFkey(trimmed.split(/\s+/)[0], ship.fkeys ?? []);
+    const line = expanded != null ? expanded : trimmed;
+
+    const tokens = line.split(/\s+/);
     const keyword = tokens[0].toLowerCase();
     const args = tokens.slice(1);
 

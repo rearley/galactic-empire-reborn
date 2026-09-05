@@ -49,6 +49,15 @@ model User {
   population BigInt  @default(0)
   /// WARUSR.options[30] — player option flags; native array per FR-034
   options    Int[]
+  /// Function-key command bindings, f1..f12 at indices 0..11.
+  ///
+  /// PORT-ORIGINAL: canon has no such feature. On a BBS this lived in the
+  /// TERMINAL — people bound F-keys in Telix or Qmodem to send "pha 0 0\r" —
+  /// so GECMDS.C has no key handling at all and there is nothing to be
+  /// faithful to. A browser cannot reliably claim F-keys (F11 and F12 never
+  /// reach the page), so these are TYPED: `fset f1 pha 0 0`, then `f1`.
+  /// @see docs/DECISIONS.md
+  fkeys      String[]  @default([])
   /// WARUSR.teamcode — no FK; dangling teamcode tolerated per original game behavior (R-3)
   teamcode   BigInt?
 

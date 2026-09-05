@@ -115,6 +115,10 @@ const IN_MEMORY_ONLY = [
   'lastfiredBy',
   // Set by a gravity collision so the mail names the body, not a person.
   'deathCause',
+  // Function-key bindings, cached from User.fkeys. They belong to the CAPTAIN,
+  // not the hull, so they follow them across ships and have no Ship column.
+  // @see src/game/commands/fkeys.ts
+  'fkeys',
   // The player's display handle, cached from User.username so public messages
   // can name a captain without leaking the account key. @see display-name.ts
   'username',

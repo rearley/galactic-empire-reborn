@@ -30,6 +30,11 @@ export interface CommandResult {
    * to the main menu for exactly that reason. @see GEMAIN.C:2859 mnu_fightsub
    */
   exitGame?: boolean;
+  /**
+   * Updated function-key bindings, so the client can refresh its F Key Map
+   * without a round trip. @see src/game/commands/fkeys.ts
+   */
+  fkeys?: string[];
   /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
   broadcasts?: Array<{
     room: string;
