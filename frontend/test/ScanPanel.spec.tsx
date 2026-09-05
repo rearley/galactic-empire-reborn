@@ -237,7 +237,7 @@ describe('ScanPanel', () => {
         ...baseScanEvent,
         mode: 'overwrite',
         sidePanel: [
-          { letter: 'A', distance: 120, bearing: 45, heading: 270, speedDisplay: 'Warp 4.5', name: 'Avenger' },
+          { letter: 'A', distance: 120, bearing: 45, heading: 270, speedDisplay: '4.50', name: 'Avenger' },
           { letter: 'B', distance: 300, bearing: 90, heading: 180, speedDisplay: 'Impulse' },
         ],
       });
@@ -251,7 +251,7 @@ describe('ScanPanel', () => {
     expect(rowA.textContent).toContain('120');
     expect(rowA.textContent).toMatch(/\s45\s/);
     expect(rowA.textContent).toMatch(/\s270\s/);
-    expect(rowA.textContent).toContain('Warp 4.5');
+    expect(rowA.textContent).toContain('4.50');
     expect(rowA.textContent).toContain('Avenger');
   });
 
@@ -277,7 +277,7 @@ describe('ScanPanel', () => {
         cells: [{ x: 15, y: 7, type: 'self', char: '*', colour: 'self' }],
         header: 'Range: 1000 — Sector 5,5',
         sidePanel: [
-          { letter: 'A', distance: 42, bearing: 90, heading: 0, speedDisplay: 'Warp 2.0', name: 'Avenger' },
+          { letter: 'A', distance: 42, bearing: 90, heading: 0, speedDisplay: '2.00', name: 'Avenger' },
           { letter: 'B', distance: 88, bearing: 270, heading: 180, speedDisplay: 'Stopped' },
         ],
       });
@@ -292,7 +292,7 @@ describe('ScanPanel', () => {
     expect(rowA.textContent).toContain('42');
     expect(rowA.textContent).toMatch(/\s90\s/);
     expect(rowA.textContent).toMatch(/\s0\s/);
-    expect(rowA.textContent).toContain('Warp 2.0');
+    expect(rowA.textContent).toContain('2.00');
     expect(rowA.textContent).toContain('Avenger');
 
     const rowB = screen.getByTestId('side-panel-row-B');
