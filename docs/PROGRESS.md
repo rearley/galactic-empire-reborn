@@ -2985,3 +2985,48 @@ receipt line, and the roster printing `username` rather than the synthetic
 - **Still open:** `hel transfer` serves canon's HLPTRA, which describes the
   planet legs only and so contradicts the shipped ship-to-ship feature. Ranked
   low by the owner.
+
+## 2026-09-05 — full test-suite audit and canon-coverage sweep
+
+**Completed:** Read every spec file in the repo (501 files, 72,535 lines) against
+three questions: does it exercise real production code, is the expectation
+grounded in canon where canon applies, and are both the happy and error paths
+covered. Ran separately an 18-way survey of the original C source against
+`backend/src` looking for canon behaviour the port never implemented. Both passes
+put every finding to an adversarial verifier instructed to refute it; roughly
+half of all findings were refuted and discarded.
+
+**Results:** 78 confirmed test defects and 53 confirmed canon gaps, written up in
+`docs/audits/2026-09-05-test-suite-audit.md` and
+`docs/audits/2026-09-05-canon-gaps.md`. Nothing was changed — both files are
+finding lists. Suite was green throughout (backend 480 suites / 4,925 tests;
+frontend 22 files / 160 tests), which is the point: these tests pass whether or
+not the code is correct.
+
+**The headline defect classes:**
+- Tests that cannot fail — `transfer.conservation.spec.ts` addresses the receiver
+  in a form `resolveTransferTarget` now rejects, so all 200 transfers are refused
+  and the conservation invariant passes vacuously.
+- Wrong canon pinned as canon — `price`, `shi dn`, `orb`, `jet`, `mai` and the
+  sector-crossing notice each have a test freezing a divergence in place.
+- The projectile counterplay loop is absent in production: a target is never told
+  it is locked (LOCK2/LOCK4), never told a torpedo was fired (TFIRE2/MFIRE2),
+  never sees the inbound alert (TORP1/MISSL1) and is never held by the lock's
+  `cantexit` — so `decoy` has no trigger a player could react to.
+- `sys` has no authorization check: any player can type `sys unjam` and cancel
+  being jammed, free and instantly.
+
+**Corrections made during the audit:** 15 canon constants are defined and pinned
+by balance tests but used nowhere in production. On inspection 12 of them are
+dead in canon too (`PMINENG`, `CYB_MINCLASS`, `ROTAMT`, `SHHITENG`, `SCANADJ`,
+`HYSCANRANGE`, `NUM_MINES`, `SHMAXCHG`, `QUADMAXPERTICK`, `CYB_TOUGH_0` are used
+zero times in the original `.C` files), so not using them is faithful. Only
+`DESTRUCTRANGE` is a genuine unimplemented mechanic. `TOPPHASOR`/`TOPSHIELD` are
+redundant with the class-max bound the port already enforces.
+
+**Next:** triage. Neither list is a work order, and the canon list in particular
+needs a decision per item on whether to implement or to record as a deliberate
+deviation in DECISIONS.md.
+
+**Known issues:** the audit is static. It says nothing about whether the game
+plays right — a playtest remains the outstanding item from round 7.
