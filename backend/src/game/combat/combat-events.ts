@@ -8,6 +8,12 @@
 
 export const COMBAT_PHASER_FIRED = 'combat.phaser-fired' as const;
 export interface CombatPhaserFiredEvent {
+  /**
+   * The firing ship's NAME, resolved by the gateway. AI are absent from the
+   * client's roster, so without it the event renders as a userid — and canon
+   * names an AI by its hull. @see GEFUNCS.C:2596 username
+   */
+  shipName?: string | null;
   shipId: string;
   bearing: number;
   percent: number;

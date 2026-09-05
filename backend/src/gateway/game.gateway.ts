@@ -1020,10 +1020,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /** @see specs/006b-combat/contracts/combat-events.md */
+  /**
+   * A phaser discharge is heard by the SHOOTER, not the sector.
+   *
+   * Canon prints PFIRED with `outprfge(FILTER, usrn)` — `usrn` is the firer's
+   * own channel (GECMDS.C:943-944). Only the HIT is public. Broadcasting the
+   * shot to the whole sector produced a log full of "Cybrg-203 fires phasers!"
+   * with no outcome attached, because most AI shots miss or fall under the
+   * `damage >= 1` gate and correctly emit nothing further. A player watching
+   * that cannot tell a near miss from a bug.
+   *
+   * The name is resolved here for the same reason the hit handler does it:
+   * AI are absent from the client's roster, so an unenriched event renders as
+   * the userid ("Cybrg-203") rather than the ship ("Cybertron 40123") — and
+   * canon names an AI by its hull. @see GEFUNCS.C:2596 username
+   */
   @OnEvent(COMBAT_PHASER_FIRED)
   handleCombatPhaserFired(event: CombatPhaserFiredEvent): void {
-    const room = `sector:${event.sector.x}:${event.sector.y}`;
-    this.server.to(room).emit(COMBAT_PHASER_FIRED, event);
+    const enriched: CombatPhaserFiredEvent = {
+      ...event,
+      shipName: this.shipNameOf(event.shipId),
+    };
+    this.server.to(`user:${useridOf(event.shipId)}`).emit(COMBAT_PHASER_FIRED, enriched);
   }
 
   @OnEvent(COMBAT_HIT)
