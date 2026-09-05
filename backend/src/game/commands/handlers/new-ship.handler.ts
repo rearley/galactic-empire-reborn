@@ -222,7 +222,9 @@ export class NewShipHandlerService {
 
     // Validate: fleet cap (@see GEMAIN.C MAXSHIPS)
     if (noships >= MAXSHIPS) {
-      return { lines: [{ text: formatMessage(MessageId.NEW_FLEET_FULL), category: 'system' }] };
+      // NEW16 is "You already have %d ships, the maximum permitted!" — it names
+      // the count, so the player knows what the cap is.
+      return { lines: [{ text: formatMessage(MessageId.NEW_FLEET_FULL, noships), category: 'system' }] };
     }
 
     // Validate: sufficient credits

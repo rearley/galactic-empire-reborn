@@ -178,7 +178,7 @@ describe('NewShipHandlerService', () => {
     it('rejects purchase when fleet is at MAXSHIPS — no ship created, no cash deducted', async () => {
       const { service, prismaMock } = makeService({}, MAXSHIPS, MAXSHIPS);
       const result = await service.command.handler(makeShip(), ['ship', '4'], {});
-      expect(result.lines[0].text).toMatch(/fleet is full|cannot own more ships/i);
+      expect(result.lines[0].text).toMatch(/You already have \d+ ships, the maximum permitted!/i);
       expect(prismaMock.ship.create).not.toHaveBeenCalled();
       expect(prismaMock.user.update).not.toHaveBeenCalled();
       expect(prismaMock.$transaction).not.toHaveBeenCalled();

@@ -12,7 +12,7 @@ const MAINT_MIN_POPULATION = 25_000 as const;
 
 export type GateResult =
   | { ok: true; price: bigint; repairAmt: number }
-  | { ok: false; reason: 'not-in-orbit' | 'no-facility' | 'combat-locked' | 'nz-not-zygor' | 'password-required' | 'wrong-password' | 'no-damage' | 'insufficient-cash' };
+  | { ok: false; reason: 'not-in-orbit' | 'no-facility' | 'combat-locked' | 'nz-not-zygor' | 'password-required' | 'wrong-password' | 'insufficient-cash' };
 
 /**
  * Domain service encapsulating the gate logic, cash debit, and repair-queue
@@ -76,7 +76,6 @@ export class MaintenanceService {
       }
     }
 
-    if (ship.damage <= 0) return { ok: false, reason: 'no-damage' };
 
     const price = BigInt(isZygor ? MAINT_COST_NEUTRAL : MAINT_COST_NORMAL);
     const userRow = await this.prisma.user.findUnique({
