@@ -94,8 +94,17 @@ export const MAXPL: readonly number[] = Object.freeze([
  * Cargo tons per ONE unit. @see MBMGEMSG.MSG ITMWT01-14
  *
  * The option is "Weight of 100 <item>", so each value is the option / 100.
- * Thirteen of the fourteen were already right; gold read 0.5 where canon's
- * 200-per-100 gives 2, making it four times cheaper to haul than it should be.
+ *
+ * Gold is 0.5, from `ITMWT13 {Weight of 100 Gold: 50}` in GE/REL/MBMGEMSG.MSG.
+ * This comment used to claim the opposite — that canon gives "200-per-100", so
+ * 2, and that 0.5 made gold four times cheaper to haul than it should be. That
+ * 200 is the GE/MSG/ copy, the pre-3.2d snapshot CLAUDE.md names as wrong on
+ * exactly this value alongside PFIRDST and HPFIRDST. The array was right and
+ * the note was reasoning from the forbidden file, inviting the next reader to
+ * "fix" 0.5 to 2 and quadruple gold's weight.
+ *
+ * @see test/balance/item-tables-canon.balance.spec.ts — re-reads GE/REL and
+ *      would have failed the moment anyone acted on that note.
  */
 export const ITEM_TONS: readonly number[] = Object.freeze([
   1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 0.5, 1,
