@@ -286,7 +286,10 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
   it('fails to lock a target beyond ~4.9 sectors', () => {
     const farTarget = spawnTarget({ sectorsAway: 6 });
     const res = handler.command.handler(firer, [farTarget.shipname, '5000'], ctx) as CommandResult;
-    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOCK_FAIL));
+    // LOCK3 names the target by its scan LETTER (%c). This target was never
+    // scanned, so shipLetter yields canon's unknown marker rather than
+    // silently dropping the slot the way the old formatter did.
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOCK_FAIL, '?'));
   });
 
   it('locks a near target', () => {

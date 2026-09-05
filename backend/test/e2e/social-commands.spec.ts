@@ -83,7 +83,7 @@ describe('sen E2E round-trip', () => {
       const longMsg = 'x '.repeat(101).trim(); // 201 chars
       const result = router.dispatch(`sen a ${longMsg}`, ship, ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
-      expect(result.lines[0].text).toMatch(/Usage: sen/i);
+      expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);
     });
   });
 
