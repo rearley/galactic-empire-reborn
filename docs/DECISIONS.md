@@ -72,6 +72,7 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-08-31 — Ship channels: this port's `usrnum`](#2026-08-31-ship-channels-this-ports-usrnum)
 - [2026-08-31 — `sca pl` reads live planet state, not the boot-time read model](#2026-08-31-sca-pl-reads-live-planet-state-not-the-boot-time-read-model)
 - [2026-09-01 — Droids stay out of the neutral zone](#2026-09-01-droids-stay-out-of-the-neutral-zone)
+- [2026-09-05 — PLANTOCK restored to canon's 360](#2026-09-05--plantock-restored-to-canons-360-supersedes-the-120-decision)
 - [2026-09-04 — PLTVCASH restored to canon](#2026-09-04--pltvcash-restored-to-canon-supersedes-the-entry-below)
 - [2026-09-04 — The wormhole 'W' on the sector scan is ours](#2026-09-04--the-wormhole-w-on-the-sector-scan-is-ours)
 - [2026-09-04 — Planet precedence on `sca se` follows canon, planets last](#2026-09-04--planet-precedence-on-sca-se-follows-canon-planets-last)
@@ -1639,6 +1640,32 @@ usually watching. This is the same reasoning already recorded for Cybertrons.
 **Alternatives rejected:** Matching C exactly — rejected on the grounds above.
 Spawning droids anywhere but making them passive inside the zone — more moving
 parts for the same outcome.
+
+## 2026-09-05 — PLANTOCK restored to canon's 360 (supersedes the 120 decision)
+**Context:** PLANTOCK was deployed at 120 minutes against canon's 360, argued as
+"six-hour ticks suit a BBS people dialled into for hours, not a web game with
+daily logins". The owner then ran the first real colony operation and produced
+the data that argument lacked: two stocked worlds at 1.75x, ~250,000 credits
+invested and a handful of small fights, yielding roughly 320,000 credits a DAY.
+**Decision:** PLANTOCK = 360, canon. Removed from config/game.config.json
+entirely rather than pinned to the canon value — that file holds deviations, and
+an entry equal to canon is noise that makes it look authoritative over numbers
+nobody chose.
+**Reason:** The 120-minute case assumes a short game. This is a persistent 24/7
+world, which is the owner's own framing: "the only reason to make planets faster
+would be if the game was over a short period of time... but I want long running
+games". Wealth that compounds in real days trivialises the mid game, and the
+compounding is real — production is linear in men and men produce men, so a
+colony grows ~1.46% per tick forever.
+**Consequence:** Colony output drops 3x. Combined with PLTVCASH returning to
+canon earlier the same day, planet-derived SCORE is now negligible against
+combat: a Cybertron Scout pays 1,000 points in about ninety seconds, two mature
+colonies pay roughly 3 points a day. That is canon's balance, and it is now
+visible rather than assumed.
+**Alternatives rejected:** Keeping 120 as a quality-of-life deviation — it is
+the last economic knob off canon, and the owner asked for canon. Slowing
+PLTVCASH instead — already at canon, and it is not what makes colonies
+attractive or otherwise.
 
 ## 2026-09-04 — PLTVCASH restored to canon (supersedes the entry below)
 **Context:** The 2026-09-01 entry chose PLTVCASH = 1000 because "the original's

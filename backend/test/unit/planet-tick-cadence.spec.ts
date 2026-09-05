@@ -32,8 +32,13 @@ describe('PLANET_UPDATE cadence formula', () => {
     expect(computeCadence(n) * n).toBeCloseTo(PLANTOCK_SECONDS, -1);
   });
 
-  it('N=1800 → clamped to PLANTIME_MIN_SECONDS = 4s', () => {
-    expect(computeCadence(1800)).toBe(PLANTIME_MIN_SECONDS);
+  it('enough planets and the cadence clamps to PLANTIME_MIN_SECONDS', () => {
+    // Derived, not hard-coded: the count that hits the floor depends on
+    // PLANTOCK, and this asserted N=1800 back when PLANTOCK was 120 minutes.
+    // At canon's 360 the same N gives a 12s cadence and the test failed for a
+    // reason that had nothing to do with the formula it guards.
+    const enough = Math.floor(PLANTOCK_SECONDS / PLANTIME_MIN_SECONDS) + 1;
+    expect(computeCadence(enough)).toBe(PLANTIME_MIN_SECONDS);
   });
 
   it('N=999999 → clamped to PLANTIME_MIN_SECONDS', () => {

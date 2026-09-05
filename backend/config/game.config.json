@@ -12,8 +12,6 @@
     "overrode every correction made to the defaults."
   ],
   "world": {
-    "UNIVMAX": 100,
-    "_PLANTOCK": "canon 360 minutes; deployed at 120 - see docs/DECISIONS.md",
-    "PLANTOCK": 120
+    "UNIVMAX": 100
   }
 }
