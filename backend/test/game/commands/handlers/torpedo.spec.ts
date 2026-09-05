@@ -1,4 +1,5 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
 import { TorpedoHandlerService } from '../../../../src/game/commands/handlers/torpedo.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
@@ -90,7 +91,9 @@ function makeHarness(
   }
 
   const events = new EventEmitter2();
-  const handler = new TorpedoHandlerService(shipState, cache, events, new Mulberry32Adapter(42));
+  const handler = new TorpedoHandlerService(shipState, cache, events, new Mulberry32Adapter(42),
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
   return { handler, shipMap, cache };
 }
 

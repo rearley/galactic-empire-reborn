@@ -59,6 +59,8 @@ describe('help text matches the commands it documents', () => {
         'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
         'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',
         'sys', 'tea', 'tor', 'transfer', 'warp', 'who', 'withdraw', 'zip',
+        // Port-original: canon kept function keys in the terminal. @see fkeys.ts
+        'fset', 'x',
       ].map((v) => v.slice(0, 3)),
     );
 

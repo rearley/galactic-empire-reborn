@@ -188,6 +188,20 @@ export class ScanHandlerService implements OnModuleInit {
     this.scantabMap.delete(`${userid}#${shipno}`);
   }
 
+  /**
+   * The letter assignments a pilot last saw, for `loc`/`tor`/`mis`.
+   *
+   * Canon addresses ships by scan LETTER (GECMDS.C:1473-1487 findshp), so the
+   * weapon and lock commands need the same table `sca` builds. Public because
+   * they live in other handlers.
+   */
+  lettersFor(userid: string, shipno: number): ReadonlyArray<{ shipKey: string; letter: string }> {
+    return (this.getScantab(userid, shipno) ?? []).map((e) => ({
+      shipKey: e.shipKey,
+      letter: e.letter,
+    }));
+  }
+
   private getScantab(userid: string, shipno: number): Scantab | null {
     return this.scantabMap.get(`${userid}#${shipno}`) ?? null;
   }

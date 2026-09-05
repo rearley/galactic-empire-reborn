@@ -13,6 +13,7 @@
  * @see specs/013-ship-management/tasks.md T014
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { TorpedoHandlerService } from '../../../../src/game/commands/handlers/torpedo.handler';
 import { ReportHandlerService } from '../../../../src/game/commands/handlers/report.handler';
 import { CybertronTickService } from '../../../../src/game/cybertron/cybertron-tick.service';
@@ -73,7 +74,9 @@ describe('cloak reachability — torpedo.handler.ts:82 (firer cloaked)', () => {
     } as unknown as ShipClassCacheService;
     const mockEvents = new EventEmitter2();
     const mockRandom = { next: jest.fn().mockReturnValue(0.5) } as unknown as Random;
-    return new TorpedoHandlerService(mockShipState, mockShipClassCache, mockEvents, mockRandom);
+    return new TorpedoHandlerService(mockShipState, mockShipClassCache, mockEvents, mockRandom,
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
   }
 
   it('cloak=CLOAK_RAMP_FULL (10) on firer → TOR_CLOAK rejection', async () => {

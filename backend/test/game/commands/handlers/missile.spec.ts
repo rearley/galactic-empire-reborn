@@ -1,4 +1,5 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
 import { MissileHandlerService } from '../../../../src/game/commands/handlers/missile.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
@@ -79,7 +80,9 @@ function makeHarness(
   }
 
   const events = new EventEmitter2();
-  const handler = new MissileHandlerService(shipState, cache, events, new Mulberry32Adapter(42));
+  const handler = new MissileHandlerService(shipState, cache, events, new Mulberry32Adapter(42),
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
   return { handler, shipMap };
 }
 
@@ -268,7 +271,9 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
     } as never);
 
     const events = new EventEmitter2();
-    handler = new MissileHandlerService(shipState, cache, events, new Mulberry32Adapter(42));
+    handler = new MissileHandlerService(shipState, cache, events, new Mulberry32Adapter(42),
+      { lettersFor: () => [] } as unknown as ScanHandlerService,
+    );
   });
 
   it('refuses to fire while cloaked', () => {

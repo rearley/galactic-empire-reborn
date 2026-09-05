@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ScanHandlerService } from './scan.handler';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState, shipKey } from '../../ship/ship-state.types';
@@ -27,6 +28,9 @@ export class LockHandlerService {
   constructor(
     private readonly shipState: ShipStateService,
     private readonly shipClassCache: ShipClassCacheService,
+    // Canon resolves a target by SCAN LETTER (GECMDS.C:1473-1487), so this
+    // needs the table `sca` builds. @see ScanHandlerService.lettersFor
+    private readonly scanHandler: ScanHandlerService,
   ) {}
 
   readonly command: Command = {
@@ -71,7 +75,7 @@ export class LockHandlerService {
     }
 
     const allShips = this.shipState.findAllShips();
-    const result = findShip(query, ship, allShips, scanRange);
+    const result = findShip(query, ship, allShips, scanRange, this.scanHandler.lettersFor(ship.userid, ship.shipno));
     if (!result.ok) {
       // Lazy clear semantics — if findShip flagged the lock as stale, persist clear.
       if (result.clearedLock) {
