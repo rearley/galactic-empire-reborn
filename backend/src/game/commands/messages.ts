@@ -572,14 +572,14 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // orbit (feature 005) — GECMDS.C:758 cmd_orbit
   // MBMGEMSG.MSG:2840 ORBIT1 carries the plnum AND the name — the number is
   // what the player types into `sca pl <n>` and `tra`.
-  [MessageId.ORBIT01]: 'We are now in stationary orbit around planet %d %s SIR!.',
+  [MessageId.ORBIT01]: CANON_MESSAGES.ORBIT1,
   // Canon's own words. @see GECMDS.C:791-793, GE/REL/MBMGEMSG.MSG ORBIT0
   [MessageId.ORBIT0]: "You can't do that to a wormhole!!!",
-  [MessageId.ORBITALR]: 'You are already in orbit.',
+  [MessageId.ORBITALR]: CANON_MESSAGES.ORBIT3,
   // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
   // MBMGEMSG.MSG ORBIT2, verbatim. Canon gives no distance and we do not add
   // one: the gravity warnings are how a pilot learns the range in situ.
-  [MessageId.ORBIT_TOO_FAR]: 'We must be much closer to establish an orbit Sir!',
+  [MessageId.ORBIT_TOO_FAR]: CANON_MESSAGES.ORBIT2,
   // Not in C — cmd_abandon releases the colony on the spot. Three letters
   // separated a developed colony from oblivion, with `aba`/`abo` adjacent in
   // the same command set. @see docs/DECISIONS.md
@@ -593,7 +593,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // Bare `pri` on a planet offering nothing. Distinct from BUY5, which is the
   // item-scoped "that item is not for sale" answer to `pri <qty> <item>`.
   [MessageId.PRICE_NONE]: 'This planet has nothing for sale.',
-  [MessageId.ORBITNO]: 'There is nothing to orbit here.',
+  [MessageId.ORBITNO]: CANON_MESSAGES.ORBIT0,
   [MessageId.ORBITPK]: 'Multiple planets — orbit which? %s',
 
   // land (feature 005)
@@ -738,12 +738,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // withheld the one number that makes the choice meaningful — a player
   // seeding an escape path could not tell a 5-second fuse from a 4-minute one.
   [MessageId.MIN_DEPLOYED]: 'Neutron Mine launched. Detonation in %s centocks!',
-  [MessageId.ZIP_NOAMMO]: 'No zippers in cargo.',
-  [MessageId.ZIP_SWEPT]: 'Mines swept.',
-  [MessageId.DEC_NOAMMO]: 'No decoys in cargo.',
-  [MessageId.DEC_DEPLOYED]: 'Decoy deployed.',
-  [MessageId.JAM_NOAMMO]: 'No jammers in cargo.',
-  [MessageId.JAM_FIRED]: 'Jammer deployed.',
+  [MessageId.ZIP_NOAMMO]: CANON_MESSAGES.ZIPPER1,
+  [MessageId.ZIP_SWEPT]: CANON_MESSAGES.ZIPPER2,
+  [MessageId.DEC_NOAMMO]: CANON_MESSAGES.NODECOYS,
+  [MessageId.DEC_DEPLOYED]: CANON_MESSAGES.DECFIRE,
+  [MessageId.JAM_NOAMMO]: CANON_MESSAGES.JAMMER1,
+  [MessageId.JAM_FIRED]: CANON_MESSAGES.JAMMER2,
   [MessageId.SYS_UNJAM]: 'Jammer cleared.',
   [MessageId.SYS_UNKNOWN]: 'Unknown system command.',
   [MessageId.SYS_FMT]: 'Format: sys <command>',
@@ -767,11 +767,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SHNORPR]: CANON_MESSAGES.SHNORPR,
 
   // flux (feature 006b Phase 6) — GECMDS.C:735-752 cmd_flux
-  [MessageId.FLUX_NOPODS]: 'No flux pods in cargo.',
-  [MessageId.FLUX_USED]: 'Flux pod used — energy restored.',
+  [MessageId.FLUX_NOPODS]: CANON_MESSAGES.NOFLUX,
+  [MessageId.FLUX_USED]: CANON_MESSAGES.FLUXLOAD,
   [MessageId.FLUX_FMT]: 'Format: flux',
   /** @see GECMDS.C:748 LASTFLUX — warn when the pod just used was the last one. */
-  [MessageId.FLUX_LAST]: 'That was your last flux pod.',
+  [MessageId.FLUX_LAST]: CANON_MESSAGES.LASTFLUX,
 
   // who (feature 012) — GECMDS.C:5162 cmd_who reinterpreted
   [MessageId.WHO_HEADER]: '  Shipname               Class                Sector  Kills',
@@ -787,21 +787,21 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ROS_ROW]: ' %4s  %s %10s  %5s  %5s  %10s',
 
   // sen (feature 012) — GECMDS.C:1825 cmd_send
-  [MessageId.MSG_USAGE_SEN]: 'Usage: sen <A|B|C> <message>',
+  [MessageId.MSG_USAGE_SEN]: CANON_MESSAGES.SNDFMT,
   [MessageId.MSG_SENT]: 'Message sent on channel %s.',
   [MessageId.FRE_HAIL]: 'Channel %s set to hail.',
   [MessageId.FRE_SECTOR]: 'Channel %s set to %d (sector-scoped).',
   [MessageId.FRE_GALAXY]: 'Channel %s set to %d (galaxy-wide).',
 
   // fre (feature 012) — GECMDS.C:1885 cmd_freq
-  [MessageId.MSG_USAGE_FRE]: 'Usage: fre <A|B|C> <number|hail>',
+  [MessageId.MSG_USAGE_FRE]: CANON_MESSAGES.BADCOM,
 
   // tea (feature 012) — GECMDS.C:5277 cmd_team (subset)
-  [MessageId.TEAM_NONE]: 'You are not on a team.',
+  [MessageId.TEAM_NONE]: CANON_MESSAGES.TEAMNOT,
   [MessageId.TEAM_CURRENT]: 'You are on team %s.',
-  [MessageId.TEAM_LEFT]: 'You have left your team.',
-  [MessageId.TEAM_JOINED]: 'You have joined team %s.',
-  [MessageId.TEAM_NOT_FOUND]: 'No such team: %s',
+  [MessageId.TEAM_LEFT]: CANON_MESSAGES.TEAMUNJN,
+  [MessageId.TEAM_JOINED]: CANON_MESSAGES.TEAMJOIN,
+  [MessageId.TEAM_NOT_FOUND]: CANON_MESSAGES.TEAMBAD,
 
   // cloak (feature 013) — GECMDS.C:3188 cmd_cloak
   [MessageId.CLOAK_ENGAGED]: CANON_MESSAGES.CLOKON,
@@ -833,9 +833,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TRAN_UNKNOWN_ITEM]: 'Usage: transfer <amt> <item|gold> <target-shipno>',
   [MessageId.TRAN_OK]: 'Transferred %d %s to %s.',
   [MessageId.TRAN_RECEIVED]: '%s transferred %d %s to you.',
-  [MessageId.TRAN_FMT]: 'Usage: tra down/up <qty> <item>  or  tra <qty> <item> <shipno>',
-  [MessageId.TRAN_NOT_ORBIT]: 'You must be in orbit to transfer to a planet.',
-  [MessageId.TRAN_NOT_OWNER]: 'You do not own this planet.',
+  [MessageId.TRAN_FMT]: CANON_MESSAGES.TRANSFMT,
+  [MessageId.TRAN_NOT_ORBIT]: CANON_MESSAGES.TRANSFR3,
+  [MessageId.TRAN_NOT_OWNER]: CANON_MESSAGES.TRANSFR3,
   [MessageId.TRAN_PLANET_LOW]: 'Planet does not have that many.',
   [MessageId.TRAN_DOWN_OK]: 'Transferred %d %s down to %s.',
   [MessageId.TRAN_UP_OK]: 'Transferred %d %s up from %s.',
@@ -843,19 +843,19 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
   [MessageId.JET_NO_CARGO]: 'Insufficient cargo to jettison.',
   [MessageId.JET_OK]: 'Jettisoned %d %s.',
-  [MessageId.JET_FMT]: 'Usage: jettison <amt|ALL> <item>',
+  [MessageId.JET_FMT]: CANON_MESSAGES.JETTFMT,
 
   // set (feature 013/015) — GECMDS.C:5190 cmd_set reinterpreted
   [MessageId.SET_OK_ON]: 'Option %s set ON.',
   [MessageId.SET_OK_OFF]: 'Option %s set OFF.',
   [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
   [MessageId.SET_STATUS]: '%s',
-  [MessageId.SET_FMT]: 'Usage: set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
+  [MessageId.SET_FMT]: CANON_MESSAGES.SETFMT,
 
   // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
-  [MessageId.DESTRUCT_NZ]: 'Cannot self-destruct in the neutral zone.',
+  [MessageId.DESTRUCT_NZ]: CANON_MESSAGES.SELFD1A,
   [MessageId.DESTRUCT_ACTIVE]: 'Self-destruct already in progress.',
-  [MessageId.DESTRUCT_START]: 'Self-destruct sequence initiated.',
+  [MessageId.DESTRUCT_START]: CANON_MESSAGES.SELFD1,
   [MessageId.DESTRUCT_SECTOR_START]: '%s has initiated self-destruct sequence.',
   [MessageId.DESTRUCT_TICK]: '%s: %d ticks until self-destruct.',
   [MessageId.DESTRUCT_TICK_10]: '%s has 10 ticks until self-destruct!',
@@ -864,8 +864,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.DESTRUCT_BOOM]: '%s has self-destructed!',
 
   // abort (feature 013) — GECMDS.C:5044 cmd_abort
-  [MessageId.ABORT_OK]: 'Self-destruct sequence aborted.',
-  [MessageId.ABORT_NONE]: 'No active self-destruct sequence.',
+  [MessageId.ABORT_OK]: CANON_MESSAGES.SELFD4,
+  [MessageId.ABORT_NONE]: CANON_MESSAGES.SELFD5,
   [MessageId.ABORT_SECTOR]: '%s has aborted self-destruct.',
 
   // abandon (feature 013) — GECMDS.C:3420 cmd_abandon reinterpreted
@@ -928,21 +928,21 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.HEL_UNKNOWN]: "Unknown help topic '%s'. Valid topics: %s.",
 
   // att (feature 014) — GECMDS.C:3515 cmd_attack
-  [MessageId.ATT_NOT_ORBIT]: 'You must be orbiting a planet to attack.',
-  [MessageId.ATT_NO_CAPABILITY]: 'Your ship class cannot attack planets.',
-  [MessageId.ATT_WORMHOLE]: 'You cannot attack a wormhole.',
-  [MessageId.ATT_SELF]: 'You cannot attack your own planet.',
-  [MessageId.ATT_FORMAT]: 'Usage: att <amount> <troops|fighters>',
-  [MessageId.ATT_NO_TROOPS]: 'You do not have enough troops.',
-  [MessageId.ATT_NO_FIGHTERS]: 'You do not have enough fighters.',
+  [MessageId.ATT_NOT_ORBIT]: CANON_MESSAGES.ATTACK1,
+  [MessageId.ATT_NO_CAPABILITY]: CANON_MESSAGES.ATTACK0A,
+  [MessageId.ATT_WORMHOLE]: CANON_MESSAGES.ATTACK0B,
+  [MessageId.ATT_SELF]: CANON_MESSAGES.ATTACK0,
+  [MessageId.ATT_FORMAT]: CANON_MESSAGES.ATTFMT,
+  [MessageId.ATT_NO_TROOPS]: CANON_MESSAGES.ATTACKM0,
+  [MessageId.ATT_NO_FIGHTERS]: CANON_MESSAGES.ATTACKF0,
   [MessageId.ATT_DEFENDER_FIGHTER_KILL]: 'Defender fighters destroyed %d of your troops.',
   [MessageId.ATT_GROUND_TROOP_KILL]: 'Defender ground troops killed %d more.',
   [MessageId.ATT_ATTACKER_COUNTER_KILL]: 'Your forces eliminated %d defenders.',
   [MessageId.ATT_LOSS_REPORT]: 'You lost %d; defenders lost %d.',
-  [MessageId.ATT_WIN_TROOP]: 'Your troops have overrun the defenders.',
-  [MessageId.ATT_WIN_FIGHTER]: 'You have wiped out the planet\'s defenders.',
+  [MessageId.ATT_WIN_TROOP]: CANON_MESSAGES.ATTACK8,
+  [MessageId.ATT_WIN_FIGHTER]: CANON_MESSAGES.ATTACK8,
   [MessageId.ATT_RETREAT]: 'Your remaining troops surrender to the defenders.',
-  [MessageId.ATT_STANDOFF]: 'The attack ends in a standoff.',
+  [MessageId.ATT_STANDOFF]: CANON_MESSAGES.ATTACK9,
   [MessageId.ATT_ITEM_DESTROYED]: '%d %s on the planet were destroyed.',
   [MessageId.ATT_RESOLVED]: 'Attack resolved. %d attackers survive.',
   [MessageId.ATT_OWNER_ALERT]: 'ALERT: %s (%d,%d) is under attack by %s commanded by %s.',
