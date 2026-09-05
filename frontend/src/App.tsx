@@ -305,7 +305,7 @@ function Terminal(): React.JSX.Element {
           * been built to replace it and nothing having removed it), so a
           * `sca se` painted the identical picture twice and the history filled
           * with near-duplicates.
-          */
+          */}
         <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
           <ScanMap cells={scanCells} shipId={localShipId} />
           <div className="flex-1 overflow-auto border-t border-gray-800">
