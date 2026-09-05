@@ -85,14 +85,14 @@ describe('MaintHandlerService — password gate (T045)', () => {
     const { handler } = makeService(OK_RESULT);
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     const result = await handler.command.handler(ship, ['secret'], {}) as Lines;
-    expect(result.lines[0].text).toContain('Maintenance complete');
+    expect(result.lines[0].text).toContain('commencing the maintenance and repairs');
   });
 
   it('FR-014-062: password == "none" → gate bypassed, maintenance proceeds', async () => {
     const { handler } = makeService(OK_RESULT);
     const ship = makeShip({ where: 10, xcoord: 5.5, ycoord: 5.5, damage: 30 });
     const result = await handler.command.handler(ship, [], {}) as Lines;
-    expect(result.lines[0].text).toContain('Maintenance complete');
+    expect(result.lines[0].text).toContain('commencing the maintenance and repairs');
   });
 
   it('SC-007: no debit on password-required rejection', async () => {

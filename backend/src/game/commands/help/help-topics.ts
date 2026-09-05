@@ -35,12 +35,23 @@ const CANON_COMMAND_PAGES: Readonly<Record<string, string>> = Object.freeze({
   war: 'HLPWAR', zip: 'HLPZIP',
 });
 
-/** Canon's concept pages — the topics HELP INDEX lists separately. */
-const CANON_CONCEPT_PAGES: Readonly<Record<string, string>> = Object.freeze({
-  starting: 'HLPSTART', galaxy: 'HLPGALXY', sector: 'HLPSECTR',
-  communicate: 'HLPCOMMU', moving: 'HLPNAVIG', planets: 'HLPPLANT',
-  strategy: 'HLPSTRAT', battle: 'HLPBATTL', cybertron: 'HLPCYBER',
-  scoring: 'HLPSCORE', wormholes: 'HLPWORM',
+/**
+ * Canon's concept pages — the topics HELP INDEX lists separately from commands.
+ *
+ * Several run to MORE THAN ONE page: canon pages `planets` across HLPPLANT,
+ * HLPPLAN2 and HLPPLAN3, and `battle` across HLPBATTL, HLPBATT2 and HLPBATT3.
+ * Wiring only the first page hid real content — the explanation of what a
+ * planet's RESOURCE rating actually does is on HLPPLANT, but the troops and
+ * fighters detail is on HLPPLAN2, and a player looking for the second could
+ * not find it.
+ */
+const CANON_CONCEPT_PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  starting: ['HLPSTART'], galaxy: ['HLPGALXY'], sector: ['HLPSECTR'],
+  communicate: ['HLPCOMMU'], moving: ['HLPNAVIG'],
+  planets: ['HLPPLANT', 'HLPPLAN2', 'HLPPLAN3'],
+  strategy: ['HLPSTRAT'],
+  battle: ['HLPBATTL', 'HLPBATT2', 'HLPBATT3'],
+  cybertron: ['HLPCYBER'], scoring: ['HLPSCORE'], wormholes: ['HLPWORM'],
 });
 
 export type HelpTopicId =
@@ -472,12 +483,17 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
  */
 export function canonHelpPage(query: string): ReadonlyArray<string> | null {
   const q = query.toLowerCase();
-  const id =
-    CANON_COMMAND_PAGES[q] ??
-    CANON_CONCEPT_PAGES[q] ??
-    CANON_COMMAND_PAGES[q.slice(0, 3)];
-  if (!id) return null;
-  return CANON_HELP[id] ?? null;
+
+  // A concept may span several pages; join them so one `hel planets` shows the
+  // whole topic instead of its first third.
+  const concept = CANON_CONCEPT_PAGES[q] ?? CANON_CONCEPT_PAGES[`${q}s`];
+  if (concept) {
+    const pages = concept.flatMap((id) => CANON_HELP[id] ?? []);
+    if (pages.length) return pages;
+  }
+
+  const id = CANON_COMMAND_PAGES[q] ?? CANON_COMMAND_PAGES[q.slice(0, 3)];
+  return id ? (CANON_HELP[id] ?? null) : null;
 }
 
 export const HELP_TOPIC_IDS: ReadonlyArray<HelpTopicId> = Object.freeze(

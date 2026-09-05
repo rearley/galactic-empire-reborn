@@ -73,7 +73,7 @@ describe('MaintHandlerService — happy path (delegates to MaintenanceService)',
     const { handler } = makeService({ ok: true, price: BigInt(MAINT_COST_NEUTRAL), repairAmt: 11 });
     const ship = makeShip({ damage: 30, where: 10, xcoord: 0.5, ycoord: 0.5 });
     const result = await handler.command.handler(ship, [], {}) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toContain('Maintenance complete');
+    expect(result.lines[0].text).toContain('commencing the maintenance and repairs');
   });
 });
 

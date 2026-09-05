@@ -749,16 +749,16 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SYS_FMT]: 'Format: sys <command>',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
-  [MessageId.LOC_SELF]: 'Cannot lock onto yourself.',
-  [MessageId.LOC_NOTFOUND]: 'No such ship in range.',
+  [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,
+  [MessageId.LOC_NOTFOUND]: CANON_MESSAGES.NOSHIP,
   [MessageId.LOC_LOCKED]: 'Target locked.',
-  [MessageId.LOC_FMT]: 'Format: loc <target>',
+  [MessageId.LOC_FMT]: CANON_MESSAGES.NOSHIP,
   [MessageId.NOLOCK]: CANON_MESSAGES.NOLOCK,
 
   // shield (feature 006b Phase 6) — GECMDS.C cmd_shield
-  [MessageId.SHI_UP]: 'Shields up.',
+  [MessageId.SHI_UP]: CANON_MESSAGES.SHLDCHP,
   [MessageId.SHI_DN]: 'Shields down.',
-  [MessageId.SHI_FMT]: 'Format: shi up|dn',
+  [MessageId.SHI_FMT]: CANON_MESSAGES.SHLDFMT,
   // cmd_shields gates, GECMDS.C:3114-3170
   [MessageId.SHIELD0]: CANON_MESSAGES.SHIELD0,
   [MessageId.SHLD1]: CANON_MESSAGES.SHLD1,
@@ -804,25 +804,25 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TEAM_NOT_FOUND]: 'No such team: %s',
 
   // cloak (feature 013) — GECMDS.C:3188 cmd_cloak
-  [MessageId.CLOAK_ENGAGED]: 'Cloaking device engaged.',
+  [MessageId.CLOAK_ENGAGED]: CANON_MESSAGES.CLOKON,
   [MessageId.CLOAK_ALREADY_ON]: 'Cloaking device already engaged.',
-  [MessageId.CLOAK_NO_ENERGY]: 'Insufficient energy to engage cloak.',
-  [MessageId.CLOAK_DAMAGED]: 'Cloaking device damaged.',
-  [MessageId.CLOAK_HYPERSPACE]: 'Cannot cloak while in hyperspace.',
-  [MessageId.CLOAK_DISENGAGED]: 'Cloaking device disengaged.',
-  [MessageId.CLOAK_ALREADY_OFF]: 'Cloaking device already down.',
-  [MessageId.CLOAK_FMT]: 'Usage: cloak <on|off>',
-  [MessageId.CLOAK_SECTOR_DECLOAKED]: '%s has decloaked.',
+  [MessageId.CLOAK_NO_ENERGY]: CANON_MESSAGES.CLOKPWR,
+  [MessageId.CLOAK_DAMAGED]: CANON_MESSAGES.CLOKDAM,
+  [MessageId.CLOAK_HYPERSPACE]: CANON_MESSAGES.CLOK1,
+  [MessageId.CLOAK_DISENGAGED]: CANON_MESSAGES.CLOKOFF,
+  [MessageId.CLOAK_ALREADY_OFF]: CANON_MESSAGES.CLOKDWN,
+  [MessageId.CLOAK_FMT]: CANON_MESSAGES.CLOFMT,
+  [MessageId.CLOAK_SECTOR_DECLOAKED]: CANON_MESSAGES.CLOK2,
   [MessageId.CLOAK_COLLAPSED]: 'Emergency decloak — insufficient energy to maintain cloak.',
 
   // maint (feature 013) — GECMDS.C:4452 cmd_maint
-  [MessageId.MAINT_NOT_ORBIT]: 'You must be orbiting a planet to perform maintenance.',
-  [MessageId.MAINT_NO_FACILITY]: 'This planet has no maintenance facility.',
-  [MessageId.MAINT_COMBAT]: 'Cannot perform maintenance — ship is locked into combat.',
-  [MessageId.MAINT_NZ]: 'No maintenance available in the neutral zone except at Zygor.',
+  [MessageId.MAINT_NOT_ORBIT]: CANON_MESSAGES.MAINT1,
+  [MessageId.MAINT_NO_FACILITY]: CANON_MESSAGES.MAINT8,
+  [MessageId.MAINT_COMBAT]: CANON_MESSAGES.MAINT9,
+  [MessageId.MAINT_NZ]: CANON_MESSAGES.MAINT4,
   [MessageId.MAINT_NO_DAMAGE]: 'No maintenance is needed.',
-  [MessageId.MAINT_NO_CASH]: 'Insufficient funds for maintenance.',
-  [MessageId.MAINT_OK]: 'Maintenance complete. Repair queue: %d units.',
+  [MessageId.MAINT_NO_CASH]: CANON_MESSAGES.MAINT6,
+  [MessageId.MAINT_OK]: CANON_MESSAGES.MAINT5,
 
   // transfer (feature 013) — GECMDS.C:3271 cmd_transfer reinterpreted
   [MessageId.TRAN_SELF]: 'Cannot transfer to your own ship.',
