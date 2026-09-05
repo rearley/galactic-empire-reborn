@@ -26,6 +26,7 @@ import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
 import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
+import { shipLetter } from '../game/commands/helpers/find-ship';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -143,6 +144,11 @@ function useridOf(shipKey: string): string {
   return parts.slice(0, -1).join(':');
 }
 
+/** `usr_x:2` -> `2`. The counterpart to {@link useridOf}. */
+function shipnoOf(shipKey: string): number {
+  return Number(shipKey.split(':').pop());
+}
+
 
 /**
  * Canon prints a different message for each weapon that hits you, and only the
@@ -162,6 +168,7 @@ function hitText(
   event: CombatHitEvent,
   deflected: boolean,
   attackerLabel: string,
+  attackerLetter: string,
 ): string {
   const hull = damstr(event.damageHull ?? 0);
   switch (event.weapon) {
@@ -175,8 +182,18 @@ function hitText(
       // the mine was, and we do not carry that on the hit event yet.
       return formatMessage(MessageId.MINE4, 0, 0, hull);
     default:
+      // PHITDEF leads with the attacker's scan LETTER — canon passes
+      // shpltr(othusn,usrn), the letter in the VICTIM's table, so it is the
+      // one the victim would type to shoot back. The port's copy of this
+      // string had dropped the %c entirely, which is precisely the drift
+      // hand-transcribing canon produces.
       return deflected
-        ? formatMessage(MessageId.PHITDEF, attackerLabel, Math.round(event.damageShield ?? 0))
+        ? formatMessage(
+            MessageId.PHITDEF,
+            attackerLetter,
+            attackerLabel,
+            Math.round(event.damageShield ?? 0),
+          )
         : formatMessage(MessageId.PHITYOU, attackerLabel, hull);
   }
 }
@@ -1071,9 +1088,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // did. damstr renders hull damage as a WORD; a deflection reports a number.
     const deflected = (event.damageHull ?? 0) <= 0 && (event.damageShield ?? 0) > 0;
     const attackerLabel = enriched.attackerName ?? 'an unknown assailant';
+    const [victimUser, victimShip] = [useridOf(event.victimId), shipnoOf(event.victimId)];
+    const attackerLetter = shipLetter(
+      this.scanHandler.lettersFor(victimUser, victimShip),
+      event.attackerId,
+    );
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
-      text: hitText(event, deflected, attackerLabel),
+      text: hitText(event, deflected, attackerLabel, attackerLetter),
     });
 
     // Victim may be in a DIFFERENT sector room (cross-sector phaser range), so
