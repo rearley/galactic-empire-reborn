@@ -1305,6 +1305,35 @@ unnecessary boilerplate and couples test setup to module composition.
 
 **D1 — `transfer` moves cargo between ships (not ship→planet)**
 
+> **AMENDED 2026-09-05.** Two corrections, and an owner ruling.
+>
+> It is no longer *instead of* — it is *as well as*. `tra up`/`tra down` move
+> cargo between the ship and the planet it orbits, exactly as canon does, and
+> carry canon's own text (TRANSFR1/2/5, TRANSUP1/5). Ship-to-ship is an
+> ADDITION on top of that.
+>
+> The Reason below is also wrong: `buy`/`sell` trade with a planet's SHOP at its
+> prices, which is not the same act as moving your own cargo down to a colony
+> you own. It never covered the planet path.
+>
+> **Ship-to-ship is not canon in any form** — not the strings, the feature.
+> Three independent confirmations: the command table has only `tra`
+> (GECMDS.C:120-171); `cmd_transfer` branches on `"up"`/`"down"` alone
+> (GECMDS.C:3283-3295); and HLPTRA reads "from your ship to a newly established
+> planet, or from a planet to your ship".
+>
+> **Owner ruling 2026-09-05: keep it.** It is therefore a deliberate,
+> recorded deviation rather than an undocumented one, which is what CLAUDE.md
+> requires. Its own strings stay too, since canon has no words for a feature it
+> does not have. Behaviour is pinned by
+> `test/game/commands/handlers/transfer-qty-capacity.spec.ts` — quantity,
+> receiving-hold capacity, and the guarantee that it is player-to-player only
+> (AI hulls are GESTAT_AUTO and never resolve as a target).
+>
+> **Known gap, parked as low priority:** `hel transfer` serves canon's HLPTRA,
+> which describes the planet legs only, so the help contradicts a feature we
+> ship. Ship-to-ship is documented under `hel trade`.
+
 Original `cmd_transfer` (GECMDS.C:3271) moves items from ship hold to an orbiting planet. This port moves items between two online ships in the same sector.
 
 **Reason**: Planet-based cargo transfer is already handled by `buy`/`sell` (feature 005). A ship-to-ship transfer is more useful for cooperative multiplayer.
