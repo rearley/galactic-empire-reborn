@@ -2,6 +2,16 @@
 
 Format: decision, Context, Reason, Alternatives rejected.
 
+**This log is append-only.** Entries are never rewritten. When a decision stops
+being true, it gains a quoted marker directly under its heading rather than an
+edit to its body:
+
+- **SUPERSEDED** / **NO LONGER IN FORCE** — the code has moved on.
+- **RESOLVED** — a declared deviation has since been closed.
+- **CORRECTION** — the entry asserted something about CANON that was never true.
+  These are worth reading twice: a wrong belief about the original is what tends
+  to steer the code wrong in the first place.
+
 ---
 
 <!-- TOC -->
@@ -94,6 +104,11 @@ were rejected — the last of those is usually the part worth reading.
 <!-- /TOC -->
 
 ## 2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid
+
+> **SUPERSEDED 2026-09-05 (value only).** The Decision below fixes `UNIVMAX` at 10
+> (441 sectors). The deployed value is **100** — 201x201 = 40,401 sectors
+> (`backend/config/game.config.json`). The origin-centred shape this entry
+> establishes still stands; only the size moved.
 
 **Context**: C's universe is a square spanning `-univmax..+univmax` on both axes with the neutral
 zone at `NEUTRAL_X = NEUTRAL_Y = 0` (GEMAIN.H:70-71) — the origin is its CENTRE. Coordinates are
@@ -339,6 +354,10 @@ signal. Treating the failing test rather than the data loss is the trap to avoid
 
 ## 2026-05-08 — Feature 019: score_f2 = 100 default; Cybertron kill counter decoupled; mutual-kill snapshot
 
+> **CORRECTION 2026-09-05.** The parenthetical below calls 100 "the original
+> default" for `SCRFACT`. The bounds are right (GEMAIN.C:603) but the shipped
+> default is **35** (`GE/REL/MBMGEMSG.MSG`). 100 was our choice, not canon's.
+
 **Context**: Three decisions made during feature 019 implementation.
 
 **Decision 1 — `score_f2 = 100` default**: `SCORE_F2` env var, range `[0, 32700]`, default 100 (matching GEMAIN.C:603 `numopt(SCRFACT, 0, 32700)` with the original default). Balance regression test in `constants.spec.ts` pins this. Out-of-range throws at module init.
@@ -352,6 +371,11 @@ signal. Treating the failing test rather than the data loss is the trap to avoid
 ---
 
 ## 2026-05-08 — Team creation: auto-assigned teamcode + single plaintext password
+
+> **NO LONGER IN FORCE 2026-09-05.** Both halves were reverted. The founder
+> `secret` is back (`schema.prisma:327`, `team.service.ts:80`), so the
+> secret/password distinction stands; and the password limit is **10**, not 8
+> (`team.types.ts:32`), which is what canon does (GECMDS.C:5702).
 
 **Context**: GECMDS.C:5277 `cmd_team` in the original required the player to supply a 5-digit
 `teamcode` manually, and maintained two passwords: `secret` (founder-only) and `password`
@@ -594,6 +618,11 @@ are precise; no need for runtime type narrowing or a discriminator column.
 
 ## 2026-05-01 — Handshake active-ship resolution (no BOARD command)
 
+> **PARTLY SUPERSEDED 2026-09-05.** Only the one-ship branch survives. Zero ships
+> no longer disconnects with NO_SHIP — it enters onboarding and prompts for a
+> ship name (`game.gateway.ts:444`); two or more no longer binds the lowest
+> shipno — it emits `prompt:ship-select` and waits.
+
 **Context**: Players may own more than one ship. The original GECMDS.C command table has no BOARD or SELECT_SHIP command — the active ship is determined at login time. FR-030 requires the active ship to be resolved on handshake.
 
 **Decision**: On `handleConnection`, call `shipStateService.findByUserid(userid)`. Zero ships → NO_SHIP disconnect. One ship → bind it. Two or more → bind the lowest `shipno` and log a warning.
@@ -621,6 +650,13 @@ are precise; no need for runtime type narrowing or a discriminator column.
 ---
 
 ## 2026-05-01 — Galaxy generator deviations from GEPLANET.C
+
+> **BOTH DEVIATIONS RESOLVED 2026-09-05.** Wormhole destinations are no longer
+> clamped to a 0..29 / 0..14 box — they are drawn across the whole origin-centred
+> square, as C does (`galaxy.service.ts:324`). And the `s00` fixture is no longer
+> hand-authored: the canon data IS in the reference source (`S00PLNUM` and the
+> `S00P1..S00P6` blocks of `MBMGEMSG.MSG`) and is now generated from it by
+> `tools/extract-s00.mjs`.
 
 **Context**: The procedural galaxy generator (feature 004) reimplements the sector
 population logic from `GEPLANET.C:455-650 (xgetsector)`. Three areas required
@@ -669,6 +705,10 @@ typed constant.
 ---
 
 ## 2026-05-02 — Planet system decisions (feature 005)
+
+> **SUPERSEDED 2026-09-05.** `PlanetTickService` no longer processes exactly one
+> planet per firing; it sweeps up to `MAXTIC` per `PLANTIME`, so each planet is
+> updated once per `PLANTOCK` (canon 360 minutes). See `planet-tick.service.ts:38`.
 
 Ten decisions made during the feature 005 research session. Full rationale in `specs/005-planet-system/research.md`.
 
@@ -1047,6 +1087,11 @@ diverge from the existing seed without benefit; 31/32/33 is already live in `ge_
 
 ## 2026-05-05 — AdminTokenGuard constant-time comparison (D9)
 
+> **CORRECTION 2026-09-05.** The guard does not use `crypto.timingSafeEqual` —
+> there is no such call under `backend/src`. It defines its own
+> `constantTimeEqual` (`admin-token.guard.ts:44`). The property the entry argues
+> for holds; the mechanism named does not exist.
+
 **Context**: Naive string equality (`===`) on a secret token is vulnerable to timing attacks — an attacker can determine correct prefix bytes by measuring response time.
 
 **Decision**: `AdminTokenGuard` uses `crypto.timingSafeEqual` on `Buffer.from` representations of the provided and expected tokens. Returns 503 if env token is unset, 401 otherwise.
@@ -1212,6 +1257,10 @@ spec mandates name-based (clarification accepted).
 
 ## 2026-05-06 — RosHandlerService reads `process.env` directly instead of ConfigService
 
+> **NO LONGER IN FORCE 2026-09-05.** `ROSTER_MAX` is gone. The roster cap is the
+> canon `MAXLIST` sysop option (default 10), imported from `constants.ts`
+> (`ros.handler.ts:37`), so the env-var-versus-ConfigService question is moot.
+
 **Context**: Integration tests import `CommandsModule` without `ConfigModule`, which causes
 NestJS DI to fail to resolve `ConfigService` and leaves the test `app` as `undefined`.
 
@@ -1237,6 +1286,10 @@ unnecessary boilerplate and couples test setup to module composition.
 **Alternatives rejected**: Redux Toolkit (overkill for a single list); Zustand (unnecessary dependency); Context API with a global store (heavier than needed for one panel).
 
 ## 2026-05-07 — 013-ship-management: four deviations from canonical C source
+
+> **CORRECTION 2026-09-05.** The DI/env/bounds description of `CLOAK_ENERGY_USE`
+> still holds, but its default is **7500** — canon's `CLENGUSE` — not 50
+> (`cloak.config.ts:25`).
 
 > **STALE — these deviations were later reverted to canon.** Verified 2026-09-02:
 > D1 `transfer` is canon `tra up|down` against the orbited planet, gated on
@@ -1540,6 +1593,13 @@ no formatting (pushes all formatting to frontend, harder to keep in sync with or
 **Alternatives rejected**: Two independent draws for strict C fidelity — deferred; revisit if Cybertron fire cadence feels off in playtest.
 
 ## 2026-08-31 — `who` lists players, not the whole galaxy
+
+> **CORRECTION 2026-09-05.** The Context calls the Murdonian Transport "the
+> designed new-player PvE target". It is not, and this is a claim about the
+> original rather than about our code, so it was never true. The Murdonian is
+> 30,000 tons and carries a Mark-2 shield; a stock Interceptor cannot scratch
+> it. The starter target is the **Vakory Survey Drone** (class 33, 100 tons).
+> See the droid section of CLAUDE.md, which records this error twice over.
 
 **Context:** Flying a fresh pilot, a bare `who` printed every live ship —
 including all 24 Cybertrons and the droids — with each one's exact sector. That
@@ -1917,6 +1977,12 @@ expectation from the configured exponent instead of assuming the linear case.
 
 ## 2026-09-02 — Canon is the source of truth; sysop options re-baselined from MBMGEMSG.MSG
 
+> **CORRECTION 2026-09-05.** The count below says 20 options sat exactly on a
+> clamp bound. Whatever the tally, one example given is wrong: `PFIRDST`'s
+> shipped value is **5** (`MBMGEMSG.MSG:417`), and the port's old 1 was the clamp
+> FLOOR. The entry's argument is unaffected — that is one more option that had
+> been pinned to a bound rather than to canon.
+
 **Context:** The original distribution was obtained in full (github.com/bsimser/ge,
 vendored read-only at `reference/ge-upstream/`). Our nine C files proved
 byte-identical to it, but the *data* files had never been available: the port had
@@ -2030,6 +2096,12 @@ consumption multiply, so they must be retuned together.
 
 ## 2026-09-02 — Gold base price set to 1000, on wiki evidence only
 
+> **CORRECTION 2026-09-05.** The entry dismisses `reference/wiki/items.md` partly
+> because it "gives gold's cargo weight as 0.5". That figure is RIGHT:
+> `ITMWT13 {Weight of 100 Gold: 50}` (`MBMGEMSG.MSG:1188`) is per hundred, so 0.5
+> per unit. The forbidden `GE/MSG/` copy is the one that says 200. The wiki row
+> agreeing with canon is not evidence against the wiki.
+
 **Context:** `baseprice[i] = numopt(ITMPR01+i,...)` is read at `GEMAIN.C:569`, but
 the shipped `MBMGEMSG.MSG` contains **no ITMPR blocks at all** — that option family
 was added to the code after the message file we have. So unlike MAXPL, ITEM_TONS,
@@ -2096,6 +2168,11 @@ fixed, not reproduced.
 the message — that documents a bug rather than fixing it.
 
 ## 2026-09-03 — Ship-loss mail, and the autopilot answers stop
+
+> **CORRECTION 2026-09-05.** "our own documentation pointed new players at the
+> Murdonian when the tonnage arithmetic says Scow" — the arithmetic says neither.
+> A stock Interceptor strips 12 against the Scow's 18 regen and can never get
+> through it either. The only target it can kill is the **Vakory Survey Drone**.
 
 Three questions the playtest raised that canon could not settle directly. Each
 was decided from what the surrounding code shows the original INTENDED, not
@@ -2322,6 +2399,11 @@ channel later. Not done; it is a narrow window and the rest of the attribution
 path was rewritten this session.
 
 ## 2026-09-03 — NUMMINES is a galaxy-wide mine table, enforced in MineRegistry
+
+> **DEVIATION RESOLVED 2026-09-05.** The declared deviation — the table-full case
+> surfacing as the gateway's generic "Internal error" — no longer applies:
+> `mine.handler.ts:102` catches `MineTableFullError` and answers with canon's
+> own message.
 
 **Context:** `NUMMINES` (canon default 12) was declared in `SYSOP_OPTIONS` but
 read by nothing. The port enforced only the per-user `USRMINES` cap (3), so
@@ -2602,6 +2684,11 @@ than by firing. The canon roll is available as `missileShakeWarp(rand)` in
 `combat-math.ts`, tested, and deliberately not called from anywhere yet.
 
 ## 2026-09-03 — CLOK3 ion trail: canon logic implemented, delivery left behind a seam
+
+> **BOTH RESOLVED 2026-09-05.** The seam is wired — `commands.module.ts:199` calls
+> `setIonTrailObserverSource(...)`, so a cloaked ship opening the throttle does
+> leak CLOK3. And the invented `'%s has decloaked.'` string is gone: the sector
+> notice is canon's `CLOK2`.
 
 **Context:** `cmd_impulse` has two canon behaviours the port never had. The
 first, IMPULSE1 (GECMDS.C:495-500, GE/REL/MBMGEMSG.MSG:2900), is a pure gate and
