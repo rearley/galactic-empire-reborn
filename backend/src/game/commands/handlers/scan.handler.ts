@@ -112,13 +112,19 @@ function stockpileBand(qty: bigint): string {
   return 'Large';
 }
 
-// Resource display strings (the original uses separate text for resources vs environment)
-const RES_DISPLAY: Record<number, string> = {
-  0: 'Barren',
-  1: 'Sparse',
-  2: 'Rich',
-  3: 'Abundant',
-};
+/**
+ * Canon indexes ONE table for both axes — SCAN12..SCAN15, Poor/Marginal/Good/
+ * Very Good (GECMDS.C:2338-2356). A third hardcoded table lived here with the
+ * comment "the original uses separate text for resources vs environment",
+ * which is not true, and it showed: an owner's scan printed canon's word for
+ * environment and ours for resources in the same block —
+ *
+ *   Environment:Good        <- SCAN14, canon
+ *   Resources: Abundant     <- ours
+ *
+ * The words are axis-neutral on purpose, because they have to serve both.
+ */
+const QUALITY = [MessageId.SCAN12, MessageId.SCAN13, MessageId.SCAN14, MessageId.SCAN15] as const;
 
 /**
  * Handles the `scan` / `sc` command family.
@@ -935,12 +941,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     // GECMDS.C:2337-2349 — environment
     const envIdx = Math.max(0, Math.min(3, planet.enviorn));
-    const envStr = [
-      formatMessage(MessageId.SCAN12), // 0 Inferno-like (worst)
-      formatMessage(MessageId.SCAN13), // 1 Toxic
-      formatMessage(MessageId.SCAN14), // 2 Hostile
-      formatMessage(MessageId.SCAN15), // 3 Earth-like (best)
-    ][envIdx];
+    const envStr = formatMessage(QUALITY[envIdx]);
     lines.push({
       text: formatMessage(MessageId.SCAN11) + envStr,
       category: 'info',
@@ -948,7 +949,7 @@ export class ScanHandlerService implements OnModuleInit {
 
     // GECMDS.C:2350-2356 — resources (table-driven like env)
     const resIdx = Math.max(0, Math.min(3, planet.resource));
-    const resStr = RES_DISPLAY[resIdx] ?? 'Unknown';
+    const resStr = formatMessage(QUALITY[resIdx]);
     lines.push({
       text: formatMessage(MessageId.SCAN16) + resStr,
       category: 'info',
