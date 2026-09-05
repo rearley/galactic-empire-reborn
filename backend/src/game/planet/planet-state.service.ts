@@ -1,4 +1,5 @@
 import { I_MEN, I_FOOD } from '../constants/items';
+import { clampRateToBudget, RateClampResult } from './rate-budget';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { NEUTRAL_ZONE_SECTOR } from '../combat/neutral-zone';
 import { MAXPLNTS } from '../constants';
@@ -441,19 +442,35 @@ export class PlanetStateService implements OnModuleInit {
     key: string,
     requesterUserid: string,
     change: AdminChange,
-  ): Promise<{ ok: true } | { ok: false; reason: 'NOT_OWNER' | 'INVALID' | 'NOT_FOUND' }> {
+  ): Promise<
+    | { ok: true; rateClamp?: RateClampResult }
+    | { ok: false; reason: 'NOT_OWNER' | 'INVALID' | 'NOT_FOUND' }
+  > {
     return this.runSerialized(key, async () => {
       const state = this.map.get(key);
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
       if (state.userid !== requesterUserid) return { ok: false as const, reason: 'NOT_OWNER' as const };
 
+      let rateClamp: RateClampResult | undefined;
+
       switch (change.type) {
-        case 'rate':
+        case 'rate': {
           if (change.itemIndex < 0 || change.itemIndex >= state.items.length || change.value < 0) {
             return { ok: false as const, reason: 'INVALID' as const };
           }
-          state.items[change.itemIndex].rate = change.value;
+          // Rates share ONE 100% budget across all items (GEMAIN.C:3539-3560).
+          // The clamp lives at the point of SETTING; the production loop trusts
+          // whatever it is handed, which is why reading GEPLANET.C alone made
+          // unlimited rates look legitimate. @see rate-budget.ts
+          const clamp = clampRateToBudget(
+            state.items.map((it) => it.rate),
+            change.itemIndex,
+            change.value,
+          );
+          state.items[change.itemIndex].rate = clamp.value;
+          rateClamp = clamp;
           break;
+        }
         case 'markup':
           if (change.itemIndex < 0 || change.itemIndex >= state.items.length || change.value < 0) {
             return { ok: false as const, reason: 'INVALID' as const };
@@ -509,7 +526,7 @@ export class PlanetStateService implements OnModuleInit {
         data: stateToPrismaUpdate(state),
       });
 
-      return { ok: true as const };
+      return { ok: true as const, rateClamp };
     });
   }
 
