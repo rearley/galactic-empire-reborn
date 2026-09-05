@@ -65,3 +65,31 @@ describe('planet survey labels match the production they describe', () => {
     expect(formatMessage(MessageId.SCAN12)).not.toBe('Abundant');
   });
 });
+
+/**
+ * The OWNER's `sca pl <n>` and the recon view must use the same words.
+ *
+ * A third hardcoded table (RES_DISPLAY: Barren/Sparse/Rich/Abundant) sat in
+ * scan.handler.ts under the comment "the original uses separate text for
+ * resources vs environment" — which is not true. Canon indexes ONE table for
+ * both axes (GECMDS.C:2338-2356), which is exactly why its words are
+ * axis-neutral. An owner scanning their own colony saw the mismatch in a
+ * single block: "Environment:Good" from canon, "Resources: Abundant" from us.
+ */
+describe('both axes read from canon\'s one table', () => {
+  it('uses the same four words for environment and resources', () => {
+    const quality = [MessageId.SCAN12, MessageId.SCAN13, MessageId.SCAN14, MessageId.SCAN15]
+      .map((id) => formatMessage(id));
+    expect(quality).toEqual(['Poor', 'Marginal', 'Good', 'Very Good']);
+  });
+
+  it('has no separate resource vocabulary left', () => {
+    const src = require('node:fs').readFileSync(
+      require('node:path').resolve(__dirname, '../../src/game/commands/handlers/scan.handler.ts'),
+      'utf8',
+    ) as string;
+    for (const invented of ['Barren', 'Sparse', 'Rich', 'Abundant']) {
+      expect(src).not.toContain(`'${invented}'`);
+    }
+  });
+});
