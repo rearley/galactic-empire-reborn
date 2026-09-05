@@ -4,6 +4,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { showarp } from '../../ship/showarp';
 import { ShipState } from '../../ship/ship-state.types';
 import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
 import { coord1, coord2 } from '../../physics/coord';
@@ -151,7 +152,11 @@ export class ReportHandlerService implements OnModuleInit {
     const ycord = coord2(ship.ycoord);
     const heading = Math.round(ship.heading);
     const displaySpeed = ship.speed;
-    const speedStr = displaySpeed === 0 ? 'stopped' : displaySpeed < 1000 ? 'impulse' : `warp ${(displaySpeed / 1000).toFixed(1)}`;
+    // REP03/REP06 are `Speed..................Warp %s` and canon fills the slot
+    // with `showarp(speed)` — the bare figure (GECMDS.C:1972, :1980). Passing
+    // our own "warp 10.0" into a message that already says Warp printed
+    // "Speed..................Warp warp 10.0", which is what a pilot saw.
+    const speedStr = showarp(displaySpeed);
 
     if (ship.where === 1) {
       // Hyperspace
