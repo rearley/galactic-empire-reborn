@@ -804,8 +804,11 @@ branch.
 
 This branch was missing until 2026-08-31, which made the entire planet economy inert — every planet
 in the galaxy had rate 0 and no men, so a claimed colony produced nothing and production reports,
-tax and planet cash never moved. `tools/backfill-planet-inventory.ts` applies the roll to an
-already-generated galaxy.
+tax and planet cash never moved.
+
+An existing galaxy generated before that fix keeps the inert planets — the roll runs at
+generation time only. There is no backfill script — this paragraph used to name a
+tools/backfill-planet-inventory.ts that was never written — so reseed the galaxy instead.
 
 ---
 

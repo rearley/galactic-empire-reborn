@@ -39,6 +39,22 @@ If a doc needs a number to make its point, cite where the number lives. If it
 needs to be exact, there is a balance spec for that — a test re-reads the
 original and fails on drift, which no paragraph can do.
 
+**The docs themselves are now tested.**
+`backend/test/balance/docs-truth.balance.spec.ts` fails the build when a doc:
+
+- cites a `FILE.C:line` that does not exist,
+- backticks a repo path that is not there,
+- names a `*Service` / `*Handler` / `*Repository` the code does not have,
+- or states what CANON ships and gets it wrong.
+
+It is deliberately narrow. A broader check — every option name against its canon
+default — was prototyped and produced 69 candidates that were almost all false:
+documented deviations, digits caught from neighbouring option names, and
+append-only entries correctly recording an old value. A noisy test gets
+disabled, and a disabled test is worse than none. Each check that shipped runs
+at zero false positives across the whole corpus, and each was verified to FAIL
+on a deliberately broken doc before being trusted.
+
 ## The audit trail
 
 All three audit reports are closed and have been removed; they remain in git
