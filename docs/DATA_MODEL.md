@@ -1,6 +1,6 @@
 # Data Model
 
-Plain-English description of the 10 persisted entities and their relationships.
+Plain-English description of the 12 persisted entities and their relationships.
 For column-level citations back to the original C source, see
 `specs/001-prisma-schema/data-model.md`.
 
@@ -14,7 +14,10 @@ Team but the foreign key is intentionally relaxed — the original game tolerate
 a teamcode referencing a deleted team. Source: `WARUSR` in `GEMAIN.H`.
 
 **Feature 011 additions**:
-- `username String @unique` — human-readable display name used for login. Backfilled from
+- `username String` — human-readable display name used for login. NOT `@unique` at the
+  Prisma level: the model declares a plain `@@index([username])`, and case-insensitive
+  uniqueness comes from a raw `LOWER(username)` expression index created in a migration.
+  Backfilled from
   `userid` for pre-existing rows. A `LOWER(username)` expression index enforces case-insensitive
   uniqueness across all login attempts. Cannot be NULL after migration.
 - `passwordHash String?` — bcrypt cost-12 hash of the password. Nullable at the DB level;
@@ -38,7 +41,8 @@ Both were previously dead columns (always 0). They are now live after branch 030
 ## Ship
 
 A warship owned by a User, identified by the composite primary key `(userid, shipno)`.
-**As of branch 030:** a single User may own up to `MAXSHIPS=10` Ship rows simultaneously (the old `@@unique([userid])` constraint was dropped). Each ship is individually identified by its `shipno` — allocated monotonically (`topshipno+1`) and never reused after deletion.
+**As of branch 030:** a single User may own up to `MAXSHIPS` Ship rows simultaneously — a
+sysop option whose canon default is **8** (`MBMGEMSG.MSG:92`), env-tunable 1–50 (the old `@@unique([userid])` constraint was dropped). Each ship is individually identified by its `shipno` — allocated monotonically (`topshipno+1`) and never reused after deletion.
 
 Carries the complete real-time flight state: floating-point position and
 heading, speed, energy, phaser charge, shield state, damage percentage, class,
@@ -87,12 +91,14 @@ users (no migration required — the existing column already has a default in th
 
 ## Scantab (in-memory, feature 015)
 
-`ScanHandlerService` owns a per-socket `Map<letter: string, shipKey: string>` called the scantab.
+`ScanHandlerService` owns a per-SHIP scantab, keyed `"userid#shipno"` — not per-socket, and
+not a letter map: the value is an ordered `Scantab` array of up to 26 entries.
 It is not persisted to the database — it exists only for the lifetime of a socket connection.
 
 ```
 scantab key:   one of 'A'..'Z' (up to 26 entries)
-scantab value: shipKey string — "userid:shipno" format, matching ShipStateService Map keys
+scantab entry shipKey: `"userid#shipno"` — deliberately a DIFFERENT separator from the
+ShipStateService map key, which uses `:` (see helpers/scantab.ts:36-41)
 ```
 
 The scantab is rebuilt on every `scan lo`, `scan ra`, `scan se`, or `scan lo full` invocation:
@@ -112,17 +118,19 @@ to the issuing socket only (never broadcast):
 
 ```ts
 interface ScanRenderEvent {
-  mode:       'lo' | 'ra' | 'se' | 'lo-full';
-  grid:       ScanCell[];         // length = MAXX × MAXY = 30 × 15 = 450 cells
-  sidePanel?: SidePanelRow[];     // present only when mode === 'lo-full'
-  overwrite:  boolean;            // true when User.options[1] (SCANHOME) is on
+  kind:       'ra' | 'se' | 'lo' | 'lo-full';
+  mode:       'overwrite' | 'append';  // 'overwrite' when User.options[1] (SCANHOME) is on
+  cells:      ScanCell[];              // SPARSE — only occupied cells, not 450
+  header:     string;                  // the scan's own heading line
+  sidePanel?: SidePanelRow[];          // present only when kind === 'lo-full'
 }
 
 interface ScanCell {
-  x:      number;   // 0-29
-  y:      number;   // 0-14
-  char:   string;   // display character: '*', 'A'-'Z', 'O', 'W', '1'-'9', '.'
-  colour: 'self' | 'human' | 'ai' | 'planet' | 'empty';
+  x:       number;   // 0-29
+  y:       number;   // 0-14
+  type:    'ship' | 'planet' | 'mine' | 'self' | 'wormhole';
+  char:    string;   // display character: '*', 'A'-'Z', 'O', 'W', '1'-'9', '.'
+  colour?: 'self' | 'human' | 'ai' | 'planet';   // optional; there is no 'empty'
 }
 
 interface SidePanelRow {
@@ -130,18 +138,19 @@ interface SidePanelRow {
   distance: number;   // parsecs (cdistance × 10000)
   bearing:  number;   // degrees 0-359
   heading:  number;   // target ship heading degrees
-  speed:    number;   // target ship speed
+  speedDisplay: string;   // 'Warp 4.5' | 'Impulse' | 'Stopped'
   name?:    string;   // only present when SCANNAMES = on (User.options[0] === 1)
 }
 ```
 
 The frontend `useScanRender` hook subscribes to `scan:render` and maintains a `ScanCard[]`.
-When `overwrite === true`, the hook replaces the last card (SCANHOME mode). When `false`,
+When `mode === 'overwrite'`, the hook replaces the last card (SCANHOME mode). Otherwise
 it appends a new card (capped at a display limit). `ScanPanel` renders the most-recent card.
 
 ## Sector
 
-One cell of the 30×15 galaxy grid (`MAXX=30`, `MAXY=15`), identified by
+One cell of the universe square, which runs `-UNIVMAX..+UNIVMAX` on both axes
+(`MAXX`/`MAXY` are the scan VIEWPORT, not the galaxy), identified by
 `(xsect, ysect)`. Records the sector type and the count of planetary objects
 inside it. Source: `GALSECT` in `GEMAIN.H`. The galaxy generator seeds 450
 rows on first boot.
@@ -160,7 +169,7 @@ two running-total fields, all stored as parallel native arrays. Source:
 
 A teleport link inside a sector, identified by `(xsect, ysect, plnum)`. Stores
 both the origin coordinate and a destination coordinate, a visibility flag, and
-a name. Destination may fall outside the 30×15 grid (the schema allows it;
+a name. Destinations are generated inside the universe square (the schema imposes no bound;
 validation is a runtime concern). Source: `GALWORM` in `GEMAIN.H`.
 
 ## Team
@@ -176,7 +185,8 @@ reference teams via `User.teamcode` (no enforced FK — original tolerance).
   at the DB level. The `WHERE teamcount >= 0` predicate is always true (column default 0, never negative)
   and is present to allow future refinement (e.g. exclude soft-deleted teams via `flag != 1`).
 - `Team.secret` — remains in schema but is unused by feature 018; stored as `""` on creation.
-- `Team.flag` — remains in schema; midnight job uses `flag = 1` for "removed"; feature 018 does not write it.
+- `Team.flag` — remains in schema (canon's TEAM.flag) but NOTHING writes it. Disbandment is
+  recorded in the dedicated `removed Boolean` column by the midnight job.
 - `Team.teamcount` — maintained by midnight job; **NOT** read by `tea list` (FR-023 requires live
   `GROUP BY teamcode` on `User` table instead of this denormalised counter).
 
@@ -220,7 +230,8 @@ galaxy was produced.
 
 The `Sector`, `Planet`, and `Wormhole` tables are populated by `GalaxyService.onModuleInit()`
 on first boot within a single Postgres transaction that also writes the `GalaxyMeta` row.
-They are no longer empty placeholder tables — after first boot all 450 sector rows exist,
+They are no longer empty placeholder tables — after first boot all (2·UNIVMAX+1)² sector
+rows exist (40,401 at the deployed UNIVMAX=100),
 and every planet and wormhole that was generated is present and queryable.
 
 ## Planet (in-memory PlanetState — feature 005)
