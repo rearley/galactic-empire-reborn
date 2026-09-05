@@ -93,7 +93,7 @@ describe('lock → tor @ integration', () => {
 
     // 1) loc Murdonian
     const lockRes = lock.command.handler(alice, ['Murdonian'], ctx) as CommandResult;
-    expect(lockRes.lines[0].text).toMatch(/Target locked: Murdonian/);
+    expect(lockRes.lines[0].text).toMatch(/Fire control locked on Murdonian commanded by/);
     expect(alice.lock).toBe(droid.shipno);
 
     // 2) tor @ — must succeed with the same locked target

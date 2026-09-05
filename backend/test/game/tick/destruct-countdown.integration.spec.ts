@@ -96,7 +96,9 @@ describe('destructTick — full countdown from COUNTDOWN (20) to 0', () => {
     }
 
     expect(booms).toHaveLength(1);
-    expect(booms[0].message).toContain('USS Doomed');
+    // SELFD3 to the pilot carries no name; SELFD3A names the ship for the room.
+    expect(booms[0].pilotMessage).toBe(formatMessage(MessageId.DESTRUCT_BOOM));
+    expect(booms[0].sectorMessage).toContain('USS Doomed');
   });
 
   it('emits COMBAT_SHIP_DESTROYED with null attacker when countdown expires', () => {
@@ -125,7 +127,10 @@ describe('destructTick — full countdown from COUNTDOWN (20) to 0', () => {
     // The last emitted tick should have countdown=10
     const last = ticks[ticks.length - 1];
     expect(last.countdown).toBe(10);
-    expect(last.message).toBe(formatMessage(MessageId.DESTRUCT_TICK_10, 'USS Doomed'));
+    // The sector hears the escalation AND the pilot still gets their number —
+    // canon prints both on this tick, not one or the other.
+    expect(last.sectorMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK_10, 'USS Doomed'));
+    expect(last.pilotMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK, 10));
   });
 
   it('emits special warning at tick=5 remaining (SELFD2B)', () => {
@@ -139,7 +144,10 @@ describe('destructTick — full countdown from COUNTDOWN (20) to 0', () => {
 
     const last = ticks[ticks.length - 1];
     expect(last.countdown).toBe(5);
-    expect(last.message).toBe(formatMessage(MessageId.DESTRUCT_TICK_5, 'USS Doomed'));
+    // The sector hears the escalation AND the pilot still gets their number —
+    // canon prints both on this tick, not one or the other.
+    expect(last.sectorMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK_5, 'USS Doomed'));
+    expect(last.pilotMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK, 5));
   });
 
   it('emits special warning at tick=2 remaining (SELFD2C)', () => {
@@ -153,7 +161,27 @@ describe('destructTick — full countdown from COUNTDOWN (20) to 0', () => {
 
     const last = ticks[ticks.length - 1];
     expect(last.countdown).toBe(2);
-    expect(last.message).toBe(formatMessage(MessageId.DESTRUCT_TICK_2, 'USS Doomed'));
+    // The sector hears the escalation AND the pilot still gets their number —
+    // canon prints both on this tick, not one or the other.
+    expect(last.sectorMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK_2, 'USS Doomed'));
+    expect(last.pilotMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK, 2));
+  });
+
+  it('keeps the countdown off the sector channel on an ordinary tick', () => {
+    // SELFD2 is outprfge(usrn) — the pilot only. The port broadcast it to the
+    // whole room every tick, so anyone in the sector could watch the timer.
+    const { service, state, events } = buildHarness(COUNTDOWN);
+    const ticks: DestructTickPayload[] = [];
+    events.on('ship-management.destruct-tick', (p: DestructTickPayload) => ticks.push(p));
+
+    for (let i = 0; i < COUNTDOWN - 15; i++) {
+      service.destructTick(state);
+    }
+
+    const last = ticks[ticks.length - 1];
+    expect(last.countdown).toBe(15);
+    expect(last.sectorMessage).toBeNull();
+    expect(last.pilotMessage).toBe(formatMessage(MessageId.DESTRUCT_TICK, 15));
   });
 
   it('ship with destruct=0 → no action (no-op guard)', () => {

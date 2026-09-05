@@ -134,3 +134,20 @@ function isIngame(ship: ShipState | undefined): ship is ShipState {
   if (!ship) return false;
   return ship.status === 1 || ship.status === 2;
 }
+
+/**
+ * The scan letter the viewer currently has assigned to `shipKey`.
+ *
+ * Canon's `shpltr(usrn, ship)` — the letter is a property of the LOOKER's scan
+ * table, not of the ship, so two pilots can hold different letters for the same
+ * target. LOCK3/LOCK5 and the lock warnings are all written around `%c`.
+ *
+ * Falls back to `?` when the target is not on the viewer's last scan, which is
+ * reachable: the scan table can be stale by the time the shot is taken.
+ */
+export function shipLetter(
+  scantab: ReadonlyArray<{ shipKey: string; letter: string }> | undefined,
+  shipKey: string,
+): string {
+  return scantab?.find((e) => e.shipKey === shipKey)?.letter ?? '?';
+}

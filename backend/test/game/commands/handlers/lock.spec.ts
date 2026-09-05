@@ -60,7 +60,9 @@ describe('LockHandlerService — `loc <target>`', () => {
     const h = makeHarness([alice, bob]);
     const result = h.command.handler(alice, ['Bob'], ctx) as CommandResult;
     expect(alice.lock).toBe(7);
-    expect(result.lines[0].text).toMatch(/Target locked: Bob/);
+    // LOCK02 names the ship AND its commander — canon passes username() as the
+    // second arg (GECMDS.C:5093). The old assertion pinned an invented string.
+    expect(result.lines[0].text).toMatch(/Fire control locked on Bob commanded by/);
   });
 
   it('rejects locking onto self (LOC_SELF)', () => {
@@ -94,7 +96,9 @@ describe('LockHandlerService — `loc <target>`', () => {
     const bob = makeShip({ userid: 'b', shipno: 7, shipname: 'Bob', xcoord: 100, ycoord: 100 });
     const h = makeHarness([alice, bob]);
     const result = h.command.handler(alice, ['@'], ctx) as CommandResult;
-    expect(result.lines[0].text).toMatch(/Target locked: Bob/);
+    // LOCK02 names the ship AND its commander — canon passes username() as the
+    // second arg (GECMDS.C:5093). The old assertion pinned an invented string.
+    expect(result.lines[0].text).toMatch(/Fire control locked on Bob commanded by/);
     expect(alice.lock).toBe(7);
   });
 

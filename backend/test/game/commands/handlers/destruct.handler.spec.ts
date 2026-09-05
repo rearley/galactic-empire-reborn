@@ -63,17 +63,19 @@ describe('DestructHandlerService — happy path', () => {
     expect(result.lines[0].category).toBe('system');
   });
 
-  it('broadcasts DESTRUCT_SECTOR_START to the sector room', () => {
+  it('tells the sector nothing — the neighbours find out at ten ticks, not twenty', () => {
+    // cmd_destruct prints SELFD1 and nothing else (GECMDS.C:5025-5035). The
+    // first outrange is SELFD2A when destruct hits 10 (GEFUNCS.C:1835), so a
+    // ship in the room gets eight ticks of warning. The port used to broadcast
+    // an invented line the moment the sequence started, which both leaked the
+    // decision immediately and had no canon string behind it.
     const ship = makeShip({ xcoord: 7.3, ycoord: 4.9, destruct: 0 });
     const { handler } = makeService(ship);
     const result = handler.command.handler(ship, [], {}) as {
       lines: unknown[];
-      broadcasts?: { room: string; event: string; payload: { text: string } }[];
+      broadcasts?: unknown[];
     };
-    expect(result.broadcasts).toBeDefined();
-    expect(result.broadcasts![0].room).toBe('sector:7:4');
-    expect(result.broadcasts![0].event).toBe('event.log');
-    expect(result.broadcasts![0].payload.text).toContain('USS Doomed');
+    expect(result.broadcasts).toBeUndefined();
   });
 });
 
@@ -90,12 +92,17 @@ describe('DestructHandlerService — rejection paths', () => {
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
 
-  it('already counting down (destruct > 0) → DESTRUCT_ACTIVE, no mutation', () => {
-    const ship = makeShip({ destruct: 15 });
+  it('re-issued mid-countdown, RESTARTS the timer rather than refusing', () => {
+    // cmd_destruct has exactly one gate, the neutral zone; past it, it assigns
+    // destruct = COUNTDOWN unconditionally and reprints SELFD1. The port's
+    // "already in progress" refusal was invented, and it made a countdown
+    // impossible to extend once begun.
+    const ship = makeShip({ destruct: 3 });
     const { handler, mockShipState } = makeService(ship);
     const result = handler.command.handler(ship, [], {}) as { lines: { text: string }[] };
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.DESTRUCT_ACTIVE));
-    expect(mockShipState.mutate).not.toHaveBeenCalled();
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.DESTRUCT_START));
+    expect(mockShipState.mutate).toHaveBeenCalled();
+    expect(ship.destruct).toBe(COUNTDOWN);
   });
 });
 
