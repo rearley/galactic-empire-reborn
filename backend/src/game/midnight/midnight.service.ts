@@ -25,6 +25,7 @@ import { MidnightCounters, hasRunForToday, recordRun } from './midnight-run.ledg
 import { ADVISORY_LOCK_KEY } from './midnight.constants';
 import { loadMidnightConfig } from './midnight.config';
 import { MIDNIGHT_COMPLETED, MidnightCompletedPayload } from './midnight-events';
+import { GAME_TIMEZONE, runDateValue } from './midnight-time';
 
 export const MIDNIGHT_LOCK_HELD = 'MIDNIGHT_LOCK_HELD' as const;
 
@@ -33,10 +34,13 @@ export class MidnightLockHeldError extends Error {
   constructor() { super('Midnight advisory lock is held by another invocation'); }
 }
 
+/**
+ * The game's current calendar date, as the Postgres `date` column stores it.
+ * Measured in {@link GAME_TIMEZONE}, not the host's zone — see midnight-time.ts
+ * for why the cron and this must read the same clock.
+ */
 function todayLocal(): Date {
-  const d = new Date();
-  // Strip time component — Postgres date type stores date only
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return runDateValue(new Date());
 }
 
 @Injectable()
@@ -68,10 +72,13 @@ export class MidnightService implements OnApplicationBootstrap {
   }
 
   /**
-   * Calendar-cadence cron — fires at server-local 00:00 every day.
+   * Calendar-cadence cron — fires at 00:00 in {@link GAME_TIMEZONE} every day.
+   *
+   * The zone is passed explicitly rather than left to the host's TZ so the
+   * schedule survives redeployment onto a machine set to anything else.
    * @see GEMAIN.C:gemidnighta — the original game's midnight pass
    */
-  @Cron('0 0 * * *')
+  @Cron('0 0 * * *', { timeZone: GAME_TIMEZONE })
   async scheduledRun(): Promise<void> {
     this.logger.log('midnight cron: starting scheduled run');
     try {
