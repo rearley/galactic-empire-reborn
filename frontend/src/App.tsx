@@ -292,7 +292,20 @@ function Terminal(): React.JSX.Element {
           <EventLog lines={logLines} />
         </div>
 
-        {/* Main-right: ASCII sector-map panel (legacy ScanMap) + new ScanPanel (015) */}
+        {/*
+          * Two panels, one job each.
+          *
+          * ScanMap is the LIVE view — the most recent scan, always current,
+          * the thing you glance at while typing. ScanPanel is the READOUT —
+          * header and contact table, with history you can scroll to compare
+          * two scans.
+          *
+          * They used to render the same grid from the same event (this comment
+          * previously read "legacy ScanMap + new ScanPanel", ScanPanel having
+          * been built to replace it and nothing having removed it), so a
+          * `sca se` painted the identical picture twice and the history filled
+          * with near-duplicates.
+          */
         <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
           <ScanMap cells={scanCells} shipId={localShipId} />
           <div className="flex-1 overflow-auto border-t border-gray-800">

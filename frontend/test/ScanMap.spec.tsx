@@ -93,7 +93,7 @@ describe('ScanMap', () => {
 
   // T014: 30x15 empty grid. Canon clears to ' ' and uses '.' for a live MINE
   // (GECMDS.C:2978 vs :2607) — an empty cell must not wear the mine glyph.
-  it('empty cells render "." character — not a blank (FR-014)', () => {
+  it('empty cells render a SPACE — canon clears to \' \', and \'.\' is a MINE', () => {
     render(<ScanMap cells={[]} />);
     const map = screen.getByTestId('scan-map');
     const rows = map.querySelectorAll('div');

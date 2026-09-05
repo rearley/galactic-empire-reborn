@@ -1,6 +1,6 @@
 import React from 'react';
 import { useScanRender } from '../hooks/useScanRender';
-import type { ScanRenderEvent, ScanCell } from '../hooks/useScanRender';
+import type { ScanRenderEvent } from '../hooks/useScanRender';
 
 export const SCAN_WIDTH = 30;
 export const SCAN_HEIGHT = 15;
@@ -18,41 +18,6 @@ export const SCAN_HEIGHT = 15;
  *
  * @see specs/015-scan-modes/plan.md §ScanPanel
  */
-const COLOUR_MAP: Record<string, string> = {
-  self: '#4ade80',
-  human: '#60a5fa',
-  ai: '#f87171',
-  planet: '#facc15',
-};
-
-const DEFAULT_COLOUR = '#d1d5db'; // gray-300
-
-interface GridCell {
-  char: string;
-  colour?: string;
-}
-
-/**
- * Builds a 15×30 grid of `{ char, colour? }` objects from a sparse cells array.
- * Empty positions are filled with ' ' (space) — the monospace pre renders them
- * as visible whitespace gaps without needing the '.' filler used by ScanMap.
- */
-function buildGrid(cells: ScanCell[]): GridCell[][] {
-  const grid: GridCell[][] = Array.from({ length: SCAN_HEIGHT }, () =>
-    Array.from({ length: SCAN_WIDTH }, () => ({ char: ' ' })),
-  );
-
-  for (const cell of cells) {
-    if (cell.x >= 0 && cell.x < SCAN_WIDTH && cell.y >= 0 && cell.y < SCAN_HEIGHT) {
-      grid[cell.y][cell.x] = {
-        char: cell.char,
-        colour: cell.colour != null ? COLOUR_MAP[cell.colour] : undefined,
-      };
-    }
-  }
-
-  return grid;
-}
 
 interface ScanCardProps {
   event: ScanRenderEvent;
@@ -63,7 +28,6 @@ interface ScanCardProps {
  * @see specs/015-scan-modes/contracts/scan-render.md §1
  */
 function ScanCard({ event }: ScanCardProps): React.JSX.Element {
-  const grid = buildGrid(event.cells);
 
   return (
     <div
@@ -80,26 +44,24 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
         {event.header}
       </div>
 
-      {/* 30×15 monospace grid */}
-      <pre
-        className="font-mono text-xs leading-tight m-0 whitespace-pre"
-        data-testid="scan-card-grid"
-      >
-        {grid.map((row, y) => (
-          <span key={y} data-testid={`scan-row-${y}`}>
-            {row.map((cell, x) => (
-              <span
-                key={x}
-                style={cell.colour != null ? { color: cell.colour } : { color: DEFAULT_COLOUR }}
-                data-testid={cell.char !== ' ' ? `scan-cell-${x}-${y}` : undefined}
-              >
-                {cell.char}
-              </span>
-            ))}
-            {'\n'}
-          </span>
-        ))}
-      </pre>
+      {/*
+        * NO GRID HERE.
+        *
+        * ScanPanel was built (feature 015) to replace the older ScanMap, and
+        * nobody removed ScanMap — App.tsx still says "legacy ScanMap ... + new
+        * ScanPanel" and mounts both. They render the same cells from the same
+        * event, so every `sca se` painted the identical picture twice: once in
+        * SECTOR MAP, once inside the card. The card history then accumulated
+        * several near-identical grids to scroll past, and the owner's reaction
+        * was the honest one — "not sure what is what".
+        *
+        * Each panel now has ONE job:
+        *   SECTOR MAP  the live view, always the most recent scan
+        *   SCAN DATA   the readout — header and contact table, with history
+        *
+        * That keeps the scrollback worth having (two scans' numbers side by
+        * side) without duplicating the picture.
+        */}
 
       {/* Side panel legend — stacked below grid when present */}
       {event.sidePanel != null && event.sidePanel.length > 0 && (
