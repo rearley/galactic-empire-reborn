@@ -99,7 +99,17 @@ export class LockHandlerService {
       s.lockKey = `${target.userid}:${target.shipno}`;
     });
 
-    // LOCK02: show full ship name so player knows which ship matched the partial name.
-    return { lines: [{ text: `Target locked: ${target.shipname} (class ${target.shpclass}).`, category: 'success' }] };
+    // LOCK02 takes the ship's name AND its commander (GECMDS.C:5093 passes
+    // username(warshpoff(shpnum))). The port had an inline string here that
+    // reported the hull class instead of who is flying it — the one fact that
+    // decides whether you shoot.
+    return {
+      lines: [
+        {
+          text: formatMessage(MessageId.LOC_LOCKED, target.shipname, target.username ?? target.userid),
+          category: 'success',
+        },
+      ],
+    };
   }
 }

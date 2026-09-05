@@ -12,9 +12,15 @@ import { COUNTDOWN } from '../_ship-management-constants';
  * decrements it each physics tick (6s), broadcasting sector warnings until
  * the ship is destroyed at 0.
  *
- * Rejection gates:
- *  - Neutral zone (sector 0,0): canonical rejection per GEFUNCS.C:725-729
- *  - Already counting down: destruct > 0
+ * The only gate is the neutral zone. Re-issuing `destruct` mid-countdown is
+ * not an error in canon — cmd_destruct sets `destruct = COUNTDOWN`
+ * unconditionally, so a second call RESTARTS the timer at 20 and reprints
+ * SELFD1. The port used to refuse with an invented "already in progress",
+ * which quietly made the countdown un-extendable.
+ *
+ * Nor does starting one tell the sector. Canon's first outrange is SELFD2A at
+ * ten ticks remaining (GEFUNCS.C:1835) — the neighbours get eight ticks of
+ * warning, not twenty, and the port's start-broadcast gave the game away.
  *
  * @see GECMDS.C:5025 cmd_destruct
  * @see GEFUNCS.C:1820 destruct() — tick-driven countdown in ShipManagementTickService
@@ -41,26 +47,10 @@ export class DestructHandlerService {
       return { lines: [{ text: formatMessage(MessageId.DESTRUCT_NZ), category: 'system' }] };
     }
 
-    if (ship.destruct > 0) {
-      return { lines: [{ text: formatMessage(MessageId.DESTRUCT_ACTIVE), category: 'system' }] };
-    }
-
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.destruct = COUNTDOWN;
     });
 
-    return {
-      lines: [{ text: formatMessage(MessageId.DESTRUCT_START), category: 'system' }],
-      broadcasts: [
-        {
-          room: `sector:${xsect}:${ysect}`,
-          event: 'event.log',
-          payload: {
-            category: 'system',
-            text: formatMessage(MessageId.DESTRUCT_SECTOR_START, ship.shipname),
-          },
-        },
-      ],
-    };
+    return { lines: [{ text: formatMessage(MessageId.DESTRUCT_START), category: 'system' }] };
   }
 }

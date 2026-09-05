@@ -10,7 +10,7 @@ import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact, missileFluxCost, missileFluxShort } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
-import { findShip } from '../helpers/find-ship';
+import { findShip, shipLetter } from '../helpers/find-ship';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
@@ -179,7 +179,8 @@ export class MissileHandlerService {
     // 5. Target lookup
     const allShips = this.shipState.findAllShips();
     const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
-    const found = findShip(args[0] ?? '', ship, allShips, scanRange, this.scanHandler.lettersFor(ship.userid, ship.shipno));
+    const letters = this.scanHandler.lettersFor(ship.userid, ship.shipno);
+    const found = findShip(args[0] ?? '', ship, allShips, scanRange, letters);
     if (!found.ok) {
       return { lines: [{ text: found.message, category: 'system' }] };
     }
@@ -190,14 +191,22 @@ export class MissileHandlerService {
       return { lines: [{ text: formatMessage(MessageId.LOCK_NEUTRAL), category: 'system' }] };
     }
     // Fully cloaked target is unlockable (GECMDS.C:1371).
+    // Canon does not call this a failed lock — the guarded block at
+    // GECMDS.C:1371 is never entered for a cloaked or out-of-range target, so
+    // control falls to the else at 1426 and prints LOCK5, "cannot FIND ship
+    // %c". LOCK3 ("cannot get a positive lock") is the different, later answer
+    // for a target that is plainly visible but too fast or too far to hold.
+    // The port returned the same string for both and lost that distinction.
     if (target.cloak >= 10) {
-      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+      const letter = shipLetter(letters, `${target.userid}:${target.shipno}`);
+      return { lines: [{ text: formatMessage(MessageId.LOCK_UNREACHABLE, letter), category: 'system' }] };
     }
     // Lock-quality gate (GECMDS.C:1378-1395) — missile branch: (5 - dist)/MISFACT.
     const distSectors = cdistance(ship, target);
     const fact = lockFact('missile', ship.speed, target.speed, distSectors, MISFACT);
     if (fact <= 0.7) {
-      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL), category: 'system' }] };
+      const letter = shipLetter(letters, `${target.userid}:${target.shipno}`);
+      return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL, letter), category: 'system' }] };
     }
 
     // 6. Find lowest free slot on target's lmissl

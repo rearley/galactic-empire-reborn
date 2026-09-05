@@ -1606,21 +1606,35 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  /** Per-sector self-destruct countdown tick warning. @see GEFUNCS.C:1833-1851 */
+  /**
+   * Self-destruct countdown tick. Two audiences, per canon: the pilot always
+   * gets the number (SELFD2), the sector only hears anything at 10, 5 and 2.
+   * @see GEFUNCS.C:1833-1852
+   */
   @OnEvent('ship-management.destruct-tick')
   handleDestructTick(event: DestructTickPayload): void {
-    this.server.to(event.room).emit('event.log', {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
       category: 'system',
-      text: event.message,
+      text: event.pilotMessage,
     });
+    if (event.sectorMessage !== null) {
+      this.server.to(event.room).emit('event.log', {
+        category: 'system',
+        text: event.sectorMessage,
+      });
+    }
   }
 
-  /** Sector broadcast when self-destruct expires. @see GEFUNCS.C:1863 */
+  /** Self-destruct expiring: SELFD3 to the pilot, SELFD3A to the sector. @see GEFUNCS.C:1856-1859 */
   @OnEvent('ship-management.destruct-boom')
   handleDestructBoom(event: DestructBoomPayload): void {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
+      category: 'combat',
+      text: event.pilotMessage,
+    });
     this.server.to(event.room).emit('event.log', {
       category: 'combat',
-      text: event.message,
+      text: event.sectorMessage,
     });
   }
 

@@ -332,14 +332,13 @@ export enum MessageId {
 
   // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
   DESTRUCT_NZ = 'DESTRUCT_NZ',
-  DESTRUCT_ACTIVE = 'DESTRUCT_ACTIVE',
   DESTRUCT_START = 'DESTRUCT_START',
-  DESTRUCT_SECTOR_START = 'DESTRUCT_SECTOR_START',
   DESTRUCT_TICK = 'DESTRUCT_TICK',
   DESTRUCT_TICK_10 = 'DESTRUCT_TICK_10',
   DESTRUCT_TICK_5 = 'DESTRUCT_TICK_5',
   DESTRUCT_TICK_2 = 'DESTRUCT_TICK_2',
   DESTRUCT_BOOM = 'DESTRUCT_BOOM',
+  DESTRUCT_BOOM_SECTOR = 'DESTRUCT_BOOM_SECTOR',
 
   // abort (feature 013) — GECMDS.C:5044 cmd_abort
   ABORT_OK = 'ABORT_OK',
@@ -478,6 +477,7 @@ export enum MessageId {
 
   // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
   LOCK_FAIL = 'LOCK_FAIL',
+  LOCK_UNREACHABLE = 'LOCK_UNREACHABLE',
   LOCK_NEUTRAL = 'LOCK_NEUTRAL',
   // fire control damaged gate — GECMDS.C:1346-1351 lockon first check
   FCBROKE = 'FCBROKE',
@@ -764,7 +764,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MHIT1]: CANON_MESSAGES.MHIT1,
   [MessageId.MHIT2]: CANON_MESSAGES.MHIT2,
   [MessageId.MINE4]: CANON_MESSAGES.MINE4,
-  [MessageId.MIN_DEPLOYED]: 'Neutron Mine launched. Detonation in %s centocks!',
+  [MessageId.MIN_DEPLOYED]: CANON_MESSAGES.MINE3,
   [MessageId.ZIP_NOAMMO]: CANON_MESSAGES.ZIPPER1,
   [MessageId.ZIP_SWEPT]: CANON_MESSAGES.ZIPPER2,
   [MessageId.DEC_NOAMMO]: CANON_MESSAGES.NODECOYS,
@@ -778,7 +778,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,
   [MessageId.LOC_NOTFOUND]: CANON_MESSAGES.NOSHIP,
-  [MessageId.LOC_LOCKED]: 'Target locked.',
+  [MessageId.LOC_LOCKED]: CANON_MESSAGES.LOCK02,
   [MessageId.LOC_FMT]: CANON_MESSAGES.NOSHIP,
   [MessageId.NOLOCK]: CANON_MESSAGES.NOLOCK,
 
@@ -832,7 +832,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // cloak (feature 013) — GECMDS.C:3188 cmd_cloak
   [MessageId.CLOAK_ENGAGED]: CANON_MESSAGES.CLOKON,
-  [MessageId.CLOAK_ALREADY_ON]: 'Cloaking device already engaged.',
+  [MessageId.CLOAK_ALREADY_ON]: CANON_MESSAGES.CLOKCOM,
   [MessageId.CLOAK_NO_ENERGY]: CANON_MESSAGES.CLOKPWR,
   [MessageId.CLOAK_DAMAGED]: CANON_MESSAGES.CLOKDAM,
   [MessageId.CLOAK_HYPERSPACE]: CANON_MESSAGES.CLOK1,
@@ -840,7 +840,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.CLOAK_ALREADY_OFF]: CANON_MESSAGES.CLOKDWN,
   [MessageId.CLOAK_FMT]: CANON_MESSAGES.CLOFMT,
   [MessageId.CLOAK_SECTOR_DECLOAKED]: CANON_MESSAGES.CLOK2,
-  [MessageId.CLOAK_COLLAPSED]: 'Emergency decloak — insufficient energy to maintain cloak.',
+  [MessageId.CLOAK_COLLAPSED]: CANON_MESSAGES.CLOKNOP,
 
   // maint (feature 013) — GECMDS.C:4452 cmd_maint
   [MessageId.MAINT_NOT_ORBIT]: CANON_MESSAGES.MAINT1,
@@ -868,8 +868,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TRAN_UP_OK]: 'Transferred %d %s up from %s.',
 
   // jettison (feature 013) — GECMDS.C:6102 cmd_jettison
-  [MessageId.JET_NO_CARGO]: 'Insufficient cargo to jettison.',
-  [MessageId.JET_OK]: 'Jettisoned %d %s.',
+  [MessageId.JET_NO_CARGO]: CANON_MESSAGES.JETT1,
+  [MessageId.JET_OK]: CANON_MESSAGES.JETT3,
   [MessageId.JET_FMT]: CANON_MESSAGES.JETTFMT,
 
   // set (feature 013/015) — GECMDS.C:5190 cmd_set reinterpreted
@@ -881,19 +881,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // destruct (feature 013) — GECMDS.C:5025 cmd_destruct
   [MessageId.DESTRUCT_NZ]: CANON_MESSAGES.SELFD1A,
-  [MessageId.DESTRUCT_ACTIVE]: 'Self-destruct already in progress.',
   [MessageId.DESTRUCT_START]: CANON_MESSAGES.SELFD1,
-  [MessageId.DESTRUCT_SECTOR_START]: '%s has initiated self-destruct sequence.',
-  [MessageId.DESTRUCT_TICK]: '%s: %d ticks until self-destruct.',
-  [MessageId.DESTRUCT_TICK_10]: '%s has 10 ticks until self-destruct!',
-  [MessageId.DESTRUCT_TICK_5]: '%s has 5 ticks until self-destruct!!',
-  [MessageId.DESTRUCT_TICK_2]: '%s has 2 ticks until self-destruct!!!',
-  [MessageId.DESTRUCT_BOOM]: '%s has self-destructed!',
+  [MessageId.DESTRUCT_TICK]: CANON_MESSAGES.SELFD2,
+  [MessageId.DESTRUCT_TICK_10]: CANON_MESSAGES.SELFD2A,
+  [MessageId.DESTRUCT_TICK_5]: CANON_MESSAGES.SELFD2B,
+  [MessageId.DESTRUCT_TICK_2]: CANON_MESSAGES.SELFD2C,
+  [MessageId.DESTRUCT_BOOM]: CANON_MESSAGES.SELFD3,
+  [MessageId.DESTRUCT_BOOM_SECTOR]: CANON_MESSAGES.SELFD3A,
 
   // abort (feature 013) — GECMDS.C:5044 cmd_abort
   [MessageId.ABORT_OK]: CANON_MESSAGES.SELFD4,
   [MessageId.ABORT_NONE]: CANON_MESSAGES.SELFD5,
-  [MessageId.ABORT_SECTOR]: '%s has aborted self-destruct.',
+  [MessageId.ABORT_SECTOR]: CANON_MESSAGES.SELFD4A,
 
   // abandon (feature 013) — GECMDS.C:3420 cmd_abandon reinterpreted
   [MessageId.ABANDON_OK]: 'You have abandoned ship %s.',
@@ -1040,8 +1039,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.MESG05]: CANON_MESSAGES.MESG05,
 
   // torpedo / missile lock-quality gates (feature 023) — GECMDS.C:1363-1395
-  [MessageId.LOCK_FAIL]: 'Cannot get a firing lock — target too distant or evading.',
-  [MessageId.LOCK_NEUTRAL]: 'Fire control refuses: target is in the neutral zone.',
+  [MessageId.LOCK_FAIL]: CANON_MESSAGES.LOCK3,
+  [MessageId.LOCK_UNREACHABLE]: CANON_MESSAGES.LOCK5,
+  [MessageId.LOCK_NEUTRAL]: CANON_MESSAGES.FCNONO,
   // fire control damaged gate — GECMDS.C:1346-1351 lockon
   [MessageId.FCBROKE]: CANON_MESSAGES.FCBROKE,
 

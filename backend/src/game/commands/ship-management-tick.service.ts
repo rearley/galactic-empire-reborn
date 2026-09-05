@@ -116,29 +116,38 @@ export class ShipManagementTickService implements OnModuleInit {
     });
 
     if (newCount > 0) {
-      // Broadcast tick warning — SELFD2A at 10, SELFD2B at 5, SELFD2C at 2, SELFD2 otherwise.
-      let message: string;
-      if (newCount === 10) {
-        message = formatMessage(MessageId.DESTRUCT_TICK_10, ship.shipname);
-      } else if (newCount === 5) {
-        message = formatMessage(MessageId.DESTRUCT_TICK_5, ship.shipname);
-      } else if (newCount === 2) {
-        message = formatMessage(MessageId.DESTRUCT_TICK_2, ship.shipname);
-      } else {
-        message = formatMessage(MessageId.DESTRUCT_TICK, ship.shipname, newCount);
-      }
+      // Canon prints TWO different things on a countdown tick, to two different
+      // audiences, and they are not alternatives (GEFUNCS.C:1833-1852):
+      //
+      //   SELFD2A/2B/2C -> outrange, i.e. the SECTOR, and only at 10, 5 and 2
+      //   SELFD2        -> outprfge(usrn), i.e. the PILOT, on every tick
+      //
+      // The port had them in one if/else chain on a single sector broadcast, so
+      // the whole sector read the pilot's countdown every tick (canon tells the
+      // neighbours nothing until ten remain), and at 10/5/2 the pilot lost the
+      // number and saw only the room's warning.
+      const sectorMessage =
+        newCount === 10 ? formatMessage(MessageId.DESTRUCT_TICK_10, ship.shipname)
+        : newCount === 5 ? formatMessage(MessageId.DESTRUCT_TICK_5, ship.shipname)
+        : newCount === 2 ? formatMessage(MessageId.DESTRUCT_TICK_2, ship.shipname)
+        : null;
+
       this.events.emit('ship-management.destruct-tick', {
         room,
-        message,
+        userid: ship.userid,
+        pilotMessage: formatMessage(MessageId.DESTRUCT_TICK, newCount),
+        sectorMessage,
         countdown: newCount,
         shipId: shipKey(ship.userid, ship.shipno),
       } satisfies DestructTickPayload);
     } else {
-      // Countdown expired: destroy the ship.
-      const boomMessage = formatMessage(MessageId.DESTRUCT_BOOM, ship.shipname);
+      // Same split at detonation: SELFD3 to the pilot, SELFD3A to the sector.
+      // @see GEFUNCS.C:1856-1859
       this.events.emit('ship-management.destruct-boom', {
         room,
-        message: boomMessage,
+        userid: ship.userid,
+        pilotMessage: formatMessage(MessageId.DESTRUCT_BOOM),
+        sectorMessage: formatMessage(MessageId.DESTRUCT_BOOM_SECTOR, ship.shipname),
         shipId: shipKey(ship.userid, ship.shipno),
       } satisfies DestructBoomPayload);
 
@@ -175,13 +184,21 @@ export interface CloakCollapsedPayload {
 
 export interface DestructTickPayload {
   room: string;
-  message: string;
+  userid: string;
+  /** SELFD2 — the countdown number, for the pilot alone. */
+  pilotMessage: string;
+  /** SELFD2A/2B/2C — null on every tick except 10, 5 and 2. */
+  sectorMessage: string | null;
   countdown: number;
   shipId: string;
 }
 
 export interface DestructBoomPayload {
   room: string;
-  message: string;
+  userid: string;
+  /** SELFD3 — for the pilot. */
+  pilotMessage: string;
+  /** SELFD3A — for the sector. */
+  sectorMessage: string;
   shipId: string;
 }
