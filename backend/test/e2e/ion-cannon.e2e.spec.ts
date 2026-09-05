@@ -178,7 +178,13 @@ describe('ion cannons (real services, no mocks)', () => {
       userid: 'guarded', shipno: 2, hostile: 10 + armedPlnum!,
       shieldstat: 1, shield: 50, shieldtype: 1,
     });
-    for (let i = 0; i < 30; i++) { runTick(bare); runTick(guarded); }
+    // ONE hit each. Over many ticks the guarded ship's shield BLOWS, after
+    // which it takes full damage too and the two converge — which made this
+    // an RNG coin-flip that passed alone and failed in a full run. A single
+    // exchange keeps the ranges disjoint: bare takes IDAMMAX x (0.5..1.0),
+    // shielded takes IDAMMAX x (0..0.15). @see ion-cannon.ts
+    runTick(bare);
+    runTick(guarded);
     expect(bare.damage).toBeGreaterThan(guarded.damage);
   });
 });
