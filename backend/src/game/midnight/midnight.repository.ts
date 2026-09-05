@@ -350,14 +350,15 @@ export class MidnightRepository {
     const zygorMkup  = Array.from({ length: NUMITEMS }, (_, i) =>
       BASEPRICE[i] * 2 + Math.floor(Math.random() * BASEPRICE[i]),
     );
-    await tx.planet.update({
-      where: { xsect_ysect_plnum: { xsect: 0, ysect: 0, plnum: 1 } },
+    const zygor = await tx.planet.updateMany({
+      where: { xsect: 0, ysect: 0, plnum: 1 },
       data: {
         itemsQty: zygorQty,
         itemsSell: zygorSell,
         itemsMarkup2a: zygorMkup,
       },
     });
+    if (zygor.count === 0) this.warnMissingNeutralZone('Zygor-3', 1);
 
     // Nexus Prime: troops, men, food only  @see GEMAIN.C:2162-2174
     const nexusMkup = new Array<number>(NUMITEMS).fill(0);
@@ -372,14 +373,29 @@ export class MidnightRepository {
     nexusSell[I_TROOPS] = 1;
     nexusSell[I_MEN]    = 1;
     nexusSell[I_FOOD]   = 1;
-    await tx.planet.update({
-      where: { xsect_ysect_plnum: { xsect: 0, ysect: 0, plnum: 2 } },
+    const tstation = await tx.planet.updateMany({
+      where: { xsect: 0, ysect: 0, plnum: 2 },
       data: {
         itemsQty: nexusQty,
         itemsSell: nexusSell,
         itemsMarkup2a: nexusMkup,
       },
     });
+    if (tstation.count === 0) this.warnMissingNeutralZone('Tahanian Station', 2);
+  }
+
+  /**
+   * Restocking a neutral-zone planet that is not in the galaxy is a no-op, not
+   * a failure. `update` threw `Record to update not found` and, because this
+   * runs inside the nightly `$transaction`, took scoring, production and mail
+   * down with it — a whole missed midnight over two absent shop planets. Any
+   * galaxy generated without the neutral zone (every fresh integration DB)
+   * reproduced it.
+   */
+  private warnMissingNeutralZone(name: string, plnum: number): void {
+    this.logger.warn(
+      `neutral zone: no planet at 0,0 #${plnum} (${name}) — skipping restock`,
+    );
   }
 
   /**

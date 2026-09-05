@@ -2988,3 +2988,24 @@ rule is that canon wins where we merely find its behaviour surprising.
 **Alternatives rejected:** Keeping self on top as a usability call — that is a
 preference, not a defect in canon, and it was never written down. If it proves
 genuinely confusing in play it can come back HERE as a justified deviation.
+
+## 2026-09-05 — Midnight maintenance runs on a named game timezone, not the host's
+**Context:** The nightly pass was `@Cron('0 0 * * *')` with no zone, so it fired
+at server-local midnight. The host runs UTC, which put maintenance at 8pm ET —
+inside the owner's play evening rather than after it.
+**Decision:** A single `GAME_TIMEZONE` (`src/game/midnight/midnight-time.ts`,
+default `America/New_York`, overridable by env) governs both the cron's firing
+time and the calendar date the run is recorded under.
+**Reason:** Which hour maintenance runs is a deployment choice, not a canon one
+— the original's sysop set their own — so there is nothing to be faithful to,
+and ET is where the owner is. The zone is passed to `@Cron` explicitly rather
+than set as a host `TZ` so the schedule survives redeployment onto any machine.
+Both halves read one constant because they are one decision: the recorded date
+is the idempotency key the boot self-heal checks to answer "has today already
+run?", and a cron in ET against a date computed in UTC agrees most of the time
+and disagrees either side of the boundary — silently skipping or doubling a
+midnight, invisible until scores are wrong.
+**Alternatives rejected:** Setting `TZ=America/New_York` on the container —
+works, but makes correctness depend on deploy configuration that nothing tests,
+and silently changes every other date in the process. Leaving it UTC — the
+maintenance window then lands mid-session.
