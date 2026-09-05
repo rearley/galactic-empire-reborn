@@ -34,6 +34,21 @@ export class HelpHandlerService {
       // that page answers the question a player actually asked — `hel mine`
       // should return the mine page, not the whole combat topic.
       // @see MBMGEHLP.MSG, tools/extract-help.mjs
+      // Order matters, and each step earned its place:
+      //
+      //  1. Our own TOPIC IDS first. Canon matches commands on three characters
+      //     (GECMDS.C:249 gesearch) and "ship" truncates to "shi" — canon's
+      //     SHIELD page — so canon-first answered `hel ship` with shields.
+      //  2. Canon's page next, exact then 3-char. 45 of its 61 entries document
+      //     one command, and that is the better answer to `hel mine`.
+      //  3. Our aliases last. They were the stopgap BEFORE canon's pages were
+      //     wired, and ahead of canon they shadowed the real page: `mine` and
+      //     `torpedo` both alias to our combat topic.
+      const ownTopic = HELP_TOPICS[raw as HelpTopicId] as { body: ReadonlyArray<string> } | undefined;
+      if (ownTopic) {
+        return { lines: ownTopic.body.map((line) => ({ text: line, category: 'info' as const })) };
+      }
+
       const canon = canonHelpPage(raw);
       if (canon) {
         return { lines: canon.map((line) => ({ text: line, category: 'info' as const })) };

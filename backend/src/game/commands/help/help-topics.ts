@@ -481,7 +481,10 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
  * (GECMDS.C:249 gesearch) — `hel torpedo`, `hel torp` and `hel tor` are the
  * same question.
  */
-export function canonHelpPage(query: string): ReadonlyArray<string> | null {
+export function canonHelpPage(
+  query: string,
+  opts: { prefix?: boolean } = { prefix: true },
+): ReadonlyArray<string> | null {
   const q = query.toLowerCase();
 
   // A concept may span several pages; join them so one `hel planets` shows the
@@ -492,7 +495,9 @@ export function canonHelpPage(query: string): ReadonlyArray<string> | null {
     if (pages.length) return pages;
   }
 
-  const id = CANON_COMMAND_PAGES[q] ?? CANON_COMMAND_PAGES[q.slice(0, 3)];
+  const id =
+    CANON_COMMAND_PAGES[q] ??
+    (opts.prefix === false ? undefined : CANON_COMMAND_PAGES[q.slice(0, 3)]);
   return id ? (CANON_HELP[id] ?? null) : null;
 }
 
