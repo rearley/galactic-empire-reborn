@@ -557,8 +557,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REP28]: CANON_MESSAGES.REP28,
   [MessageId.REP30]: CANON_MESSAGES.REP30,
   [MessageId.REP31]: CANON_MESSAGES.REP31,
-  [MessageId.REP31A]: 'Team: %s',
-
+  [MessageId.REP31A]: CANON_MESSAGES.REP31A,
   // scan — GECMDS.C:2138
   [MessageId.SCANFMT]: CANON_MESSAGES.SCANFMT,
   [MessageId.TABROKE]: CANON_MESSAGES.TABROKE,
@@ -585,7 +584,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SCAN13]: CANON_MESSAGES.SCAN13,
   [MessageId.SCAN14]: CANON_MESSAGES.SCAN14,
   [MessageId.SCAN15]: CANON_MESSAGES.SCAN15,
-  [MessageId.SCAN16]: 'Resources: ',
+  [MessageId.SCAN16]: CANON_MESSAGES.SCAN16,
   [MessageId.SCAN_LOCATED_IN]: 'Located in sector (%d,%d).',
 
   // scan pl beacon (feature 005)
@@ -596,7 +595,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // what the player types into `sca pl <n>` and `tra`.
   [MessageId.ORBIT01]: CANON_MESSAGES.ORBIT1,
   // Canon's own words. @see GECMDS.C:791-793, GE/REL/MBMGEMSG.MSG ORBIT0
-  [MessageId.ORBIT0]: "You can't do that to a wormhole!!!",
+  [MessageId.ORBIT0]: CANON_MESSAGES.ORBIT0,
   [MessageId.ORBITALR]: CANON_MESSAGES.ORBIT3,
   // C's ORBIT2 — you must close to within 250 units first. @see GECMDS.C cmd_orbit
   // MBMGEMSG.MSG ORBIT2, verbatim. Canon gives no distance and we do not add
@@ -650,7 +649,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // planet's "reserve" — a mechanic that was zero on every neutral-zone planet
   // — and left no way to learn from inside the game that the real limit was 5.
   // @see GECMDS.C:4380-4381, MBMGEMSG.MSG:3289
-  [MessageId.BUY3]: 'They only have %s %s available for sale, Sir!',
+  [MessageId.BUY3]: CANON_MESSAGES.BUY3,
   [MessageId.BUY4]: CANON_MESSAGES.BUY4,
   [MessageId.BUY5]: CANON_MESSAGES.BUY5,
   [MessageId.BUYPAS1]: CANON_MESSAGES.BUYPAS1,
@@ -666,10 +665,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SELL1]: CANON_MESSAGES.SELL1,
   // Canon argument order is (tax, net, quantity, item) — the port led with the
   // net and dropped the tax to a parenthetical. @see MBMGEMSG.MSG:4008
-  [MessageId.SELL2]: "After the Transfer Tax of %s we have netted %s C's for our %s %s, Sir!",
+  [MessageId.SELL2]: CANON_MESSAGES.SELL2,
   // @see MBMGEMSG.MSG:4012
-  [MessageId.SELL3]: "We don't have that many %s Sir!",
-
+  [MessageId.SELL3]: CANON_MESSAGES.SELL3,
   // admin (feature 005) — GECMDS.C:3462 cmd_admin
   // Same `where < 10` orbit gate as buy — see BUY1.
   [MessageId.ADM_NOT_LANDED]: CANON_MESSAGES.ADMIN1,
@@ -727,25 +725,25 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // Canon has BOTH the '.' on the scan map and this warning; only the port's
   // wording was invented. The `***` banner is canon's own attention marker,
   // the same one the Cybertron taunts open with.
-  [MessageId.MINE6]: '***\nWARNING! WARNING!\nSensors indicate a neutron mine bearing %s, distance %s.',
+  [MessageId.MINE6]: CANON_MESSAGES.MINE6,
   // Canon prints the raw range and no unit: `spr("%ld",(long)range)` while
   // `range` is still in coordinate units (GECMDS.C:2516, :2673).
   // @see GE/REL/MBMGEMSG.MSG:3506-3547
-  [MessageId.SCAN01]: 'Scanning The %s',
-  [MessageId.SCAN01A]: 'Ship Class: %s',
-  [MessageId.SCAN02]: 'Commanded by: %s',
-  [MessageId.SCAN02A]: 'Alliance: %s',
-  [MessageId.SCAN03]: 'Bearing: %s Heading: %s Dist: %s',
-  [MessageId.SCAN03A]: 'Galactic Heading: %s Sect: %s %s',
-  [MessageId.SCAN04]: 'Speed: Warp %s',
-  [MessageId.SCAN04A]: 'Size: %sm long by %sm wide',
-  [MessageId.SCAN05]: 'Damage: %s damage',
-  [MessageId.SCAN06]: 'Shields: UP',
-  [MessageId.SCAN07]: 'Shields: DOWN',
-  [MessageId.SCAN07A]: 'Registered Kills: %s',
-  [MessageId.SCAN24]: '   Range Scan Dist:%s (s:%s %s)',
+  [MessageId.SCAN01]: CANON_MESSAGES.SCAN01,
+  [MessageId.SCAN01A]: CANON_MESSAGES.SCAN01A,
+  [MessageId.SCAN02]: CANON_MESSAGES.SCAN02,
+  [MessageId.SCAN02A]: CANON_MESSAGES.SCAN02A,
+  [MessageId.SCAN03]: CANON_MESSAGES.SCAN03,
+  [MessageId.SCAN03A]: CANON_MESSAGES.SCAN03A,
+  [MessageId.SCAN04]: CANON_MESSAGES.SCAN04,
+  [MessageId.SCAN04A]: CANON_MESSAGES.SCAN04A,
+  [MessageId.SCAN05]: CANON_MESSAGES.SCAN05,
+  [MessageId.SCAN06]: CANON_MESSAGES.SCAN06,
+  [MessageId.SCAN07]: CANON_MESSAGES.SCAN07,
+  [MessageId.SCAN07A]: CANON_MESSAGES.SCAN07A,
+  [MessageId.SCAN24]: CANON_MESSAGES.SCAN24,
   // The sector scan is always 1x and carries no range at all.
-  [MessageId.SCAN25]: '   Sector Scan mag:1x (s:%s %s)',
+  [MessageId.SCAN25]: CANON_MESSAGES.SCAN25,
   [MessageId.MIN_NOMINE]: CANON_MESSAGES.MINE0,
   [MessageId.MIN_CLOAK]: CANON_MESSAGES.PCLOKUP,
   [MessageId.MIN_NEUTRAL]: CANON_MESSAGES.MINE7,
@@ -918,20 +916,20 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.NAV_ARRIVED]: 'Autopilot disengaged — arrived at (%s,%s).',
   [MessageId.NAV_ALREADY_THERE]: 'Already at target sector.',
   [MessageId.LEAVEORB]: CANON_MESSAGES.LEAVEORB,
-  [MessageId.SHLDCHP]: 'Shields energizing, Sir!',
+  [MessageId.SHLDCHP]: CANON_MESSAGES.SHLDCHP,
   [MessageId.SHLDUP]: CANON_MESSAGES.SHLDUP,
   [MessageId.SHLDAT]: CANON_MESSAGES.SHLDAT,
-  [MessageId.SHLDDN]: 'Shields are now down, Sir!',
+  [MessageId.SHLDDN]: CANON_MESSAGES.SHLDDN,
   // Canon combat narration. Note the asymmetry, which is canon's own: a hull
   // hit reports damage as a WORD via damstr (%s), while a DEFLECTED hit
   // reports a numeric magnitude (%d). Without these the shooter was never told
   // whether a beam was deflected or simply missed — which is what made three
   // separate playtesters conclude phasers were broken.
-  [MessageId.PFIRED]: 'Phasers fired at %d percent power - focus %d',
-  [MessageId.PHITHIM]: "Sensors indicate we caused %s damage to Commander %s's ship!",
-  [MessageId.PHITYOU]: "Phaser hit from Commander %s's ship, caused %s damage, Sir!",
-  [MessageId.PDEFLECT]: "Sensors indicate our phasers were deflected by Commander %s's shields!",
-  [MessageId.PHITDEF]: "Phaser hit from Commander %s's ship, magnitude %d, was deflected by the shields, Sir!",
+  [MessageId.PFIRED]: CANON_MESSAGES.PFIRED,
+  [MessageId.PHITHIM]: CANON_MESSAGES.PHITHIM,
+  [MessageId.PHITYOU]: CANON_MESSAGES.PHITYOU,
+  [MessageId.PDEFLECT]: CANON_MESSAGES.PDEFLECT,
+  [MessageId.PHITDEF]: CANON_MESSAGES.PHITDEF,
   [MessageId.YOURDEAD]:
     CANON_MESSAGES.YOURDEAD
     + 'Damage control reports severe structural damage in critical systems!\n\n'
@@ -982,19 +980,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // pri (feature 014) — GECMDS.C:4284 cmd_price
   [MessageId.PRICEFMT]: CANON_MESSAGES.PRICEFMT,
   // @see MBMGEMSG.MSG:3313
-  [MessageId.PRICE1]: '%s %s are going to cost %d each for a total of %s, Sir.',
+  [MessageId.PRICE1]: CANON_MESSAGES.PRICE1,
   [MessageId.PRICE_NO_CASH]: 'Insufficient credits to purchase that quantity.',
   [MessageId.BUY7]: CANON_MESSAGES.BUY7,
   // @see MBMGEMSG.MSG:3305
-  [MessageId.BUY8]: 'Sorry Sir! That would put us overweight.',
+  [MessageId.BUY8]: CANON_MESSAGES.BUY8,
   // @see MBMGEMSG.MSG:3309
   [MessageId.BUY9]: CANON_MESSAGES.BUY9,
 
   // Canon names the killer on every death path — the prfmsg sits AFTER the
   // GESTAT_AUTO branch, so an AI kill is announced exactly like a player one.
   // @see GEFUNCS.C:1116, MBMGEMSG.MSG:2122
-  [MessageId.KILLEDBY]: "Commander %s's ship was destroyed by %s!!!",
-
+  [MessageId.KILLEDBY]: CANON_MESSAGES.KILLEDBY,
   // Helm answers the throttle. @see MBMGEMSG.MSG:2120, :1960
   // The second slot is %s, not canon's %d, so the hundredths keep their
   // leading zero -- "warp 9 point 05", not "warp 9 point 5". Canon's own two
@@ -1009,18 +1006,17 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // the Yardmaster's fitting report, which is what makes an upgrade priced at
   // 36,666 rather than 40,000 legible to the player.
   // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3946,3960,3982,3986,3990,3996,4001
-  [MessageId.NEW19]: 'They will credit us %s for our existing used shield, Sir!',
+  [MessageId.NEW19]: CANON_MESSAGES.NEW19,
   [MessageId.NEW7]:
     CANON_MESSAGES.NEW7
     + 'The Yardmaster Reports: For the meager sum of %s\n'
     + 'your ship now has a Mark-%d Shield defense system.',
-  [MessageId.NEW29]: 'They will credit us %s for our existing used phaser, Sir!',
+  [MessageId.NEW29]: CANON_MESSAGES.NEW29,
   [MessageId.NEW10]:
     CANON_MESSAGES.NEW10
     + 'The Yardmaster Reports: For the meager sum of %s\n'
     + 'your ship now has a Mark-%d Phaser System.',
-  [MessageId.NEW17]:
-    "The minimum charge of 1000 C's will be charged for installation, Sir!",
+  [MessageId.NEW17]: CANON_MESSAGES.NEW17,
   [MessageId.NEW18]:
     CANON_MESSAGES.NEW18
     + "fee of %s C's %s has been deposited to your account, Sir.",
@@ -1049,10 +1045,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.HLBROKE]: CANON_MESSAGES.HLBROKE,
   // MBMGEMSG.MSG:2090 NUMOOR, verbatim. The paraphrase rendered a negative
   // lower bound as "(-180-180)", which reads as a single negative number.
-  [MessageId.NUMOOR]: 'Please enter a number in the range from %d to %d.',
+  [MessageId.NUMOOR]: CANON_MESSAGES.NUMOOR,
   [MessageId.UNKNOWN_CMD]: 'Unknown command. Type "help" for a list.',
   // Blank line — GECMDS.C:282-284 warnop()
-  [MessageId.FORHELP]: "Type 'help' for a list of commands.",
+  [MessageId.FORHELP]: CANON_MESSAGES.FORHELP,
   [MessageId.SHIP_ABANDONED]: 'Your ship has been abandoned. Please create a new ship.',
 };
 

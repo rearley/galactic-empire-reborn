@@ -45,7 +45,7 @@ describe('GameGateway — combat notices name the attacking SHIP', () => {
       { validate: jest.fn() } as unknown as WsAuthGuard,
       {} as unknown as PrismaService,
       {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
       { emit: jest.fn(), on: jest.fn() } as never,

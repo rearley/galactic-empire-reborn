@@ -111,14 +111,16 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
   const fire = (e: CombatShipDestroyedEvent) => fireFull(e).texts;
 
   it('announces an AI kill to the whole galaxy, naming the Cybertron by ship name', () => {
-    expect(fire(event())).toContain(
+    // KILLEDBY opens with a blank line and a *** banner in canon; assert on
+    // the sentence rather than on the whole string.
+    expect(fire(event()).join('\n')).toContain(
       "Commander usr_abc's ship was destroyed by Cybrg-49340!!!",
     );
   });
 
   it('names a human killer by userid, as username() does for a non-automaton', () => {
     expect(
-      fire(event({ attackerId: 'usr_kil:1', attackerShipKey: 'usr_kil:1', attackerUserid: 'usr_kil', attackerName: 'Marauder' })),
+      fire(event({ attackerId: 'usr_kil:1', attackerShipKey: 'usr_kil:1', attackerUserid: 'usr_kil', attackerName: 'Marauder' })).join('\n'),
     ).toContain("Commander usr_abc's ship was destroyed by usr_kil!!!");
   });
 
@@ -127,7 +129,7 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     // the exclude argument, and GEMAIN.C:1522 skips it. The victim gets
     // YOURDEAD instead, which says they survived.
     const { texts, excluded } = fireFull(event());
-    expect(texts).toContain("Commander usr_abc's ship was destroyed by Cybrg-49340!!!");
+    expect(texts.join('\n')).toContain("Commander usr_abc's ship was destroyed by Cybrg-49340!!!");
     expect(excluded).toContain('user:usr_abc');
   });
 

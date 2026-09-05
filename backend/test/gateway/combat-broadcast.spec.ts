@@ -41,7 +41,7 @@ describe('GameGateway combat broadcasts', () => {
     const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
     const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockScanHandler = { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService;
     gateway = new GameGateway(
       {} as ShipStateService,
       {} as CommandRouterService,
@@ -154,7 +154,7 @@ describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
     const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
     const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockScanHandler = { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService;
 
     // Registry returns a socket ID for the victim
     const mockRegistry = {
