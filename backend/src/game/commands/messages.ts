@@ -267,6 +267,10 @@ export enum MessageId {
   // sen (feature 012) — GECMDS.C:1825 cmd_send
   MSG_USAGE_SEN = 'MSG_USAGE_SEN',
   MSG_SENT = 'MSG_SENT',
+  MSG_SENT_SECTOR = 'MSG_SENT_SECTOR',
+  MSG_SENT_HYPER = 'MSG_SENT_HYPER',
+  MSG_BADCOM = 'MSG_BADCOM',
+  FRE_BADFREQ = 'FRE_BADFREQ',
   FRE_HAIL = 'FRE_HAIL',
   FRE_SECTOR = 'FRE_SECTOR',
   FRE_GALAXY = 'FRE_GALAXY',
@@ -818,13 +822,17 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // sen (feature 012) — GECMDS.C:1825 cmd_send
   [MessageId.MSG_USAGE_SEN]: CANON_MESSAGES.SNDFMT,
-  [MessageId.MSG_SENT]: 'Message sent on channel %s.',
-  [MessageId.FRE_HAIL]: 'Channel %s set to hail.',
-  [MessageId.FRE_SECTOR]: 'Channel %s set to %d (sector-scoped).',
-  [MessageId.FRE_GALAXY]: 'Channel %s set to %d (galaxy-wide).',
+  [MessageId.MSG_SENT]: CANON_MESSAGES.MSGSNT2,
+  [MessageId.MSG_SENT_SECTOR]: CANON_MESSAGES.MSGSNT4,
+  [MessageId.MSG_SENT_HYPER]: CANON_MESSAGES.MSGSNT6,
+  [MessageId.MSG_BADCOM]: CANON_MESSAGES.BADCOM,
+  [MessageId.FRE_BADFREQ]: CANON_MESSAGES.FREQFMT,
+  [MessageId.FRE_HAIL]: CANON_MESSAGES.RADSET1,
+  [MessageId.FRE_SECTOR]: CANON_MESSAGES.RADSET2,
+  [MessageId.FRE_GALAXY]: CANON_MESSAGES.RADSET3,
 
   // fre (feature 012) — GECMDS.C:1885 cmd_freq
-  [MessageId.MSG_USAGE_FRE]: CANON_MESSAGES.BADCOM,
+  [MessageId.MSG_USAGE_FRE]: CANON_MESSAGES.SETFMT,
 
   // tea (feature 012) — GECMDS.C:5277 cmd_team (subset)
   [MessageId.TEAM_NONE]: CANON_MESSAGES.TEAMNOT,
@@ -1089,12 +1097,62 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
  * @see tools/extract-messages.mjs
  * @see test/balance/message-canon.balance.spec.ts
  */
+/**
+ * Canon's printf specifiers, substituted positionally.
+ *
+ * The conversion set is C's, because the strings are C's. Two omissions here
+ * were silently mangling canon text that had been wired correctly:
+ *
+ *   %c  was not recognised at all, so it survived into the output verbatim.
+ *       Canon uses it for the SHIP LETTER — LOCK3/LOCK5 when fire control
+ *       cannot hold a target, PHITDEF when your shields turn a phaser, and all
+ *       three RADSET confirmations. Every one of those printed a literal "%c"
+ *       where the letter belonged.
+ *   Width and the `-` flag were parsed but discarded, so `%-11s` and `%5u` lost
+ *       their padding. Those exist to line up columns: ADMIN03 is a planet
+ *       accounting table and ROS_ROW is the roster. Dropping the width turned
+ *       both into ragged text.
+ *
+ * Length modifiers (l, ll, h, hh) are accepted and ignored, which is right —
+ * they describe the C argument's storage, and JavaScript has one number type.
+ */
 export function formatMessage(id: MessageId, ...args: Array<string | number>): string {
-  let result = MESSAGE_STRINGS[id];
   let argIdx = 0;
-  result = result.replace(/%(?:\d+)?(?:\.\d+)?[suduf]/g, () => {
-    const val = args[argIdx++];
-    return val !== undefined ? String(val) : '';
-  });
-  return result.replace(/%%/g, '%');
+  return MESSAGE_STRINGS[id].replace(
+    /%%|%([-+ 0#]*)(\d+)?(?:\.(\d+))?(?:hh|h|ll|l)?([sduxXfc])/g,
+    (whole, flags: string, width: string | undefined, precision: string | undefined, conv: string) => {
+      if (whole === '%%') return '%';
+
+      const val = args[argIdx++];
+      if (val === undefined) return '';
+
+      let text: string;
+      switch (conv) {
+        case 'c':
+          // A char in C. Take the first character of whatever was passed, so a
+          // caller may hand over either a letter or a one-letter string.
+          text = String(val).charAt(0);
+          break;
+        case 'x':
+        case 'X': {
+          const hex = Math.trunc(Number(val)).toString(16);
+          text = conv === 'X' ? hex.toUpperCase() : hex;
+          break;
+        }
+        case 'f':
+          text = precision !== undefined ? Number(val).toFixed(Number(precision)) : String(val);
+          break;
+        default:
+          text = String(val);
+      }
+
+      const w = width === undefined ? 0 : Number(width);
+      if (text.length >= w) return text;
+      // `-` left-justifies; `0` zero-pads, but never a left-justified field
+      // and never a string, exactly as printf has it.
+      if (flags.includes('-')) return text.padEnd(w);
+      const pad = flags.includes('0') && conv !== 's' && conv !== 'c' ? '0' : ' ';
+      return text.padStart(w, pad);
+    },
+  );
 }

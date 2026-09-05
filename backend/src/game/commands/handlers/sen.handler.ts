@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { FREQ_SECTOR_MAX, FREQ_GALAXY_MIN } from './_freq-thresholds';
+import { formatMessage, MessageId } from '../messages';
 
 const CHANNEL_MAP: Record<string, number> = { a: 0, b: 1, c: 2 };
 const MAX_MSG_LEN = 200;
@@ -29,13 +30,14 @@ export class SenHandlerService {
   private handle(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
     const channelStr = args[0].toLowerCase();
     const channelIdx = CHANNEL_MAP[channelStr];
+    // BADCOM is `send`'s own answer for a channel outside A-C (GECMDS.C:1868).
     if (channelIdx === undefined) {
-      return { lines: [{ text: 'Usage: sen <A|B|C> <message>', category: 'system' }] };
+      return { lines: [{ text: formatMessage(MessageId.MSG_BADCOM), category: 'system' }] };
     }
 
     const messageText = args.slice(1).join(' ');
     if (messageText.length > MAX_MSG_LEN) {
-      return { lines: [{ text: 'Usage: sen <A|B|C> <message>', category: 'system' }] };
+      return { lines: [{ text: formatMessage(MessageId.MSG_USAGE_SEN), category: 'system' }] };
     }
 
     const channelLabel = args[0].toUpperCase();
@@ -54,10 +56,17 @@ export class SenHandlerService {
 
     // C confirms back to the sender with the frequency it went out on
     // (MSGSNT4 / MSGSNT6) and excludes them from the transmission itself.
+    // Canon confirms differently for each of the three tiers: MSGSNT2 for an
+    // open hail, MSGSNT4 naming the com frequency, MSGSNT6 naming the
+    // hyperspace code (GECMDS.C:1834-1862). The port had one invented line for
+    // all three, so the confirmation never told you which way the message had
+    // actually gone out.
     const confirmation =
-      freq > 0
-        ? `Message sent on channel ${channelLabel}, frequency ${freq}.`
-        : `Message sent on channel ${channelLabel} (open hail).`;
+      freq <= 0
+        ? formatMessage(MessageId.MSG_SENT)
+        : freq <= FREQ_SECTOR_MAX
+          ? formatMessage(MessageId.MSG_SENT_SECTOR, freq)
+          : formatMessage(MessageId.MSG_SENT_HYPER, freq);
 
     return {
       lines: [{ text: confirmation, category: 'system' }],

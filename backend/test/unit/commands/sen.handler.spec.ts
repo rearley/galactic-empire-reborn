@@ -77,7 +77,8 @@ describe('SenHandlerService', () => {
       const longMsg = 'x'.repeat(201).split(' ');
       const result = handler.command.handler(ship, ['a', ...longMsg], ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
-      expect(result.lines[0].text).toMatch(/Usage: sen/i);
+      // the answer to the wrong NUMBER of arguments, not a wrong channel.
+      expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);
     });
 
     it('accepts exactly 200 chars', () => {
@@ -109,7 +110,13 @@ describe('SenHandlerService', () => {
     it('returns system confirmation line to sender', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
       const result = handler.command.handler(ship, ['a', 'hi'], ctx) as CommandResult;
-      expect(result.lines.some((l) => l.category === 'system' && l.text.includes('A'))).toBe(true);
+      // MSGSNT2 is "Message sent on all hailing channels, Sir!" — canon's
+      // hail confirmation names no channel, because an open hail goes out on
+      // all of them. The old assertion looked for the letter because the
+      // invented line put one there.
+      expect(
+        result.lines.some((l) => l.category === 'system' && /all hailing channels/i.test(l.text)),
+      ).toBe(true);
     });
   });
 
@@ -123,7 +130,9 @@ describe('SenHandlerService', () => {
     it('rejects invalid channel "d"', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
       const result = handler.command.handler(ship, ['d', 'hi'], ctx) as CommandResult;
-      expect(result.lines[0].text).toMatch(/Usage: sen/i);
+      // A channel outside A-C is BADCOM in canon (GECMDS.C:1868); SNDFMT is
+      // the answer to the wrong NUMBER of arguments, not a wrong channel.
+      expect(result.lines[0].text).toMatch(/Please specify com channel A, B, or C\./i);
     });
   });
 

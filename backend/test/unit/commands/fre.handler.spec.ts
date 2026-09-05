@@ -38,7 +38,7 @@ describe('FreHandlerService', () => {
     });
 
     it('argMissingMessage mentions usage', () => {
-      expect(handler.command.argMissingMessage).toMatch(/Usage: fre/i);
+      expect(handler.command.argMissingMessage).toMatch(/Type HELP SET for the correct usage\./i);
     });
   });
 
@@ -59,7 +59,7 @@ describe('FreHandlerService', () => {
       const ship = makeShip();
       const result = handler.command.handler(ship, ['a', 'hail'], ctx);
       const r = result as import('../../../src/game/commands/command.types').CommandResult;
-      expect(r.lines[0].text).toMatch(/set to hail/i);
+      expect(r.lines[0].text).toMatch(/set to\nthe general hailing frequency/i);
       expect(r.lines[0].category).toBe('success');
     });
   });
@@ -69,7 +69,7 @@ describe('FreHandlerService', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
       const result = handler.command.handler(ship, ['b', '5000'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
       expect(ship.freq[1]).toBe(5000);
-      expect(result.lines[0].text).toMatch(/sector-scoped/i);
+      expect(result.lines[0].text).toMatch(/is set to\nfrequency \d+/i);
       expect(result.lines[0].category).toBe('success');
     });
   });
@@ -79,15 +79,15 @@ describe('FreHandlerService', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
       const result = handler.command.handler(ship, ['c', '20000'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
       expect(ship.freq[2]).toBe(20000);
-      expect(result.lines[0].text).toMatch(/galaxy-wide/i);
+      expect(result.lines[0].text).toMatch(/set to hyperspace\npacket code \d+/i);
     });
   });
 
   describe('FR-019: explicit 0 is rejected', () => {
-    it('returns usage error for fre a 0', () => {
+    it('answers a zero frequency with FREQFMT, not the general usage line', () => {
       const ship = makeShip({ freq: [5, 0, 0] });
       const result = handler.command.handler(ship, ['a', '0'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
-      expect(result.lines[0].text).toMatch(/Usage: fre/i);
+      expect(result.lines[0].text).toMatch(/Type HELP FREQ for the correct usage\./i);
       expect(ship.freq[0]).toBe(5); // unchanged
     });
   });
@@ -96,7 +96,7 @@ describe('FreHandlerService', () => {
     it('rejects negative frequency', () => {
       const ship = makeShip();
       const result = handler.command.handler(ship, ['a', '-1'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
-      expect(result.lines[0].text).toMatch(/Usage: fre/i);
+      expect(result.lines[0].text).toMatch(/Type HELP SET for the correct usage\./i);
     });
   });
 
@@ -104,7 +104,7 @@ describe('FreHandlerService', () => {
     it('rejects decimal frequency', () => {
       const ship = makeShip();
       const result = handler.command.handler(ship, ['a', '1.5'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
-      expect(result.lines[0].text).toMatch(/Usage: fre/i);
+      expect(result.lines[0].text).toMatch(/Type HELP SET for the correct usage\./i);
     });
   });
 
@@ -112,7 +112,7 @@ describe('FreHandlerService', () => {
     it('rejects invalid channel "d"', () => {
       const ship = makeShip();
       const result = handler.command.handler(ship, ['d', '5000'], ctx) as import('../../../src/game/commands/command.types').CommandResult;
-      expect(result.lines[0].text).toMatch(/Usage: fre/i);
+      expect(result.lines[0].text).toMatch(/Type HELP SET for the correct usage\./i);
     });
   });
 

@@ -45,7 +45,11 @@ describe('phaser narration text', () => {
 
   it('the victim is told who fired, in both outcomes', () => {
     expect(formatMessage(MessageId.PHITYOU, 'Vega', damstr(10))).toContain('Vega');
-    expect(formatMessage(MessageId.PHITDEF, 'Vega', 10)).toContain('Vega');
+    // PHITDEF leads with the attacker's scan LETTER (%c) before the
+    // commander — "Phaser hit from Ship %c, Commander %s's ship". The port's
+    // copy of the string had dropped the %c, so this call had two arguments
+    // where canon has three and 'Vega' landed in the letter's slot.
+    expect(formatMessage(MessageId.PHITDEF, 'B', 'Vega', 10)).toContain('Vega');
   });
 
   it('no message still renders an unfilled slot', () => {

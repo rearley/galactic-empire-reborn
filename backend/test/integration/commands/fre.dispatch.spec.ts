@@ -38,7 +38,7 @@ describe('fre dispatch integration', () => {
   it('missing arg returns usage message', () => {
     const router = buildRouter();
     const result = router.dispatch('fre', makeShip(), ctx) as import('../../../src/game/commands/command.types').CommandResult;
-    expect(result.lines[0].text).toMatch(/Usage: fre/i);
+    expect(result.lines[0].text).toMatch(/Type HELP SET for the correct usage\./i);
   });
 
   it('fre a hail sets freq[0] and returns hail confirmation', () => {
@@ -54,7 +54,7 @@ describe('fre dispatch integration', () => {
     const ship = makeShip({ freq: [0, 0, 0] });
     const result = router.dispatch('fre b 5000', ship, ctx) as import('../../../src/game/commands/command.types').CommandResult;
     expect(ship.freq[1]).toBe(5000);
-    expect(result.lines[0].text).toMatch(/sector-scoped/i);
+    expect(result.lines[0].text).toMatch(/is set to\nfrequency \d+/i);
   });
 
   it('fre c 25000 sets galaxy-wide frequency', () => {
@@ -62,14 +62,14 @@ describe('fre dispatch integration', () => {
     const ship = makeShip({ freq: [0, 0, 0] });
     const result = router.dispatch('fre c 25000', ship, ctx) as import('../../../src/game/commands/command.types').CommandResult;
     expect(ship.freq[2]).toBe(25000);
-    expect(result.lines[0].text).toMatch(/galaxy-wide/i);
+    expect(result.lines[0].text).toMatch(/set to hyperspace\npacket code \d+/i);
   });
 
-  it('fre a 0 returns usage error', () => {
+  it('fre a 0 answers with FREQFMT, its own canon message', () => {
     const router = buildRouter();
     const ship = makeShip({ freq: [5, 0, 0] });
     const result = router.dispatch('fre a 0', ship, ctx) as import('../../../src/game/commands/command.types').CommandResult;
-    expect(result.lines[0].text).toMatch(/Usage: fre/i);
+    expect(result.lines[0].text).toMatch(/Type HELP FREQ for the correct usage\./i);
     expect(ship.freq[0]).toBe(5);
   });
 
@@ -77,6 +77,6 @@ describe('fre dispatch integration', () => {
     const router = buildRouter();
     const ship = makeShip();
     const result = router.dispatch('fre d 1000', ship, ctx) as import('../../../src/game/commands/command.types').CommandResult;
-    expect(result.lines[0].text).toMatch(/Usage: fre/i);
+    expect(result.lines[0].text).toMatch(/Type HELP SET for the correct usage\./i);
   });
 });
