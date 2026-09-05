@@ -4,6 +4,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { PMINFIRE } from '../../constants';
 import { showarp } from '../../ship/showarp';
 import { ShipState } from '../../ship/ship-state.types';
 import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
@@ -194,15 +195,30 @@ export class ReportHandlerService implements OnModuleInit {
       if (ship.shieldstat === 1) {
         const maxCharge = 40 + ship.shieldtype * 10;
         const pct = maxCharge > 0 ? Math.max(0, Math.round((ship.shield * 100) / maxCharge)) : 0;
-        lines.push({ text: formatMessage(MessageId.REP10, ship.shieldtype, pct), category: 'info' });
+        // REP10 is `Shields (Mark-%d)...... UP` — ONE slot, the mark. The
+        // charge percentage has its own line in canon (REP11B, Shield Bank
+        // Charge), so passing pct here filled nothing and dropped it.
+        void pct;
+        lines.push({ text: formatMessage(MessageId.REP10, ship.shieldtype), category: 'info' });
+        lines.push({ text: formatMessage(MessageId.REP11B, ship.shield), category: 'info' });
       } else {
-        lines.push({ text: formatMessage(MessageId.REP11), category: 'info' });
+        // REP11 takes the mark too — without it the report read
+        // "Shields (Mark-)...... DOWN".
+        lines.push({ text: formatMessage(MessageId.REP11, ship.shieldtype), category: 'info' });
       }
     }
 
     if (ship.phasrtype > 0) {
-      const chargeStr = ship.phasr > 0 ? `${Math.round(ship.phasr)}% charged` : 'uncharged';
-      lines.push({ text: `Phasors: type ${ship.phasrtype}  (${chargeStr})`, category: 'info' });
+      // Canon has two lines here and no percentage: REP23 when the bank can
+      // fire and REP24 when it cannot. `Phasors: type 2 (100% charged)` was
+      // ours. @see GE/REL/MBMGEMSG.MSG
+      lines.push({
+        text: formatMessage(
+          ship.phasr >= PMINFIRE ? MessageId.REP23 : MessageId.REP24,
+          ship.phasrtype,
+        ),
+        category: 'info',
+      });
     }
 
     lines.push({
