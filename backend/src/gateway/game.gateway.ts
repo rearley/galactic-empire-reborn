@@ -272,6 +272,35 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Failures are logged rather than thrown — the command itself already
    * succeeded and its reply has been sent.
    */
+  /**
+   * `x` — canon's exit (GEMAIN.C:2859 mnu_fightsub).
+   *
+   * Unboards the hull, which flushes it, runs cleartm and sets it AVAIL, then
+   * puts the client back at ship entry. That last step is the point: the
+   * ship-select menu is only offered on connect, so before this a pilot with a
+   * SECOND ship could only reach it by dropping the connection. Canon drops
+   * you to the main menu for the same reason.
+   *
+   * The refusal while `cantexit > 0` lives in the handler, so this only ever
+   * runs on a permitted exit.
+   */
+  private async maybeExitGame(
+    client: Socket,
+    result: import('../game/commands/command.types').CommandResult,
+  ): Promise<void> {
+    if (!result.exitGame) return;
+    const userid = client.data.userid as string | undefined;
+    const shipno = client.data.activeShipNo as number | undefined;
+    if (!userid || shipno === undefined) return;
+    try {
+      this.scanHandler.clearScantab(userid, shipno);
+      await this.shipStateService.unboard(userid, shipno);
+      await this.presentShipEntry(client, userid, { noticeShipLoss: false });
+    } catch (err: unknown) {
+      this.logger.error('Exit to ship entry failed:', err);
+    }
+  }
+
   private async maybeReenterShipEntry(
     client: Socket,
     result: import('../game/commands/command.types').CommandResult,
@@ -710,6 +739,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             this.emitCommandResult(client, result);
             this.processBroadcasts(result, client);
             void this.maybeReenterShipEntry(client, result);
+            void this.maybeExitGame(client, result);
           })
           .catch((err: unknown) => {
             this.logger.error('Async command handler threw:', err);
@@ -721,6 +751,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.emitCommandResult(client, resultOrPromise);
         this.processBroadcasts(resultOrPromise, client);
         void this.maybeReenterShipEntry(client, resultOrPromise);
+        void this.maybeExitGame(client, resultOrPromise);
       }
     } catch (err: unknown) {
       this.logger.error('Command handler threw:', err);
