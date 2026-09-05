@@ -22,8 +22,10 @@
  * `items[I_MINE]` INSIDE the success branch — a refused lay costs nothing
  * (GECMDS.C:1805-1818).
  *
- * Timer 10, not the droids' 100: this mine is dropped by something fleeing, and
- * is meant to be a short-lived hazard behind it.
+ * Timer 10: this mine is dropped by something fleeing and is meant to be a
+ * short-lived hazard behind it. Droids get the same 10 (GEDROIDS.C:512) — an
+ * earlier version of this comment said "not the droids' 100", repeating the
+ * belief that our 100 was canon. It was not; see docs/PROGRESS.md.
  */
 import { I_MINE } from '../../../src/game/constants/items';
 import { FIRETICKS } from '../../../src/game/constants';

@@ -5,7 +5,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { MineRegistry } from '../../combat/mine.registry';
-import { MineRepository, MineTableFullError } from '../../combat/mine.repository';
+import { MineRepository, MineRefusedError } from '../../combat/mine.repository';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { I_MINE } from '../../constants/items';
@@ -100,7 +100,7 @@ export class MineHandlerService {
         deployedBy: ship.userid,
       });
     } catch (err: unknown) {
-      if (err instanceof MineTableFullError) {
+      if (err instanceof MineRefusedError) {
         return { lines: [{ text: formatMessage(MessageId.MIN_JAMMED), category: 'system' }] };
       }
       throw err;

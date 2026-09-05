@@ -2725,6 +2725,35 @@ Mitigations already in place, all canon:
 - droids use a much longer fuse, so THEY are the ones that accumulate
 - the lay is gated behind a specific behavioural branch, not every tick
 
+**RESOLVED, 2026-09-05 — it was two canon defects, not a balance dial.** The
+question was posed as one to measure. Reading `laymine` end to end answered it
+instead, and corrected this note twice over:
+
+1. **The droid fuse was ours, not canon's.** The bullet above is wrong: canon
+   passes 10 at EVERY AI call site — droids at GEDROIDS.C:512, Cybertrons at
+   GECYBS.C:315 and :632. Our droids passed 100, ten times the slot occupancy
+   per mine. And the branch it sits in is the >75%-damage flee, which carries no
+   per-tick roll, so a damaged droid laid one every physics tick until its
+   magazine emptied — the third bullet above is true of Cybertrons (1-in-5) and
+   false of droids. Both now use `AI_MINE_TIMER` in `game/constants.ts`.
+2. **The per-layer cap never bound the AI.** `laymine`'s FIRST act is
+   `if (cnt >= usermines) return(0)` (GECMDS.C:1794-1802), above the free-slot
+   scan, so USRMINES=3 caps droids and Cybertrons exactly as it caps captains.
+   We enforced it in `mine.handler.ts` alone, leaving every AI layer unbounded:
+   one droid could hold all twelve slots. It now lives in
+   `MineRepository.create`, which is the boundary all three callers share, and
+   refuses with `MineLayerCapError` — a sibling of `MineTableFullError` under
+   `MineRefusedError`, because canon returns 0 for both and prints one message.
+
+With both fixed, the ceiling on AI-held slots is bounded by layers rather than
+by magazines, and each is held for a minute rather than ten. The measurement in
+the paragraph below is still worth taking on the next playtest, but it is now a
+confirmation rather than an open question — and if it still crowds, the lever
+named there (AI lay probability) is unchanged.
+
+Pinned by `test/game/combat/mine-layer-cap.spec.ts` and
+`test/game/droid/droid-laymine-fuse.spec.ts`, both sabotage-verified.
+
 **Measure before tuning.** The numbers that would settle it: mine-table
 occupancy sampled over a session, the share held by AI versus players, and how
 often a player's `mine` command is refused. Added to the observer's brief for

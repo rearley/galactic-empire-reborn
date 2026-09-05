@@ -10,7 +10,7 @@ import { NO_CHANNEL, CYBMINE_NONE } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
 import { MineRegistry } from '../combat/mine.registry';
-import { MineRepository, MineTableFullError } from '../combat/mine.repository';
+import { MineRepository, MineRefusedError } from '../combat/mine.repository';
 import { CybertronRepository } from './cybertron.repository';
 import { buildCybertronClassConfigs, bootSeedEnabled } from './cybertron.config';
 import type { CybertronClassConfig } from './cybertron.config';
@@ -32,6 +32,7 @@ import {
   UNIVMAX,
   SHIELDDM,
   GESTAT_AUTO,
+  AI_MINE_TIMER,
 } from '../constants';
 import {
   CYBERTRON_EVENT,
@@ -93,12 +94,6 @@ import { CombatTickService } from '../combat/combat-tick.service';
  * @see GECYBS.C:198 cyb_lives — per-ship AI state machine
  * @see specs/007-cybertron-ai/plan.md R-1 (tick ordering), R-2 (spawn cadence)
  */
-/**
- * Fuse a Cybertron sets on a mine it drops while breaking away: `laymine(ptr,
- * usrn, 10)` (GECYBS.C:315). Droids use a much longer fuse — this one is a
- * hazard dropped behind something fleeing, not a persistent minefield.
- */
-const CYB_MINE_TIMER = 10;
 
 @Injectable()
 export class CybertronTickService implements OnModuleInit {
@@ -934,7 +929,7 @@ export class CybertronTickService implements OnModuleInit {
     const channel = ship.channel ?? CYBMINE_NONE;
     void this.mineRepo.create({
       channel,
-      timer: CYB_MINE_TIMER,
+      timer: AI_MINE_TIMER,
       xcoord: ship.xcoord,
       ycoord: ship.ycoord,
       deployedBy: ship.userid,
@@ -947,7 +942,7 @@ export class CybertronTickService implements OnModuleInit {
       });
       this.mineRegistry?.add({ ...mine, deployedBy: ship.userid });
     }).catch((err: unknown) => {
-      if (err instanceof MineTableFullError) return; // canon: no slot, no mine spent
+      if (err instanceof MineRefusedError) return; // canon: laymine returned 0, nothing spent
       this.logger.error('Cybertron mine lay failed:', err);
     });
   }
