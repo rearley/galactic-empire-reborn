@@ -44,6 +44,18 @@ const baseScanEvent: ScanRenderEvent = {
   header: 'Range: 450 — Sector 5,7',
 };
 
+/**
+ * The grid moved out.
+ *
+ * ScanPanel was built to REPLACE the older ScanMap and both stayed mounted, so
+ * every scan painted the same picture twice — once in SECTOR MAP, once inside
+ * the card — and the card history stacked near-identical grids. Each panel now
+ * has one job: SECTOR MAP is the live view, SCAN DATA is the readout.
+ *
+ * The grid assertions that lived here (dimensions, per-type colour) are
+ * ScanMap's, and ScanMap already covers them plus replacement, clearing,
+ * overlap priority and sector transition.
+ */
 describe('ScanPanel', () => {
   beforeEach(() => socketListeners.clear());
 
@@ -135,21 +147,6 @@ describe('ScanPanel', () => {
   });
 
   // T012: grid dimensions — renders 30×15 grid
-  it('renders a 30-column × 15-row grid', () => {
-    render(<ScanPanel />);
-
-    act(() => {
-      triggerScanRender({ ...baseScanEvent, mode: 'overwrite' });
-    });
-
-    const grid = screen.getByTestId('scan-card-grid');
-    // 15 rows
-    const rows = grid.querySelectorAll('[data-testid^="scan-row-"]');
-    expect(rows).toHaveLength(15);
-    // Each row contains 30 spans (one per column)
-    const firstRowSpans = rows[0].querySelectorAll('span');
-    expect(firstRowSpans).toHaveLength(30);
-  });
 
   // T012: header text is rendered
   it('renders the scan event header text', () => {
@@ -163,70 +160,12 @@ describe('ScanPanel', () => {
   });
 
   // T012: self cell gets green colour
-  it('self cell renders with self colour (#4ade80)', () => {
-    render(<ScanPanel />);
-
-    act(() => {
-      triggerScanRender({
-        ...baseScanEvent,
-        mode: 'overwrite',
-        cells: [{ x: 5, y: 3, type: 'self', char: '*', colour: 'self' }],
-      });
-    });
-
-    const cellEl = screen.getByTestId('scan-cell-5-3');
-    expect(cellEl.textContent).toBe('*');
-    expect((cellEl as HTMLElement).style.color).toBe('rgb(74, 222, 128)');
-  });
 
   // T012: human ship cell gets blue colour
-  it('human ship cell renders with human colour (#60a5fa)', () => {
-    render(<ScanPanel />);
-
-    act(() => {
-      triggerScanRender({
-        ...baseScanEvent,
-        mode: 'overwrite',
-        cells: [{ x: 10, y: 7, type: 'ship', char: 'A', colour: 'human' }],
-      });
-    });
-
-    const cellEl = screen.getByTestId('scan-cell-10-7');
-    expect(cellEl.textContent).toBe('A');
-    expect((cellEl as HTMLElement).style.color).toBe('rgb(96, 165, 250)');
-  });
 
   // T012: ai ship cell gets red colour
-  it('ai ship cell renders with ai colour (#f87171)', () => {
-    render(<ScanPanel />);
-
-    act(() => {
-      triggerScanRender({
-        ...baseScanEvent,
-        mode: 'overwrite',
-        cells: [{ x: 2, y: 2, type: 'ship', char: 'B', colour: 'ai' }],
-      });
-    });
-
-    const cellEl = screen.getByTestId('scan-cell-2-2');
-    expect((cellEl as HTMLElement).style.color).toBe('rgb(248, 113, 113)');
-  });
 
   // T012: planet cell gets yellow colour
-  it('planet cell renders with planet colour (#facc15)', () => {
-    render(<ScanPanel />);
-
-    act(() => {
-      triggerScanRender({
-        ...baseScanEvent,
-        mode: 'overwrite',
-        cells: [{ x: 15, y: 8, type: 'planet', char: '1', colour: 'planet' }],
-      });
-    });
-
-    const cellEl = screen.getByTestId('scan-cell-15-8');
-    expect((cellEl as HTMLElement).style.color).toBe('rgb(250, 204, 21)');
-  });
 
   // T012: side panel renders when present
   it('renders side panel rows when sidePanel is present', () => {
