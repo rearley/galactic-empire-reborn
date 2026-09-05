@@ -26,7 +26,12 @@ export const HELP_MSG_PATH = join(here, '..', 'reference', 'ge-upstream', 'mbmge
 
 /** Strip ANSI SGR sequences and the [2J screen clear canon opens each page with. */
 function stripAnsi(s) {
-  return s.replace(/\x1b?\[[0-9;]*[A-Za-z]/g, '');
+  // The ESC is REQUIRED. It used to be optional (`\x1b?`), which made this
+  // match any literal `[word]` in the prose — and canon writes every usage
+  // line that way: `transfer [up/down]`, `cloak [ON/OFF]`, `roster [all]`.
+  // Seventeen sequences across fourteen pages were being eaten, all of them
+  // on the one line a player reads to learn the syntax.
+  return s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 }
 
 export function extractHelp(rawIn = readFileSync(HELP_MSG_PATH, 'latin1')) {
