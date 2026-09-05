@@ -42,7 +42,8 @@ that was once hand-transcribed had drifted, so the path is now one-directional
 and pinned at both ends:
 
 ```
-reference/ge-upstream/mbmgemp/GE/MSG/*.MSG      the original option database
+reference/ge-upstream/mbmgemp/GE/REL/*.MSG      the shipped 3.2e option database
+                                                (NOT GE/MSG/ — that is the pre-3.2d snapshot)
         │
         ├── tools/extract-ship-classes.mjs --ts ──→ backend/prisma/seed/ship-classes.ts
         ├── tools/extract-sysop-options.mjs ──────→ SYSOP_OPTIONS[].canonDefault
@@ -141,14 +142,16 @@ AppModule (app.module.ts)
   │     └── WsAuthGuard — validates `socket.handshake.auth.token` JWT before handleConnection runs;
   │                        disconnects with AUTH_REQUIRED error if token is absent or invalid
   ├── OnboardingModule (game/onboarding/) — new-player and rename flows
-  │     ├── OnboardingService — multi-step state machine per socketId:
-  │     │                        AWAITING_CLASS → AWAITING_NAME → finalized.
-  │     │                        handleNewPlayer(): emits prompt:class-list; handleReply(): advances
-  │     │                        state; on completion, creates User+Ship rows and emits player.snapshot.
-  │     │                        handleReturningPlayer(): emits welcome command:result for existing ship.
+  │     ├── OnboardingService — single-step name flow. Public API:
+  │     │                        buildClassListPayload(), validateClassReply(),
+  │     │                        validateNameReply(name), finalize(userid, shipname).
+  │     │                        There is no class picker: a shipless captain goes straight
+  │     │                        to the name prompt. The gateway owns the flow, not a
+  │     │                        per-socket state machine in this service.
   │     ├── RenameService — rename(userid, shipno, newName): validates format (1-19 printable, no spaces),
   │     │                    checks case-insensitive uniqueness, updates DB + in-memory; case-identical = no-op
-  │     └── OnboardingState type — { step, classNumber?, shipId? }
+  │     └── OnboardingState — declared in gateway/game.gateway.ts, not here:
+  │                          { step: 'AWAITING_NAME' }
   ├── MailModule (game/mail/) — exports MailInboxService
   │     ├── MailInboxRepository — Prisma queries on MailStat; findByUserid (stamp DESC, msgno DESC, class DESC); deleteOne (returns false on P2025)
   │     ├── MailInboxService — list(userid)/resolveIndex(userid,index)/deleteByIndex(userid,index); R3 sender resolution (ShipStateService → raw dtime → "(system)"); R5 re-query per call
@@ -175,7 +178,8 @@ AppModule (app.module.ts)
   │     │                         emits scan:render (unicast) for grid payload; command:result for headers
   │     ├── ReportHandlerService — @Injectable report/rep handler; reads ShipClass.typeName/hasCloak;
   │     │                           builds multi-line nav/sys/cargo/wpns read-out
-  │     └── plain Command objects: rotateCommand, impulseCommand, warpCommand
+  │     └── plain Command objects: rotateCommand, impulseCommand
+  │         (warp is WarpHandlerService, an @Injectable — see below)
   ├── ShipModule (game/ship/) — exports ShipStateService, MaintenanceService, ShipTickService
   │     ├── ShipStateService — owns in-memory Map<"userid:shipno", ShipState>; hydrates from
   │     │                       Postgres on init; subscribes SHIP_UPDATE tick → async dirty flush;
@@ -197,12 +201,14 @@ POST /auth/register  →  AuthService.register()  →  bcrypt hash + DB insert  
 POST /auth/login     →  AuthService.login()     →  bcrypt compare           →  JWT
 
 Socket connect  →  WsAuthGuard validates JWT  →  GameGateway.handleConnection()
-  ├─ ship found  →  OnboardingService.handleReturningPlayer()  →  welcome command:result
-  └─ no ship     →  OnboardingService.handleNewPlayer()        →  prompt:class-list
-       client replies: prompt:reply {value: classNumber}
-         →  OnboardingService.handleReply()  →  prompt:ship-name
-       client replies: prompt:reply {value: shipName}
-         →  OnboardingService.handleReply()  →  create Ship  →  player.snapshot
+  →  seat cap: ≥ MAXPLRS other pilots in flight  →  notice + disconnect
+  →  GameGateway.presentShipEntry()
+       ├─ 1 flyable ship   →  boardShipAndWelcome  →  welcome command:result
+       ├─ ≥2 flyable ships →  prompt:ship-select (does NOT board)
+       │      client replies: prompt:reply {value: index}  →  board the chosen hull
+       └─ 0 flyable ships  →  prompt:ship-name
+              client replies: prompt:reply {value: shipName}
+                →  OnboardingService.finalize()  →  create Ship  →  player.snapshot
 ```
 
 ### GameGateway broadcast resolution
@@ -270,8 +276,9 @@ Error per-entry is caught and logged; other ships are not affected.
 
 ### Socket.io sector rooms and handshake
 
-Handshake: no userid → NO_USER + disconnect. No ships → NO_SHIP + disconnect.
-1 ship → bind; ≥2 ships → bind lowest shipno + log warning.
+Handshake: WsAuthGuard validates the JWT and disconnects on failure — there is no
+NO_USER or NO_SHIP path. A shipless captain is prompted for a name rather than
+disconnected, and ≥2 ships prompts for a choice rather than binding the lowest.
 Room key format: `sector:{X}:{Y}`. Clients join on `sector:join`, leave on `sector:leave`.
 
 ### TickService subscriber registry
@@ -369,7 +376,8 @@ galactic-empire-reborn/
 ```
 
   └── GalaxyModule (game/galaxy/) — exports GalaxyService
-        └── GalaxyService — generates the full 30×15 galaxy inside a single Postgres transaction
+        └── GalaxyService — generates the universe square, -UNIVMAX..+UNIVMAX on both
+            axes (201×201 = 40,401 sectors at our UNIVMAX=100), in one Postgres transaction
         │                    on first boot (idempotency probe: checks for GalaxyMeta row in
         │                    onModuleInit, skips generation if present)
         │                    owns in-memory read model:
@@ -528,11 +536,15 @@ Player-presence wire events (feature 010):
 
 Scan wire events (feature 015):
   command:result           → issuing socket only; header lines for scan subcommands
-  scan:render              → issuing socket only; ScanRenderEvent: { mode, grid, sidePanel?, overwrite }
-    mode: 'lo' | 'ra' | 'se' | 'lo-full'
-    grid: ScanCell[] (30×15); colour field: 'self' | 'human' | 'ai' | 'planet'
-    sidePanel: SidePanelRow[] (letter, distance, bearing, heading, speed, name) — only for 'lo-full'
-    overwrite: boolean — driven by SCANHOME User.options[1]; true = home cursor, false = append
+  scan:render              → issuing socket only; ScanRenderEvent:
+                             { kind, mode, cells, header, sidePanel? }
+    kind:   'ra' | 'se' | 'lo' | 'lo-full'   — which scan produced it
+    mode:   'overwrite' | 'append'           — driven by SCANHOME User.options[1];
+                                               'overwrite' homes the cursor
+    cells:  ScanCell[] — SPARSE. Only occupied cells are sent (ships, planets,
+            mines, the self marker) within the 30×15 viewport, not 450 entries.
+    header: string — the scan's own heading line
+    sidePanel: SidePanelRow[] — only for 'lo-full'
 ```
 
 ### Frontend state (feature 010)
@@ -565,7 +577,8 @@ Components (frontend/src/components/)
 
 Auth / onboarding components (frontend/src/auth/, frontend/src/onboarding/)
   AuthScreen          ← register/login form; calls /auth/register; stores JWT via tokenStore.setToken
-  ClassPickerPrompt   ← rendered when onboardingPrompt.type === 'class-list'; emits prompt:reply
+  ShipSelectPrompt    ← rendered on prompt:ship-select (≥2 ships); lists the fleet,
+                         emits prompt:reply with the chosen index
   ShipNamePrompt      ← rendered when onboardingPrompt.type === 'ship-name'; emits prompt:reply; shows
                          role="alert" on error="name-taken"
   tokenStore          ← localStorage wrapper: getToken / setToken / clearToken (key: 'ge_jwt')
@@ -608,7 +621,8 @@ CybertronModule (game/cybertron/)
   ├── cyb-decisions.ts        — pure AI decision functions (all randomness via injected Random):
   │                            pickSpawnClass, randomInitLoadout, randomCybSkill, pickPursuitBand,
   │                            cybwhoops, gebemean, rollTorpedoCount
-  ├── taunt-pool.ts           — 13 in-character taunt strings, pickTaunt(rand)
+  ├── taunt-pool.ts           — band selection over the generated canon catalogue
+  │                             (cyb-taunt-catalog.generated.ts); pickTaunt(rand, class, band)
   └── constants (game/constants.ts additions) — CYBTICKTIME=6, CYBSLO=3, CYB_ALLOW=35,
                                CYB_MAXCASH=2_000_000, CYB_BE_NICE=30, CYB_BE_EASY=60,
                                CYB_BREAKOFF=500, CYB_MINDAM=75, CYBMAXPERTICK=2,
@@ -723,7 +737,8 @@ MidnightModule (game/midnight/)
    zeroAllTeams             → Team.updateMany (teamcount=0, teamscore=0)
    countTeamMembersAndResetOrphans → per-user: increment teamcount or reset orphan
    applyPerMemberTeamScore  → per-user: teamscore += TEAMBONU + (score / teamcount)
-   markEmptyTeamsRemoved    → Team.update (teamcode=-1 for teamcount=0 teams)
+   markEmptyTeamsRemoved    → Team.updateMany (removed=true for teamcount=0 teams;
+                              teamcode is the PK, so the marker gets its own column)
    assignRosterPositions    → raw SQL: ROW_NUMBER() OVER (ORDER BY score DESC, userid ASC)
 ```
 
@@ -795,7 +810,8 @@ PlanetAttackService (game/planet/)
 
 attack.config.ts (game/commands/)
   └── DI tokens: PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS
-  └── Defaults: 0.05 for all PLATTR*, 10 for FIRETICKS
+  └── Defaults: PLATTR* resolve from canon via GAME_CONFIG (F1 0.18, F2 1.00, F3 0.55,
+      T1 1.25, T2 0.35); FIRETICKS 10. The old 0.05 was numopt's FLOOR, not a default.
   └── Env-var overrides follow the CLOAK_ENERGY_USE pattern from feature 013
 
 Planet attack handlers (game/commands/handlers/)
@@ -835,7 +851,7 @@ SetHandlerService (game/commands/handlers/set.handler.ts) — extended (feature 
   ├── set scanhome on|off   → persists to User.options[1] via Prisma + in-memory ShipState
   └── set ?                 → now lists all 4 options: auto-shield, auto-repair, scannames, scanhome
 
-useScanRender (frontend/src/socket/useScanRender.ts)
+useScanRender (frontend/src/hooks/useScanRender.ts)
   └── subscribes to scan:render Socket.io event
   └── maintains array of ScanCard objects; overwrite mode (SCANHOME=on) replaces last card,
       append mode (SCANHOME=off) pushes new card (capped)
