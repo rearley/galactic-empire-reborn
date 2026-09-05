@@ -61,18 +61,26 @@ export class PlanetAttackService {
     let kill1 = 0;
     let kill2 = 0;
 
-    // Step 1: defender fighters fire first. @see GECMDS.C:3590–3604
+    // Canon opens with the landing itself (GECMDS.C:3643).
+    narration.push(formatMessage(MessageId.ATT_TROOP_LAUNCH, num));
+
+    // Step 1: defender fighters fire first. @see GECMDS.C:3659-3668
+    // Two lines, not one: ATTACKM7 announces the counter-attack, ATTACKM8
+    // gives its cost. The port had a single invented line in their place.
     const fighters = Number(planet.items[I_FIGHTER].qty);
     if (fighters > 1) {
       const fighterKill = (gernd(this.random) % 35 + 9) * fighters;
       kill1 = Math.min(fighterKill, left1);
-      narration.push(formatMessage(MessageId.ATT_DEFENDER_FIGHTER_KILL, kill1));
+      narration.push(formatMessage(MessageId.ATT_TROOP_COUNTER));
+      narration.push(formatMessage(MessageId.ATT_TROOP_COUNTER_KILL, kill1));
     }
 
-    // Step 2: ground troops engage. @see GECMDS.C:3605–3608
+    // Step 2: ground troops engage. @see GECMDS.C:3671-3673
+    // Silent in canon — these kills accumulate into kill1 and are reported
+    // once by ATTACKM2 below. The port announced them separately, which
+    // double-counted the same casualties in the player's reading.
     const groundKills = Math.floor(left2 * (rndm(this.random, this.plattrt1) + 0.25));
     kill1 += groundKills;
-    narration.push(formatMessage(MessageId.ATT_GROUND_TROOP_KILL, groundKills));
 
     // Step 3: ratio-based attacker counter-kill. @see GECMDS.C:3610-3617
     //
@@ -96,15 +104,19 @@ export class PlanetAttackService {
     if (kill2 > left2) kill2 = left2;
     left1 -= kill1;
     left2 -= kill2;
-    narration.push(formatMessage(MessageId.ATT_LOSS_REPORT, kill1, kill2));
+    // ATTACKM2 reads "our troops killed %s, and suffered losses of %s" and
+    // canon passes gechrbuf2 (kill2, THEIR dead) before gechrbuf (kill1, ours)
+    // — GECMDS.C:3693. The port passed them the other way round, so every
+    // ground battle reported its casualties inverted.
+    narration.push(formatMessage(MessageId.ATT_LOSS_REPORT, kill2, kill1));
 
     // Step 5: outcome branching. @see GECMDS.C:3631–3700
     let won = 0;
     if (left2 > 0 && left2 < Math.floor(left1 / 4)) {
       won = 1;
-      narration.push(formatMessage(MessageId.ATT_WIN_TROOP));
+      narration.push(formatMessage(MessageId.ATT_WIN_TROOP, left2));
     } else if (left1 > 0 && left1 < Math.floor(left2 / 4)) {
-      narration.push(formatMessage(MessageId.ATT_RETREAT));
+      narration.push(formatMessage(MessageId.ATT_RETREAT, left1));
       planet.items[I_TROOPS].qty += BigInt(left1);
       left1 = 0;
     } else if (left1 > 0 && left2 === 0 && Number(planet.items[I_FIGHTER].qty) === 0) {
@@ -154,7 +166,13 @@ export class PlanetAttackService {
       });
     }
 
-    narration.push(formatMessage(MessageId.ATT_RESOLVED, left1));
+    // ATTACKM6 is "%s troops have returned to the ship" — canon prints it only
+    // when somebody actually came back (GECMDS.C:3735). The port printed it
+    // unconditionally, so a wiped-out landing party still "returned", zero of
+    // them.
+    if (left1 > 0) {
+      narration.push(formatMessage(MessageId.ATT_RESOLVED, left1));
+    }
 
     return { left1, left2, kill1, kill2, won, itemsDestroyed, narration };
   }
@@ -173,6 +191,9 @@ export class PlanetAttackService {
     let left2 = Number(planet.items[I_FIGHTER].qty);
     let kill1 = 0;
     let kill2 = 0;
+
+    // Canon opens with the launch (GECMDS.C:3809).
+    narration.push(formatMessage(MessageId.ATT_FIG_LAUNCH, num));
 
     // Step 1: attack strength as a percentage of the defending fighter wing.
     //
@@ -196,9 +217,10 @@ export class PlanetAttackService {
 
     // Step 3: defender fighters return-fire. @see GECMDS.C:~3830
     if (left2 > 0) {
+      // Silent in canon (GECMDS.C:3848-3849) — folded into kill1 and reported
+      // once by ATTACKF2 below, the same way the troop path folds ground kills.
       const returnFire = Math.floor(left2 * (rndm(this.random, this.plattrf2) + 0.2));
       kill1 += returnFire;
-      narration.push(formatMessage(MessageId.ATT_DEFENDER_FIGHTER_KILL, returnFire));
     }
 
     // Step 4: attacker counter-kill (gated by ratio > 1). @see GECMDS.C:~3850
@@ -222,7 +244,9 @@ export class PlanetAttackService {
     if (kill2 > left2) kill2 = left2;
     left1 -= kill1;
     left2 -= kill2;
-    narration.push(formatMessage(MessageId.ATT_LOSS_REPORT, kill1, kill2));
+    // ATTACKF2: "our fighters destroyed %s fighters, and we lost %s" — canon
+    // passes kill2 (theirs) then kill1 (ours), GECMDS.C:3871-3874.
+    narration.push(formatMessage(MessageId.ATT_FIG_LOSS_REPORT, kill2, kill1));
 
     // Step 6: outcome. @see GECMDS.C:~3890
     let won = 0;
@@ -239,7 +263,7 @@ export class PlanetAttackService {
         if (destroyed > 0) {
           planet.items[i].qty -= BigInt(destroyed);
           itemsDestroyed.push({ itemIndex: i, destroyed });
-          narration.push(formatMessage(MessageId.ATT_ITEM_DESTROYED, destroyed, ITEM_NAMES[i]));
+          narration.push(formatMessage(MessageId.ATT_FIG_ITEM_DESTROYED, destroyed, ITEM_NAMES[i]));
         }
       }
     }
@@ -274,7 +298,10 @@ export class PlanetAttackService {
       });
     }
 
-    narration.push(formatMessage(MessageId.ATT_RESOLVED, left1));
+    // ATTACKF6 only when fighters actually came home (GECMDS.C:3905-3909).
+    if (left1 > 0) {
+      narration.push(formatMessage(MessageId.ATT_FIG_RESOLVED, left1));
+    }
 
     return { left1, left2, kill1, kill2, won, itemsDestroyed, narration };
   }
@@ -294,13 +321,16 @@ export class PlanetAttackService {
   ): Promise<void> {
     // Owner real-time alert — emit to user:${ownerUserid} room via EventEmitter.
     // If owner is offline the room is empty and the emit silently drops.
+    // ATTACK6 reads "...under attack from Commander %s in The %s...", so the
+    // COMMANDER comes before the ship. The port passed them the other way
+    // round, which put the ship's name where the captain's belongs.
     const alertMsg = formatMessage(
       MessageId.ATT_OWNER_ALERT,
       planet.name,
       planet.xsect,
       planet.ysect,
+      ship.username ?? ship.userid,
       ship.shipname,
-      ship.userid,
     );
     this.events.emit(ATTACK_OWNER_ALERT_EVENT, { ownerUserid, message: alertMsg } as AttackOwnerAlertPayload);
 
