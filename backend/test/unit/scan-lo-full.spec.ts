@@ -112,7 +112,6 @@ describe('T027 — sca lo: scans work in orbit and docked', () => {
     const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
     expect(result.lines).toHaveLength(1);
     expect(result.scanRender).toBeDefined();
-    expect(result.scanRender).toBeDefined();
   });
 
   it('sca lo while dead (where=20) still renders a scan', async () => {
@@ -120,8 +119,11 @@ describe('T027 — sca lo: scans work in orbit and docked', () => {
     await service.onModuleInit();
     const ship = makeShip({ where: 20 });
     const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
+    // `sca lo full` is the one mode that produces a SCAN DATA card, and the
+    // card carries the header — so it emits NO log line, or the event log
+    // fills with rows duplicating the card beside them. What "still renders a
+    // scan" means here is the render payload, which is what this checks.
     expect(result.lines).toHaveLength(1);
-    expect(result.scanRender).toBeDefined();
     expect(result.scanRender).toBeDefined();
   });
 });
@@ -133,15 +135,25 @@ describe('T027 — sca lo: scans work in orbit and docked', () => {
 // Canon has NO not-in-flight gate: scan_lo (GECMDS.C:2640) tests `where`
 // nowhere, and the only scan-side `where` test in the file is scan_hy at
 // :2737 inside `#ifdef NOTHING`. Orbit is where a pilot parks to shop.
+/**
+ * `sca lo full` is the ONE mode that produces a SCAN DATA card, and the card
+ * carries the header — so it emits no log line. Echoing it as well filled the
+ * event log with rows duplicating the card beside them. "Still renders a scan"
+ * therefore means the render payload, not a line of text.
+ */
 describe('T027 — sca lo full: scans work in orbit and docked', () => {
   it('sca lo full while docked (where=10) still renders a scan', async () => {
     const { service } = makeService([]);
     await service.onModuleInit();
     const ship = makeShip({ where: 10 });
     const result = await (service.command.handler(ship, ['lo', 'full'], {}) as Promise<CommandResult>);
-    expect(result.lines).toHaveLength(1);
+    // `sca lo full` is the one mode that produces a SCAN DATA card, and the
+    // card carries the header — so it emits NO log line, or the event log
+    // fills with rows duplicating the card beside them. What "still renders a
+    // scan" means here is the render payload, which is what this checks.
+    expect(result.lines).toHaveLength(0);
     expect(result.scanRender).toBeDefined();
-    expect(result.scanRender).toBeDefined();
+    expect(result.scanRender?.sidePanel).toBeDefined();
   });
 
   it('sca lo full while dead (where=20) still renders a scan', async () => {
@@ -149,9 +161,13 @@ describe('T027 — sca lo full: scans work in orbit and docked', () => {
     await service.onModuleInit();
     const ship = makeShip({ where: 20 });
     const result = await (service.command.handler(ship, ['lo', 'full'], {}) as Promise<CommandResult>);
-    expect(result.lines).toHaveLength(1);
+    // `sca lo full` is the one mode that produces a SCAN DATA card, and the
+    // card carries the header — so it emits NO log line, or the event log
+    // fills with rows duplicating the card beside them. What "still renders a
+    // scan" means here is the render payload, which is what this checks.
+    expect(result.lines).toHaveLength(0);
     expect(result.scanRender).toBeDefined();
-    expect(result.scanRender).toBeDefined();
+    expect(result.scanRender?.sidePanel).toBeDefined();
   });
 });
 

@@ -464,8 +464,13 @@ export class ScanHandlerService implements OnModuleInit {
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
     const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
 
+    // No log line: this is the ONE mode that produces a SCAN DATA card, and
+    // the card carries the same header. Echoing it as well filled the event
+    // log with rows of "Range Scan Dist:300000 (s:0 0)" duplicating the card
+    // beside them. The other modes keep their line — they draw only to the
+    // map, so the log is their sole textual confirmation.
     return {
-      lines: [{ text: header, category: 'info' }],
+      lines: [],
       scanRender: { kind: 'lo-full', mode, cells: grid, header, sidePanel },
     };
   }
