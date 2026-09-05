@@ -442,14 +442,9 @@ PhysicsModule (game/physics/)
   │                            countdowns (hypha, cantexit). Per-ship try/catch logs and
   │                            increments getFaultCount() on fault; batch continues.
   │                            Iterates ships in ascending shipKey order (FR-019).
-  │                            Autopilot branch (feature 016): per ship with holdcourse>0,
-  │                            updates head2b toward navTargetX+0.5/navTargetY+0.5 each
-  │                            physics tick; clears holdcourse/navTargetX/navTargetY and
-  │                            emits physics.nav-arrived on sector arrival.
   │                            Emits typed events on EventEmitter2:
   │                              physics.sector-transition (on floor(coord) change)
   │                              physics.hyperspace        (on warp-threshold crossing)
-  │                              physics.nav-arrived       (on autopilot arrival, feature 016)
   └── physics-math.ts       — pure: rotationStep, accelerationStep, positionIntegration,
                                 tryEnergyDebit, sectorOf, normalizeHeading
 ```

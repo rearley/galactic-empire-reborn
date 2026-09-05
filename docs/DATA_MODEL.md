@@ -59,11 +59,10 @@ control fields. Source: `WARSHP` in `GEMAIN.H`.
   should queue repair automatically (wiring deferred to feature 019).
   Both columns added via migration `20260506235607_ship_auto_flags`.
 
-**Feature 016 additions**:
-- `navTargetX: Int?` — Autopilot target X sector coordinate. Null when inactive. @see GECMDS.C:5121
-- `navTargetY: Int?` — Autopilot target Y sector coordinate. Null when inactive. Both columns added
-  via Prisma migration alongside the `nav` command implementation. Cleared on arrival or when the
-  player manually issues `rot`, `imp`, or `war`.
+`navTargetX` and `navTargetY` were added by feature 016 for a port-original
+autopilot and dropped on 2026-09-05 by migration
+`20260905134143_drop_autopilot_nav_target`. Nothing wrote them by then: canon's
+`nav` is a bearing report, not a course-holder. @see GECMDS.C:5109
 
 **Relations**: belongs to one User (FK enforced).
 
