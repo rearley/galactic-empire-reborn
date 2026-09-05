@@ -15,12 +15,6 @@ export const rotateCommand: Command = {
   minArgs: 1,
   argMissingMessage: formatMessage(MessageId.ROTFMT),
   handler(ship: ShipState, args: string[], _ctx: CommandContext): CommandResult {
-    if (ship.holdcourse > 0) {
-      ship.holdcourse = 0;
-      ship.navTargetX = null;
-      ship.navTargetY = null;
-    }
-
     // C takes `rot @<deg>` as an ABSOLUTE compass heading and a bare `rot <deg>`
     // as a relative turn, quoting a different range for each on failure.
     // @see GECMDS.C:643, helpers/rotation.ts

@@ -66,8 +66,6 @@ export function prismaShipToState(row: Ship): ShipState {
     warncntr: row.warncntr,
     autoShield: row.autoShield,
     autoRepair: row.autoRepair,
-    navTargetX: row.navTargetX ?? null,
-    navTargetY: row.navTargetY ?? null,
     scanNames: false,
     scanHome: false,
     scanFull: false,

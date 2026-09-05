@@ -230,11 +230,6 @@ export const impulseCommand: Command = {
     const course = resolveEngineCourse(ship, courseGiven, courseResult.value);
     const deg = course.deg;
 
-    if (course.releaseAutopilot && ship.holdcourse > 0) {
-      ship.holdcourse = 0;
-      ship.navTargetX = null;
-      ship.navTargetY = null;
-    }
 
     const lines: Array<{ text: string; category: string }> = [];
 

@@ -16,9 +16,6 @@ import { resolveEngineCourse } from '../../src/game/commands/handlers/helpers/en
 const AT_ORIGIN = {
   heading: 132,
   head2b: 132,
-  holdcourse: 0,
-  navTargetX: null as number | null,
-  navTargetY: null as number | null,
   xcoord: 4.4,
   ycoord: 3.5,
 };
@@ -28,7 +25,6 @@ describe('resolveEngineCourse', () => {
     const r = resolveEngineCourse(AT_ORIGIN, true, 90);
     expect(r.deg).toBe(222);
     expect(r.setHeading).toBe(true);
-    expect(r.releaseAutopilot).toBe(true);
   });
 
   it('normalises a relative turn past 360', () => {
@@ -44,25 +40,21 @@ describe('resolveEngineCourse', () => {
     const r = resolveEngineCourse({ ...AT_ORIGIN, head2b: 200 }, false, 0);
     expect(r.deg).toBe(200);
     expect(r.setHeading).toBe(false);
-    expect(r.releaseAutopilot).toBe(false);
   });
 
   it('holds the present heading when no turn is in progress', () => {
     const r = resolveEngineCourse(AT_ORIGIN, false, 0);
     expect(r.deg).toBe(132);
     expect(r.setHeading).toBe(true);
-    expect(r.releaseAutopilot).toBe(false);
   });
 
-  it('an explicit course takes the helm back from the autopilot', () => {
-    const r = resolveEngineCourse(
-      { ...AT_ORIGIN, holdcourse: 1, navTargetX: 4, navTargetY: 4 },
-      true,
-      45,
-    );
+  it('an explicit course is applied relative to the current heading', () => {
+    // This used to assert that the course "took the helm back from the
+    // autopilot" — there is no autopilot, and holdcourse is a droid-AI wander
+    // timer in canon (GEDROIDS.C), never a player field.
+    const r = resolveEngineCourse(AT_ORIGIN, true, 45);
     expect(r.deg).toBe(177);
     expect(r.setHeading).toBe(true);
-    expect(r.releaseAutopilot).toBe(true);
   });
 
   /**
@@ -85,7 +77,6 @@ describe('resolveEngineCourse', () => {
     const r = resolveEngineCourse(midTurn, false, 0);
     expect(r.deg).toBe(0);          // report where the ship is going
     expect(r.setHeading).toBe(false); // and do not overwrite it
-    expect(r.releaseAutopilot).toBe(false);
   });
 
   it('an explicit course still overrides a turn in progress', () => {

@@ -53,7 +53,6 @@ function makeShip(userid: string, troops = 500): ShipState {
     firecntl: 0, destruct: 0, status: 1, cybmine: 0,
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    navTargetX: null, navTargetY: null,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
   };

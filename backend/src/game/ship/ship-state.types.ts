@@ -154,16 +154,6 @@ export interface ShipState {
   autoRepair?: boolean;
 
   /**
-   * Autopilot target X sector. Null when autopilot inactive.
-   * @see GECMDS.C:5121 cmd_navigate (deviation: original was one-shot)
-   * @see specs/016-navigation-spy/research.md D1
-   */
-  navTargetX: number | null;
-
-  /** Autopilot target Y sector. Null when autopilot inactive. */
-  navTargetY: number | null;
-
-  /**
    * Show ship names on scan lo overlay. Derived from User.options[0].
    * @see GEMAIN.H:233 SCANNAMES
    */

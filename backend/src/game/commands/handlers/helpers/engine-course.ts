@@ -24,17 +24,13 @@ export interface EngineCourse {
   readonly deg: number;
   /** Whether the caller should write `head2b` — false while the autopilot flies. */
   readonly setHeading: boolean;
-  /** Whether the caller should disengage `holdcourse` and clear the nav target. */
-  readonly releaseAutopilot: boolean;
+
 }
 
 export interface EngineCourseShip {
   readonly heading: number;
   /** Heading the ship is turning TOWARD — differs from `heading` mid-turn. */
   readonly head2b: number;
-  readonly holdcourse: number;
-  readonly navTargetX: number | null;
-  readonly navTargetY: number | null;
   readonly xcoord: number;
   readonly ycoord: number;
 }
@@ -56,7 +52,7 @@ export function resolveEngineCourse(
   if (courseGiven) {
     // GECMDS.C:625 — relative to current heading, normalised.
     const deg = Math.round((ship.heading + courseDelta + 360) % 360) % 360;
-    return { deg, setHeading: true, releaseAutopilot: true };
+    return { deg, setHeading: true };
   }
 
   // A turn already ordered by `rot` is a steering order in progress. Writing
@@ -66,10 +62,9 @@ export function resolveEngineCourse(
     return {
       deg: Math.round((ship.head2b + 360) % 360) % 360,
       setHeading: false,
-      releaseAutopilot: false,
     };
   }
 
   const deg = Math.round((ship.heading + 360) % 360) % 360;
-  return { deg, setHeading: true, releaseAutopilot: false };
+  return { deg, setHeading: true };
 }

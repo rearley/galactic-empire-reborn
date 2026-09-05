@@ -96,8 +96,6 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
       holdcourse: 0,
       topspeed: 0,
       warncntr: 0,
-      navTargetX: null,
-      navTargetY: null,
     };
 
     prismaMock = {

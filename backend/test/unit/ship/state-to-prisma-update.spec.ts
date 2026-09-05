@@ -40,7 +40,6 @@ describe('stateToPrismaUpdate — every key must be a real Ship column', () => {
       firecntl: 0, destruct: 0, status: 0, cybmine: 0,
       cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
       minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-      navTargetX: null, navTargetY: null,
       scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
       dirty: true,
       channel: 7,
