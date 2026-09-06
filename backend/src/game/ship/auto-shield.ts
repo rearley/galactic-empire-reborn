@@ -23,6 +23,16 @@ export type AutoShieldDecision =
  * @see specs/019-physics-polish/spec.md US4
  */
 export function decideAutoShield(ship: ShipState): AutoShieldDecision {
+  // Guard: hyperspace forbids shields at all.
+  //
+  // `cmd_shields` refuses outright there — `if (warsptr->where == 1)
+  // { prfmsg(SHLD1); return; }` (GECMDS.C:3125-3130) — and `hyperspace()`
+  // drops them on the way in (GEFUNCS.C:590). This feature is port-original,
+  // but it must not manufacture a state the game forbids: without this gate
+  // `set autoshield on` put shields back up in hyperspace on the next tick,
+  // silently, where no command could have done it.
+  if (ship.where === 1) return { action: 'noop' };
+
   // Guard: combat lock prevents raise
   if (ship.cantexit > 0) return { action: 'noop' };
 

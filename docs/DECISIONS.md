@@ -3520,3 +3520,64 @@ would then show a neighbouring sector's contents under your current sector's
 header, which is worse than either rule. Clearing on a distance threshold rather
 than a boundary — invented, untestable against canon, and it would still fight
 the fact that the map goes stale continuously rather than at a threshold.
+
+## 2026-09-06 — gebemean is rolled once per WEAPON, and the hyperspace batch
+**Context (1):** Reported from play — "AI has not really fought back... no
+torpedo, no phasers, just let me kill it", against Cybertron Scouts at 6 kills.
+
+Canon calls `gebemean` TWICE inside `cyb_attack`: once to decide phasers
+(GECYBS.C:514) and again, independently, to decide torpedoes (GECYBS.C:527).
+The port evaluated it once and reused the result, with a comment claiming that
+"preserves deterministic PRNG consumption" — which has it backwards. Matching
+canon means consuming the generator the way canon consumes it, which is twice.
+
+For an ordinary Cybertron against a player under CYB_BE_NICE (30) kills,
+`gebemean` is a 1-in-CYBSLO (1-in-3) roll:
+
+    canon:  P(phasers) = 1/3, P(torps) = 1/3, INDEPENDENT
+            P(does anything) = 1 - (2/3)(2/3) = 5/9 = 56%
+    port:   one roll drives both
+            P(does anything) = 1/3 = 33%
+
+So Scouts engaged at 0.6x canon's rate and could be farmed nearly unopposed.
+Ruled out first, all fine: AI phaser charge (24/24 at 100 vs PMINFIRE 60), scan
+ranges (all match MBMGESHP.MSG), the attack gate (`cybCanAttack` is true for the
+Interceptor so it always passes), and aiming (`degrees` set in both paths).
+
+**Decision (1):** roll `gebemean` separately for each weapon, as canon does.
+
+**Reason:** it is the difference between a PvE opponent and a pinata, and the
+grace period for new players is supposed to be a reduced chance of being shot,
+not a near-guarantee of not being shot.
+
+**Context (2), the hyperspace batch — four defects found by the same playtest:**
+
+  a. `cmd_phas` routes to `firehp` on `warsptr->where == 1` (GECMDS.C:843). The
+     port tested `speed >= WARP_THRESHOLD`. For a player the two normally agree
+     (you only reach warp by accelerating through the boundary, the one thing
+     that sets `where`), but they come apart for any hull whose speed was
+     ASSIGNED rather than accelerated into — which is what canon's Cybertron
+     pursuit bands do (GECYBS.C:746, 761, 775).
+  b. `prfmsg(HPFIRED,deg)` lives inside `firehp` (GECMDS.C:1037). The port
+     emitted it from the ORDINARY phaser path and not from the hyper one, so a
+     normal shot reported "Hyper-Phaser fired at bearing N, Sir!" immediately
+     before "Phasers fired at N percent" — telling the pilot they had fired a
+     weapon they had not. Found by the routing test above.
+  c. HYSHDN, HYCLDN, HYPERIN and HYPEROUT were all paraphrased ("** Shields
+     collapse as you enter hyperspace. **"). All four exist verbatim in the
+     generated canon table.
+  d. HYPERIN2 was not emitted at all. Canon tells the SECTOR a ship jumped
+     (`outsect`, GEFUNCS.C:605-606), so leaving a fight was silent.
+  e. `decideAutoShield` gated on `cantexit` and `shieldstat` but not `where`,
+     so `set autoshield on` would raise shields in hyperspace — a state
+     `cmd_shields` refuses outright (SHLD1, GECMDS.C:3125) and `hyperspace()`
+     undoes on entry.
+
+**Decision (2):** fix all five. `PhysicsHyperspaceEvent` gains `shipname` and
+`sector` so the gateway can address the sector room.
+
+**Alternatives rejected:** leaving (a) because player behaviour is unaffected —
+it is a wrong test that happens to agree most of the time, and it was hiding
+(b). Keeping the paraphrases as friendlier text — canon's wording is the thing
+being ported, and the paraphrase in (c) is what made the invented HPFIRED in (b)
+hard to spot among other invented lines.

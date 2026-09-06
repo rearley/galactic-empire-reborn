@@ -652,11 +652,25 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
-   * Attack with phasers + torpedo volley, gated by gebemean + phasr charge + cybwhoops.
-   * Matches GECYBS.C:514-519: `if (phasr >= PMINFIRE && gebemean(...) && !cybwhoops(...)) firep(...)`.
-   * gebemean is evaluated ONCE and reused for both the phaser gate and torpedo-count roll
-   * to preserve deterministic PRNG consumption (single call per cyb_attack invocation).
+   * Attack with phasers + torpedo volley.
+   *
+   * Canon calls `gebemean` TWICE — once to decide phasers (GECYBS.C:514) and
+   * again, independently, to decide torpedoes (GECYBS.C:527):
+   *
+   *   if (ptr->phasr >= PMINFIRE && gebemean(ptr,zothusn)) { ...firep... }
+   *   j = gernd()%6; ...
+   *   if (!gebemean(ptr,zothusn)) j = 0;
+   *
+   * This used to evaluate it once and reuse the result, with a comment saying
+   * that "preserves deterministic PRNG consumption". That had it backwards:
+   * matching canon means consuming the generator the way canon consumes it,
+   * which is twice. Coupling the two roughly halved how often a Cybertron did
+   * anything at all — for a player under CYB_BE_NICE kills, `gebemean` is a
+   * 1-in-CYBSLO roll, so canon attacks on 5/9 of passes and the port managed
+   * 1/3. Found in play: Scouts that "just let me kill them".
+   *
    * @see GECYBS.C:490-543 cyb_attack
+   * @see docs/DECISIONS.md 2026-09-06 — gebemean is rolled once per weapon
    */
   private cybAttack(ship: ShipState, target: ShipState, tough: number, ddist: number, ctx: TickContext): void {
     const cls = this.shipClassCache.get(ship.shpclass);
@@ -669,13 +683,16 @@ export class CybertronTickService implements OnModuleInit {
       s.percent = CYB_PHASER_FOCUS;
     });
 
-    const mean = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
-    if (ship.phasr >= PMINFIRE && mean && !cybwhoops(ship.cybskill, this.random)) {
+    // Roll 1 — phasers. @see GECYBS.C:514
+    const meanForPhaser = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
+    if (ship.phasr >= PMINFIRE && meanForPhaser && !cybwhoops(ship.cybskill, this.random)) {
       this.cybFirePhaser(ship, target, ctx);
     }
 
+    // Roll 2 — torpedoes, INDEPENDENT of the first. @see GECYBS.C:527
+    const meanForTorps = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
     const torpCount = rollTorpedoCount(
-      tough, escalationKills(target), cls?.hasTorpedo ?? false, mean, CYB_BE_EASY, this.random,
+      tough, escalationKills(target), cls?.hasTorpedo ?? false, meanForTorps, CYB_BE_EASY, this.random,
     );
     for (let i = 0; i < torpCount && i < MAXTORPS; i++) {
       // Refill one torp slot before launching (@see GECYBS.C:534)

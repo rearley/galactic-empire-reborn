@@ -1614,24 +1614,38 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (event.shieldsDropped) {
         this.server.to(room).emit('event.log', {
           category: 'combat',
-          text: '** Shields collapse as you enter hyperspace. **',
+          text: formatMessage(MessageId.HYPER_SHIELDS_DOWN),
         });
       }
       if (event.cloakDropped) {
         this.server.to(room).emit('event.log', {
           category: 'combat',
-          text: '** Your cloak collapses as you enter hyperspace. **',
+          text: formatMessage(MessageId.HYPER_CLOAK_DOWN),
         });
       }
       this.server.to(room).emit('event.log', {
         category: 'system',
-        text: 'Entering hyperspace.',
+        text: formatMessage(MessageId.HYPER_IN),
       });
+
+      // `prfmsg(HYPERIN2,ptr->shipname); outsect(FILTER,&coord,usrn,0);`
+      // — the SECTOR is told, not just the pilot (GEFUNCS.C:605-606). The port
+      // emitted nothing here, so a ship leaving a fight vanished silently and
+      // whoever it was fighting had no way to know it had jumped rather than
+      // simply outrun them.
+      if (event.sector) {
+        this.server
+          .to(`sector:${event.sector.x}:${event.sector.y}`)
+          .emit('event.log', {
+            category: 'nav',
+            text: formatMessage(MessageId.HYPER_IN_SECTOR, event.shipname ?? 'ship'),
+          });
+      }
       return;
     }
     this.server.to(room).emit('event.log', {
       category: 'system',
-      text: 'Dropping out of hyperspace.',
+      text: formatMessage(MessageId.HYPER_OUT),
     });
   }
 

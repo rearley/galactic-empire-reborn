@@ -282,6 +282,12 @@ export enum MessageId {
   HELM_NOACCEL = 'HELM_NOACCEL',
   /** HPFIRED — to the firer, as the hyper-phaser discharges. */
   HP_FIRED = 'HP_FIRED',
+  /** @see GEFUNCS.C:590-606 hyperspace — entry/exit narration */
+  HYPER_SHIELDS_DOWN = 'HYPER_SHIELDS_DOWN',
+  HYPER_CLOAK_DOWN = 'HYPER_CLOAK_DOWN',
+  HYPER_IN = 'HYPER_IN',
+  HYPER_IN_SECTOR = 'HYPER_IN_SECTOR',
+  HYPER_OUT = 'HYPER_OUT',
   /** HPHITM — to the firer, on a hyper-phaser hit. */
   HP_HIT_MINE = 'HP_HIT_MINE',
   /** HPHITU — to the VICTIM of a hyper-phaser hit. */
@@ -917,6 +923,16 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.HELM_NOACCEL]: CANON_MESSAGES.NOACCEL,
   /** @see GECMDS.C:1037, :1074, :1076 — damage is a damstr WORD in both directions. */
   [MessageId.HP_FIRED]: CANON_MESSAGES.HPFIRED,
+  /**
+   * Hyperspace entry/exit. All five were paraphrased ("** Shields collapse as
+   * you enter hyperspace. **"), and HYPERIN2 was not emitted at all.
+   * @see GEFUNCS.C:588-606
+   */
+  [MessageId.HYPER_SHIELDS_DOWN]: CANON_MESSAGES.HYSHDN,
+  [MessageId.HYPER_CLOAK_DOWN]: CANON_MESSAGES.HYCLDN,
+  [MessageId.HYPER_IN]: CANON_MESSAGES.HYPERIN,
+  [MessageId.HYPER_IN_SECTOR]: CANON_MESSAGES.HYPERIN2,
+  [MessageId.HYPER_OUT]: CANON_MESSAGES.HYPEROUT,
   [MessageId.HP_HIT_MINE]: CANON_MESSAGES.HPHITM,
   [MessageId.HP_HIT_YOU]: CANON_MESSAGES.HPHITU,
   /**

@@ -67,3 +67,26 @@ describe('decideAutoShield', () => {
     expect(decideAutoShield(ship)).toEqual({ action: 'noop' });
   });
 });
+
+/**
+ * Auto-shield must not raise shields in hyperspace.
+ *
+ * Canon refuses it outright — `cmd_shields` returns SHLD1 when
+ * `warsptr->where == 1` (GECMDS.C:3125-3130) — and `hyperspace()` drops them
+ * on the way in (GEFUNCS.C:590). `decideAutoShield` gated on `cantexit` and
+ * `shieldstat` but never on `where`, so `set autoshield on` would put shields
+ * back up in the one place the game forbids them, silently, on the next tick.
+ *
+ * @see docs/DECISIONS.md 2026-09-06
+ */
+describe('auto-shield respects hyperspace (GECMDS.C:3125)', () => {
+  it('does not raise shields while in hyperspace', () => {
+    const ship = { cantexit: 0, shieldstat: 0, where: 1, recentlyWarpedExit: true } as never;
+    expect(decideAutoShield(ship).action).toBe('noop');
+  });
+
+  it('still raises them in normal space', () => {
+    const ship = { cantexit: 0, shieldstat: 0, where: 0, recentlyWarpedExit: true } as never;
+    expect(decideAutoShield(ship).action).toBe('raise');
+  });
+});

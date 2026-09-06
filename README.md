@@ -242,3 +242,5 @@ galactic-empire-reborn/
 
 See `docs/ARCHITECTURE.md` for the full module map and `docs/GAME_MECHANICS.md` for
 implemented mechanics with C source references.
+
+DB=EjhA64ypfRm3%_md
