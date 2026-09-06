@@ -188,11 +188,19 @@ describe('mines on the scan', () => {
     expect(cells.find((c) => c.type === 'planet')?.char).toBe('1');
   });
 
-  it('draws mines on `sca lo` too — GECMDS.C:2529', async () => {
+  /**
+   * This test used to assert the opposite, citing GECMDS.C:2529 — which is
+   * scan_ra's mine loop, not scan_lo's. `scan_lo` (GECMDS.C:2640 onward) has no
+   * `mptr` iteration at all before printmap(), so the long-range overview draws
+   * no mines in canon. The loop belongs to scan_ra, the zoomable tactical scan
+   * a pilot actually uses to pick through a minefield, and to scan_se
+   * (GECMDS.C:2598). Both of those are covered above and in scan-ra-mines.spec.
+   */
+  it('draws NO mines on `sca lo` — canon has no loop there', async () => {
     const ship = makeShip();
     const service = await makeService([ship], [makeMine({ xcoord: 5.6, ycoord: 5.6 })]);
 
     const cells = await run(service, ship, ['lo']);
-    expect(cells.find((c) => c.type === 'mine')?.char).toBe('.');
+    expect(cells.find((c) => c.type === 'mine')).toBeUndefined();
   });
 });
