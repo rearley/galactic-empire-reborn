@@ -9,7 +9,7 @@ import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, Side
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { cbearing } from '../../physics/physics-math';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX } from '../../constants';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX, GESTAT_AUTO } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
@@ -310,6 +310,61 @@ export class ScanHandlerService implements OnModuleInit {
   }
 
   /**
+   * Canon's `scan_lo` map loop — every ship in the game, projected, gated by
+   * nothing:
+   *
+   *   for (othusn=0 ; othusn < nships ; othusn++)
+   *     if (ingegame(othusn))
+   *       { ...project...
+   *         if (in grid) map[y][x] = (status == GESTAT_AUTO) ? '+' : '='; }
+   *
+   * This used to iterate the SCANTAB instead. The scantab is canon's
+   * IDENTIFICATION table, gated on cloak and on `scanrange` (GECMDS.C:1371) —
+   * a third of the radius this projects, and a tenth of it in canon. So every
+   * contact between the detection radius and the edge of the map was
+   * structurally invisible: the outer ~90% of the grid could never draw
+   * anything, which is the entire point of a LONG RANGE scan. A pilot parked
+   * at the hub ran this with three Cybertrons 17.8, 21.6 and 21.7 sectors out
+   * and saw empty space.
+   *
+   * The two tables answer different questions and canon keeps them apart:
+   * the MAP says something is out there, the SCANTAB says what it is, how far
+   * and on what bearing. Cloak is gated in the scantab alone, so a cloaked
+   * ship shows here as a contact that cannot be identified, ranged or locked
+   * — which is what canon does, deliberately or not.
+   *
+   * Deviation D1 is preserved where it means anything: a ship the scanner has
+   * resolved keeps its scantab letter, so the map and the `sca lo full` legend
+   * still agree and `loc <letter>` still addresses what you can see. Anything
+   * unresolved falls back to canon's own glyphs.
+   *
+   * @see GECMDS.C:2686-2718 scan_lo
+   * @see GECMDS.C:1371 the scantab's cloak + scanrange gate
+   */
+  private projectAllShips(
+    ship: ShipState,
+    allShips: ReadonlyArray<ShipState>,
+    scantab: Scantab,
+    projectionRange: number,
+  ): ScanCell[] {
+    const letterByKey = new Map(scantab.map((e) => [e.shipKey, e.letter]));
+    const selfKey = `${ship.userid}#${ship.shipno}`;
+
+    const cells: ScanCell[] = [];
+    for (const other of allShips) {
+      const key = `${other.userid}#${other.shipno}`;
+      if (key === selfKey) continue;
+
+      const cell = projectRangeCell(ship, other, projectionRange);
+      if (!cell) continue;
+
+      const char = letterByKey.get(key) ?? (other.status === GESTAT_AUTO ? '+' : '=');
+      cells.push({ x: cell.x, y: cell.y, type: 'ship', char });
+    }
+    return cells;
+  }
+
+  /**
    * Range-centred tactical scan producing a scanGrid payload.
    * Projection order per contracts/scan-projection.md:
    *   1. All in-range ships (excluding self)
@@ -352,17 +407,8 @@ export class ScanHandlerService implements OnModuleInit {
     // it while citing scan_ra's line numbers, so the long-range overview drew
     // mines canon never puts there and the tactical scan showed clean space.
 
-    // 1. Project all in-range ships via scantab — GECMDS.C:2700-2720
-    // Deviation D1: char = entry.letter ('A'..'Z') not '+' / '='
-    for (const entry of newScantab) {
-      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
-      if (!other) continue;
-
-      const cell = projectRangeCell(ship, other, projectionRange);
-      if (!cell) continue;
-
-      grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
-    }
+    // 1. Project EVERY ship in the game — GECMDS.C:2686-2718
+    grid.push(...this.projectAllShips(ship, allShips, newScantab, projectionRange));
 
     // NO PLANETS. `scan_lo`'s only projection loop is over ships
     // (GECMDS.C:2686 `for (othusn=0; othusn < nships; othusn++)`), and
@@ -422,16 +468,8 @@ export class ScanHandlerService implements OnModuleInit {
 
     const grid: ScanCell[] = [];
 
-    // 1. Project in-range ships with scantab letters (same as sca lo)
-    for (const entry of newScantab) {
-      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
-      if (!other) continue;
-
-      const cell = projectRangeCell(ship, other, projectionRange);
-      if (!cell) continue;
-
-      grid.push({ x: cell.x, y: cell.y, type: 'ship', char: entry.letter });
-    }
+    // 1. Same map as `sca lo` — every ship, gated by nothing.
+    grid.push(...this.projectAllShips(ship, allShips, newScantab, projectionRange));
 
     // NO PLANETS — same as `sca lo`. See the note there: map_planets() belongs
     // to scan_se alone (GECMDS.C:2634), and scan_lo projects ships only.

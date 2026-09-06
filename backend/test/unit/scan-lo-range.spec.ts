@@ -122,7 +122,20 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
     expect(selfCells[0].y).toBe(7);
   });
 
-  it('ship outside scantab gate (cloaked or out of scanRange) is not shown even on scan lo', async () => {
+  /**
+   * CORRECTION 2026-09-06. This case asserted the opposite — that a ship
+   * outside the scantab gate is "not shown even on scan lo" — and it was
+   * wrong, so the passing test was holding the defect in place.
+   *
+   * Canon's map loop tests `ingegame` and nothing else (GECMDS.C:2686-2718):
+   * no cloak test, no range test. Cloak and `scanrange` gate the SCANTAB
+   * (GECMDS.C:1371), which is a different table answering a different
+   * question — what a contact IS, not whether it is there. Gating the map on
+   * it made the outer ~90% of a LONG RANGE scan permanently blank.
+   *
+   * @see test/unit/scan-lo-projects-all-ships.spec.ts
+   */
+  it('shows a cloaked ship on the map — canon gates cloak in the scantab, not here', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const cloaked = makeShip({
       userid: 'cloaked', shipno: 1, xcoord: 6, ycoord: 5, cloak: 10,
@@ -132,6 +145,9 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
-    expect(shipCells).toHaveLength(0);
+    // Present, but with no scantab letter — an unidentified contact. Cloak
+    // still costs the attacker their identity, range readout and lock.
+    expect(shipCells).toHaveLength(1);
+    expect(shipCells[0].char).toBe('=');
   });
 });
