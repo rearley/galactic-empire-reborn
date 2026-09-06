@@ -176,12 +176,12 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
   it('firer at warp fires the HYPER-phaser (hyper=true) — C-009 true separation', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, phasr: 100, energy: 50000,
+      speed: WARP_THRESHOLD, where: 1, phasr: 100, energy: 50000,
     });
     // Bob also at warp, due north at range 1 — inside the hyper beam arc.
     const bob = makeShip({
       userid: 'b', shipno: 2,
-      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, speed: WARP_THRESHOLD, where: 1, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -459,11 +459,11 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('firer at warp with energy < HPMINFIR → HP_NOPOW, no fire, no energy debit', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: HPMINFIR - 1,
+      speed: WARP_THRESHOLD, where: 1, energy: HPMINFIR - 1,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
-      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1,
+      speed: WARP_THRESHOLD, where: 1, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -481,7 +481,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
-      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
+      speed: WARP_THRESHOLD, where: 1, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -547,7 +547,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
-      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
+      speed: WARP_THRESHOLD, where: 1, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -589,7 +589,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
-      speed: WARP_THRESHOLD, shield: 5000, shieldstat: 1, damage: 0,
+      speed: WARP_THRESHOLD, where: 1, shield: 5000, shieldstat: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
