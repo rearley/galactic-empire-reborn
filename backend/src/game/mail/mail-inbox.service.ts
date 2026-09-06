@@ -5,6 +5,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { MailInboxRepository } from './mail-inbox.repository';
 import {
   DistressSignalPayload,
+  SpyReportPayload,
   StarvationPayload,
   RevoltPayload,
   GenericPayload,
@@ -14,6 +15,10 @@ import {
   ShipLossPayload,
   ProductionCapPayload,
 } from './mail.types';
+
+/** SPYM3 / SPYM4 rows. @see MAIL_TYPE_MAP in planet-attack.service.ts */
+const SPY_REPORT_HELD_TYPE = 33;
+const SPY_REPORT_TAKEN_TYPE = 34;
 import { capItemIndexForType } from './production-cap';
 import { classLabel } from './mail-render';
 import { MAIL_CLASS_DISTRESS } from '../constants';
@@ -92,6 +97,7 @@ export class MailInboxService {
     | ProductionReportPayload
     | ProductionCapPayload
     | DistressSignalPayload
+    | SpyReportPayload
     | StarvationPayload
     | RevoltPayload
     | ShipLossPayload
@@ -130,6 +136,19 @@ export class MailInboxService {
         sectorX: row.int1,
         sectorY: row.int2,
         ...(row.type === MESG_SHIPLOSS_GRAVITY ? { cause: 'gravity' as const } : {}),
+      };
+    }
+    if (row.class === MAIL_CLASS_DISTRESS
+      && (row.type === SPY_REPORT_HELD_TYPE || row.type === SPY_REPORT_TAKEN_TYPE)) {
+      // A spy's report on somebody else's planet. `dtime` carries the attacking
+      // commander — SPYM3/SPYM4's fourth slot. @see GECMDS.C:3972-3992
+      return {
+        kind: 'spy_report',
+        outcome: row.type === SPY_REPORT_TAKEN_TYPE ? 'taken' : 'held',
+        planetName: row.name1,
+        sectorX: row.int1,
+        sectorY: row.int2,
+        attackerUserid: row.dtime,
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS && row.type === 30) {

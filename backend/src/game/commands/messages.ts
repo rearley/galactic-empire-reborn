@@ -254,6 +254,12 @@ export enum MessageId {
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
   /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
   TEAM_TOO_MANY = 'TEAM_TOO_MANY',
+  /** ATTACK7 — told to the ATTACKER: the planet has called for help. */
+  ATT_DISTRESS_SENT = 'ATT_DISTRESS_SENT',
+  /** SPYM3 — operative report: the attack was repelled. */
+  SPY_REPORT_HELD = 'SPY_REPORT_HELD',
+  /** SPYM4 — operative report: the planet was taken. */
+  SPY_REPORT_TAKEN = 'SPY_REPORT_TAKEN',
   /** CYBNEW — a new Cybertron has been created somewhere in the galaxy. */
   CYB_NEW = 'CYB_NEW',
   /** DROIDNEW — a new droid has entered the galaxy. */
@@ -894,6 +900,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
   [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
+  [MessageId.ATT_DISTRESS_SENT]: CANON_MESSAGES.ATTACK7,
+  [MessageId.SPY_REPORT_HELD]: CANON_MESSAGES.SPYM3,
+  [MessageId.SPY_REPORT_TAKEN]: CANON_MESSAGES.SPYM4,
   [MessageId.CYB_NEW]: CANON_MESSAGES.CYBNEW,
   [MessageId.DROID_NEW]: CANON_MESSAGES.DROIDNEW,
   [MessageId.ARRIVE_GALAXY]: CANON_MESSAGES.ANNOUN,

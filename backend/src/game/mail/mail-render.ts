@@ -9,6 +9,7 @@ import { ITEM_NAMES } from '../constants/items';
 import {
   MailListEntry,
   DistressSignalPayload,
+  SpyReportPayload,
   ProductionReportPayload,
   StarvationPayload,
   RevoltPayload,
@@ -66,6 +67,19 @@ export function formatDetail(entry: MailListEntry): string[] {
     const who = p.who === 'troops' ? 'troops' : 'colonists';
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
     lines.push(`${p.lost.toLocaleString()} ${who} starved to death — the colony is out of food.`);
+  } else if (entry.payload.kind === 'spy_report') {
+    // The operative's own words. The reader does NOT own this planet, which is
+    // why it cannot borrow the distress body below. @see GECMDS.C:3972-3992
+    const p = entry.payload as SpyReportPayload;
+    lines.push('Classification: TOP SECRET');
+    lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
+    lines.push(
+      p.outcome === 'taken'
+        ? `Our operative reports hostile forces commanded by ${p.attackerUserid} have`
+          + ' toppled the defenses and taken over the planet.'
+        : `Our operative reports hostile forces commanded by ${p.attackerUserid} launched`
+          + ' an attack on this planet. The outcome was unclear as of this report.',
+    );
   } else if (entry.payload.kind === 'distress_signal') {
     const p = entry.payload as DistressSignalPayload;
     lines.push(`Attacker: ${p.attackerShipName}`);

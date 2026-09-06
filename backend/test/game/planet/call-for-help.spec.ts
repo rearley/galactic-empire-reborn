@@ -15,6 +15,8 @@ import { I_TROOPS, I_FIGHTER, NUMITEMS } from '../../../src/game/constants/items
 import {
   PLATTRT1_DEFAULT, PLATTRT2_DEFAULT, FIRETICKS_DEFAULT,
 } from '../../../src/game/commands/attack.config';
+import { formatMessage, MessageId } from '../../../src/game/commands/messages';
+import { MAIL_TYPE_MAP } from '../../../src/game/planet/planet-attack.service';
 
 function makeItems(): PlanetState['items'] {
   return Array.from({ length: NUMITEMS }, () => ({
@@ -47,7 +49,7 @@ function makeShip(): ShipState {
   };
 }
 
-function buildService(seed: number, opts: { spyowner?: string } = {}) {
+function buildService(seed: number, opts: { spyowner?: string; ownerInGame?: boolean } = {}) {
   const random = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
   const emitted: { event: string; payload: unknown }[] = [];
@@ -60,8 +62,11 @@ function buildService(seed: number, opts: { spyowner?: string } = {}) {
         fn(s);
       },
     ),
-    // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
-    findByUserid: jest.fn().mockReturnValue([]),
+    // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231) and
+    // the first arm of call_4_help's chain (GECMDS.C:3955).
+    findByUserid: jest.fn().mockReturnValue(
+      opts.ownerInGame ? [{ ...makeShip(), userid: 'defender', status: 1 }] : [],
+    ),
   } as unknown as ShipStateService;
 
   const mockPrisma = {
@@ -101,8 +106,13 @@ function buildService(seed: number, opts: { spyowner?: string } = {}) {
 // ---------------------------------------------------------------------------
 
 describe('PlanetAttackService — owner alert (troop branch)', () => {
+  // `ownerInGame` is now load-bearing: canon's first arm is
+  // `instat(plptr->userid,gestt) && othusp->substt >= FIGHTSUB`
+  // (GECMDS.C:3955), so the live alert only fires for an owner who is actually
+  // flying. This spec used to leave the owner offline and still expect the
+  // alert, which was the port's flattened chain rather than canon's.
   it('emits ATTACK_OWNER_ALERT_EVENT with ownerUserid when ratio > 1', async () => {
-    const { service, events, makePlanetWithOwner } = buildService(42);
+    const { service, events, makePlanetWithOwner } = buildService(42, { ownerInGame: true });
     const alertPayloads: unknown[] = [];
     events.on(ATTACK_OWNER_ALERT_EVENT, (payload) => alertPayloads.push(payload));
 
@@ -207,7 +217,7 @@ describe('PlanetAttackService — spy mail roll (troop branch)', () => {
 
 describe('PlanetAttackService — owner alert (fighter branch)', () => {
   it('emits alert when ratio > 1 in fighter attack', async () => {
-    const { service, events, makePlanetWithOwner } = buildService(42);
+    const { service, events, makePlanetWithOwner } = buildService(42, { ownerInGame: true });
     const alertPayloads: unknown[] = [];
     events.on(ATTACK_OWNER_ALERT_EVENT, (payload) => alertPayloads.push(payload));
 
@@ -239,5 +249,93 @@ describe('PlanetAttackService — owner alert (fighter branch)', () => {
     // Alert fires on (ratio > 1 || won == 1)
     // We just assert the service ran without error and alert was or wasn't emitted consistently
     expect(typeof alertPayloads.length).toBe('number');
+  });
+});
+
+/**
+ * `call_4_help` is an if/else-if CHAIN, and the port had flattened it.
+ *
+ *   if (instat(plptr->userid,gestt) && othusp->substt >= FIGHTSUB) {
+ *       prfmsg(ATTACK6,...);  outprf(othusn);          // the OWNER
+ *       prfmsg(ATTACK7);      outprfge(ALWAYS,usrnum); // the ATTACKER
+ *   }
+ *   else if (onsys(plptr->userid) && ...) { ATTACK6A; ATTACK7; }
+ *   else if (won == 0 && send_spy_mail && gernd()%6 == 0 && spyowner[0]) { SPYM3 }
+ *   else if (won == 1 && spyowner[0])                                    { SPYM4 }
+ *
+ * @see GECMDS.C:3952-3994
+ *
+ * Three things follow from it being a chain, and the port had none of them:
+ *
+ *  - the ATTACKER is told the planet called for help. That is the tell that
+ *    the owner is online and inbound — the cue to press the assault or break
+ *    orbit — and it was silently absent;
+ *  - the spy's report is only sent when the owner could NOT be reached. The
+ *    port sent it unconditionally;
+ *  - a WON attack always reports to the spy owner. The port gated it on
+ *    `sendSpyMail` (ratio > 5), so a planet taken at low ratio told the spy
+ *    nothing, which is the case a spy is most useful for.
+ *
+ * The port also sent the spy a MESG02/MESG04 body — "they successfully
+ * defended the planet", written as though the planet were the recipient's own.
+ * Canon sends SPYM3/SPYM4: a TOP SECRET operative report in the spy's voice.
+ */
+describe('call_4_help is a chain, not a broadcast (GECMDS.C:3952)', () => {
+  const highRatioAttack = 10_000;
+
+  it('tells the ATTACKER the planet is calling for help', async () => {
+    const { service, makePlanetWithOwner } = buildService(42, { ownerInGame: true });
+
+    const out = await service.attackTroop(highRatioAttack, makeShip(), makePlanetWithOwner('defender'));
+
+    expect(out.narration).toContain(formatMessage(MessageId.ATT_DISTRESS_SENT));
+  });
+
+  it('says nothing to the attacker when the owner is not there to hear it', async () => {
+    const { service, makePlanetWithOwner } = buildService(42, { ownerInGame: false });
+
+    const out = await service.attackTroop(highRatioAttack, makeShip(), makePlanetWithOwner('defender'));
+
+    expect(out.narration).not.toContain(formatMessage(MessageId.ATT_DISTRESS_SENT));
+  });
+
+  it('does NOT mail the spy when the owner was reached — the spy arms are else-ifs', async () => {
+    const { service, mockPrisma, makePlanetWithOwner } = buildService(42, {
+      ownerInGame: true, spyowner: 'spook',
+    });
+
+    await service.attackTroop(highRatioAttack, makeShip(), makePlanetWithOwner('defender'));
+
+    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    expect(calls.filter((c) => c[0].data.userid === 'spook')).toHaveLength(0);
+  });
+
+  it('mails the spy SPYM4 when the planet FALLS, with no ratio gate', async () => {
+    // canon: `won == 1 && spyowner[0] != 0` — no send_spy_mail, no roll.
+    const { service, mockPrisma, makePlanetWithOwner } = buildService(42, { spyowner: 'spook' });
+    const planet = makePlanetWithOwner('defender');
+    planet.items[I_TROOPS].qty = 1n;
+
+    const out = await service.attackTroop(highRatioAttack, makeShip(), planet);
+
+    if (out.won === 1) {
+      const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+      const spy = calls.find((c) => c[0].data.userid === 'spook');
+      expect(spy?.[0].data.type).toBe(MAIL_TYPE_MAP[MessageId.SPY_REPORT_TAKEN]);
+    }
+  });
+
+  it('uses the operative report, not the owner distress body', async () => {
+    const { service, mockPrisma, makePlanetWithOwner } = buildService(42, { spyowner: 'spook' });
+    const planet = makePlanetWithOwner('defender');
+    planet.items[I_TROOPS].qty = 1n;
+
+    await service.attackTroop(highRatioAttack, makeShip(), planet);
+
+    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    const spy = calls.find((c) => c[0].data.userid === 'spook');
+    // MESG02/MESG04 are the OWNER's distress bodies; a spy must never get one.
+    expect([MAIL_TYPE_MAP[MessageId.MESG02], MAIL_TYPE_MAP[MessageId.MESG04]])
+      .not.toContain(spy?.[0].data.type);
   });
 });
