@@ -3423,3 +3423,71 @@ cosmetic `beacon` case, since a gate that held for the beacon and leaked on
 markup would be worse than none.
 
 **Known issues:** deployed.
+
+## 2026-09-06 — canon-gap audit closed
+
+**Completed:** the remaining actionable items from
+`docs/audits/2026-09-05-canon-gaps.md`, in nine commits. Correctness first,
+then the narration tier.
+
+Correctness (`e7bc7b2`, `f4949a6`):
+- gold's half-ton weight was rounded up to 1 in the buy capacity gate, halving
+  how much gold a hold would take — on the one item the Zygor-3 bank exists to
+  move in bulk (GEFUNCS.C:2541)
+- MAXTEAMS was declared in two files and read in neither; the team table was
+  unbounded while the midnight job pays TEAMBONU per member (GECMDS.C:5484)
+- markup and reserve accepted values past canon's 32000 ceiling
+  (GEMAIN.C:3169, :3209)
+- `tea leave` reported success to someone who was never on a team
+  (GECMDS.C:5464)
+- `orb <n>` ignored the slot whenever the sector held one planet, so `orb 2`
+  on a wormhole silently orbited planet 1 (GECMDS.C:785-816)
+- planet distress mail was written even for an owner who watched the raid;
+  `mailit(1)` suppresses it (GEFUNCS.C:2231)
+
+Narration (`870a5e8`, `d0e598e`, `4869689`, `f3cd81b`, `8c00b11`, `667b9a2`,
+`63d6e5b`): the WARP ladder and NOACCEL (which also fired 500 energy late,
+because the debit floor was 0 instead of `useenergy`'s reserve); bare `loc`
+releasing a lock; JAMMER3 to each jammed ship; ANNOUN/ENTWAR/WARHUP arrival
+and departure; CYBNEW/DROIDNEW; canon's `call_4_help` chain including ATTACK7
+to the attacker and the SPYM3/SPYM4 operative reports; SPYM2, the reporting
+half of `check_spy`; CAPTDOC; and the admin report's Sold column plus
+`adm rename`.
+
+**Tests:** 511 suites / 5,153 green. Every fix was written test-first and the
+red was read before implementing, which is what caught the traps below.
+
+**Decisions made:**
+- DEADSTOP is deliberately not emitted — its branch is unreachable in canon
+  (needs a negative `speed2b`, which canon never assigns). I wrote the test
+  asserting it first and the failure was the test being wrong.
+- ATTACK6A is not emulated: it addresses an owner on the BBS but outside the
+  game, and this port has no lobby outside the game.
+- The captured-document roll happens before the DB lookup, so five kills in
+  six cost no query.
+
+**Three audit entries were WRONG and are withdrawn** (ORBIT4, TRANSOPT,
+MSG_FILTER open hails) — all already implemented, all "found missing" by
+grepping the canon token when the port aliases canon strings behind its own
+`MessageId` names. My own follow-up summary repeated the same mistake before
+the mapping check caught it. The reliable check is to map the token through
+`messages.ts` first.
+
+**Four of my own earlier tests were corrected rather than worked around**, each
+because it pinned port behaviour rather than canon: FR-028's "leave is a no-op
+with success message"; two call-for-help specs that expected the live owner
+alert with the owner offline; and attack-mail's "does not suppress the SPY
+copy", which was right about `mailit` and wrong about the outcome — it is not
+`mailit` that stops that mail, it is never reaching the `else if`.
+
+**One live trap caught mid-change:** `planet-economy.service` had
+`if (spy.outcome !== 'none') next.spyowner = ''`, correct while every non-none
+outcome removed the spy — and it would have silently deleted a spy every time
+one filed a report. The outcomes are now named individually.
+
+**Next:** a playtest. This is a large amount of new narration going live at
+once, and whether the volume is right is a question canon cannot answer.
+
+**Known issues:** the `ITEM_NAMES` spelling divergence ("Torpedoes"/"Gold"
+against canon's "torpedos"/"gold") is still open, deliberately, as a change of
+its own.
