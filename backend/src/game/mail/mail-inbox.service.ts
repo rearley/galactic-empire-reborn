@@ -6,6 +6,7 @@ import { MailInboxRepository } from './mail-inbox.repository';
 import {
   DistressSignalPayload,
   SpyReportPayload,
+  SpyIntelPayload,
   StarvationPayload,
   RevoltPayload,
   GenericPayload,
@@ -19,6 +20,8 @@ import {
 /** SPYM3 / SPYM4 rows. @see MAIL_TYPE_MAP in planet-attack.service.ts */
 const SPY_REPORT_HELD_TYPE = 33;
 const SPY_REPORT_TAKEN_TYPE = 34;
+/** SPYM2 — the operative's inventory report. @see GEPLANET.C:181 */
+const SPY_INTEL_TYPE = 35;
 import { capItemIndexForType } from './production-cap';
 import { classLabel } from './mail-render';
 import { MAIL_CLASS_DISTRESS } from '../constants';
@@ -98,6 +101,7 @@ export class MailInboxService {
     | ProductionCapPayload
     | DistressSignalPayload
     | SpyReportPayload
+    | SpyIntelPayload
     | StarvationPayload
     | RevoltPayload
     | ShipLossPayload
@@ -149,6 +153,19 @@ export class MailInboxService {
         sectorX: row.int1,
         sectorY: row.int2,
         attackerUserid: row.dtime,
+      };
+    }
+    if (row.class === MAIL_CLASS_DISTRESS && row.type === SPY_INTEL_TYPE) {
+      // `debt` holds the item slot and `tax` the confidence — MailStat has no
+      // column for either, and both are unused on a distress row.
+      return {
+        kind: 'spy_intel',
+        planetName: row.name1,
+        sectorX: row.int1,
+        sectorY: row.int2,
+        itemIndex: Number(row.debt),
+        reportedQty: row.cash,
+        confidence: Number(row.tax),
       };
     }
     if (row.class === MAIL_CLASS_DISTRESS && row.type === 30) {
