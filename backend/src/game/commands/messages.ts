@@ -266,6 +266,22 @@ export enum MessageId {
   REPAIR_HELM = 'REPAIR_HELM',
   /** FCREPR — fire control is functioning again. */
   REPAIR_FIRECNTL = 'REPAIR_FIRECNTL',
+  /** PHSRUP — the bank can fire at all. */
+  PHASER_MIN_POWER = 'PHASER_MIN_POWER',
+  /** PHSRMAX — the bank is at 100%. */
+  PHASER_FULL_POWER = 'PHASER_FULL_POWER',
+  /** SHDNNOP — shields fell for want of power. */
+  SHIELDS_NO_POWER = 'SHIELDS_NO_POWER',
+  /** SHREPR — the shield generator is repaired. */
+  SHIELDS_REPAIRED = 'SHIELDS_REPAIRED',
+  /** CLOKUP — the cloak ramp completed; fully invisible. */
+  CLOAK_FULL = 'CLOAK_FULL',
+  /** CLREPR — the cloaking device is functional again. */
+  CLOAK_REPAIRED = 'CLOAK_REPAIRED',
+  /** MAINT7 — a paid repair finished. */
+  MAINT_COMPLETE = 'MAINT_COMPLETE',
+  /** MAINT10 — a paid repair was cancelled because someone fired. */
+  MAINT_INTERRUPTED = 'MAINT_INTERRUPTED',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -866,6 +882,18 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.REPAIR_TACTICAL]: CANON_MESSAGES.TAREPR,
   [MessageId.REPAIR_HELM]: CANON_MESSAGES.HLREPR,
   [MessageId.REPAIR_FIRECNTL]: CANON_MESSAGES.FCREPR,
+  /** @see GEFUNCS.C:1037, :1046 — the feedback loop of the reload cadence. */
+  [MessageId.PHASER_MIN_POWER]: CANON_MESSAGES.PHSRUP,
+  [MessageId.PHASER_FULL_POWER]: CANON_MESSAGES.PHSRMAX,
+  /** @see GEFUNCS.C:1345 SHDNNOP, :2486 SHREPR */
+  [MessageId.SHIELDS_NO_POWER]: CANON_MESSAGES.SHDNNOP,
+  [MessageId.SHIELDS_REPAIRED]: CANON_MESSAGES.SHREPR,
+  /** @see GEFUNCS.C:1724 CLOKUP, :1392 CLREPR */
+  [MessageId.CLOAK_FULL]: CANON_MESSAGES.CLOKUP,
+  [MessageId.CLOAK_REPAIRED]: CANON_MESSAGES.CLREPR,
+  /** @see GEFUNCS.C:422 MAINT7, :399 MAINT10 */
+  [MessageId.MAINT_COMPLETE]: CANON_MESSAGES.MAINT7,
+  [MessageId.MAINT_INTERRUPTED]: CANON_MESSAGES.MAINT10,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

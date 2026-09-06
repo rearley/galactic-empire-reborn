@@ -17,6 +17,8 @@ import {
   SHIP_SYSTEM_REPAIRED,
   RepairedSystem,
   ShipSystemRepairedEvent,
+  SHIP_STATUS_NOTICE,
+  ShipStatusNoticeEvent,
 } from './repair-events';
 import {
   SHIP_SHIELD_CHARGE,
@@ -199,13 +201,23 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     // Each 1s tick: subtract 3 hull damage, recalculate queue, clear when done.
     if (ship.repair > 0) {
       if (ship.cantexit > 0) {
-        // Combat interrupts repair — GEFUNCS.C:397
+        // Combat interrupts repair — GEFUNCS.C:397 — and the yard SAYS SO:
+        // `prfmsg(MAINT10)`, the maintenance team downing tools under their
+        // union contract. The port cancelled the paid-for repair silently, so a
+        // captain undocked believing they were repaired. @see GEFUNCS.C:399
         this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.repair = 0; });
+        this.events?.emit(SHIP_STATUS_NOTICE, {
+          shipId: shipKey(ship.userid, ship.shipno),
+          notice: 'maint-interrupted',
+          tickAt: new Date(),
+        } satisfies ShipStatusNoticeEvent);
       } else {
+        let maintComplete = false;
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.damage = s.damage > 3 ? s.damage - 3 : 0;
           s.repair = Math.floor(s.damage / 3);
           if (s.repair <= 1) {
+            maintComplete = true;
             // A finished repair puts the ship back to factory condition — C
             // restores seven fields here, not three. topspeed is the one that
             // matters most: overspeeding sets it to 0 and `warp` refuses on
@@ -225,6 +237,17 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
             if (s.maxWarp !== undefined) s.topspeed = s.maxWarp;
           }
         });
+
+        // `prfmsg(MAINT7)` — the yard reporting the job done. Without it a
+        // captain had no way to know the repair had finished except by watching
+        // `rep`. @see GEFUNCS.C:422
+        if (maintComplete) {
+          this.events?.emit(SHIP_STATUS_NOTICE, {
+            shipId: shipKey(ship.userid, ship.shipno),
+            notice: 'maint-complete',
+            tickAt: new Date(),
+          } satisfies ShipStatusNoticeEvent);
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import { tryEnergyDebit, cbearing } from '../physics/physics-math';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
 import { COMBAT_TARGET_WARNING, CombatTargetWarningEvent } from './combat-events';
+import { SHIP_PHASER_CHARGE, ShipPhaserChargeEvent } from '../ship/repair-events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
@@ -21,6 +22,7 @@ import {
   SHIELDDM,
   PENGUSE,
   USEENERGY_RESERVE,
+  PMINFIRE,
 } from '../constants';
 import { MineRegistry, MineState } from './mine.registry';
 import { MineRepository } from './mine.repository';
@@ -512,6 +514,20 @@ export class CombatTickService implements OnModuleInit {
     }
   }
 
+  /**
+   * PHSRUP / PHSRMAX — the bank reporting it can fire, and that it is full.
+   * @see GEFUNCS.C:1037, :1046
+   */
+  private emitPhaserCharge(
+    ship: ShipState, level: ShipPhaserChargeEvent['level'], ctx: TickContext,
+  ): void {
+    this.events.emit(SHIP_PHASER_CHARGE, {
+      shipId: shipKey(ship.userid, ship.shipno),
+      level,
+      tickAt: ctx.firedAt,
+    } satisfies ShipPhaserChargeEvent);
+  }
+
   /** Per-ship combat work — filled in by subsequent user-story phases. */
   private processShipCombat(ship: ShipState, ctx: TickContext): void {
     // Phaser reload: phasr += phasrtype * PRELOAD, capped at class maxPhaser.
@@ -529,10 +545,21 @@ export class CombatTickService implements OnModuleInit {
       const debit = tryEnergyDebit(ship.energy, PENGUSE, USEENERGY_RESERVE);
       if (debit.ok) {
         const reloadAmt = phaserReloadAmount(ship.phasrtype);
+
+        // Canon tests the CROSSING before adding the charge, so PHSRUP fires
+        // once — on the tick the bank becomes able to fire at all — rather than
+        // on every tick above the threshold.
+        // @see GEFUNCS.C:1035-1039
+        const crossesMinimum = ship.phasr < PMINFIRE && ship.phasr + reloadAmt >= PMINFIRE;
+        const reachesFull = ship.phasr + reloadAmt >= 100;
+
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.phasr = Math.min(100, s.phasr + reloadAmt);
           s.energy = debit.newEnergy;
         });
+
+        if (crossesMinimum) this.emitPhaserCharge(ship, 'minimum', ctx);
+        if (reachesFull) this.emitPhaserCharge(ship, 'full', ctx);
       }
     }
 

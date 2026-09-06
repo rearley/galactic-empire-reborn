@@ -3357,3 +3357,35 @@ and its repair (CLREPR), maintenance completion and interruption
 (MAINT7/MAINT10), and the kill salvage report (KILLGOT1/KILLPNTS).
 
 **Known issues:** deployed.
+
+## 2026-09-06 — the rest of the narration tier
+
+**Completed:** every remaining "canon string exists, nothing emits it" item from
+the audit except the kill salvage report.
+
+- **Phaser charge — PHSRUP / PHSRMAX** (GEFUNCS.C:1037, :1046). The feedback
+  loop of the reload cadence: canon's rhythm is break off, wait for "Phaser
+  banks are at full power, Sir!", re-engage. PHSRUP fires on the CROSSING, as
+  canon tests the sum before adding it, so it does not repeat every tick above
+  the threshold.
+- **Shields fall for want of power — SHDNNOP** (GEFUNCS.C:1340-1348). This one
+  was a missing MECHANIC, not a missing line: `SHMINPWR` was defined in
+  constants.ts and used by no production code, so shields never dropped at all
+  and a drained ship sat shielded indefinitely.
+- **Cloak ramp completing — CLOKUP** (GEFUNCS.C:1724), and the cloak finishing
+  repair — CLREPR (:1392). The ramp one matters most: the two ticks between
+  `clo on` and full concealment are exactly the window in which the ship is
+  still visible and still lockable, so "we are now completely invisible" is the
+  moment the pilot is waiting for.
+- **Maintenance — MAINT7 and MAINT10** (GEFUNCS.C:422, :399). A finished repair
+  said nothing, and a repair cancelled by combat said nothing either — so a
+  captain undocked believing they were repaired.
+
+**Tests:** phaser-charge-notices (4), status-notices (7), plus the gateway
+relays. 504 suites / 5,054 tests.
+
+**Still open:** the kill salvage report (KILLGOT1/KILLPNTS — you never learn
+what you looted or scored), `hel transfer` from the round-7 list, and a test for
+`applyAdminChange`'s ownership gate.
+
+**Known issues:** deployed.
