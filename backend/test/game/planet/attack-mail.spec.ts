@@ -50,7 +50,7 @@ function makeShip(): ShipState {
   };
 }
 
-function makeService(seed = 42) {
+function makeService(seed = 42, onlineOwnerShips: ShipState[] = []) {
   const random = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -61,6 +61,9 @@ function makeService(seed = 42) {
         fn(s);
       },
     ),
+    // Canon suppresses the owner's distress mail when the owner is in-game
+    // (GEFUNCS.C:2231). Default: nobody is flying, so mail is always written.
+    findByUserid: jest.fn().mockReturnValue(onlineOwnerShips),
   } as unknown as ShipStateService;
 
   const mailCreates: unknown[] = [];
@@ -206,5 +209,74 @@ describe('PlanetAttackService — fighter branch mail (T027)', () => {
 
     // ratio = (10/10000)*100 = 0.1 ≤ 2 → no mail
     expect(mailCreates.length).toBe(0);
+  });
+});
+
+/**
+ * The owner's distress mail is for the owner who WASN'T there.
+ *
+ *   if (flag == 1) {
+ *       if (instat(mail.userid,gestt)) {
+ *           if (othusp->substt >= FIGHTSUB) { return; }
+ *       }
+ *   }
+ *
+ * @see GEFUNCS.C:2231-2237 mailit — the flag-1 arm returns before writing
+ * @see GECMDS.C:3779, :3943 — both planet-attack resolutions call mailit(1)
+ *
+ * It is the same predicate `call_4_help` uses to decide whether to send the
+ * live ATTACK6 alert (`instat(plptr->userid,gestt) && othusp->substt >=
+ * FIGHTSUB`, GECMDS.C:3955): the mail exists precisely when the alert could
+ * not be delivered. The port sent both, so an owner who watched the raid
+ * happen also found a letter about it afterwards.
+ *
+ * Every other mail producer uses mailit(0) and is never suppressed — the spy's
+ * intelligence copy included, which is why it is asserted separately here.
+ */
+describe('owner distress mail is suppressed for an owner in-game (GEFUNCS.C:2231)', () => {
+  function flyingOwner(): ShipState {
+    return { ...makeShip(), userid: 'owner', shipno: 1, status: 1 };
+  }
+
+  it('writes no owner mail while the owner is flying', async () => {
+    const { service, mailCreates } = makeService(999, [flyingOwner()]);
+    const planet = makePlanet(100);
+
+    await service.attackTroop(50_000, makeShip(), planet);
+
+    expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'owner'))
+      .toHaveLength(0);
+  });
+
+  it('still writes it when the owner is logged in but not in the game', async () => {
+    // status 0 — a captain parked outside GE. `instat` alone is not enough;
+    // canon also requires substt >= FIGHTSUB.
+    const parked = { ...flyingOwner(), status: 0 };
+    const { service, mailCreates } = makeService(999, [parked]);
+
+    await service.attackTroop(50_000, makeShip(), makePlanet(100));
+
+    expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'owner').length)
+      .toBeGreaterThan(0);
+  });
+
+  it('still writes it when the owner is offline', async () => {
+    const { service, mailCreates } = makeService(999, []);
+
+    await service.attackTroop(50_000, makeShip(), makePlanet(100));
+
+    expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'owner').length)
+      .toBeGreaterThan(0);
+  });
+
+  it('does not suppress the SPY copy — only mailit(1) is gated', async () => {
+    const { service, mailCreates } = makeService(999, [flyingOwner()]);
+    const planet = makePlanet(100);
+    planet.spyowner = 'spook';
+
+    await service.attackTroop(50_000, makeShip(), planet);
+
+    expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'spook').length)
+      .toBeGreaterThan(0);
   });
 });

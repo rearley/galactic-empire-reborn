@@ -69,10 +69,19 @@ export class OrbitHandlerService {
 
     let targetPlnum: number | undefined;
 
-    if (planets.length === 1) {
+    // Canon makes the slot argument mandatory (`margc != 2` -> ORBFMT,
+    // GECMDS.C:763) and always looks up the slot the pilot typed. This port
+    // adds one convenience — a lone planet in the sector is orbited without an
+    // argument — and that convenience used to swallow the argument outright:
+    // in a sector holding planet #1 and wormhole #2, `orb 2` put you around
+    // planet #1 and announced it by name. An argument that IS given is now
+    // always honoured, whatever the sector holds.
+    const slotArg = args[0]?.trim();
+
+    if (planets.length === 1 && !slotArg) {
       targetPlnum = planets[0].plnum;
     } else {
-      const arg = args[0]?.trim();
+      const arg = slotArg;
       if (!arg) {
         const list = planets.map((p) => `${p.plnum}: ${p.name || '(unnamed)'}`).join(', ');
         return {

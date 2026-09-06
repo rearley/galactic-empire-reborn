@@ -80,6 +80,8 @@ function makeService(seed: number) {
     mutate: jest.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => { fn(makeShip(0)); },
     ),
+    // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
+    findByUserid: jest.fn().mockReturnValue([]),
   } as unknown as ShipStateService;
   const mockPrisma = {
     user: { update: jest.fn().mockResolvedValue({}) },

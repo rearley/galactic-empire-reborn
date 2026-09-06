@@ -160,3 +160,75 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
     expect(r.lines[0].text).not.toMatch(/wormhole/);
   });
 });
+
+/**
+ * The slot the pilot types is the slot that is looked up.
+ *
+ *   plnum = (atoi(margv[1]));
+ *   if (plnum <= MAXPLANETS && plnum > 0) {
+ *       got_plt = getplanetdat(usrnum);
+ *       if (got_plt) { if (plptr->type == PLTYPE_WORM) { prfmsg(ORBIT0); return; } ... }
+ *       else { prfmsg(FOOLISH); }
+ *   }
+ *
+ * @see GECMDS.C:785-816
+ *
+ * Canon never substitutes a different planet — `margv[1]` is mandatory there.
+ * The port added a convenience: with exactly one planet in the sector it
+ * orbits that one without an argument. That convenience swallowed the
+ * argument entirely, so in a sector holding planet #1 and wormhole #2, a
+ * pilot typing `orb 2` — deliberately naming the wormhole `sca pl` had just
+ * listed — was silently put in orbit around planet #1 and told so by name.
+ *
+ * The convenience is kept for the NO-ARGUMENT case only. An argument that is
+ * present is always honoured.
+ */
+describe('orb <n> honours the slot even when the sector holds one planet', () => {
+  function serviceWithWormhole(planets: ReturnType<typeof makePlanet>[], wormPlnum: number) {
+    const shipMock = { mutate: jest.fn(), get: jest.fn() };
+    const planetMock = { bySector: jest.fn().mockReturnValue(planets) };
+    return new OrbitHandlerService(
+      shipMock as unknown as ShipStateService,
+      planetMock as unknown as PlanetStateService,
+      {
+        wormhole: {
+          findFirst: async ({ where }: { where: { plnum: number } }) =>
+            where.plnum === wormPlnum ? { plnum: wormPlnum } : null,
+        },
+      } as never,
+    );
+  }
+
+  it('answers ORBIT0 for a wormhole slot, not silent success on the lone planet', async () => {
+    const svc = serviceWithWormhole([makePlanet(1, 'Terra')], 2);
+
+    const result = await svc.command.handler(makeShip(), ['2'], {}) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ORBIT0));
+  });
+
+  it('does not orbit the lone planet when a different slot was named', async () => {
+    const { svc, shipMock } = makeService([makePlanet(1, 'Terra')]);
+
+    await svc.command.handler(makeShip(), ['5'], {}) as CommandResult;
+
+    expect(shipMock.mutate).not.toHaveBeenCalled();
+  });
+
+  it('still orbits the lone planet when no slot is given', async () => {
+    const { svc, mutated } = makeService([makePlanet(1, 'Terra')]);
+
+    const result = await svc.command.handler(makeShip(), [], {}) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.ORBIT01, 1, 'Terra'));
+    expect(mutated.where).toBe(11);
+  });
+
+  it('orbits the lone planet when its own slot is named', async () => {
+    const { svc, mutated } = makeService([makePlanet(1, 'Terra')]);
+
+    await svc.command.handler(makeShip(), ['1'], {}) as CommandResult;
+
+    expect(mutated.where).toBe(11);
+  });
+});
