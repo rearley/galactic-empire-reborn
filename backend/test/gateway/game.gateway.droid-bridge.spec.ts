@@ -41,7 +41,9 @@ describe('GameGateway — droid event bridge', () => {
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
 
     gateway = new GameGateway(
-      {} as ShipStateService,
+      // DROIDNEW is a galaxy broadcast that skips filtered pilots, so the
+      // bridge now reads the ship map. @see GEDROIDS.C:173
+      { findAllShips: () => [] } as unknown as ShipStateService,
       {} as CommandRouterService,
       {} as ConnectedShipsRegistry,
       mockWsGuard,
@@ -54,7 +56,12 @@ describe('GameGateway — droid event bridge', () => {
     );
 
     // Inject the mock socket.io Server
-    (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+    // `except` is the top-level Socket.io broadcast the CYBNEW/DROIDNEW line
+    // uses; the roster emit still goes through `to`.
+    (gateway as unknown as { server: unknown }).server = {
+      to: toMock,
+      except: jest.fn().mockReturnValue({ emit: jest.fn() }),
+    };
   });
 
   describe('handleDroidSpawned', () => {

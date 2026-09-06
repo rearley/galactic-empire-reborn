@@ -254,6 +254,16 @@ export enum MessageId {
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
   /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
   TEAM_TOO_MANY = 'TEAM_TOO_MANY',
+  /** CYBNEW — a new Cybertron has been created somewhere in the galaxy. */
+  CYB_NEW = 'CYB_NEW',
+  /** DROIDNEW — a new droid has entered the galaxy. */
+  DROID_NEW = 'DROID_NEW',
+  /** ANNOUN — galaxy-wide notice that a ship has entered the game. */
+  ARRIVE_GALAXY = 'ARRIVE_GALAXY',
+  /** ENTWAR — the same arrival, announced in the ship's own star system. */
+  ARRIVE_SECTOR = 'ARRIVE_SECTOR',
+  /** WARHUP — a captain logged off; their ship vanishes from the sector. */
+  DEPART_SECTOR = 'DEPART_SECTOR',
   /** LOCK01 — bare `loc` released the fire-control lock. */
   LOC_CLEARED = 'LOC_CLEARED',
   /** JAMMER3 — told to a ship whose scanners have just been jammed. */
@@ -884,6 +894,11 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
   [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
+  [MessageId.CYB_NEW]: CANON_MESSAGES.CYBNEW,
+  [MessageId.DROID_NEW]: CANON_MESSAGES.DROIDNEW,
+  [MessageId.ARRIVE_GALAXY]: CANON_MESSAGES.ANNOUN,
+  [MessageId.ARRIVE_SECTOR]: CANON_MESSAGES.ENTWAR,
+  [MessageId.DEPART_SECTOR]: CANON_MESSAGES.WARHUP,
   [MessageId.LOC_CLEARED]: CANON_MESSAGES.LOCK01,
   [MessageId.JAMMER3_JAMMED]: CANON_MESSAGES.JAMMER3,
   [MessageId.HELM_WARP]: CANON_MESSAGES.WARP,

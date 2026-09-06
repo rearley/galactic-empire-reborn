@@ -101,7 +101,10 @@ describe('GameGateway player.snapshot', () => {
     (gateway as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
-      to: jest.fn(() => ({ emit: jest.fn() })),
+      // .except() is part of the real Socket.io chain — WARHUP uses it.
+      to: jest.fn(() => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) })),
+      // ANNOUN is a top-level server.except(...) broadcast.
+      except: jest.fn(() => ({ emit: jest.fn(), to: () => ({ emit: jest.fn() }) })),
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };
