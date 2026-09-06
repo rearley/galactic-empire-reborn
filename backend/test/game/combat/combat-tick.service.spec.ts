@@ -405,11 +405,13 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     const dmg100 = await runMissileHit(100); // neutral: multiplier = 1.0×
     const dmg200 = await runMissileHit(200); // double factor: multiplier = 0.5×
 
-    // rollHullDamage = floor(rand * dmgMax * (100/factor)).
-    // Since floor(floor(x) * 0.5) === floor(x * 0.5) for all x ≥ 0, this
-    // identity holds regardless of the specific PRNG output.
+    // CORRECTION 2026-09-06: this asserted `Math.floor(dmg100 * 0.5)`, which
+    // only held while projectile damage was floored. Canon accumulates it on a
+    // double uncast -- `ptr->damage += mdammax*damfact` (GEFUNCS.C:1644) -- and
+    // the phaser is the only weapon that truncates (GECMDS.C:969). The ton_fact
+    // ratio is therefore exact, not floor-of-half.
     expect(dmg100).toBeGreaterThan(0);
-    expect(dmg200).toBe(Math.floor(dmg100 * 0.5));
+    expect(dmg200).toBeCloseTo(dmg100 * 0.5, 10);
   });
 
   it('decoy intercept — when carrier has active decoy and roll succeeds, emit COMBAT_DECOY_INTERCEPT and clear slot, no COMBAT_HIT', async () => {

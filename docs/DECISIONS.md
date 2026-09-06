@@ -3581,3 +3581,44 @@ it is a wrong test that happens to agree most of the time, and it was hiding
 (b). Keeping the paraphrases as friendlier text — canon's wording is the thing
 being ported, and the paraphrase in (c) is what made the invented HPFIRED in (b)
 hard to spot among other invented lines.
+
+## 2026-09-06 — Projectile hull damage is fractional; only the phaser truncates
+**Context:** Reported from play — "missiles seem interesting.. even at like 3k I
+don't seem to record hits at 20000."
+
+`WARSHP.damage` is a `double` (GEMAIN.H:332) and canon adds to it WITHOUT a cast
+for both projectiles:
+
+    ptr->damage += damfact;             /* torpedo, GEFUNCS.C:1574        */
+    ptr->damage += mdammax*damfact;     /* missile, GEFUNCS.C:1644, :1658 */
+
+The phaser is the deliberate exception and truncates on the way in:
+
+    damage = (int)(factor);             /* GECMDS.C:969, :1063 */
+
+The port floored all three. For the phaser that is correct; for the projectiles
+it silently deleted every hit worth less than one point.
+
+The missile is where it showed. Against a SHIELDED target the roll is `rndm(.1)`,
+so with MDAMMAX 25 and MISSILE_CHARGE_MAX 50000, a 20,000-charge missile on a
+90-damfact hull earns 0.2-1.0 hull per hit — floored to ZERO on almost every
+hit. A full volley that should have taken ~8% off did nothing measurable, which
+is exactly what the report described. Torpedoes lost under a point per hit,
+noticeable only in aggregate.
+
+**Decision:** return the fraction from `rollMissileHullDamage` and
+`rollProjectileHullDamage`; leave the phaser's floor alone.
+
+**Reason:** canon, and the shielded-missile case is not a rounding detail — it
+is the difference between a weapon that works and one that does not. The
+missile's role against a shielded target is to strip shields via `shieldhit`
+while contributing a trickle of hull damage; deleting the trickle removed half
+of what the weapon is for.
+
+**Alternatives rejected:** rounding rather than truncating — still wrong, and it
+would over-credit as often as it under-credited. Scaling MDAMMAX up to
+compensate — invents a balance change to paper over an arithmetic bug.
+
+Two tests pinned the floored integers (`toBe(Math.floor(dmg100 * 0.5))` and
+`toBe(Math.floor(soft / 2))`); both are corrected in place, since the identity
+they relied on held only while the defect did.

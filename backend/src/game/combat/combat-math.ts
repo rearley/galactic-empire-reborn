@@ -287,7 +287,10 @@ export function rollProjectileHullDamage(
   shieldsUp: boolean,
 ): number {
   const factor = shieldsUp ? rand.next() * 0.5 : rand.next() * 0.5 + 0.5;
-  return Math.floor(dmgMax * factor * damageScale(victimDamageFactor));
+  // NOT floored — `ptr->damage += damfact` (GEFUNCS.C:1574) has no cast. Less
+  // dramatic than the missile case since a torpedo's roll is larger, but it was
+  // shaving up to a point off every hit.
+  return dmgMax * factor * damageScale(victimDamageFactor);
 }
 
 /**
@@ -316,7 +319,15 @@ export function rollMissileHullDamage(
 ): number {
   const adjusted = charge * damageScale(victimDamageFactor);
   const factor = shieldsUp ? rand.next() * 0.1 : rand.next() * 0.5 + 0.5;
-  return Math.floor(MDAMMAX * (adjusted / MISSILE_CHARGE_MAX) * factor);
+  // NOT floored. `WARSHP.damage` is a double (GEMAIN.H:332) and canon adds to
+  // it uncast: `ptr->damage += mdammax*damfact` (GEFUNCS.C:1644, :1658). The
+  // phaser is the deliberate exception, truncating at GECMDS.C:969.
+  //
+  // Flooring here deleted every hit worth less than a point, and against a
+  // SHIELDED target the roll is `rndm(.1)` — so a 20,000-charge missile on a
+  // 90-damfact hull earns 0.2-1.0 hull and scored ZERO on almost every hit.
+  // A full volley that should have taken ~8% off did nothing at all.
+  return MDAMMAX * (adjusted / MISSILE_CHARGE_MAX) * factor;
 }
 
 /**
