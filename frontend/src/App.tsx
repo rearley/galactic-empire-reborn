@@ -56,6 +56,9 @@ function Terminal(): React.JSX.Element {
     useSocket(playerDispatch);
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
+  // Which scan produced them — ScanMap needs it to decide whether a sector
+  // crossing invalidates the view. Only `sca se` is sector-scoped.
+  const [scanKind, setScanKind] = useState<ScanRenderEvent['kind'] | null>(null);
 
   useEffect(() => {
     if (lastResult) {
@@ -80,6 +83,7 @@ function Terminal(): React.JSX.Element {
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
       setScanCells(event.cells as ScanCell[]);
+      setScanKind(event.kind);
     };
     socket.on('scan:render', handleScanRender);
     return () => { socket.off('scan:render', handleScanRender); };
@@ -317,7 +321,7 @@ function Terminal(): React.JSX.Element {
           * with near-duplicates.
           */}
         <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
-          <ScanMap cells={scanCells} shipId={localShipId} />
+          <ScanMap cells={scanCells} shipId={localShipId} kind={scanKind} />
           <div className="flex-1 overflow-auto border-t border-gray-800">
             <ScanPanel />
           </div>

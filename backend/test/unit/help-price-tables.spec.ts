@@ -69,7 +69,13 @@ describe('hel class', () => {
   });
 
   it('shows the Interceptor at its canon price', () => {
-    expect(classText).toMatch(/Interceptor\s+65k/);
+    // CORRECTION 2026-09-06: price no longer follows the name. Canon's row puts
+    // fourteen capability columns between them (GECMDS.C:411), so the old
+    // `Interceptor\s+65k` pinned a layout canon does not have. Assert on the
+    // ROW instead, which is what actually matters.
+    const row = classText.split('\n').find((l) => l.includes('Interceptor'));
+    expect(row).toBeDefined();
+    expect(row).toContain('65k');
   });
 
   it('points at the other table rather than repeating it', () => {

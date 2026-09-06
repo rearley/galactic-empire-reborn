@@ -3464,3 +3464,59 @@ them decorative.
 invented, just quieter, and it would have kept a citation that points at
 nothing. Clawing back the ~308,000 already banked — the owner's call, and they
 declined.
+
+## 2026-09-06 — `hel class` shows canon's full table; only `sca se` clears on transit
+**Context (1):** `hel class` printed seven columns — #, Class, Price, Phas,
+Shld, Cargo, Warp — where canon prints eighteen (GECMDS.C:411-431) under the
+stacked header at MBMGEHLP.MSG HLPCLS1, followed by HLPCLS2, a legend defining
+every abbreviation. The eleven missing columns are exactly the ones that say
+what a hull can DO: torpedo, missile, decoy, jammer, zipper, mine, planetary
+attack, cloak, acceleration, scan range and kill value.
+
+Reported from play, and the report was a question the table itself provoked: on
+the visible columns the Star Cruiser (700k) is a Destroyer (600k) with 2,000
+tons LESS cargo and nothing to show for the extra hundred thousand. The answer
+— cloak, double acceleration, and 5,000 kill points against 2,000 — was in
+three of the columns we were not printing. A buyer could not make the decision
+the shipyard was asking them to make.
+
+**Decision (1):** print canon's table, generated from `SHIP_CLASSES` (already
+extracted from MBMGESHP.MSG and pinned by ship-class-canon.balance.spec.ts), in
+canon's column order — note Shld BEFORE Phsr, which the port had reversed — with
+canon's stacked header and the HLPCLS2 legend beneath it.
+
+Canon's width helpers are integer division, so the Frigate's 1,250,000 credits
+print as "1m". That lossiness is kept rather than "improved" to 1.3m: the
+columns are fixed width, and inventing a decimal in the one table a buyer reads
+before spending a million is a silent divergence for no gain.
+
+NOT done: canon's `HELP CLASS nn` per-class detail view, which HLPCLS2's closing
+note advertises. The table and legend answer the reported problem; the detail
+view is a separate piece of work and is not pretended at.
+
+**Context (2):** FR-013 blanked the sector map on ANY sector crossing, for every
+scan mode. That is right for `sca se`, which draws the sector you are standing
+in, and wrong for `sca lo` and `sca ra`, which are RANGE-scoped and do not know
+what a sector boundary is. A long-range map spans about 30 sectors, so crossing
+one invalidates ~3% of it — and at warp you cross one every few seconds, so the
+map was blank for most of any journey, exactly when a long-range picture is
+worth having.
+
+This got worse on 2026-09-06: until `sca lo` was fixed to project every ship it
+only ever drew contacts inside the 10-sector scantab, so a sector of travel was
+a meaningful fraction of what could be seen. Once the map reached its real
+radius, the rule was discarding a view that was almost entirely still good.
+
+**Decision (2):** clear on transit only when the last render was `kind === 'se'`.
+`ScanRenderEvent.kind` is already on the wire; App threads it to ScanMap.
+
+**Reason:** canon never invalidates the map at all — it is text printed into a
+scrolling terminal, and with SCANHOME the next scan redraws in place. Clearing
+only the sector-scoped mode is the narrowest rule that still blanks the one view
+that would otherwise be a picture of somewhere else.
+
+**Alternatives rejected:** matching canon exactly by never clearing — `sca se`
+would then show a neighbouring sector's contents under your current sector's
+header, which is worse than either rule. Clearing on a distance threshold rather
+than a boundary — invented, untestable against canon, and it would still fight
+the fact that the map goes stale continuously rather than at a threshold.
