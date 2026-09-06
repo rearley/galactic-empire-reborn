@@ -68,6 +68,14 @@ export interface PhysicsHyperspaceEvent {
   shieldsDropped?: boolean;
   /** Entering dropped an ACTIVE cloak (HYCLDN). */
   cloakDropped?: boolean;
+  /**
+   * The jumping ship's name and the sector it left from — canon tells the
+   * SECTOR, not just the pilot: `prfmsg(HYPERIN2,ptr->shipname);
+   * outsect(FILTER,&coord,usrn,0)` (GEFUNCS.C:605-606). Optional because the
+   * exit path has no sector announcement in canon and does not carry them.
+   */
+  shipname?: string;
+  sector?: { x: number; y: number };
 }
 
 /** @see GEFUNCS.C:836-905 gravity */

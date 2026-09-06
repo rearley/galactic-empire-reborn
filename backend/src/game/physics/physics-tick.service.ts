@@ -414,6 +414,9 @@ export class PhysicsTickService implements OnModuleInit {
         tickAt: ctx.firedAt,
         shieldsDropped: dropped.shieldsDropped,
         cloakDropped: dropped.cloakDropped,
+        // Canon announces the jump to the sector by NAME (GEFUNCS.C:605).
+        shipname: ship.shipname,
+        sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
       };
       this.events.emit(PHYSICS_HYPERSPACE, payload);
 

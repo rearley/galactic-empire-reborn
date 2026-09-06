@@ -144,9 +144,17 @@ export class PhaserHandlerService {
       return { lines: [{ text: formatMessage(MessageId.PHA_CLOAK), category: 'system' }] };
     }
 
-    // C-009: a firer AT WARP fires the HYPER-phaser (firehp, GECMDS.C:1020),
-    // an entirely separate weapon — flux-gated, fixed 5° beam, warp-only victims.
-    if (ship.speed >= WARP_THRESHOLD) {
+    // Canon routes on WHERE YOU ARE, not how fast you are going:
+    //   `if (warsptr->where == 1) { ... firehp(warsptr,usrnum); }` GECMDS.C:843
+    // This tested `speed >= WARP_THRESHOLD`. For a player the two normally
+    // agree — you only reach warp by accelerating through the boundary, which
+    // is the one thing that sets `where` — but they are different tests, and
+    // they come apart for any hull whose speed was ASSIGNED rather than
+    // accelerated into, which is what canon's Cybertron pursuit bands do
+    // (GECYBS.C:746, 761, 775). Such a ship is at warp with `where === 0` and
+    // must fire the ordinary phaser; routing it to firehp handed it a weapon
+    // whose victim gate is `wptr->where == 1` and silently emptied its arc.
+    if (ship.where === 1) {
       return this.handleHyper(ship, degree, focus);
     }
 
@@ -209,9 +217,11 @@ export class PhaserHandlerService {
     let hits = 0;
     const lines: CommandResult['lines'] = [];
 
-    // `prfmsg(HPFIRED,deg); outprfge(FILTER,usrn);` — the shot announces
-    // itself to the firer before any hit is resolved. @see GECMDS.C:1037
-    lines.push({ text: formatMessage(MessageId.HP_FIRED, Math.round(degree)), category: 'combat' });
+    // NO HPFIRED here. `prfmsg(HPFIRED,deg)` sits inside `firehp`
+    // (GECMDS.C:1037) — it is the HYPER-phaser announcing itself. Emitting it
+    // from the ordinary path made every normal shot report "Hyper-Phaser fired
+    // at bearing N, Sir!" immediately before "Phasers fired at N percent",
+    // which told the pilot they had fired a weapon they had not.
 
     // The discharge notice, before any per-victim result. C prints
     // `prfmsg(PFIRED,(int)ptr->phasr,ptr->percent)` at GECMDS.C:943-944 — the
@@ -412,6 +422,12 @@ export class PhaserHandlerService {
     };
     this.events.emit(COMBAT_PHASER_FIRED, firedEvent);
 
+    // `prfmsg(HPFIRED,deg)` — the HYPER-phaser announcing itself, after the
+    // neutral-zone abort and before any hit resolves. This used to be emitted
+    // from the ORDINARY phaser path instead, so a normal shot claimed to be a
+    // hyper shot and the real hyper shot never announced itself at all.
+    // @see GECMDS.C:1037
+
     // Flux debit + battle-lock + hypha cooldown (GECMDS.C:1039-1041).
     // Hyper does NOT discharge phasr (uses flux) and does NOT drop shields
     // (firehp omits shielddn). hypha=1 arms the cooldown — physics tick
@@ -424,7 +440,14 @@ export class PhaserHandlerService {
 
     const allShips = this.shipState.findAllShips();
     let hits = 0;
-    const lines: CommandResult['lines'] = [];
+    // `prfmsg(HPFIRED,deg)` — the HYPER-phaser announcing itself, after the
+    // neutral-zone abort and before any hit resolves. This used to be emitted
+    // from the ORDINARY phaser path instead, so a normal shot claimed to be a
+    // hyper shot and the real hyper shot never announced itself at all.
+    // @see GECMDS.C:1037
+    const lines: CommandResult['lines'] = [
+      { text: formatMessage(MessageId.HP_FIRED, Math.round(degree)), category: 'combat' },
+    ];
 
     // Victim selection is canon's firehp, shared with the AI path — canon has
     // ONE firehp and both the player command and GECYBS.C:279 call it.

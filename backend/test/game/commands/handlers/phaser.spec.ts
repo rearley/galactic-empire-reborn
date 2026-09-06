@@ -452,6 +452,14 @@ describe('pha command semantics (Plan 1 T5)', () => {
   });
 });
 
+/**
+ * CORRECTION 2026-09-06: these fixtures set `speed: WARP_THRESHOLD` alone to
+ * mean "at warp". Canon routes to firehp on `warsptr->where == 1`
+ * (GECMDS.C:843), not on speed, so a fixture at warp with `where: 0` describes
+ * a ship that cannot arise from accelerating and no longer reaches the hyper
+ * path. `where: 1` goes WITH the speed — the same point the block at line ~381
+ * already makes for victims.
+ */
 describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', () => {
   const getShip = (h: Harness, s: ShipState): ShipState =>
     h.shipMap.get(shipKey(s.userid, s.shipno))!;
@@ -477,7 +485,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hull hit + energy -= HPFIRAMT', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000, phasr: 100,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
@@ -502,7 +510,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('a NON-warp victim is NOT hit by the hyper-phaser', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: 50000,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000,
     });
     // Bob in arc but sub-warp (speed 0) — hyper only reaches warp targets.
     const bob = makeShip({
@@ -522,11 +530,11 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('firing the hyper-phaser inside the neutral zone self-zaps (WPN_ZAP, damage += SE100DAM)', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
-      speed: WARP_THRESHOLD, energy: 50000, damage: 0,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000, damage: 0,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: -1,
-      speed: WARP_THRESHOLD, damage: 0,
+      speed: WARP_THRESHOLD, where: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
 
@@ -543,7 +551,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('Fix1-RED: hyper-phaser hit on shields-up victim goes straight to HULL — shield unchanged, damageShield=0', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: 50000, phasr: 100,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000, phasr: 100,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
@@ -569,11 +577,11 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('Fix2a-RED: successful hyper fire sets firer hypha = 1', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: 50000, hypha: 0,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000, hypha: 0,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
-      speed: WARP_THRESHOLD,
+      speed: WARP_THRESHOLD, where: 1,
     });
     const h = makeHarness([alice, bob]);
 
@@ -585,7 +593,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   it('Fix2b-RED: second hyper fire while hypha !== 0 → HP_WAIT, no energy debit, no hit', () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
-      speed: WARP_THRESHOLD, energy: 50000, hypha: 1,
+      speed: WARP_THRESHOLD, where: 1, energy: 50000, hypha: 1,
     });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
