@@ -74,7 +74,10 @@ describe('missile hull damage is normalised against the 50000 charge scale', () 
   it('scales by the victim damageFactor exactly as ton_fact does', () => {
     const soft = rollMissileHullDamage(fixedRandom([0.4]), MAX_CHARGE, 100, false);
     const tough = rollMissileHullDamage(fixedRandom([0.4]), MAX_CHARGE, 200, false);
-    expect(tough).toBe(Math.floor(soft / 2));
+    // CORRECTION 2026-09-06: was `Math.floor(soft / 2)`, which only held while
+    // the damage was floored. Canon adds missile damage to a double uncast
+    // (`ptr->damage += mdammax*damfact`, GEFUNCS.C:1644), so the ratio is exact.
+    expect(tough).toBeCloseTo(soft / 2, 10);
   });
 });
 
