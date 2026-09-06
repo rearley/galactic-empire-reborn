@@ -258,6 +258,10 @@ model Planet {
   technology  Int    @default(0)
   /// GALPLNT.teamcode — no FK (R-3)
   teamcode    BigInt @default(0)
+  /// NOT canon. When this planet's economy last ran; null = never.
+  /// The schedule was in-memory, so every restart made every planet due at once
+  /// and granted a free PLANTOCK. @see docs/DECISIONS.md 2026-09-06
+  lastTickAt  DateTime?
 
   // ITEM substructure — parallel arrays, one column per ITEM field, NUMITEMS=14 entries each
   /// ITEM.qty[NUMITEMS] — BigInt per FR-037

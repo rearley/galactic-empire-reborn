@@ -49,13 +49,18 @@ describe('T044 — PlanetTickService all-planets-per-tick', () => {
   // Owned AND populated: the sweep skips zero-population worlds outright
   // (GEMAIN.C:2130), so slot 0 (I_MEN) has to be non-zero here.
   const populated = () => Array.from({ length: 14 }, () => ({ qty: 1000n }));
-  const fakePlanets = [
+  // A FACTORY, not a shared array. The sweep now stamps `lastTickAt` on the
+  // planet object itself — a persisted schedule rather than a Map inside the
+  // service — so one test's sweep would otherwise leave the next test's planets
+  // already up to date. @see planet-tick.service isDue
+  const makePlanets = () => [
     { xsect: 1, ysect: 0, plnum: 1, userid: 'owner', items: populated() },
     { xsect: 1, ysect: 0, plnum: 2, userid: 'owner', items: populated() },
     { xsect: 2, ysect: 1, plnum: 1, userid: 'owner', items: populated() },
   ];
 
   it('ticks every owned planet exactly once per firing (N=3)', async () => {
+    const fakePlanets = makePlanets();
     const { planetServiceMock, tickServiceMock, tickedKeys, getHandler } =
       buildMocks(fakePlanets);
 
@@ -74,6 +79,7 @@ describe('T044 — PlanetTickService all-planets-per-tick', () => {
   });
 
   it('a second firing in the same period does no work', async () => {
+    const fakePlanets = makePlanets();
     const { planetServiceMock, tickServiceMock, tickedKeys, getHandler } =
       buildMocks(fakePlanets);
 
@@ -103,7 +109,7 @@ describe('T044 — PlanetTickService all-planets-per-tick', () => {
   });
 
   it('startPlanetUpdateTimer called with the fixed PLANTIME cadence (55 000 ms)', async () => {
-    const { planetServiceMock, tickServiceMock } = buildMocks(fakePlanets);
+    const { planetServiceMock, tickServiceMock } = buildMocks(makePlanets());
 
     const svc = new PlanetTickService(planetServiceMock, tickServiceMock);
     await svc.onModuleInit();

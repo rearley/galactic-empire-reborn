@@ -41,6 +41,7 @@ export function prismaPlanetToState(row: Planet): PlanetState {
     spyowner: row.spyowner,
     technology: row.technology,
     teamcode: row.teamcode,
+    lastTickAt: row.lastTickAt,
     items,
   };
 }
@@ -66,6 +67,7 @@ export function stateToPrismaUpdate(state: PlanetState): Prisma.PlanetUpdateInpu
     spyowner: state.spyowner,
     technology: state.technology,
     teamcode: state.teamcode,
+    lastTickAt: state.lastTickAt ?? null,
     itemsQty: state.items.map((it) => it.qty),
     itemsRate: state.items.map((it) => it.rate),
     itemsSell: state.items.map((it) => (it.sell ? 1 : 0)),

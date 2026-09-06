@@ -3491,3 +3491,26 @@ once, and whether the volume is right is a question canon cannot answer.
 **Known issues:** the `ITEM_NAMES` spelling divergence ("Torpedoes"/"Gold"
 against canon's "torpedos"/"gold") is still open, deliberately, as a change of
 its own.
+
+## 2026-09-06 — persisted planet production schedule
+**Completed:** `Planet.lastTickAt` column plus a backfill migration;
+`PlanetTickService` now schedules against it instead of an in-memory Map, so a
+restart no longer grants every populated planet a free PLANTOCK. The stamp is
+written in the same Postgres update as the production result.
+
+**Tests:** `test/unit/planet-tick-schedule-persistence.spec.ts` — five cases:
+not due five minutes after a restart, due when the period elapsed while the
+server was down, due when never ticked, schedule survives a second service
+instance, and the stamp reaches the Postgres update payload alongside the
+production result. Full suite 512 suites / 5,158 tests green.
+
+**Decisions made:** `PlanetState.lastTickAt` is optional (like `dirty`) so the
+existing hand-built fixtures still typecheck; absent reads as NULL reads as due.
+See `docs/DECISIONS.md` 2026-09-06.
+
+**Next:** playtest the narration batch from 2026-09-05, which is still unplayed.
+
+**Known issues:** `test/integration/planet-tick-roundrobin.spec.ts` shared one
+mutable fixture array across cases — harmless while the schedule lived inside
+the service, a cross-test leak once it moved onto the planet. Changed to a
+factory. Worth watching for the same shape elsewhere.

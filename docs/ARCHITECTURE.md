@@ -410,9 +410,13 @@ PlanetModule (game/planet/)
   │                         per-planet promise-chain mutex (runSerialized) for all writes;
   │                         per-mutation Postgres flush on every claim/buy/sell/admin/withdraw/tick;
   │                         public: get/all/size/claim/buy/sell/applyAdminChange/withdrawTax/runEconomicTickFor
-  └── PlanetTickService  — subscribes to TickKind.PLANET_UPDATE; snapshots all planet keys on init;
-                            round-robins one planet per firing (cursor % keys.length);
-                            calls TickService.startPlanetUpdateTimer(floor(1800/N) clamped ≥ 4s)
+  └── PlanetTickService  — subscribes to TickKind.PLANET_UPDATE; sweeps every PLANTIME (55s);
+                            a planet is due when PLANTOCK (30 min) has elapsed since its own
+                            Planet.lastTickAt, and at most MAXTIC (20) run per sweep;
+                            the schedule is a PERSISTED column, not process state — an in-memory
+                            map made every planet due at boot and gave the galaxy a free
+                            PLANTOCK per restart (DECISIONS.md 2026-09-06);
+                            calls TickService.startPlanetUpdateTimer(PLANTIME * 1000)
 ```
 
 `CommandsModule` imports `PlanetModule`, adding:
