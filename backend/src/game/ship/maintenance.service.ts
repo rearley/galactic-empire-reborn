@@ -6,8 +6,13 @@ import { PlanetStateService } from '../planet/planet-state.service';
 import { MAINT_COST_NORMAL, MAINT_COST_NEUTRAL } from '../commands/_ship-management-constants';
 
 /** Planet index of the Zygor galactic market in the neutral zone (sector 0,0). */
-const ZYGOR_PLNUM_1 = 0 as const;
-const ZYGOR_PLNUM_2 = 1 as const;
+// Canon: `if (plnum == 1 || plnum == 2)` where `plnum = warsptr->where - 10`
+// (GECMDS.C:4500). Planets in this port are 1-based — s00.ts numbers Zygor 1
+// and Tahanian Station 2, and orbit.handler.ts sets `where = 10 + plnum` — so
+// these are 1 and 2. They were 0 and 1, which refused Tahanian Station outright
+// and admitted a plnum 0 that does not exist.
+const ZYGOR_PLNUM_1 = 1 as const;
+const ZYGOR_PLNUM_2 = 2 as const;
 const MAINT_MIN_POPULATION = 25_000 as const;
 
 export type GateResult =
@@ -58,23 +63,37 @@ export class MaintenanceService {
     const ysect = Math.floor(ship.ycoord);
     const planet = this.planetService.get(xsect, ysect, plnum);
 
+    // CANON ORDER (GECMDS.C:4468-4510): password, THEN facility, THEN combat
+    // lock, THEN the neutral-zone test. The port ran the password check last,
+    // so a visiting captain learned whether a stranger's colony was big enough
+    // to service them before being asked for the password.
+    //
+    // The password gate is command-layer only; tick callers (auto-repair) pass
+    // undefined and skip it, which has no canon counterpart because canon has
+    // no auto-repair.
+    // @see GECMDS.C:4471 MAINT2, :4479 MAINT3
+    if (passwordArg !== undefined && planet?.password && planet.password.toLowerCase() !== 'none') {
+      if (!passwordArg) return { ok: false, reason: 'password-required' };
+      if (planet.password.toLowerCase() !== passwordArg.toLowerCase()) {
+        return { ok: false, reason: 'wrong-password' };
+      }
+    }
+
+    // `plptr->userid[0] == 0 || plptr->items[I_MEN].qty < 25000L` -> MAINT8.
+    // BOTH halves matter: the planet must be COLONISED, not merely populated.
+    // Without the ownership test a damaged captain could orbit any wild world
+    // with 25,000 natives and buy a full repair for 200 credits.
+    // @see GECMDS.C:4486
     const men = planet ? Number(planet.items[0]?.qty ?? 0n) : 0;
-    if (!planet || men < MAINT_MIN_POPULATION) return { ok: false, reason: 'no-facility' };
+    if (!planet || !planet.userid || men < MAINT_MIN_POPULATION) {
+      return { ok: false, reason: 'no-facility' };
+    }
 
     if (ship.cantexit > 0) return { ok: false, reason: 'combat-locked' };
 
     const inNeutralZone = xsect === 0 && ysect === 0;
     const isZygor = inNeutralZone && (plnum === ZYGOR_PLNUM_1 || plnum === ZYGOR_PLNUM_2);
     if (inNeutralZone && !isZygor) return { ok: false, reason: 'nz-not-zygor' };
-
-    // FR-210: password gate (command layer only — tick callers pass undefined).
-    // @see GECMDS.C:4471 MAINT2, :4479 MAINT3
-    if (passwordArg !== undefined && planet.password && planet.password.toLowerCase() !== 'none') {
-      if (!passwordArg) return { ok: false, reason: 'password-required' };
-      if (planet.password.toLowerCase() !== passwordArg.toLowerCase()) {
-        return { ok: false, reason: 'wrong-password' };
-      }
-    }
 
 
     const price = BigInt(isZygor ? MAINT_COST_NEUTRAL : MAINT_COST_NORMAL);

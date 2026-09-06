@@ -3249,3 +3249,37 @@ Zygor alone (NEW5) — both are what make Zygor the hub. Then the Zygor plnum
 off-by-one in the maintenance gate.
 
 **Known issues:** deployed.
+
+## 2026-09-06 — Zygor is the hub again: maint and new gates
+
+**Completed:** Both commands that make the neutral zone matter were accepting
+places canon refuses.
+
+- **`mai` — three defects in one gate.** (1) The password check ran LAST; canon
+  runs it SECOND, right after the orbit test (GECMDS.C:4471/:4479), so a visitor
+  learned whether a stranger's colony was big enough to service them before
+  being asked for the password. (2) MAINT8 is
+  `plptr->userid[0] == 0 || items[I_MEN].qty < 25000` — the planet must be
+  COLONISED, not merely populated; the port checked only the headcount, so a
+  damaged captain could orbit any wild world with 25,000 natives and buy a full
+  repair for 200 credits. (3) Zygor's plnum was 0/1 against canon's 1/2
+  (GECMDS.C:4500). Planets here are 1-based, so that refused Tahanian Station
+  outright and admitted a plnum 0 that does not exist.
+- **`new` — Zygor only.** Canon gates the whole command on
+  `neutral(&warsptr->coord) && plnum == 1` and answers NEW5 otherwise
+  (GECMDS.C:4557, :4720). The port required "sector (0,0), orbiting anything",
+  so Tahanian Station, the Enforcer Planet and the Kayriez Portal all sold hulls
+  and Mark-N upgrades. The refusal text was invented; it is now canon's NEW5.
+
+Worth recording as a deliberate asymmetry rather than an inconsistency: `mai`
+accepts plnum 1 OR 2, `new` accepts only 1. You can be SERVICED at Tahanian
+Station; you can only BUY at Zygor.
+
+**Tests:** maint-canon-gates (8) and new-ship-zygor-only (4). Existing specs
+were repaired rather than worked around: `maintenance.service.spec.ts` asserted
+plnum 0 valid and plnum 2 refused (the audit had already flagged this) and
+asserted a gate order that inverts canon's; `new-ship.handler.spec.ts` had a
+`where: 10` fixture — plnum 0, not a planet — which passed only because the
+location gate was loose.
+
+**Known issues:** deployed.
