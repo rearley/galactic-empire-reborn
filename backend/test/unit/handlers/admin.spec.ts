@@ -5,7 +5,8 @@ import { AdminHandlerService } from '../../../src/game/commands/handlers/admin.h
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
-import { NUMITEMS } from '../../../src/game/constants/items';
+import { ITEM_NAMES, NUMITEMS } from '../../../src/game/constants/items';
+import { CommandResult } from '../../../src/game/commands/command.types';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -233,5 +234,115 @@ describe('AdminHandlerService', () => {
     const { svc } = makeService();
     expect(svc.command.keyword).toBe('admin');
     expect(svc.command.aliases).toContain('adm');
+  });
+});
+
+/**
+ * The accounting report shows every slot, and shows what has been SOLD.
+ *
+ *   for (i=0; i<NUMITEMS; ++i) {
+ *       sprintf(gechrbuf,"%-11s %5u %5ld %5u %5u %1c %5ld",
+ *               item_name[i], rate, qty, markup2a, reserve, sell, sold2a);
+ *       prf("%s\r",gechrbuf);
+ *   }
+ *
+ * @see GEMAIN.C:2999-3016, header text ADMIN02
+ *      'Item          Rate Qty  Price  Resv  S Sold'
+ *
+ * Two omissions. `sold2a` — the running units-sold counter — was carried in
+ * state, persisted, and read by nothing, so an owner could never see how much
+ * of a commodity their colony had actually moved. And the port skipped any
+ * slot with no stock and no rate, so an item priced and reserved but currently
+ * empty vanished from the report: the owner could not check or correct its
+ * settings without re-issuing the command blind. Canon's loop has no filter.
+ */
+describe('the accounting report is unfiltered and includes Sold (GEMAIN.C:2999)', () => {
+  function planetWithStock() {
+    const items = Array.from({ length: NUMITEMS }, () => ({
+      qty: 0n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+    }));
+    // One slot priced and reserved but EMPTY — the row the port used to hide.
+    items[3] = { qty: 0n, rate: 0, sell: true, reserve: 250, markup2a: 40, sold2a: 900n };
+    items[5] = { qty: 1_000n, rate: 20, sell: true, reserve: 0, markup2a: 12, sold2a: 4_242n };
+    return { userid: 'owner', items };
+  }
+
+  const report = async () => {
+    const { svc } = makeService(planetWithStock() as never);
+    const res = await svc.command.handler(makeShip({ where: 11 }), [], {}) as CommandResult;
+    return res.lines.map((l) => l.text).join('\n');
+  };
+
+  it('shows the units sold for a slot that has moved stock', async () => {
+    expect(await report()).toContain('4,242');
+  });
+
+  it('shows a slot that is priced and reserved but empty', async () => {
+    const text = await report();
+    expect(text).toContain(ITEM_NAMES[3]);
+    expect(text).toContain('250');
+  });
+
+  it('prints a row for every one of the NUMITEMS slots — canon does not filter', async () => {
+    const text = await report();
+    for (const name of ITEM_NAMES) expect(text).toContain(name);
+  });
+});
+
+/**
+ * Admin menu item 4 renames the colony.
+ *
+ *   *margv[0] = toupper(*margv[0]);
+ *   strncpy(plptr->name,margv[0],19);
+ *   plptr->name[19] = 0;
+ *
+ * @see GEMAIN.C:2949-2981 mnu_admenu1a, reached from `case '4'` at :3041
+ *
+ * The owner may rename an owned colony as often as they like; the port fixed
+ * the name at claim time, and `adm rename` answered "Invalid value." The two
+ * canon details worth keeping are the 19-character truncation and the forced
+ * capital on the first letter.
+ */
+describe('adm rename (GEMAIN.C:2949)', () => {
+  it('renames the colony', async () => {
+    const { svc, applyAdminChangeMock } = makeService();
+
+    await svc.command.handler(makeShip({ where: 11 }), ['rename', 'Aurora'], {});
+
+    expect(applyAdminChangeMock).toHaveBeenCalledWith(
+      expect.anything(), 'owner', { type: 'name', value: 'Aurora' },
+    );
+  });
+
+  it('capitalises the first letter, as toupper(*margv[0]) does', async () => {
+    const { svc, applyAdminChangeMock } = makeService();
+
+    await svc.command.handler(makeShip({ where: 11 }), ['rename', 'aurora'], {});
+
+    expect(applyAdminChangeMock.mock.calls[0][2]).toMatchObject({ value: 'Aurora' });
+  });
+
+  it('truncates at canon 19 characters', async () => {
+    const { svc, applyAdminChangeMock } = makeService();
+
+    await svc.command.handler(makeShip({ where: 11 }), ['rename', 'A'.repeat(40)], {});
+
+    expect((applyAdminChangeMock.mock.calls[0][2] as { value: string }).value).toHaveLength(19);
+  });
+
+  it('keeps a multi-word name together', async () => {
+    const { svc, applyAdminChangeMock } = makeService();
+
+    await svc.command.handler(makeShip({ where: 11 }), ['rename', 'New', 'Terra'], {});
+
+    expect(applyAdminChangeMock.mock.calls[0][2]).toMatchObject({ value: 'New Terra' });
+  });
+
+  it('refuses an empty name rather than clearing the colony\'s', async () => {
+    const { svc, applyAdminChangeMock } = makeService();
+
+    await svc.command.handler(makeShip({ where: 11 }), ['rename'], {});
+
+    expect(applyAdminChangeMock).not.toHaveBeenCalled();
   });
 });

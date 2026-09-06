@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PlanetStateService } from '../../planet/planet-state.service';
+import { PLANET_NAME_MAX, PlanetStateService } from '../../planet/planet-state.service';
 import { AdminChange, planetKey } from '../../planet/planet-state.types';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -28,6 +28,7 @@ const ADMIN_USAGE: readonly string[] = [
   '  adm sellflag <item> on|off     offer item to visitors',
   '  adm reserve <item> <value>     hold back from sale',
   '  adm tax <0-100>                tax rate',
+  '  adm rename <name>              rename the colony (19 chars)',
   '  adm beacon <message>           message shown to visitors',
   '  adm password <word|none|team>  who may trade here',
 ];
@@ -89,22 +90,23 @@ export class AdminHandlerService {
       const lines: CommandResult['lines'] = [];
       lines.push({ text: `${state.name} — Inventory`, category: 'system' });
       lines.push({ text: '--------------------------------', category: 'system' });
-      let hasAny = false;
+      // Canon's loop is `for (i=0; i<NUMITEMS; ++i)` with no filter
+      // (GEMAIN.C:2999). The port skipped any slot with no stock and no rate,
+      // so an item priced and reserved but currently empty vanished — and its
+      // settings could then only be corrected blind.
       for (let i = 0; i < NUMITEMS; i++) {
         const item = state.items[i];
         const qty = Number(item.qty);
-        if (qty === 0 && item.rate === 0) continue;
-        hasAny = true;
         const sellFlag = item.sell ? 'sell=Y' : 'sell=N';
         const name = ITEM_NAMES[i];
         const dots = '.'.repeat(Math.max(1, 20 - name.length));
         lines.push({
-          text: `${name}${dots}${qty.toLocaleString()}  rate:${item.rate}  price:${item.markup2a}  ${sellFlag}  reserve:${item.reserve}`,
+          // `sold2a` is the running units-sold counter, ADMIN02's 'Sold'
+          // column. It was carried in state, persisted, and read nowhere, so
+          // an owner could never see how much their colony had actually moved.
+          text: `${name}${dots}${qty.toLocaleString()}  rate:${item.rate}  price:${item.markup2a}  ${sellFlag}  reserve:${item.reserve}  sold:${Number(item.sold2a ?? 0n).toLocaleString()}`,
           category: 'info',
         });
-      }
-      if (!hasAny) {
-        lines.push({ text: '(no items in stock, no rates set)', category: 'info' });
       }
       // C prints four separate lines here — planet cash, the tax pool, the
       // rate, and who may trade (GEMAIN.C:3018-3024). This showed only two, and
@@ -167,6 +169,17 @@ export class AdminHandlerService {
           return usageError();
         }
         change = { type: 'taxrate', value: rate.value };
+        break;
+      }
+      case 'rename': {
+        // Admin menu item 4. Canon uppercases the first letter and truncates
+        // at 19 (`strncpy(plptr->name,margv[0],19); name[19] = 0`), and an
+        // empty entry re-prompts rather than clearing the name.
+        // @see GEMAIN.C:2955-2959
+        const raw = args.slice(1).join(' ').trim();
+        if (raw === '') return usageError();
+        const value = (raw.charAt(0).toUpperCase() + raw.slice(1)).slice(0, PLANET_NAME_MAX);
+        change = { type: 'name', value };
         break;
       }
       case 'beacon': {

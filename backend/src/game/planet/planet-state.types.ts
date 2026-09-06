@@ -60,5 +60,6 @@ export type AdminChange =
   | { type: 'sellflag'; itemIndex: number; value: boolean }
   | { type: 'reserve';  itemIndex: number; value: number }
   | { type: 'taxrate';  value: number }
+  | { type: 'name';     value: string }
   | { type: 'beacon';   value: string }
   | { type: 'password'; value: string; ownerTeamcode: bigint | null };

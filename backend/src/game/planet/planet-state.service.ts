@@ -29,6 +29,12 @@ import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
  */
 const ITEM_FIELD_MAX = 32000;
 
+/**
+ * `strncpy(plptr->name,margv[0],19); plptr->name[19] = 0;`
+ * @see GEMAIN.C:2957-2958
+ */
+export const PLANET_NAME_MAX = 19;
+
 const NEUTRAL_ZONE_POSTS = [1, 2] as const;
 
 /**
@@ -519,6 +525,14 @@ export class PlanetStateService implements OnModuleInit {
             return { ok: false as const, reason: 'INVALID' as const };
           }
           state.taxrate = change.value;
+          break;
+        case 'name':
+          // 19 chars, and never empty — canon re-prompts on a blank entry
+          // rather than storing one. @see GEMAIN.C:2955-2959
+          if (change.value.length === 0 || change.value.length > PLANET_NAME_MAX) {
+            return { ok: false as const, reason: 'INVALID' as const };
+          }
+          state.name = change.value;
           break;
         case 'beacon':
           if (change.value.length > 75) {
