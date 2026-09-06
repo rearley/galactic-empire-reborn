@@ -18,16 +18,20 @@
 
 import { CANON_MESSAGES } from '../../src/game/commands/canon-messages.generated';
 
-type Emit = { rooms: string[]; event: string; payload: unknown };
+type Emit = { rooms: string[]; event: string; payload: unknown; excepted?: string[] };
 
 function build() {
   const emits: Emit[] = [];
   const server = {
     to(room: string) {
       const rooms = [room];
+      let excepted: string[] = [];
       const chain = {
-        emit(event: string, payload: unknown) { emits.push({ rooms, event, payload }); return true; },
-        except() { return chain; },
+        emit(event: string, payload: unknown) {
+          emits.push({ rooms, event, payload, excepted } as Emit);
+          return true;
+        },
+        except(rs: string[]) { excepted = excepted.concat(rs); return chain; },
         to(next: string) { rooms.push(next); return chain; },
       };
       return chain;
@@ -95,6 +99,29 @@ describe('hyperspace narration (GEFUNCS.C:588-606)', () => {
     const sector = textsFor(emits, 'sector:3:4').join('\n');
     expect(sector).toContain('WildCat');
     expect(sector).toMatch(/Hyper Space/i);
+  });
+
+  /**
+   * `outsect(FILTER,&coord,usrn,0)` — the third argument is an EXCLUSION:
+   * `if (ingegame(zothusn) && zothusn != exclude)` (GEMAIN.C outsect). Canon
+   * passes the jumping ship, so it does not hear its own departure announced.
+   *
+   * Reported from play the moment this shipped: "Sensors indicate The Stealth
+   * Fighter #3 has gone to Hyper Space, Sir! — that is us."
+   */
+  it('does not tell the jumping ship about its own departure', () => {
+    const { gw, emits } = gateway();
+
+    gw.handlePhysicsHyperspace({
+      shipId: 'u1:1', direction: 'enter',
+      shieldsDropped: false, cloakDropped: false,
+      shipname: 'Stealth Fighter #3', sector: { x: 3, y: 4 },
+    });
+
+    const excluded = emits
+      .filter((e) => e.rooms.includes('sector:3:4'))
+      .map((e) => (e as unknown as { excepted?: string[] }).excepted ?? []);
+    expect(excluded.flat()).toContain('user:u1');
   });
 
   it('says nothing about shields or cloak that were already down', () => {
