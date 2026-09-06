@@ -51,6 +51,7 @@ import {
 } from '../game/combat/combat-events';
 import {
   CYBERTRON_EVENT,
+  CybertronSpawnedPayload,
   CybertronTauntPayload,
   CybertronBrokeOffPayload,
 } from '../game/cybertron/cybertron-events';
@@ -592,6 +593,84 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     // broadcast (not server.emit) — connecting client already has themselves via snapshot
     client.broadcast.emit('player.joined', connectedPlayer);
+
+    // Canon's tossingegame: ANNOUN to the galaxy, ENTWAR to the star system.
+    // Must come AFTER joinPlayerRooms, or the sector room the arrival is
+    // announced into does not yet contain anybody. @see GEFUNCS.C:153-175
+    this.announceArrival(activeShip);
+  }
+
+  /**
+   * Rooms to skip for a FILTER-class broadcast: every pilot who has set the
+   * MSG_FILTER option.
+   *
+   *   if (class == FILTER && warusroff(shpno)->options[MSG_FILTER] == TRUE)
+   *       { clrprf(); return; }
+   *
+   * @see GEMAIN.C:2562-2567 outprfge
+   *
+   * ALWAYS-class messages bypass this entirely (GEMAIN.C:2557-2561), which is
+   * why WARHUP below does not call it.
+   */
+  private filteredRooms(): string[] {
+    return [...new Set(
+      this.shipStateService.findAllShips()
+        .filter((s) => s.msgFilter)
+        .map((s) => `user:${s.userid}`),
+    )];
+  }
+
+  /**
+   * A captain entering the game: ANNOUN to the whole galaxy, ENTWAR to the
+   * star system they appeared in. Both are FILTER, and both are skipped
+   * outright for a fully cloaked ship.
+   *
+   *   if (warsptr->cloak != 10) { prfmsg(ANNOUN,...); outwar(FILTER,usrnum,0); }
+   *   if (warsptr->cloak != 10) { prfmsg(ENTWAR,...); outsect(FILTER,&coord,usrnum,0); }
+   *
+   * The test is `!= 10`, not `> 0` — a ship still spooling its cloak is
+   * announced like any other. @see GEFUNCS.C:153-175 tossingegame
+   */
+  private announceArrival(ship: ShipState): void {
+    if (ship.cloak === 10) return;
+
+    const typeName = this.shipClassCache.getTypeName(ship.shpclass) ?? '';
+    const skip = [`user:${ship.userid}`, ...this.filteredRooms()];
+
+    this.server.except(skip).emit('event.log', {
+      category: 'system',
+      text: formatMessage(MessageId.ARRIVE_GALAXY, typeName, ship.shipname),
+    });
+    this.server
+      .to(`sector:${Math.floor(ship.xcoord)}:${Math.floor(ship.ycoord)}`)
+      .except(skip)
+      .emit('event.log', {
+        category: 'system',
+        text: formatMessage(MessageId.ARRIVE_SECTOR, typeName, ship.shipname),
+      });
+  }
+
+  /**
+   * A clean logoff: the ship simply vanishes from the sector it was in.
+   *
+   *   prfmsg(WARHUP,username(warsptr));
+   *   outsect(ALWAYS,&warsptr->coord,usrnum,0);
+   *
+   * @see GEMAIN.C:1425-1427 warhupa
+   *
+   * ALWAYS, so `set filter on` does not suppress it, and warhupa has NO cloak
+   * test — a cloaked ship that logs off is announced like any other. This is
+   * only the clean arm; the `cantexit > 0` arm above kills the ship instead,
+   * and that path announces the kill.
+   */
+  private announceDeparture(ship: ShipState): void {
+    this.server
+      .to(`sector:${Math.floor(ship.xcoord)}:${Math.floor(ship.ycoord)}`)
+      .except([`user:${ship.userid}`])
+      .emit('event.log', {
+        category: 'system',
+        text: formatMessage(MessageId.DEPART_SECTOR, ship.username ?? ship.userid),
+      });
   }
 
   async handleDisconnect(client: Socket): Promise<void> {
@@ -711,6 +790,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // A stale socket must only clean up its own registration (done below).
           const shipId = shipKey(userid, activeShipNo);
           if (this.registry.getSocketId(shipId) === client.id) {
+            // WARHUP, before the unboard — once the ship leaves the map the
+            // sector it was in can no longer be read off it. Only this clean
+            // arm announces a departure; the `cantexit > 0` arm above kills
+            // the ship instead, and that path announces the kill.
+            // @see GEMAIN.C:1425-1427 warhupa
+            this.announceDeparture(ship);
             await this.shipStateService.unboard(userid, activeShipNo);
           }
         }
@@ -1986,6 +2071,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDroidSpawned(event: DroidSpawnedEvent): void {
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(DroidEvents.SPAWNED, event);
+    this.announceAiArrival(MessageId.DROID_NEW);
+  }
+
+  /**
+   * A new Cybertron. Galaxy-wide, FILTER class, with a bearing that is pure
+   * decoration: `prfmsg(CYBNEW,gernd()%359); outwar(FILTER,usrn,0)`.
+   * @see GECYBS.C:186
+   */
+  @OnEvent(CYBERTRON_EVENT.SPAWNED)
+  handleCybertronSpawned(_event: CybertronSpawnedPayload): void {
+    this.announceAiArrival(MessageId.CYB_NEW);
+  }
+
+  /**
+   * The shared body of CYBNEW and DROIDNEW.
+   *
+   * The bearing is `gernd()%359` — a RANDOM number with no relationship to
+   * where the ship actually is. That is canon's intent, not a shortcut: the
+   * line is a sensor contact rather than a fix, and feeding it the real bearing
+   * would turn a piece of atmosphere into a tracker that canon never gave you.
+   */
+  private announceAiArrival(messageId: MessageId): void {
+    this.server.except(this.filteredRooms()).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(messageId, gernd(this.random) % 359),
+    });
   }
 
   /**

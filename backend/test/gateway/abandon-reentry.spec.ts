@@ -86,7 +86,10 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),
-      to: () => ({ emit: jest.fn() }),
+      // .except() is part of the real Socket.io chain — WARHUP uses it.
+      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
+      // ANNOUN is a top-level server.except(...) broadcast.
+      except: () => ({ emit: jest.fn(), to: () => ({ emit: jest.fn() }) }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, prisma };
