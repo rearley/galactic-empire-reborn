@@ -86,3 +86,80 @@ describe('lock warnings are addressed to the target (GECMDS.C:1401, :1415)', () 
     expect(String((emits[0].payload as { text: string }).text)).toContain('F');
   });
 });
+
+describe('launch warnings reach the target (GECMDS.C:1198, :1313)', () => {
+  it('renders TFIRE2 for an inbound torpedo', () => {
+    const { gateway, emits } = build();
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      kind: 'torpedo-launched',
+      attackerLetter: 'D',
+      tickAt: new Date('2026-09-06T12:00:00Z'),
+    });
+
+    expect(emits[0].rooms).toEqual(['user:usr_victim']);
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.TORP_INBOUND, 'D'),
+    });
+  });
+
+  it('renders MFIRE2 for an inbound missile, distinct from the torpedo line', () => {
+    const { gateway, emits } = build();
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      kind: 'missile-launched',
+      attackerLetter: 'D',
+      tickAt: new Date('2026-09-06T12:00:00Z'),
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.MISSILE_INBOUND, 'D'),
+    });
+    // A victim must be able to tell which weapon is coming — the port's
+    // long-standing bug shape is one message standing in for several.
+    expect(formatMessage(MessageId.MISSILE_INBOUND, 'D'))
+      .not.toBe(formatMessage(MessageId.TORP_INBOUND, 'D'));
+  });
+});
+
+describe('the in-flight RED ALERT reaches the target (GEFUNCS.C:1600, :1685)', () => {
+  it('renders TORP1, which takes no attacker letter', () => {
+    const { gateway, emits } = build();
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      kind: 'torpedo-inbound',
+      attackerLetter: '',
+      tickAt: new Date('2026-09-06T12:00:00Z'),
+    });
+
+    expect(emits[0].rooms).toEqual(['user:usr_victim']);
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.TORP_TRACKING),
+    });
+    // Canon tells you something is tracking you, not who fired it — so no
+    // stray '%c' may survive into the rendered line.
+    expect(String((emits[0].payload as { text: string }).text)).not.toContain('%');
+  });
+
+  it('renders MISSL1 for a missile', () => {
+    const { gateway, emits } = build();
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      kind: 'missile-inbound',
+      attackerLetter: '',
+      tickAt: new Date('2026-09-06T12:00:00Z'),
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.MISSILE_TRACKING),
+    });
+  });
+});

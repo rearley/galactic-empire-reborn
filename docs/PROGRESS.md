@@ -3160,3 +3160,51 @@ TORP1/MISSL1 and the target's `cantexit`) is the largest remaining gameplay gap
 **Known issues:** deployed. Combined with the movement change, the world now
 plays materially differently from yesterday: ships move twice as fast and the
 leaderboard measures population rather than treasure.
+
+## 2026-09-06 — the projectile warning chain
+
+**Completed:** A target now learns it is under attack, which it never did
+before. All four canon messages existed in the generated string table and were
+emitted from nowhere:
+
+- **LOCK2 / LOCK4** — the target is told when fire control locks onto it, and
+  when a lock is merely ATTEMPTED and fails (that is how a stalker gives
+  themselves away). `GECMDS.C:1401`, `:1415`.
+- **Both ships battle-locked.** Canon's lockon ends `wptr->cantexit = FIRETICKS;
+  ptr->cantexit = FIRETICKS;` on BOTH the success and failure paths. The port
+  set only the firer's, so the ship being shot at could leave — including during
+  a torpedo's entire flight. `GECMDS.C:1405-1406`, `:1419-1420`.
+- **TFIRE2 / MFIRE2** — "Incoming torpedo from ship %c" as the tube empties.
+  `GECMDS.C:1198`, `:1313`.
+- **TORP1 / MISSL1** — the per-tick RED ALERT while anything is closing, with
+  canon's `flag` so a three-torpedo volley raises ONE alert per tick rather than
+  three. `GEFUNCS.C:1600`, `:1685`.
+
+Together these give `decoy` a trigger for the first time: a pilot can now see a
+weapon tracking them and spend a decoy in response, rather than guessing.
+
+Canon's `%c` is `shpltr(ship,usrn)` — the FIRER's scan letter as the TARGET sees
+it — so the victim can match the warning to a contact on their own scan. The
+in-flight alerts take no argument: canon tells you something is tracking you,
+not who fired it.
+
+Note LOCK1, the firer's own "you have a lock" line, is COMMENTED OUT in canon,
+so a successful lock still tells the firer nothing extra.
+
+**Structure:** the lock tail lives in `combat/lock-outcome.ts` because canon has
+ONE `lockon` that `torp` and `missl` both call. The port had the gate copied
+into each handler, which is how the hyperspace check once landed on only one of
+them.
+
+**Tests:** `lock-warning.spec.ts` (13) drives the real handlers for both
+weapons; `inbound-alert.spec.ts` (5) pins the per-tick alert including the
+volley-dedupe and that it REPEATS each tick; `lock-warning-routing.spec.ts` (7)
+pins that each warning is addressed to the target's room alone and renders the
+right canon string.
+
+**Next:** the remaining medium-impact canon gaps in
+`docs/audits/2026-09-05-canon-gaps.md` — self-destruct blast damage
+(DESTRUCTRANGE is defined and used nowhere), rotation energy (ROTENGUSE, three
+TODOs in the rotate handler), and `maint`/`new` accepting the wrong planets.
+
+**Known issues:** deployed.

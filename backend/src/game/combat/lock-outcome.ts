@@ -40,15 +40,32 @@ export interface LockOutcomeDeps {
 export function applyLockOutcome(
   firer: ShipState,
   target: ShipState,
-  kind: CombatTargetWarningEvent['kind'],
+  kind: 'lock-acquired' | 'lock-attempt',
   deps: LockOutcomeDeps,
 ): void {
   // Battle-lock BOTH. Canon does this whether the lock succeeded or failed.
   deps.shipState.mutate(firer.userid, firer.shipno, (s) => { s.cantexit = FIRETICKS; });
   deps.shipState.mutate(target.userid, target.shipno, (t) => { t.cantexit = FIRETICKS; });
 
-  // `%c` is `shpltr(ship,usrn)` — the FIRER's letter as the TARGET sees it, so
-  // the victim can match the warning to a contact on their own scan.
+  warnTarget(firer, target, kind, deps);
+}
+
+/**
+ * Send one warning to the target, with no other side effect.
+ *
+ * The launch messages are announcements, not locks: canon prints TFIRE2/MFIRE2
+ * as the tube empties and does not touch `cantexit` there — the lock that
+ * preceded the shot already set it. @see GECMDS.C:1198, :1313
+ *
+ * `%c` is `shpltr(ship,usrn)` — the FIRER's letter as the TARGET sees it, so
+ * the victim can match the warning to a contact on their own scan.
+ */
+export function warnTarget(
+  firer: ShipState,
+  target: ShipState,
+  kind: CombatTargetWarningEvent['kind'],
+  deps: Pick<LockOutcomeDeps, 'events' | 'lettersFor'>,
+): void {
   const targetLetters = deps.lettersFor(target.userid, target.shipno);
   deps.events.emit(COMBAT_TARGET_WARNING, {
     victimId: shipKey(target.userid, target.shipno),

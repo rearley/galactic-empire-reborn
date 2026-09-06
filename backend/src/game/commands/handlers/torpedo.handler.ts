@@ -12,7 +12,7 @@ import { cdistance, lockFact } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip, shipLetter } from '../helpers/find-ship';
 import { CombatTargetWarningEvent } from '../../combat/combat-events';
-import { applyLockOutcome } from '../../combat/lock-outcome';
+import { applyLockOutcome, warnTarget } from '../../combat/lock-outcome';
 import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WARP_THRESHOLD } from '../../constants';
 import { I_TORP } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
@@ -75,10 +75,20 @@ export class TorpedoHandlerService {
    * @see GECMDS.C:1395-1422
    */
   private applyLock(
-    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+    firer: ShipState, target: ShipState, kind: 'lock-acquired' | 'lock-attempt',
   ): void {
     applyLockOutcome(firer, target, kind, {
       shipState: this.shipState,
+      events: this.events,
+      lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
+    });
+  }
+
+  /** One warning to the target, no lock side effects. @see GECMDS.C:1198 */
+  private announce(
+    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+  ): void {
+    warnTarget(firer, target, kind, {
       events: this.events,
       lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
     });
@@ -200,6 +210,11 @@ export class TorpedoHandlerService {
       t.ltorpsChannel[slot] = firerChannel;
       t.ltorpsDistance[slot] = dist;
     });
+
+    // The target is told the moment the tube empties:
+    //   prfmsg(TFIRE2,shpltr(shpnum,usrn)); outprfge(FILTER,shpnum);
+    // @see GECMDS.C:1198-1199
+    this.announce(ship, target, 'torpedo-launched');
 
     // Shields drop, and the pilot is TOLD. C calls shielddn at GECMDS.C:1130,
     // and shielddn prints SHLDDN (GEFUNCS.C:2419-2427). The port dropped them

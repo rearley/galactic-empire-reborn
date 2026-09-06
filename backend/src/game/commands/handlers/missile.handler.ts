@@ -12,7 +12,7 @@ import { cdistance, lockFact, missileFluxCost, missileFluxShort } from '../../co
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip, shipLetter } from '../helpers/find-ship';
 import { CombatTargetWarningEvent } from '../../combat/combat-events';
-import { applyLockOutcome } from '../../combat/lock-outcome';
+import { applyLockOutcome, warnTarget } from '../../combat/lock-outcome';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
@@ -86,10 +86,20 @@ export class MissileHandlerService {
    * @see GECMDS.C:1395-1422
    */
   private applyLock(
-    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+    firer: ShipState, target: ShipState, kind: 'lock-acquired' | 'lock-attempt',
   ): void {
     applyLockOutcome(firer, target, kind, {
       shipState: this.shipState,
+      events: this.events,
+      lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
+    });
+  }
+
+  /** One warning to the target, no lock side effects. @see GECMDS.C:1313 */
+  private announce(
+    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+  ): void {
+    warnTarget(firer, target, kind, {
       events: this.events,
       lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
     });
@@ -261,6 +271,11 @@ export class MissileHandlerService {
       t.lmisslDistance[slot] = dist;
       t.lmisslEnergy[slot] = charge;
     });
+
+    // The target is told the moment the tube empties:
+    //   prfmsg(MFIRE2,shpltr(shpnum,usrn)); outprfge(FILTER,shpnum);
+    // @see GECMDS.C:1313
+    this.announce(ship, target, 'missile-launched');
 
     // Mutate firer — debit energy + ammo, set battle-lock.
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
