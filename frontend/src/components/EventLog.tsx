@@ -2,7 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { EventLogLine } from '../types/contracts';
 
 const MAX_ENTRIES = 500;
-const STICKY_THRESHOLD = 8; // px from bottom before sticky disengages (research.md R2)
+/**
+ * How far off the bottom the reader may drift and still be "following".
+ *
+ * This was 8px against a ~20px line height, so drifting a SINGLE line
+ * disengaged auto-scroll for good — a trackpad nudge, a click that shifted
+ * scroll a few pixels, or the container growing between the scroll write and
+ * the scroll event during a burst. Nothing showed it had happened and nothing
+ * brought it back but scrolling to within 8px of the bottom by hand. Reported
+ * from play as having to scroll manually mid-battle to see what happened.
+ *
+ * Three lines is a deliberate tolerance: enough to survive noise, small enough
+ * that a reader who has genuinely scrolled up is left where they put
+ * themselves. @see test/eventlog-sticky.spec.tsx
+ */
+const STICKY_THRESHOLD = 60;
 
 const CATEGORY_CLASS: Record<string, string> = {
   system:  'text-gray-400',
@@ -38,6 +52,13 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
     setStickyBottom(distanceFromBottom <= STICKY_THRESHOLD);
   };
 
+  /** Resume following, and go to the bottom now. */
+  const jumpToLatest = () => {
+    setStickyBottom(true);
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
   /**
    * Coalesce the scroll to one write per animation frame.
    *
@@ -57,8 +78,24 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0 flex items-center justify-between">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Event Log</span>
+        {/*
+          * Auto-scroll is a MODE, and it used to be invisible: once it
+          * disengaged there was no sign it had, and no way back but scrolling
+          * by hand. Showing it only while paused keeps the header quiet the
+          * rest of the time.
+          */}
+        {!stickyBottom && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            data-testid="jump-to-latest"
+            className="text-xs text-accent hover:underline"
+          >
+            ↓ jump to latest
+          </button>
+        )}
       </div>
       <div
         ref={containerRef}
