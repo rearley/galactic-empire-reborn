@@ -36,7 +36,7 @@ export class LockHandlerService {
   readonly command: Command = {
     keyword: 'loc',
     aliases: ['lock'],
-    minArgs: 1,
+    minArgs: 0,
     argMissingMessage: formatMessage(MessageId.LOC_FMT),
     handler: (ship: ShipState, args: string[], _ctx: CommandContext): CommandResult => {
       return this.handle(ship, args);
@@ -44,6 +44,20 @@ export class LockHandlerService {
   };
 
   private handle(ship: ShipState, args: string[]): CommandResult {
+    // 0. Bare `loc` RELEASES the lock, and canon does it before every other
+    // gate — `if (margc == 1) { warsptr->lock = -1; prfmsg(LOCK01); return; }`
+    // (GECMDS.C:5073-5079). Releasing is not an act of targeting, so neither a
+    // shot-out fire control nor a jammer can block it. The port declared
+    // minArgs 1 and answered a usage line instead, leaving no way to drop a
+    // lock at all except by taking another one.
+    if ((args[0] ?? '').trim() === '') {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.lock = NOLOCK_SENTINEL;
+        s.lockKey = null;
+      });
+      return { lines: [{ text: formatMessage(MessageId.LOC_CLEARED), category: 'system' }] };
+    }
+
     // 1. Fire control damaged — GECMDS.C:1346-1351 lockon first check (C-010, Fix 1)
     if (ship.firecntl > 0) {
       return { lines: [{ text: formatMessage(MessageId.FCBROKE), category: 'system' }] };

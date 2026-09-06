@@ -177,7 +177,10 @@ export interface CombatTargetWarningEvent {
     | 'torpedo-launched'
     | 'missile-launched'
     | 'torpedo-inbound'
-    | 'missile-inbound';
+    | 'missile-inbound'
+    // JAMMER3 — "Our scanners are being jammed Sir!", sent to every ship the
+    // burst reaches. @see GECMDS.C:1645
+    | 'scanners-jammed';
   /**
    * The firer's scan letter as the victim sees it, canon's `%c`. Empty for the
    * in-flight alerts: TORP1 and MISSL1 take no argument — canon does not tell
