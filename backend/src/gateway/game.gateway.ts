@@ -176,6 +176,10 @@ function hitText(
 ): string {
   const hull = damstr(event.damageHull ?? 0);
   switch (event.weapon) {
+    case 'hyper-phaser':
+      // HPHITU — the victim is told WHICH weapon, because only the
+      // hyper-phaser can reach them at warp. @see GECMDS.C:1076
+      return formatMessage(MessageId.HP_HIT_YOU, attackerLabel, hull);
     case 'torpedo':
       return formatMessage(deflected ? MessageId.THIT1 : MessageId.THIT2);
     case 'missile':
