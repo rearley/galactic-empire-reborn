@@ -111,7 +111,7 @@ import { damstr } from '../game/combat/combat-math';
 import { attackerNameFromLastFired, resolveKillSpoils } from '../game/combat/kill-resolution';
 import { isAiUserid } from '../game/commands/helpers/ai-userid';
 import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
-import { MAIL_CLASS_DISTRESS } from '../game/constants';
+import { DOC_PLANET_LIMIT, MAIL_CLASS_DISTRESS, RNDDOC } from '../game/constants';
 
 interface SectorPayload {
   x: unknown;
@@ -1305,6 +1305,51 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return ship?.username ?? null;
   }
 
+  /**
+   * One kill in six yields the victim's colony list to the victor.
+   *
+   *   if (gernd()%RNDDOC == 0) {
+   *       if (qeqbtv(ptr->userid,1)) {
+   *           prfmsg(CAPTDOC);
+   *           do { ...if (sameas(planet.userid,ptr->userid))
+   *                    prf("%-20s %d %d   %d \r",name,xsect,ysect,plnum);
+   *                  outprfge(ALWAYS,who); ... } while (qnxbtv() && (++i < 20));
+   *       }
+   *   }
+   *
+   * @see GEFUNCS.C:1227-1251 (inside killem), GEMAIN.H:192-193 SHOWDOC/RNDDOC
+   *
+   * `ptr` is the VICTIM, so what is captured is a list of THEIR planets, handed
+   * to `who` — the killer. It is real intelligence: where to raid next. SHOWDOC
+   * is `#define SHOWDOC 1`, so this is compiled in, not an optional extra.
+   *
+   * The 20 is canon's cap on the listing, and the roll is taken BEFORE the
+   * lookup so an unlucky kill costs no query.
+   */
+  private async revealCapturedDocument(victimUserid: string, killerUserid: string): Promise<void> {
+    if (!killerUserid) return;
+    if (gernd(this.random) % RNDDOC !== 0) return;
+
+    const planets = await this.prisma.planet.findMany({
+      where: { userid: victimUserid },
+      select: { name: true, xsect: true, ysect: true, plnum: true },
+      take: DOC_PLANET_LIMIT,
+    });
+    if (planets.length === 0) return;
+
+    const room = `user:${killerUserid}`;
+    this.server.to(room).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(MessageId.CAPTURED_DOC),
+    });
+    for (const p of planets) {
+      this.server.to(room).emit('event.log', {
+        category: 'combat',
+        text: `${p.name.padEnd(20)} ${p.xsect} ${p.ysect}   ${p.plnum}`,
+      });
+    }
+  }
+
   @OnEvent(COMBAT_SHIP_DESTROYED)
   handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
     const keyParts = event.victimShipKey.split(':');
@@ -1467,6 +1512,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         category: 'combat',
         text: formatMessage(MessageId.KILLEDBY, victimLabel, killerLabel),
       });
+    }
+
+    // The victor may capture the victim's colony list — one kill in six.
+    // Canon does this inside killem, after the kill is attributed and before
+    // the class kill_func (GEFUNCS.C:1227-1251). Fire-and-forget: a failed
+    // lookup must not take the rest of the kill handling down with it.
+    if (event.attackerUserid && !isAiUserid(event.attackerUserid)) {
+      void this.revealCapturedDocument(event.victimUserid, event.attackerUserid)
+        .catch((err: unknown) => {
+          const stack = err instanceof Error ? err.stack : String(err);
+          this.logger.error(`Captured-document reveal failed: ${stack}`);
+        });
     }
 
     // Tell the pilot who just died that they SURVIVED. C prints YOURDEAD to

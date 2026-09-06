@@ -375,6 +375,21 @@ export const SCANADJ = 40 as const;
 export const TONFACT = 15000 as const;
 /** @see GEMAIN.H:10 #define FIRETICKS 10 — battle-lock counter set on fire/hit */
 export const FIRETICKS = 10 as const;
+
+/**
+ * One kill in RNDDOC yields the victim's colony list to the killer.
+ *
+ * The feature is compiled IN — `#define SHOWDOC 1` — so this is not optional
+ * behaviour behind a flag that the shipped game had switched off.
+ *
+ * @see GEMAIN.H:192 `#define SHOWDOC 1`
+ * @see GEMAIN.H:193 `#define RNDDOC 6`
+ * @see GEFUNCS.C:1227-1251 killem
+ */
+export const RNDDOC = 6 as const;
+
+/** Canon's cap on the captured-document listing. @see GEFUNCS.C:1245 `++i < 20` */
+export const DOC_PLANET_LIMIT = 20 as const;
 /** @see GEMAIN.H:132 #define DECOYTIME 15 — decoy slot lifetime in ticks */
 export const DECOYTIME = 15 as const;
 /** @see GEMAIN.H:127 #define MAXDECOY 10 — maximum decoy slots per ship */
