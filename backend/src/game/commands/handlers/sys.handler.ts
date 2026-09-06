@@ -34,24 +34,34 @@ export class SysHandlerService {
    * ordinary player gets "Huh?" and nothing else.
    *
    * Canon reads sysop status from the MajorBBS user record's ISYSOP flag. This
-   * port has no such record, so identity comes from the GE_SYSOP_USERIDS
+   * port has no such record, so identity comes from the GE_SYSOP_USERNAME
    * allowlist — port-original plumbing for a canon gate. Empty or unset means
    * nobody is a sysop, which is the safe default: `sys unjam` clears the
    * caller's own jammer counter, so an ungated `sys` is a free, instant,
    * universal counter to the jammer weapon.
    *
+   * It matches on USERNAME, not `userid`. `userid` is
+   * `usr_${randomBytes(12).toString('hex')}` (auth.service.ts:38) — minted at
+   * registration, so it cannot be configured before the account exists and is
+   * different after every database reset, which would make the allowlist
+   * silently stop granting. The username is chosen by the operator and re-used
+   * across resets, so it can be set once and stay true. Matching is
+   * case-insensitive because `User.username` is case-insensitively unique.
+   *
    * @see GECMDS.C:4752-4760 cmd_sysop
    */
-  private isSysop(userid: string): boolean {
-    return (process.env.GE_SYSOP_USERIDS ?? '')
+  private isSysop(ship: ShipState): boolean {
+    const name = ship.username?.trim().toLowerCase();
+    if (!name) return false;
+    return (process.env.GE_SYSOP_USERNAME ?? '')
       .split(',')
-      .map((u) => u.trim())
+      .map((u) => u.trim().toLowerCase())
       .filter((u) => u.length > 0)
-      .includes(userid);
+      .includes(name);
   }
 
   private handle(ship: ShipState, args: string[]): CommandResult {
-    if (!this.isSysop(ship.userid)) {
+    if (!this.isSysop(ship)) {
       return {
         lines: [{ text: formatMessage(MessageId.SYS_HUH), category: 'system' }],
       };

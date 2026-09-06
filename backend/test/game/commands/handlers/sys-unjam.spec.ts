@@ -21,6 +21,7 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    username: 'Sysop',
     dirty: false, ...over,
   };
 }
@@ -48,11 +49,11 @@ describe('SysHandlerService — `sys unjam`', () => {
   // "Huh?" before the subcommand is even read. These cases are about what the
   // subcommand DOES, so they run as a sysop. The gate itself is covered by
   // sys-authorization.spec.ts.
-  const saved = process.env.GE_SYSOP_USERIDS;
-  beforeEach(() => { process.env.GE_SYSOP_USERIDS = 'u1'; });
+  const saved = process.env.GE_SYSOP_USERNAME;
+  beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'Sysop'; });
   afterEach(() => {
-    if (saved === undefined) delete process.env.GE_SYSOP_USERIDS;
-    else process.env.GE_SYSOP_USERIDS = saved;
+    if (saved === undefined) delete process.env.GE_SYSOP_USERNAME;
+    else process.env.GE_SYSOP_USERNAME = saved;
   });
 
   it('happy path — clears jammer immediately', () => {
