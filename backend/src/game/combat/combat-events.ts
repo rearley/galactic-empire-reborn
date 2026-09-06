@@ -38,7 +38,13 @@ export interface CombatHitEvent {
   victimId: string;
   /** The victim SHIP's name, for the same reason as `attackerName`. */
   victimName?: string;
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine';
+  /**
+   * `hyper-phaser` is a distinct weapon, not a phaser variant: it is the only
+   * thing that can reach a ship at warp, and canon gives it its own hit lines
+   * (HPHITM to the firer, HPHITU to the victim, GECMDS.C:1074-1076). Tagging a
+   * hyper hit as 'phaser' told the victim the wrong weapon.
+   */
+  weapon: 'phaser' | 'hyper-phaser' | 'torpedo' | 'missile' | 'mine';
   damageHull: number;
   damageShield: number;
   sector: { x: number; y: number };

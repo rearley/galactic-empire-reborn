@@ -252,6 +252,12 @@ export enum MessageId {
   TRAN_UP_NOT_OWNER = 'TRAN_UP_NOT_OWNER',
   /** ORBIT4 — `orb` attempted from hyperspace. */
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
+  /** HPFIRED — to the firer, as the hyper-phaser discharges. */
+  HP_FIRED = 'HP_FIRED',
+  /** HPHITM — to the firer, on a hyper-phaser hit. */
+  HP_HIT_MINE = 'HP_HIT_MINE',
+  /** HPHITU — to the VICTIM of a hyper-phaser hit. */
+  HP_HIT_YOU = 'HP_HIT_YOU',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -839,6 +845,10 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TRAN_UP_NOT_OWNER]: CANON_MESSAGES.TRANSUP4,
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
+  /** @see GECMDS.C:1037, :1074, :1076 — damage is a damstr WORD in both directions. */
+  [MessageId.HP_FIRED]: CANON_MESSAGES.HPFIRED,
+  [MessageId.HP_HIT_MINE]: CANON_MESSAGES.HPHITM,
+  [MessageId.HP_HIT_YOU]: CANON_MESSAGES.HPHITU,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

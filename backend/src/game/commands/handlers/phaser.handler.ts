@@ -18,6 +18,7 @@ import {
   withinArc,
 } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
+import { displayName } from '../../ship/display-name';
 import { selectHyperVictims } from '../../combat/firehp';
 import { selectPhaserVictims } from '../../combat/firep';
 import {
@@ -207,6 +208,10 @@ export class PhaserHandlerService {
     const allShips = this.shipState.findAllShips();
     let hits = 0;
     const lines: CommandResult['lines'] = [];
+
+    // `prfmsg(HPFIRED,deg); outprfge(FILTER,usrn);` — the shot announces
+    // itself to the firer before any hit is resolved. @see GECMDS.C:1037
+    lines.push({ text: formatMessage(MessageId.HP_FIRED, Math.round(degree)), category: 'combat' });
 
     // The discharge notice, before any per-victim result. C prints
     // `prfmsg(PFIRED,(int)ptr->phasr,ptr->percent)` at GECMDS.C:943-944 — the
@@ -448,7 +453,9 @@ export class PhaserHandlerService {
       const hitEvent: CombatHitEvent = {
         attackerId,
         victimId: shipKey(candidate.userid, candidate.shipno),
-        weapon: 'phaser',
+        // Tagged as its own weapon so the VICTIM is told which one hit them —
+        // only the hyper-phaser reaches a ship at warp. @see GECMDS.C:1076
+        weapon: 'hyper-phaser',
         damageHull: damage,
         damageShield: 0,
         sector: { x: sectorX, y: sectorY },
@@ -467,7 +474,10 @@ export class PhaserHandlerService {
       });
       hits++;
       lines.push({
-        text: `Hyper-phaser hit on ${candidate.shipname}: hull -${damage}.`,
+        // HPHITM — "Our Hyper-Phaser caused %s damage to Commander %s's ship!"
+        // Damage as a damstr WORD, and the OWNER named, as canon does with
+        // username(wptr). @see GECMDS.C:1074
+        text: formatMessage(MessageId.HP_HIT_MINE, damstr(damage), displayName(candidate)),
         category: 'combat',
       });
     }
