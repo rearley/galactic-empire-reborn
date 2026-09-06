@@ -228,6 +228,10 @@ export enum MessageId {
   SYS_UNKNOWN = 'SYS_UNKNOWN',
   SYS_FMT = 'SYS_FMT',
   SYS_HUH = 'SYS_HUH',
+  /** LOCK2 — to the TARGET when a fire-control lock is acquired on it. */
+  LOCK_WARN_ACQUIRED = 'LOCK_WARN_ACQUIRED',
+  /** LOCK4 — to the TARGET when a lock is ATTEMPTED and fails. */
+  LOCK_WARN_ATTEMPT = 'LOCK_WARN_ATTEMPT',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -783,6 +787,14 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
    * @see GECMDS.C:4757
    */
   [MessageId.SYS_HUH]: 'Huh?',
+  /**
+   * Addressed to the ship being locked, never to the firer — canon's LOCK1
+   * (the firer's own confirmation) is commented out in the original.
+   * `%c` is the FIRER's scan letter as the TARGET sees it: `shpltr(ship,usrn)`.
+   * @see GECMDS.C:1401, :1415
+   */
+  [MessageId.LOCK_WARN_ACQUIRED]: CANON_MESSAGES.LOCK2,
+  [MessageId.LOCK_WARN_ATTEMPT]: CANON_MESSAGES.LOCK4,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

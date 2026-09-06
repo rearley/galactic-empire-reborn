@@ -11,6 +11,8 @@ import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact, missileFluxCost, missileFluxShort } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip, shipLetter } from '../helpers/find-ship';
+import { CombatTargetWarningEvent } from '../../combat/combat-events';
+import { applyLockOutcome } from '../../combat/lock-outcome';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
@@ -78,6 +80,20 @@ export class MissileHandlerService {
       return this.handle(ship, args);
     },
   };
+
+  /**
+   * Canon's shared lockon tail: battle-lock BOTH ships and tell the target.
+   * @see GECMDS.C:1395-1422
+   */
+  private applyLock(
+    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+  ): void {
+    applyLockOutcome(firer, target, kind, {
+      shipState: this.shipState,
+      events: this.events,
+      lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
+    });
+  }
 
   private handle(ship: ShipState, args: string[]): CommandResult {
     // 1. Launcher mounted?
@@ -206,8 +222,16 @@ export class MissileHandlerService {
     const fact = lockFact('missile', ship.speed, target.speed, distSectors, MISFACT);
     if (fact <= 0.7) {
       const letter = shipLetter(letters, `${target.userid}:${target.shipno}`);
+      // Canon's lockon pins BOTH ships and warns the target even when the lock
+      // fails — the same tail `torp` gets, because canon has one lockon.
+      // @see GECMDS.C:1413-1421
+      this.applyLock(ship, target, 'lock-attempt');
       return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL, letter), category: 'system' }] };
     }
+
+    // Successful lock: warn and pin the target. LOCK1 (the firer's own
+    // confirmation) is commented out in canon. @see GECMDS.C:1397-1407
+    this.applyLock(ship, target, 'lock-acquired');
 
     // 6. Find lowest free slot on target's lmissl
     let slot = -1;

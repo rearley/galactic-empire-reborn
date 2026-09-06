@@ -32,6 +32,8 @@ import {
   COMBAT_HIT,
   COMBAT_MINE_DETONATION,
   COMBAT_MINE_WARNING,
+  COMBAT_TARGET_WARNING,
+  CombatTargetWarningEvent,
   CombatMineWarningEvent,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
@@ -1483,6 +1485,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * The port emitted the event and nothing listened, so mines gave NO warning
    * at all — and a mine does up to MNDAMMAX to a hull that dies at 100.
    */
+  /**
+   * The half of combat canon addresses to the VICTIM.
+   *
+   *   prfmsg(LOCK2,shpltr(ship,usrn)); outprfge(FILTER,ship);   // good lock
+   *   prfmsg(LOCK4,shpltr(ship,usrn)); outprfge(FILTER,ship);   // failed lock
+   *
+   * @see GECMDS.C:1401, :1415
+   *
+   * Addressed to the target's own room and nowhere else: canon does not tell
+   * the sector, and LOCK1 — the firer's confirmation — is commented out in the
+   * original, so the firer learns nothing from a successful lock.
+   */
+  @OnEvent(COMBAT_TARGET_WARNING)
+  handleCombatTargetWarning(event: CombatTargetWarningEvent): void {
+    const messageId = event.kind === 'lock-acquired'
+      ? MessageId.LOCK_WARN_ACQUIRED
+      : MessageId.LOCK_WARN_ATTEMPT;
+    this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(messageId, event.attackerLetter),
+    });
+  }
+
   @OnEvent(COMBAT_MINE_WARNING)
   handleCombatMineWarning(event: CombatMineWarningEvent): void {
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {

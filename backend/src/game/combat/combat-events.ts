@@ -131,3 +131,33 @@ export interface CombatShipDestroyedEvent {
   /** Points awarded on this kill — shipClass.points for victim's class. 0 if class unknown. @see GEFUNCS.C:killem (1145) */
   scoreAwarded: number;
 }
+
+/**
+ * A warning delivered to the ship being targeted — the half of combat canon
+ * addresses to the victim rather than the attacker.
+ *
+ * Canon prints these with `outprfge(FILTER, ship)`, i.e. to the TARGET's
+ * channel, and they are the whole reason a pilot can react:
+ *
+ *   lock-acquired    LOCK2   "Ship %c has a fire control scanner locked on us!"
+ *                            @see GECMDS.C:1401
+ *   lock-attempt     LOCK4   "Ship %c is attempting to lock fire control..."
+ *                            @see GECMDS.C:1415
+ *
+ * The port emitted none of them, so being locked, shot at, or tracked was
+ * invisible until the detonation — which left `decoy` with no trigger a player
+ * could ever respond to.
+ *
+ * `attackerLetter` is canon's `%c`: `shpltr(ship,usrn)` renders the FIRER's
+ * scan letter as the TARGET sees it, so the victim can match the warning to a
+ * contact on their own scan.
+ */
+export const COMBAT_TARGET_WARNING = 'combat.target-warning' as const;
+export interface CombatTargetWarningEvent {
+  /** `${userid}:${shipno}` of the ship being warned. */
+  victimId: string;
+  kind: 'lock-acquired' | 'lock-attempt';
+  /** The firer's scan letter as the victim sees it, canon's `%c`. */
+  attackerLetter: string;
+  tickAt: Date;
+}
