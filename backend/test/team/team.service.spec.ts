@@ -52,6 +52,7 @@ function makeService(
 ): TeamService {
   const repo = {
     getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+    countTeams: jest.fn().mockResolvedValue(0),
     insertTeam: jest.fn().mockResolvedValue(undefined),
     findByNameLower: jest.fn().mockResolvedValue(null),
     liveCountsGroupBy: jest.fn().mockResolvedValue([]),
@@ -83,6 +84,7 @@ describe('TeamService.create', () => {
   it('allocates teamcode as MAX(teamcode)+1', async () => {
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(5n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam: jest.fn().mockResolvedValue(undefined),
       findByNameLower: jest.fn(),
       liveCountsGroupBy: jest.fn(),
@@ -102,6 +104,7 @@ describe('TeamService.create', () => {
   it('sets User.teamcode in the transaction', async () => {
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam: jest.fn().mockResolvedValue(undefined),
     } as unknown as TeamRepository;
     const userUpdate = jest.fn().mockResolvedValue({});
@@ -118,6 +121,7 @@ describe('TeamService.create', () => {
   it('mirrors ShipState.teamcode after create', async () => {
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam: jest.fn().mockResolvedValue(undefined),
     } as unknown as TeamRepository;
     const prisma = {
@@ -135,6 +139,7 @@ describe('TeamService.create', () => {
     const insertTeam = jest.fn().mockResolvedValue(undefined);
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam,
     } as unknown as TeamRepository;
     const prisma = {
@@ -159,6 +164,7 @@ describe('TeamService.create', () => {
     const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam: jest.fn().mockRejectedValue(p2002),
     } as unknown as TeamRepository;
     const prisma = {
@@ -177,6 +183,7 @@ describe('TeamService.create', () => {
     let callCount = 0;
     const repo = {
       getMaxTeamcode: jest.fn().mockResolvedValue(0n),
+      countTeams: jest.fn().mockResolvedValue(0),
       insertTeam: jest.fn().mockImplementation(() => {
         callCount++;
         if (callCount === 1) throw p2002;
@@ -409,5 +416,51 @@ describe('Balance regression constants', () => {
     // documented deviation. Canon is `password[11]` (GEMAIN.H:650) filled by
     // `strncpy(tmp.password, margv[4], 10)` (GECMDS.C:5518).
     expect(MAX_TEAM_PASSWORD_LENGTH).toBe(10);
+  });
+});
+
+/**
+ * Canon refuses to create the 51st team.
+ *
+ *   numteams = 0;
+ *   for (next=0;next<MAXTEAMS;++next) {
+ *       if (teamtab[next].teamcode == 0) break;
+ *       numteams++;
+ *   }
+ *   if (numteams >= MAXTEAMS) { prfmsg(TOOMANY,MAXTEAMS); outprf(usrnum); return; }
+ *
+ * @see GECMDS.C:5477-5490 (cmd_team, "start" branch)
+ * @see GEMAIN.H:240 `#define MAXTEAMS 50`
+ *
+ * `MAXTEAMS` was declared twice in the port (team.types.ts, midnight.constants.ts)
+ * and read by neither: the cap existed as documentation only. It matters for the
+ * same reason TEAMMAX does — the midnight job pays TEAMBONU per member and
+ * ranks the team table — so an unbounded table is a scoreboard problem, not a
+ * storage one.
+ */
+describe('TeamService.create enforces MAXTEAMS (GECMDS.C:5484)', () => {
+  it('refuses when the table is already full', async () => {
+    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS) });
+
+    const res = await svc.create({ ship: makeShip(), name: 'Latecomers', password: 'pw' });
+
+    expect(res).toEqual({ error: 'too_many', limit: MAXTEAMS });
+  });
+
+  it('allows the last free slot — the gate is >=, not >', async () => {
+    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS - 1) });
+
+    const res = await svc.create({ ship: makeShip(), name: 'JustInTime', password: 'pw' });
+
+    expect(res).toMatchObject({ ok: true, teamname: 'JustInTime' });
+  });
+
+  it('does not write a team row when it refuses', async () => {
+    const insertTeam = jest.fn().mockResolvedValue(undefined);
+    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS), insertTeam });
+
+    await svc.create({ ship: makeShip(), name: 'Latecomers', password: 'pw' });
+
+    expect(insertTeam).not.toHaveBeenCalled();
   });
 });

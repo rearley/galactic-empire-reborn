@@ -382,3 +382,57 @@ describe('computeBuyOutcome — cargo capacity is tonnage, not unit count', () =
     expect(out.ok).toBe(false);
   });
 });
+
+/**
+ * Gold weighs HALF a ton, so a hold takes twice as many gold as its tonnage.
+ *
+ *   total += (amt*weight[itm])/100;
+ *   return (total <= shipclass[wptr->shpclass].max_tons) && ...;
+ *
+ * @see GEFUNCS.C:2541-2557 chkweight
+ * @see MBMGEMSG.MSG `ITMWT13 {Weight of 100 Gold: 50}` — 50/100 = 0.5 tons
+ *
+ * `unitsThatFit` divided by `Math.max(1, tonsEach)`, which turned gold's 0.5
+ * into 1 and halved the capacity of every gold run. The clamp was presumably
+ * meant to stop a divide-by-zero, but no item weighs zero — canon's lightest
+ * is gold at 0.5 — so it only ever fired on gold, the one item whose whole
+ * purpose is being hauled in bulk from the Zygor-3 bank.
+ */
+describe('gold is half a ton, so twice as much fits (GEFUNCS.C:2541)', () => {
+  function goldPlanet(): PlanetState {
+    const p = makePlanet();
+    p.items[I_GOLD] = { ...p.items[I_GOLD], qty: 1_000_000n, sell: true, reserve: 0, markup2a: 5 };
+    return p;
+  }
+
+  it('accepts 2000 gold into 1000 free tons', () => {
+    const out = computeBuyOutcome({
+      planet: goldPlanet(), buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 2000, buyerCargoCapacityRemaining: 1000,
+      isNeutralZone: false, buyerCash: 100_000_000n,
+    });
+
+    expect(out).toMatchObject({ ok: true, transferred: 2000 });
+  });
+
+  it('still refuses an order past the doubled capacity', () => {
+    const out = computeBuyOutcome({
+      planet: goldPlanet(), buyerIsOwner: false, itemIndex: I_GOLD,
+      requestedQty: 2001, buyerCargoCapacityRemaining: 1000,
+      isNeutralZone: false, buyerCash: 100_000_000n,
+    });
+
+    expect(out).toEqual({ ok: false, reason: 'WONT_FIT' });
+  });
+
+  it('leaves whole-ton items alone', () => {
+    // I_MEN is 1 ton: the clamp was a no-op here, and must stay one.
+    const out = computeBuyOutcome({
+      planet: makePlanet(), buyerIsOwner: false, itemIndex: I_MEN,
+      requestedQty: 101, buyerCargoCapacityRemaining: 100,
+      isNeutralZone: false, buyerCash: 100_000_000n,
+    });
+
+    expect(out).toEqual({ ok: false, reason: 'WONT_FIT' });
+  });
+});

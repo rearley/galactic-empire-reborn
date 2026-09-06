@@ -6,7 +6,8 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { parseTeaArgs, validateName, validatePassword } from '../../team/team-name';
 import { renderTeamList } from '../../team/team-render';
-import { TeamAdminError } from '../../team/team.types';
+import { MAXTEAMS, TeamAdminError } from '../../team/team.types';
+import { formatMessage, MessageId } from '../messages';
 import {
   TEAMBDSC,
   TEAMBNAM,
@@ -122,6 +123,14 @@ export class TeaHandlerService {
   }
 
   private async leaveTeam(ship: ShipState): Promise<CommandResult> {
+    // Canon's unjoin branch only runs for a pilot who holds a live teamcode;
+    // everyone else gets TEAMNOT and nothing is written (GECMDS.C:5429-5468).
+    // Without this, `tea leave` answered "You have left your team." to someone
+    // who never joined one, and fired a snapshot rebroadcast for a no-op.
+    if (ship.teamcode == null || ship.teamcode === 0n) {
+      return { lines: [{ text: TEAMNOT, category: 'system' }] };
+    }
+
     await this.prisma.user.update({
       where: { userid: ship.userid },
       data: { teamcode: null },
@@ -181,6 +190,10 @@ export class TeaHandlerService {
       case 'password_too_long': return 'Team password must be 8 characters or fewer.';
       case 'password_has_space': return 'Team password may not contain spaces.';
       case 'name_taken': return 'Team name already taken.';
+      // Canon's own refusal, with the ceiling filled in (GECMDS.C:5488). It
+      // must not fall through to the usage line: a full table is not something
+      // the captain can fix by retyping the command.
+      case 'too_many': return formatMessage(MessageId.TEAM_TOO_MANY, MAXTEAMS);
       default: return 'Usage: tea create <name> <password>';
     }
   }

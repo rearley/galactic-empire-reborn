@@ -56,8 +56,12 @@ export type BuyOutcome =
  * "1060 tons in cargo (capacity: 1000 tons)".
  */
 function unitsThatFit(remainingTons: number, itemIndex: number): number {
-  const tonsEach = ITEM_TONS[itemIndex] ?? 1;
-  return Math.floor(remainingTons / Math.max(1, tonsEach));
+  // No canon item weighs zero — gold is the lightest at 0.5 — so there is no
+  // divide to guard against. A `Math.max(1, tonsEach)` here used to round
+  // gold's half-ton up to a whole one, halving how much of it a hold would
+  // take: exactly the item the Zygor-3 bank exists to move in bulk.
+  const tonsEach = ITEM_TONS[itemIndex] || 1;
+  return Math.floor(remainingTons / tonsEach);
 }
 
 /**

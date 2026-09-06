@@ -415,6 +415,46 @@ describe('PlanetStateService — applyAdminChange()', () => {
     expect(prisma.planet.update).toHaveBeenCalled();
   });
 
+  /**
+   * markup and reserve are unsigned 16-bit fields, and canon refuses anything
+   * above 32000 rather than storing it:
+   *
+   *   if (margc == 1 && amt <=32000) { titems[usrnum].markup2a = amt; ... }
+   *   prfmsg(ADMEN2F2,item_name[warsptr->titem]);   // re-prompt, no write
+   *
+   * @see GEMAIN.C:3163-3181 mnu_admenu2f2 (markup)
+   * @see GEMAIN.C:3204-3220 mnu_admenu2f4 (reserve)
+   *
+   * The port bounded only the low end. The taxrate case below has always
+   * enforced its ceiling, so the two fields left unbounded were exactly the
+   * ones that set what visiting captains pay and what the colony refuses to
+   * part with.
+   */
+  it.each([
+    ['markup', 32000, true],
+    ['markup', 32001, false],
+    ['reserve', 32000, true],
+    ['reserve', 32001, false],
+  ])('%s accepts %d: %s', async (type, value, expected) => {
+    const { svc } = await setup();
+
+    const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', {
+      type, itemIndex: 5, value,
+    } as never);
+
+    expect(result.ok).toBe(expected);
+  });
+
+  it('does not store a markup that exceeds the ceiling', async () => {
+    const { svc } = await setup();
+
+    await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', {
+      type: 'markup', itemIndex: 5, value: 999_999,
+    });
+
+    expect(svc.get(1, 1, 1)?.items[5].markup2a).not.toBe(999_999);
+  });
+
   it('INVALID when taxrate > 119', async () => {
     const { svc } = await setup();
     const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'taxrate', value: 120 });

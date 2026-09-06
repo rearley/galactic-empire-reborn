@@ -64,4 +64,17 @@ export class TeamRepository {
     const result = await this.prisma.team.aggregate({ _max: { teamcode: true } });
     return result._max.teamcode ?? 0n;
   }
+
+  /**
+   * How many teams exist, for canon's MAXTEAMS gate.
+   *
+   * Canon walks `teamtab` and stops at the first zero teamcode, so it counts
+   * the OCCUPIED PREFIX of a fixed table rather than the rows. A row count is
+   * the same number here because the port has no sparse table to walk.
+   *
+   * @see GECMDS.C:5477-5484
+   */
+  async countTeams(): Promise<number> {
+    return this.prisma.team.count();
+  }
 }
