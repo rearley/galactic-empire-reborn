@@ -1,0 +1,12 @@
+-- Backfill the persisted production schedule.
+--
+-- Every existing planet has a NULL lastTickAt, which reads as "never ticked"
+-- and therefore "due now". Without this, the very deploy that stops restarts
+-- from granting a free PLANTOCK would itself grant one last free PLANTOCK to
+-- the whole galaxy.
+--
+-- Stamping NOW() starts every planet's 30-minute clock at the deploy, which
+-- errs toward slow (a colony waits up to a full period) rather than fast.
+--
+-- @see docs/DECISIONS.md 2026-09-06 — planet tick schedule is persisted
+UPDATE "Planet" SET "lastTickAt" = NOW() WHERE "lastTickAt" IS NULL;

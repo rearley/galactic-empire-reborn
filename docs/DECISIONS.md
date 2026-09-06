@@ -3369,3 +3369,52 @@ there is no single ratio, since the two tables disagree per item and canon's is
 zero for twelve of the fourteen; any factor would be invented. Leaving old
 scores in place — the roster would rank players on two incompatible scales with
 no way to tell which was which.
+
+## 2026-09-06 — The planet production schedule is persisted, not process state
+**Context:** `PlanetTickService` decided when each planet was next due from an
+in-memory `Map<planetKey, number>` holding the last tick time. Boot cleared it,
+so on the first sweep after startup every populated planet had no recorded
+last-tick and was immediately due. **Every restart therefore handed the whole
+galaxy a free PLANTOCK** — 30 minutes of production, permanently in the ground.
+During a heavy development day that is hours of unearned economy, and it is
+invisible: nothing logs it and the stock it creates is indistinguishable from
+stock that was actually earned.
+
+Found by the owner asking a plain question — "so anytime we deploy changes we
+cause issues?" — during a playtest. Everything else survives a restart cleanly:
+ships flush every second, player ships hydrate on connect rather than at boot,
+and mines, Cybertrons and locked torpedoes are all persisted columns. This was
+the only real cost, and it was not the one either of us had written down. The
+standing note in memory said to hold deploys because a restart wipes droids;
+droids are ephemeral by design and the owner does not mind losing them.
+
+**Decision:** add `Planet.lastTickAt DateTime?` and schedule against it.
+`PlanetTickService.advance` stamps the planet immediately before running its
+economy, and `runEconomicTickFor`'s existing flush carries the stamp to Postgres
+in the same write as the production result. A NULL means "never ticked",
+therefore due. A second migration backfills every existing row to `NOW()` so the
+deploy that lands this does not itself grant one last free tick.
+
+`PlanetState.lastTickAt` is declared optional, like `dirty`, because thirty-odd
+test fixtures build a `PlanetState` by hand and have no schedule to carry;
+absent reads the same as NULL.
+
+**Reason:** elapsed game time should be measured against the wall clock, not
+against process uptime. The economy is balanced around one `multiply()` per
+planet per 30 minutes (GEMAIN.C:469) and that invariant has to hold across a
+restart, or the balance work is measuring a world that got extra turns.
+
+**Alternatives rejected:** seeding the in-memory map to boot time — one line and
+no migration, and it errs toward slow rather than fast, but it still discards
+real elapsed time. A server down for six hours would resume as though no time
+had passed, which is the same class of bug pointing the other way. Accepting the
+free tick and counting restarts by hand — that is what we were already doing,
+and it silently corrupted every economy measurement taken on a day with deploys.
+
+**Note on canon:** the original has the same class of artefact for a different
+reason — `plarti` walks the planet file with an in-memory cursor that resets to
+record 0 on boot, so a restart re-does the front of the file (GEMAIN.C:656). We
+schedule per planet by elapsed time rather than by cursor position, which is why
+ours landed as a clean free tick for everyone rather than a partial replay. This
+is a deliberate deviation from canon's mechanism in service of canon's stated
+invariant.

@@ -16,12 +16,25 @@ import { planetKey } from './planet-state.types';
  */
 export const MAXTIC = 20;
 
+/**
+ * Is this planet due for a production tick?
+ *
+ * `lastTickAt` is a persisted column rather than process state, so the elapsed
+ * time measured here is wall-clock time and survives a restart. It used to be
+ * an in-memory Map that boot cleared, which made every populated planet due on
+ * the first sweep after startup — one free PLANTOCK for the whole galaxy per
+ * deploy. A null means the planet has never run and is due now.
+ *
+ * @see docs/DECISIONS.md 2026-09-06 — planet tick schedule is persisted
+ */
+function isDue(lastTickAt: Date | null | undefined, nowMs: number, periodMs: number): boolean {
+  if (lastTickAt == null) return true;
+  return nowMs - lastTickAt.getTime() >= periodMs;
+}
+
 @Injectable()
 export class PlanetTickService implements OnModuleInit {
   private readonly logger = new Logger(PlanetTickService.name);
-
-  /** When each planet last had its economy run, keyed by planetKey. */
-  private readonly lastTickMs = new Map<string, number>();
 
   constructor(
     private readonly planets: PlanetStateService,
@@ -59,17 +72,15 @@ export class PlanetTickService implements OnModuleInit {
       // C skips a planet with no population outright — no starvation, no gold
       // conversion, no tax. @see GEMAIN.C:2130
       .filter((p) => shouldRunEconomy(p))
-      .filter((p) => {
-        const key = planetKey(p.xsect, p.ysect, p.plnum);
-        const last = this.lastTickMs.get(key);
-        return last === undefined || nowMs - last >= periodMs;
-      })
+      .filter((p) => isDue(p.lastTickAt, nowMs, periodMs))
       .slice(0, MAXTIC);
 
     for (const p of due) {
-      const key = planetKey(p.xsect, p.ysect, p.plnum);
-      this.lastTickMs.set(key, nowMs);
-      await this.planets.runEconomicTickFor(key);
+      // Stamped BEFORE the run so the flush inside runEconomicTickFor carries
+      // it to Postgres in the same write. A planet that has never ticked keeps
+      // a null here until its first run, which is what makes it due.
+      p.lastTickAt = new Date(nowMs);
+      await this.planets.runEconomicTickFor(planetKey(p.xsect, p.ysect, p.plnum));
     }
   }
 
@@ -109,7 +120,8 @@ export class PlanetTickService implements OnModuleInit {
     // scheduled tick on the next sweep.
     const nowMs = this.now();
     for (const p of populated) {
-      this.lastTickMs.set(planetKey(p.xsect, p.ysect, p.plnum), nowMs);
+      p.lastTickAt = new Date(nowMs);
+      await this.planets.flushPlanet(p.xsect, p.ysect, p.plnum);
     }
     return { planets: populated.length, ticks: times };
   }

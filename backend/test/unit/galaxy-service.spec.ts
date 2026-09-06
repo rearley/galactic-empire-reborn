@@ -23,6 +23,8 @@ function makePlanet(overrides: Partial<Planet> & Pick<Planet, 'xsect' | 'ysect' 
     lastattack: '',
     beacon: '',
     spyowner: '',
+    // Never ticked — the persisted production schedule. @see planet-tick.service isDue
+    lastTickAt: null,
     technology: 0,
     teamcode: BigInt(0),
     itemsQty: [],

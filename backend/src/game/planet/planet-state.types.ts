@@ -44,6 +44,20 @@ export interface PlanetState {
 
   items: PlanetItem[];        // length === NUMITEMS (14)
 
+  /**
+   * When this planet's economy last ran; null or absent if it never has.
+   *
+   * Persisted, deliberately. The schedule used to be an in-memory Map on
+   * PlanetTickService, which boot cleared — so every restart made every
+   * populated planet immediately due and granted the galaxy a free PLANTOCK.
+   * Optional for the same reason `dirty` is: test fixtures and in-flight
+   * snapshots build a PlanetState by hand and have no schedule to carry. A
+   * missing value reads the same as null — never ticked, therefore due.
+   *
+   * @see docs/DECISIONS.md 2026-09-06 — planet tick schedule is persisted
+   */
+  lastTickAt?: Date | null;
+
   /** Marks planet state as needing a flush to Postgres. */
   dirty?: boolean;
 }
