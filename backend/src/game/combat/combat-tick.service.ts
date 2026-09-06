@@ -1,6 +1,7 @@
 import { tryEnergyDebit, cbearing } from '../physics/physics-math';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
+import { COMBAT_TARGET_WARNING, CombatTargetWarningEvent } from './combat-events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
@@ -570,6 +571,9 @@ export class CombatTickService implements OnModuleInit {
    */
   private processIncomingTorpedoes(carrier: ShipState, ctx: TickContext): void {
     const carrierIngame = carrier.status === 1 || carrier.status === 2;
+    // Canon's `flag`: one RED ALERT per TICK however many are tracking.
+    // @see GEFUNCS.C:1595-1603
+    let stillTracking = false;
     for (let i = 0; i < MAXTORPS; i++) {
       const ch = carrier.ltorpsChannel[i];
       if (ch === undefined || ch === 255) continue;
@@ -599,6 +603,7 @@ export class CombatTickService implements OnModuleInit {
         this.shipState.mutate(carrier.userid, carrier.shipno, (s) => {
           s.ltorpsDistance[i] = newDist;
         });
+        stillTracking = true;
         continue;
       }
 
@@ -606,6 +611,30 @@ export class CombatTickService implements OnModuleInit {
       this.resolveProjectileHit(carrier, ch, 'torpedo', TDAMMAX, ctx);
       this.clearTorpSlot(carrier, i);
     }
+
+    if (stillTracking) this.raiseInboundAlert(carrier, 'torpedo-inbound');
+  }
+
+  /**
+   * The tracking alert canon prints to the ship being chased, once per tick,
+   * for as long as something is closing on it. This is the cue a pilot acts on
+   * — it is what makes `decoy` a reaction rather than a guess.
+   *
+   * TORP1 and MISSL1 take no argument: canon tells you something is tracking
+   * you, not who fired it.
+   *
+   * @see GEFUNCS.C:1600 (TORP1), :1685 (MISSL1)
+   */
+  private raiseInboundAlert(
+    carrier: ShipState,
+    kind: 'torpedo-inbound' | 'missile-inbound',
+  ): void {
+    this.events.emit(COMBAT_TARGET_WARNING, {
+      victimId: shipKey(carrier.userid, carrier.shipno),
+      kind,
+      attackerLetter: '',
+      tickAt: new Date(),
+    } satisfies CombatTargetWarningEvent);
   }
 
   /**
@@ -615,6 +644,9 @@ export class CombatTickService implements OnModuleInit {
    */
   private processIncomingMissiles(carrier: ShipState, ctx: TickContext): void {
     const carrierIngame = carrier.status === 1 || carrier.status === 2;
+    // Canon's `flag` again — one alert per tick, not one per missile.
+    // @see GEFUNCS.C:1680-1688
+    let stillTracking = false;
     for (let i = 0; i < MAXMISSL; i++) {
       const ch = carrier.lmisslChannel[i];
       if (ch === undefined || ch === 255) continue;
@@ -648,6 +680,7 @@ export class CombatTickService implements OnModuleInit {
         this.shipState.mutate(carrier.userid, carrier.shipno, (s) => {
           s.lmisslDistance[i] = newDist;
         });
+        stillTracking = true;
         continue;
       }
 
@@ -658,6 +691,8 @@ export class CombatTickService implements OnModuleInit {
       this.resolveProjectileHit(carrier, ch, 'missile', charge, ctx);
       this.clearMisslSlot(carrier, i);
     }
+
+    if (stillTracking) this.raiseInboundAlert(carrier, 'missile-inbound');
   }
 
   /** Burn out the decoy that just did its job: `dptr[j] = 0`. @see GEFUNCS.C:1588 */

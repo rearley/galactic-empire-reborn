@@ -1499,9 +1499,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(COMBAT_TARGET_WARNING)
   handleCombatTargetWarning(event: CombatTargetWarningEvent): void {
-    const messageId = event.kind === 'lock-acquired'
-      ? MessageId.LOCK_WARN_ACQUIRED
-      : MessageId.LOCK_WARN_ATTEMPT;
+    const messageId = {
+      'lock-acquired': MessageId.LOCK_WARN_ACQUIRED,
+      'lock-attempt': MessageId.LOCK_WARN_ATTEMPT,
+      'torpedo-launched': MessageId.TORP_INBOUND,
+      'missile-launched': MessageId.MISSILE_INBOUND,
+      'torpedo-inbound': MessageId.TORP_TRACKING,
+      'missile-inbound': MessageId.MISSILE_TRACKING,
+    }[event.kind];
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
       text: formatMessage(messageId, event.attackerLetter),

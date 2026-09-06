@@ -224,3 +224,46 @@ describe('the missile path shares canon\'s lockon, so it warns identically', () 
       .toEqual({ firer: FIRETICKS, target: FIRETICKS });
   });
 });
+
+describe('launch warns the target (GECMDS.C:1198, :1313)', () => {
+  /**
+   * Canon tells the target the moment the weapon leaves the tube:
+   *
+   *   prfmsg(TFIRE1);                    outprfge(FILTER,usrn);    // firer
+   *   --ptr->items[I_TORPEDO];
+   *   prfmsg(TFIRE2,shpltr(shpnum,usrn)); outprfge(FILTER,shpnum); // TARGET
+   *
+   * @see GECMDS.C:1194-1201 (torpedo) and :1313 (missile)
+   *
+   * TFIRE2/MFIRE2 read "WARNING! WARNING! Incoming torpedo from ship %c." —
+   * they existed in the generated table and were emitted nowhere, so the first
+   * thing a victim knew of a torpedo was the detonation six seconds later.
+   */
+  it('warns the target that a torpedo is inbound', () => {
+    const { handler, firer, target, warnings } = closeEngagement();
+
+    handler.command.handler(firer, ['Quarry'], ctx);
+
+    expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
+      .toContainEqual({ kind: 'torpedo-launched', victim: shipKey(target.userid, target.shipno) });
+  });
+
+  it('warns the target that a missile is inbound', () => {
+    const { missile, firer, target, warnings } = closeEngagement();
+
+    missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
+
+    expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
+      .toContainEqual({ kind: 'missile-launched', victim: shipKey(target.userid, target.shipno) });
+  });
+
+  it('does not announce a launch that never happened', () => {
+    // A failed lock returns before the tube is emptied, so the target gets the
+    // lock warning and nothing else — no phantom "incoming torpedo".
+    const { handler, firer, warnings } = distantEngagement();
+
+    handler.command.handler(firer, ['Quarry'], ctx);
+
+    expect(warnings.map((w) => w.kind)).not.toContain('torpedo-launched');
+  });
+});

@@ -156,8 +156,18 @@ export const COMBAT_TARGET_WARNING = 'combat.target-warning' as const;
 export interface CombatTargetWarningEvent {
   /** `${userid}:${shipno}` of the ship being warned. */
   victimId: string;
-  kind: 'lock-acquired' | 'lock-attempt';
-  /** The firer's scan letter as the victim sees it, canon's `%c`. */
+  kind:
+    | 'lock-acquired'
+    | 'lock-attempt'
+    | 'torpedo-launched'
+    | 'missile-launched'
+    | 'torpedo-inbound'
+    | 'missile-inbound';
+  /**
+   * The firer's scan letter as the victim sees it, canon's `%c`. Empty for the
+   * in-flight alerts: TORP1 and MISSL1 take no argument — canon does not tell
+   * you who fired the thing that is tracking you, only that it is.
+   */
   attackerLetter: string;
   tickAt: Date;
 }

@@ -232,6 +232,14 @@ export enum MessageId {
   LOCK_WARN_ACQUIRED = 'LOCK_WARN_ACQUIRED',
   /** LOCK4 — to the TARGET when a lock is ATTEMPTED and fails. */
   LOCK_WARN_ATTEMPT = 'LOCK_WARN_ATTEMPT',
+  /** TFIRE2 — to the TARGET as a torpedo leaves the tube. */
+  TORP_INBOUND = 'TORP_INBOUND',
+  /** MFIRE2 — to the TARGET as a missile leaves the tube. */
+  MISSILE_INBOUND = 'MISSILE_INBOUND',
+  /** TORP1 — per-tick tracking alert to the ship being chased. No argument. */
+  TORP_TRACKING = 'TORP_TRACKING',
+  /** MISSL1 — per-tick tracking alert for a missile. No argument. */
+  MISSILE_TRACKING = 'MISSILE_TRACKING',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -795,6 +803,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
    */
   [MessageId.LOCK_WARN_ACQUIRED]: CANON_MESSAGES.LOCK2,
   [MessageId.LOCK_WARN_ATTEMPT]: CANON_MESSAGES.LOCK4,
+  /** @see GECMDS.C:1198, :1313 — `%c` is the firer's letter as the victim sees it. */
+  [MessageId.TORP_INBOUND]: CANON_MESSAGES.TFIRE2,
+  [MessageId.MISSILE_INBOUND]: CANON_MESSAGES.MFIRE2,
+  /** @see GEFUNCS.C:1600, :1685 — raised once per tick while anything tracks you. */
+  [MessageId.TORP_TRACKING]: CANON_MESSAGES.TORP1,
+  [MessageId.MISSILE_TRACKING]: CANON_MESSAGES.MISSL1,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,
