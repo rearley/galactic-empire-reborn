@@ -11,6 +11,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { cbearing } from '../../physics/physics-math';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX, GESTAT_AUTO } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
+import { findShip } from '../helpers/find-ship';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
@@ -773,8 +774,33 @@ export class ScanHandlerService implements OnModuleInit {
 
     let target: ShipState | undefined;
 
-    // Single alpha char → scantab-only lookup (letter-based targeting, original game style)
-    if (arg.length === 1 && /^[a-zA-Z]$/.test(arg)) {
+    // `@` → whatever you are locked onto.
+    //
+    // Canon resolves a target argument through `findshp`, and `scan_sh` is one
+    // of its four callers (GECMDS.C:2207) alongside cmd_torp, cmd_missl and
+    // cmd_lock. The port's findShip helper already implements `@` — with the
+    // stale-lock clearing and NOLOCK answer canon does at GECMDS.C:1461-1465 —
+    // but `sca sh` parsed its argument by hand and had no `@` branch.
+    //
+    // It matters because the scan LETTERS shuffle while a lock holds a ship
+    // identity: the letter you locked with may since belong to someone else,
+    // and `sca sh @` is the only way to re-read your actual target without
+    // guessing which letter it wears now.
+    if (arg.trim() === '@') {
+      const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+      const found = findShip(
+        '@',
+        ship,
+        this.shipService.findAllShips(),
+        scanRange,
+        this.getScantab(ship.userid, ship.shipno) ?? undefined,
+      );
+      if (!found.ok) {
+        return { lines: [{ text: found.message, category: 'system' }] };
+      }
+      target = found.ship;
+    } else if (arg.length === 1 && /^[a-zA-Z]$/.test(arg)) {
+      // Single alpha char → scantab lookup (letter-based targeting, as canon has it)
       const letter = arg.toUpperCase();
       const scantab = this.getScantab(ship.userid, ship.shipno);
       if (!scantab || scantab.length === 0) {
