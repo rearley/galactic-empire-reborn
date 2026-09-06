@@ -3041,3 +3041,46 @@ deviation in DECISIONS.md.
 
 **Known issues:** the audit is static. It says nothing about whether the game
 plays right — a playtest remains the outstanding item from round 7.
+
+## 2026-09-06 — first canon fixes from the audit
+
+**Completed:** Four canon divergences and one vacuous invariant, all TDD — the
+failing test was written and watched to fail before any production change.
+
+- **`sys` is gated (canon GECMDS.C:4752-4760).** It had no authorization check
+  at all, and `sys unjam` zeroes the caller's own jammer counter, so any player
+  could cancel being jammed instantly and for free. Sysop identity now comes
+  from the `GE_SYSOP_USERIDS` allowlist; unset means nobody, so everyone gets
+  canon's `Huh?`. Recorded in DECISIONS.md (2026-09-06) because canon's
+  `usrptr->flags & ISYSOP` has no equivalent here.
+- **Troop raids no longer kill colonists (GECMDS.C:3714).** Canon's trash loop
+  is `for(ii=1;...)` — it never touches I_MEN. Ours started at 0 and skipped
+  I_TROOPS instead, the exact mirror image. Canon DOES include I_TROOPS, but
+  :3745 overwrites that slot with `left2`, so the draw is discarded — it still
+  consumes a gernd(), which is why the index range matters beyond Men.
+- **Cybertrons aim (GECYBS.C:276-282).** `degrees` was never assigned, so the
+  AI fired down its hull facing and connected only by coincidence. The bearing
+  was already being computed for the fired-event payload and simply never
+  written back. `percent` now takes canon's normal-space focus of 2.
+- **`SCORE_F2` rejects non-numeric values.** `parseInt('abc')` is NaN and NaN
+  fails BOTH range comparisons, so the guard passed it and `killScoreDeduction`
+  returned NaN for every kill, silently. Also rejects `'12abc'` (parseInt
+  truncated it to 12) and treats an empty value as unset rather than as 0.
+- **`transfer.conservation.spec.ts` actually tests conservation again.** It
+  addressed the receiver by bare shipno, which resolves to your OWN fleet only,
+  so all 200 transfers were refused and both invariants held trivially. Fixed
+  the addressing, gave the hulls a hold that can physically contain the fixture
+  (1,000 of every item is 316,500 tons against a 1,000-ton default), and added
+  the assertion that was missing: cargo must have MOVED before conservation
+  means anything. Sabotage-verified — both tests now fail when the receiver
+  gains one more than the sender loses; the old version passed that sabotage.
+
+**Tests:** 5 new/repaired specs. Full backend suite green.
+
+**Next:** the remaining high-impact canon gaps — movement at half rate, the
+projectile warning chain (LOCK2/LOCK4, TFIRE2/MFIRE2, TORP1/MISSL1 and the
+target's `cantexit`), and planet scoring on ITMVAL. Scores are to be RESET when
+the scoring formula changes (owner's call, 2026-09-06).
+
+**Known issues:** committed, NOT deployed — a restart wipes every droid and a
+playtest is planned.

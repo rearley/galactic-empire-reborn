@@ -227,6 +227,7 @@ export enum MessageId {
   SYS_UNJAM = 'SYS_UNJAM',
   SYS_UNKNOWN = 'SYS_UNKNOWN',
   SYS_FMT = 'SYS_FMT',
+  SYS_HUH = 'SYS_HUH',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -776,6 +777,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.SYS_UNJAM]: 'Jammer cleared.',
   [MessageId.SYS_UNKNOWN]: 'Unknown system command.',
   [MessageId.SYS_FMT]: 'Format: sys <command>',
+  /**
+   * Canon's refusal for a non-sysop reaching `sys`. Printed as a bare literal
+   * rather than a .MSG entry: `prf("Huh?\r")`.
+   * @see GECMDS.C:4757
+   */
+  [MessageId.SYS_HUH]: 'Huh?',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

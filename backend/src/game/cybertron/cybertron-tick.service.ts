@@ -12,7 +12,7 @@ import { Random, RANDOM } from '../combat/random.port';
 import { MineRegistry } from '../combat/mine.registry';
 import { MineRepository, MineRefusedError } from '../combat/mine.repository';
 import { CybertronRepository } from './cybertron.repository';
-import { buildCybertronClassConfigs, bootSeedEnabled } from './cybertron.config';
+import { buildCybertronClassConfigs, bootSeedEnabled , CYB_PHASER_FOCUS } from './cybertron.config';
 import type { CybertronClassConfig } from './cybertron.config';
 import {
   CYB_ALLOW,
@@ -483,6 +483,20 @@ export class CybertronTickService implements OnModuleInit {
     const dy = target.ycoord - ship.ycoord;
     const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
     const bearing = (absAngle - ship.heading + 360) % 360;
+
+    // AIM. Canon sets the bearing to the target immediately before every
+    // discharge, in BOTH engagement branches:
+    //   ptr->degrees = (int)(cbearing(&ptr->coord,&wptr->coord,ptr->heading)+.5);
+    // @see GECYBS.C:276-277 (hyperspace) and :281 (normal space)
+    //
+    // `firep` sweeps the cone around `heading + degrees` (GECMDS.C:946-1004),
+    // so without this a Cybertron fires straight down its hull facing and only
+    // connects when the target drifts into the nose. The bearing was already
+    // being computed here for the fired-event payload; it was simply never
+    // written back to the ship.
+    this.shipState.mutate(ship.userid, ship.shipno, (s2) => {
+      s2.degrees = Math.round(bearing);
+    });
     const sector = { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) };
     const tickAt = ctx.firedAt;
 
@@ -599,6 +613,13 @@ export class CybertronTickService implements OnModuleInit {
     const cls = this.shipClassCache.get(ship.shpclass);
 
     // Evaluate gebemean once — reused for phaser gate and torpedo-count roll (@see GECYBS.C:514,527)
+    // Canon narrows the cone to focus 2 in the normal-space branch, alongside
+    // the bearing assignment: `ptr->percent = 2;` @see GECYBS.C:282. The
+    // hyperspace branch does NOT set it — firehp uses its own fixed HPBEAMW.
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.percent = CYB_PHASER_FOCUS;
+    });
+
     const mean = gebemean(tough, escalationKills(target), CYB_BE_NICE, CYBSLO, this.random);
     if (ship.phasr >= PMINFIRE && mean && !cybwhoops(ship.cybskill, this.random)) {
       this.cybFirePhaser(ship, target, ctx);
