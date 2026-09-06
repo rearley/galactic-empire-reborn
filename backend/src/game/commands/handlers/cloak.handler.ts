@@ -122,6 +122,13 @@ export class CloakHandlerService {
         {
           room: `sector:${sectorX}:${sectorY}`,
           event: 'event.log',
+          // `outrange(FILTER,&warsptr->coord)` takes no exclude argument but
+          // skips the acting ship GEOMETRICALLY: `ddist > 1` (GEMAIN.C
+          // outrange), and a ship is distance 0 from its own coordinate.
+          // Without this the pilot was told "Sensors indicate a ship
+          // de-cloaking nearby Sir!" about themselves, one line after
+          // "Cloaking device is now off, Sir!". @see GECMDS.C:3258
+          excludeSelf: true,
           payload: {
             category: 'info',
             text: formatMessage(MessageId.CLOAK_SECTOR_DECLOAKED, ship.shipname),
