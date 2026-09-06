@@ -1634,8 +1634,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // whoever it was fighting had no way to know it had jumped rather than
       // simply outrun them.
       if (event.sector) {
+        // `outsect(FILTER,&coord,usrn,0)` — the third argument is an
+        // EXCLUSION (`zothusn != exclude`, GEMAIN.C outsect), and canon passes
+        // the JUMPING ship. Without the except() the pilot was told "Sensors
+        // indicate The <their own ship> has gone to Hyper Space, Sir!" about
+        // themselves, immediately after being told they were entering it.
         this.server
           .to(`sector:${event.sector.x}:${event.sector.y}`)
+          .except([room])
           .emit('event.log', {
             category: 'nav',
             text: formatMessage(MessageId.HYPER_IN_SECTOR, event.shipname ?? 'ship'),
