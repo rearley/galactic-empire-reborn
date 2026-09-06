@@ -62,6 +62,7 @@ import {
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { selectPhaserVictims } from '../combat/firep';
+import { selectHyperVictims } from '../combat/firehp';
 import {
   CYBERTRON_SCORED_KILL,
   CybertronScoredKillEvent,
@@ -427,7 +428,11 @@ export class CybertronTickService implements OnModuleInit {
           || target.cantexit > 0
           || ship.cantexit > 0;
         if (mean && ddist < 30_000 && canHit && !this.isInNeutralZone(target)) {
-          this.cybFirePhaser(ship, target, ctx);
+          // HYPER-phaser. Canon's hyperspace branch calls firehp, not firep
+          // (GECYBS.C:279) — and firep discards a target at warp unless
+          // phasrtype >= phatowrp (GECMDS.C:948), so routing this to the normal
+          // sweep made a Cybertron's hyperspace pursuit completely harmless.
+          this.cybFireHyperPhaser(ship, target, ctx);
         }
         continue;
       }
@@ -467,6 +472,53 @@ export class CybertronTickService implements OnModuleInit {
    * Fire phasers at target — emit COMBAT_PHASER_FIRED, compute damage, apply, emit COMBAT_HIT.
    * @see GECYBS.C:490-525 cyb_attack → firep
    */
+  /**
+   * `firehp` for an AI hull: a fixed 5-degree beam, damage straight to hull,
+   * no shield interaction. @see GECMDS.C:1044-1083, called from GECYBS.C:279
+   */
+  private cybFireHyperPhaser(ship: ShipState, target: ShipState, ctx: TickContext): void {
+    // Aim first, exactly as the branch above the call does in canon.
+    const dx = target.xcoord - ship.xcoord;
+    const dy = target.ycoord - ship.ycoord;
+    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.degrees = Math.round((absAngle - ship.heading + 360) % 360);
+    });
+
+    const scanRange = this.shipClassCache.get(ship.shpclass)?.scanRange ?? 100_000;
+    const victims = selectHyperVictims({
+      firer: ship,
+      allShips: this.shipState.findAllShips(),
+      degree: absAngle,
+      scanRange,
+      maxTonsFor: (c) => this.shipClassCache.getMaxTons(c),
+    });
+
+    for (const { victim, damage } of victims) {
+      // `wptr->damage += damage` — straight to hull, no shieldhit; firehp
+      // bypasses shields entirely. Both ships are battle-locked, and an AI
+      // victim is turned onto the shooter. @see GECMDS.C:1071-1081
+      this.shipState.mutate(victim.userid, victim.shipno, (v) => {
+        v.damage += damage;
+        v.lastfired = ship.channel ?? NO_CHANNEL;
+        v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
+        v.cantexit = FIRETICKS;
+        if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
+      });
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.cantexit = FIRETICKS; });
+
+      this.events.emit(COMBAT_HIT, {
+        attackerId: shipKey(ship.userid, ship.shipno),
+        victimId: shipKey(victim.userid, victim.shipno),
+        weapon: 'phaser',
+        damageHull: damage,
+        damageShield: 0,
+        sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
+        tickAt: ctx.firedAt,
+      } as CombatHitEvent);
+    }
+  }
+
   private cybFirePhaser(ship: ShipState, target: ShipState, ctx: TickContext): void {
     if (ship.phasr < PMINFIRE) return;
 

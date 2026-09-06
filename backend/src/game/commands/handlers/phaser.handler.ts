@@ -18,6 +18,7 @@ import {
   withinArc,
 } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
+import { selectHyperVictims } from '../../combat/firehp';
 import { selectPhaserVictims } from '../../combat/firep';
 import {
   COMBAT_HIT,
@@ -420,24 +421,16 @@ export class PhaserHandlerService {
     let hits = 0;
     const lines: CommandResult['lines'] = [];
 
-    for (const candidate of allShips) {
-      if (candidate.userid === ship.userid && candidate.shipno === ship.shipno) continue;
-      if (candidate.status !== 1 && candidate.status !== 2) continue;
-      // Hyper-phaser ONLY reaches victims at warp (firehp where==1, GECMDS.C:1045).
-      if (candidate.speed < WARP_THRESHOLD) continue;
-      // Victims inside the neutral zone are immune (GECMDS.C:1047).
-      if (isInNeutralZone(candidate)) continue;
-      // Hard range cap (GECMDS.C:1054 ddistance < scanrange).
-      if (!inScanRange(ship, candidate, scanRange)) continue;
-      // Fixed 5° half-angle beam (HPBEAMW, GECMDS.C:1050) — NOT focus-based.
-      if (!withinArc(ship, candidate, degree, HPBEAMW)) continue;
-
-      const distRaw = cdistance(ship, candidate) * 10000;
-      const damage = hyperPhaserDamage({
-        phasrtype: ship.phasrtype,
-        distRaw,
-        victimMaxTons: this.shipClassCache.getMaxTons(candidate.shpclass),
-      });
+    // Victim selection is canon's firehp, shared with the AI path — canon has
+    // ONE firehp and both the player command and GECYBS.C:279 call it.
+    // @see src/game/combat/firehp.ts
+    for (const { victim: candidate, damage } of selectHyperVictims({
+      firer: ship,
+      allShips,
+      degree,
+      scanRange,
+      maxTonsFor: (c) => this.shipClassCache.getMaxTons(c),
+    })) {
       if (damage < 1) continue;
 
       // C-009 Fix 1: firehp applies damage STRAIGHT TO HULL (`wptr->damage += damage`,
