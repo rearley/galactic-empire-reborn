@@ -1522,6 +1522,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'missile-launched': MessageId.MISSILE_INBOUND,
       'torpedo-inbound': MessageId.TORP_TRACKING,
       'missile-inbound': MessageId.MISSILE_TRACKING,
+      'scanners-jammed': MessageId.JAMMER3_JAMMED,
     }[event.kind];
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',

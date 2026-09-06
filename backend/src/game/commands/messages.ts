@@ -254,6 +254,10 @@ export enum MessageId {
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
   /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
   TEAM_TOO_MANY = 'TEAM_TOO_MANY',
+  /** LOCK01 — bare `loc` released the fire-control lock. */
+  LOC_CLEARED = 'LOC_CLEARED',
+  /** JAMMER3 — told to a ship whose scanners have just been jammed. */
+  JAMMER3_JAMMED = 'JAMMER3_JAMMED',
   /** WARP — the helm calling out an integer warp factor as it passes. */
   HELM_WARP = 'HELM_WARP',
   /** NOACCEL — the engines shut down for want of flux. */
@@ -880,6 +884,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
   [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
+  [MessageId.LOC_CLEARED]: CANON_MESSAGES.LOCK01,
+  [MessageId.JAMMER3_JAMMED]: CANON_MESSAGES.JAMMER3,
   [MessageId.HELM_WARP]: CANON_MESSAGES.WARP,
   [MessageId.HELM_NOACCEL]: CANON_MESSAGES.NOACCEL,
   /** @see GECMDS.C:1037, :1074, :1076 — damage is a damstr WORD in both directions. */

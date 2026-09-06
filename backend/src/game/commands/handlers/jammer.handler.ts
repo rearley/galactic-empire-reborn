@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { ShipState } from '../../ship/ship-state.types';
+import { ShipState, shipKey } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { cdistance, jammerCounter } from '../../combat/combat-math';
 import { JAMTIME } from '../../constants';
 import { I_JAMMER } from '../../constants/items';
+import {
+  COMBAT_TARGET_WARNING,
+  CombatTargetWarningEvent,
+} from '../../combat/combat-events';
 
 /**
  * Handles `jam` — deploys a jammer that interferes with all ships within
@@ -27,6 +32,7 @@ export class JammerHandlerService {
   constructor(
     private readonly shipState: ShipStateService,
     private readonly shipClassCache: ShipClassCacheService,
+    private readonly events: EventEmitter2,
   ) {}
 
   readonly command: Command = {
@@ -63,6 +69,19 @@ export class JammerHandlerService {
       this.shipState.mutate(candidate.userid, candidate.shipno, (s) => {
         s.jammer = value;
       });
+      // Canon tells each ship it blinds: `prfmsg(JAMMER3); outprfge(FILTER,
+      // zothusn)` — addressed to the VICTIM, inside the same range branch that
+      // writes the counter (GECMDS.C:1645). Without it a victim's scan just
+      // went blank, which reads as a bug rather than as an attack and gives no
+      // cue to run or to call for `sys unjam`. The loop has no self-exclusion
+      // in canon, so the firer is warned too; that is canon, not an oversight.
+      this.events.emit(COMBAT_TARGET_WARNING, {
+        victimId: shipKey(candidate.userid, candidate.shipno),
+        kind: 'scanners-jammed',
+        // JAMMER3 takes no argument — canon does not say who jammed you.
+        attackerLetter: '',
+        tickAt: new Date(),
+      } satisfies CombatTargetWarningEvent);
     }
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {

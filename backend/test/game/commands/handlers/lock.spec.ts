@@ -128,3 +128,66 @@ describe('LockHandlerService — `loc <target>`', () => {
     expect(alice.lock).toBe(7);
   });
 });
+
+/**
+ * Bare `loc` releases the fire-control lock.
+ *
+ *   if (margc == 1) {
+ *       warsptr->lock = -1;
+ *       prfmsg(LOCK01);
+ *       outprfge(ALWAYS,usrnum);
+ *       return;
+ *   }
+ *
+ * @see GECMDS.C:5073-5079 cmd_lock
+ * @see GE/REL/MBMGEMSG.MSG:5839 LOCK01 {***\nFire control Lock removed!}
+ *
+ * This is the FIRST thing cmd_lock does, ahead of every other gate. The port
+ * declared `minArgs: 1`, so a bare `loc` was answered with a usage line and
+ * there was no way to release a lock at all short of acquiring another one —
+ * which matters because a live lock is what `tor` and `mis` fire down, and
+ * what makes `cantexit` keep re-arming.
+ */
+describe('bare `loc` clears the lock (GECMDS.C:5073)', () => {
+  it('releases the lock and says so', () => {
+    const ship = makeShip({ lock: 4, lockKey: 'u2:4' });
+    const svc = makeHarness([ship]);
+
+    const res = svc.command.handler(ship, [], {} as CommandContext) as CommandResult;
+
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOC_CLEARED));
+    expect({ lock: ship.lock, lockKey: ship.lockKey })
+      .toEqual({ lock: NOLOCK_SENTINEL, lockKey: null });
+  });
+
+  it('works even with fire control shot out — canon clears before every gate', () => {
+    // cmd_lock's margc==1 arm returns before any other test. Releasing a lock
+    // is not an act of targeting, so a broken scanner cannot block it.
+    const ship = makeShip({ lock: 4, lockKey: 'u2:4', firecntl: 5 });
+    const svc = makeHarness([ship]);
+
+    const res = svc.command.handler(ship, [], {} as CommandContext) as CommandResult;
+
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOC_CLEARED));
+    expect(ship.lock).toBe(NOLOCK_SENTINEL);
+  });
+
+  it('works while jammed, for the same reason', () => {
+    const ship = makeShip({ lock: 4, lockKey: 'u2:4', jammer: 30 });
+    const svc = makeHarness([ship]);
+
+    const res = svc.command.handler(ship, [], {} as CommandContext) as CommandResult;
+
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOC_CLEARED));
+  });
+
+  it('is a no-op message when there was no lock to clear', () => {
+    const ship = makeShip();
+    const svc = makeHarness([ship]);
+
+    const res = svc.command.handler(ship, [], {} as CommandContext) as CommandResult;
+
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOC_CLEARED));
+    expect(ship.lock).toBe(NOLOCK_SENTINEL);
+  });
+});
