@@ -59,6 +59,8 @@ import {
   CombatHitEvent,
   CombatMissEvent,
   CombatShipDestroyedEvent,
+  COMBAT_TARGET_WARNING,
+  CombatTargetWarningEvent,
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { selectPhaserVictims } from '../combat/firep';
@@ -703,7 +705,9 @@ export class CybertronTickService implements OnModuleInit {
       if (Number(ship.items[I_TORP]) > 0) {
         ship.items = [...ship.items] as typeof ship.items;
         ship.items[I_TORP] = BigInt(Number(ship.items[I_TORP]) - 1);
-        this.cybLaunchTorpedo(ship, target, ddist);
+        // `if (i>0) lockwarn = FALSE;` — canon warns ONCE per volley, not
+        // once per tube. @see GECYBS.C:537
+        this.cybLaunchTorpedo(ship, target, ddist, i === 0);
       }
     }
 
@@ -808,7 +812,12 @@ export class CybertronTickService implements OnModuleInit {
    * Queue a torpedo into the target's incoming torpedo array.
    * @see GECYBS.C:534-543 cyb_attack — torp launch
    */
-  private cybLaunchTorpedo(ship: ShipState, target: ShipState, ddist: number): void {
+  private cybLaunchTorpedo(
+    ship: ShipState,
+    target: ShipState,
+    ddist: number,
+    announce: boolean,
+  ): void {
     const emptySlot = (target.ltorpsChannel as number[]).findIndex((ch) => ch === 255 || ch === undefined);
     if (emptySlot === -1) return; // all slots full
     this.shipState.mutate(target.userid, target.shipno, (v) => {
@@ -817,6 +826,21 @@ export class CybertronTickService implements OnModuleInit {
       v.ltorpsChannel[emptySlot] = ship.channel ?? NO_CHANNEL;
       v.ltorpsDistance[emptySlot] = ddist;
     });
+
+    // `prfmsg(TFIRE2,shpltr(shpnum,usrn)); outprfge(FILTER,shpnum);` — the
+    // TARGET is told as the tube fires (GECMDS.C:1198-1199). This path emitted
+    // nothing at all, so an AI volley arrived in silence and the first a pilot
+    // knew of it was the hit. The gateway already maps `torpedo-launched` to
+    // TORP_INBOUND; only the AI never raised it.
+    if (announce) {
+      this.events.emit(COMBAT_TARGET_WARNING, {
+        victimId: shipKey(target.userid, target.shipno),
+        attackerId: shipKey(ship.userid, ship.shipno),
+        attackerLetter: String.fromCharCode(65 + ((ship.channel ?? 0) % 26)),
+        kind: 'torpedo-launched',
+        tickAt: new Date(),
+      } as CombatTargetWarningEvent);
+    }
   }
 
   /**
