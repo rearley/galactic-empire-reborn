@@ -3219,7 +3219,7 @@ lines indexed as the current divergence list, and a stale snapshot read as
 current is the exact failure this audit round existed to fix. It remains in git
 history.
 
-## 2026-09-06 — Sysop identity comes from GE_SYSOP_USERIDS, not a user-record flag
+## 2026-09-06 — Sysop identity comes from an env allowlist, not a user-record flag
 
 **Context:** `sys` is a sysop-only command in canon. `cmd_sysop` refuses before
 it even reads the subcommand:
@@ -3236,9 +3236,25 @@ player could cancel being jammed instantly and for free, a universal hard
 counter to the entire jammer weapon. Found by the 2026-09-05 canon sweep.
 
 **Decision:** implement canon's gate. Sysop identity comes from a
-`GE_SYSOP_USERIDS` environment allowlist (comma-separated userids), checked
-before the subcommand is read. Unset or empty means nobody is a sysop, so every
-player gets canon's `Huh?`.
+`GE_SYSOP_USERNAME` environment allowlist (comma-separated usernames, matched
+case-insensitively), checked before the subcommand is read. Unset or empty means
+nobody is a sysop, so every player gets canon's `Huh?`.
+
+**AMENDED, same day, before anyone relied on it.** This shipped first as
+`GE_SYSOP_USERIDS`, matching on `userid` — which cannot work. `userid` is
+`usr_${randomBytes(12).toString('hex')}` (auth.service.ts:38), minted at
+registration: it does not exist until the account does, so it cannot be
+configured in advance, and it is different after every database reset, so the
+allowlist would silently stop granting exactly when the operator most needed it
+(a fresh world). The owner caught this immediately — "my in game user will
+change if we reset". The username is operator-chosen, case-insensitively unique
+(`User.username`), and re-used across resets, so it can be set once and stay
+true. `ShipState` already caches it, so the gate needs no lookup.
+
+The trade is name-squatting: whoever registers the configured name becomes
+sysop. That is acceptable here because registration is not public and the
+allowlist is deployment-time config, but it is the reason to prefer a DB flag
+if the server is ever opened up.
 
 **Reason:** canon reads `usrptr->flags & ISYSOP` from the MajorBBS user record,
 which this port has no equivalent of — there is no operator account concept in

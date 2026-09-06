@@ -18,8 +18,14 @@
  *
  * Canon carries sysop identity in the MajorBBS user record (`usrptr->flags &
  * ISYSOP`), which this port has no equivalent of, so identity comes from the
- * GE_SYSOP_USERIDS environment allowlist. That substitution is port-original
+ * GE_SYSOP_USERNAME environment allowlist. That substitution is port-original
  * plumbing for a canon gate — see docs/DECISIONS.md.
+ *
+ * It matches on USERNAME, not userid, because `userid` is
+ * `usr_${randomBytes(12).toString('hex')}` (auth.service.ts:38) — generated
+ * fresh at registration, so it cannot be configured before the account exists
+ * and changes on every database reset. The username is chosen by the operator
+ * and re-used across resets, so the allowlist can be set once and stay true.
  */
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
@@ -67,15 +73,15 @@ function makeHarness(ships: ShipState[]) {
 const ctx: CommandContext = {};
 
 describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
-  const saved = process.env.GE_SYSOP_USERIDS;
+  const saved = process.env.GE_SYSOP_USERNAME;
   afterEach(() => {
-    if (saved === undefined) delete process.env.GE_SYSOP_USERIDS;
-    else process.env.GE_SYSOP_USERIDS = saved;
+    if (saved === undefined) delete process.env.GE_SYSOP_USERNAME;
+    else process.env.GE_SYSOP_USERNAME = saved;
   });
 
   it('refuses an ordinary player with "Huh?" and does NOT clear their jammer', () => {
-    delete process.env.GE_SYSOP_USERIDS;
-    const alice = makeShip({ userid: 'alice', jammer: 15 });
+    delete process.env.GE_SYSOP_USERNAME;
+    const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
     const h = makeHarness([alice]);
 
     const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
@@ -85,8 +91,8 @@ describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
   });
 
   it('refuses before dispatch, so an unknown subcommand also answers "Huh?"', () => {
-    delete process.env.GE_SYSOP_USERIDS;
-    const alice = makeShip({ userid: 'alice' });
+    delete process.env.GE_SYSOP_USERNAME;
+    const alice = makeShip({ userid: 'usr_a1', username: 'Alice' });
     const h = makeHarness([alice]);
 
     const result = h.command.handler(alice, ['bogus'], ctx) as CommandResult;
@@ -94,9 +100,9 @@ describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
   });
 
-  it('a userid in GE_SYSOP_USERIDS is a sysop and may unjam', () => {
-    process.env.GE_SYSOP_USERIDS = 'root,alice';
-    const alice = makeShip({ userid: 'alice', jammer: 15 });
+  it('a username in GE_SYSOP_USERNAME is a sysop and may unjam', () => {
+    process.env.GE_SYSOP_USERNAME = 'root,Alice';
+    const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
     const h = makeHarness([alice]);
 
     const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
@@ -105,14 +111,52 @@ describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
     expect(alice.jammer).toBe(0);
   });
 
-  it('the allowlist is exact — a non-listed userid is still refused', () => {
-    process.env.GE_SYSOP_USERIDS = 'root';
-    const mallory = makeShip({ userid: 'mallory', jammer: 15 });
+  it('the allowlist is exact — a non-listed username is still refused', () => {
+    process.env.GE_SYSOP_USERNAME = 'root';
+    const mallory = makeShip({ userid: 'usr_m1', username: 'Mallory', jammer: 15 });
     const h = makeHarness([mallory]);
 
     const result = h.command.handler(mallory, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
     expect(mallory.jammer).toBe(15);
+  });
+  it('matches the username case-insensitively, as registration does', () => {
+    // username is case-insensitively unique (schema.prisma User.username), so
+    // the allowlist must not care about the case the operator typed in .env.
+    process.env.GE_SYSOP_USERNAME = 'rick';
+    const rick = makeShip({ userid: 'usr_r1', username: 'Rick', jammer: 15 });
+    const h = makeHarness([rick]);
+
+    const result = h.command.handler(rick, ['unjam'], ctx) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
+    expect(rick.jammer).toBe(0);
+  });
+
+  it('a matching USERID does not grant sysop — only the username counts', () => {
+    // Guards the whole point of the change: userids are random per
+    // registration, so treating one as an allowlist entry would be a
+    // configuration that silently stops working after a reset.
+    process.env.GE_SYSOP_USERNAME = 'usr_a1';
+    const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
+    const h = makeHarness([alice]);
+
+    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
+    expect(alice.jammer).toBe(15);
+  });
+
+  it('a ship with no cached username is never a sysop', () => {
+    process.env.GE_SYSOP_USERNAME = 'Alice';
+    const ghost = makeShip({ userid: 'usr_g1', jammer: 15 });
+    delete (ghost as { username?: string }).username;
+    const h = makeHarness([ghost]);
+
+    const result = h.command.handler(ghost, ['unjam'], ctx) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
+    expect(ghost.jammer).toBe(15);
   });
 });

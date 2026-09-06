@@ -3050,7 +3050,10 @@ failing test was written and watched to fail before any production change.
 - **`sys` is gated (canon GECMDS.C:4752-4760).** It had no authorization check
   at all, and `sys unjam` zeroes the caller's own jammer counter, so any player
   could cancel being jammed instantly and for free. Sysop identity now comes
-  from the `GE_SYSOP_USERIDS` allowlist; unset means nobody, so everyone gets
+  from the `GE_SYSOP_USERNAME` allowlist (CORRECTED same day from
+  `GE_SYSOP_USERIDS` — userids are random per registration and change on every
+  reset, so a userid allowlist can never be set in advance; see DECISIONS.md);
+  unset means nobody, so everyone gets
   canon's `Huh?`. Recorded in DECISIONS.md (2026-09-06) because canon's
   `usrptr->flags & ISYSOP` has no equivalent here.
 - **Troop raids no longer kill colonists (GECMDS.C:3714).** Canon's trash loop
