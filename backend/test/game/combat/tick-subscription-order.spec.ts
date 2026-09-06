@@ -44,16 +44,17 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
   it('combat handler runs AFTER physics handler within a single PHYSICS tick', async () => {
     // Build a manual subscriber-capturing TickService stub so we can assert order
     // without standing up real timers/DB.
-    const subscriptions: Array<{ kind: TickKind; owner: string }> = [];
-    const handlers: Array<{ owner: string; fn: (c: TickContext) => void }> = [];
+    // Records only what the SERVICES actually do — the tick kind and the
+    // registration order. The previous version had the test tag each
+    // subscription with an owner name itself and then asserted the order it had
+    // just imposed, which passed no matter what the services registered.
+    const subscriptions: Array<{ kind: TickKind }> = [];
+    const handlers: Array<{ kind: TickKind; fn: (c: TickContext) => void }> = [];
 
     const tickStub: Pick<TickService, 'subscribe' | 'registerSnapshotProvider'> = {
       subscribe: jest.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
-        // Identify owner by parsing the handler — we'll tag during register below
-        // Instead we tag when we register manually, so this just collects.
-        const owner = (fn as unknown as { __owner?: string }).__owner ?? 'unknown';
-        subscriptions.push({ kind, owner });
-        handlers.push({ owner, fn });
+        subscriptions.push({ kind });
+        handlers.push({ kind, fn });
         return () => undefined;
       }),
       registerSnapshotProvider: jest.fn(),
@@ -84,25 +85,15 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
       cache,
       events,
     );
-    // Tag and register physics subscription via its real onModuleInit.
-    const origPhysSub = tickStub.subscribe;
-    (tickStub.subscribe as jest.Mock).mockImplementationOnce((kind: TickKind, fn: (c: TickContext) => void) => {
-      subscriptions.push({ kind, owner: 'physics' });
-      handlers.push({ owner: 'physics', fn });
-      return () => undefined;
-    });
     physics.onModuleInit();
+    const physicsKinds = subscriptions.map((s2) => s2.kind);
+    const physicsHandlers = handlers.length;
 
     // Stand up CombatTickService manually with a stub MineRepository.
     const mineRepo = { findAllActive: jest.fn().mockResolvedValue([]) } as unknown as MineRepository;
     const { MineRegistry } = await import('../../../src/game/combat/mine.registry');
     const { Mulberry32Adapter } = await import('../../../src/game/combat/random.port');
     const { Logger } = await import('@nestjs/common');
-    (tickStub.subscribe as jest.Mock).mockImplementationOnce((kind: TickKind, fn: (c: TickContext) => void) => {
-      subscriptions.push({ kind, owner: 'combat' });
-      handlers.push({ owner: 'combat', fn });
-      return () => undefined;
-    });
     const combat = new CombatTickService(
       tickStub as TickService,
       shipStateStub as ShipStateService,
@@ -114,27 +105,42 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
       cache,
     );
     await combat.onModuleInit();
-    void origPhysSub;
 
-    // Subscription order: physics first, then combat.
-    expect(subscriptions.map((s) => s.owner)).toEqual(['physics', 'combat']);
+    // PhysicsTickService registers movement on the 1-second timer (canon
+    // warrti2a) and the hypha/cantexit countdowns on the 6-second one (canon
+    // checktm). CombatTickService is 6-second only (canon warrtia).
+    expect(physicsKinds).toEqual([TickKind.SHIP_UPDATE, TickKind.PHYSICS]);
+    expect(subscriptions.slice(physicsHandlers).map((s2) => s2.kind)).toEqual([TickKind.PHYSICS]);
 
-    // Now fire a synthetic PHYSICS tick in registration order and verify the
-    // combat handler observes the post-physics coordinates.
-    let combatObservedX = -1;
-    const originalCombatFn = handlers.find((h) => h.owner === 'combat')!.fn;
-    const wrappedCombat = (ctx: TickContext) => {
-      combatObservedX = ship.xcoord;
-      originalCombatFn(ctx);
-    };
+    // Among the 6-second subscribers, physics is registered before combat —
+    // CombatModule imports PhysicsModule, so Nest runs its onModuleInit first,
+    // and TickService dispatches in registration order.
+    const physicsIdx = subscriptions.findIndex((s2) => s2.kind === TickKind.PHYSICS);
+    const combatIdx = subscriptions.length - 1;
+    expect(physicsIdx).toBeLessThan(combatIdx);
 
-    const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new Date() };
+    // Movement happens on the 1-second tick, so by the time a 6-second combat
+    // tick runs, combat sees the moved coordinates. Firing the real handlers in
+    // registration order proves the ship actually moved first.
     const preX = ship.xcoord;
-    // Run handlers in the order they were registered.
-    handlers.find((h) => h.owner === 'physics')!.fn(ctx);
-    wrappedCombat(ctx);
+    const shipUpdateCtx: TickContext = { kind: TickKind.SHIP_UPDATE, tickNumber: 1, firedAt: new Date() };
+    for (let i = 0; i < 3; i++) {
+      // three 1-second ticks = one canon move for every ship (stride of 3)
+      for (const h of handlers) if (h.kind === TickKind.SHIP_UPDATE) h.fn(shipUpdateCtx);
+    }
+    expect(ship.xcoord).not.toBe(preX);
 
-    expect(combatObservedX).not.toBe(preX); // physics moved the ship before combat ran
+    // Combat is the last registered PHYSICS handler (it constructs after
+    // physics), so capture what it sees when its turn comes.
+    let combatObservedX = -1;
+    const physicsCtx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 2, firedAt: new Date() };
+    const physicsKindHandlers = handlers.filter((h) => h.kind === TickKind.PHYSICS);
+    physicsKindHandlers.forEach((h, i) => {
+      if (i === physicsKindHandlers.length - 1) combatObservedX = ship.xcoord;
+      h.fn(physicsCtx);
+    });
+
     expect(combatObservedX).toBe(ship.xcoord);
+    expect(combatObservedX).not.toBe(preX);
   });
 });

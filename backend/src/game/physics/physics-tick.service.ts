@@ -71,6 +71,12 @@ const NAV_ARRIVAL_RANGE = 250;
 /** Empty projectile slot — C's `channel == 255`. @see GEFUNCS.C:1611-1613 */
 const NO_CHANNEL_SLOT = 255;
 
+/**
+ * Canon walks the ship table with a stride of 3 on the 1-second timer, so each
+ * ship is advanced once every 3 seconds. @see GEMAIN.C:2472-2489 warrti2a
+ */
+const PHYSICS_STRIDE = 3;
+
 @Injectable()
 export class PhysicsTickService implements OnModuleInit {
   private readonly logger = new Logger(PhysicsTickService.name);
@@ -90,9 +96,51 @@ export class PhysicsTickService implements OnModuleInit {
     @Optional() @Inject(RANDOM) private readonly random?: Random,
   ) {}
 
+  /**
+   * Canon's `clicker` — which third of the fleet this second belongs to.
+   * @see GEMAIN.C:2470 `static int clicker = 0;`
+   */
+  private clicker = 0;
+
   onModuleInit(): void {
-    this.tickService.subscribe(TickKind.PHYSICS, (ctx) => this.advanceAll(ctx));
-    this.logger.log('Subscribed to PHYSICS tick');
+    // Canon runs rotateship/accel/moveship/destruct from `warrti2a`, which is
+    // registered on the 1-SECOND timer (`rtkick(TICKTIME2,warrti2)`, TICKTIME2
+    // = 1) and strides the fleet by 3 — so each ship moves every 3 seconds.
+    // @see GEMAIN.C:2462-2493
+    //
+    // This used to sit on the 6-second PHYSICS tick, which halved every ship's
+    // speed, turn rate, time-to-warp and self-destruct countdown, because
+    // `positionIntegration` carries canon's per-CALL displacement and has no dt
+    // term to compensate. The 6-second timer keeps what canon's `warrtia` puts
+    // there — repair, shields, cloak, torpedo/missile flight, ion, recharge,
+    // damage control — which the port already had right.
+    this.tickService.subscribe(TickKind.SHIP_UPDATE, (ctx) => this.advanceAll(ctx));
+
+    // hypha and cantexit are decremented inside `checktm`, which canon calls
+    // from `warrtia` — the SIX-second timer — not from warrti2a. They must not
+    // ride the movement cadence: at 3s the hyper-phaser would recharge in half
+    // canon's time and a battle lock would release twice as early, letting a
+    // ship run from a fight it should still be pinned in.
+    // @see GEFUNCS.C:1522-1541 checktm
+    this.tickService.subscribe(TickKind.PHYSICS, () => this.runCountdowns());
+    this.logger.log(
+      'Subscribed to SHIP_UPDATE (canon warrti2a, 1s stride 3) and PHYSICS (countdowns)',
+    );
+  }
+
+  /**
+   * Per-6-second countdowns: hyper-phaser cooldown and battle lock. Applied to
+   * every ship, unstrided — the stride is a movement-loop detail in canon, and
+   * `checktm` walks the whole table. @see GEFUNCS.C:1537-1541
+   */
+  private runCountdowns(): void {
+    for (const ship of this.shipState.findAllShips()) {
+      if (ship.hypha <= 0 && ship.cantexit <= 0) continue;
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        if (s.hypha > 0) s.hypha = Math.max(0, s.hypha - 1);
+        if (s.cantexit > 0) s.cantexit = Math.max(0, s.cantexit - 1);
+      });
+    }
   }
 
   /** Total per-process fault counter, exposed for the debug controller. */
@@ -101,13 +149,24 @@ export class PhysicsTickService implements OnModuleInit {
   }
 
   /**
-   * Advance every active ship by one physics tick. Caller is the TickService
+   * Advance the third of the fleet due this second. Caller is the TickService
    * dispatcher; we walk a deterministic ascending-shipId snapshot of the
    * in-memory map and isolate per-ship faults.
+   *
+   * Canon's loop, verbatim in shape:
+   *
+   *   zothusn = clicker;
+   *   while (zothusn < nships) { ...; zothusn += 3; }
+   *   clicker = (clicker+1)%3;
+   *
+   * Every ship is therefore touched once per three seconds. The stride exists
+   * in canon to smooth load across the 1-second timer; keeping it (rather than
+   * moving the whole fleet every third second) preserves both the cadence and
+   * the smoothing. @see GEMAIN.C:2472-2489
    */
   advanceAll(ctx: TickContext): void {
     // FR-019 — ascending composite-shipId order (lexicographic on `${userid}:${shipno}`).
-    const ships = this.shipState
+    const all = this.shipState
       .findAllShips()
       .slice()
       .sort((a, b) => {
@@ -115,6 +174,9 @@ export class PhysicsTickService implements OnModuleInit {
         const kb = shipKey(b.userid, b.shipno);
         return ka < kb ? -1 : ka > kb ? 1 : 0;
       });
+
+    const ships = all.filter((_, i) => i % PHYSICS_STRIDE === this.clicker);
+    this.clicker = (this.clicker + 1) % PHYSICS_STRIDE;
 
     for (const ship of ships) {
       try {
@@ -173,11 +235,6 @@ export class PhysicsTickService implements OnModuleInit {
       this.runConditionalBlock(ship, ctx);
     }
 
-    // Unconditional countdowns — every non-destroyed ship, every tick (FR-008/9).
-    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      if (s.hypha > 0) s.hypha = Math.max(0, s.hypha - 1);
-      if (s.cantexit > 0) s.cantexit = Math.max(0, s.cantexit - 1);
-    });
   }
 
   /**

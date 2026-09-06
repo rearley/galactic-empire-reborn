@@ -47,10 +47,25 @@ Postgres is the durable store — flushed async, not on every tick.
 
 ### Tick Engine
 
-- **Physics tick**: 6 seconds (`setInterval(…, 6000)` in `TickService`) — moves ships, processes
-  combat, updates mines, decoys, torpedoes, missiles
-- **Ship update tick**: 1 second (`setInterval(…, 1000)`) — energy regen, shield
-  updates, repair progress, minor state changes
+- **Ship update tick**: 1 second (`setInterval(…, 1000)`) — **movement**:
+  rotate, accelerate, move, and the self-destruct countdown. Canon runs these
+  from `warrti2a`, registered on `TICKTIME2` (1s) and striding the ship table by
+  3 (`zothusn += 3`, `clicker = (clicker+1)%3`), so **each ship moves once every
+  3 seconds** (`GEMAIN.C:2462-2493`). Also: energy regen and the DB flush.
+- **Physics tick**: 6 seconds (`setInterval(…, 6000)` in `TickService`) — canon's
+  `warrtia`: mines, flux, repair, shields (`shieldchg`), cloak, torpedo/missile/
+  decoy flight (`checktm`, including the `hypha` and `cantexit` countdowns), ion
+  cannons, phaser recharge and damage control (`GEMAIN.C` warrtia).
+
+  **This table used to have the two backwards on movement** — it said the
+  6-second tick "moves ships". `positionIntegration` carries canon's per-CALL
+  displacement with no `dt` term, so every ship flew at exactly HALF canon's
+  speed, turned half as fast, took twice as long to reach an ordered warp and
+  twice as long to self-destruct. The code was correct against this file and
+  wrong against canon; the 2026-09-05 audit found it. If you are tempted to move
+  something between these two timers, find it in `GEMAIN.C` first — canon's
+  split is not intuitive (shields regenerate on the SLOW tick, movement on the
+  fast one).
 - **Midnight job**: `@Cron('0 0 * * *')` — recalculate scores, send planet
   production reports to players, purge mail older than 3 days (`MAILDAYS`,
   GEMAIN.C:497 — 7 is the clamp ceiling, not the default), rebuild team
