@@ -8,6 +8,45 @@ This is a **finding list, not a work order.** Nothing here has been changed. Eac
 item needs a decision: implement it, or record it in `DECISIONS.md` as a
 deliberate deviation. CLAUDE.md permits the second, but not silence.
 
+---
+
+## CLOSED — 2026-09-06
+
+Every actionable item in this file is now either implemented or recorded below
+as a deliberate non-implementation. Commits `e7bc7b2`, `f4949a6`, `870a5e8`,
+`d0e598e`, `4869689`, `f3cd81b`, `8c00b11`, `667b9a2`, `63d6e5b`, plus the
+earlier round in `ac4e034` and before.
+
+**Three entries in this file were WRONG and are withdrawn**, all for the same
+reason — they were verified by grepping the canon token (`ORBIT4`, `TRANSOPT`,
+`MSG_FILTER`) when the port aliases canon strings behind its own `MessageId`
+names. The correct check is to map the token through `messages.ts` and grep the
+`MessageId` instead:
+
+- **`orb` from hyperspace is allowed / ORBIT4 never emitted** — implemented all
+  along at `orbit.handler.ts:47` as `MessageId.ORBIT_HYPERSPACE`.
+- **TRANSOPT ships YES, the port always refuses `tra down`** — implemented;
+  `depositToPlanet` has carried the "NO ownership test" rule and its citation
+  the whole time.
+- **Open hails ignore MSG_FILTER** — implemented at `game.gateway.ts:1365-1375`.
+
+**Deliberately NOT implemented**, each with its reasoning recorded at the code:
+
+- **DEADSTOP** (`speed-events.ts`) — dead code in canon. Its branch needs a
+  negative `speed2b`; canon assigns a negative speed nowhere, and GEFUNCS.C:566
+  is the only `prfmsg(DEADSTOP)` in the source. The standstill a pilot sees is
+  the snap to zero, already reported by SPEED0.
+- **ATTACK6A** (`planet-attack.service.ts`) — it addresses an owner logged into
+  the BBS but outside Galactic Empire. This port has no lobby outside the game;
+  connecting to the gateway *is* entering it. Its ATTACK7 half is covered by the
+  first arm of the chain.
+
+The one item left open by choice is the `ITEM_NAMES` spelling divergence
+("Torpedoes"/"Gold" against canon's "torpedos"/"gold"), which is a change of its
+own and is recorded in `PROGRESS.md`.
+
+---
+
 All 44 canon command verbs in `GECMDS.C:126-171` already have a handler, so
 nothing below is a missing command — every gap sits *inside* a command or a tick.
 
