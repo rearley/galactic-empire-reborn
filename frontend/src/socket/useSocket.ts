@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { socket, sendCommand, onCommandResult, connectSocket } from './socketClient';
+import { useCommandResultQueue } from './useCommandResultQueue';
 import type {
   CommandResultPayload,
   PlayerSnapshotPayload,
@@ -34,7 +35,6 @@ export interface OnboardingPrompt {
 
 export interface UseSocketReturn {
   status: ConnectionStatus;
-  lastResult: CommandResultPayload | null;
   send: (input: string) => void;
   /** Re-open the socket after this session was displaced by a newer login. */
   reconnect: () => void;
@@ -56,11 +56,22 @@ export interface UseSocketReturn {
  */
 export function useSocket(
   playerDispatch?: UsePlayerListReturn['dispatch'],
+  /**
+   * Called for EVERY command result, synchronously from the socket callback.
+   *
+   * Results used to be parked in a single `lastResult` state slot with App
+   * reacting to it. React 18 batches state updates, so two payloads arriving
+   * in the same batch collapsed and the first was never rendered — a one-slot
+   * mailbox used as a queue. Reported from play as messages going missing
+   * during a fight, which is exactly when command traffic is densest.
+   * @see socket/useCommandResultQueue.ts, test/message-loss.spec.tsx
+   */
+  onResult?: (payload: CommandResultPayload) => void,
 ): UseSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>(
     socket.connected ? 'connected' : 'connecting',
   );
-  const [lastResult, setLastResult] = useState<CommandResultPayload | null>(null);
+  const resultSink = useCommandResultQueue<CommandResultPayload>(onResult ?? (() => {}));
   const [localShipId, setLocalShipId] = useState<string | null>(null);
   const [onboardingPrompt, setOnboardingPrompt] = useState<OnboardingPrompt | null>(null);
 
@@ -80,7 +91,7 @@ export function useSocket(
     socket.on('reconnect_attempt', handleReconnectAttempt);
     socket.on('connect_error', handleConnectError);
 
-    const unsubResult = onCommandResult((payload) => setLastResult(payload));
+    const unsubResult = onCommandResult((payload) => resultSink.push(payload));
 
     const handleShipName = (payload: Record<string, unknown>) => {
       setOnboardingPrompt({ type: 'ship-name', payload });
@@ -158,5 +169,5 @@ export function useSocket(
     connectSocket();
   };
 
-  return { status, lastResult, send, reconnect, localShipId, onboardingPrompt, emitPromptReply };
+  return { status, send, reconnect, localShipId, onboardingPrompt, emitPromptReply };
 }
