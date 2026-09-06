@@ -240,6 +240,10 @@ export enum MessageId {
   TORP_TRACKING = 'TORP_TRACKING',
   /** MISSL1 — per-tick tracking alert for a missile. No argument. */
   MISSILE_TRACKING = 'MISSILE_TRACKING',
+  /** SELFD6 — a shielded ship caught in a self-destruct blast. */
+  DESTRUCT_BLAST_DEFLECTED = 'DESTRUCT_BLAST_DEFLECTED',
+  /** SELFD7 — an unshielded ship caught in a self-destruct blast. */
+  DESTRUCT_BLAST_HIT = 'DESTRUCT_BLAST_HIT',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -809,6 +813,9 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GEFUNCS.C:1600, :1685 — raised once per tick while anything tracks you. */
   [MessageId.TORP_TRACKING]: CANON_MESSAGES.TORP1,
   [MessageId.MISSILE_TRACKING]: CANON_MESSAGES.MISSL1,
+  /** @see GEFUNCS.C:1878-1891 — `%s` is a damstr WORD, not a number. */
+  [MessageId.DESTRUCT_BLAST_DEFLECTED]: CANON_MESSAGES.SELFD6,
+  [MessageId.DESTRUCT_BLAST_HIT]: CANON_MESSAGES.SELFD7,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

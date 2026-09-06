@@ -1,10 +1,15 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
 import { TickKind } from '../tick/tick.types';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { CLOAK_ENERGY_USE } from './cloak.config';
+import { isInNeutralZone } from '../combat/neutral-zone';
+import { cdistance, destructBlastDamage } from '../combat/combat-math';
+import { MINERANGE } from '../constants';
+import { RANDOM, Random, gernd } from '../combat/random.port';
+import { COMBAT_DESTRUCT_BLAST, CombatDestructBlastEvent } from '../combat/combat-events';
 import { CLOAK_RAMP_INIT, CLOAK_RAMP_MID, CLOAK_RAMP_FULL } from './_ship-management-constants';
 import { formatMessage, MessageId } from './messages';
 import { COMBAT_SHIP_DESTROYED, CombatShipDestroyedEvent } from '../combat/combat-events';
@@ -28,6 +33,10 @@ export class ShipManagementTickService implements OnModuleInit {
     private readonly tickService: TickService,
     private readonly events: EventEmitter2,
     @Inject(CLOAK_ENERGY_USE) private readonly cloakEnergyUse: number,
+    // Optional so the hand-built test harnesses keep working; without one the
+    // shield divisor roll is 0, which is simply canon's most favourable case
+    // for the victim rather than a change of behaviour.
+    @Optional() @Inject(RANDOM) private readonly random?: Random,
   ) {}
 
   /** Canon's `clicker` — which third of the fleet this second belongs to. */
@@ -114,6 +123,55 @@ export class ShipManagementTickService implements OnModuleInit {
   }
 
   /**
+   * Damage every ship within one sector of a scuttled hull.
+   *
+   *   if (ddist < MINERANGE && (xsect != 0 || ysect != 0)) { ... }
+   *   wptr->damage += damage;
+   *   wptr->lastfired = -1;
+   *
+   * @see GEFUNCS.C:1866-1895
+   *
+   * The neutral zone is exempt — `(xsect != 0 || ysect != 0)` — so a scuttle at
+   * the origin harms nobody, which is what keeps (0,0) safe for new captains.
+   * `lastfired = -1` means a scuttle that finishes someone off scores for
+   * no one.
+   *
+   * The destructing ship is skipped: canon's loop includes it, but it is
+   * already at damage 101 and is removed on the next line, so the only visible
+   * difference would be a damage report sent to a pilot whose ship no longer
+   * exists.
+   */
+  private applyDestructBlast(bomb: ShipState): void {
+    if (isInNeutralZone(bomb)) return;
+
+    for (const victim of this.shipState.findAllShips()) {
+      if (victim.userid === bomb.userid && victim.shipno === bomb.shipno) continue;
+
+      const distanceRaw = cdistance(bomb, victim) * 10_000;
+      if (distanceRaw >= MINERANGE) continue;
+
+      const shieldUp = victim.shieldstat === 1;
+      const damage = destructBlastDamage(
+        distanceRaw, bomb.shpclass, shieldUp, victim.shieldtype,
+        this.random ? gernd(this.random) % 5 : 0,
+      );
+      if (damage <= 0) continue;
+
+      this.shipState.mutate(victim.userid, victim.shipno, (v) => {
+        v.damage += damage;
+        v.lastfired = -1;
+      });
+
+      this.events.emit(COMBAT_DESTRUCT_BLAST, {
+        victimId: shipKey(victim.userid, victim.shipno),
+        damage,
+        shieldUp,
+        tickAt: new Date(),
+      } satisfies CombatDestructBlastEvent);
+    }
+  }
+
+  /**
    * The strided destruct pass — a third of the fleet each second, so every ship
    * counts down once per 3 seconds. @see GEMAIN.C:2472-2489
    */
@@ -183,6 +241,11 @@ export class ShipManagementTickService implements OnModuleInit {
         sectorMessage: formatMessage(MessageId.DESTRUCT_BOOM_SECTOR, ship.shipname),
         shipId: shipKey(ship.userid, ship.shipno),
       } satisfies DestructBoomPayload);
+
+      // The blast. Canon damages every ship within one sector of the wreck,
+      // hardest at point blank, and credits nobody for anything it kills.
+      // @see GEFUNCS.C:1860-1899
+      this.applyDestructBlast(ship);
 
       // Emit COMBAT_SHIP_DESTROYED for score/gateway broadcast chain.
       // Self-destruct: no attacker, no loot, no score awarded.

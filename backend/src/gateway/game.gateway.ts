@@ -34,6 +34,8 @@ import {
   COMBAT_MINE_WARNING,
   COMBAT_TARGET_WARNING,
   CombatTargetWarningEvent,
+  COMBAT_DESTRUCT_BLAST,
+  CombatDestructBlastEvent,
   CombatMineWarningEvent,
   COMBAT_MISS,
   COMBAT_PHASER_FIRED,
@@ -1510,6 +1512,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
       text: formatMessage(messageId, event.attackerLetter),
+    });
+  }
+
+  /**
+   * A ship caught in someone's self-destruct. Two lines, because shields
+   * deflecting the blast reads differently from taking it bare, and the figure
+   * is a damstr word. Addressed to that victim alone — canon uses
+   * `outprfge(ALWAYS,zothusn)` inside the per-ship loop.
+   * @see GEFUNCS.C:1878-1891
+   */
+  @OnEvent(COMBAT_DESTRUCT_BLAST)
+  handleDestructBlast(event: CombatDestructBlastEvent): void {
+    this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
+      category: 'combat',
+      text: formatMessage(
+        event.shieldUp ? MessageId.DESTRUCT_BLAST_DEFLECTED : MessageId.DESTRUCT_BLAST_HIT,
+        damstr(event.damage),
+      ),
     });
   }
 

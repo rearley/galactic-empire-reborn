@@ -3208,3 +3208,44 @@ right canon string.
 TODOs in the rotate handler), and `maint`/`new` accepting the wrong planets.
 
 **Known issues:** deployed.
+
+## 2026-09-06 — rotation energy, destruct cadence, self-destruct blast
+
+**Completed:** Three more canon items from the audit, each verified against the
+C source before implementation.
+
+- **Rotation costs energy.** Canon turns only
+  `if (useenergy(warsptr,usrnum,ROTENGUSE) == 1)` and otherwise prints NOROTPW
+  (GECMDS.C:660, :702). ROTENGUSE was exported and used by no production code;
+  `rotate.handler.ts` carried three TODO(006) comments where canon's gates go.
+  `useenergy` keeps a 500-unit reserve above the cost — the original's own
+  comment is "fudge a bit" (GEFUNCS.C:1507) — so a ship is refused while it
+  still holds ROTENGUSE. Both sides of the inclusive boundary are pinned.
+- **Self-destruct blast.** DESTRUCTRANGE was defined and referenced nowhere, so
+  scuttling beside an enemy was harmless. Canon damages every ship within one
+  sector, cubic falloff, scaled by the class of the ship BLOWING UP — not the
+  victim's, which is why this is not `mineFalloff` renamed. Shields divide it by
+  `gernd()%5 + shieldtype` and get SELFD6; unshielded victims get SELFD7. The
+  neutral zone is exempt (`xsect != 0 || ysect != 0`), and `lastfired = -1`
+  means a scuttle that finishes someone off credits nobody.
+
+**Correction to the 2026-09-06 movement entry.** That entry said movement,
+rotation, acceleration AND the self-destruct countdown were running at half
+canon's rate, and the commit moved only the first three. `destruct()` is called
+from warrti2a in the same strided loop (GEMAIN.C:2476-2483), but `destructTick`
+sat in ShipManagementTickService on the 6-second tick, so a 20-count still took
+two minutes instead of one. It now has its own strided SHIP_UPDATE pass.
+`cloakTick` correctly stays on the 6-second tick — canon runs `cloakstat` from
+warrtia (GEFUNCS.C:1366) — and the spec pins both directions, because two
+behaviours sharing a service and belonging to different clocks is exactly what
+gets lost when a service is moved wholesale.
+
+**Tests:** rotate-energy (5), destruct-cadence (3), destruct-blast math (7),
+destruct-blast applied (5), destruct-blast routing (3).
+
+**Next from the audit:** `maint` works at uncolonized planets (canon needs
+25,000 colonists, MAINT8) and `new` works at any neutral-zone planet rather than
+Zygor alone (NEW5) — both are what make Zygor the hub. Then the Zygor plnum
+off-by-one in the maintenance gate.
+
+**Known issues:** deployed.
