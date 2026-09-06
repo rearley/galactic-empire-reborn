@@ -1,3 +1,26 @@
+/**
+ * `sys` is a SYSOP command. Canon gates the whole thing before it looks at the
+ * subcommand:
+ *
+ *   if ((!syscmds) || (sysonly && !(usrptr->flags&ISYSOP)))
+ *       { prf("Huh?\r"); outprfge(ALWAYS,usrnum); return; }
+ *
+ * @see GECMDS.C:4752-4760 cmd_sysop
+ *
+ * Both options ship YES — SYSCMDS {Allow sysop commands? YES} at
+ * MBMGEMSG.MSG:197 and SYSONLY {Allow sysop only to use sysop commands? YES}
+ * at :202 — so in the shipped configuration an ordinary player gets "Huh?" and
+ * nothing else.
+ *
+ * The port had no gate at all, which mattered because `sys unjam` clears the
+ * caller's own jammer counter: any player could cancel being jammed instantly
+ * and for free, which is a universal hard counter to the entire jammer weapon.
+ *
+ * Canon carries sysop identity in the MajorBBS user record (`usrptr->flags &
+ * ISYSOP`), which this port has no equivalent of, so identity comes from the
+ * GE_SYSOP_USERIDS environment allowlist. That substitution is port-original
+ * plumbing for a canon gate — see docs/DECISIONS.md.
+ */
 import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
@@ -43,38 +66,53 @@ function makeHarness(ships: ShipState[]) {
 
 const ctx: CommandContext = {};
 
-describe('SysHandlerService — `sys unjam`', () => {
-  // `sys` is sysop-only in canon (GECMDS.C:4752-4760); an ordinary player gets
-  // "Huh?" before the subcommand is even read. These cases are about what the
-  // subcommand DOES, so they run as a sysop. The gate itself is covered by
-  // sys-authorization.spec.ts.
+describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
   const saved = process.env.GE_SYSOP_USERIDS;
-  beforeEach(() => { process.env.GE_SYSOP_USERIDS = 'u1'; });
   afterEach(() => {
     if (saved === undefined) delete process.env.GE_SYSOP_USERIDS;
     else process.env.GE_SYSOP_USERIDS = saved;
   });
 
-  it('happy path — clears jammer immediately', () => {
-    const alice = makeShip({ jammer: 15 });
+  it('refuses an ordinary player with "Huh?" and does NOT clear their jammer', () => {
+    delete process.env.GE_SYSOP_USERIDS;
+    const alice = makeShip({ userid: 'alice', jammer: 15 });
     const h = makeHarness([alice]);
+
     const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
-    expect(alice.jammer).toBe(0);
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
+    expect(alice.jammer).toBe(15);
   });
 
-  it('idempotent — works when jammer already 0', () => {
-    const alice = makeShip({ jammer: 0 });
+  it('refuses before dispatch, so an unknown subcommand also answers "Huh?"', () => {
+    delete process.env.GE_SYSOP_USERIDS;
+    const alice = makeShip({ userid: 'alice' });
     const h = makeHarness([alice]);
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
-    expect(alice.jammer).toBe(0);
-  });
 
-  it('unknown subcommand → SYS_UNKNOWN', () => {
-    const alice = makeShip();
-    const h = makeHarness([alice]);
     const result = h.command.handler(alice, ['bogus'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNKNOWN));
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
+  });
+
+  it('a userid in GE_SYSOP_USERIDS is a sysop and may unjam', () => {
+    process.env.GE_SYSOP_USERIDS = 'root,alice';
+    const alice = makeShip({ userid: 'alice', jammer: 15 });
+    const h = makeHarness([alice]);
+
+    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
+    expect(alice.jammer).toBe(0);
+  });
+
+  it('the allowlist is exact — a non-listed userid is still refused', () => {
+    process.env.GE_SYSOP_USERIDS = 'root';
+    const mallory = makeShip({ userid: 'mallory', jammer: 15 });
+    const h = makeHarness([mallory]);
+
+    const result = h.command.handler(mallory, ['unjam'], ctx) as CommandResult;
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
+    expect(mallory.jammer).toBe(15);
   });
 });

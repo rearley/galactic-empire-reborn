@@ -62,6 +62,22 @@ function seededRng(seed: number): () => number {
   };
 }
 
+/**
+ * These two invariants went vacuous when ship-to-ship addressing changed.
+ *
+ * They addressed the receiver as `String(receiver.shipno)`, but a BARE NUMBER
+ * resolves to a hull in your OWN fleet only (transfer-target.ts:46-51) — a
+ * per-user index cannot name a stranger's ship. Alice asking for "2" therefore
+ * looked for Alice's second hull, found nothing, and every one of the 200
+ * transfers was refused before any cargo moved. Both totals then held trivially:
+ * the tests would have passed just as well against a `tra` that created or
+ * destroyed cargo outright.
+ *
+ * The fix is two-part, and the second part is the one that matters: address the
+ * receiver BY NAME (the form `loc`, `dat` and `sca sh` already use), and assert
+ * that cargo actually moved. A conservation test that cannot tell "conserved"
+ * from "nothing happened" is not a conservation test.
+ */
 describe('transfer conservation across 100 randomized transfers (SC-003)', () => {
   it('total items[i] invariant across 100 successful + failing transfers', () => {
     const rng = seededRng(0xdeadbeef);
@@ -69,8 +85,13 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
     // Start with 1000 units of every transferable item in each ship
     const makeItems = (qty: bigint) => Array(NUMITEMS).fill(qty) as bigint[];
 
-    const alice = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alice', xcoord: 5, ycoord: 5, items: makeItems(1000n) });
-    const bob   = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob',   xcoord: 5, ycoord: 5, items: makeItems(1000n) });
+    // ITEM_TONS sums to 316.5 tons for one of each item, so 1,000 of each is
+    // 316,500 tons. Against the 1,000-ton default hold every transfer is
+    // refused for want of room — the fixture has to fit before conservation
+    // can be observed at all.
+    const HOLD = 1_000_000;
+    const alice = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alice', xcoord: 5, ycoord: 5, maxTons: HOLD, items: makeItems(1000n) });
+    const bob   = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob',   xcoord: 5, ycoord: 5, maxTons: HOLD, items: makeItems(1000n) });
 
     const handler = buildService(alice, bob);
 
@@ -86,8 +107,12 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
       const amt = Math.floor(rng() * 200) + 1;
 
       // Execute — handler will reject if insufficient inventory; that's fine
-      handler.command.handler(sender, [String(amt), itemName.toLowerCase(), String(receiver.shipno)], {});
+      handler.command.handler(sender, [String(amt), itemName.toLowerCase(), receiver.shipname], {});
     }
+
+    // Cargo must actually have moved, or the invariant below proves nothing.
+    const moved = alice.items.some((qty, idx) => idx < NUMITEMS && qty !== 1000n);
+    expect(moved).toBe(true);
 
     // After all transfers, verify total of each item is preserved
     for (let idx = 0; idx < NUMITEMS; idx++) {
@@ -98,16 +123,21 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
 
   it('total gold invariant: 100 gold-only transfers between two ships', () => {
     const rng = seededRng(0xcafebabe);
-    const alice = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alice', xcoord: 5, ycoord: 5, items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 5000n }) as bigint[] });
-    const bob   = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob',   xcoord: 5, ycoord: 5, items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 5000n }) as bigint[] });
+    // 5,000 gold is 2,500 tons (ITMWT13: 0.5 t/unit), over the 1,000-ton default.
+    const HOLD = 1_000_000;
+    const alice = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alice', xcoord: 5, ycoord: 5, maxTons: HOLD, items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 5000n }) as bigint[] });
+    const bob   = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob',   xcoord: 5, ycoord: 5, maxTons: HOLD, items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 5000n }) as bigint[] });
 
     const handler = buildService(alice, bob);
 
     for (let i = 0; i < 100; i++) {
       const [sender, receiver] = rng() < 0.5 ? [alice, bob] : [bob, alice];
       const amt = Math.floor(rng() * 500) + 1;
-      handler.command.handler(sender, [String(amt), 'gold', String(receiver.shipno)], {});
+      handler.command.handler(sender, [String(amt), 'gold', receiver.shipname], {});
     }
+
+    // Same guard: prove gold moved before asserting none was created or lost.
+    expect(alice.items[I_GOLD]).not.toBe(5000n);
 
     const totalGold = (alice.items[I_GOLD] ?? 0n) + (bob.items[I_GOLD] ?? 0n);
     expect(totalGold).toBe(10000n); // 5000 + 5000

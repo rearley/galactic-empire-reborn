@@ -88,3 +88,21 @@ function envFloat(key: string, fallback: number): number {
 export function bootSeedEnabled(): boolean {
   return process.env.CYBERTRON_BOOT_SEED !== 'false';
 }
+
+/**
+ * Cone half-width a Cybertron uses when engaging in normal space.
+ *
+ * Canon writes it inline beside the bearing, immediately before `cyb_attack`:
+ *
+ *   ptr->degrees = (int)(cbearing(...)+.5);
+ *   ptr->percent = 2;
+ *
+ * @see GECYBS.C:281-282
+ *
+ * Deliberately NOT in `game/constants.ts`: that file mirrors `GEMAIN.H`
+ * #defines and is pinned field-for-field against it by
+ * test/unit/gemain-pins.spec.ts. Canon has no `CYB_PHASER_FOCUS` define — this
+ * is a literal in the AI source — so putting it there would assert a canon
+ * constant that does not exist.
+ */
+export const CYB_PHASER_FOCUS = 2 as const;

@@ -125,8 +125,15 @@ export class PlanetAttackService {
 
     // Step 6: high-ratio item destruction. @see GECMDS.C:3705–3735
     if (ratio > 2 && left1 > Math.floor(left2 / 2)) {
-      for (let i = 0; i < planet.items.length; i++) {
-        if (i === I_TROOPS) continue;
+      // Canon's loop is `for(ii=1;ii<NUMITEMS;++ii)` — it starts at 1, so
+      // I_MEN (index 0) is never trashed: a raid takes stockpiles, never the
+      // colony's population. It does include I_TROOPS, which looks odd until
+      // you notice :3745 overwrites that slot with `left2` immediately after,
+      // so the draw is discarded — but it still consumes one gernd(), so
+      // skipping the index here would shift every later item's random draw.
+      // (attack_fig deliberately differs: it starts at 0 and excludes only
+      // I_FIGHTER, GECMDS.C:3875-3890.)
+      for (let i = 1; i < planet.items.length; i++) {
         const destroyed = Math.min(gernd(this.random) % ITEM_DESTRUCTION_RANGE, Number(planet.items[i].qty));
         if (destroyed > 0) {
           planet.items[i].qty -= BigInt(destroyed);

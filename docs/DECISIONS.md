@@ -3218,3 +3218,43 @@ explaining why canon is unavailable is this project's most reliable warning sign
 lines indexed as the current divergence list, and a stale snapshot read as
 current is the exact failure this audit round existed to fix. It remains in git
 history.
+
+## 2026-09-06 — Sysop identity comes from GE_SYSOP_USERIDS, not a user-record flag
+
+**Context:** `sys` is a sysop-only command in canon. `cmd_sysop` refuses before
+it even reads the subcommand:
+
+```c
+if ((!syscmds) || (sysonly && !(usrptr->flags&ISYSOP)))
+    { prf("Huh?\r"); outprfge(ALWAYS,usrnum); return; }
+```
+
+(GECMDS.C:4752-4760; both options ship YES — MBMGEMSG.MSG:197 `SYSCMDS`, :202
+`SYSONLY`.) The port shipped `sys` with **no authorization check at all**, which
+mattered because `sys unjam` sets the caller's own `jammer` counter to 0: any
+player could cancel being jammed instantly and for free, a universal hard
+counter to the entire jammer weapon. Found by the 2026-09-05 canon sweep.
+
+**Decision:** implement canon's gate. Sysop identity comes from a
+`GE_SYSOP_USERIDS` environment allowlist (comma-separated userids), checked
+before the subcommand is read. Unset or empty means nobody is a sysop, so every
+player gets canon's `Huh?`.
+
+**Reason:** canon reads `usrptr->flags & ISYSOP` from the MajorBBS user record,
+which this port has no equivalent of — there is no operator account concept in
+our auth model, and inventing a `User.isSysop` column would be a schema change
+carrying migration and admin-UI weight for a single boolean that only ever
+changes by hand. An env allowlist is the same trust boundary the port already
+uses for `GE_DEBUG_ENDPOINTS`, it is deployment-time rather than data, and it
+fails closed.
+
+The refusal text is canon's literal `"Huh?"` — printed by `prf()` rather than
+drawn from the message table, so `MessageId.SYS_HUH` wraps a string that has no
+`.MSG` id to be generated from.
+
+**Alternatives rejected:** a `User.isSysop` column (migration + admin surface for
+one hand-edited boolean); leaving `sys` ungated behind `GE_DEBUG_ENDPOINTS` only
+(that flag mounts unauthenticated debug ROUTES, a different and much larger
+hole, and it would leave `sys` fully open whenever debug endpoints were on);
+removing `sys unjam` entirely (canon has it — the defect was the missing gate,
+not the subcommand).

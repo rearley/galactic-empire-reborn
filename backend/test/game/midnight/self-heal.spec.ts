@@ -15,6 +15,7 @@ import { MidnightService } from '../../../src/game/midnight/midnight.service';
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { runDateValue } from '../../../src/game/midnight/midnight-time';
 
 async function truncateAll(prisma: PrismaService) {
   await prisma.midnightRun.deleteMany();
@@ -61,9 +62,19 @@ describe('self-heal on startup (FR-001b)', () => {
     const { app, prisma, service } = await makeApp();
     await truncateAll(prisma);
 
-    // Seed today's row
-    const today = new Date();
-    const runDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    // Seed today's row — dated the way PRODUCTION dates it.
+    //
+    // This used to hand-compute `new Date(y, m, d)` from HOST-local time, but
+    // MidnightService dates every run in GAME_TIMEZONE (America/New_York by
+    // default) via runDateValue. The two agree for most of the day and diverge
+    // either side of the boundary: at 01:25 UTC the host says 2026-09-06 while
+    // the game day is still 2026-09-05, so the seeded row did not match the key
+    // the service looks up, self-heal saw no row, and it ran. The test failed
+    // nightly in the 00:00-04:00 UTC window and passed the rest of the time.
+    //
+    // midnight-time.ts's own docblock warns about exactly this mismatch. Using
+    // the production function means the test cannot drift from it again.
+    const runDate = runDateValue(new Date());
     await prisma.midnightRun.create({
       data: {
         runDate,
