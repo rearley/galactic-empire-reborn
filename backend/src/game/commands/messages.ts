@@ -254,6 +254,8 @@ export enum MessageId {
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
   /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
   TEAM_TOO_MANY = 'TEAM_TOO_MANY',
+  /** CAPTDOC — intelligence captured from a kill: the victim's colony list. */
+  CAPTURED_DOC = 'CAPTURED_DOC',
   /** ATTACK7 — told to the ATTACKER: the planet has called for help. */
   ATT_DISTRESS_SENT = 'ATT_DISTRESS_SENT',
   /** SPYM3 — operative report: the attack was repelled. */
@@ -900,6 +902,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
   [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
+  [MessageId.CAPTURED_DOC]: CANON_MESSAGES.CAPTDOC,
   [MessageId.ATT_DISTRESS_SENT]: CANON_MESSAGES.ATTACK7,
   [MessageId.SPY_REPORT_HELD]: CANON_MESSAGES.SPYM3,
   [MessageId.SPY_REPORT_TAKEN]: CANON_MESSAGES.SPYM4,
