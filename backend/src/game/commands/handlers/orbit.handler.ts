@@ -40,6 +40,15 @@ export class OrbitHandlerService {
   }
 
   private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
+    // Hyperspace first, above the already-in-orbit test and above any planet
+    // lookup — canon's order (GECMDS.C:770-774). Without it a captain at warp
+    // passing within 250 units of a planet dropped into orbit mid-flight, and
+    // the orbit path then zeroed speed and speed2b: a free emergency stop from
+    // any velocity.
+    if (ship.where === 1) {
+      return { lines: [{ text: formatMessage(MessageId.ORBIT_HYPERSPACE), category: 'system' }] };
+    }
+
     if (ship.where >= 10) {
       return { lines: [{ text: formatMessage(MessageId.ORBITALR), category: 'system' }] };
     }
