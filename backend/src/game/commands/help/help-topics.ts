@@ -213,7 +213,7 @@ function priceTableBody(): string[] {
   }
   rows.push(
     '',
-    '  Buy at Zygor-3 in sector 0 0, in orbit:  new phaser <mark>',
+    '  Buy in orbit of Zygor (planet 1) in sector 0 0:  new phaser <mark>',
     '                                          new shield <mark>',
     '  Your old unit is traded in for two thirds of what it lists at,',
     '  So an upgrade costs far less than the sticker price.',
@@ -273,7 +273,7 @@ const CLASS_TABLE_BODY: string[] = (() => {
   }
   rows.push(
     '',
-    '  Buy at Zygor-3 in sector 0 0, in orbit:  new ship <#>',
+    '  Buy in orbit of Zygor (planet 1) in sector 0 0:  new ship <#>',
     '  Shld/Phsr are the highest marks that hull will mount — see HEL NEWPRICE.',
     '',
     // HLPCLS2 — canon prints the legend under the table, in its own words.
