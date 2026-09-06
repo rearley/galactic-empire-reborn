@@ -346,16 +346,11 @@ export class ScanHandlerService implements OnModuleInit {
 
     const grid: ScanCell[] = [];
 
-    // 0. Live mines, projected the same way ships are and with NO sector
-    // filter — `scan_lo` tests only `mptr->channel != 255` and lets the grid
-    // bounds do the rest. Pushed first so a ship or the self-cell drawn later
-    // takes the cell. @see GECMDS.C:2529-2545
-    for (const mine of this.mineRegistry.getAll()) {
-      if (mine.channel === MINE_SLOT_FREE) continue;
-      const cell = projectRangeCell(ship, { xcoord: mine.xcoord, ycoord: mine.ycoord }, projectionRange);
-      if (!cell) continue;
-      grid.push({ x: cell.x, y: cell.y, type: 'mine', char: '.' });
-    }
+    // NO mine loop here. `scan_lo` (GECMDS.C:2640 onward) contains no `mptr`
+    // iteration at all before printmap() — the mine loop belongs to scan_ra
+    // (GECMDS.C:2529) and to scan_se (GECMDS.C:2598). This method used to carry
+    // it while citing scan_ra's line numbers, so the long-range overview drew
+    // mines canon never puts there and the tactical scan showed clean space.
 
     // 1. Project all in-range ships via scantab — GECMDS.C:2700-2720
     // Deviation D1: char = entry.letter ('A'..'Z') not '+' / '='
@@ -537,6 +532,24 @@ export class ScanHandlerService implements OnModuleInit {
     const rangeDbl = 2 * effectiveRangeSectors;
     const xfactor = rangeDbl / (SCAN_GRID_WIDTH - 1);
     const yfactor = rangeDbl / (SCAN_GRID_HEIGHT - 1);
+
+    // Live mines. Canon's mine loop belongs to scan_ra — this is the zoomable
+    // tactical scan, the only mode with an adjustable range, and therefore the
+    // one a pilot uses to pick a way through a minefield.
+    //
+    //   for (i=0,mptr = mines; i<nummines;++mptr,++i)
+    //       if (mptr->channel != 255) { xf = ...; yf = ...; }
+    //
+    // @see GECMDS.C:2529-2545. Drawn before ships so a contact in the same cell
+    // takes it, matching canon's write order.
+    for (const mine of this.mineRegistry.getAll()) {
+      if (mine.channel === MINE_SLOT_FREE) continue;
+      const mxf = (mine.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
+      const myf = (mine.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
+      if (mxf >= 0 && mxf < SCAN_GRID_WIDTH && myf >= 0 && myf < SCAN_GRID_HEIGHT) {
+        cells.push({ x: Math.floor(mxf), y: Math.floor(myf), type: 'mine', char: '.' });
+      }
+    }
 
     for (const entry of newScantab) {
       // Find the ship state for this scantab entry
