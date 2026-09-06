@@ -39,7 +39,14 @@ export class SectorTransitionSubscriber implements OnModuleInit {
 
   onModuleInit(): void {
     if (this.tickService) {
-      this.tickService.subscribe(TickKind.PHYSICS, () => this.onPhysicsTick());
+      // Sampled at the MOVEMENT cadence, not the 6-second one. Canon prints
+      // MOVE1 from inside `moveship` at the instant of the crossing
+      // (GEFUNCS.C:711-713), and moveship runs every 3 seconds (warrti2a,
+      // GEMAIN.C:2472). This subscriber derives crossings by diffing integer
+      // cells between ticks, so its sampling rate is its fidelity: on the
+      // 6-second tick a hull crossing two cells in six seconds reported one
+      // A->C transition and the intermediate crossing was lost.
+      this.tickService.subscribe(TickKind.SHIP_UPDATE, () => this.onPhysicsTick());
     }
   }
 

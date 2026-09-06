@@ -3087,3 +3087,46 @@ the scoring formula changes (owner's call, 2026-09-06).
 
 **Known issues:** committed, NOT deployed — a restart wipes every droid and a
 playtest is planned.
+
+## 2026-09-06 — movement restored to canon's cadence
+
+**Completed:** Ships move at canon's rate for the first time. `warrti2a` runs on
+the 1-second timer with a stride of 3 (`GEMAIN.C:2462-2493`), so each hull
+rotates, accelerates, moves and counts down its self-destruct every 3 seconds.
+The port ran all four on the 6-second tick with canon's per-call displacement
+and no `dt`, so everything about flying was exactly half speed. Recorded in
+DECISIONS.md (2026-09-06).
+
+Two things moved the other way, which is the part worth remembering: `hypha` and
+`cantexit` are decremented inside `checktm`, which canon calls from the SIX-second
+`warrtia` (`GEFUNCS.C:1522-1541`). Carrying them along with the movement would
+have recharged the hyper-phaser and released battle locks twice as fast — a
+regression introduced by the fix, caught only by checking canon before moving
+them. `SectorTransitionSubscriber` did follow the movement to the 1-second tick,
+because it derives crossings by diffing integer cells: on the slow tick a fast
+hull reported A→C and the intermediate crossing vanished.
+
+**Tests:** `movement-cadence.spec.ts` (9) pins the 3-second cadence, the stride
+fairness, and that countdowns stay on the 6-second timer. Three existing specs
+were repaired rather than patched:
+- `physics-tick.service.spec.ts` had a kind-BLIND harness firing every handler
+  on every tick, which would have hidden a subscription moving between timers.
+  It is now kind-aware, and its `FR-019 ordering` test — which the audit flagged
+  as asserting `['a:1','a:2','b:1'].sort()` equalled itself — now records the
+  order `mutate` was actually called in. Sabotage-verified: reversing the sort
+  fails it, where the old version passed.
+- `tick-subscription-order.spec.ts` tagged its own subscriptions and asserted the
+  order it had just imposed. It now records only what the services do — the tick
+  kind and registration order.
+- `bench.spec.ts` measured one `advanceAll` call while claiming "100 ships"; with
+  the stride that is 34, so it now measures a full three-call rotation.
+
+**Corrected:** CLAUDE.md's tick table, which is what caused this. It said the
+6-second tick "moves ships"; the code was correct against the file and wrong
+against canon.
+
+**Next:** planet scoring on ITMVAL, with a score reset (owner's call).
+
+**Known issues:** committed and deployed. Every ship in the live world now moves
+twice as fast as it did yesterday — that is the intended change, but it is a
+large change in feel.

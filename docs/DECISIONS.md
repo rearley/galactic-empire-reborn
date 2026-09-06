@@ -3274,3 +3274,58 @@ one hand-edited boolean); leaving `sys` ungated behind `GE_DEBUG_ENDPOINTS` only
 hole, and it would leave `sys` fully open whenever debug endpoints were on);
 removing `sys unjam` entirely (canon has it — the defect was the missing gate,
 not the subcommand).
+
+## 2026-09-06 — Movement runs on the 1-second tick with canon's stride of 3
+
+**Context:** `CLAUDE.md` said the 6-second physics tick "moves ships", and the
+port implemented exactly that. Canon does not. `warrti2a` is registered on the
+1-second timer and walks the ship table with a stride of 3:
+
+```c
+static int clicker = 0;
+zothusn = clicker;
+while (zothusn < nships) {
+    if (ingegame(zothusn)) {
+        rotateship(wptr,zothusn); accel(wptr,zothusn);
+        moveship(wptr,zothusn);   destruct(wptr,zothusn);
+    }
+    zothusn += 3;
+}
+clicker = (clicker+1)%3;
+rtkick(TICKTIME2,warrti2);          /* TICKTIME2 == 1 */
+```
+
+(`GEMAIN.C:2462-2493`.) Each ship therefore rotates, accelerates, moves and
+counts down its self-destruct **every 3 seconds**. `positionIntegration`
+(physics-math.ts) carries canon's per-CALL displacement — `speed * sin(heading)
+/ 65000`, no `dt` term — so running it every 6 seconds instead of every 3 made
+every ship in the game fly at exactly half canon's speed, turn half as fast,
+take twice as long to reach an ordered warp, and take twice as long to explode.
+
+**Decision:** `PhysicsTickService` subscribes to `SHIP_UPDATE` (1s) and applies
+canon's stride, advancing one third of the fleet per tick. The `hypha` and
+`cantexit` countdowns move the other way: they are decremented inside `checktm`
+(`GEFUNCS.C:1522-1541`), which canon calls from the SIX-second `warrtia`, so
+they now have their own PHYSICS subscription. `SectorTransitionSubscriber` also
+moves to the 1-second tick, because it derives crossings by diffing integer
+cells and its sampling rate is its fidelity — on the 6-second tick a hull
+crossing two cells in six seconds reported one A→C transition and lost the
+intermediate crossing canon reports from inside `moveship`.
+
+**Reason:** canon is the source of truth and this is a pure fidelity defect, not
+a balance dial. The stride is kept rather than moving the whole fleet every
+third second: it is what canon does, and it smooths the per-tick cost across
+three seconds instead of spiking it.
+
+**Alternatives rejected:** doubling the per-call displacement and staying on the
+6-second tick — arithmetically equivalent at 6-second boundaries, but it halves
+the sampling rate of everything derived from position (sector crossings, mine
+proximity, gravity, arrival checks), so ships would teleport past hazards that
+canon gives them a tick to notice. Leaving it and documenting the deviation —
+rejected because it is not a deviation anyone chose; it was a transcription
+error in CLAUDE.md that the code faithfully implemented.
+
+**Note for future work:** CLAUDE.md's tick table has been corrected. Canon's
+split is counter-intuitive — shields regenerate on the SLOW tick and movement on
+the fast one — so anything moved between the two timers must be located in
+`GEMAIN.C` first.

@@ -51,29 +51,42 @@ interface Harness {
   events: EventEmitter2;
   capturedSector: PhysicsSectorTransitionEvent[];
   capturedHyperspace: PhysicsHyperspaceEvent[];
+  /** shipKeys in the order the service actually mutated them. */
+  touched: string[];
+  /** Advance every ship one canon movement step (three 1-second ticks). */
   fire(): void;
-  ctx(tickNumber?: number): TickContext;
+  /** One raw 1-second tick — only a third of the fleet moves. */
+  second(): void;
+  /** One 6-second tick — the hypha/cantexit countdown pass. */
+  firePhysics(): void;
+  ctx(kind?: TickKind, tickNumber?: number): TickContext;
 }
 
 function makeHarness(ships: ShipState[], classes: Array<{ classNumber: number; maxAcceleration: number; maxWarp: number }> = [{ classNumber: 1, maxAcceleration: 1000, maxWarp: 10 }]): Harness {
   const shipMap = new Map<string, ShipState>();
   for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
 
+  const touched: string[] = [];
   const shipState = {
     findAllShips: () => Array.from(shipMap.values()),
     mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
       const s = shipMap.get(shipKey(userid, shipno));
       if (!s) return undefined;
+      touched.push(shipKey(userid, shipno));
       fn(s);
       s.dirty = true;
       return s;
     },
   } as any;
 
-  const subscribers: Array<(c: TickContext) => void> = [];
+  // Kind-AWARE: PhysicsTickService registers movement on SHIP_UPDATE (canon
+  // warrti2a, 1s) and the hypha/cantexit countdowns on PHYSICS (canon checktm,
+  // 6s). A harness that fired every handler on every tick would hide a
+  // subscription moving between the two timers.
+  const subscribers: Array<{ kind: TickKind; fn: (c: TickContext) => void }> = [];
   const tickService = {
-    subscribe: (_kind: TickKind, h: (c: TickContext) => void) => {
-      subscribers.push(h);
+    subscribe: (kind: TickKind, h: (c: TickContext) => void) => {
+      subscribers.push({ kind, fn: h });
       return () => {};
     },
   } as any;
@@ -91,17 +104,39 @@ function makeHarness(ships: ShipState[], classes: Array<{ classNumber: number; m
   service.onModuleInit();
 
   let n = 0;
+  const ctx = (kind: TickKind = TickKind.SHIP_UPDATE, tickNumber: number = ++n): TickContext =>
+    ({ kind, tickNumber, firedAt: new Date() });
+
+  /** One raw 1-second tick — a THIRD of the fleet moves (canon's stride). */
+  const second = () => {
+    const c = ctx(TickKind.SHIP_UPDATE);
+    for (const sub of subscribers) if (sub.kind === TickKind.SHIP_UPDATE) sub.fn(c);
+  };
+
+  /**
+   * Advance every ship one canon movement step. Canon strides the fleet by 3 on
+   * the 1-second timer, so three ticks is exactly one move for each hull.
+   * @see GEMAIN.C:2472-2489 warrti2a
+   */
+  const fire = () => { second(); second(); second(); };
+
+  /** One 6-second tick — the hypha/cantexit countdown pass (canon checktm). */
+  const firePhysics = () => {
+    const c = ctx(TickKind.PHYSICS);
+    for (const sub of subscribers) if (sub.kind === TickKind.PHYSICS) sub.fn(c);
+  };
+
   return {
     service,
     shipMap,
     events,
     capturedSector,
     capturedHyperspace,
-    ctx: (tickNumber: number = ++n) => ({ kind: TickKind.PHYSICS, tickNumber, firedAt: new Date() }),
-    fire() {
-      const c = this.ctx();
-      for (const sub of subscribers) sub(c);
-    },
+    touched,
+    ctx,
+    second,
+    fire,
+    firePhysics,
   };
 }
 
@@ -233,13 +268,15 @@ describe('PhysicsTickService', () => {
       const a = makeShip({ userid: 'a', shipno: 1, hypha: 3, cantexit: 5 });
       const b = makeShip({ userid: 'b', shipno: 1, where: 13, hypha: 3, cantexit: 5 });
       const h = makeHarness([a, b]);
-      h.fire();
+      // hypha and cantexit are decremented by canon's checktm, on the SIX-second
+      // timer (GEFUNCS.C:1522-1541) — not by the movement tick.
+      h.firePhysics();
       expect(a.hypha).toBe(2);
       expect(a.cantexit).toBe(4);
       expect(b.hypha).toBe(2);
       expect(b.cantexit).toBe(4);
 
-      for (let i = 0; i < 10; i++) h.fire();
+      for (let i = 0; i < 10; i++) h.firePhysics();
       expect(a.hypha).toBe(0);
       expect(a.cantexit).toBe(0);
       expect(b.hypha).toBe(0);
@@ -372,25 +409,40 @@ describe('PhysicsTickService', () => {
   });
 
   describe('FR-019 ordering', () => {
-    it('processes ships in ascending shipKey order', () => {
-      const order: string[] = [];
-      const a = makeShip({ userid: 'b', shipno: 1, hypha: 1 });
-      const b = makeShip({ userid: 'a', shipno: 2, hypha: 1 });
-      const c = makeShip({ userid: 'a', shipno: 1, hypha: 1 });
-      // Use a logger spy via mutate to record order. Easier: hook the mutate via shipname update side effect.
-      const h = makeHarness([a, b, c]);
-      // Patch findAllShips order to be insertion order; service should re-sort.
+    it('processes ships in ascending shipKey order within a tick', () => {
+      // The previous version of this test asserted `['a:1','a:2','b:1'].sort()`
+      // equalled itself and never observed the service at all — it passed with
+      // the sort deleted. This one records the order `mutate` was actually
+      // called in.
+      const h = makeHarness([
+        makeShip({ userid: 'b', shipno: 1, speed: 1000, speed2b: 1000, energy: 90000 }),
+        makeShip({ userid: 'a', shipno: 2, speed: 1000, speed2b: 1000, energy: 90000 }),
+        makeShip({ userid: 'a', shipno: 1, speed: 1000, speed2b: 1000, energy: 90000 }),
+      ]);
+
       h.fire();
-      // After tick, all should have hypha 0; the test really verifies sorting
-      // doesn't blow up on multi-key. (Direct order check would require a hook.)
-      expect(a.hypha).toBe(0);
-      expect(b.hypha).toBe(0);
-      expect(c.hypha).toBe(0);
-      // Sanity-check sort: 'a:1' < 'a:2' < 'b:1'
-      const keys = ['a:1', 'a:2', 'b:1'];
-      const sorted = keys.slice().sort();
-      expect(sorted).toEqual(keys);
-      void order;
+
+      const seen = h.touched.filter((k, i) => h.touched.indexOf(k) === i);
+      expect(seen).toEqual([...seen].sort());
+    });
+
+    it('touches every ship exactly once per three-second window', () => {
+      // Canon strides the fleet by 3 across the 1-second timer, so a full
+      // rotation is three ticks and no hull is moved twice or skipped.
+      // @see GEMAIN.C:2472-2489
+      const h = makeHarness(
+        Array.from({ length: 6 }, (_, i) =>
+          makeShip({ userid: `u${i}`, shipno: 1, speed: 1000, speed2b: 1000, energy: 90000 }),
+        ),
+      );
+
+      h.fire();
+
+      const counts = new Map<string, number>();
+      for (const k of h.touched) counts.set(k, (counts.get(k) ?? 0) + 1);
+      expect([...counts.keys()].sort()).toEqual(
+        Array.from({ length: 6 }, (_, i) => `u${i}:1`).sort(),
+      );
     });
   });
 });

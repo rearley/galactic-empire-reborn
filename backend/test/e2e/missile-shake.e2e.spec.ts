@@ -124,8 +124,17 @@ describe('missiles between two missile-capable ships (real services, no mocks)',
 
   const combatTick = (seq = 1) =>
     (combat as unknown as { onPhysicsTick: (c: unknown) => void }).onPhysicsTick(ctx(seq));
-  const physicsTick = (seq = 1) =>
-    (physics as unknown as { advanceAll: (c: unknown) => void }).advanceAll(ctx(seq));
+  /**
+   * One canon movement step for EVERY ship. Canon strides the fleet by 3 on the
+   * 1-second timer (GEMAIN.C:2472-2489 warrti2a), so `advanceAll` moves a third
+   * of the hulls per call and three calls is one move each.
+   */
+  const physicsTick = (seq = 1) => {
+    const p = physics as unknown as { advanceAll: (c: unknown) => void };
+    p.advanceAll(ctx(seq));
+    p.advanceAll(ctx(seq));
+    p.advanceAll(ctx(seq));
+  };
 
   /** Put a ship in the game with a real channel, the way the gateway does. */
   function enter(s: ShipState): ShipState {

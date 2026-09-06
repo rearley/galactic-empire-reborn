@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { SectorTransitionSubscriber } from '../../../src/game/tick/sector-transition.subscriber';
+import { TickService } from '../../../src/game/tick/tick.service';
+import { TickKind } from '../../../src/game/tick/tick.types';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PHYSICS_SECTOR_TRANSITION_EVENT } from '../../../src/game/tick/sector-transition.subscriber';
@@ -132,5 +134,32 @@ describe('SectorTransitionSubscriber', () => {
     subscriber.onPhysicsTick();
 
     expect(events.emit).not.toHaveBeenCalled();
+  });
+});
+
+describe('SectorTransitionSubscriber — which timer it runs on', () => {
+  /**
+   * Sector crossings must be sampled at the MOVEMENT cadence. Canon prints
+   * MOVE1 from inside `moveship` (GEFUNCS.C:711-713), i.e. at the instant of
+   * the crossing, and moveship runs every 3 seconds (warrti2a, GEMAIN.C:2472).
+   *
+   * This subscriber derives crossings by diffing integer cells between ticks,
+   * so its sampling rate IS its fidelity: left on the 6-second tick while
+   * ships move every 3 seconds, a hull fast enough to cross two cells in six
+   * seconds reports a single A->C transition and the intermediate crossing is
+   * lost entirely.
+   */
+  it('subscribes to the 1-second tick, so no crossing is sampled away', () => {
+    const kinds: TickKind[] = [];
+    const tickService = {
+      subscribe: (kind: TickKind, _fn: () => void) => { kinds.push(kind); return () => {}; },
+    } as unknown as TickService;
+    const shipStateService = { findAllShips: () => [] } as unknown as ShipStateService;
+
+    new SectorTransitionSubscriber(
+      shipStateService, new EventEmitter2(), tickService,
+    ).onModuleInit();
+
+    expect(kinds).toEqual([TickKind.SHIP_UPDATE]);
   });
 });

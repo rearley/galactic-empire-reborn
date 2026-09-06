@@ -26,7 +26,8 @@ function makeShip(userid: string, shipno: number): ShipState {
 }
 
 /**
- * SC-004 / R-10 — 100 ships through one advanceAll() call must complete in
+ * SC-004 / R-10 — 100 ships through one full stride rotation (three
+ * advanceAll() calls, canon's 3-second window) must complete in
  * under 50 ms on the project's CI runner. Skipped on low-perf runners that
  * set CI_LOW_PERF=1.
  */
@@ -57,7 +58,12 @@ describe('PhysicsTickService perf budget', () => {
     // Warm up the JIT.
     for (let i = 0; i < 3; i++) service.advanceAll(ctx);
 
+    // Canon strides the fleet by 3 (GEMAIN.C:2472-2489), so ONE advanceAll call
+    // touches a third of the hulls. Measure a full rotation, or this budget
+    // silently becomes "34 ships in under 50 ms" while still claiming 100.
     const start = process.hrtime.bigint();
+    service.advanceAll(ctx);
+    service.advanceAll(ctx);
     service.advanceAll(ctx);
     const elapsedNs = process.hrtime.bigint() - start;
 
