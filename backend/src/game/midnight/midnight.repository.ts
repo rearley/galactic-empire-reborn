@@ -365,7 +365,7 @@ export class MidnightRepository {
         itemsMarkup2a: zygorMkup,
       },
     });
-    if (zygor.count === 0) this.warnMissingNeutralZone('Zygor-3', 1);
+    if (zygor.count === 0) this.warnMissingNeutralZone('Zygor', 1);
 
     // Nexus Prime: troops, men, food only  @see GEMAIN.C:2162-2174
     const nexusMkup = new Array<number>(NUMITEMS).fill(0);
