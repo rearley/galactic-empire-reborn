@@ -171,3 +171,22 @@ export interface CombatTargetWarningEvent {
   attackerLetter: string;
   tickAt: Date;
 }
+
+/**
+ * Blast damage from a ship destroying itself, delivered to one neighbour.
+ *
+ * Canon prints SELFD6 to a shielded victim and SELFD7 to an unshielded one,
+ * each with the damage as a WORD via damstr, addressed to that victim alone
+ * (`outprfge(ALWAYS,zothusn)`).
+ *
+ * @see GEFUNCS.C:1875-1892
+ */
+export const COMBAT_DESTRUCT_BLAST = 'combat.destruct-blast' as const;
+export interface CombatDestructBlastEvent {
+  /** `${userid}:${shipno}` of the ship caught in the blast. */
+  victimId: string;
+  damage: number;
+  /** Shields up selects SELFD6 over SELFD7. */
+  shieldUp: boolean;
+  tickAt: Date;
+}

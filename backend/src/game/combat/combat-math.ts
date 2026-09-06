@@ -1,4 +1,4 @@
-import { HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, MOVENGMIN, PDAMMAX, PFIRDST, PHABIAS, PHATOWRP, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
+import { DESTRUCTRANGE, HPDAMMAX, HPFIRDST, MDAMMAX, MINEDAMMAX, MINERANGE, MISSILE_CHARGE_MAX, MOVENGMIN, PDAMMAX, PFIRDST, PHABIAS, PHATOWRP, PRELOAD, SHIELD_FACTOR, SHMINCHG, TONFACT } from '../constants';
 import { Random } from './random.port';
 
 /**
@@ -499,6 +499,49 @@ export function mineFalloff(distance: number, victimDamageFactor: number): numbe
   if (distance >= MINERANGE) return 0;
   const factor = 1 - distance / MINERANGE;
   return Math.floor(MINEDAMMAX * factor * factor * factor * damageScale(victimDamageFactor));
+}
+
+/**
+ * Blast damage from a self-destructing ship to one neighbour.
+ *
+ *   ddist = 1.0-(ddist/DESTRUCTRANGE); if (ddist < 0) ddist = 0;
+ *   ddist = ddist*ddist*ddist;
+ *   damage = (unsigned)(ddist*minedammax);
+ *   damage = damage*((ptr->shpclass/2)+1);
+ *   if (SHIELDUP) damage = damage/(gernd()%5+wptr->shieldtype);
+ *
+ * @see GEFUNCS.C:1871-1893 destruct
+ *
+ * Deliberately NOT `mineFalloff`: the two look alike and scale by different
+ * things. A mine's damage scales by the VICTIM's per-class damageFactor; a
+ * scuttle scales by the class of the ship BLOWING UP, which is what makes
+ * ramming a fight in a heavy hull worth doing.
+ *
+ * @param distanceRaw   cdistance * 10000, as canon compares it
+ * @param destructClass ship class of the ship destroying itself
+ * @param shieldUp      victim's shields raised
+ * @param shieldType    victim's shield mark
+ * @param roll          canon's `gernd()%5`, passed in so the caller owns the RNG
+ */
+export function destructBlastDamage(
+  distanceRaw: number,
+  destructClass: number,
+  shieldUp: boolean,
+  shieldType: number,
+  roll: number,
+): number {
+  const linear = Math.max(0, 1 - distanceRaw / DESTRUCTRANGE);
+  let damage = Math.floor(linear * linear * linear * MINEDAMMAX);
+  // Integer division, as in C: class 5 gives (5/2)+1 = 3.
+  damage *= Math.floor(destructClass / 2) + 1;
+  if (shieldUp) {
+    // C would divide by zero here for an unshielded-but-SHIELDUP ship; that
+    // state cannot arise (shields cannot be raised without a generator), but
+    // guard rather than emit Infinity.
+    const divisor = roll + shieldType;
+    damage = divisor > 0 ? Math.floor(damage / divisor) : damage;
+  }
+  return damage;
 }
 
 /**
