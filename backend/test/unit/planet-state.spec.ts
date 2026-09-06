@@ -377,6 +377,36 @@ describe('PlanetStateService — applyAdminChange()', () => {
     expect(result).toEqual({ ok: false, reason: 'NOT_OWNER' });
   });
 
+  /**
+   * The gate guards EVERY change type, not just the harmless one.
+   *
+   * The case above uses `beacon`, which is cosmetic. The changes that matter
+   * are the economic ones: tax rate, markup and reserve set what visiting
+   * captains are charged and what the colony will part with. A gate that held
+   * for the beacon and leaked on markup would be worse than no gate, because
+   * the passing test would say it was covered.
+   *
+   * Written after a near-miss: a textual edit aimed at depositToPlanet matched
+   * this method's identical guard line and removed THIS check instead. The
+   * beacon case above does catch that (verified by re-running it against the
+   * sabotaged build), but only one change type was ever exercised.
+   */
+  it.each([
+    ['taxrate', { type: 'taxrate', value: 50 }],
+    ['markup', { type: 'markup', itemIndex: 5, value: 100 }],
+    ['reserve', { type: 'reserve', itemIndex: 5, value: 10 }],
+  ])('refuses a non-owner changing %s', async (_label, change) => {
+    const { svc, prisma } = await setup();
+
+    const result = await svc.applyAdminChange(
+      planetKey(1, 1, 1), 'intruder', change as never,
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'NOT_OWNER' });
+    // and nothing was written
+    expect(prisma.planet.update).not.toHaveBeenCalled();
+  });
+
   it('sets taxrate in bounds', async () => {
     const { svc, prisma } = await setup();
     const result = await svc.applyAdminChange(planetKey(1, 1, 1), 'owner', { type: 'taxrate', value: 50 });

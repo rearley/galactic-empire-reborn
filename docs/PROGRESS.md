@@ -3323,8 +3323,9 @@ transfer-ownership-canon (5), orb-hyperspace (3). The existing
 `scan-mines.spec.ts` asserted "draws mines on `sca lo` too" citing 2529 — it
 encoded the defect and is corrected.
 
-**Known issues:** deployed. `applyAdminChange` still has no test for its
-ownership gate, which is how the near-miss above went unnoticed — worth adding.
+**Known issues:** deployed. (The claim that `applyAdminChange` had no ownership
+test is CORRECTED in the 2026-09-06 narration entry below — it did, at
+`test/unit/planet-state.spec.ts:374`, and that test catches the deletion.)
 
 ## 2026-09-06 — hyper-phaser narration and Damage Control
 
@@ -3396,7 +3397,29 @@ where canon's `item_name[]` is "torpedos"/"gold" (GECMDS.C:81-107). The
 difference is pre-existing and shared by every narration site in the port, so it
 is one change of its own rather than a side-effect of this one.
 
-**Still open:** `hel transfer` from the round-7 list, and a test for
-`applyAdminChange`'s ownership gate.
+**`hel transfer` — DONE, same day, closing the last round-7 item.** The help
+resolver prefers a canon page over our curated topic, and rightly so; but
+`transfer` is not one of our topic IDs, so `hel transfer` returned canon's
+HLPTRA verbatim. That page documents ship-to-planet and planet-to-ship, because
+that is all `cmd_transfer` had — a player reading it would conclude the
+ship-to-ship leg (deviation D1) does not exist.
+
+Canon's page was NOT edited. CLAUDE.md is explicit that the shipped text is
+authoritative for the original's design intent, and rewriting it would erase the
+record of what the original said. A `PORT_HELP_ADDENDA` block is appended after
+it instead, headed "ADDED BY THIS PORT", so the canon page stays exactly as
+shipped and the player still learns the command they have. `transfer` is the
+only entry; a test asserts an unrelated canon page picks up no addendum.
+
+**CORRECTION, same day.** An earlier entry today said "nothing covers
+`applyAdminChange`'s ownership gate, which is how the near-miss went unnoticed".
+That is WRONG. `test/unit/planet-state.spec.ts:374` covers it, and re-running
+that test against the sabotaged build confirms it fails — so the suite WOULD
+have caught the deletion; I found it by reading first, which is why I never saw
+the failure. The claim was reasoning from memory instead of grepping, which is
+the exact habit this whole audit exists to correct. What was genuinely thin is
+now fixed: the gate is exercised for taxrate, markup and reserve as well as the
+cosmetic `beacon` case, since a gate that held for the beacon and leaked on
+markup would be worse than none.
 
 **Known issues:** deployed.
