@@ -10,6 +10,7 @@ import {
   MailListEntry,
   DistressSignalPayload,
   SpyReportPayload,
+  SpyIntelPayload,
   ProductionReportPayload,
   StarvationPayload,
   RevoltPayload,
@@ -67,6 +68,17 @@ export function formatDetail(entry: MailListEntry): string[] {
     const who = p.who === 'troops' ? 'troops' : 'colonists';
     lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
     lines.push(`${p.lost.toLocaleString()} ${who} starved to death — the colony is out of food.`);
+  } else if (entry.payload.kind === 'spy_intel') {
+    const p = entry.payload as SpyIntelPayload;
+    const name = ITEM_NAMES[p.itemIndex] ?? `Item ${p.itemIndex}`;
+    lines.push('Classification: TOP SECRET/EYES ONLY');
+    lines.push(`Planet:   ${p.planetName}   Sector: (${p.sectorX}, ${p.sectorY})`);
+    lines.push(
+      `Our operative reports ${p.reportedQty.toLocaleString()} ${name} in planetary reserves.`,
+    );
+    // Canon states the accuracy in the message itself — the figure above is a
+    // deviated estimate, not a count. @see GEPLANET.C:181
+    lines.push(`The information is from a questionable source: ${p.confidence}% confidence.`);
   } else if (entry.payload.kind === 'spy_report') {
     // The operative's own words. The reader does NOT own this planet, which is
     // why it cannot borrow the distress body below. @see GECMDS.C:3972-3992

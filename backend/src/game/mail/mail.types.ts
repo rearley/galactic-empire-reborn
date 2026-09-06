@@ -22,6 +22,7 @@ export interface MailListEntry {
     | ProductionCapPayload
     | DistressSignalPayload
     | SpyReportPayload
+    | SpyIntelPayload
     | StarvationPayload
     | RevoltPayload
     | ShipLossPayload
@@ -77,6 +78,25 @@ export interface SpyReportPayload {
   sectorY: number;
   /** SPYM3/SPYM4's fourth slot — `warsptr->userid`, the attacking commander. */
   attackerUserid: string;
+}
+
+/**
+ * The periodic inventory report a planted spy files — canon's SPYM2.
+ *
+ * The count is deliberately INEXACT: canon deviates it either side by a random
+ * amount bounded by `confidence`, and the message states that confidence
+ * outright. @see GEPLANET.C:149-186
+ */
+export interface SpyIntelPayload {
+  kind: 'spy_intel';
+  planetName: string;
+  sectorX: number;
+  sectorY: number;
+  itemIndex: number;
+  /** The reported figure — not the true stock. */
+  reportedQty: bigint;
+  /** Stated accuracy, 50-98%. */
+  confidence: number;
 }
 
 export interface DistressSignalPayload {

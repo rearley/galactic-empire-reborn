@@ -16,6 +16,14 @@ const MESG30 = 30 as const;
 const MESG_SPYC1 = 31 as const;
 /** SPYC2 — to the planet's owner: we caught a spy. @see GEPLANET.C:134 */
 const MESG_SPYC2 = 32 as const;
+/**
+ * SPYM2 — the operative's periodic inventory report. @see GEPLANET.C:181
+ *
+ * 35, clear of SPYC1/SPYC2 (31/32) and of the attack reports SPYM3/SPYM4
+ * (33/34, MAIL_TYPE_MAP in planet-attack.service.ts). Canon assigns no type on
+ * this path, so the numbering is this port's and must stay stable.
+ */
+const MESG_SPYM2 = 35 as const;
 import { applyEconomyTickWithLosses, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
@@ -85,15 +93,23 @@ export class PlanetEconomyService {
         spyowner: next.spyowner ?? '',
         owner: next.userid,
         counterSpies: Number(next.items[I_SPY]?.qty ?? 0n),
+        itemQty: next.items.map((it) => it.qty),
       },
       this.random,
     );
-    if (spy.outcome !== 'none') {
+    // Each outcome is named. This used to be `if (outcome !== 'none') spyowner
+    // = ''`, which was fine while the only outcomes removed the spy — and
+    // would have quietly deleted a spy every time one filed a report.
+    if (spy.outcome === 'own-planet') {
       next.spyowner = '';
-      if (spy.outcome === 'caught') {
-        // C mails BOTH sides an "** Official Protest **" (GEPLANET.C:122-141).
-        this.mailSpyCaught(next, spy.spyowner);
-      }
+    } else if (spy.outcome === 'caught') {
+      next.spyowner = '';
+      // C mails BOTH sides an "** Official Protest **" (GEPLANET.C:122-141).
+      this.mailSpyCaught(next, spy.spyowner);
+    } else if (spy.outcome === 'report') {
+      // The spy stays put — reporting is what it is there for.
+      // @see GEPLANET.C:149-186
+      this.mailSpyIntel(next, spy);
     }
 
     // Revolt only against an owned planet.
@@ -180,6 +196,49 @@ export class PlanetEconomyService {
         planet.userid, 'OFFICIAL PROTEST', MESG_SPYC2, planet.name, planet.xsect, planet.ysect, 0,
       ).catch(log);
     }
+  }
+
+  /**
+   * The operative's inventory report.
+   *
+   *   prfmsg(SPYM2,plptr->name,xsect,ysect,odds,item_name[i],spr("%ld",itemcnt));
+   *   strcpy(mail.userid,plptr->spyowner);
+   *   strcpy(mail.topic,"Intelligence Report");
+   *
+   * @see GEPLANET.C:181-185
+   *
+   * MailStat has no column for "which item" or "how sure", so `debt` carries
+   * the item slot and `tax` the confidence percentage. Both are otherwise
+   * unused on a distress-class row, and the inbox reads them back for this
+   * type only.
+   *
+   * Fire-and-forget like the other economy notices — a failed insert must not
+   * stall the tick.
+   */
+  private mailSpyIntel(
+    planet: PlanetState,
+    report: { spyowner: string; itemIndex: number; reportedQty: bigint; confidence: number },
+  ): void {
+    void this.prisma.mailStat.create({
+      data: {
+        userid: report.spyowner,
+        class: MAIL_CLASS_DISTRESS,
+        msgno: this.nextMsgno(),
+        type: MESG_SPYM2,
+        stamp: Math.floor(Date.now() / 1000),
+        topic: 'Intelligence Report',
+        name1: planet.name.slice(0, 25),
+        int1: planet.xsect,
+        int2: planet.ysect,
+        cash: report.reportedQty,
+        debt: BigInt(report.itemIndex),
+        tax: BigInt(report.confidence),
+        itemqty: [],
+      },
+    }).catch((err: unknown) => {
+      const stack = err instanceof Error ? err.stack : String(err);
+      this.logger.error(`Spy-intel mail failed for ${planet.name}: ${stack}`);
+    });
   }
 
   /**
