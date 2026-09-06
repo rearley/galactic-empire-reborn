@@ -16,6 +16,9 @@ import { COMBAT_SHIP_DESTROYED, CombatShipDestroyedEvent } from '../combat/comba
  * @see GEFUNCS.C:1366 cloakstat — cloak per-tick maintenance
  * @see GEFUNCS.C:1820 destruct — self-destruct countdown
  */
+/** Canon strides the ship table by 3 on the 1-second timer. @see GEMAIN.C:2472 */
+const DESTRUCT_STRIDE = 3;
+
 @Injectable()
 export class ShipManagementTickService implements OnModuleInit {
   private readonly logger = new Logger(ShipManagementTickService.name);
@@ -27,8 +30,22 @@ export class ShipManagementTickService implements OnModuleInit {
     @Inject(CLOAK_ENERGY_USE) private readonly cloakEnergyUse: number,
   ) {}
 
+  /** Canon's `clicker` — which third of the fleet this second belongs to. */
+  private clicker = 0;
+
   onModuleInit(): void {
     this.tickService.subscribe(TickKind.PHYSICS, () => this.onPhysicsTick());
+
+    // The self-destruct countdown belongs to the MOVEMENT clock. Canon calls
+    // `destruct(wptr,zothusn)` from warrti2a, in the same strided loop as
+    // rotate/accel/move (GEMAIN.C:2476-2483) — so it ticks once per 3 seconds
+    // per ship, not once per 6. Left on the slow tick a 20-count took two
+    // minutes instead of one.
+    //
+    // `cloakstat` deliberately stays on the 6-second tick: canon runs THAT from
+    // warrtia (GEFUNCS.C:1366). The two live in this service together but
+    // belong to different clocks.
+    this.tickService.subscribe(TickKind.SHIP_UPDATE, () => this.onDestructTick());
     this.logger.log('ShipManagementTickService subscribed to PHYSICS tick');
   }
 
@@ -45,7 +62,6 @@ export class ShipManagementTickService implements OnModuleInit {
     for (const ship of ships) {
       try {
         this.cloakTick(ship);
-        this.destructTick(ship);
       } catch (err) {
         const id = shipKey(ship.userid, ship.shipno);
         const stack = err instanceof Error ? err.stack : String(err);
@@ -98,7 +114,24 @@ export class ShipManagementTickService implements OnModuleInit {
   }
 
   /**
-   * Per-physics-tick destruct countdown — decrements, broadcasts sector warnings,
+   * The strided destruct pass — a third of the fleet each second, so every ship
+   * counts down once per 3 seconds. @see GEMAIN.C:2472-2489
+   */
+  private onDestructTick(): void {
+    const all = this.shipState.findAllShips();
+    const due = all.filter((_, i) => i % DESTRUCT_STRIDE === this.clicker);
+    this.clicker = (this.clicker + 1) % DESTRUCT_STRIDE;
+    for (const ship of due) {
+      try {
+        this.destructTick(ship);
+      } catch (err) {
+        this.logger.error(`destruct tick failed for ${shipKey(ship.userid, ship.shipno)}: ${String(err)}`);
+      }
+    }
+  }
+
+  /**
+   * Per-tick destruct countdown — decrements, broadcasts sector warnings,
    * and destroys the ship on expiration.
    * @see GEFUNCS.C:1820 destruct
    */
