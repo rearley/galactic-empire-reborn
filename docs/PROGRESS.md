@@ -3325,3 +3325,35 @@ encoded the defect and is corrected.
 
 **Known issues:** deployed. `applyAdminChange` still has no test for its
 ownership gate, which is how the near-miss above went unnoticed — worth adding.
+
+## 2026-09-06 — hyper-phaser narration and Damage Control
+
+**Completed:** two message-fidelity items, both cases of canon strings that
+existed in the generated table and were emitted from nowhere.
+
+- **The hyper-phaser says it is a hyper-phaser.** HPFIRED announces the shot
+  (GECMDS.C:1037), HPHITM reports the hit to the firer with damage as a damstr
+  WORD and the commander named via `username()` (:1074), and HPHITU tells the
+  VICTIM which weapon hit them (:1076). The port tagged a hyper hit as
+  `weapon: 'phaser'`, so the victim was told "Phaser hit from Commander X's
+  ship" — the wrong weapon, and the one place it matters most, since the
+  hyper-phaser is the only thing that can reach a ship at warp. `hyper-phaser`
+  is now its own weapon on CombatHitEvent rather than a phaser variant.
+- **Damage Control announces systems coming back.** PHREPR, TAREPR, HLREPR and
+  FCREPR (GEFUNCS.C:1021, :1059, :1070, :1080), each fired exactly once on the
+  tick its counter reaches zero. Every recovery was already implemented and all
+  four were silent: a captain got the BROKE refusals when using a downed system
+  but was never told when it came back, so the only way to find out was to keep
+  retrying until the command stopped failing. Four distinct lines, because
+  "something is fixed" does not tell a pilot whether they can steer, lock, scan
+  or shoot.
+
+**Tests:** hyper-phaser-messages (3), damage-control-notices (6),
+repair-notice-routing (5).
+
+**Still open in the message tier:** phaser charge milestones (PHSRUP/PHSRMAX),
+shield collapse and repair (SHDNNOP/SHREPR), the cloak ramp completing (CLOKUP)
+and its repair (CLREPR), maintenance completion and interruption
+(MAINT7/MAINT10), and the kill salvage report (KILLGOT1/KILLPNTS).
+
+**Known issues:** deployed.
