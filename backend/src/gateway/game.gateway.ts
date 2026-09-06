@@ -87,7 +87,11 @@ import {
   ATTACK_OWNER_ALERT_EVENT,
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
-import { SHIP_SYSTEM_REPAIRED, ShipSystemRepairedEvent } from '../game/ship/repair-events';
+import {
+  SHIP_SYSTEM_REPAIRED, ShipSystemRepairedEvent,
+  SHIP_PHASER_CHARGE, ShipPhaserChargeEvent,
+  SHIP_STATUS_NOTICE, ShipStatusNoticeEvent,
+} from '../game/ship/repair-events';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
 import {
   SHIP_MISSILE_SHAKEN,
@@ -1550,6 +1554,40 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       helm: MessageId.REPAIR_HELM,
       firecntl: MessageId.REPAIR_FIRECNTL,
     }[event.system];
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'system',
+      text: formatMessage(messageId),
+    });
+  }
+
+  /**
+   * The bank reporting it can fire, or that it is full.
+   * @see GEFUNCS.C:1037 PHSRUP, :1046 PHSRMAX
+   */
+  @OnEvent(SHIP_PHASER_CHARGE)
+  handlePhaserCharge(event: ShipPhaserChargeEvent): void {
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'system',
+      text: formatMessage(
+        event.level === 'minimum' ? MessageId.PHASER_MIN_POWER : MessageId.PHASER_FULL_POWER,
+      ),
+    });
+  }
+
+  /**
+   * State transitions the captain is told about but does not initiate.
+   * @see GEFUNCS.C:1345, :2486, :1724, :1392, :422, :399
+   */
+  @OnEvent(SHIP_STATUS_NOTICE)
+  handleStatusNotice(event: ShipStatusNoticeEvent): void {
+    const messageId = {
+      'shields-no-power': MessageId.SHIELDS_NO_POWER,
+      'shields-repaired': MessageId.SHIELDS_REPAIRED,
+      'cloak-full': MessageId.CLOAK_FULL,
+      'cloak-repaired': MessageId.CLOAK_REPAIRED,
+      'maint-complete': MessageId.MAINT_COMPLETE,
+      'maint-interrupted': MessageId.MAINT_INTERRUPTED,
+    }[event.notice];
     this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
       category: 'system',
       text: formatMessage(messageId),

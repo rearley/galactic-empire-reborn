@@ -5,6 +5,15 @@ import { TickService } from '../tick/tick.service';
 import { TickKind } from '../tick/tick.types';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { CLOAK_ENERGY_USE } from './cloak.config';
+import { SHMINPWR } from '../constants';
+import {
+  SHIP_STATUS_NOTICE,
+  ShipStatusNotice,
+  ShipStatusNoticeEvent,
+} from '../ship/repair-events';
+
+/** `shieldstat == SHIELDUP` — shields raised. @see GEMAIN.H */
+const SHIELDUP_STAT = 1;
 import { isInNeutralZone } from '../combat/neutral-zone';
 import { cdistance, destructBlastDamage } from '../combat/combat-math';
 import { MINERANGE } from '../constants';
@@ -71,6 +80,7 @@ export class ShipManagementTickService implements OnModuleInit {
     for (const ship of ships) {
       try {
         this.cloakTick(ship);
+        this.shieldPowerTick(ship);
       } catch (err) {
         const id = shipKey(ship.userid, ship.shipno);
         const stack = err instanceof Error ? err.stack : String(err);
@@ -89,9 +99,13 @@ export class ShipManagementTickService implements OnModuleInit {
 
     // Damaged cloak (< 0): increment toward 0 each tick.
     if (ship.cloak < 0) {
+      let repaired = false;
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.cloak += 1;
+        repaired = s.cloak === 0;
       });
+      // `if (ptr->cloak == 0) prfmsg(CLREPR);` @see GEFUNCS.C:1391-1394
+      if (repaired) this.notice(ship, 'cloak-repaired');
       return;
     }
 
@@ -111,15 +125,53 @@ export class ShipManagementTickService implements OnModuleInit {
     }
 
     // Drain energy and advance ramp.
+    let reachedFull = false;
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.energy -= this.cloakEnergyUse;
       if (s.cloak === CLOAK_RAMP_INIT) {
         s.cloak = CLOAK_RAMP_MID;
       } else if (s.cloak === CLOAK_RAMP_MID) {
         s.cloak = CLOAK_RAMP_FULL;
+        reachedFull = true;
       }
       // CLOAK_RAMP_FULL (10): no further transition.
     });
+
+    // `ptr->cloak = 10; prfmsg(CLOKUP);` — the ramp completing is the moment
+    // that matters: until then the ship is still visible and still lockable.
+    // @see GEFUNCS.C:1722-1726
+    if (reachedFull) this.notice(ship, 'cloak-full');
+  }
+
+  /**
+   * Shields fall the moment there is not enough power to hold them.
+   *
+   *   if (ptr->shieldstat == SHIELDUP && ptr->energy < SHMINPWR)
+   *       { ptr->shieldstat = SHIELDDN; ptr->shield = 0; prfmsg(SHDNNOP); }
+   *
+   * @see GEFUNCS.C:1340-1348 shieldstat
+   *
+   * SHMINPWR was defined in constants.ts and used by no production code, so
+   * this did not happen at all — a drained ship sat shielded indefinitely.
+   */
+  shieldPowerTick(ship: ShipState): void {
+    if (ship.shieldstat !== SHIELDUP_STAT) return;
+    if (ship.energy >= SHMINPWR) return;
+
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.shieldstat = 0; // SHIELDDN
+      s.shield = 0;
+    });
+    this.notice(ship, 'shields-no-power');
+  }
+
+  /** One status notice to the ship's own captain. */
+  private notice(ship: ShipState, notice: ShipStatusNotice): void {
+    this.events.emit(SHIP_STATUS_NOTICE, {
+      shipId: shipKey(ship.userid, ship.shipno),
+      notice,
+      tickAt: new Date(),
+    } satisfies ShipStatusNoticeEvent);
   }
 
   /**
