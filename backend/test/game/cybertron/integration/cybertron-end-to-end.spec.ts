@@ -136,7 +136,6 @@ async function buildHarness(seed = 77) {
   });
 
   const createdSpawns: unknown[] = [];
-  const transferGoldMock = jest.fn().mockResolvedValue(undefined);
 
   const repository = {
     hydrateAll: jest.fn().mockResolvedValue(undefined),
@@ -148,7 +147,6 @@ async function buildHarness(seed = 77) {
     flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
     flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
-    transferGold: transferGoldMock,
   } as unknown as CybertronRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];
@@ -174,7 +172,7 @@ async function buildHarness(seed = 77) {
     }
   }
 
-  return { svc, shipMap, events, repository, createdSpawns, transferGoldMock, fireTick, shipStateService };
+  return { svc, shipMap, events, repository, createdSpawns, fireTick, shipStateService };
 }
 
 // ─── 1. Spawn-fill ────────────────────────────────────────────────────────────
@@ -291,57 +289,36 @@ describe('T070-4 — damage response: Cybertron deploys mine when damage > CYB_M
 
 // ─── 5. Kill + gold transfer ──────────────────────────────────────────────────
 
-describe('T070-5 — kill + gold transfer: combat.ship-destroyed triggers transferGold', () => {
-  it('calls repository.transferGold when a Cybrg-* ship is destroyed', async () => {
-    const { events, transferGoldMock } = await buildHarness(42);
+describe('T070-5 — a Cybertron kill moves no cash', () => {
+  /**
+   * CORRECTION 2026-09-06. Both cases here asserted `transferGold` — a port
+   * invention that handed the killer the victim Cybertron's entire bank
+   * balance. Canon has no such payout: a Cybertron's cash is clamped at init
+   * (GECYBS.C:121-122) and topped up by CYB_ALLOW (GECYBS.C:229), and in
+   * `killem` the flotsam cash grab is commented out (GEFUNCS.C:1137-1139)
+   * while `chgloser` requires both ships to be GESTAT_USER (GEFUNCS.C:1200).
+   *
+   * The dedicated coverage now lives in
+   * test/game/cybertron/gold-transfer.spec.ts.
+   * @see docs/DECISIONS.md 2026-09-06 — no cash payout for killing a Cybertron
+   */
+  it('leaves the repository untouched on a Cybrg-* kill', async () => {
+    const { events, repository } = await buildHarness(42);
 
     const killEvent: CombatShipDestroyedEvent = {
-      victimId: 'Cybrg-300:300',
-      attackerId: 'player1:1',
-      victimShipKey: 'Cybrg-300:300',
-      attackerShipKey: 'player1:1',
-      victimUserid: 'Cybrg-300',
-      attackerUserid: 'player1',
-      attackerChannel: 1,
-      weapon: 'phaser',
-      sector: { x: 5, y: 5 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
+      victimId: 'Cybrg-300:300', attackerId: 'player1:1',
+      victimShipKey: 'Cybrg-300:300', attackerShipKey: 'player1:1',
+      victimUserid: 'Cybrg-300', attackerUserid: 'player1',
+      attackerChannel: 1, weapon: 'phaser', sector: { x: 5, y: 5 },
+      tickAt: new Date(), loot: [], scoreAwarded: 0,
     };
 
     events.emit(COMBAT_SHIP_DESTROYED, killEvent);
     await new Promise((r) => setImmediate(r));
 
-    expect(transferGoldMock).toHaveBeenCalledWith('Cybrg-300', 'player1');
-  });
-
-  it('does NOT call transferGold when a human player is destroyed', async () => {
-    const { events, transferGoldMock } = await buildHarness(42);
-
-    const killEvent: CombatShipDestroyedEvent = {
-      victimId: 'human1:1',
-      attackerId: 'Cybrg-300:300',
-      victimShipKey: 'human1:1',
-      attackerShipKey: 'Cybrg-300:300',
-      victimUserid: 'human1',
-      attackerUserid: 'Cybrg-300',
-      attackerChannel: 1,
-      weapon: 'phaser',
-      sector: { x: 5, y: 5 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
-    };
-
-    events.emit(COMBAT_SHIP_DESTROYED, killEvent);
-    await new Promise((r) => setImmediate(r));
-
-    expect(transferGoldMock).not.toHaveBeenCalled();
+    expect((repository as unknown as Record<string, unknown>).transferGold).toBeUndefined();
   });
 });
-
-// ─── T076 Performance: full population + 100 humans under 1s ────────────────
 
 describe('T076 — performance: onPhysicsTick completes in <1 s at full population', () => {
   it('24 Cybertrons + 100 player ships tick in <1000 ms', async () => {

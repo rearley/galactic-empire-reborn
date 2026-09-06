@@ -277,33 +277,6 @@ export class CybertronRepository {
   }
 
   /**
-   * Transfer Cybertron gold on kill: add victim's clamped cash to attacker, zero victim.
-   * Executes as a single Prisma transaction for atomicity.
-   * @see GECYBS.C:104-105 kill gold transfer
-   * @see specs/007-cybertron-ai/tasks.md T061 (FR-005a, R-4)
-   */
-  async transferGold(victimUserid: string, attackerUserid: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const victim = await tx.user.findUnique({ where: { userid: victimUserid } });
-      if (!victim || victim.cash <= 0n) return;
-
-      const gold = this.clampCybertronCash(victim.cash);
-
-      // Zero victim cash
-      await tx.user.update({ where: { userid: victimUserid }, data: { cash: 0n } });
-
-      // Add to attacker (upsert in case attacker row doesn't exist yet)
-      const attacker = await tx.user.findUnique({ where: { userid: attackerUserid } });
-      if (attacker) {
-        await tx.user.update({
-          where: { userid: attackerUserid },
-          data: { cash: { increment: gold } },
-        });
-      }
-    });
-  }
-
-  /**
    * Atomically increment a Cybertron ship's kill count by 1.
    * Used to track escalating difficulty per CYB_BE_NICE/CYB_BE_EASY thresholds.
    * @see GECYBS.C — kill counter used for CYB_BE_NICE/CYB_BE_EASY escalation

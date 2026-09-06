@@ -148,9 +148,6 @@ export class CybertronTickService implements OnModuleInit {
       TickKind.SHIP_UPDATE,
       (ctx) => this.onAiTick(ctx),
     );
-    this.events.on('combat.ship-destroyed', (payload: unknown) =>
-      this.onShipDestroyed(payload),
-    );
     this.events.on(CYBERTRON_SCORED_KILL, (e: CybertronScoredKillEvent) =>
       this.onCybertronScoredKill(e),
     );
@@ -1057,27 +1054,23 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
-   * Gold transfer on Cybertron kill: attacker gets victim's cash, victim is zeroed.
-   * Victim must match /^Cybrg-/ (covers Sarterns). @see GECYBS.C:104-105
-   * @see specs/007-cybertron-ai/plan.md R-4 (gold transfer event)
-   * @see specs/007-cybertron-ai/tasks.md T061
+   * NO cash payout for killing a Cybertron.
+   *
+   * This service used to subscribe to `combat.ship-destroyed` and hand the
+   * killer the victim's entire bank balance, citing
+   * `GECYBS.C:104-105 kill gold transfer`. Those lines are the middle of
+   * `cyb_init`'s name-building block; no such transfer exists in canon.
+   *
+   * Canon's only Cybertron cash sites are the CYB_MAXCASH clamp
+   * (GECYBS.C:121-122) and the CYB_ALLOW allowance (GECYBS.C:229). In `killem`
+   * the flotsam cash grab is commented out (GEFUNCS.C:1137-1139) and
+   * `chgloser` is gated on both ships being GESTAT_USER (GEFUNCS.C:1200) —
+   * strictly PvP. A Cybertron's cash is its purchasing power, not a prize.
+   *
+   * What a killer gets is the gold in the victim's HOLD, looted by the
+   * ordinary flotsam loop under `chkweight`. @see combat/kill-resolution.ts
+   * @see docs/DECISIONS.md 2026-09-06 — no cash payout for killing a Cybertron
    */
-  private onShipDestroyed(payload: unknown): void {
-    const event = payload as CombatShipDestroyedEvent;
-    if (!event?.victimUserid?.match(/^Cybrg-/)) return;
-    if (!event.attackerUserid) return;
-    void this.transferCybertronGold(event.victimUserid, event.attackerUserid);
-  }
-
-  private async transferCybertronGold(victimUserid: string, attackerUserid: string): Promise<void> {
-    try {
-      await this.repository.transferGold(victimUserid, attackerUserid);
-      this.logger.log(`Gold transfer: ${victimUserid} → ${attackerUserid}`);
-    } catch (err: unknown) {
-      const stack = err instanceof Error ? err.stack : String(err);
-      this.logger.error(`Gold transfer fault ${victimUserid}→${attackerUserid}: ${stack}`);
-    }
-  }
 
   /**
    * Per-slot spawn entry point: pick a class (1-in-30 tick cadence) and spawn one ship.

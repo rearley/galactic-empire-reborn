@@ -1,9 +1,36 @@
 /**
- * T059 — Gold transfer on Cybertron kill.
- * Emit combat.ship-destroyed with Cybrg-* victim; assert transferGold called.
+ * Killing a Cybertron does NOT hand you its bank account.
  *
- * @see GECYBS.C:104-105 — Cybertron kill gold transfer
- * @see specs/007-cybertron-ai/tasks.md T059
+ * CORRECTION 2026-09-06. This file used to be `T059 — gold transfer on
+ * Cybertron kill` and asserted the opposite, citing
+ * `GECYBS.C:104-105 — Cybertron kill gold transfer`. There is no such transfer
+ * at those lines or anywhere else: 104-105 is the middle of `cyb_init`'s
+ * name-building block (`strncpy(cybname,"@Cybrg-",UIDSIZ); sprintf(...)`).
+ *
+ * Canon has exactly three cash sites for a Cybertron, and none of them is a
+ * death payout:
+ *
+ *   GECYBS.C:121-122  clamp to CYB_MAXCASH at init
+ *   GECYBS.C:229      cash += CYB_ALLOW, the periodic allowance
+ *
+ * and in `killem`:
+ *
+ *   GEFUNCS.C:1137-1139  the flotsam cash grab — COMMENTED OUT in the original
+ *   GEFUNCS.C:1200-1210  chgloser, gated on
+ *                        `ptr->status == GESTAT_USER && wptr->status == GESTAT_USER`
+ *                        — strictly human-versus-human
+ *
+ * A Cybertron's cash exists so it can BUY things. What a killer is entitled to
+ * is the gold in its HOLD, looted through the ordinary flotsam loop and
+ * subject to `chkweight` — which is the whole point of the tonnage limit, and
+ * which the port already implements in `kill-resolution.ts`.
+ *
+ * Found in play: three Cybertron kills paid out ~308,000 credits, against
+ * ~60,000 for selling 300 flux pods. The clamp allowed up to CYB_MAXCASH —
+ * 2,000,000 — from a single kill, so combat was worth more than the entire
+ * trading economy by an order of magnitude.
+ *
+ * @see docs/DECISIONS.md 2026-09-06 — no cash payout for killing a Cybertron
  */
 import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { CybertronTickService } from '../../../src/game/cybertron/cybertron-tick.service';
@@ -15,9 +42,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { COMBAT_SHIP_DESTROYED } from '../../../src/game/combat/combat-events';
 import type { CombatShipDestroyedEvent } from '../../../src/game/combat/combat-events';
 
+/**
+ * The repository double records every method the tick service reaches for on a
+ * kill. Asserting on the RECORD rather than on a single named spy is
+ * deliberate: the defect was a cash-moving call existing at all, so a test that
+ * only knew the old method's name would not catch it coming back under another.
+ */
 function buildHarness() {
-  const rand = new Mulberry32Adapter(42);
-  const events = new EventEmitter2();
+  const calls: string[] = [];
 
   const shipStateService = {
     findAllShips: () => [],
@@ -29,127 +61,67 @@ function buildHarness() {
     size: () => 0,
   } as unknown as ShipStateService;
 
-  const shipClassCache = {
-    get: () => undefined,
-  } as unknown as ShipClassCacheService;
-
-  const transferGoldMock = jest.fn().mockResolvedValue(undefined);
-  const repository = {
+  const repository = new Proxy({
     hydrateAll: jest.fn().mockResolvedValue(undefined),
     createSpawn: jest.fn().mockResolvedValue(undefined),
     flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
     flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
-    clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
-    transferGold: transferGoldMock,
-  } as unknown as CybertronRepository;
+    clampCybertronCash: (n: bigint) => (n > 2_000_000n ? 2_000_000n : n),
+  } as Record<string, unknown>, {
+    get(target, prop: string) {
+      if (typeof prop === 'string') calls.push(prop);
+      return target[prop] ?? (() => Promise.resolve(undefined));
+    },
+  }) as unknown as CybertronRepository;
 
-  const tickService = {
-    subscribe: (_: unknown, fn: (ctx: unknown) => void) => { void fn; return () => {}; },
-  } as unknown as TickService;
-
+  const events = new EventEmitter2();
   const svc = new CybertronTickService(
-    tickService, shipStateService, shipClassCache, repository, events, rand,
+    { subscribe: () => () => {} } as unknown as TickService,
+    shipStateService,
+    { get: () => undefined } as unknown as ShipClassCacheService,
+    repository,
+    events,
+    new Mulberry32Adapter(42),
   );
-  svc.onModuleInit();
+  void svc.onModuleInit();
 
-  return { events, transferGoldMock };
+  return { events, calls };
 }
 
-describe('T059 — gold transfer on Cybertron kill', () => {
-  it('transfers gold from Cybrg-* victim to attacker on combat.ship-destroyed', async () => {
-    const { events, transferGoldMock } = buildHarness();
+function kill(over: Partial<CombatShipDestroyedEvent> = {}): CombatShipDestroyedEvent {
+  return {
+    victimId: 'Cybrg-7:7', attackerId: 'player1:1',
+    victimShipKey: 'Cybrg-7:7', attackerShipKey: 'player1:1',
+    victimUserid: 'Cybrg-7', attackerUserid: 'player1',
+    attackerChannel: 1, weapon: 'phaser', sector: { x: 5, y: 5 },
+    tickAt: new Date(), loot: [], scoreAwarded: 0,
+    ...over,
+  } as CombatShipDestroyedEvent;
+}
 
-    const event: CombatShipDestroyedEvent = {
-      victimId: 'Cybrg-7:7',
-      attackerId: 'player1:1',
-      victimShipKey: 'Cybrg-7:7',
-      attackerShipKey: 'player1:1',
-      victimUserid: 'Cybrg-7',
-      attackerUserid: 'player1',
-      attackerChannel: 1,
-      weapon: 'phaser',
-      sector: { x: 5, y: 5 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
-    };
+describe('a Cybertron kill moves no cash (GEFUNCS.C:1137-1139, :1200)', () => {
+  it('reaches for nothing that transfers the victim\'s bank balance', async () => {
+    const { events, calls } = buildHarness();
 
-    events.emit(COMBAT_SHIP_DESTROYED, event);
+    events.emit(COMBAT_SHIP_DESTROYED, kill());
     await new Promise((r) => setImmediate(r));
 
-    expect(transferGoldMock).toHaveBeenCalledWith('Cybrg-7', 'player1');
+    expect(calls.filter((c) => /gold|cash|transfer/i.test(c))).toEqual([]);
   });
 
-  it('does NOT transfer gold when victim is a human player (non-Cybrg-)', async () => {
-    const { events, transferGoldMock } = buildHarness();
+  it('still does nothing for a human victim', async () => {
+    const { events, calls } = buildHarness();
 
-    const event: CombatShipDestroyedEvent = {
-      victimId: 'player2:2',
-      attackerId: 'player1:1',
-      victimShipKey: 'player2:2',
-      attackerShipKey: 'player1:1',
-      victimUserid: 'player2',
-      attackerUserid: 'player1',
-      attackerChannel: 1,
-      weapon: 'phaser',
-      sector: { x: 5, y: 5 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
-    };
-
-    events.emit(COMBAT_SHIP_DESTROYED, event);
+    events.emit(COMBAT_SHIP_DESTROYED, kill({ victimUserid: 'player2', victimId: 'player2:2' }));
     await new Promise((r) => setImmediate(r));
 
-    expect(transferGoldMock).not.toHaveBeenCalled();
+    expect(calls.filter((c) => /gold|cash|transfer/i.test(c))).toEqual([]);
   });
 
-  it('handles Sartern victim (Cybrg- prefix) same as Cybertron', async () => {
-    const { events, transferGoldMock } = buildHarness();
-
-    // Sartern uses Cybrg- prefix per GECYBS.C:104-105
-    const event: CombatShipDestroyedEvent = {
-      victimId: 'Cybrg-250:250',
-      attackerId: 'player1:1',
-      victimShipKey: 'Cybrg-250:250',
-      attackerShipKey: 'player1:1',
-      victimUserid: 'Cybrg-250',
-      attackerUserid: 'player1',
-      attackerChannel: 1,
-      weapon: 'torpedo',
-      sector: { x: 10, y: 8 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
-    };
-
-    events.emit(COMBAT_SHIP_DESTROYED, event);
-    await new Promise((r) => setImmediate(r));
-
-    expect(transferGoldMock).toHaveBeenCalledWith('Cybrg-250', 'player1');
-  });
-
-  it('skips transfer when attacker is null (killed by mine/unknown)', async () => {
-    const { events, transferGoldMock } = buildHarness();
-
-    const event: CombatShipDestroyedEvent = {
-      victimId: 'Cybrg-7:7',
-      attackerId: null,
-      victimShipKey: 'Cybrg-7:7',
-      attackerShipKey: null,
-      victimUserid: 'Cybrg-7',
-      attackerUserid: null,
-      attackerChannel: 255,
-      weapon: 'mine',
-      sector: { x: 5, y: 5 },
-      tickAt: new Date(),
-      loot: [],
-      scoreAwarded: 0,
-    };
-
-    events.emit(COMBAT_SHIP_DESTROYED, event);
-    await new Promise((r) => setImmediate(r));
-
-    expect(transferGoldMock).not.toHaveBeenCalled();
+  it('the repository exposes no cash-transfer method at all', () => {
+    // The type system is the real guard — this catches a re-introduction that
+    // typechecks because it was added back with the same shape.
+    const names = Object.getOwnPropertyNames(CybertronRepository.prototype);
+    expect(names.filter((n) => /transferGold/i.test(n))).toEqual([]);
   });
 });

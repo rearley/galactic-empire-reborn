@@ -3418,3 +3418,49 @@ schedule per planet by elapsed time rather than by cursor position, which is why
 ours landed as a clean free tick for everyone rather than a partial replay. This
 is a deliberate deviation from canon's mechanism in service of canon's stated
 invariant.
+
+## 2026-09-06 — Killing a Cybertron pays no cash
+**Context:** `CybertronRepository.transferGold` moved the victim Cybertron's
+entire bank balance to the killer on every AI kill, citing
+`GECYBS.C:104-105 kill gold transfer`. Those lines are the middle of
+`cyb_init`'s name-building block (`strncpy(cybname,"@Cybrg-",UIDSIZ)`); no such
+transfer exists there or anywhere else in canon.
+
+Canon's complete set of Cybertron cash sites:
+
+  GECYBS.C:121-122   clamp to CYB_MAXCASH (2,000,000) at init
+  GECYBS.C:229       cash += CYB_ALLOW, the periodic allowance
+
+and in `killem`:
+
+  GEFUNCS.C:1137-1139  the flotsam cash grab — COMMENTED OUT in the original
+  GEFUNCS.C:1200-1210  chgloser, gated on
+                       `ptr->status == GESTAT_USER && wptr->status == GESTAT_USER`
+
+A Cybertron's cash is its purchasing power, not a prize. The port already gates
+`chgloser` correctly to PvP; this was a second, invented reward on top.
+
+Found in play: three Cybertron kills paid ~308,000 credits against ~60,000 for
+selling 300 flux pods, making combat worth roughly five times the entire
+trading economy. The clamp allowed up to CYB_MAXCASH — 2,000,000 — from one
+kill.
+
+**Decision:** delete `transferGold` and its `combat.ship-destroyed`
+subscription. What a killer is entitled to is the gold in the victim's HOLD,
+looted by the ordinary flotsam loop under `chkweight` — which the port already
+implements in `kill-resolution.ts`, and which is why a rich Cybertron is often
+*harder* to loot: the take is `qty/(gernd()%5+1)` and must fit whole, so a
+larger pile can put every possible take over the tonnage limit.
+
+Balances already earned were LEFT IN PLACE at the owner's instruction — this is
+a dev server mid-playtest and the inflated cash harms nobody. Only the ongoing
+payout is removed.
+
+**Reason:** canon, and the economy. Trading, colonising and tax exist as ways
+to make money; a payout that dwarfs all three by an order of magnitude makes
+them decorative.
+
+**Alternatives rejected:** scaling the transfer down to `chgloser`'s 2% — still
+invented, just quieter, and it would have kept a citation that points at
+nothing. Clawing back the ~308,000 already banked — the owner's call, and they
+declined.

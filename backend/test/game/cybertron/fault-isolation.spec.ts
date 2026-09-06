@@ -134,7 +134,6 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
       flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
       flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
       clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
-      transferGold: jest.fn().mockResolvedValue(undefined),
     } as unknown as CybertronRepository;
 
     const subscribed: Array<(ctx: unknown) => void> = [];
