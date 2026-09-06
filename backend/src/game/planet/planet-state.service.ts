@@ -19,6 +19,16 @@ import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
  * The neutral-zone planets midnight restocks: Zygor-3 (all items) and
  * Nexus Prime (men, food, troops). @see midnight.repository.ts
  */
+/**
+ * Ceiling on the per-item admin fields that canon stores as `unsigned`.
+ *
+ * `mnu_admenu2f2` (markup) and `mnu_admenu2f4` (reserve) both gate on
+ * `amt <= 32000` and re-prompt instead of writing when the entry is larger.
+ *
+ * @see GEMAIN.C:3169, :3209
+ */
+const ITEM_FIELD_MAX = 32000;
+
 const NEUTRAL_ZONE_POSTS = [1, 2] as const;
 
 /**
@@ -472,7 +482,14 @@ export class PlanetStateService implements OnModuleInit {
           break;
         }
         case 'markup':
-          if (change.itemIndex < 0 || change.itemIndex >= state.items.length || change.value < 0) {
+          // `amt <= 32000` — an unsigned 16-bit field, and canon re-prompts
+          // rather than storing an over-large entry (GEMAIN.C:3169).
+          if (
+            change.itemIndex < 0 ||
+            change.itemIndex >= state.items.length ||
+            change.value < 0 ||
+            change.value > ITEM_FIELD_MAX
+          ) {
             return { ok: false as const, reason: 'INVALID' as const };
           }
           state.items[change.itemIndex].markup2a = change.value;
@@ -484,7 +501,14 @@ export class PlanetStateService implements OnModuleInit {
           state.items[change.itemIndex].sell = change.value;
           break;
         case 'reserve':
-          if (change.itemIndex < 0 || change.itemIndex >= state.items.length || change.value < 0) {
+          // Same 32000 ceiling as markup (GEMAIN.C:3209). An unbounded reserve
+          // locks the entire stock out of sale for good.
+          if (
+            change.itemIndex < 0 ||
+            change.itemIndex >= state.items.length ||
+            change.value < 0 ||
+            change.value > ITEM_FIELD_MAX
+          ) {
             return { ok: false as const, reason: 'INVALID' as const };
           }
           state.items[change.itemIndex].reserve = change.value;

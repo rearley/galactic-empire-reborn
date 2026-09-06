@@ -17,6 +17,7 @@ export type TeamCreateError =
   | { error: 'name_too_long' }
   | { error: 'password_too_long' }
   | { error: 'password_has_space' }
+  | { error: 'too_many'; limit: number }
   | { error: 'name_taken' };
 
 export type TeamJoinError =

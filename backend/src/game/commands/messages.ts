@@ -252,6 +252,8 @@ export enum MessageId {
   TRAN_UP_NOT_OWNER = 'TRAN_UP_NOT_OWNER',
   /** ORBIT4 — `orb` attempted from hyperspace. */
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
+  /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
+  TEAM_TOO_MANY = 'TEAM_TOO_MANY',
   /** HPFIRED — to the firer, as the hyper-phaser discharges. */
   HP_FIRED = 'HP_FIRED',
   /** HPHITM — to the firer, on a hyper-phaser hit. */
@@ -873,6 +875,7 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.TRAN_UP_NOT_OWNER]: CANON_MESSAGES.TRANSUP4,
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
+  [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
   /** @see GECMDS.C:1037, :1074, :1076 — damage is a damstr WORD in both directions. */
   [MessageId.HP_FIRED]: CANON_MESSAGES.HPFIRED,
   [MessageId.HP_HIT_MINE]: CANON_MESSAGES.HPHITM,

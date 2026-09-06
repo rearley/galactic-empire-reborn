@@ -10,6 +10,7 @@ import {
   TeamListEntry,
   MAX_TEAM_PASSWORD_LENGTH,
   MAX_TEAMNAME_LENGTH,
+  MAXTEAMS,
   MIN_TEAMNAME_LENGTH,
   TEAM_LIST_DISPLAY_CAP,
 } from './team.types';
@@ -75,6 +76,15 @@ export class TeamService {
 
     if (ship.teamcode != null && ship.teamcode !== 0n) {
       return { error: 'already_on_team' };
+    }
+
+    // Canon counts the teams already declared and refuses the next one at the
+    // ceiling, before it validates anything about the name or the code
+    // (GECMDS.C:5477-5490). MAXTEAMS was declared in two places in this port
+    // and read in neither, so the table was unbounded — and the midnight job
+    // pays TEAMBONU per member across every team in it.
+    if ((await this.repo.countTeams()) >= MAXTEAMS) {
+      return { error: 'too_many', limit: MAXTEAMS };
     }
 
     const secret = TeamService.generateSecret();

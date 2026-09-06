@@ -4,6 +4,9 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { TeamService } from '../../src/game/team/team.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../src/game/commands/command.types';
+import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { MAXTEAMS } from '../../src/game/team/team.types';
+import { TEAMNOT } from '../../src/game/team/team-messages';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -205,5 +208,98 @@ describe('TeaHandlerService — tea list', () => {
     const result = await handler.command.handler(makeShip(), ['list'], ctx);
     expect(result.lines[0].text).toBe('No teams have been formed.');
     expect(result.lines[0].category).toBe('info');
+  });
+});
+
+/**
+ * The refusal a full team table produces is canon's TOOMANY, with the limit
+ * interpolated:
+ *
+ *   prfmsg(TOOMANY,MAXTEAMS);
+ *
+ * @see GECMDS.C:5488
+ * @see GE/REL/MBMGEMSG.MSG:5858 `TOOMANY {***\nThere are already a maximum of %d teams declared.}`
+ *
+ * Asserted against CANON_MESSAGES rather than a literal, so the string stays
+ * pinned to the extracted .MSG rather than to my transcription of it.
+ */
+describe('tea create renders TOOMANY when the table is full (GECMDS.C:5488)', () => {
+  it('prints canon text with the limit filled in', async () => {
+    const handler = makeHandler({
+      create: jest.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
+    } as unknown as Partial<TeamService>);
+
+    const result = await handler.command.handler(makeShip(), ['create', 'Latecomers', 'pw'], ctx);
+
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.TEAM_TOO_MANY, MAXTEAMS));
+    expect(result.lines[0].text).toContain(String(MAXTEAMS));
+  });
+
+  it('is not the generic usage line — a full table is not a typo', async () => {
+    const handler = makeHandler({
+      create: jest.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
+    } as unknown as Partial<TeamService>);
+
+    const result = await handler.command.handler(makeShip(), ['create', 'Latecomers', 'pw'], ctx);
+
+    expect(result.lines[0].text).not.toContain('Usage:');
+  });
+});
+
+/**
+ * `tea unjoin` from an unaffiliated pilot changes nothing and says so.
+ *
+ * Canon wraps the whole unjoin branch in `if (waruptr->teamcode > 0) { ... }`
+ * and falls to `badfmt(TEAMNOT)` otherwise (GECMDS.C:5429-5468).
+ *
+ * `leaveTeam` was the one sub-verb that never routed through TeamService, so
+ * it never learned the not_on_team answer every sibling already gives — it
+ * wrote `teamcode: null` unconditionally and reported success.
+ */
+describe('tea leave requires actually being on a team (GECMDS.C:5464)', () => {
+  it('answers TEAMNOT and does not touch the row', async () => {
+    const update = jest.fn().mockResolvedValue({});
+    const prisma = {
+      team: { findFirst: jest.fn().mockResolvedValue(null) },
+      user: { update },
+    } as unknown as PrismaService;
+    const handler = new TeaHandlerService(
+      prisma, {} as unknown as ShipStateService, {} as unknown as TeamService,
+    );
+
+    const result = await handler.command.handler(makeShip({ teamcode: undefined }), ['leave'], ctx);
+
+    expect(result.lines[0].text).toBe(TEAMNOT);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('does not rebroadcast a snapshot for a no-op', async () => {
+    const prisma = {
+      team: { findFirst: jest.fn().mockResolvedValue(null) },
+      user: { update: jest.fn().mockResolvedValue({}) },
+    } as unknown as PrismaService;
+    const handler = new TeaHandlerService(
+      prisma, {} as unknown as ShipStateService, {} as unknown as TeamService,
+    );
+
+    const result = await handler.command.handler(makeShip({ teamcode: 0n }), ['leave'], ctx);
+
+    expect(result.broadcasts ?? []).toHaveLength(0);
+  });
+
+  it('still lets a real member leave', async () => {
+    const update = jest.fn().mockResolvedValue({});
+    const prisma = {
+      team: { findFirst: jest.fn().mockResolvedValue(null) },
+      user: { update },
+    } as unknown as PrismaService;
+    const handler = new TeaHandlerService(
+      prisma, {} as unknown as ShipStateService, {} as unknown as TeamService,
+    );
+
+    const result = await handler.command.handler(makeShip({ teamcode: 7n }), ['leave'], ctx);
+
+    expect(result.lines[0].text).toBe('You have left your team.');
+    expect(update).toHaveBeenCalled();
   });
 });

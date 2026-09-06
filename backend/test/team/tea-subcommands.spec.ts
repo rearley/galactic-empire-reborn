@@ -40,7 +40,7 @@ const ctx: CommandContext = {};
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface PrismaStub {
-  team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock; aggregate: jest.Mock };
+  team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock; aggregate: jest.Mock; count: jest.Mock };
   user: { findUnique: jest.Mock; update: jest.Mock; count: jest.Mock; findMany: jest.Mock };
   mailStat: { create: jest.Mock };
   $transaction: jest.Mock;
@@ -53,6 +53,8 @@ function makePrisma(over: Partial<Record<string, unknown>> = {}): PrismaStub {
         teamcode: 7n, teamname: 'Raiders', secret: 'FOUND123', password: 'joinpw',
       }),
       update: jest.fn().mockResolvedValue({}),
+      // countTeams() — canon's MAXTEAMS gate on `tea create` (GECMDS.C:5484).
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn().mockResolvedValue({}),
       aggregate: jest.fn().mockResolvedValue({ _max: { teamcode: 0n } }),
     },

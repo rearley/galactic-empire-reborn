@@ -2,6 +2,7 @@ import { TeaHandlerService } from '../../../src/game/commands/handlers/tea.handl
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { TEAMNOT } from '../../../src/game/team/team-messages';
 import { CommandContext } from '../../../src/game/commands/command.types';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
@@ -146,11 +147,29 @@ describe('TeaHandlerService', () => {
     });
   });
 
-  describe('FR-028: leave when not on a team is a no-op with success message', () => {
-    it('succeeds gracefully when leaving with no team', async () => {
+  /**
+   * FR-028 read "leave when not on a team is a no-op with success message",
+   * and this spec pinned the "success" category to match. Canon disagrees: the
+   * unjoin branch is gated on `waruptr->teamcode > 0` and the else arm is
+   * `badfmt(TEAMNOT)` (GECMDS.C:5464-5468) — a refusal, not a courtesy.
+   *
+   * The no-op half of FR-028 was right and is kept; only the "success" reading
+   * was a port invention, and reporting a team departure to someone who never
+   * joined one is exactly the kind of false confirmation the audit was after.
+   */
+  describe('FR-028: leave when not on a team changes nothing, and says so', () => {
+    it('refuses rather than congratulating (GECMDS.C:5464)', async () => {
       const ship = makeShip({ teamcode: undefined });
       const result = await makeHandler(null).command.handler(ship, ['leave'], ctx);
-      expect(result.lines[0].category).toBe('success');
+      expect(result.lines[0].category).toBe('system');
+      expect(result.lines[0].text).toBe(TEAMNOT);
+    });
+
+    it('leaves the ship unaffiliated and unmarked', async () => {
+      const ship = makeShip({ teamcode: undefined, dirty: false });
+      await makeHandler(null).command.handler(ship, ['leave'], ctx);
+      expect({ teamcode: ship.teamcode, dirty: ship.dirty })
+        .toEqual({ teamcode: undefined, dirty: false });
     });
   });
 });
