@@ -76,6 +76,14 @@ describe('help text matches the commands it documents', () => {
         // flagging "Your old unit is traded in..." as an unknown command.
         const first = line.trimStart()[0] ?? '';
         if (first < 'a' || first > 'z') continue;
+        // `hel class` carries canon's STACKED column header (HLPCLS1), which
+        // spells "Shld Phsr Torp..." vertically one letter per row:
+        //     h  h  o i e a i i t l
+        //     l  s  r s c m p n t o
+        // Every token on such a line is a single character. A command line
+        // never is — it always pairs a verb with arguments or a description —
+        // so this excludes the header without weakening the guard.
+        if (line.trim().split(/\s+/).every((t) => t.length === 1)) continue;
         const verb = line.trim().split(/[\s<]/)[0].toLowerCase();
         if (!verb || !/^[a-z]+$/.test(verb)) continue;
         if (!KNOWN_VERBS.has(verb.slice(0, 3))) unknown.push(`${topic}: ${verb}`);

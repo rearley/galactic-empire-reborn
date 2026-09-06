@@ -236,26 +236,63 @@ function priceTableBody(): string[] {
  * once before that bound was added.
  */
 const CLASS_TABLE_BODY: string[] = (() => {
+  /**
+   * Canon's own width rules, from the sprintf block above the row
+   * (GECMDS.C:381-409). Each is integer division, so 1_250_000 credits prints
+   * as "1m" — canon's own lossiness, kept rather than "improved", because the
+   * columns are fixed width and inventing a decimal here would be a silent
+   * divergence in the one table a buyer reads before spending a million.
+   */
+  const wide = (v: number, w: number): string =>
+    v > 999_999 ? `${Math.floor(v / 1_000_000)}m`.padStart(w)
+    : v > 999   ? `${Math.floor(v / 1_000)}k`.padStart(w)
+    :             `${v}`.padStart(w);
+  const flag = (b: boolean): string => (b ? '1' : '0');
+
   const rows: string[] = [
     'Ship Classes',
     '',
-    '  #  Class             Price   Phas  Shld     Cargo  Warp',
-    '  -  -----             -----   ----  ----     -----  ----',
+    // HLPCLS1's stacked header, letter for letter.
+    '                       S  P  T M D J Z M A C',
+    '                       h  h  o i e a i i t l',
+    '                       l  s  r s c m p n t o',
+    '## --Class Name---     d--r--p-l-y-r-r-e-k-k-Acc-Warp-Tons----Price--Scan--Pts',
   ];
   for (const c of SHIP_CLASSES) {
     if (c.category !== 'PLAYER' || c.classNumber >= FIRST_CPU_CLASS) continue;
     rows.push(
-      `  ${String(c.classNumber).padEnd(2)} ${c.typeName.padEnd(17)} ` +
-      `${money(c.maxPrice).padStart(6)}  ${String(c.maxPhaser).padStart(4)}  ` +
-      `${String(c.maxShields).padStart(4)}  ${c.maxTons.toLocaleString().padStart(8)}  ` +
-      `${String(c.maxWarp).padStart(4)}`,
+      `${String(c.classNumber).padStart(2)} ${c.typeName.padEnd(20)}` +
+      `${String(c.maxShields).padEnd(3)}${String(c.maxPhaser).padEnd(3)}` +
+      `${flag(c.hasTorpedo)} ${flag(c.hasMissile)} ${flag(c.hasDecoy)} ` +
+      `${flag(c.hasJammer)} ${flag(c.hasZipper)} ${flag(c.hasMine)} ` +
+      `${flag(c.canAttackPlanet)} ${flag(c.hasCloak)} ` +
+      `${wide(c.maxAcceleration, 4)} ${String(c.maxWarp).padStart(4)} ` +
+      `${wide(c.maxTons, 6)} ${wide(Number(c.maxPrice), 7)} ` +
+      `${wide(c.scanRange, 5)} ${String(c.points).padStart(5)}`,
     );
   }
   rows.push(
     '',
     '  Buy at Zygor-3 in sector 0 0, in orbit:  new ship <#>',
-    '  Phas/Shld are the highest marks that hull will mount — see HEL NEWPRICE.',
-    '  Cargo is tonnage; a torpedo is 3 tons, a fighter 15, gold 50.',
+    '  Shld/Phsr are the highest marks that hull will mount — see HEL NEWPRICE.',
+    '',
+    // HLPCLS2 — canon prints the legend under the table, in its own words.
+    'Shld - Maximum Shield type (0 = No shields available)',
+    'Phsr - Maximum Phaser type',
+    'Torp - 0 = Has no Torpedo System / 1 = Has Torpedo System',
+    'Misl - 0 = Has no Missile System / 1 = Has Missile System',
+    'Decy - 0 = Has no Decoy Launching system / 1 = Has Decoy Launcher',
+    'Jamr - 0 = Has no Jammer Launching system / 1 = Has Jammer Launcher',
+    'Zipr - 0 = Has no Zipper Launching system / 1 = Has Zipper Launcher',
+    'Mine - 0 = Has no Mine Launching system / 1 = Has Mine Launcher',
+    'Attk - Has Planetary Attack Capability',
+    'Clok - 0 = Has no Cloaking System / 1 = Has Cloaking System',
+    'Acc  - Maximum Acceleration rate',
+    'Warp - 0 = Has no Warp Drive / >0 = Maximum Warp drive capable of',
+    'Tons - Maximum Tonnage ship can transport',
+    'Price- Price for a ship of this class',
+    'Scan - Maximum Scanner Range',
+    'Pts  - Points for killing a ship in this class',
   );
   return rows;
 })();

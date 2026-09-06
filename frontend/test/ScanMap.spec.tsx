@@ -138,10 +138,28 @@ describe('ScanMap', () => {
     expect(screen.getByTestId('cell-planet-7-2')).toBeDefined();
   });
 
-  // T014: clear on physics.sector-transition containing local shipId (FR-013)
-  it('clears cells when physics.sector-transition contains local shipId', () => {
+  /**
+   * CORRECTION 2026-09-06. FR-013 blanked the map on ANY sector crossing, for
+   * every scan mode. That is right for `sca se` and wrong for the others.
+   *
+   * `sca se` is sector-scoped — it draws the sector you are standing in, so
+   * leaving that sector makes it a picture of somewhere else. `sca lo` and
+   * `sca ra` are RANGE-scoped and do not know what a sector boundary is: a
+   * long-range map spans ~30 sectors, so moving one invalidates about 3% of it
+   * and blanking the whole thing throws away a view that is almost entirely
+   * still good. At warp you cross a boundary every few seconds, so the map was
+   * blank for nearly the whole of any journey — exactly when a long-range
+   * picture is worth having.
+   *
+   * Canon has no such rule at all: it prints the map as text into a scrolling
+   * terminal and never invalidates it. Clearing only the sector-scoped mode is
+   * the narrowest rule that keeps the one case where staleness genuinely lies.
+   *
+   * @see docs/DECISIONS.md 2026-09-06 — only the sector scan clears on transit
+   */
+  it('clears a SECTOR scan when physics.sector-transition contains local shipId', () => {
     const cells: ScanCell[] = [{ x: 5, y: 5, type: 'ship', char: '@' }];
-    render(<ScanMap cells={cells} shipId="ship-42" />);
+    render(<ScanMap cells={cells} shipId="ship-42" kind="se" />);
     expect(screen.getByTestId('cell-ship-5-5')).toBeDefined();
 
     const payload: PhysicsSectorTransitionPayload = {
@@ -172,4 +190,22 @@ describe('ScanMap', () => {
 
     expect(screen.getByTestId('cell-ship-5-5')).toBeDefined();
   });
+  it.each(['lo', 'lo-full', 'ra'] as const)(
+    'keeps a %s scan across a sector crossing — it is range-scoped, not sector-scoped',
+    (kind) => {
+      const cells: ScanCell[] = [{ x: 5, y: 5, type: 'ship', char: '+' }];
+      render(<ScanMap cells={cells} shipId="ship-42" kind={kind} />);
+
+      const payload: PhysicsSectorTransitionPayload = {
+        shipId: 'ship-42',
+        fromSector: { x: 0, y: 0 },
+        toSector: { x: 1, y: 0 },
+        x: 1.5,
+        y: 0.5,
+      };
+      act(() => triggerSocket('physics.sector-transition', payload));
+
+      expect(screen.getByTestId('cell-ship-5-5')).toBeDefined();
+    },
+  );
 });

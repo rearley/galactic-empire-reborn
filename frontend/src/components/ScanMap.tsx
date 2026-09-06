@@ -28,6 +28,11 @@ interface ScanMapProps {
   cells: ScanCell[] | null;
   /** Local ship's ID — used to detect sector transitions that clear the map (FR-013) */
   shipId?: string | null;
+  /**
+   * Which scan drew these cells. Only the SECTOR scan is invalidated by
+   * leaving the sector; the range-scoped modes are not. @see handleTransition
+   */
+  kind?: 'lo' | 'lo-full' | 'ra' | 'se' | null;
 }
 
 /**
@@ -46,7 +51,7 @@ interface ScanMapProps {
  * @see GECMDS.C:2721 player centre at map[MAXY/2][MAXX/2]
  * @see specs/010-react-frontend/data-model.md §B.4 ScanMapState
  */
-export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Element {
+export function ScanMap({ cells, shipId = null, kind = null }: ScanMapProps): React.JSX.Element {
   // Internal display state — cleared on sector transition, refreshed when cells prop changes
   const [displayCells, setDisplayCells] = useState<ScanCell[] | null>(cells);
 
@@ -57,15 +62,31 @@ export function ScanMap({ cells, shipId = null }: ScanMapProps): React.JSX.Eleme
   useEffect(() => {
     if (!shipId) return;
 
+    /**
+     * Only a SECTOR scan goes stale by leaving the sector.
+     *
+     * FR-013 blanked the map on any crossing, for every mode. `sca se` draws
+     * the sector you are standing in, so that is right for it. `sca lo` and
+     * `sca ra` are RANGE-scoped and do not know what a sector boundary is — a
+     * long-range map spans about 30 sectors, so crossing one invalidates ~3%
+     * of it, and at warp you cross one every few seconds, which left the map
+     * blank for most of any journey.
+     *
+     * Canon never invalidates it at all: the map is text printed into a
+     * scrolling terminal. This is the narrowest rule that still blanks the one
+     * view that would otherwise be a picture of somewhere else.
+     *
+     * @see docs/DECISIONS.md 2026-09-06 — only the sector scan clears on transit
+     */
     const handleTransition = (payload: PhysicsSectorTransitionPayload) => {
-      if (payload.shipId === shipId) setDisplayCells(null);
+      if (payload.shipId === shipId && kind === 'se') setDisplayCells(null);
     };
 
     socket.on(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
     return () => {
       socket.off(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
     };
-  }, [shipId]);
+  }, [shipId, kind]);
 
   // Build priority-resolved cell lookup: "x:y" → highest-priority ScanCell
   const cellMap = new Map<string, ScanCell>();
