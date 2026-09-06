@@ -15,7 +15,7 @@ import { valuePlanet } from './value-pl';
 import { buildProductionMailStat, productionMailMsgno } from './mailstat-builder';
 import { PLTVCASH, PLTVDIV, TEAMBONU } from './midnight.constants';
 import { PLTYPE_PLNT } from '../constants';
-import { BASEPRICE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
+import { BASEPRICE, ITEM_VALUE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
 import { NEUTRAL_ZONE_OWNER } from '../combat/neutral-zone';
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
@@ -110,7 +110,14 @@ export class MidnightRepository {
         continue;
       }
 
-      const plScore = valuePlanet(planet.cash, planet.tax, planet.itemsQty, BASEPRICE, PLTVCASH, PLTVDIV);
+      // ITEM_VALUE, not BASEPRICE. Canon scores a planet from the item
+      // POINT-VALUE table — `value[i] = lngopt(ITMVAL01+i,...)` (GEMAIN.C:563),
+      // used as `v += value[i] * (qty[i]/pltvdiv)` (GEMAIN.C:1357). The shipped
+      // table is `{Point Value of man: 10}` and ZERO for everything else
+      // (MBMGEMSG.MSG:1265-1330). Passing the shop price table instead scored
+      // gold at 1000 and a man at 2, so hoarding beat colonising and the only
+      // thing canon actually rewards was credited at a fifth of its worth.
+      const plScore = valuePlanet(planet.cash, planet.tax, planet.itemsQty, ITEM_VALUE, PLTVCASH, PLTVDIV);
       const popDelta = planet.itemsQty[0] / 10_000n; // I_MEN / 10000
 
       const existing = userDeltas.get(uid) ?? { planets: 0, population: 0n, plscore: 0n };

@@ -21,7 +21,7 @@
 
 import { valuePlanet } from '../../../src/game/midnight/value-pl';
 import { PLTVCASH, PLTVDIV } from '../../../src/game/midnight/midnight.constants';
-import { BASEPRICE, NUMITEMS, I_MEN } from '../../../src/game/constants/items';
+import { ITEM_VALUE, NUMITEMS, I_MEN } from '../../../src/game/constants/items';
 
 const noItems = Array.from({ length: NUMITEMS }, () => 0n);
 
@@ -40,21 +40,21 @@ describe('PLTVCASH and PLTVDIV are usable sysop values', () => {
 
 describe('valuePlanet — GEMAIN.C:1348-1359', () => {
   it('divides banked cash rather than multiplying it', () => {
-    const v = valuePlanet(1_000_000n, 0n, noItems, BASEPRICE, PLTVCASH, PLTVDIV);
+    const v = valuePlanet(1_000_000n, 0n, noItems, ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(v).toBeLessThan(1_000_000n);
     expect(v).toBeGreaterThan(0n);
   });
 
   it('counts tax alongside cash', () => {
-    const a = valuePlanet(1_000_000n, 0n, noItems, BASEPRICE, PLTVCASH, PLTVDIV);
-    const b = valuePlanet(500_000n, 500_000n, noItems, BASEPRICE, PLTVCASH, PLTVDIV);
+    const a = valuePlanet(1_000_000n, 0n, noItems, ITEM_VALUE, PLTVCASH, PLTVDIV);
+    const b = valuePlanet(500_000n, 500_000n, noItems, ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(a).toBe(b);
   });
 
   it('makes a real stockpile visible to the score', () => {
     const items = Array.from({ length: NUMITEMS }, () => 0n);
     items[I_MEN] = 1_000_000n;
-    const v = valuePlanet(0n, 0n, items, BASEPRICE, PLTVCASH, PLTVDIV);
+    const v = valuePlanet(0n, 0n, items, ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(v).toBeGreaterThan(0n);
   });
 
@@ -64,7 +64,7 @@ describe('valuePlanet — GEMAIN.C:1348-1359', () => {
     // comparable amount, not 200x or 0.
     const items = Array.from({ length: NUMITEMS }, () => 0n);
     items[I_MEN] = 1_000_000n;
-    const v = Number(valuePlanet(1_000_000n, 0n, items, BASEPRICE, PLTVCASH, PLTVDIV));
+    const v = Number(valuePlanet(1_000_000n, 0n, items, ITEM_VALUE, PLTVCASH, PLTVDIV));
     expect(v).toBeGreaterThan(100);
     expect(v).toBeLessThan(100_000);
   });

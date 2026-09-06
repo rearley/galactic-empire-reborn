@@ -3130,3 +3130,33 @@ against canon.
 **Known issues:** committed and deployed. Every ship in the live world now moves
 twice as fast as it did yesterday — that is the intended change, but it is a
 large change in feel.
+
+## 2026-09-06 — planet scoring on ITMVAL, scores reset
+
+**Completed:** `valuePlanet` is now given `ITEM_VALUE` (canon's ITMVAL point
+values) instead of `BASEPRICE` (the shop price table). Canon scores only
+population — `{Point Value of man: 10}`, zero for the other thirteen items — so
+gold at 1000/unit was inflating the roster while colonists at 2 were credited at
+a fifth of canon's 10. One argument; the function itself was already right, and
+`ITEM_VALUE` was already generated from `ITMVAL01..14`. Recorded in DECISIONS.md.
+
+Existing scores were RESET (owner's call): `score`, `plscore`, `klscore`,
+`rospos`, `planets` and `population` zeroed, then a midnight pass run to
+recompute the planet-derived columns under the new basis. Only `klscore` is
+genuinely lost — it accumulated from kills scored on the old scale and cannot be
+re-derived.
+
+**Tests:** two new DB-backed cases in `midnight.service.spec.ts` — one pinning
+the ITMVAL result, one stating the rule table-independently (two colonies with
+equal population score the same however much treasure one is sitting on). Four
+existing expectations that computed with `BASEPRICE` were repointed; they had
+mirrored production's own mistake, so they would have passed either way.
+
+**Next:** the projectile warning chain (LOCK2/LOCK4, TFIRE2/MFIRE2,
+TORP1/MISSL1 and the target's `cantexit`) is the largest remaining gameplay gap
+— a target currently has no way to know it is being shot at, which leaves
+`decoy` with no trigger.
+
+**Known issues:** deployed. Combined with the movement change, the world now
+plays materially differently from yesterday: ships move twice as fast and the
+leaderboard measures population rather than treasure.

@@ -20,7 +20,7 @@ import { MidnightRepository } from '../../../src/game/midnight/midnight.reposito
 import { ScheduleModule } from '@nestjs/schedule';
 import { PLTVCASH, PLTVDIV, MAIL_CLASS_PRODRPT } from '../../../src/game/midnight/midnight.constants';
 import { valuePlanet } from '../../../src/game/midnight/value-pl';
-import { BASEPRICE, NUMITEMS, I_MEN } from '../../../src/game/constants/items';
+import { ITEM_VALUE, NUMITEMS, I_MEN, I_GOLD } from '../../../src/game/constants/items';
 import { PLTYPE_PLNT } from '../../../src/game/constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { seedNeutralZonePlanets } from './neutral-zone.fixture';
@@ -106,9 +106,66 @@ describe('US1 — score recalculation and rospos ranking', () => {
     await service.run();
 
     const user = await prisma.user.findUniqueOrThrow({ where: { userid: 'alice' } });
-    const expectedPlscore = valuePlanet(500_000n, 50_000n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV);
+    const expectedPlscore = valuePlanet(500_000n, 50_000n, makeItemsQty(50_000n), ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(user.plscore).toBe(expectedPlscore);
     expect(user.planets).toBe(1);
+  });
+
+  /**
+   * Canon scores a planet from ITMVAL — the item POINT-VALUE table — not from
+   * the shop price table.
+   *
+   *   value[i] = lngopt(ITMVAL01+i,...)          GEMAIN.C:563
+   *   v += (value[i] * (plptr->items[i].qty/pltvdiv))   GEMAIN.C:1357
+   *
+   * The shipped values are `ITMVAL01 {Point Value of man: 10}` and ZERO for
+   * every other item (MBMGEMSG.MSG:1265-1330). The port passed BASEPRICE
+   * instead, where gold is 1000 and a man is 2 — so a colony that hoarded gold
+   * climbed the roster while population, the only thing canon scores, was
+   * credited at a fifth of its worth.
+   */
+  it('scores population and ignores stockpiles, as canon ITMVAL does', async () => {
+    await prisma.user.create({ data: { userid: 'alice', username: 'alice', klscore: 0n } });
+    const qty = Array<bigint>(NUMITEMS).fill(0n);
+    qty[I_MEN] = 1_000_000n;
+    qty[I_GOLD] = 1_000_000n;
+    await prisma.planet.create({
+      data: makePlanetRow({ userid: 'alice', cash: 0n, tax: 0n, itemsQty: qty }),
+    });
+
+    await service.run();
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { userid: 'alice' } });
+    expect(user.plscore).toBe(
+      valuePlanet(0n, 0n, qty, ITEM_VALUE, PLTVCASH, PLTVDIV),
+    );
+  });
+
+  it('gives a gold hoard no score at all', async () => {
+    // The clearest statement of the rule, independent of any table: two
+    // colonies with the same population score the same, however much treasure
+    // one of them is sitting on.
+    await prisma.user.create({ data: { userid: 'poor', username: 'poor', klscore: 0n } });
+    await prisma.user.create({ data: { userid: 'rich', username: 'rich', klscore: 0n } });
+
+    const bare = Array<bigint>(NUMITEMS).fill(0n);
+    bare[I_MEN] = 500_000n;
+    const hoard = Array<bigint>(NUMITEMS).fill(0n);
+    hoard[I_MEN] = 500_000n;
+    hoard[I_GOLD] = 9_000_000n;
+
+    await prisma.planet.create({
+      data: makePlanetRow({ userid: 'poor', xsect: 1, ysect: 1, plnum: 1, cash: 0n, tax: 0n, itemsQty: bare }),
+    });
+    await prisma.planet.create({
+      data: makePlanetRow({ userid: 'rich', xsect: 2, ysect: 2, plnum: 1, cash: 0n, tax: 0n, itemsQty: hoard }),
+    });
+
+    await service.run();
+
+    const poor = await prisma.user.findUniqueOrThrow({ where: { userid: 'poor' } });
+    const rich = await prisma.user.findUniqueOrThrow({ where: { userid: 'rich' } });
+    expect(rich.plscore).toBe(poor.plscore);
   });
 
   it('sets score = plscore + klscore', async () => {
@@ -118,7 +175,7 @@ describe('US1 — score recalculation and rospos ranking', () => {
     await service.run();
 
     const user = await prisma.user.findUniqueOrThrow({ where: { userid: 'alice' } });
-    const expectedPlscore = valuePlanet(1_000_000n, 0n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV);
+    const expectedPlscore = valuePlanet(1_000_000n, 0n, makeItemsQty(50_000n), ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(user.score).toBe(expectedPlscore + 5_000n);
   });
 
@@ -240,8 +297,8 @@ describe('US1 — score recalculation and rospos ranking', () => {
     // stockpiles now contribute to net worth — with the old PLTVDIV every item
     // term truncated to zero, so this mismatch was invisible.
     const expectedAlicePlscore =
-      valuePlanet(100_000n, 10_000n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV) +
-      valuePlanet(200_000n, 20_000n, makeItemsQty(50_000n), BASEPRICE, PLTVCASH, PLTVDIV);
+      valuePlanet(100_000n, 10_000n, makeItemsQty(50_000n), ITEM_VALUE, PLTVCASH, PLTVDIV) +
+      valuePlanet(200_000n, 20_000n, makeItemsQty(50_000n), ITEM_VALUE, PLTVCASH, PLTVDIV);
     expect(alice.plscore).toBe(expectedAlicePlscore);
     expect(alice.score).toBe(expectedAlicePlscore + 1_000n);
 

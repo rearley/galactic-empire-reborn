@@ -3329,3 +3329,43 @@ error in CLAUDE.md that the code faithfully implemented.
 split is counter-intuitive — shields regenerate on the SLOW tick and movement on
 the fast one — so anything moved between the two timers must be located in
 `GEMAIN.C` first.
+
+## 2026-09-06 — Planet score comes from ITMVAL, not the shop price table
+
+**Context:** Canon values a planet with the item POINT-VALUE table:
+
+```c
+value[i] = lngopt(ITMVAL01+i,0L,201288837L);        /* GEMAIN.C:563 */
+...
+v += (value[i] * ((long)plptr->items[i].qty/pltvdiv));   /* GEMAIN.C:1357 */
+```
+
+The shipped table is `ITMVAL01 {Point Value of man: 10}` and **zero for every
+other item** (MBMGEMSG.MSG:1265-1330). The port passed `BASEPRICE` — the shop
+price table — into `valuePlanet` instead, where gold is 1000 and a man is 2. So
+a colony hoarding gold climbed the roster hard while population, the only thing
+canon scores, was credited at a fifth of its worth. Found by the 2026-09-05
+canon sweep.
+
+**Decision:** pass `ITEM_VALUE` (already generated from `ITMVAL01..14` by
+`tools/extract-item-tables.mjs` and pinned by
+`test/balance/item-tables-canon.balance.spec.ts`). Existing scores were RESET
+rather than migrated, at the owner's instruction.
+
+**Reason:** canon, and the two tables mean genuinely different things — one is
+what a trader pays, the other is what the empire is worth. Conflating them
+inverted the game's incentive: hoarding beat colonising, which is the opposite
+of what a colonisation game should reward.
+
+Scores were reset rather than recomputed-in-place because `klscore` is
+accumulated from kills earned under the old scale and cannot be re-derived;
+leaving it while `plscore` changed basis would have produced a leaderboard that
+was half old-money and half new. `plscore`, `planets` and `population` are
+recomputed from live planets by the next midnight pass, so only `klscore` is
+genuinely lost.
+
+**Alternatives rejected:** scaling old scores by the ratio between the tables —
+there is no single ratio, since the two tables disagree per item and canon's is
+zero for twelve of the fourteen; any factor would be invented. Leaving old
+scores in place — the roster would rank players on two incompatible scales with
+no way to tell which was which.
