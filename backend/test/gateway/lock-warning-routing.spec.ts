@@ -163,3 +163,42 @@ describe('the in-flight RED ALERT reaches the target (GEFUNCS.C:1600, :1685)', (
     });
   });
 });
+
+/**
+ * The helm's own lines go to the captain's socket, and nowhere else.
+ *
+ * WARP is `outprfge(FILTER, usrn)` (GEFUNCS.C:499) — the captain, filterable.
+ * NOACCEL is `outprfge(ALWAYS, usrn)` (GEFUNCS.C:529) — the captain, and canon
+ * will not let it be filtered away, which is why it is carried as an alert.
+ */
+describe('helm narration routing (GEFUNCS.C:498, :528)', () => {
+  it('sends the WARP rung to the captain only', () => {
+    const { gateway, emits } = build();
+
+    (gateway as unknown as { handleWarpProgress: (e: unknown) => void }).handleWarpProgress({
+      shipId: 'usr_pilot:1', userid: 'usr_pilot', shipno: 1, warp: 4,
+    });
+
+    expect(emits).toHaveLength(1);
+    expect(emits[0].rooms).toEqual(['user:usr_pilot']);
+    expect(emits[0].payload).toEqual({
+      category: 'system',
+      text: formatMessage(MessageId.HELM_WARP, 4),
+    });
+  });
+
+  it('carries NOACCEL as an alert, with the raw speed canon interpolates', () => {
+    const { gateway, emits } = build();
+
+    (gateway as unknown as { handleEngineShutdown: (e: unknown) => void }).handleEngineShutdown({
+      shipId: 'usr_pilot:1', userid: 'usr_pilot', shipno: 1, speed: 3000,
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'alert',
+      text: formatMessage(MessageId.HELM_NOACCEL, 3000),
+    });
+    // Canon's own quirk: `(int)ptr->speed`, not the warp factor.
+    expect(String((emits[0].payload as { text: string }).text)).toContain('3000');
+  });
+});

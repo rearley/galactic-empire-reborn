@@ -95,10 +95,14 @@ import {
 } from '../game/ship/repair-events';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
 import {
+  SHIP_ENGINE_SHUTDOWN,
   SHIP_MISSILE_SHAKEN,
   SHIP_SPEED_REPORT,
+  SHIP_WARP_PROGRESS,
+  ShipEngineShutdownEvent,
   ShipMissileShakenEvent,
   ShipSpeedReportEvent,
+  ShipWarpProgressEvent,
 } from '../game/physics/speed-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { showarp } from '../game/ship/showarp';
@@ -1693,6 +1697,34 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * were tracking, to the captain's own socket — `outprfge(FILTER, usrn)`.
    * @see GEFUNCS.C:517-520
    */
+  /**
+   * The WARP ladder — one rung per integer warp factor crossed, both ways.
+   * `outprfge(FILTER, usrn)`: the captain's own socket. @see GEFUNCS.C:498
+   */
+  @OnEvent(SHIP_WARP_PROGRESS)
+  handleWarpProgress(event: ShipWarpProgressEvent): void {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
+      category: 'system',
+      text: formatMessage(MessageId.HELM_WARP, event.warp),
+    });
+  }
+
+  /**
+   * The engines quitting. `outprfge(ALWAYS, usrn)` in canon — this one cannot
+   * be filtered away, which is why it is 'alert' rather than 'system'.
+   *
+   * NOACCEL interpolates `(int)ptr->speed`, the RAW speed, so the line reads
+   * "engine shutdown at warp 3000". That is canon's own varargs quirk and it is
+   * reproduced rather than quietly corrected. @see GEFUNCS.C:528
+   */
+  @OnEvent(SHIP_ENGINE_SHUTDOWN)
+  handleEngineShutdown(event: ShipEngineShutdownEvent): void {
+    this.server.to(`user:${event.userid}`).emit('event.log', {
+      category: 'alert',
+      text: formatMessage(MessageId.HELM_NOACCEL, event.speed),
+    });
+  }
+
   @OnEvent(SHIP_MISSILE_SHAKEN)
   handleMissileShaken(event: ShipMissileShakenEvent): void {
     this.server.to(`user:${event.userid}`).emit('event.log', {

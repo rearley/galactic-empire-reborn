@@ -254,6 +254,10 @@ export enum MessageId {
   ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
   /** TOOMANY — `tea create` refused because MAXTEAMS teams already exist. */
   TEAM_TOO_MANY = 'TEAM_TOO_MANY',
+  /** WARP — the helm calling out an integer warp factor as it passes. */
+  HELM_WARP = 'HELM_WARP',
+  /** NOACCEL — the engines shut down for want of flux. */
+  HELM_NOACCEL = 'HELM_NOACCEL',
   /** HPFIRED — to the firer, as the hyper-phaser discharges. */
   HP_FIRED = 'HP_FIRED',
   /** HPHITM — to the firer, on a hyper-phaser hit. */
@@ -876,6 +880,8 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
   [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
   [MessageId.TEAM_TOO_MANY]: CANON_MESSAGES.TOOMANY,
+  [MessageId.HELM_WARP]: CANON_MESSAGES.WARP,
+  [MessageId.HELM_NOACCEL]: CANON_MESSAGES.NOACCEL,
   /** @see GECMDS.C:1037, :1074, :1076 — damage is a damstr WORD in both directions. */
   [MessageId.HP_FIRED]: CANON_MESSAGES.HPFIRED,
   [MessageId.HP_HIT_MINE]: CANON_MESSAGES.HPHITM,
