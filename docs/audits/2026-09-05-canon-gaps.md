@@ -1,31 +1,159 @@
 # Canon not implemented — audit note, 2026-09-05
 
-Produced by an 18-way survey of the original C source against `backend/src`,
-each claimed gap then put to an adversarial verifier whose instruction was to
-refute it by finding the implementation. 53 of 53 verified gaps survived
-refutation. This note is a **finding list, not a work order** — nothing here has
-been changed.
+An 18-way survey of the original C source against `backend/src`, each claimed
+gap then put to an adversarial verifier whose only instruction was to refute it
+by finding the implementation. **72 of 74 verified gaps survived.**
 
-Scope note: the survey covered mechanics and command internals. All 44 canon
-command verbs in `GECMDS.C:126-171` already have a handler, so there are no
-missing commands; every gap below sits *inside* a command or a tick.
+This is a **finding list, not a work order.** Nothing here has been changed. Each
+item needs a decision: implement it, or record it in `DECISIONS.md` as a
+deliberate deviation. CLAUDE.md permits the second, but not silence.
 
-Impact is what a player would notice: **high** = a mechanic is missing or wrong,
-**medium** = a reachable branch or message never occurs, **low** = an edge case.
+All 44 canon command verbs in `GECMDS.C:126-171` already have a handler, so
+nothing below is a missing command — every gap sits *inside* a command or a tick.
+
+Impact: **high** = a mechanic is missing or materially wrong; **medium** = a
+reachable branch or message never occurs; **low** = an edge case.
 
 
 ## The theme
 
-The port consistently implements the *mechanic* and omits the *telemetry*.
-Canon is a text game: the messages are not decoration, they are the feedback
-loop the player acts on. The clearest case is the projectile chain — four
-separate gaps that together mean a target never learns it is locked, never
-learns a torpedo was fired, never sees the inbound alert, and is never held in
-place — which leaves the `decoy` command with no trigger a player could react
-to.
+The port implements the *mechanic* and omits the *telemetry*. Canon is a text
+game: its messages are not decoration, they are the feedback loop the player acts
+on. The clearest case is the projectile chain — a target is never told it is
+locked (LOCK2/LOCK4), never told a torpedo was fired at it (TFIRE2/MFIRE2), never
+sees the per-tick inbound alert (TORP1/MISSL1), and is never held in place by the
+lock's `cantexit`. Those four together leave `decoy` with no trigger a player
+could ever react to. The same shape recurs in phaser recharge, subsystem repair,
+shield collapse, cloak ramp and maintenance completion: the state changes
+correctly and silently, and the only way to observe it is to poll `rep`.
 
 
-## projectiles
+## Verified by hand, not only by agents
+
+Five findings were re-checked directly against the C source because they
+would drive real code changes:
+
+- **Movement runs at half canon's rate.** Canon's `warrti2a` (`GEMAIN.C:2462-2491`)
+  runs `rotateship`/`accel`/`moveship`/`destruct` every `TICKTIME2` = 1s, walking
+  the fleet with `zothusn += 3` and `clicker = (clicker+1)%3` — so each ship moves
+  once per **3 seconds**. Our `PhysicsTickService.advanceAll` runs on the 6s tick,
+  and `positionIntegration` (`physics-math.ts:121-133`) is canon's formula exactly,
+  with no `dt` term to compensate. Same displacement per call, half the calls.
+  `CLAUDE.md` encodes this ("Physics tick: 6 seconds — moves ships"); no
+  `DECISIONS.md` entry records it. NOTE: the sibling claim that shields/repair are
+  also mis-assigned is FALSE — `ShipTickService.processRestorativeTick` correctly
+  sits on the 6s tick, matching canon's `warrti`, and its comment records that the
+  6x-too-fast version was already found and fixed.
+- **`sys` has no authorization check at all** (`sys.handler.ts`). Canon gates the
+  whole command behind SYSONLY (`GECMDS.C:4752-4760`). `sys unjam` sets
+  `s.jammer = 0` on the caller, so any player cancels being jammed for free.
+- **Rotation is free.** `ROTENGUSE = 30` is exported from `constants.ts:63` and
+  `rotate.handler.ts` carries three `TODO(006)` comments exactly where canon's
+  `useenergy` gates go (`GECMDS.C:664`, `:691`, `:711`).
+- **Cybertrons never aim.** Canon assigns `ptr->degrees = cbearing(...)` before
+  every shot (`GECYBS.C:277`). In `cybertron-tick.service.ts`, `degrees` appears
+  once — at line 526, being *read*. It is never assigned.
+- **The troop-raid loop is inverted in both directions.** Canon's
+  `for(ii=1;ii<NUMITEMS;++ii)` (`GECMDS.C:3714`) never destroys Men (index 0) but
+  does destroy Troops (index 8). Ours starts at 0 and skips `I_TROOPS` — the exact
+  mirror image. We kill the colonists canon protects and spare the garrison canon
+  destroys.
+
+
+## A correction worth keeping
+
+Mid-audit I found 15 canon constants defined in `constants.ts` and pinned by
+balance tests but used by no production code, and started to call it systemic.
+Checking canon's own usage showed **12 of them are used zero times in the original
+`.C` files** (`PMINENG`, `CYB_MINCLASS`, `ROTAMT`, `SHHITENG`, `SCANADJ`,
+`HYSCANRANGE`, `NUM_MINES`, `SHMAXCHG`, `QUADMAXPERTICK`, `CYB_TOUGH_0` among
+them) — vestigial defines in `GEMAIN.H`. Not wiring them up is faithful.
+`TOPPHASOR`/`TOPSHIELD` are redundant with the class-max bound the port already
+enforces. Only `DESTRUCTRANGE` is a real gap.
+
+
+## cybertrons (4)
+
+
+### [high] A Cybertron never aims its phaser: `ptr->degrees` is never set, so the beam goes down the hull's facing
+
+- **Canon** (`reference/ge-source/GECYBS.C:276-277 and 280-281 — `ptr->degrees = (int)(cbearing(&ptr->coord,&wptr->coord,ptr->heading)+.5);` immediately before `firehp` / `cyb_attack``): Before firing, the Cybertron sets `degrees` to the bearing of the target RELATIVE to its own heading, so `firep`'s firing bearing `normal(heading + degrees)` (GECMDS.C:941) points at the victim regardless of which way the hull is pointed.
+- **Port**: cybertron-tick.service.ts:526 passes `degree: (ship.heading + ship.degrees) % 360` to `selectPhaserVictims`, but `ship.degrees` is never assigned for an AI hull — grepping backend/src for `.degrees =` finds only rotate.handler.ts:53 (player `rot`) and droid-spawner.ts:170 (`degrees: 0`); the Cybertron path only sets `head2b` (lines 434-441, 869-876), which the physics tick then turns toward at ROTAMT per tick. The DB default is 0 (prisma/schema.prisma).
+- **Player sees**: Cybertron phaser fire only connects when the hull happens to be pointed within the arc — during a turning fight, or against a target that keeps changing relative bearing, its shots go past you into empty space. Canon's Cybertron hits whatever it has locked, whichever way it is flying.
+
+### [medium] Cybertrons in hyperwarp fire the normal phaser instead of the hyper-phaser (firehp)
+
+- **Canon** (`reference/ge-source/GECYBS.C:263-279 (`if (ptr->where == 1 && wptr->where == 1 ... firehp(ptr,usrn);`), implemented at GECMDS.C:1020-1094`): When both the Cybertron and its prey are in hyperspace, canon calls `firehp` — a different weapon from `firep`: it needs `energy >= HPMINFIR`, spends HPFIRAMT (5000) flux energy, sets `hypha = 1`, sweeps a fixed HPBEAMW (5 degree) beam, uses the hyper branch of `pdamage` (hpdammax/hpfirdst), scales by `phasrtype` alone, and adds the result straight to `wptr->damage` — shields are never consulted. Messages HPFIRED / HPHITM / HPHITU.
+- **Port**: backend/src/game/cybertron/cybertron-tick.service.ts:444-461 takes this branch but calls `cybFirePhaser`, which emits `hyper: false` and resolves through `selectPhaserVictims` (backend/src/game/combat/firep.ts:64-93). That function applies canon's *normal*-phaser gate `victimAtWarp && firer.phasrtype < PHATOWRP` — PHATOWRP is 5 (MBMGEMSG.MSG:433) while classes 21/22/24 ship phaser types 2/3/1 (MBMGESHP.MSG:4624, 4854, 5314) — so every candidate is counted `unreachableAtWarp` and discarded. I grepped backend/src for `firehp`, `hypha`, `HPFIRED`, `HPHITM`, `hyperPhaserDamage`: the hyper-phaser exists and is used by the player handler (commands/handlers/phaser.handler.ts) and by droids (droid/droid-tick.service.ts:535-590), but nothing in game/cybertron/ references it.
+- **Player sees**: A Cybertron Scout, Cyberquad or Sartern Attack Drone chasing you through hyperspace never lands a shot — no HPFIRED, no damage, no shield drain — where canon would be putting hull damage on you every reload that your shields cannot absorb. Warp flight is a free escape from three of the five Cybertron classes.
+
+### [medium] `ptr->percent = 2` is never applied — Cybertron phaser arc is half canon's and its damage ~1.5x canon's
+
+- **Canon** (`reference/ge-source/GECYBS.C:281-282 — `ptr->degrees = ...; ptr->percent = 2;` in the normal-space engagement branch`): Every engagement pass sets the Cybertron's phaser focus to 2. `firep` then tests `smallest(heading,deg) < ptr->percent + PHABIAS` (GECMDS.C:954, PHABIAS 2 → a 4 degree arc) and `pdamage` scales the shot by `fd = 1 - foc/11`, squared (GEFUNCS.C:2085-2086) → a 0.669 factor.
+- **Port**: cybertron-tick.service.ts:527 passes `focus: ship.percent`, and nothing in game/cybertron/ ever writes `percent` — `cybertron.repository.ts` createSpawn omits it, so it stays at Prisma's `@default(0)` (schema.prisma:119-120). Result: arc = 0 + PHABIAS = 2 degrees, and `fd² = 1.0`.
+- **Player sees**: A Cybertron that does connect hits about 50% harder than the original (fd² 1.0 vs 0.669), but its cone is half as wide, so hits are rarer and each one is disproportionately punishing — the opposite of canon's wide, grinding fire.
+
+### [low] CYBNEW is never broadcast — no galaxy-wide warning when a new Cybertron is created
+
+- **Canon** (`reference/ge-source/GECYBS.C:186-187 — `prfmsg(CYBNEW,gernd()%359); outwar(FILTER,usrn,0);` in the new-ship branch of `cyb_init`; text at MBMGEMSG.MSG:4286`): Every time a brand-new Cybertron hull is created, every player in the game is told "Sir! The scanners indicate a huge energy burst bearing %d." with a random bearing 0-358.
+- **Port**: `spawnOne` (cybertron-tick.service.ts:1017-1085) emits only the internal `CYBERTRON_EVENT.SPAWNED` payload, and game.gateway.ts has no `@OnEvent` for it — grep for `CYBERTRON_EVENT.SPAWNED` in backend/src/gateway returns nothing (only DroidEvents.SPAWNED at game.gateway.ts:1805 is wired). `CYBNEW` appears in backend/src only as a string in canon-messages.generated.ts:763 and in a balance test; it is never referenced by any handler or gateway code.
+- **Player sees**: New Cybertrons appear silently. Canon gave every logged-in pilot a scanner warning with a bearing each time one was born — the game's ambient sense that something dangerous just entered the galaxy is missing.
+
+## droids (4)
+
+
+### [high] Droid normal-space phasers are guided and un-focused — canon fires a fixed 4° beam straight ahead at focus 2
+
+- **Canon** (`reference/ge-source/GEDROIDS.C:361-362 (class 11) and :468-469 (class 12); GECMDS.C:942, 953-955 firep; GEFUNCS.C:2083 pdamage`): Before calling firep, both fighting droid classes set `ptr->degrees = 0; ptr->percent = 2;`. firep then fires along `deg = normal(ptr->heading + ptr->degrees)` — i.e. straight out the droid's nose, NOT at the attacker — and a ship is only struck when `smallest(vector(firer,victim), deg) < ptr->percent + PHABIAS`, a 4° half-arc (PHABIAS 2, GEMAIN.H:84). Damage is computed with the same focus: `pdamage(ptr, dist, ptr->percent)` with `fd = 1 - foc/11`, so foc 2 scales damage by fd² = 0.669. The beam also sweeps every ship in that arc, not just the attacker.
+- **Port**: backend/src/game/droid/droid-tick.service.ts:432-436 computes the exact relative bearing to the attacker and passes it as the firing degree, then gates with `lineOfFire(droid, target, bearing, 0)` at :470 — the arc test compares the bearing to itself (combat-math.ts:61-77 withinArc), so it can never fail. Damage at :475 passes `focus: 0`. I grepped the whole droid module and combat-math for `percent`, `degrees`, `PHABIAS` and `focus`: nothing sets a droid's firing degree to 0 or its focus to 2, and docs/DECISIONS.md has no entry for AI phaser aiming.
+- **Player sees**: A Murdonian or Vakory that fights back hits you every single shot regardless of which way its hull is pointing, and each hit lands about 1.5x harder than canon (fd² 1.0 instead of 0.669). In canon you can break contact simply by getting off the droid's nose, and passing third parties can be caught in the beam.
+
+### [high] Vakory torpedoes bypass lockon entirely — no lock-quality gate and no warning to the target
+
+- **Canon** (`reference/ge-source/GEDROIDS.C:476-483 (torp(ptr,usrn,zothusn), lockwarn); GECMDS.C:1195-1215 torp; GECMDS.C:1341-1400 lockon`): The droid's torpedo goes through the same `torp()` a player uses, which fires only `if (lockon(ptr,0,shpnum,usrn) == 1)`. lockon requires the target not cloaked and inside the firer's scanrange, then computes `fact = (1.2 - (speed_sum/5000)) * ((5.0 - dist)/tor_fact)` — 0 outright when the target's speed > 999 — and refuses unless `fact > .7`. On a successful lock it prints LOCK2 ("WARNING! WARNING! Ship %c has a fire control scanner locked on us!") to the target and sets `wptr->cantexit = FIRETICKS` on both ships; torp then prints TFIRE2 ("WARNING! WARNING! Incoming torpedo from ship %c.") to the target and seeds the slot with `cdistance*10000 + 20`.
+- **Port**: backend/src/game/droid/droid-tick.service.ts:617-627 launchTorpedo just finds a free `ltorps` slot on the victim and writes channel + raw ddist. No lock roll, no scan-range or warp check, no `+20`, no cantexit on the victim, and no message. The port does implement the lock math for players (`lockFact` in backend/src/game/commands/handlers/torpedo.handler.ts:145-150) — the droid path skips it. Grepping backend/src for TFIRE2/LOCK2 finds them only in canon-messages.generated.ts:380,390; nothing emits them, and combat-tick.service.ts:564-606 narrates a torpedo only when it hits.
+- **Player sees**: A Vakory that you have engaged lands torpedoes on you at warp and at ranges where canon could never hold a lock, and the first indication you get is the detonation — no fire-control lock warning, no incoming-torpedo warning.
+
+### [low] No DROIDNEW announcement when a droid enters the galaxy
+
+- **Canon** (`reference/ge-source/GEDROIDS.C:173-174 — `prfmsg(DROIDNEW,gernd()%359); outwar(FILTER,usrn,0);`; GEMAIN.C:1517-1540 outwar`): droid_init ends by printing DROIDNEW ("Sir! We have detected some low frequency energy fluxation bearing %d.") with a random bearing 0-358 and pushing it through outwar, which sends it to EVERY ship in the game (all channels except the new droid). Canon does the same for Cybertrons with CYBNEW (GECYBS.C:185-186).
+- **Port**: DroidTickService emits only a structured DroidEvents.SPAWNED payload (backend/src/game/droid/droid-tick.service.ts:155-163), and game.gateway.ts:1805-1809 relays it to the spawn sector's room as roster data — no text line, no galaxy-wide send, no bearing. `grep -rn DROIDNEW backend/src` hits only canon-messages.generated.ts:764; the string exists but is never used, and docs/DECISIONS.md has no entry dropping it.
+- **Player sees**: Players never get the ambient "low frequency energy fluxation bearing NNN" traffic that in canon tells the whole galaxy a new droid has appeared; droids simply materialise silently.
+
+### [low] The Garbage Scow never shortens its action countdown when it spots a player
+
+- **Canon** (`reference/ge-source/GEDROIDS.C:276-280 — inside the scan-range branch, `ptr->tick = CYBTICKTIME + gernd()%CYBTICKTIME;``): All three droid classes reset `tick` to the short 1x cadence the moment a player falls inside scanrange (class 10 at :278, class 11 at :335, class 12 at :442). droid_lives only applies the long `*3` cruising cadence when `tick` is still 255, i.e. when nothing was spotted (GEDROIDS.C:216-227).
+- **Port**: backend/src/game/droid/droid-tick.service.ts:252 actClass10 returns void, and droid-act-class-10.ts's Class10Action has no `detected` field at all — unlike Class11Action/Class12Action, which do. At :211-223 `detected` therefore stays false for the Scow, so nextDroidTick is called with 0 and the Scow always re-arms on the 3x cruising cadence unless it has been shot (cantexit > 0). I searched the whole droid module for `detected` and `nextDroidTick`; nothing else re-arms the Scow.
+- **Player sees**: Flying alongside a Lydorian Garbage Scow, its hazmat beacon chatter and shield-state reactions come about three times less often than canon — it stays sleepy while a player is right next to it.
+
+## midnight-scoring (4)
+
+
+### [high] Planet scoring uses the item PRICE table instead of canon's item POINT-VALUE table
+
+- **Canon** (`GEMAIN.C:563 `value[i] = lngopt(ITMVAL01+i,0L,201228378L);` and GEMAIN.C:1357 `v += (value[i] * ((long)plptr->items[i].qty/pltvdiv));`; shipped values at GE/REL/MBMGEMSG.MSG:1265-1330 (ITMVAL01 man = 10, ITMVAL02..14 all 0)`): `value_pl()` — the whole of a planet's contribution to plscore, and therefore to `score = plscore + klscore` — multiplies each item stack by `value[i]`, the ITMVAL point-value table. In the shipped configuration only MEN carry a point value (10 each); missiles, torpedoes, ion cannons, flux pods, food, fighters, decoys, troops, zippers, jammers, mines, gold and spies are all worth exactly ZERO points. A colony scores for its population and its banked cash, and for nothing else.
+- **Port**: backend/src/game/midnight/midnight.repository.ts:113 calls `valuePlanet(planet.cash, planet.tax, planet.itemsQty, BASEPRICE, PLTVCASH, PLTVDIV)` — it passes BASEPRICE (the shipyard/market PRICE table: 2, 20, 7, 33, 200, 2, 50, 18, 1, 99, 21, 16, 1000, 100) where canon passes `value[]`. The canon table IS present and canon-pinned as ITEM_VALUE in backend/src/game/constants/items.ts:120 (and asserted against MBMGEMSG.MSG by test/balance/item-tables-canon.balance.spec.ts:66) — it is simply never read by anything. I grepped the whole backend/src and test tree for ITEM_VALUE: items.ts and that one balance spec are the only hits, and the source comment at items.ts:117 says so outright ("NOT the same table as BASEPRICE, which is what valuePlanet currently uses"). Not in docs/DECISIONS.md — the only ITEM_VALUE mention there (line 2137) is the gold base-price entry, which does not touch scoring.
+- **Player sees**: The leaderboard rewards the wrong thing. A colony hoarding gold (1000/unit in the port, 0 in canon), ion cannons (200 vs 0) or flux pods (200 vs 0) climbs the roster hard, while population — the only stockpile canon scores — is worth 2 points a head instead of 10, five times too little relative to itself and worthless relative to the gold sitting beside it. `ros`, `rep acc` score, the `tea` team standings and the kill bonus (SCRBONUS/rospos) all read off this number, so the whole ranking economy is skewed toward stockpiling tradeables rather than growing people.
+
+### [medium] The CHGLOSER reparations transfer happens silently — neither player is told
+
+- **Canon** (`GEFUNCS.C:1198-1213 — `prfmsg(CHGLSR1,gechrbuf); outprfge(ALWAYS,usrn); prfmsg(CHGLSR2,gechrbuf,ptr->userid); outprfge(ALWAYS,who);``): After moving `chgloser` percent of the loser's cash to the winner, killem prints CHGLSR1 to the LOSER ("According to Galactic Treaty you have been ordered to pay to the winner the amount of %s as reparations and fines. Next time don't lose!") and CHGLSR2 to the WINNER ("...you are awarded the sum of %s as reparations and fines from Commander %s"). Both go out with class ALWAYS, so they bypass the message filter.
+- **Port**: backend/src/game/player/player-score.service.ts:86 calls `this.repo.applyCashPenalty(...)` and discards its return value; backend/src/game/player/player-score.repository.ts:105-133 moves the cash and returns the amount, emitting nothing. Both message strings exist, generated from canon, at backend/src/game/commands/canon-messages.generated.ts:658-659 (CHGLSR1, CHGLSR2). I grepped backend/src, frontend/src, docs/ and specs/ for CHGLSR / "reparations" — the only hit outside the generated catalogue is a comment in gateway/game.gateway.ts:1349 explaining which message class CHGLSR uses. Nothing is recorded in docs/DECISIONS.md.
+- **Player sees**: A player killed in PvP loses 2% of their bank with no notification at all — they discover it only by comparing `rep acc` before and after. The winner is never told they were paid, so the one mechanic that makes killing a rich commander lucrative is invisible from both ends.
+
+### [medium] The killer is never told what they salvaged or what the kill scored
+
+- **Canon** (`GEFUNCS.C:1121 `prfmsg(KILLGOT1,ptr->shipname);` and the item list at 1123-1136; GEFUNCS.C:1187-1194 `prfmsg(KILLPNTS,gechrbuf,shipclass[ptr->shpclass].typename);` and `if (bonus > 0) prfmsg(KILLBON,gechrbuf);``): killem writes a running block to the winner: KILLGOT1 ("We have destroyed The %s. Our crew have collected any usable flotsam. We have retrieved"), then one `", %ld %s"` fragment per looted stack and a closing ".", then KILLPNTS ("You got %s points for The %s.") and, when the victim was on the roster, KILLBON ("You also got %s bonus points for killing a top player.").
+- **Port**: The mechanics are all there — backend/src/game/combat/kill-resolution.ts:76-95 does the loot transfer, combat-tick.service.ts:276-307 computes scoreAwarded, player-score.service.ts:78-81 adds killScoreBonus — but no message is ever emitted for any of it. The gateway (backend/src/gateway/game.gateway.ts:1303) puts `loot` and `scoreAwarded` on the structured COMBAT_SHIP_DESTROYED payload and stops there; grepping frontend/src for `loot` returns nothing, so nothing renders it either. KILLGOT1/KILLPNTS/KILLBON exist unused at backend/src/game/commands/canon-messages.generated.ts:655-657 — grep across backend/src, frontend/src, docs/ and specs/ finds no other reference. Only KILLEDBY (the galaxy-wide announcement) is wired up.
+- **Player sees**: You destroy a ship, your hold silently gains a random fraction of its cargo and your score silently moves, and the log says only "X was destroyed by Y". The player cannot tell what they picked up, how many points a class was worth, or that killing a top-ranked commander paid a bonus at all — which removes the entire feedback loop behind the SCRBONUS/rospos mechanic.
+
+### [low] `rep` omits canon's "Ros Pos:" line
+
+- **Canon** (`GECMDS.C:2052 `prf("Ros Pos: %d\r",waruptr->rospos);` — the closing line of the default `rep` block`): The bare `rep` status block ends by printing the captain's roster position, the value the midnight job assigns and the value that sets how big a bonus whoever kills you collects.
+- **Port**: backend/src/game/commands/handlers/report.handler.ts:263-267 — the default block ends at REP18A (repair) and returns; there is no rospos line. `rospos` is read from the DB in exactly one place in the whole tree (backend/src/game/player/player-score.repository.ts:41, for the kill bonus) and written in one (midnight.repository.ts:229-243). Grep of backend/src and frontend/src for "Ros Pos" or a rospos display returns nothing; `ros` shows an ordered board but never the player's own numeric position, and it truncates at MAXLIST=10 so a player outside the top ten cannot infer it. Nothing in docs/DECISIONS.md.
+- **Player sees**: A player can never see their roster position, so they have no way to know the number that determines the bounty on their head.
+
+## projectiles (4)
 
 
 ### [high] The target is never told a torpedo or missile was fired at it (TFIRE2 / MFIRE2)
@@ -52,7 +180,55 @@ to.
 - **Port**: torpedo.handler.ts:186-192 and missile.handler.ts:242-248 mutate only the firer (`s.cantexit = FIRETICKS`). `grep -rn "cantexit = FIRETICKS" backend/src` shows the target being set only in phaser.handler.ts:265/274, cybertron-tick.service.ts and in combat-tick.service.ts resolveProjectileHit — i.e. not until the projectile actually lands, and never on a failed lock. exit.handler.ts:41 is the consumer (`if (ship.cantexit > 0)` refuses).
 - **Player sees**: A player who is locked on and fired at can type `exit` and leave cleanly during the whole flight time of the torpedo, and can always leave after a failed lock. Canon nails them in place for FIRETICKS from the instant the lock is attempted.
 
-## countermeasures
+## tick-physics (4)
+
+
+### [high] Movement, rotation, acceleration and the self-destruct countdown run half as often as canon
+
+- **Canon** (`reference/ge-source/GEMAIN.C:2470-2491 (warrti2a); rtkick(TICKTIME2,pwarrti2) at :2491, TICKTIME2=1 (GEMAIN.H)`): warrti2a is kicked every 1 second and calls rotateship, accel, moveship and destruct. It walks the ship table in a stride of three — `zothusn += 3` (:2485) with `clicker = (clicker+1)%3` (:2488) — so every ship gets exactly one rotate/accel/move/destruct step every 3 seconds. Each step advances position by `speed*sin(heading)/65000` (GEFUNCS.C:637-638), rotates by `max_accel/10` degrees (GEFUNCS.C:441), and changes speed by max_accel (accel) or max_accel*2 (decel).
+- **Port**: backend/src/game/physics/physics-tick.service.ts:93 subscribes rotate/accel/move to TickKind.PHYSICS, which backend/src/game/tick/tick.service.ts:54 fires on a 6000 ms setInterval; backend/src/game/commands/ship-management-tick.service.ts:31 puts destructTick on the same 6 s tick. So every one of those steps happens once per 6 s instead of once per 3 s. The port is aware of the stride — backend/src/game/ship/ship-tick.service.ts:52 defines MOVE_STRIDE=3 and :131-134 applies it — but it uses it only for the overspeed roll on the 1 s tick, leaving the overspeed check running at canon's 3 s cadence while the movement it is supposed to be part of runs at 6 s. I grepped tick.service.ts, physics-tick.service.ts, ship-tick.service.ts and every TickKind.SHIP_UPDATE subscriber, and searched docs/DECISIONS.md for 'TICKTIME2', 'warrti2', 'stride', 'clicker' and '1s tick' — no entry records this as a deliberate deviation.
+- **Player sees**: Everything about flying is exactly twice as slow as the original: a ship covers half the sectors per minute at any given warp, takes twice as long to reach an ordered speed, takes twice as long to complete a turn (a 180 on a 200-accel hull is ~54 s instead of ~27 s), and a `des 20` self-destruct counts down over 120 s instead of 60 s. Because the overspeed roll still fires every 3 s, a pilot running above rated warp also takes roughly twice as many strain rolls per sector travelled as canon, so engines blow sooner relative to distance covered.
+
+### [medium] Phaser recharge is completely silent — PHSRUP, PHSRMAX and PHREPR are never emitted
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:1037 prfmsg(PHSRUP), :1046 prfmsg(PHSRMAX), :1021 prfmsg(PHREPR) — all in checkdam, all outprfge(ALWAYS)`): On every 6 s pass checkdam recharges the phaser bank by `phasrtype*PRELOAD` behind a useenergy(PENGUSE) gate and narrates it: PHSRUP ('Phaser banks are now at minimum fire power, Sir!') on the tick the charge crosses PMINFIRE, PHSRMAX ('Phaser banks are at full power, Sir!') on reaching 100, and PHREPR ('Damage Control reports Phasers are now functional Sir!') when a shot-out negative phasr climbs back to 0. All three go to the captain unconditionally (ALWAYS, not FILTER).
+- **Port**: backend/src/game/combat/combat-tick.service.ts:521-536 does the reload and the PENGUSE debit correctly but emits no event of any kind; backend/src/game/ship/ship-tick.service.ts:238-247 lifts negative phasr to 0 silently. The strings exist unused in backend/src/game/commands/canon-messages.generated.ts:301-302 and :324. `grep -rn '\bPHSRUP\b|\bPHSRMAX\b|\bPHREPR\b' backend/src --include=*.ts` outside the generated catalogue returns nothing, and there is no MessageId mapping for them in backend/src/game/commands/messages.ts.
+- **Player sees**: A pilot has no idea when their phasers are ready. In canon you break off, wait for 'Phaser banks are at full power, Sir!' and re-engage; here the only way to know is to fire and see, or to poll `rep`. After a fire-control hit that drove phasr negative, nothing ever tells you the bank is working again.
+
+### [medium] Subsystem repairs complete silently — TAREPR, HLREPR, FCREPR, CLREPR and SHREPR never print
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:1059 TAREPR, :1070 HLREPR, :1080 FCREPR (checkdam); :1393 CLREPR (cloakstat); :2486 SHREPR (shieldrep)`): Each damaged subsystem walks its counter one step per 6 s tick and, on the tick it reaches 0, Damage Control reports it: tactical display, helm navigational controls, fire control systems, cloaking device, and shields each get their own line, all outprfge(ALWAYS).
+- **Port**: backend/src/game/ship/ship-tick.service.ts:238-255 increments tactical, helm, firecntl and the SHIELDDM shield back to 0 with no event emitted; backend/src/game/commands/ship-management-tick.service.ts:63-69 does the same for a negative cloak. The five strings sit unused at backend/src/game/commands/canon-messages.generated.ts:366, :367, :371, :350, :340. Grepping backend/src for each identifier outside the generated file returns zero hits.
+- **Player sees**: After a torpedo knocks out your tactical display or helm, the port tells you it happened but never tells you it came back. The player has to keep retrying `sca` or `rot` to discover the system works again, and a captain who took a shield hit never learns the shields are repairable and re-raisable.
+
+### [medium] Queued repair (`mai`) finishes and aborts silently — MAINT7 and MAINT10 never print
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:399 prfmsg(MAINT10), :422 prfmsg(MAINT7) in repairship`): repairship runs each 6 s tick while `repair > 0`. If the ship is combat-locked (`cantexit > 0`) it prints MAINT10 — the maintenance team's union-contract refusal — and zeroes the repair queue. When the queue drains it restores the ship and prints MAINT7, 'Repairs and general maintenance have been completed Sir!'.
+- **Port**: backend/src/game/ship/ship-tick.service.ts:185-217 implements both branches — the cantexit abort at :186-188 and the seven-field restore at :195-215 — but neither path emits an event or message. `grep -rn 'MAINT7|MAINT10' backend/src --include=*.ts` outside backend/src/game/commands/canon-messages.generated.ts:680,:683 returns nothing.
+- **Player sees**: A pilot who pays for maintenance is never told when it finishes, and a pilot whose repair is cancelled because someone shot at them is never told it stopped — they undock believing they are repaired, still carrying damage.
+
+## constants-sweep (3)
+
+
+### [medium] Self-destruct does no damage to nearby ships (DESTRUCTRANGE unused; SELFD6/SELFD7 never emitted)
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:1860-1899 (blast loop), GEMAIN.H:197 `#define DESTRUCTRANGE 10000``): When the countdown reaches zero, canon sets `ptr->damage = 101`, prints SELFD3/SELFD3A, then walks every ship in the game: for each one within MINERANGE (`ddist*10000 < MINERANGE`) and outside the neutral sector it computes a cubic falloff `ddist = 1.0-(ddist/DESTRUCTRANGE); ddist = ddist*ddist*ddist`, scales `minedammax` by `((ptr->shpclass/2)+1)`, and applies it. Shields-up victims get the damage divided by `gernd()%5 + shieldtype`, take a `shieldhit(wptr, zothusn, damage+20)`, and are told SELFD6 ("Shields deflected some of the blast! Damage Control reports %s damage."); shields-down victims take it whole and are told SELFD7 ("The shock wave caused %s damage Sir!"). Every victim also has `lastfired` reset to -1. Self-destruct is a kamikaze weapon.
+- **Port**: backend/src/game/commands/ship-management-tick.service.ts:143-172 handles the detonation branch: it emits SELFD3 to the pilot, SELFD3A to the sector, fires COMBAT_SHIP_DESTROYED with `attackerId: null, loot: [], scoreAwarded: 0`, and calls `removeFromGame`. There is no proximity loop, no falloff, no shieldhit. `DESTRUCTRANGE` is declared at backend/src/game/constants.ts:401 and exported in GEMAIN_GAMEPLAY_PINS but referenced by no other file (`grep -rlw DESTRUCTRANGE` over backend/src returns constants.ts alone). `SELFD6`/`SELFD7` exist only as strings in backend/src/game/commands/canon-messages.generated.ts:761-762 — not mapped in messages.ts, emitted nowhere. I searched backend/src for DESTRUCTRANGE, SELFD6, SELFD7, 'shockwave', 'shock wave', 'blast' and 'minedammax'; docs/DECISIONS.md records nothing on it.
+- **Player sees**: A captain can scuttle inside a hostile formation and nobody feels it. In canon a self-destructing hull damages every ship within one sector, hardest at point-blank, and neighbours read "The shock wave caused N damage Sir!" — in the port the ship simply vanishes and adjacent ships take zero damage and see only the SELFD3A announcement.
+
+### [medium] Rotating costs no energy — ROTENGUSE is never charged and NOROTPW is never printed
+
+- **Canon** (`reference/ge-source/GECMDS.C:660 and GECMDS.C:702 (`if (useenergy(warsptr,usrnum,ROTENGUSE) == 1)`), GEMAIN.H:73 `#define ROTENGUSE 30``): Both branches of `cmd_rotate` (absolute `rot @<deg>` and relative `rot <deg>`) call `useenergy(warsptr, usrnum, ROTENGUSE)` BEFORE setting `head2b`. The turn happens only if the debit succeeds; on failure canon prints NOROTPW ("Sorry Sir, we don't have enough power to rotate") and head2b is left untouched. Every rotation costs 30 energy, and a drained ship cannot turn at all.
+- **Port**: backend/src/game/commands/handlers/rotate.handler.ts:41-45 leaves the debit as an explicit deferral — five `TODO(006)` comments naming GECMDS.C:679/691/711/717 — then sets `ship.head2b = target` unconditionally at line 51. The physics tick does not compensate: backend/src/game/physics/physics-tick.service.ts:183-193 `applyRotation` states "Tick does not debit rotation energy; that is paid by the `rotate` command" and debits nothing. `ROTENGUSE` appears only at backend/src/game/constants.ts:63/672 and in backend/test/game/physics/balance-regression.spec.ts:30 — no production file consumes it. `MessageId.NOROTPW` is declared (messages.ts:28, mapped :521) but grep across backend/src finds no emitter. docs/GAME_MECHANICS.md:144-145 and :331 already assert the command pays ROTENGUSE, so docs and code disagree; docs/DECISIONS.md's only rotation entry (2026-05-02) is about using max_accel/10 instead of ROTAMT for the per-tick step, not about the energy cost.
+- **Player sees**: Turning is free. A captain at near-zero energy can still spin to any heading, and never sees "Sorry Sir, we don't have enough power to rotate"; in canon each `rot` burns 30 energy and is refused when the flux runs dry.
+
+### [low] No captured-document reveal on a player kill (SHOWDOC/RNDDOC, CAPTDOC never printed)
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:1227-1248, GEMAIN.H:192-193 `#define SHOWDOC 1` / `#define RNDDOC 6``): Inside the kill-award path, guarded by `#ifdef SHOWDOC`, canon rolls `gernd()%RNDDOC == 0` — a 1-in-6 chance on every kill — and on success prints CAPTDOC ("Our intelligence team has captured a secret document, it reads... / Planet Name sector planet") to the victor followed by up to 20 rows of the victim's planets: `prf("%-20s %d %d   %d\r", planet.name, planet.xsect, planet.ysect, planet.plnum)`. GEMAIN.H:186-191 documents this as a deliberate, switchable game feature.
+- **Port**: The CAPTDOC string exists only as data in backend/src/game/commands/canon-messages.generated.ts:743; grep for CAPTDOC across backend/src outside that generated file returns nothing, and messages.ts defines no MessageId for it. Grep for 'RNDDOC', 'SHOWDOC' and 'secret document' over backend/src finds nothing. SHOWDOC and RNDDOC are listed in the EXCLUDED set of backend/test/unit/gemain-pins.spec.ts:60 with no justification in that file's header comment — every other exclusion there is comment-justified — so they are neither pinned nor implemented. I also read the kill-resolution path (game/combat, game/mail) for any planet-list reveal under a different name; there is none, and docs/DECISIONS.md and docs/GAME_MECHANICS.md do not mention it.
+- **Player sees**: Killing another commander's ship never yields intelligence. In canon roughly one kill in six hands the victor a printed list of up to 20 of the victim's planets with sector and planet number — a direct lead on where to raid next. In the port that reveal never happens.
+
+## countermeasures (4)
 
 
 ### [medium] Zipper deletes mines instead of detonating them
@@ -79,22 +255,7 @@ to.
 - **Port**: backend/src/game/commands/handlers/jammer.handler.ts:71-77 sets `s.jammer = value` on each in-range ship and emits nothing to them; the only output is JAM_FIRED back to the firer. `grep -rn JAMMER3 backend/src` matches only canon-messages.generated.ts:687 — the string is generated and never referenced.
 - **Player sees**: A jammed pilot suddenly loses cloak-wake detection and mine proximity warnings with no explanation at all — canon prints a warning line at the moment of jamming.
 
-## cybertrons
-
-
-### [medium] Cybertrons in hyperwarp fire the normal phaser instead of the hyper-phaser (firehp)
-
-- **Canon** (`reference/ge-source/GECYBS.C:263-279 (`if (ptr->where == 1 && wptr->where == 1 ... firehp(ptr,usrn);`), implemented at GECMDS.C:1020-1094`): When both the Cybertron and its prey are in hyperspace, canon calls `firehp` — a different weapon from `firep`: it needs `energy >= HPMINFIR`, spends HPFIRAMT (5000) flux energy, sets `hypha = 1`, sweeps a fixed HPBEAMW (5 degree) beam, uses the hyper branch of `pdamage` (hpdammax/hpfirdst), scales by `phasrtype` alone, and adds the result straight to `wptr->damage` — shields are never consulted. Messages HPFIRED / HPHITM / HPHITU.
-- **Port**: backend/src/game/cybertron/cybertron-tick.service.ts:444-461 takes this branch but calls `cybFirePhaser`, which emits `hyper: false` and resolves through `selectPhaserVictims` (backend/src/game/combat/firep.ts:64-93). That function applies canon's *normal*-phaser gate `victimAtWarp && firer.phasrtype < PHATOWRP` — PHATOWRP is 5 (MBMGEMSG.MSG:433) while classes 21/22/24 ship phaser types 2/3/1 (MBMGESHP.MSG:4624, 4854, 5314) — so every candidate is counted `unreachableAtWarp` and discarded. I grepped backend/src for `firehp`, `hypha`, `HPFIRED`, `HPHITM`, `hyperPhaserDamage`: the hyper-phaser exists and is used by the player handler (commands/handlers/phaser.handler.ts) and by droids (droid/droid-tick.service.ts:535-590), but nothing in game/cybertron/ references it.
-- **Player sees**: A Cybertron Scout, Cyberquad or Sartern Attack Drone chasing you through hyperspace never lands a shot — no HPFIRED, no damage, no shield drain — where canon would be putting hull damage on you every reload that your shields cannot absorb. Warp flight is a free escape from three of the five Cybertron classes.
-
-### [medium] A Cybertron never aims its phaser: `ptr->degrees` is never set, so the beam goes down the hull's facing
-
-- **Canon** (`reference/ge-source/GECYBS.C:276-277 and 280-281 — `ptr->degrees = (int)(cbearing(&ptr->coord,&wptr->coord,ptr->heading)+.5);` immediately before `firehp` / `cyb_attack``): Before firing, the Cybertron sets `degrees` to the bearing of the target RELATIVE to its own heading, so `firep`'s firing bearing `normal(heading + degrees)` (GECMDS.C:941) points at the victim regardless of which way the hull is pointed.
-- **Port**: cybertron-tick.service.ts:526 passes `degree: (ship.heading + ship.degrees) % 360` to `selectPhaserVictims`, but `ship.degrees` is never assigned for an AI hull — grepping backend/src for `.degrees =` finds only rotate.handler.ts:53 (player `rot`) and droid-spawner.ts:170 (`degrees: 0`); the Cybertron path only sets `head2b` (lines 434-441, 869-876), which the physics tick then turns toward at ROTAMT per tick. The DB default is 0 (prisma/schema.prisma).
-- **Player sees**: Cybertron phaser fire only connects when the hull happens to be pointed within the arc — during a turning fight, or against a target that keeps changing relative bearing, its shots go past you into empty space. Canon's Cybertron hits whatever it has locked, whichever way it is flying.
-
-## defense
+## defense (4)
 
 
 ### [medium] Self-destruct does no blast damage to nearby ships
@@ -121,7 +282,7 @@ to.
 - **Port**: backend/src/game/commands/ship-management-tick.service.ts:59-97 — `cloakTick` performs both transitions (`s.cloak = CLOAK_RAMP_MID` / `CLOAK_RAMP_FULL` at lines 91-95; `s.cloak += 1` for the damaged case at lines 66-71) and emits nothing in either case. The only cloak event the service emits is 'ship-management.cloak-collapsed'. Grepping backend/src for CLOKUP and CLREPR finds them only as unused strings in canon-messages.generated.ts:346 and :350 (the PCLOKUP hits are the unrelated "not while cloaked" refusal). No gateway listener exists for either.
 - **Player sees**: After `clo on` the captain sees "cloak engaged" and then nothing — they cannot tell when the two-tick ramp completes, which is exactly the moment that matters, because canon gates torpedo/missile locks and the who/scan listings on `cloak < 10`, not `cloak > 0`. Likewise a captain whose cloak was shot out gets no notice that it works again.
 
-## ground-assault
+## ground-assault (4)
 
 
 ### [medium] The attacker is never told the planet called for help (ATTACK7), and ATTACK6A is never sent
@@ -148,7 +309,7 @@ to.
 - **Port**: attack.handler.ts:54-93 runs orbit -> class -> wormhole -> neutral zone -> self, so `isInNeutralZone(ship)` fires before the `planet.userid === ship.userid` branch and applies `s.damage += SE100DAM` (matching zaphim at GECMDS.C:1525-1532). The class check is also after the orbit check, so ATT_NOT_ORBIT wins where canon prints ATTACK0A.
 - **Player sees**: A player who owns a neutral-zone planet and mistypes `att` at his own world takes se100dam hull damage and the ZAPHIM1 message, where the original just said "that's one of ours". Sector (0,0) is where new players sit, so the mistake is cheap to make and now costs damage.
 
-## movement
+## movement (3)
 
 
 ### [medium] Rotating the ship is free — ROTENGUSE is never spent and NOROTPW never printed
@@ -163,19 +324,13 @@ to.
 - **Port**: backend/src/game/physics/physics-tick.service.ts:212 calls `tryEnergyDebit(ship.energy, accel.energyDebit, 0)` — floor 0, not USEENERGY_RESERVE — so the debit only fails below 120. The failure arm (physics-tick.service.ts:220-229) sets `s.speed2b = 0` and emits nothing at all. `grep -rn "NOACCEL" backend/src` matches only canon-messages.generated.ts:306; there is no MessageId for it and no emitter. The 500 reserve is modelled (constants.ts:345 USEENERGY_RESERVE) but used only by combat-tick.service.ts:528 for the phaser preload.
 - **Player sees**: A ship that runs out of neutron flux at warp stops accelerating with no message whatsoever — the captain watches the speed stop climbing and is never told the engines shut down. And it happens 500 energy later than canon, so the port lets you push into a reserve canon protects.
 
-### [low] Movement upkeep is charged at impulse speeds, and the flux-low engine shutdown (MOVE4) is silent
-
-- **Canon** (`reference/ge-source/GEFUNCS.C:733 (`if (ptr->speed > 1000.0 && ptr->status == GESTAT_USER) {`) enclosing GEFUNCS.C:783-790 (`useenergy(ptr,usrn,MOVENGUSE); if (ptr->energy < MOVENGMIN) { ptr->speed2b = 0; prfmsg(MOVE4); outprfge(FILTER,usrn); }`)`): The MOVENGUSE (10/tick) upkeep and the MOVENGMIN (3000) cut-out sit *inside* the `speed > 1000.0` block — only ships above warp 1 pay it, and impulse flight is free. When energy falls under 3000 canon zeroes `speed2b` AND prints MOVE4, "Neutron Flux levels are too low. Engines shut down!".
-- **Port**: backend/src/game/physics/physics-tick.service.ts:441 gates the block on `ship.speed > 0 && ship.status === 1`, so every impulse-speed player ship is charged 10/tick, and the same block forces `s.speed2b = 0` when `s.energy < MOVENGMIN` (line 447) with no message. `grep -rn "MOVE4" backend/src` matches only canon-messages.generated.ts:669 — no MessageId, no emitter.
-- **Player sees**: Limping home on impulse drains energy the original never took, and a low-energy ship crawling at impulse gets stopped dead by a cut-out canon only applies at warp. Either way the engines shut down with no explanation on screen; the pilot just finds the throttle at zero.
-
 ### [low] The helm never answers a warp boundary — "Helm reports WARP %d" and DEADSTOP are never printed
 
 - **Canon** (`reference/ge-source/GEFUNCS.C:498-500 (`prfmsg(WARP,(int)((ptr->speed + accelrate)/1000))`) and GEFUNCS.C:556-566 (`prfmsg(WARP,(int)((ptr->speed-decelrate)/1000)+1)` / `prfmsg(DEADSTOP)`)`): Every tick on which the integer warp factor changes, accel() prints WARP — "Helm reports WARP %d" — on the way up and on the way down, and prints DEADSTOP, "Helm reports we are at a dead stop, Sir.", on the deceleration step that carries the ship to zero. This is the running progress readout while the engines spool.
 - **Port**: backend/src/game/physics/physics-tick.service.ts computes the boundary crossing (line 238, `Math.trunc(speedBefore/1000) !== Math.trunc(accel.newSpeed/1000)`) but uses it *only* to roll the missile-shake threshold; no message is emitted. The only speed announcement is SHIP_SPEED_REPORT on the snap tick (physics-tick.service.ts:277, backend/src/game/physics/speed-events.ts), i.e. SPEEDIS/SPEED0 once at arrival. `grep -rn "DEADSTOP"` and a search for a WARP emitter across backend/src match only canon-messages.generated.ts:304-305.
 - **Player sees**: Ordering `war 9` from a standstill produces one acknowledgement and then silence for the ~9 ticks it takes to get there, instead of canon's "Helm reports WARP 1 … WARP 2 …" ladder counting up (and back down when slowing). The pilot has no per-tick feedback on how far the engines have spooled.
 
-## phasers
+## phasers (4)
 
 
 ### [medium] Phaser charge notifications (PHSRUP, PHSRMAX, PHREPR) are never sent
@@ -202,7 +357,7 @@ to.
 - **Port**: backend/src/game/commands/handlers/phaser.handler.ts:132-141 parses an optional focus for both paths, then :151-153 routes to `handleHyper(ship, degree, focus)`, which fires and spends HPFIRAMT flux; focus is carried only into the event payload (:404). HPHAFMT exists in canon-messages.generated.ts:1071 but has no MessageId and is never emitted.
 - **Player sees**: A pilot who types `pha 0 3` at warp burns 5000 flux and their hyper-phaser cooldown on a shot canon would have refused with a usage hint.
 
-## planet-economy
+## planet-economy (3)
 
 
 ### [medium] Planet score uses the BASEPRICE table instead of canon's ITMVAL point-value table
@@ -217,40 +372,13 @@ to.
 - **Port**: backend/src/game/planet/spy.ts implements only the removal half — its own header comment says so ("The removal half of `check_spy`") and its result type is limited to own-planet | caught | none. backend/src/game/planet/planet-economy.service.ts:82-96 acts on that result and sends only SPYC1/SPYC2. `grep -rn 'SPYM2\|TOP SECRET\|confidence' backend/src` matches nothing outside canon-messages.generated.ts:1050, where the string is generated and then never referenced. docs/DECISIONS.md 'Decision 6' deferred check_spy to feature 006; the capture half was later implemented, this half was not, and no decision records dropping it. The 2026-05-07 D3 entry covers a different mechanism (exact inventory revealed on `scan pl` when you are in the sector), not the periodic remote report.
 - **Player sees**: A player who spends a spy gets no mail, ever. Canon's spy is a remote passive intelligence source that trickles in fuzzed reserve figures with a stated confidence rating from anywhere in the galaxy; the port's spy only widens what `scan pl` shows when you fly back to that sector yourself — and shows it exactly, with no confidence rating, so the 'questionable source' flavour and the risk/accuracy trade-off never appear.
 
-### [low] Revolted (**Free**) planets keep rolling for further revolts
+### [medium] Revolted (**Free**) planets keep rolling for further revolts
 
 - **Canon** (`GEPLANET.C:341 `if (!sameas(plptr->userid,"**Free**"))``): The whole revolt block — tax-pressure test, the 1-in-10 roll, the troop massacre, the MESG30 distress mail and the ownership flip — is wrapped in a test that excludes a planet already marked "**Free**". Once a colony has thrown off its ruler it keeps producing and feeding its people but can never revolt again until someone claims it.
 - **Port**: backend/src/game/planet/planet-economy.service.ts:100 gates the revolt branch on `if (next.userid === null) return` only. FREE_PLANET_OWNER ('**Free**') is not null, so a revolted planet re-enters the branch on every subsequent PLANTOCK; the file has a `hasRealOwner()` helper (planet-economy.ts:64, used correctly for the tax levy) that is not applied here. Nothing in docs/DECISIONS.md covers it.
 - **Player sees**: A revolted world keeps its old taxrate, so it repeatedly re-rolls: its garrison is cut by another 1/(2..9) roughly every tenth tick until it is effectively demilitarised, making a reclaimed colony far easier to take and cheaper to hold than canon intends. Each roll also writes a MailStat row addressed to the literal userid '**Free**' — dead mail no player can read (swept by the '*'-prefix purge at midnight).
 
-## planets-cmds
-
-
-### [medium] `orb` from hyperspace is allowed; ORBIT4 is never emitted
-
-- **Canon** (`reference/ge-source/GECMDS.C:770-774 — `if (warsptr->where == 1) { prfmsg(ORBIT4); outprfge(...); return; }`; GE/REL/MBMGEMSG.MSG:2852 ORBIT4 {We cannot obtain an orbit from hyperspace Sir!`): cmd_orbit tests the hyperspace flag (`where == 1`) BEFORE the already-in-orbit test and before any planet lookup, and refuses outright with ORBIT4. A ship at warp can never enter orbit, regardless of how close it passes to a planet.
-- **Port**: backend/src/game/commands/handlers/orbit.handler.ts:43-45 checks only `ship.where >= 10` (already in orbit) and then proceeds straight to the sector planet list and the 250-unit range test at :101. There is no `ship.where === 1` branch. `grep -rn "ORBIT4" backend/src` finds it only in game/commands/canon-messages.generated.ts:448 — no handler references it, and MessageId has no ORBIT4 entry (messages.ts:121-126 has ORBITALR/ORBITNO/ORBITPK/ORBIT_TOO_FAR only). The port does model the flag elsewhere (decoy.handler.ts:77 `ship.where === 1`, cyb-decisions.ts:307), so this is an omission in orbit specifically.
-- **Player sees**: A captain at warp who passes within 250 units of a planet can drop into orbit mid-flight (the handler then zeroes speed and speed2b), instead of being told "We cannot obtain an orbit from hyperspace Sir!". In the near-miss case they instead get "We must be much closer to establish an orbit Sir!", which tells them the wrong thing about why it failed.
-
-### [low] Planet rename (admin menu option 4) is not implemented
-
-- **Canon** (`reference/ge-source/GEMAIN.C:3033-3035 (mnu_admenu2 case '4': prfmsg(ADMENU2G); substt = ADMENU1A) with the rename applied at GEMAIN.C:2947-2960 (mnu_admenu1a writes plptr->name and flushes the record); menu text at GE/REL/MBMGEMSG.MSG ADMENU2 "4 - Rename planet", prompt ADMENU2G "Enter the new name ---"`): An owner in orbit picks 4 from the Planet Administration Menu, is prompted "Enter the new name", and the same routine that named the planet at claim time (mnu_admenu1a) overwrites plptr->name, capitalises the first letter, truncates to 19 chars and writes the record. Renaming is reachable at any time, as often as the owner likes.
-- **Port**: backend/src/game/commands/handlers/admin.handler.ts:26-33 (ADMIN_USAGE) offers only rate/markup/sellflag/reserve/tax/beacon/password; the switch at :126-176 has no rename case and falls through to usageError(). backend/src/game/planet/planet-state.types.ts:56-63 AdminChange has no `name` variant, and applyAdminChange (planet-state.service.ts:441-528) never touches state.name. backend/src/game/commands/handlers/rename.handler.ts renames the SHIP only (delegates to onboarding/rename.service). I grepped backend/src for `renamePlanet`, `rename.*planet`, `ADMENU2G`, and `state.name =` — the only writer of PlanetState.name is claim() at planet-state.service.ts:246.
-- **Player sees**: A captain who mistypes their colony's name at claim time is stuck with it permanently — the only way to change it is to abandon the planet and re-claim it (which risks losing it and resets nothing else). Worse, the port's own generated help still advertises the feature: backend/src/game/commands/help/canon-help.generated.ts:483 prints "4 - Rename planet", so `hel adm` promises a command that does not exist.
-
-### [low] Item markup and reserve accept values far above canon's 32000 ceiling
-
-- **Canon** (`reference/ge-source/GEMAIN.C:3159-3161 (mnu_admenu2f2: `if (margc == 1 && amt <= 32000) { titems[usrnum].markup2a = amt; ... }` else re-prompt ADMEN2F2) and GEMAIN.C:3192-3196 (mnu_admenu2f4: same `amt <= 32000` guard before setting reserve)`): Both the per-item sale price and the stockpile reserve are unsigned 16-bit fields and canon refuses any entry above 32000, re-prompting with ADMEN2F2 / ADMEN2F4 rather than storing the value.
-- **Port**: backend/src/game/commands/handlers/admin.handler.ts:135-142 (markup) and :154-161 (reserve) validate with `parseUint32(...)` and only reject `undefined`; parseUint32 (backend/src/game/commands/validators.ts:37-43) accepts anything up to 0xFFFFFFFF. PlanetStateService.applyAdminChange (planet-state.service.ts:472-478 markup, :485-491 reserve) checks only `value < 0` and the item index — no upper bound. The taxrate case immediately below (:494-499) does enforce its canon ceiling, so the omission is specific to these two. I grepped for `32000` and `0x7d00` across backend/src: no occurrence.
-- **Player sees**: A colony owner can run `adm markup gold 999999999` or `adm reserve food 500000` and the port answers "Setting saved." Visiting captains are then quoted (and charged, via the buy path that reads markup2a) prices canon makes impossible, and an absurd reserve locks the whole stock out of sale permanently. In canon both entries bounce back to the prompt.
-
-### [low] `orb <n>` ignores the planet number when the sector holds exactly one planet
-
-- **Canon** (`reference/ge-source/GECMDS.C:785-816 — plnum is always taken from margv[1], `getplanetdat` returns FALSE when `plnum > sector.numplan` (GEMAIN.C:1800, 1834-1837), and cmd_orbit then prints FOOLISH (GECMDS.C:810-813); a wormhole slot prints ORBIT0 (GECMDS.C:791-794)`): The number the pilot types is always the slot that is looked up. Naming a slot that is a wormhole gives ORBIT0; naming a slot that does not exist gives FOOLISH. Canon never substitutes a different planet.
-- **Port**: backend/src/game/commands/handlers/orbit.handler.ts:62-64 — `if (planets.length === 1) { targetPlnum = planets[0].plnum; }` — the args array is never consulted on that path, so the wormhole check at :78-84 and the not-found re-prompt at :86-92 are both skipped. Only the multi-planet branch parses the argument. Sectors routinely mix one planet with wormholes (GEPLANET.C:487-490 assigns PLTYPE_WORM per slot in the same numbering run), and `sca pl` numbers wormholes alongside planets.
-- **Player sees**: In a sector holding planet #1 and wormhole #2, `orb 2` — a pilot deliberately naming the wormhole they were just shown by `sca pl` — silently puts them in orbit around planet #1 and reports "Now in orbit around planet 1, <name>", instead of "You can't do that to a wormhole!!!". Likewise `orb 5` in a one-planet sector orbits planet 1 rather than answering "That would be foolish Sir!".
-
-## sensors
+## sensors (4)
 
 
 ### [medium] `sca ra` never plots mines — the mine loop was ported onto `sca lo` instead
@@ -271,13 +399,34 @@ to.
 - **Port**: backend/src/game/commands/handlers/scan.handler.ts:509-597 `handleRangeScan` reads `ship.scanHome` for the overwrite mode but never reads `ship.scanFull`, and emits `scanRender` with no `sidePanel`. The only side-panel producer is `scanLoFull` (scan.handler.ts:415-490), reached from scan.handler.ts:286-291 by the port-only syntax `sca lo full`. `set scanfull on` is accepted and persisted (set.handler.ts:93-100, ship-state.service.ts:155) but I grepped backend/src for `scanFull` and it is read nowhere in the scan path.
 - **Player sees**: A player who types `set scanfull on` sees no change to `sca ra` — no letter/distance/bearing/heading/speed legend beside the map, ever. To get the legend they must instead use `sca lo full`, a form the original answers with the SCANFMT usage message.
 
-### [medium] Bare `loc` cannot clear a fire-control lock, and LOCK01 is never printed
+### [low] Bare `loc` cannot clear a fire-control lock, and LOCK01 is never printed
 
 - **Canon** (`reference/ge-source/GECMDS.C:5070-5078 (`if (margc == 1) { warsptr->lock = -1; prfmsg(LOCK01); ... return; }`); reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG:5839 `LOCK01 {*** Fire control Lock removed!``): `loc` with no argument sets `lock = -1` and prints LOCK01, "Fire control Lock removed!" — the player's way to drop a target.
 - **Port**: backend/src/game/commands/handlers/lock.handler.ts:39 declares `minArgs: 1` with `argMissingMessage: LOC_FMT`, so a bare `loc` returns the usage text and never reaches the handler; there is no clear path. `LOCK01` exists in canon-messages.generated.ts:1015 but I grepped backend/src for LOCK01 and for any other unlock verb (`unl`, `unlock`, NOLOCK_SENTINEL outside find-ship.ts) — the sentinel is only written on a stale-target lazy clear at lock.handler.ts:83, never on player request.
 - **Player sees**: Once locked, a pilot cannot deliberately release the lock; `loc` alone answers with a usage line, and the "Fire control Lock removed!" confirmation never appears.
 
-## ships
+## session-lifecycle (3)
+
+
+### [medium] No arrival broadcast when a captain boards and enters the game (ANNOUN / ENTWAR)
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:153-176 (tossingegame); message text at reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG:2672 (ENTWAR) and :2714 (ANNOUN)`): Every time a player boards a ship and enters the arena, `tossingegame` prints ANNOUN — "*** Hyperspace Transmission: The <class>, The <shipname> has been detected cruising the galaxy. <end trans>" — with `outwar(FILTER,usrnum,0)`, i.e. to EVERY ship in the game, and ENTWAR — "*** A <class> The <shipname> just appeared in this star system!" — with `outsect(FILTER,&coord,usrnum,0)`, i.e. to every ship in the arrival sector. Both are gated on `warsptr->cloak != 10`, so a fully cloaked hull enters silently.
+- **Port**: backend/src/gateway/game.gateway.ts:485-573 `boardShipAndWelcome` emits only `client.emit('command:result', ... 'Welcome aboard, <shipname>.')` to the arriving player plus `client.broadcast.emit('player.joined', ...)` — a roster/UI event, not a game log line. No `event.log` is pushed to the sector room or to all players. Searched the whole backend/src tree for `ENTWAR`, `ANNOUN`, `just appeared`, `Hyperspace Transmission`: the only hits are the string table backend/src/game/commands/canon-messages.generated.ts:411 and :418. Neither id exists in the MessageId enum (backend/src/game/commands/messages.ts), so nothing can emit them. There is also no cloak==10 suppression, because there is no announcement to suppress.
+- **Player sees**: Nobody in the galaxy — or even in the same sector — is told when another captain logs in and materialises next to them. In canon a pilot sitting in a sector watches ships arrive in their event log and hears the galaxy-wide hyperspace transmission naming class and ship; in the port an enemy can appear on your scan with no notice at all. The port implements the mirror-image case (exit.handler.ts broadcasts EXIWAR2 to the sector), which makes the missing arrival half more conspicuous: you see people leave but never see them come.
+
+### [medium] New ships spawn with 65,000 energy instead of canon's 50,000
+
+- **Canon** (`reference/ge-source/GEFUNCS.C:227 — `tmpshp.energy = 50000L;` inside `initshp``): `initshp` hard-codes a new hull's starting energy at 50000, which is deliberately BELOW the ENGYMAX ceiling of 65000 (GEMAIN.H:90). ENGYMAX is the cap that `flux` refills to (GECMDS.C flux), not the value a ship is created with — canon starts a captain at roughly 77% of a full tank, so the first flux pod is a real gain.
+- **Port**: backend/src/game/onboarding/onboarding.service.ts:145 sets `energy: ENGYMAX` (65000, backend/src/game/constants.ts:357) on ship creation. Every other initshp field on the same block is annotated with the correct GEFUNCS.C line (phasr 100 @:222, shieldtype 1 @:233, phasrtype 1 @:234), so this one field was taken from the wrong constant. Searched docs/DECISIONS.md for a recorded deviation on starting energy — none; the only related note is docs/PROGRESS.md:1078 F-007, which corrected the ENGYMAX *cap* 50000→65000 and appears to have propagated 65000 into the spawn value too. The same value is used by the `new ship <N>` purchase path (backend/src/game/commands/handlers/new-ship.handler.ts uses the same onboarding loadout).
+- **Player sees**: A brand-new captain (and every purchased hull) starts with 30% more energy than canon: 65,000 vs 50,000. That is roughly 400 extra units of rotation (ROTENGUSE 30) or 100 extra units of acceleration (ACCENGAMT 120) of free manoeuvring, and it makes the three starting flux pods less meaningful because the first one restores a tank that is already full.
+
+### [low] A clean logoff prints nothing to the sector — WARHUP is never emitted
+
+- **Canon** (`reference/ge-source/GEMAIN.C:1424-1425 (warhupa); message text at reference/ge-upstream/mbmgemp/GE/REL/MBMGEMSG.MSG:2074`): On a hangup with `cantexit == 0`, `warhupa` does `prfmsg(WARHUP,username(warsptr)); outsect(ALWAYS,&warsptr->coord,usrnum,0);` before saving — every ship in the departing player's sector sees "*** Commander <name>'s ship just vanished!!". Note `ALWAYS`, not `FILTER`: it bypasses the message filter, so even a player with messages filtered gets it.
+- **Port**: backend/src/gateway/game.gateway.ts:577-706 `handleDisconnect`. The kill branch (`cantexit > 0`) is faithfully ported, but the else branch at :689-700 only calls `shipStateService.unboard(...)` and then `this.server.emit('player.left', { shipId })` — a roster event with no text. No `event.log` goes to `sector:x:y`. Grepped backend/src for `WARHUP` and `vanished`: the only hit is canon-messages.generated.ts:288; `MessageId.WARHUP` does not exist.
+- **Player sees**: You are in a sector with another captain; they close the tab and their ship silently disappears from your scan with no explanation. Canon tells you their ship vanished, and names the commander. Combined with the finding above, a sector in the port gives no narration for anyone entering or leaving the game, only for the deliberate `x` exit.
+
+## ships (4)
 
 
 ### [medium] `maint` works at uncolonized planets — canon requires an established colony
@@ -304,7 +453,7 @@ to.
 - **Port**: backend/src/game/commands/handlers/new-ship.handler.ts:176-190 (purchaseShip) and :330-336 (handleUpgrade) both check only `Math.floor(ship.xcoord) !== 0 || Math.floor(ship.ycoord) !== 0` and `ship.where < 10`. Neither derives `plnum = ship.where - 10` nor compares it to the Zygor index. The port knows the index — backend/src/game/ship/maintenance.service.ts:9-10 defines `ZYGOR_PLNUM_1 = 0` for exactly this purpose — but the new-ship handler never imports or reproduces it, and MessageId has no NEW5 (grep for NEW5/NEW1 outside canon-messages.generated.ts returns nothing; the handler emits invented English strings instead).
 - **Player sees**: A player can buy a new hull or fit a Mark-N phaser or shield while orbiting Tahanian Station or the Enforcer Planet. In canon the shipyard exists only at Zygor and every other NZ planet answers NEW5, which is what gives Zygor its identity as the one place you outfit a ship.
 
-## spy-admin
+## spy-admin (4)
 
 
 ### [medium] `sys` is ungated — any player can run the sysop command, and `sys unjam` cancels being jammed
@@ -313,13 +462,7 @@ to.
 - **Port**: backend/src/game/commands/handlers/sys.handler.ts:14-41 has no privilege check of any kind, and backend/src/game/commands/commands.module.ts:226 registers the command unconditionally for every bound ship. `sys unjam` calls `shipState.mutate(... s.jammer = 0)` for the caller. I grepped backend/src for `SYSCMDS`, `SYSONLY`, `isSysop`, `ISYSOP` and any guard around the router registration: SYSCMDS and SYSONLY are absent from game-config.ts and config/game.config.json, and no guard exists.
 - **Player sees**: `jam` is supposed to blind everyone in range for JAMTIME ticks (jammer.handler.ts:61-64). In the port any jammed player just types `sys unjam` and the jamming ends instantly and for free, so the jammer weapon has a universal one-word counter. In canon that command answers "Huh?" for them.
 
-### [medium] The accounting report drops canon's "Sold" column and hides items that are out of stock with no rate
-
-- **Canon** (`reference/ge-source/GEMAIN.C:2996-3016 (ADMIN01/ADMIN02 header 'Item Rate Qty Price Resv S Sold', then `for (i=0; i<NUMITEMS; ++i)` printing rate, qty, markup2a, reserve, sell and sold2a)`): Menu item 1 prints one row for every one of the NUMITEMS slots unconditionally, with six numeric columns including `plptr->items[i].sold2a` — the running units-sold counter — under the 'Sold' heading.
-- **Port**: backend/src/game/commands/handlers/admin.handler.ts:88-98 does `if (qty === 0 && item.rate === 0) continue;` and formats only name/qty/rate/price/sell/reserve. `sold2a` is carried in state and persisted (backend/src/game/planet/planet-state.types.ts:14, planet-state.mappers.ts:18,74) but I found no read of it anywhere in a handler or report — grepping backend/src for `sold2a` returns only those three type/mapper lines.
-- **Player sees**: An owner can never see how much of each commodity their colony has actually sold to visiting traders, and an item they have priced and reserved but currently hold none of vanishes from the report entirely, so they cannot verify or correct its settings without re-issuing the command blind.
-
-### [low] The spy never sends an intelligence report — the SPYM2 half of check_spy is missing
+### [medium] The spy never sends an intelligence report — the SPYM2 half of check_spy is missing
 
 - **Canon** (`reference/ge-source/GEPLANET.C:147-186 (called each planet tick from GEMAIN.C:2137)`): After the capture roll, `check_spy` rolls `gernd()%10 == 0`; on a hit it picks a random stocked item (up to 10 draws), computes a confidence rating `50.0+rndm(48.0)`, deviates the true quantity by that factor, and mails the spy's master SPYM2 ("Classification: TOP SECRET/EYES ONLY … Planatary Reserves of %s - %s … %d% confidence rating") with topic "Intelligence Report", class MAIL_CLASS_DISTRESS.
 - **Port**: backend/src/game/planet/spy.ts:41-54 implements only the own-planet and 'caught' outcomes and returns 'none' otherwise; backend/src/game/planet/planet-economy.service.ts:83-98 acts on those two outcomes and nothing else. I grepped backend/src for SPYM2, 'confidence', 'Intelligence Report' and 'intel': SPYM2 exists in canon-messages.generated.ts:1050 but is never referenced by any code path.
@@ -331,7 +474,13 @@ to.
 - **Port**: backend/src/game/commands/handlers/admin.handler.ts:127-180 switches on rate/markup/sellflag/reserve/tax/beacon/password only; anything else falls to `usageError()`, and ADMIN_USAGE (lines 25-33) lists no rename. `AdminChange` in backend/src/game/planet/planet-state.types.ts has no name variant. I grepped backend/src for ADMENU2G, 'renamePlanet' and planet-scoped rename: ADMENU2G exists in canon-messages.generated.ts:491 and is never used; rename.handler.ts renames the ship only.
 - **Player sees**: Typing `adm rename <name>` (or `adm 4`) on your own colony answers "Invalid value." plus the usage list. The name typed during the one-time claim prompt is permanent for the life of the colony.
 
-## trade
+### [low] The accounting report drops canon's "Sold" column and hides items that are out of stock with no rate
+
+- **Canon** (`reference/ge-source/GEMAIN.C:2996-3016 (ADMIN01/ADMIN02 header 'Item Rate Qty Price Resv S Sold', then `for (i=0; i<NUMITEMS; ++i)` printing rate, qty, markup2a, reserve, sell and sold2a)`): Menu item 1 prints one row for every one of the NUMITEMS slots unconditionally, with six numeric columns including `plptr->items[i].sold2a` — the running units-sold counter — under the 'Sold' heading.
+- **Port**: backend/src/game/commands/handlers/admin.handler.ts:88-98 does `if (qty === 0 && item.rate === 0) continue;` and formats only name/qty/rate/price/sell/reserve. `sold2a` is carried in state and persisted (backend/src/game/planet/planet-state.types.ts:14, planet-state.mappers.ts:18,74) but I found no read of it anywhere in a handler or report — grepping backend/src for `sold2a` returns only those three type/mapper lines.
+- **Player sees**: An owner can never see how much of each commodity their colony has actually sold to visiting traders, and an item they have priced and reserved but currently hold none of vanishes from the report entirely, so they cannot verify or correct its settings without re-issuing the command blind.
+
+## trade (4)
 
 
 ### [medium] Gold's half-ton weight is rounded up to 1 in the buy capacity gate, halving how much gold a hold can take
@@ -358,7 +507,34 @@ to.
 - **Port**: backend/src/game/commands/messages.ts:870 maps `TRAN_NOT_OWNER` to `CANON_MESSAGES.TRANSFR3` ("Sorry Sir! We are not in orbit."), and transfer.handler.ts:82-84 and :139-143 emit it for the ownership failure on both `tra down` and `tra up`. TRANSFR4 and TRANSUP4 exist in canon-messages.generated.ts:461,466 but are referenced nowhere in backend/src (grepped). The `tra up` path is reachable in canon terms — trans_up requires owner or an unowned planet regardless of TRANSOPT — so this is not merely a consequence of the gap above.
 - **Player sees**: `tra up 50 tro` while orbiting someone else's colony answers "Sorry Sir! We are not in orbit." — a flatly untrue statement about the ship's state — instead of telling the pilot the planet is not theirs. Two canon messages never appear.
 
-## social
+## planets-cmds (4)
+
+
+### [low] Planet rename (admin menu option 4) is not implemented
+
+- **Canon** (`reference/ge-source/GEMAIN.C:3033-3035 (mnu_admenu2 case '4': prfmsg(ADMENU2G); substt = ADMENU1A) with the rename applied at GEMAIN.C:2947-2960 (mnu_admenu1a writes plptr->name and flushes the record); menu text at GE/REL/MBMGEMSG.MSG ADMENU2 "4 - Rename planet", prompt ADMENU2G "Enter the new name ---"`): An owner in orbit picks 4 from the Planet Administration Menu, is prompted "Enter the new name", and the same routine that named the planet at claim time (mnu_admenu1a) overwrites plptr->name, capitalises the first letter, truncates to 19 chars and writes the record. Renaming is reachable at any time, as often as the owner likes.
+- **Port**: backend/src/game/commands/handlers/admin.handler.ts:26-33 (ADMIN_USAGE) offers only rate/markup/sellflag/reserve/tax/beacon/password; the switch at :126-176 has no rename case and falls through to usageError(). backend/src/game/planet/planet-state.types.ts:56-63 AdminChange has no `name` variant, and applyAdminChange (planet-state.service.ts:441-528) never touches state.name. backend/src/game/commands/handlers/rename.handler.ts renames the SHIP only (delegates to onboarding/rename.service). I grepped backend/src for `renamePlanet`, `rename.*planet`, `ADMENU2G`, and `state.name =` — the only writer of PlanetState.name is claim() at planet-state.service.ts:246.
+- **Player sees**: A captain who mistypes their colony's name at claim time is stuck with it permanently — the only way to change it is to abandon the planet and re-claim it (which risks losing it and resets nothing else). Worse, the port's own generated help still advertises the feature: backend/src/game/commands/help/canon-help.generated.ts:483 prints "4 - Rename planet", so `hel adm` promises a command that does not exist.
+
+### [low] `orb` from hyperspace is allowed; ORBIT4 is never emitted
+
+- **Canon** (`reference/ge-source/GECMDS.C:770-774 — `if (warsptr->where == 1) { prfmsg(ORBIT4); outprfge(...); return; }`; GE/REL/MBMGEMSG.MSG:2852 ORBIT4 {We cannot obtain an orbit from hyperspace Sir!`): cmd_orbit tests the hyperspace flag (`where == 1`) BEFORE the already-in-orbit test and before any planet lookup, and refuses outright with ORBIT4. A ship at warp can never enter orbit, regardless of how close it passes to a planet.
+- **Port**: backend/src/game/commands/handlers/orbit.handler.ts:43-45 checks only `ship.where >= 10` (already in orbit) and then proceeds straight to the sector planet list and the 250-unit range test at :101. There is no `ship.where === 1` branch. `grep -rn "ORBIT4" backend/src` finds it only in game/commands/canon-messages.generated.ts:448 — no handler references it, and MessageId has no ORBIT4 entry (messages.ts:121-126 has ORBITALR/ORBITNO/ORBITPK/ORBIT_TOO_FAR only). The port does model the flag elsewhere (decoy.handler.ts:77 `ship.where === 1`, cyb-decisions.ts:307), so this is an omission in orbit specifically.
+- **Player sees**: A captain at warp who passes within 250 units of a planet can drop into orbit mid-flight (the handler then zeroes speed and speed2b), instead of being told "We cannot obtain an orbit from hyperspace Sir!". In the near-miss case they instead get "We must be much closer to establish an orbit Sir!", which tells them the wrong thing about why it failed.
+
+### [low] Item markup and reserve accept values far above canon's 32000 ceiling
+
+- **Canon** (`reference/ge-source/GEMAIN.C:3159-3161 (mnu_admenu2f2: `if (margc == 1 && amt <= 32000) { titems[usrnum].markup2a = amt; ... }` else re-prompt ADMEN2F2) and GEMAIN.C:3192-3196 (mnu_admenu2f4: same `amt <= 32000` guard before setting reserve)`): Both the per-item sale price and the stockpile reserve are unsigned 16-bit fields and canon refuses any entry above 32000, re-prompting with ADMEN2F2 / ADMEN2F4 rather than storing the value.
+- **Port**: backend/src/game/commands/handlers/admin.handler.ts:135-142 (markup) and :154-161 (reserve) validate with `parseUint32(...)` and only reject `undefined`; parseUint32 (backend/src/game/commands/validators.ts:37-43) accepts anything up to 0xFFFFFFFF. PlanetStateService.applyAdminChange (planet-state.service.ts:472-478 markup, :485-491 reserve) checks only `value < 0` and the item index — no upper bound. The taxrate case immediately below (:494-499) does enforce its canon ceiling, so the omission is specific to these two. I grepped for `32000` and `0x7d00` across backend/src: no occurrence.
+- **Player sees**: A colony owner can run `adm markup gold 999999999` or `adm reserve food 500000` and the port answers "Setting saved." Visiting captains are then quoted (and charged, via the buy path that reads markup2a) prices canon makes impossible, and an absurd reserve locks the whole stock out of sale permanently. In canon both entries bounce back to the prompt.
+
+### [low] `orb <n>` ignores the planet number when the sector holds exactly one planet
+
+- **Canon** (`reference/ge-source/GECMDS.C:785-816 — plnum is always taken from margv[1], `getplanetdat` returns FALSE when `plnum > sector.numplan` (GEMAIN.C:1800, 1834-1837), and cmd_orbit then prints FOOLISH (GECMDS.C:810-813); a wormhole slot prints ORBIT0 (GECMDS.C:791-794)`): The number the pilot types is always the slot that is looked up. Naming a slot that is a wormhole gives ORBIT0; naming a slot that does not exist gives FOOLISH. Canon never substitutes a different planet.
+- **Port**: backend/src/game/commands/handlers/orbit.handler.ts:62-64 — `if (planets.length === 1) { targetPlnum = planets[0].plnum; }` — the args array is never consulted on that path, so the wormhole check at :78-84 and the not-found re-prompt at :86-92 are both skipped. Only the multi-planet branch parses the argument. Sectors routinely mix one planet with wormholes (GEPLANET.C:487-490 assigns PLTYPE_WORM per slot in the same numbering run), and `sca pl` numbers wormholes alongside planets.
+- **Player sees**: In a sector holding planet #1 and wormhole #2, `orb 2` — a pilot deliberately naming the wormhole they were just shown by `sca pl` — silently puts them in orbit around planet #1 and reports "Now in orbit around planet 1, <name>", instead of "You can't do that to a wormhole!!!". Likewise `orb 5` in a one-planet sector orbits planet 1 rather than answering "That would be foolish Sir!".
+
+## social (4)
 
 
 ### [low] Open hails ignore the MSG_FILTER user option

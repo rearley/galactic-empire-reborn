@@ -2996,7 +2996,7 @@ covered. Ran separately an 18-way survey of the original C source against
 put every finding to an adversarial verifier instructed to refute it; roughly
 half of all findings were refuted and discarded.
 
-**Results:** 78 confirmed test defects and 53 confirmed canon gaps, written up in
+**Results:** 78 confirmed test defects and 72 confirmed canon gaps (6 high), in
 `docs/audits/2026-09-05-test-suite-audit.md` and
 `docs/audits/2026-09-05-canon-gaps.md`. Nothing was changed — both files are
 finding lists. Suite was green throughout (backend 480 suites / 4,925 tests;
@@ -3015,6 +3015,17 @@ not the code is correct.
   `cantexit` — so `decoy` has no trigger a player could react to.
 - `sys` has no authorization check: any player can type `sys unjam` and cancel
   being jammed, free and instantly.
+- Movement runs at half canon's rate. Canon's `warrti2a` moves each ship every
+  3s (1s timer, `zothusn += 3` stride); our `PhysicsTickService` moves on the 6s
+  tick with canon's per-call displacement and no `dt`. Rotation, acceleration
+  and the self-destruct countdown are all on that same half-rate. CLAUDE.md
+  encodes it ("Physics tick: 6 seconds -- moves ships"); DECISIONS.md does not.
+  Shields/repair are NOT affected -- `ShipTickService.processRestorativeTick`
+  correctly sits on the 6s tick, matching canon's `warrti`.
+- Cybertrons never assign `degrees`, so they fire down the hull facing.
+- The troop-raid item loop is inverted against canon in both directions: we
+  destroy Men (canon starts at index 1 and never does) and spare Troops (canon
+  destroys them).
 
 **Corrections made during the audit:** 15 canon constants are defined and pinned
 by balance tests but used nowhere in production. On inspection 12 of them are
