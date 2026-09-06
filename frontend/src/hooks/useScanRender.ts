@@ -52,6 +52,18 @@ export interface ScanRenderEvent {
  *
  * @see specs/015-scan-modes/contracts/scan-render.md §1 Mode semantics
  */
+/**
+ * How many SCAN DATA cards to keep.
+ *
+ * The list appended without any bound. `mode` is 'overwrite' only when the
+ * player has SCANHOME on; the default is 'append', so every `sca` added a card
+ * that was never removed — hundreds of live DOM blocks over an evening, each
+ * carrying a full side panel, all re-rendered whenever a new one arrived.
+ * The event log has capped at 500 since it was written; this had no equivalent.
+ * @see test/scan-card-cap.spec.tsx
+ */
+export const MAX_SCAN_CARDS = 40;
+
 export function useScanRender(): ScanRenderEvent[] {
   const [cards, setCards] = useState<ScanRenderEvent[]>([]);
 
@@ -60,7 +72,7 @@ export function useScanRender(): ScanRenderEvent[] {
       if (event.mode === 'overwrite') {
         setCards([event]);
       } else {
-        setCards((prev) => [...prev, event]);
+        setCards((prev) => [...prev, event].slice(-MAX_SCAN_CARDS));
       }
     };
 
