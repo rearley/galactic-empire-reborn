@@ -3,7 +3,7 @@ import { ScanHandlerService } from './scan.handler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { ShipState } from '../../ship/ship-state.types';
+import { ShipState, shipKey } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { NO_CHANNEL } from '../../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
@@ -11,6 +11,8 @@ import { Random, RANDOM } from '../../combat/random.port';
 import { cdistance, lockFact } from '../../combat/combat-math';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip, shipLetter } from '../helpers/find-ship';
+import { CombatTargetWarningEvent } from '../../combat/combat-events';
+import { applyLockOutcome } from '../../combat/lock-outcome';
 import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WARP_THRESHOLD } from '../../constants';
 import { I_TORP } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
@@ -67,6 +69,20 @@ export class TorpedoHandlerService {
       return this.handle(ship, args);
     },
   };
+
+  /**
+   * Canon's shared lockon tail: battle-lock BOTH ships and tell the target.
+   * @see GECMDS.C:1395-1422
+   */
+  private applyLock(
+    firer: ShipState, target: ShipState, kind: CombatTargetWarningEvent['kind'],
+  ): void {
+    applyLockOutcome(firer, target, kind, {
+      shipState: this.shipState,
+      events: this.events,
+      lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
+    });
+  }
 
   private handle(ship: ShipState, args: string[]): CommandResult {
     // 1. Launcher mounted?
@@ -145,8 +161,17 @@ export class TorpedoHandlerService {
     const fact = lockFact('torpedo', ship.speed, target.speed, distSectors, TORFACT);
     if (fact <= 0.7) {
       const letter = shipLetter(letters, `${target.userid}:${target.shipno}`);
+      // Canon pins BOTH ships even when the lock fails, and tells the target it
+      // was attempted — a failed lock is how a stalker gives themselves away.
+      // @see GECMDS.C:1413-1421
+      this.applyLock(ship, target, 'lock-attempt');
       return { lines: [{ text: formatMessage(MessageId.LOCK_FAIL, letter), category: 'system' }] };
     }
+
+    // Successful lock: the TARGET is told and pinned. Canon's LOCK1 — the
+    // firer's own confirmation — is commented out in the original, so the firer
+    // gets nothing extra here. @see GECMDS.C:1397-1407
+    this.applyLock(ship, target, 'lock-acquired');
 
     // 7. Find lowest free slot on target's ltorps
     let slot = -1;
