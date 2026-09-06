@@ -87,6 +87,7 @@ import {
   ATTACK_OWNER_ALERT_EVENT,
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
+import { ITEM_NAMES } from '../game/constants/items';
 import {
   SHIP_SYSTEM_REPAIRED, ShipSystemRepairedEvent,
   SHIP_PHASER_CHARGE, ShipPhaserChargeEvent,
@@ -1592,6 +1593,41 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       category: 'system',
       text: formatMessage(messageId),
     });
+  }
+
+  /**
+   * The killer's salvage and score report.
+   *
+   *   prfmsg(KILLGOT1,ptr->shipname);   then `prf(", %s %s")` per item
+   *   prfmsg(KILLPNTS,gechrbuf,shipclass[ptr->shpclass].typename);
+   *
+   * @see GEFUNCS.C:1120-1136, :1187
+   *
+   * Addressed to the killer alone. A self-destruct has no attacker and reports
+   * nothing — canon runs this inside the `who` branch of killem.
+   */
+  @OnEvent(COMBAT_SHIP_DESTROYED)
+  handleKillReport(event: CombatShipDestroyedEvent): void {
+    if (!event.attackerUserid) return;
+
+    const shipname = event.victimShipname ?? 'ship';
+    const flotsam = event.loot
+      .map((l) => `, ${l.amount} ${ITEM_NAMES[l.itemIndex] ?? 'items'}`)
+      .join('');
+    this.server.to(`user:${event.attackerUserid}`).emit('event.log', {
+      category: 'combat',
+      text: `${formatMessage(MessageId.KILL_SALVAGE, shipname)}${flotsam}`,
+    });
+
+    if (event.scoreAwarded > 0) {
+      const typeName = (event.victimClass !== undefined
+        ? this.shipClassCache.getTypeName(event.victimClass)
+        : undefined) ?? 'ship';
+      this.server.to(`user:${event.attackerUserid}`).emit('event.log', {
+        category: 'combat',
+        text: formatMessage(MessageId.KILL_POINTS, String(event.scoreAwarded), typeName),
+      });
+    }
   }
 
   @OnEvent(COMBAT_MINE_WARNING)

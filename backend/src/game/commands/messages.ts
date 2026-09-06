@@ -282,6 +282,10 @@ export enum MessageId {
   MAINT_COMPLETE = 'MAINT_COMPLETE',
   /** MAINT10 — a paid repair was cancelled because someone fired. */
   MAINT_INTERRUPTED = 'MAINT_INTERRUPTED',
+  /** KILLGOT1 — opens the killer's salvage report; the item list is appended. */
+  KILL_SALVAGE = 'KILL_SALVAGE',
+  /** KILLPNTS — what the kill scored, and for what class of ship. */
+  KILL_POINTS = 'KILL_POINTS',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -894,6 +898,13 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GEFUNCS.C:422 MAINT7, :399 MAINT10 */
   [MessageId.MAINT_COMPLETE]: CANON_MESSAGES.MAINT7,
   [MessageId.MAINT_INTERRUPTED]: CANON_MESSAGES.MAINT10,
+  /**
+   * KILLGOT1 ends mid-sentence ("We have retrieved") on purpose — canon appends
+   * the salvaged items with `prf(", %s %s")`, so the list is part of the line.
+   * @see GEFUNCS.C:1120-1136, :1187
+   */
+  [MessageId.KILL_SALVAGE]: CANON_MESSAGES.KILLGOT1,
+  [MessageId.KILL_POINTS]: CANON_MESSAGES.KILLPNTS,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

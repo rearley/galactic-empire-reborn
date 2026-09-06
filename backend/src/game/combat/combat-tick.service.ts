@@ -284,6 +284,8 @@ export class CombatTickService implements OnModuleInit {
         const snapshotAttackerUserid = snapshot?.userid ?? null;
         const snapshotAttackerShipKey = snapshot?.shipKey ?? null;
         const event: CombatShipDestroyedEvent = {
+          victimShipname: victim.shipname,
+          victimClass: victim.shpclass,
           victimId: shipKey(victim.userid, victim.shipno),
           attackerId: snapshotAttackerShipKey,
           victimShipKey: shipKey(victim.userid, victim.shipno),
