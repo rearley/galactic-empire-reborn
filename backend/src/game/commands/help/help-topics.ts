@@ -512,6 +512,34 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
  * (GECMDS.C:249 gesearch) — `hel torpedo`, `hel torp` and `hel tor` are the
  * same question.
  */
+/**
+ * Lines appended AFTER a canon help page, for commands this port extended.
+ *
+ * Canon's pages are not ours to edit — CLAUDE.md is explicit that the shipped
+ * text is authoritative for the original game's design intent, and rewriting it
+ * would erase the record of what the original actually said. But a page that is
+ * silent about a leg the port ships leaves a player concluding the feature does
+ * not exist.
+ *
+ * So: canon verbatim, then our addition, marked as ours.
+ *
+ * `transfer` is the only entry today. Canon's HLPTRA (MBMGEHLP.MSG:1095)
+ * documents ship-to-planet and planet-to-ship because that is all
+ * `cmd_transfer` had; ship-to-ship is this port's addition, recorded as
+ * deviation D1 in docs/DECISIONS.md.
+ */
+const PORT_HELP_ADDENDA: Readonly<Record<string, ReadonlyArray<string>>> = Object.freeze({
+  transfer: Object.freeze([
+    '',
+    'ADDED BY THIS PORT',
+    '  tra <qty> <item> <ship>  — hand cargo to another ship in your sector.',
+    '',
+    '  The original game moved cargo only between a ship and the planet it',
+    '  orbits; the line above is not part of it. Name the receiving ship, and',
+    '  both ships must be in the same sector. See docs/DECISIONS.md (D1).',
+  ]),
+});
+
 export function canonHelpPage(
   query: string,
   opts: { prefix?: boolean } = { prefix: true },
@@ -520,16 +548,21 @@ export function canonHelpPage(
 
   // A concept may span several pages; join them so one `hel planets` shows the
   // whole topic instead of its first third.
+  const addendum = PORT_HELP_ADDENDA[q] ?? [];
+
   const concept = CANON_CONCEPT_PAGES[q] ?? CANON_CONCEPT_PAGES[`${q}s`];
   if (concept) {
     const pages = concept.flatMap((id) => CANON_HELP[id] ?? []);
-    if (pages.length) return pages;
+    if (pages.length) return [...pages, ...addendum];
   }
 
   const id =
     CANON_COMMAND_PAGES[q] ??
     (opts.prefix === false ? undefined : CANON_COMMAND_PAGES[q.slice(0, 3)]);
-  return id ? (CANON_HELP[id] ?? null) : null;
+  if (!id) return null;
+  const page = CANON_HELP[id];
+  if (!page) return null;
+  return addendum.length ? [...page, ...addendum] : page;
 }
 
 export const HELP_TOPIC_IDS: ReadonlyArray<HelpTopicId> = Object.freeze(
