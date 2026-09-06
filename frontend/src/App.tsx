@@ -98,6 +98,13 @@ function Terminal(): React.JSX.Element {
     return () => { socket.off('fkeys.snapshot', handleFkeys); };
   }, []);
 
+  // The sector map belongs to the hull that drew it, for the same reason the
+  // SCAN DATA cards do. @see hooks/useScanRender
+  useEffect(() => {
+    setScanCells(null);
+    setScanKind(null);
+  }, [localShipId]);
+
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
       setScanCells(event.cells as ScanCell[]);
@@ -323,7 +330,7 @@ function Terminal(): React.JSX.Element {
         <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
           <ScanMap cells={scanCells} shipId={localShipId} kind={scanKind} />
           <div className="flex-1 overflow-auto border-t border-gray-800">
-            <ScanPanel />
+            <ScanPanel shipId={localShipId} />
           </div>
         </div>
 

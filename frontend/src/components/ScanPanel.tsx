@@ -127,8 +127,16 @@ function ScanCard({ event }: ScanCardProps): React.JSX.Element {
  * @see specs/015-scan-modes/contracts/scan-render.md §1
  * @see specs/015-scan-modes/plan.md §T012
  */
-export function ScanPanel(): React.JSX.Element {
-  const cards = useScanRender();
+interface ScanPanelProps {
+  /**
+   * Hull currently boarded. Scan data belongs to the ship that gathered it —
+   * the readings are discarded when this changes. @see hooks/useScanRender
+   */
+  shipId?: string | null;
+}
+
+export function ScanPanel({ shipId = null }: ScanPanelProps): React.JSX.Element {
+  const cards = useScanRender(shipId);
 
   return (
     <>
