@@ -21,6 +21,7 @@ export interface MailListEntry {
     | ProductionReportPayload
     | ProductionCapPayload
     | DistressSignalPayload
+    | SpyReportPayload
     | StarvationPayload
     | RevoltPayload
     | ShipLossPayload
@@ -53,6 +54,29 @@ export interface ProductionCapPayload {
   sectorY: number;
   /** C's `mail.long1` = `max` = `(long)(maxpl[i]*fact)`. */
   cap: bigint;
+}
+
+/**
+ * A planted spy's report on a planet somebody else owns.
+ *
+ * Canon's call_4_help sends SPYM3 (attack repelled) or SPYM4 (planet taken) to
+ * `plptr->spyowner`, topic "Intelligence Report", written from the operative's
+ * point of view: "Our operative on %s in sector %d %d reports that hostile
+ * forces commanded by %s...". @see GECMDS.C:3972-3992
+ *
+ * Distinct from DistressSignalPayload because the recipient does NOT own the
+ * planet — rendering the owner's body here told a spy his own colony had
+ * defended itself.
+ */
+export interface SpyReportPayload {
+  kind: 'spy_report';
+  /** 'taken' = SPYM4, the planet fell. 'held' = SPYM3, the attack was repelled. */
+  outcome: 'taken' | 'held';
+  planetName: string;
+  sectorX: number;
+  sectorY: number;
+  /** SPYM3/SPYM4's fourth slot — `warsptr->userid`, the attacking commander. */
+  attackerUserid: string;
 }
 
 export interface DistressSignalPayload {

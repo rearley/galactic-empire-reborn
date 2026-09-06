@@ -269,8 +269,31 @@ describe('owner distress mail is suppressed for an owner in-game (GEFUNCS.C:2231
       .toBeGreaterThan(0);
   });
 
-  it('does not suppress the SPY copy — only mailit(1) is gated', async () => {
+  /**
+   * CORRECTION. This case used to assert the opposite — that the spy's copy is
+   * sent even while the owner is flying, on the reasoning that only mailit(1)
+   * is suppressed. The reasoning was right and the conclusion was wrong,
+   * because it is not mailit that stops the spy mail here.
+   *
+   * `call_4_help` is an if/else-if chain (GECMDS.C:3952-3994) and the spy arms
+   * are `else if`s: a spy only files when the owner could NOT be reached. With
+   * the owner in-game the first arm returns, and the spy branches are never
+   * evaluated at all. The old assertion was pinning the port's flattened
+   * version of that chain.
+   */
+  it('does not mail the spy either, because the spy arms are else-ifs', async () => {
     const { service, mailCreates } = makeService(999, [flyingOwner()]);
+    const planet = makePlanet(100);
+    planet.spyowner = 'spook';
+
+    await service.attackTroop(50_000, makeShip(), planet);
+
+    expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'spook'))
+      .toHaveLength(0);
+  });
+
+  it('DOES mail the spy once the owner is out of reach', async () => {
+    const { service, mailCreates } = makeService(999, []);
     const planet = makePlanet(100);
     planet.spyowner = 'spook';
 

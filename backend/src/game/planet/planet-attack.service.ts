@@ -152,7 +152,11 @@ export class PlanetAttackService {
     // Step 8: notification + spy roll. @see GECMDS.C:3753–3756
     const ownerAtAttackTime = planet.userid;
     if (ratio > 1 && ownerAtAttackTime) {
-      await this.callForHelp(planet, ship, AttackKind.TROOP, num, won, ratio > 5, ownerAtAttackTime);
+      // call_4_help returns the lines addressed to the ATTACKER — ATTACK7 when
+      // the owner was actually reached. @see GECMDS.C:3959
+      narration.push(
+        ...await this.callForHelp(planet, ship, AttackKind.TROOP, num, won, ratio > 5, ownerAtAttackTime),
+      );
     }
 
     // Step 9: mail — mailit(1), so it is skipped for an owner who is in-game
@@ -285,7 +289,9 @@ export class PlanetAttackService {
     // Step 9: notification + spy roll. @see GECMDS.C:3916–3919
     const ownerAtAttackTime = planet.userid;
     if ((ratio > 1 || won === 1) && ownerAtAttackTime) {
-      await this.callForHelp(planet, ship, AttackKind.FIGHTER, num, won, ratio > 5, ownerAtAttackTime);
+      narration.push(
+        ...await this.callForHelp(planet, ship, AttackKind.FIGHTER, num, won, ratio > 5, ownerAtAttackTime),
+      );
     }
 
     // Step 10: mail — mailit(1) again, same suppression.
@@ -319,6 +325,37 @@ export class PlanetAttackService {
    * Call-for-help: real-time owner alert + spy-mail roll.
    * @see GECMDS.C:3952–3994 call_4_help
    */
+  /**
+   * canon's `call_4_help` — an if/else-if CHAIN, not a broadcast.
+   *
+   *   if (instat(plptr->userid,gestt) && othusp->substt >= FIGHTSUB) {
+   *       prfmsg(ATTACK6,...);  outprf(othusn);          // the OWNER, live
+   *       prfmsg(ATTACK7);      outprfge(ALWAYS,usrnum); // the ATTACKER
+   *   }
+   *   else if (onsys(plptr->userid) && ...) { ATTACK6A; ATTACK7; }
+   *   else if (won == 0 && send_spy_mail && gernd()%6 == 0 && spyowner[0]) SPYM3
+   *   else if (won == 1 && spyowner[0])                                    SPYM4
+   *
+   * @see GECMDS.C:3952-3994
+   *
+   * The port had flattened it: the owner alert always fired, the spy mail
+   * always fired beside it, and the attacker was told nothing. Being told the
+   * planet is calling for help is how an attacker learns the owner is online
+   * and inbound — the cue to press the assault or break orbit.
+   *
+   * Note what the spy arms are NOT gated on. SPYM4 (the planet fell) has no
+   * `send_spy_mail` test and no random roll: if the planet is taken and there
+   * is a spy, the spy's owner is always told. The port gated it on ratio > 5,
+   * so a planet taken at low ratio reported nothing — the case a spy is most
+   * useful for.
+   *
+   * ATTACK6A has no analogue here and is deliberately not emulated: it is for
+   * an owner logged into the BBS but outside Galactic Empire, and this port has
+   * no lobby outside the game — connecting to the gateway IS entering it. Its
+   * ATTACK7 half is covered by the first arm, which is the reachable case.
+   *
+   * Returns the lines addressed to the ATTACKER, for the caller's narration.
+   */
   private async callForHelp(
     planet: PlanetState,
     ship: ShipState,
@@ -327,29 +364,36 @@ export class PlanetAttackService {
     won: number,
     sendSpyMail: boolean,
     ownerUserid: string,
-  ): Promise<void> {
-    // Owner real-time alert — emit to user:${ownerUserid} room via EventEmitter.
-    // If owner is offline the room is empty and the emit silently drops.
-    // ATTACK6 reads "...under attack from Commander %s in The %s...", so the
-    // COMMANDER comes before the ship. The port passed them the other way
-    // round, which put the ship's name where the captain's belongs.
-    const alertMsg = formatMessage(
-      MessageId.ATT_OWNER_ALERT,
-      planet.name,
-      planet.xsect,
-      planet.ysect,
-      ship.username ?? ship.userid,
-      ship.shipname,
-    );
-    this.events.emit(ATTACK_OWNER_ALERT_EVENT, { ownerUserid, message: alertMsg } as AttackOwnerAlertPayload);
-
-    // Spy intel mail roll. @see research.md D4
-    if (sendSpyMail && planet.spyowner) {
-      if (won === 1 || gernd(this.random) % 6 === 0) {
-        const spyMailType = kind === AttackKind.TROOP ? MessageId.MESG02 : MessageId.MESG04;
-        await this.insertDistressMail(planet.spyowner, spyMailType, planet, num, ship);
-      }
+  ): Promise<string[]> {
+    if (this.ownerIsInGame(ownerUserid)) {
+      // ATTACK6 reads "...under attack from Commander %s in The %s", so the
+      // COMMANDER comes before the ship. The port passed them the other way
+      // round, which put the ship's name where the captain's belongs.
+      const alertMsg = formatMessage(
+        MessageId.ATT_OWNER_ALERT,
+        planet.name,
+        planet.xsect,
+        planet.ysect,
+        ship.username ?? ship.userid,
+        ship.shipname,
+      );
+      this.events.emit(ATTACK_OWNER_ALERT_EVENT, { ownerUserid, message: alertMsg } as AttackOwnerAlertPayload);
+      return [formatMessage(MessageId.ATT_DISTRESS_SENT)];
     }
+
+    // Owner unreachable — the spy arms. Both are else-ifs, so a spy only ever
+    // files when the owner could not be told directly.
+    if (!planet.spyowner) return [];
+
+    if (won === 1) {
+      await this.insertDistressMail(planet.spyowner, MessageId.SPY_REPORT_TAKEN, planet, num, ship);
+    } else if (sendSpyMail && gernd(this.random) % 6 === 0) {
+      await this.insertDistressMail(planet.spyowner, MessageId.SPY_REPORT_HELD, planet, num, ship);
+    }
+    // `kind` no longer picks the body: canon's choice is won/lost, not
+    // troop/fighter — both branches call the same call_4_help.
+    void kind;
+    return [];
   }
 
   /**
@@ -399,10 +443,21 @@ export class PlanetAttackService {
   }
 }
 
-/** Map MessageId to the integer type constant stored in MailStat.type. */
-const MAIL_TYPE_MAP: Partial<Record<MessageId, number>> = {
+/**
+ * Map MessageId to the integer type constant stored in MailStat.type.
+ *
+ * The two spy rows are this port's numbering, not canon's: call_4_help's spy
+ * arms set only `mail.userid` and `mail.topic` and never assign `mail.type`
+ * (GECMDS.C:3976-3992), so canon inherits whatever type the previous mail left
+ * behind. The inbox here dispatches on `type` to choose a body, so the spy
+ * reports need ids of their own — 33/34, clear of MESG02-07, the revolt's 30
+ * and the ship-loss 40/41.
+ */
+export const MAIL_TYPE_MAP: Partial<Record<MessageId, number>> = {
   [MessageId.MESG02]: 2,
   [MessageId.MESG03]: 3,
   [MessageId.MESG04]: 4,
   [MessageId.MESG05]: 5,
+  [MessageId.SPY_REPORT_HELD]: 33,
+  [MessageId.SPY_REPORT_TAKEN]: 34,
 };
