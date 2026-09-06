@@ -3622,3 +3622,39 @@ compensate — invents a balance change to paper over an arithmetic bug.
 Two tests pinned the floored integers (`toBe(Math.floor(dmg100 * 0.5))` and
 `toBe(Math.floor(soft / 2))`); both are corrected in place, since the identity
 they relied on held only while the defect did.
+
+## 2026-09-06 — Cybertrons leave hyperspace to fight; canon's never do
+**Context:** Canon's pursuit block (GECYBS.C:735-805) contains exactly ONE
+`where` assignment: `ptr->where = 1` in the long band, at `low_dist >=
+hyperdist1` (25 sectors). The three closer bands never clear it — they only
+TEST it, `if (ptr->where == 0) shieldup(ptr,usrn);`.
+
+And the AI snaps `ptr->speed` directly rather than decelerating through
+`accel()`, which is the only thing that calls `hyperspace(ptr,usrn,0)`. So a
+canon Cybertron that hyperwarps toward a player is stuck at `where == 1`
+permanently, and `cyb_attack`'s normal-space branch requires `ptr->where == 0`
+(GECYBS.C:282). It closes to point-blank and can never fire.
+
+The port already deviates: `cyb-decisions` returns `where: 0` for the mid,
+brake and combat bands, so ours drop out of hyperspace and engage.
+
+**Decision:** keep the deviation. Recorded at the owner's explicit instruction —
+"I like ours being more dangerous so we can leave that."
+
+**Reason:** canon's behaviour here is a dead end rather than a design. A
+pursuer that closes to within half a sector and then cannot shoot is not a
+difficulty choice; it makes the entire long-range pursuit ladder decorative,
+and `gebemean`, `cyb_attack`, `cyb_lay_decoys` and the torpedo volley all
+become unreachable for any Cybertron that ever crossed 25 sectors to reach you.
+
+**Alternatives rejected:** matching canon exactly — faithful, and it would have
+quietly removed most of the PvE game. Clearing `where` only in the combat band
+rather than all three — closer to canon in shape, but the mid and brake bands
+are where a pursuer spends most of its time, so it would reintroduce the same
+dead end for anything still closing.
+
+**Note:** this is the second AI-aggression finding of the day and they interact.
+The first (gebemean rolled once instead of per weapon) was a port bug making
+Cybertrons *less* dangerous than canon; this one is a port deviation making them
+*more* so. They are not a matched pair — the first is now fixed to canon, this
+one is kept deliberately.
