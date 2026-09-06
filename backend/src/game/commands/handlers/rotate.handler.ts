@@ -2,6 +2,8 @@ import { Command, CommandResult, CommandContext } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { parseRotation, resultingHeading } from './helpers/rotation';
 import { ShipState } from '../../ship/ship-state.types';
+import { ROTENGUSE, USEENERGY_RESERVE } from '../../constants';
+import { tryEnergyDebit } from '../../physics/physics-math';
 
 /**
  * Handles the `rotate` / `rot` command — sets the ship's pending rotation delta.
@@ -38,11 +40,21 @@ export const rotateCommand: Command = {
       };
     }
 
-    // TODO(006): see GECMDS.C:685 — speed<0 gate (CANTROT, hyperspace branch)
-    // TODO(006): see GECMDS.C:691 — useenergy gate (NOROTPW, hyperspace branch)
-    // TODO(006): see GECMDS.C:717 — speed<0 gate (CANTROT, normal branch)
-    // TODO(006): see GECMDS.C:711 — useenergy gate (NOROTPW, normal branch)
-    // TODO(006): see GECMDS.C:679 — useenergy gate (NOROTPW, hyperspace branch)
+    // Turning costs energy, and the turn only happens if the ship can pay:
+    //   if (useenergy(warsptr,usrnum,ROTENGUSE) == 1) { ...turn... }
+    //   else { prfmsg(NOROTPW); }
+    // @see GECMDS.C:660 (hyperspace branch), :702 (normal branch)
+    //
+    // useenergy keeps a 500-unit reserve on top of the cost — the original's
+    // own comment is `/* fudge a bit */` — so a ship is refused while it still
+    // has ROTENGUSE in the tank. @see GEFUNCS.C:1500-1515
+    const debit = tryEnergyDebit(ship.energy, ROTENGUSE, USEENERGY_RESERVE);
+    if (!debit.ok) {
+      return {
+        lines: [{ text: formatMessage(MessageId.NOROTPW), category: 'system' }],
+      };
+    }
+    ship.energy = debit.newEnergy;
 
     // C reports the heading you END UP on, not the delta you asked for:
     // `deg = normal(heading + degrees); prfmsg(NOWTURN, deg)`. Printing the

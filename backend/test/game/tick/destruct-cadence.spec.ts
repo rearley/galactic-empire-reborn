@@ -1,0 +1,103 @@
+/**
+ * The self-destruct countdown runs on the MOVEMENT cadence, not the 6-second one.
+ *
+ * Canon calls it from `warrti2a`, in the same strided loop as rotate/accel/move:
+ *
+ *   rotateship(wptr,zothusn); accel(wptr,zothusn);
+ *   moveship(wptr,zothusn);   destruct(wptr,zothusn);
+ *
+ * @see GEMAIN.C:2476-2483 — 1-second timer, stride of 3, so once per 3s per ship
+ *
+ * `cloakstat` is the contrast: canon runs THAT from `warrtia`, the 6-second
+ * timer (GEFUNCS.C:1366), and it stays there. The two live in the same service
+ * in this port but belong to different clocks, which is exactly the kind of
+ * detail that gets lost when a service is moved wholesale.
+ *
+ * Left on the 6-second tick the countdown took twice as long as canon to reach
+ * zero — a ship set to blow in 20 ticks took two minutes instead of one.
+ */
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ShipManagementTickService } from '../../../src/game/commands/ship-management-tick.service';
+import { ShipStateService } from '../../../src/game/ship/ship-state.service';
+import { TickService } from '../../../src/game/tick/tick.service';
+import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
+import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
+import { NUMITEMS } from '../../../src/game/constants/items';
+
+function makeShip(over: Partial<ShipState> = {}): ShipState {
+  return {
+    userid: 'u', shipno: 1, shipname: 'Doomed', shpclass: 1,
+    heading: 0, head2b: 0, speed: 0, speed2b: 0,
+    xcoord: 20, ycoord: 20, damage: 0, energy: 50_000,
+    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
+    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+    where: 0, ltorpsChannel: [], ltorpsDistance: [],
+    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
+    decout: [], jammer: 0, freq: [0, 0, 0],
+    items: new Array(NUMITEMS).fill(0n),
+    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
+    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
+    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    dirty: false, ...over,
+  } as ShipState;
+}
+
+function harness(ships: ShipState[]) {
+  const map = new Map<string, ShipState>();
+  for (const s of ships) map.set(shipKey(s.userid, s.shipno), s);
+  const shipState = {
+    findAllShips: () => Array.from(map.values()),
+    mutate: (u: string, n: number, fn: (s: ShipState) => void) => {
+      const s = map.get(shipKey(u, n));
+      if (s) { fn(s); s.dirty = true; }
+      return s;
+    },
+    removeFromGame: (s: { userid: string; shipno: number }) => map.delete(shipKey(s.userid, s.shipno)),
+  } as unknown as ShipStateService;
+
+  const subs: Array<{ kind: TickKind; fn: (c: TickContext) => void }> = [];
+  const tickService = {
+    subscribe: (kind: TickKind, fn: (c: TickContext) => void) => { subs.push({ kind, fn }); return () => {}; },
+  } as unknown as TickService;
+
+  const svc = new ShipManagementTickService(
+    shipState, tickService, new EventEmitter2(), 50,
+  );
+  svc.onModuleInit();
+
+  let n = 0;
+  const fireKind = (kind: TickKind) => {
+    const ctx = { kind, tickNumber: ++n, firedAt: new Date() } as TickContext;
+    for (const s of subs) if (s.kind === kind) s.fn(ctx);
+  };
+  return { subs, second: () => fireKind(TickKind.SHIP_UPDATE), sixSecond: () => fireKind(TickKind.PHYSICS) };
+}
+
+describe('self-destruct countdown cadence (GEMAIN.C:2476-2483)', () => {
+  it('subscribes the countdown to the 1-second timer', () => {
+    const { subs } = harness([makeShip({ destruct: 20 })]);
+
+    expect(subs.map((s) => s.kind)).toContain(TickKind.SHIP_UPDATE);
+  });
+
+  it('counts down once per three seconds, matching movement', () => {
+    const ship = makeShip({ destruct: 20 });
+    const { second } = harness([ship]);
+
+    second(); second(); second();
+
+    expect(ship.destruct).toBe(19);
+  });
+
+  it('does not count down on the 6-second tick, where cloak lives', () => {
+    const ship = makeShip({ destruct: 20 });
+    const { sixSecond } = harness([ship]);
+
+    sixSecond();
+
+    expect(ship.destruct).toBe(20);
+  });
+});
