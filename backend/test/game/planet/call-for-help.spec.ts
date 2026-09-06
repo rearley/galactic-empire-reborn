@@ -60,6 +60,8 @@ function buildService(seed: number, opts: { spyowner?: string } = {}) {
         fn(s);
       },
     ),
+    // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
+    findByUserid: jest.fn().mockReturnValue([]),
   } as unknown as ShipStateService;
 
   const mockPrisma = {

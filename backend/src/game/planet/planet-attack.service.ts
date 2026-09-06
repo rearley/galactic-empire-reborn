@@ -155,8 +155,9 @@ export class PlanetAttackService {
       await this.callForHelp(planet, ship, AttackKind.TROOP, num, won, ratio > 5, ownerAtAttackTime);
     }
 
-    // Step 9: mail. @see GECMDS.C:3760–3771
-    if (ratio > 1 && ownerAtAttackTime) {
+    // Step 9: mail — mailit(1), so it is skipped for an owner who is in-game
+    // and has already had the live alert. @see GECMDS.C:3760–3771, GEFUNCS.C:2231
+    if (ratio > 1 && ownerAtAttackTime && !this.ownerIsInGame(ownerAtAttackTime)) {
       const mailType = won === 1 ? MessageId.MESG03 : MessageId.MESG02;
       await this.insertDistressMail(ownerAtAttackTime, mailType, planet, num, ship);
     }
@@ -287,8 +288,9 @@ export class PlanetAttackService {
       await this.callForHelp(planet, ship, AttackKind.FIGHTER, num, won, ratio > 5, ownerAtAttackTime);
     }
 
-    // Step 10: mail. @see GECMDS.C:3924–3936
-    if ((ratio > 2 || won === 1) && ownerAtAttackTime) {
+    // Step 10: mail — mailit(1) again, same suppression.
+    // @see GECMDS.C:3924–3936, GEFUNCS.C:2231
+    if ((ratio > 2 || won === 1) && ownerAtAttackTime && !this.ownerIsInGame(ownerAtAttackTime)) {
       const mailType = won === 1 ? MessageId.MESG05 : MessageId.MESG04;
       await this.insertDistressMail(ownerAtAttackTime, mailType, planet, num, ship);
     }
@@ -348,6 +350,27 @@ export class PlanetAttackService {
         await this.insertDistressMail(planet.spyowner, spyMailType, planet, num, ship);
       }
     }
+  }
+
+  /**
+   * Is this owner in the game right now — canon's `mailit(1)` suppression test?
+   *
+   *   if (flag == 1) {
+   *       if (instat(mail.userid,gestt)) {
+   *           if (othusp->substt >= FIGHTSUB) { return; }
+   *       }
+   *   }
+   *
+   * @see GEFUNCS.C:2231-2237
+   *
+   * It is deliberately the same predicate `call_4_help` uses to decide whether
+   * the live ATTACK6 alert can be delivered (GECMDS.C:3955), because the two
+   * are one rule: the distress letter exists for the owner who was not there
+   * to see the raid. `status === 1` is a player hull in the game, which is what
+   * `instat(...) && substt >= FIGHTSUB` amounts to here.
+   */
+  private ownerIsInGame(ownerUserid: string): boolean {
+    return this.ships.findByUserid(ownerUserid).some((s) => s.status === 1);
   }
 
   private async insertDistressMail(

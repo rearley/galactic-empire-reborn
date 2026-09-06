@@ -80,6 +80,8 @@ function makeService(seed: number) {
         mutated['items'] = s.items;
       },
     ),
+    // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
+    findByUserid: jest.fn().mockReturnValue([]),
   } as unknown as ShipStateService;
 
   const mockPrisma = {
