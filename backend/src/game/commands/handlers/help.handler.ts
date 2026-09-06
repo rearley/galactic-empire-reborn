@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { classDetailPage } from '../help/class-detail';
 import { HELP_TOPICS, HELP_TOPIC_ALIASES, HELP_TOPIC_IDS, HelpTopicId, canonHelpPage } from '../help/help-topics';
 import { ShipState } from '../../ship/ship-state.types';
 
@@ -44,6 +45,23 @@ export class HelpHandlerService {
       //  3. Our aliases last. They were the stopgap BEFORE canon's pages were
       //     wired, and ahead of canon they shadowed the real page: `mine` and
       //     `torpedo` both alias to our combat topic.
+      // `hel class <n>` — canon's per-class detail page, before the topic
+      // lookup so the number is not swallowed by the summary table.
+      //
+      //   if (margc == 3) { i = atoi(margv[2])-1;
+      //       if (... max_type == CLASSTYPE_USER) prfmsg(shipclass[i].hlpmsg);
+      //       else prfmsg(HLPCLS3); }
+      //   -- GECMDS.C:438-453
+      //
+      // HLPCLS2's closing note advertises this command, so the table had been
+      // pointing at something that did not exist.
+      if (raw === 'class' && args.length > 1) {
+        const page = classDetailPage(args[1]);
+        if (page) {
+          return { lines: page.map((line) => ({ text: line, category: 'info' as const })) };
+        }
+      }
+
       const ownTopic = HELP_TOPICS[raw as HelpTopicId] as { body: ReadonlyArray<string> } | undefined;
       if (ownTopic) {
         return { lines: ownTopic.body.map((line) => ({ text: line, category: 'info' as const })) };

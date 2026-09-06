@@ -293,6 +293,10 @@ const CLASS_TABLE_BODY: string[] = (() => {
     'Price- Price for a ship of this class',
     'Scan - Maximum Scanner Range',
     'Pts  - Points for killing a ship in this class',
+    '',
+    // HLPCLS2's closing note, now that the command it advertises exists.
+    '*NOTE* For more details on a class of ship use the "HELP CLASS nn" command',
+    'where nn is the class number from the table above.',
   );
   return rows;
 })();
