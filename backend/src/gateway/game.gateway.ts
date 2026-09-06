@@ -87,6 +87,7 @@ import {
   ATTACK_OWNER_ALERT_EVENT,
   AttackOwnerAlertPayload,
 } from '../game/planet/planet-attack.service';
+import { SHIP_SYSTEM_REPAIRED, ShipSystemRepairedEvent } from '../game/ship/repair-events';
 import { SHIP_SHIELD_CHARGE, ShipShieldChargeEvent } from '../game/ship/shield-events';
 import {
   SHIP_MISSILE_SHAKEN,
@@ -1534,6 +1535,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         event.shieldUp ? MessageId.DESTRUCT_BLAST_DEFLECTED : MessageId.DESTRUCT_BLAST_HIT,
         damstr(event.damage),
       ),
+    });
+  }
+
+  /**
+   * Damage Control reporting a system back online, to that ship alone.
+   * @see GEFUNCS.C:1021 PHREPR, :1059 TAREPR, :1070 HLREPR, :1080 FCREPR
+   */
+  @OnEvent(SHIP_SYSTEM_REPAIRED)
+  handleSystemRepaired(event: ShipSystemRepairedEvent): void {
+    const messageId = {
+      phaser: MessageId.REPAIR_PHASER,
+      tactical: MessageId.REPAIR_TACTICAL,
+      helm: MessageId.REPAIR_HELM,
+      firecntl: MessageId.REPAIR_FIRECNTL,
+    }[event.system];
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'system',
+      text: formatMessage(messageId),
     });
   }
 

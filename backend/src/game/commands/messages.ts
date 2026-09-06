@@ -258,6 +258,14 @@ export enum MessageId {
   HP_HIT_MINE = 'HP_HIT_MINE',
   /** HPHITU — to the VICTIM of a hyper-phaser hit. */
   HP_HIT_YOU = 'HP_HIT_YOU',
+  /** PHREPR — the phaser bank is functional again. */
+  REPAIR_PHASER = 'REPAIR_PHASER',
+  /** TAREPR — the tactical display is functioning again. */
+  REPAIR_TACTICAL = 'REPAIR_TACTICAL',
+  /** HLREPR — the helm is functioning again. */
+  REPAIR_HELM = 'REPAIR_HELM',
+  /** FCREPR — fire control is functioning again. */
+  REPAIR_FIRECNTL = 'REPAIR_FIRECNTL',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -849,6 +857,15 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.HP_FIRED]: CANON_MESSAGES.HPFIRED,
   [MessageId.HP_HIT_MINE]: CANON_MESSAGES.HPHITM,
   [MessageId.HP_HIT_YOU]: CANON_MESSAGES.HPHITU,
+  /**
+   * Damage Control, one line per system — "something is fixed" is not
+   * actionable; the pilot needs to know whether they can steer, lock, scan or
+   * shoot again. @see GEFUNCS.C:1021, :1059, :1070, :1080
+   */
+  [MessageId.REPAIR_PHASER]: CANON_MESSAGES.PHREPR,
+  [MessageId.REPAIR_TACTICAL]: CANON_MESSAGES.TAREPR,
+  [MessageId.REPAIR_HELM]: CANON_MESSAGES.HLREPR,
+  [MessageId.REPAIR_FIRECNTL]: CANON_MESSAGES.FCREPR,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

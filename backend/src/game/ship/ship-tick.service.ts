@@ -14,6 +14,11 @@ import {
   SHIP_OVERSPEED,
 } from './overspeed-events';
 import {
+  SHIP_SYSTEM_REPAIRED,
+  RepairedSystem,
+  ShipSystemRepairedEvent,
+} from './repair-events';
+import {
   SHIP_SHIELD_CHARGE,
   ShipShieldChargeEvent,
 } from './shield-events';
@@ -237,12 +242,28 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     const needsSubsystemRepair = ship.tactical < 0 || ship.helm < 0
       || ship.firecntl > 0 || ship.phasr < 0 || (ship.shieldstat === SHIELDDM && ship.shield < 0);
     if (needsSubsystemRepair) {
+      // Damage Control reports each system EXACTLY ONCE, on the tick its
+      // counter reaches zero — `if (ptr->helm == 0) prfmsg(HLREPR);` and the
+      // three like it. @see GEFUNCS.C:1016-1080
+      const repaired: RepairedSystem[] = [];
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        if (s.tactical < 0) s.tactical = Math.min(0, s.tactical + 1);
-        if (s.helm < 0) s.helm = Math.min(0, s.helm + 1);
-        if (s.firecntl > 0) s.firecntl = Math.max(0, s.firecntl - 1);
+        if (s.tactical < 0) {
+          s.tactical = Math.min(0, s.tactical + 1);
+          if (s.tactical === 0) repaired.push('tactical');
+        }
+        if (s.helm < 0) {
+          s.helm = Math.min(0, s.helm + 1);
+          if (s.helm === 0) repaired.push('helm');
+        }
+        if (s.firecntl > 0) {
+          s.firecntl = Math.max(0, s.firecntl - 1);
+          if (s.firecntl === 0) repaired.push('firecntl');
+        }
         // GEFUNCS.C:1015-1018 checkdam: negative phasr recovers +1/tick (energy-free, separate from preload)
-        if (s.phasr < 0) s.phasr = Math.min(0, s.phasr + 1);
+        if (s.phasr < 0) {
+          s.phasr = Math.min(0, s.phasr + 1);
+          if (s.phasr === 0) repaired.push('phaser');
+        }
         if (s.shieldstat === SHIELDDM && s.shield < 0) {
           // GEFUNCS.C:2473-2484 shieldrep: shield recovers at +shieldtype per tick (Fix 4)
           s.shield = Math.min(0, s.shield + s.shieldtype);
@@ -251,6 +272,14 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
           }
         }
       });
+
+      for (const system of repaired) {
+        this.events?.emit(SHIP_SYSTEM_REPAIRED, {
+          shipId: shipKey(ship.userid, ship.shipno),
+          system,
+          tickAt: new Date(),
+        } satisfies ShipSystemRepairedEvent);
+      }
     }
 
     // 3. Passive hull repair — GEFUNCS.C:1009-1010, the last thing checkdam
