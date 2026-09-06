@@ -1761,9 +1761,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const flotsam = event.loot
       .map((l) => `, ${l.amount} ${ITEM_NAMES[l.itemIndex] ?? 'items'}`)
       .join('');
+    // Canon closes the sentence unconditionally — `prf(".\r")`, GEFUNCS.C:1141
+    // — whether or not anything was collected. Without it a kill that salvaged
+    // nothing rendered as a bare "We have retrieved", which reads as a message
+    // truncated mid-render rather than as "we got nothing". An empty haul is
+    // the COMMON case, not an edge one: `chkweight` refuses every item that
+    // will not fit, so any captain flying near their tonnage limit sees this
+    // on every kill.
     this.server.to(`user:${event.attackerUserid}`).emit('event.log', {
       category: 'combat',
-      text: `${formatMessage(MessageId.KILL_SALVAGE, shipname)}${flotsam}`,
+      text: `${formatMessage(MessageId.KILL_SALVAGE, shipname)}${flotsam}.`,
     });
 
     if (event.scoreAwarded > 0) {

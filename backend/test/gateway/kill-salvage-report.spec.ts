@@ -103,6 +103,38 @@ describe('kill salvage report (GEFUNCS.C:1120-1136, :1187)', () => {
     expect(killerText(emits)).toContain('We have destroyed');
   });
 
+  /**
+   * Canon closes the sentence unconditionally:
+   *
+   *     prfmsg(KILLGOT1,ptr->shipname);        // "...We have retrieved"
+   *     for (...) prf(", %s %s",amt,name);     // ", 74 gold"
+   *     prf(".\r");                            // <- always, GEFUNCS.C:1141
+   *
+   * The port emitted the header and the list and then simply stopped, so a
+   * kill that salvaged nothing — which is the common case with a full hold —
+   * read as a truncated line: "We have retrieved" with nothing after it,
+   * looking for all the world like the message had been cut off mid-render.
+   * Reported from play after a Cybertron Scout kill with 38 tons free.
+   *
+   * `toContain` in the cases above is what let it through: it can prove a
+   * fragment is present but never that the sentence ENDS.
+   */
+  it('closes the sentence with a period when nothing fitted in the hold', () => {
+    const { gateway, emits } = build();
+
+    report(gateway, kill({ loot: [] }));
+
+    expect(killerText(emits)).toMatch(/We have retrieved\.$/m);
+  });
+
+  it('closes the sentence with a period after the salvage list', () => {
+    const { gateway, emits } = build();
+
+    report(gateway, kill());
+
+    expect(killerText(emits)).toMatch(/We have retrieved(, [^\n]*)\.$/m);
+  });
+
   it('says nothing to a killer that does not exist — a self-destruct', () => {
     const { gateway, emits } = build();
 
