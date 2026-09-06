@@ -3384,8 +3384,19 @@ the audit except the kill salvage report.
 **Tests:** phaser-charge-notices (4), status-notices (7), plus the gateway
 relays. 504 suites / 5,054 tests.
 
-**Still open:** the kill salvage report (KILLGOT1/KILLPNTS — you never learn
-what you looted or scored), `hel transfer` from the round-7 list, and a test for
+**Kill salvage report — DONE, same day.** KILLGOT1 + the flotsam list and
+KILLPNTS (GEFUNCS.C:1120-1136, :1187). The port computed the loot and the score,
+carried both on COMBAT_SHIP_DESTROYED, and narrated neither — a kill silently
+filled your hold and moved your score while the log said only "X was destroyed
+by Y". KILLGOT1 deliberately ends mid-sentence ("We have retrieved") because
+canon appends the items with `prf(", %s %s")`.
+
+Noted while doing it, NOT fixed: our `ITEM_NAMES` render "Torpedoes"/"Gold"
+where canon's `item_name[]` is "torpedos"/"gold" (GECMDS.C:81-107). The
+difference is pre-existing and shared by every narration site in the port, so it
+is one change of its own rather than a side-effect of this one.
+
+**Still open:** `hel transfer` from the round-7 list, and a test for
 `applyAdminChange`'s ownership gate.
 
 **Known issues:** deployed.

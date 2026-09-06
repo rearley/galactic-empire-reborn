@@ -134,6 +134,15 @@ export interface CombatShipDestroyedEvent {
   tickAt: Date;
   /** Items looted from victim — GEFUNCS.C:killem (1122-1136). Empty when no attacker or no transfer. */
   loot: Array<{ itemIndex: number; amount: bigint }>;
+  /**
+   * The victim's ship name and class, for the killer's salvage report:
+   * `prfmsg(KILLGOT1,ptr->shipname)` and
+   * `prfmsg(KILLPNTS,gechrbuf,shipclass[ptr->shpclass].typename)`.
+   * Optional because the ship is gone by the time some callers build the event.
+   * @see GEFUNCS.C:1120, :1187
+   */
+  victimShipname?: string;
+  victimClass?: number;
   /** Points awarded on this kill — shipClass.points for victim's class. 0 if class unknown. @see GEFUNCS.C:killem (1145) */
   scoreAwarded: number;
 }
