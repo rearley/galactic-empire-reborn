@@ -75,7 +75,11 @@ export class TransferHandlerService {
 
     const result = await this.planetState.depositToPlanet(key, ship.userid, itemIndex, BigInt(qty));
     if (!result.ok) {
-      return { lines: [{ text: formatMessage(MessageId.TRAN_NOT_OWNER), category: 'system' }] };
+      // TRANSFR4 — "We don't own this planet." Canon's refusal for the down
+      // leg; the port answered TRANSFR3, "We are not in orbit", which is a
+      // false statement about a ship that is standing in orbit.
+      // @see GECMDS.C:3348
+      return { lines: [{ text: formatMessage(MessageId.TRAN_DOWN_NOT_OWNER), category: 'system' }] };
     }
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
@@ -133,7 +137,8 @@ export class TransferHandlerService {
       if (result.reason === 'INSUFFICIENT') {
         return { lines: [{ text: formatMessage(MessageId.TRAN_PLANET_LOW), category: 'system' }] };
       }
-      return { lines: [{ text: formatMessage(MessageId.TRAN_NOT_OWNER), category: 'system' }] };
+      // TRANSUP4 — "We don't own this planet." @see GECMDS.C:3411
+      return { lines: [{ text: formatMessage(MessageId.TRAN_UP_NOT_OWNER), category: 'system' }] };
     }
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {

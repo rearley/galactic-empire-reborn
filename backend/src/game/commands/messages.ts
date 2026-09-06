@@ -246,6 +246,12 @@ export enum MessageId {
   DESTRUCT_BLAST_HIT = 'DESTRUCT_BLAST_HIT',
   /** NEW5 — `new` attempted anywhere but in orbit around Zygor. */
   NEW_WRONG_PLACE = 'NEW_WRONG_PLACE',
+  /** TRANSFR4 — `tra down` refused because the planet is not ours. */
+  TRAN_DOWN_NOT_OWNER = 'TRAN_DOWN_NOT_OWNER',
+  /** TRANSUP4 — `tra up` refused because the planet is not ours. */
+  TRAN_UP_NOT_OWNER = 'TRAN_UP_NOT_OWNER',
+  /** ORBIT4 — `orb` attempted from hyperspace. */
+  ORBIT_HYPERSPACE = 'ORBIT_HYPERSPACE',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -824,6 +830,15 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
    * Tahanian Station.
    */
   [MessageId.NEW_WRONG_PLACE]: CANON_MESSAGES.NEW5,
+  /**
+   * Canon's ownership refusals for `tra`. The port answered TRANSFR3 — "We are
+   * not in orbit" — for both, which is false of a ship standing in orbit over
+   * the planet it just tried to use. @see GECMDS.C:3348, :3411
+   */
+  [MessageId.TRAN_DOWN_NOT_OWNER]: CANON_MESSAGES.TRANSFR4,
+  [MessageId.TRAN_UP_NOT_OWNER]: CANON_MESSAGES.TRANSUP4,
+  /** @see GECMDS.C:770-774 — the first thing `orb` answers for a ship at warp. */
+  [MessageId.ORBIT_HYPERSPACE]: CANON_MESSAGES.ORBIT4,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

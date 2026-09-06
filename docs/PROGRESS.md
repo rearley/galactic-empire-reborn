@@ -3283,3 +3283,45 @@ asserted a gate order that inverts canon's; `new-ship.handler.spec.ts` had a
 location gate was loose.
 
 **Known issues:** deployed.
+
+## 2026-09-06 — hyper-phaser AI, scan mines, transfer rules, orb gate
+
+**Completed:** four more canon items, each verified against the C source first.
+
+- **Cybertrons fire the hyper-phaser in hyperspace** (GECYBS.C:279). They were
+  calling the normal-phaser sweep, and `firep` discards a target at warp unless
+  `phasrtype >= phatowrp` (GECMDS.C:948) — so a Cybertron pursuing you through
+  hyperspace could not land a shot at all. Selection now lives in
+  `combat/firehp.ts` and BOTH the player command and the AI use it, because
+  canon has one `firehp`; having it in the player handler alone is what caused
+  this.
+- **Mines are drawn on `sca ra`, not `sca lo`.** The loops were swapped: canon's
+  is in scan_ra (GECMDS.C:2529), and scan_lo has no `mptr` iteration at all. The
+  port had it in `sca lo` while citing scan_ra's line numbers, so the zoomable
+  tactical scan — the mode you use to pick through a minefield — showed clean
+  space. `sca se` keeps its own loop (GECMDS.C:2598).
+- **`tra down` onto planets you do not own.** TRANSOPT ships YES
+  (MBMGEMSG.MSG:191), so canon's `trans_opt || sameas(...)` lets anyone deposit
+  anywhere; the port required ownership. `tra up` is the asymmetric half and
+  keeps its check — own planet or unclaimed (GECMDS.C:3374) — which was already
+  right. Both refusals now print canon's TRANSFR4/TRANSUP4 instead of TRANSFR3,
+  "We are not in orbit", which was false of a ship standing in orbit.
+- **`orb` from hyperspace** answers ORBIT4 (GECMDS.C:770). There was no gate, so
+  a captain at warp passing within 250 units dropped into orbit mid-flight and
+  the orbit path zeroed speed — a free emergency stop from any velocity.
+
+**A mistake worth recording.** While removing the ownership check from
+`depositToPlanet` I matched an identical line in `applyAdminChange` and removed
+THAT one instead — which would have let any player rewrite any planet's tax
+rates, prices and reserves. Caught by reading back the file rather than by a
+test: no spec covered `applyAdminChange`'s owner gate. Restored, and the correct
+method edited. A blind textual replace across a file with repeated guard lines
+is not safe; match on surrounding context.
+
+**Tests:** cyb-hyper-phaser (5), scan-ra-mines (2, sabotage-verified),
+transfer-ownership-canon (5), orb-hyperspace (3). The existing
+`scan-mines.spec.ts` asserted "draws mines on `sca lo` too" citing 2529 — it
+encoded the defect and is corrected.
+
+**Known issues:** deployed. `applyAdminChange` still has no test for its
+ownership gate, which is how the near-miss above went unnoticed — worth adding.

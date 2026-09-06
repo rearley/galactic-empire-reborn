@@ -611,7 +611,18 @@ export class PlanetStateService implements OnModuleInit {
   /**
    * Transfer items from ship cargo down to planet surface.
    * Caller must already hold the ship item in ship.items[itemIndex].
-   * Requires requester to own the planet.
+   *
+   * NO ownership test. Canon gates trans_down on
+   * `trans_opt || sameas(plptr->userid,warsptr->userid)` (GECMDS.C:3323) and
+   * TRANSOPT ships YES — "Allow goods transfers to planets not owned?"
+   * (MBMGEMSG.MSG:191) — so anyone may deposit onto any world. That is what
+   * lets a captain resupply a team-mate's colony, stock a planet before
+   * claiming it, or dump cargo somewhere other than home.
+   *
+   * Taking cargo UP is the asymmetric half and DOES check ownership
+   * (`sameas(...) || plptr->userid[0] == 0`, GECMDS.C:3374) — see
+   * `withdrawFromPlanet`.
+   *
    * @see GECMDS.C:3300 trans_down
    */
   async depositToPlanet(
@@ -623,7 +634,6 @@ export class PlanetStateService implements OnModuleInit {
     return this.runSerialized(key, async () => {
       const state = this.map.get(key);
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
-      if (state.userid !== requesterUserid) return { ok: false as const, reason: 'NOT_OWNER' as const };
 
       state.items[itemIndex].qty += qty;
 
