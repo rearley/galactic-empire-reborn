@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
@@ -52,23 +52,40 @@ export function App(): React.JSX.Element {
 
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
-  const { status, lastResult, send, reconnect, localShipId, onboardingPrompt, emitPromptReply } =
-    useSocket(playerDispatch);
   const [logLines, setLogLines] = useState<EventLogLine[]>([]);
+
+  /**
+   * Every line gets a monotonic id, used as its React key.
+   *
+   * EventLog keyed rows by ARRAY INDEX over a `slice(-500)` window, so once the
+   * log filled, each new message shifted every index and React re-rendered all
+   * 500 rows — thousands of reconciliations a second during a combat burst, on
+   * the same thread as the player's keystrokes. Reported from play as scrolling
+   * problems and a cursor that "had some issues".
+   */
+  const nextLineId = useRef(0);
+  const withIds = useCallback(
+    (lines: Array<Omit<EventLogLine, 'id'>>): EventLogLine[] =>
+      lines.map((l) => ({ ...l, id: nextLineId.current++ })),
+    [],
+  );
+  const appendLines = useCallback(
+    (lines: Array<Omit<EventLogLine, 'id'>>) =>
+      setLogLines((prev) => [...prev, ...withIds(lines)].slice(-MAX_LOG_ENTRIES)),
+    [withIds],
+  );
+
+  // Delivered synchronously from the socket callback — no state slot to
+  // overwrite, so a burst cannot drop results. @see socket/useCommandResultQueue
+  const { status, send, reconnect, localShipId, onboardingPrompt, emitPromptReply } =
+    useSocket(playerDispatch, (payload) =>
+      handleCommandResult(payload, appendLines, () => setLogLines([])),
+    );
   const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
   // Which scan produced them — ScanMap needs it to decide whether a sector
   // crossing invalidates the view. Only `sca se` is sector-scoped.
   const [scanKind, setScanKind] = useState<ScanRenderEvent['kind'] | null>(null);
 
-  useEffect(() => {
-    if (lastResult) {
-      handleCommandResult(
-        lastResult,
-        (lines) => setLogLines((prev) => [...prev, ...lines].slice(-MAX_LOG_ENTRIES)),
-        () => setLogLines([]),
-      );
-    }
-  }, [lastResult]);
 
   // Function-key bindings for the F KEY MAP panel. Sent on board and again
   // after every `fset`, so the panel is populated at login rather than only
@@ -91,14 +108,10 @@ function Terminal(): React.JSX.Element {
 
   useEffect(() => {
     const handleEntered = (payload: { shipName: string }) => {
-      setLogLines((prev) =>
-        [...prev, { text: `${payload.shipName} has entered the sector.`, category: 'nav' as const }].slice(-MAX_LOG_ENTRIES),
-      );
+      appendLines([{ text: `${payload.shipName} has entered the sector.`, category: 'nav' as const }]);
     };
     const handleLeft = (payload: { shipName: string }) => {
-      setLogLines((prev) =>
-        [...prev, { text: `${payload.shipName} has left the sector.`, category: 'nav' as const }].slice(-MAX_LOG_ENTRIES),
-      );
+      appendLines([{ text: `${payload.shipName} has left the sector.`, category: 'nav' as const }]);
     };
     socket.on('sector:ship-entered', handleEntered);
     socket.on('sector:ship-left', handleLeft);
@@ -121,8 +134,7 @@ function Terminal(): React.JSX.Element {
    * the pilot never saw, and `sen`/`fre` transmitted into a void.
    */
   useEffect(() => {
-    const append = (line: EventLogLine) =>
-      setLogLines((prev) => [...prev, line].slice(-MAX_LOG_ENTRIES));
+    const append = (line: Omit<EventLogLine, 'id'>) => appendLines([line]);
 
     const handleServerNotice = (payload: { text?: string; category?: EventLogLine['category'] }) => {
       if (typeof payload?.text !== 'string') return;

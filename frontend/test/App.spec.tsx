@@ -79,7 +79,9 @@ describe('App — multi-ship fleet menu', () => {
     const { useSocket } = await import('../src/socket/useSocket');
     vi.mocked(useSocket).mockReturnValue({
       status: 'connected' as const,
-      lastResult: null,
+      // `lastResult` is gone: results are delivered through a callback sink so
+      // a burst cannot overwrite an undelivered one.
+      // @see src/socket/useCommandResultQueue.ts
       send: vi.fn(),
       localShipId: null,
       onboardingPrompt: {

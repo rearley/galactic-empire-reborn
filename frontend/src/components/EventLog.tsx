@@ -38,11 +38,21 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
     setStickyBottom(distanceFromBottom <= STICKY_THRESHOLD);
   };
 
+  /**
+   * Coalesce the scroll to one write per animation frame.
+   *
+   * This wrote `scrollTop` synchronously for every message. A combat burst
+   * arrives as many separate socket events, so the log was forcing a layout
+   * per line and fighting the player if they tried to scroll up mid-burst.
+   * One frame is the finest granularity the display can actually show.
+   */
   useEffect(() => {
-    if (stickyBottom) {
+    if (!stickyBottom) return;
+    const raf = requestAnimationFrame(() => {
       const el = containerRef.current;
       if (el) el.scrollTop = el.scrollHeight;
-    }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [lines, stickyBottom]);
 
   return (
@@ -58,7 +68,7 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
       >
         {capped.map((line, idx) => (
           <div
-            key={idx}
+            key={line.id ?? idx}
             // whitespace-pre-wrap keeps the column padding that who/ros/pla/pri
             // emit (padEnd/padStart) from being collapsed by the browser, while
             // still wrapping long narrative lines inside the panel.

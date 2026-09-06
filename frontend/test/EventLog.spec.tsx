@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { EventLog } from '../src/components/EventLog';
 import type { EventLogLine } from '../src/types/contracts';
+
+/** Flush one animation frame — the log coalesces its scroll into one. */
+const nextFrame = () => act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
 
 describe('EventLog', () => {
   it('renders lines in arrival order', () => {
@@ -53,7 +56,14 @@ describe('EventLog', () => {
     expect(screen.getByTestId('event-log')).toBeDefined();
   });
 
-  it('auto-scrolls on update (scrollTop set to scrollHeight after update)', () => {
+  /**
+   * The scroll is coalesced to one write per animation frame — a combat burst
+   * arrives as many separate socket events, and writing scrollTop for each one
+   * forced a layout per line and fought a player trying to scroll up. These
+   * two cases pinned the write being SYNCHRONOUS, which was never the
+   * contract; they now await a frame.
+   */
+  it('auto-scrolls on update (scrollTop set to scrollHeight after update)', async () => {
     const lines: EventLogLine[] = [{ text: 'line 1', category: 'info' }];
     const { rerender } = render(<EventLog lines={lines} />);
     const container = screen.getByTestId('event-log');
@@ -62,6 +72,7 @@ describe('EventLog', () => {
     Object.defineProperty(container, 'clientHeight', { value: 200, writable: true });
 
     rerender(<EventLog lines={[...lines, { text: 'line 2', category: 'success' }]} />);
+    await nextFrame();
     expect(container.scrollTop).toBe(500);
   });
 
@@ -99,7 +110,7 @@ describe('EventLog', () => {
   });
 
   // T009: auto-scroll resumes when user scrolls back to bottom (FR-008)
-  it('resumes auto-scroll when user scrolls back to bottom', () => {
+  it('resumes auto-scroll when user scrolls back to bottom', async () => {
     const lines: EventLogLine[] = [{ text: 'line 1', category: 'info' }];
     const { rerender } = render(<EventLog lines={lines} />);
     const container = screen.getByTestId('event-log');
@@ -117,6 +128,7 @@ describe('EventLog', () => {
 
     // New line arrives — should auto-scroll now
     rerender(<EventLog lines={[...lines, { text: 'line 2', category: 'info' }]} />);
+    await nextFrame();
     expect(container.scrollTop).toBe(500);
   });
 
