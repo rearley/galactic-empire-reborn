@@ -244,6 +244,8 @@ export enum MessageId {
   DESTRUCT_BLAST_DEFLECTED = 'DESTRUCT_BLAST_DEFLECTED',
   /** SELFD7 — an unshielded ship caught in a self-destruct blast. */
   DESTRUCT_BLAST_HIT = 'DESTRUCT_BLAST_HIT',
+  /** NEW5 — `new` attempted anywhere but in orbit around Zygor. */
+  NEW_WRONG_PLACE = 'NEW_WRONG_PLACE',
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   LOC_SELF = 'LOC_SELF',
@@ -816,6 +818,12 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   /** @see GEFUNCS.C:1878-1891 — `%s` is a damstr WORD, not a number. */
   [MessageId.DESTRUCT_BLAST_DEFLECTED]: CANON_MESSAGES.SELFD6,
   [MessageId.DESTRUCT_BLAST_HIT]: CANON_MESSAGES.SELFD7,
+  /**
+   * @see GECMDS.C:4557 `if (neutral(&warsptr->coord) && plnum == 1)` and the
+   * closing else at :4720. Zygor ONLY — unlike `mai`, which also accepts
+   * Tahanian Station.
+   */
+  [MessageId.NEW_WRONG_PLACE]: CANON_MESSAGES.NEW5,
 
   // lock (feature 006b Phase 6) — GECMDS.C:1441 cmd_lock
   [MessageId.LOC_SELF]: CANON_MESSAGES.FOOLISH,

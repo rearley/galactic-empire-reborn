@@ -108,6 +108,12 @@ function isShipnameCollision(err: unknown): boolean {
   return fields.toLowerCase().includes('shipname');
 }
 
+/**
+ * Zygor is plnum 1 in the neutral zone — s00.ts numbers it first, and
+ * orbit.handler.ts stores `where = 10 + plnum`. @see GECMDS.C:4557
+ */
+const ZYGOR_PLNUM = 1;
+
 @Injectable()
 export class NewShipHandlerService {
   constructor(
@@ -177,19 +183,27 @@ export class NewShipHandlerService {
     return { lines };
   }
 
-  private async purchaseShip(ship: ShipState, classArg: string): Promise<CommandResult> {
-    // Validate: must be in neutral zone (sector 0,0)
-    if (Math.floor(ship.xcoord) !== 0 || Math.floor(ship.ycoord) !== 0) {
-      return {
-        lines: [{ text: "You must be at Zygor station (neutral zone) to purchase a ship.", category: 'system' }],
-      };
-    }
+  /**
+   * `neutral(&warsptr->coord) && plnum == 1` — in orbit around Zygor, in the
+   * neutral zone. @see GECMDS.C:4557
+   */
+  private atZygor(ship: ShipState): boolean {
+    const inNeutralZone = Math.floor(ship.xcoord) === 0 && Math.floor(ship.ycoord) === 0;
+    return inNeutralZone && ship.where - 10 === ZYGOR_PLNUM;
+  }
 
-    // Validate: must be orbiting
-    if (ship.where < 10) {
-      return {
-        lines: [{ text: "You must be orbiting a planet at Zygor station.", category: 'system' }],
-      };
+  private async purchaseShip(ship: ShipState, classArg: string): Promise<CommandResult> {
+    // Canon: `if (neutral(&warsptr->coord) && plnum == 1)` — the neutral zone
+    // AND Zygor specifically, where `plnum = warsptr->where - 10`. Anything
+    // else falls to the closing else and answers NEW5.
+    // @see GECMDS.C:4554-4560, :4718-4721
+    //
+    // Note the asymmetry with `mai`, which accepts plnum 1 OR 2
+    // (GECMDS.C:4500): you can be serviced at Tahanian Station, but you can
+    // only BUY at Zygor. The port gated on "sector (0,0), orbiting anything",
+    // so every neutral-zone body sold hulls and upgrades.
+    if (!this.atZygor(ship)) {
+      return { lines: [{ text: formatMessage(MessageId.NEW_WRONG_PLACE), category: 'system' }] };
     }
 
     const classNumber = parseInt(classArg, 10);
@@ -292,6 +306,18 @@ export class NewShipHandlerService {
   }
 
   private async handleUpgrade(ship: ShipState, typeArg: string | undefined, kind: 'phaser' | 'shield'): Promise<CommandResult> {
+    // Canon: `if (neutral(&warsptr->coord) && plnum == 1)` — the neutral zone
+    // AND Zygor specifically, where `plnum = warsptr->where - 10`. Anything
+    // else falls to the closing else and answers NEW5.
+    // @see GECMDS.C:4554-4560, :4718-4721
+    //
+    // Note the asymmetry with `mai`, which accepts plnum 1 OR 2
+    // (GECMDS.C:4500): you can be serviced at Tahanian Station, but you can
+    // only BUY at Zygor. The port gated on "sector (0,0), orbiting anything",
+    // so every neutral-zone body sold hulls and upgrades.
+    if (!this.atZygor(ship)) {
+      return { lines: [{ text: formatMessage(MessageId.NEW_WRONG_PLACE), category: 'system' }] };
+    }
     const priceTable = kind === 'phaser' ? PHASER_PRICE : SHIELD_PRICE;
     const currentType = kind === 'phaser' ? ship.phasrtype : ship.shieldtype;
 
@@ -329,13 +355,6 @@ export class NewShipHandlerService {
       return { lines: [{ text: `You already have ${kind} type ${currentType}.`, category: 'system' }] };
     }
 
-    // Must be at Zygor-3 and orbiting — GECMDS.C:4561
-    if (Math.floor(ship.xcoord) !== 0 || Math.floor(ship.ycoord) !== 0) {
-      return { lines: [{ text: 'You must be at Zygor station (neutral zone) to purchase upgrades.', category: 'system' }] };
-    }
-    if (ship.where < 10) {
-      return { lines: [{ text: 'You must be orbiting a planet at Zygor station.', category: 'system' }] };
-    }
 
     const userRow = await this.prisma.user.findUnique({ where: { userid: ship.userid }, select: { cash: true } });
     const cash = userRow?.cash ?? 0n;

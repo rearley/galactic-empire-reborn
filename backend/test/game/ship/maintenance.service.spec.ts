@@ -42,10 +42,13 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(opts: {
-  planet?: { items: { qty: bigint }[]; password?: string | null } | null;
+  planet?: { userid?: string; items: { qty: bigint }[]; password?: string | null } | null;
   cash?: bigint;
 } = {}) {
-  const { planet = { items: [{ qty: 50_000n }], password: null }, cash = BigInt(MAINT_COST_NORMAL) * 5n } = opts;
+  // Canon's MAINT8 is `plptr->userid[0] == 0 || items[I_MEN].qty < 25000` — the
+  // planet must be COLONISED, not merely populated, so the default fixture has
+  // an owner. @see GECMDS.C:4486
+  const { planet = { userid: 'owner', items: [{ qty: 50_000n }], password: null }, cash = BigInt(MAINT_COST_NORMAL) * 5n } = opts;
 
   const mutated: Record<string, unknown> = {};
   const mockShipState = {
@@ -109,13 +112,13 @@ describe('MaintenanceService — FR-207 facility gate', () => {
   });
 
   it('returns no-facility when planet population < 25000', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 24_999n }] } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 24_999n }] } });
     const result = await svc.evaluateGates(makeShip({ where: 10 }));
     expect(result).toEqual({ ok: false, reason: 'no-facility' });
   });
 
   it('passes facility gate when population === 25000', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 25_000n }] } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 25_000n }] } });
     const result = await svc.evaluateGates(makeShip({ where: 10 }));
     expect(result.ok).toBe(true);
   });
@@ -140,27 +143,31 @@ describe('MaintenanceService — FR-208 combat-lock gate', () => {
 });
 
 // ---------------------------------------------------------------------------
-// FR-209: neutral zone only at Zygor (plnum 0 or 1)
+// FR-209: neutral zone only at Zygor (plnum 1) or Tahanian Station (plnum 2)
 // ---------------------------------------------------------------------------
 
 describe('MaintenanceService — FR-209 neutral zone gate', () => {
-  it('returns nz-not-zygor for non-Zygor planet in NZ (plnum=2)', async () => {
+  // Canon allows `plnum == 1 || plnum == 2` — Zygor AND Tahanian Station
+  // (GECMDS.C:4500). Planets here are 1-based (s00.ts: "Index i is plnum i+1"),
+  // so these were off by one: they asserted plnum 0 valid and plnum 2 refused,
+  // which locked maintenance out of Tahanian Station entirely.
+  it('returns nz-not-zygor for the Enforcer Planet in NZ (plnum=3)', async () => {
     const { svc } = makeService();
-    // where=12 → plnum=2, xcoord=0.5, ycoord=0.5 → sector (0,0) → NZ
-    const result = await svc.evaluateGates(makeShip({ where: 12, xcoord: 0.5, ycoord: 0.5 }));
+    // where=13 → plnum=3, xcoord=0.5, ycoord=0.5 → sector (0,0) → NZ
+    const result = await svc.evaluateGates(makeShip({ where: 13, xcoord: 0.5, ycoord: 0.5 }));
     expect(result).toEqual({ ok: false, reason: 'nz-not-zygor' });
   });
 
-  it('passes for Zygor plnum=0 in NZ', async () => {
+  it('passes for Zygor, plnum=1, in NZ', async () => {
     // Zygor uses MAINT_COST_NEUTRAL (2500) — provide sufficient cash
     const { svc } = makeService({ cash: BigInt(MAINT_COST_NEUTRAL) * 2n });
-    const result = await svc.evaluateGates(makeShip({ where: 10, xcoord: 0.5, ycoord: 0.5 }));
+    const result = await svc.evaluateGates(makeShip({ where: 11, xcoord: 0.5, ycoord: 0.5 }));
     expect(result.ok).toBe(true);
   });
 
-  it('passes for Zygor plnum=1 in NZ', async () => {
+  it('passes for Tahanian Station, plnum=2, in NZ', async () => {
     const { svc } = makeService({ cash: BigInt(MAINT_COST_NEUTRAL) * 2n });
-    const result = await svc.evaluateGates(makeShip({ where: 11, xcoord: 0.5, ycoord: 0.5 }));
+    const result = await svc.evaluateGates(makeShip({ where: 12, xcoord: 0.5, ycoord: 0.5 }));
     expect(result.ok).toBe(true);
   });
 
@@ -178,45 +185,48 @@ describe('MaintenanceService — FR-209 neutral zone gate', () => {
 
 describe('MaintenanceService — FR-210 password gate', () => {
   it('returns password-required when planet has password and no arg given', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'secret' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'secret' } });
     const result = await svc.evaluateGates(makeShip(), '');
     expect(result).toEqual({ ok: false, reason: 'password-required' });
   });
 
   it('returns wrong-password when wrong arg given', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'secret' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'secret' } });
     const result = await svc.evaluateGates(makeShip(), 'wrong');
     expect(result).toEqual({ ok: false, reason: 'wrong-password' });
   });
 
   it('passes on correct password (case-insensitive)', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'SECRET' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'SECRET' } });
     const result = await svc.evaluateGates(makeShip(), 'secret');
     expect(result.ok).toBe(true);
   });
 
   it('bypasses password gate when password is "none"', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'none' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'none' } });
     const result = await svc.evaluateGates(makeShip(), '');
     expect(result.ok).toBe(true);
   });
 
   it('bypasses password gate when passwordArg is undefined (tick-layer caller)', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'secret' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'secret' } });
     const result = await svc.evaluateGates(makeShip());
     // passwordArg undefined → skip gate entirely, proceed to damage check
     expect(result.ok).toBe(true);
   });
 
-  it('NZ gate fires before password gate (gate ordering)', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'secret' } });
-    // NZ non-Zygor should fire before password check
-    const result = await svc.evaluateGates(makeShip({ where: 12, xcoord: 0.5, ycoord: 0.5 }), '');
-    expect(result).toEqual({ ok: false, reason: 'nz-not-zygor' });
+  it('password gate fires BEFORE the NZ gate (canon ordering)', async () => {
+    // This test previously asserted the opposite, and the opposite is not what
+    // canon does: MAINT2/MAINT3 (password) are checked at GECMDS.C:4471/:4479,
+    // long before the neutral-zone test at :4498. A password-protected planet
+    // in the neutral zone therefore demands the password first.
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'secret' } });
+    const result = await svc.evaluateGates(makeShip({ where: 13, xcoord: 0.5, ycoord: 0.5 }), '');
+    expect(result).toEqual({ ok: false, reason: 'password-required' });
   });
 
   it('password gate fires before no-damage gate (gate ordering)', async () => {
-    const { svc } = makeService({ planet: { items: [{ qty: 50_000n }], password: 'secret' } });
+    const { svc } = makeService({ planet: { userid: 'owner', items: [{ qty: 50_000n }], password: 'secret' } });
     // damage=0, ship in orbit with password — password fires first
     const result = await svc.evaluateGates(makeShip({ damage: 0 }), '');
     expect(result).toEqual({ ok: false, reason: 'password-required' });
@@ -264,8 +274,8 @@ describe('MaintenanceService — FR-205 cash gate', () => {
 
   it('uses MAINT_COST_NEUTRAL at Zygor', async () => {
     const { svc } = makeService({ cash: BigInt(MAINT_COST_NEUTRAL) });
-    // Zygor plnum=0, NZ sector
-    const result = await svc.evaluateGates(makeShip({ where: 10, xcoord: 0.5, ycoord: 0.5, damage: 10 }));
+    // Zygor plnum=1, NZ sector -> where = 10 + 1
+    const result = await svc.evaluateGates(makeShip({ where: 11, xcoord: 0.5, ycoord: 0.5, damage: 10 }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.price).toBe(BigInt(MAINT_COST_NEUTRAL));

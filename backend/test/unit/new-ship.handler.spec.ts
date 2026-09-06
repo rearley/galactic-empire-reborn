@@ -18,7 +18,12 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     phasr: 100, phasrtype: 0, kills: 0, lastfired: 0,
     shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
     degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 10, // orbiting
+    // In orbit around ZYGOR. Canon's shipyard gate is
+    // `neutral(&coord) && plnum == 1` (GECMDS.C:4557), and `where = 10 + plnum`
+    // — so orbiting Zygor is 11. This fixture said 10, i.e. plnum 0, which is
+    // not a planet at all; it passed only because the port checked "orbiting
+    // anything in sector (0,0)".
+    where: 11,
     ltorpsChannel: [], ltorpsDistance: [],
     lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
     decout: [], jammer: 0, freq: [0, 0, 0],
