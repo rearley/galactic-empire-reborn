@@ -64,8 +64,20 @@ export interface ScanRenderEvent {
  */
 export const MAX_SCAN_CARDS = 40;
 
-export function useScanRender(): ScanRenderEvent[] {
+/**
+ * @param shipId  The hull currently boarded. Scan data belongs to the ship
+ *   that gathered it — the backend keys its scantab `userid#shipno`, so a newly
+ *   boarded hull starts blind. The display kept its cards across a switch, so a
+ *   captain leaving a Stealth Fighter (200,000 scan range) for an Interceptor
+ *   (100,000) still saw contacts the new hull cannot detect, rendered as if
+ *   current. Stale scan data is worse than none: it is indistinguishable from a
+ *   live reading. @see test/scan-resets-on-ship-change.spec.tsx
+ */
+export function useScanRender(shipId?: string | null): ScanRenderEvent[] {
   const [cards, setCards] = useState<ScanRenderEvent[]>([]);
+
+  // Changing hull discards the previous hull's readings.
+  useEffect(() => { setCards([]); }, [shipId]);
 
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
