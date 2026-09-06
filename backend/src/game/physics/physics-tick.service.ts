@@ -165,6 +165,18 @@ export class PhysicsTickService implements OnModuleInit {
    * the smoothing. @see GEMAIN.C:2472-2489
    */
   advanceAll(ctx: TickContext): void {
+    // Boot race: movement runs on the 1-second timer, which can fire before
+    // ShipClassCacheService finishes hydrating from Postgres — the 6-second
+    // tick never could. Without this guard a live restart faulted every ship
+    // ("ShipClass 21 not in cache") and skipped their movement anyway. Skipping
+    // the tick costs one second of motion; faulting costs the same motion plus
+    // an error per ship.
+    //
+    // Optional-called because several hand-built test harnesses supply a stub
+    // cache object rather than the real service; a stub with no isHydrated is
+    // treated as ready, which is what those tests intend.
+    if (this.shipClassCache.isHydrated?.() === false) return;
+
     // FR-019 — ascending composite-shipId order (lexicographic on `${userid}:${shipno}`).
     const all = this.shipState
       .findAllShips()

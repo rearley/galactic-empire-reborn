@@ -156,6 +156,18 @@ export class ShipClassCacheService implements OnModuleInit {
     return this.entry(classNumber).damageFactor;
   }
 
+  /**
+   * Whether boot hydration has populated the cache.
+   *
+   * The movement tick runs on the 1-second timer (canon's warrti2a), which can
+   * fire before the async hydration in `onModuleInit` completes — the 6-second
+   * tick never could. A tick that cannot read ship classes must skip rather
+   * than fault every ship in the galaxy.
+   */
+  isHydrated(): boolean {
+    return this.cache.size > 0;
+  }
+
   /** Synchronous lookup. Throws if the class is not in the cache. */
   getHasTorpedo(classNumber: number): boolean {
     return this.entry(classNumber).hasTorpedo;
