@@ -26,12 +26,6 @@ export type EventLogCategory = 'system' | 'info' | 'success' | 'combat' | 'nav' 
 export interface EventLogLine {
   text: string;
   category: EventLogCategory;
-  /**
-   * Monotonic per-session id, assigned on append and used as the React key.
-   * Index keys over a FIFO-capped list re-key every row whenever the window
-   * slides, which re-rendered all 500 rows on every message.
-   */
-  id?: number;
 }
 
 /**

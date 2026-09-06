@@ -19,13 +19,13 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { EventLog } from '../src/components/EventLog';
-import type { EventLogLine } from '../src/types/contracts';
+import type { LogEntry } from '../src/types/logEntry';
 
 const nextFrame = () =>
   act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
 
 function mount() {
-  const lines: EventLogLine[] = [{ text: 'line 0', category: 'info', id: 0 }];
+  const lines: LogEntry[] = [{ text: 'line 0', category: 'info', id: 0 }];
   const view = render(<EventLog lines={lines} />);
   const el = screen.getByTestId('event-log');
   Object.defineProperty(el, 'scrollHeight', { value: 1000, writable: true });

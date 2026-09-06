@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { LogEntry } from './types/logEntry';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
@@ -52,7 +53,7 @@ export function App(): React.JSX.Element {
 
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
-  const [logLines, setLogLines] = useState<EventLogLine[]>([]);
+  const [logLines, setLogLines] = useState<LogEntry[]>([]);
 
   /**
    * Every line gets a monotonic id, used as its React key.
@@ -65,12 +66,12 @@ function Terminal(): React.JSX.Element {
    */
   const nextLineId = useRef(0);
   const withIds = useCallback(
-    (lines: Array<Omit<EventLogLine, 'id'>>): EventLogLine[] =>
+    (lines: EventLogLine[]): LogEntry[] =>
       lines.map((l) => ({ ...l, id: nextLineId.current++ })),
     [],
   );
   const appendLines = useCallback(
-    (lines: Array<Omit<EventLogLine, 'id'>>) =>
+    (lines: EventLogLine[]) =>
       setLogLines((prev) => [...prev, ...withIds(lines)].slice(-MAX_LOG_ENTRIES)),
     [withIds],
   );
@@ -134,7 +135,7 @@ function Terminal(): React.JSX.Element {
    * the pilot never saw, and `sen`/`fre` transmitted into a void.
    */
   useEffect(() => {
-    const append = (line: Omit<EventLogLine, 'id'>) => appendLines([line]);
+    const append = (line: EventLogLine) => appendLines([line]);
 
     const handleServerNotice = (payload: { text?: string; category?: EventLogLine['category'] }) => {
       if (typeof payload?.text !== 'string') return;
@@ -162,9 +163,7 @@ function Terminal(): React.JSX.Element {
 
     const handlePhaserFired = (event: { shipId: string }) => {
       if (event.shipId === localShipId) return;
-      setLogLines(prev =>
-        [...prev, { text: `${shipName(event.shipId)} fires phasers!`, category: 'combat' as const }].slice(-MAX_LOG_ENTRIES),
-      );
+      appendLines([{ text: `${shipName(event.shipId)} fires phasers!`, category: 'combat' as const }]);
     };
 
     const handleCombatHit = (event: { attackerId: string; attackerName?: string; victimId: string; victimName?: string; weapon: string; damageHull: number; damageShield: number }) => {
@@ -173,28 +172,22 @@ function Terminal(): React.JSX.Element {
       // command accepts — `sca sh` wants the ship name ("Cybrg-49340").
       const attacker = event.attackerName ?? shipName(event.attackerId);
       if (event.victimId === localShipId) {
-        setLogLines(prev =>
-          [...prev, {
+        appendLines([{
             text: `** INCOMING ${event.weapon.toUpperCase()}! Hull -${Math.round(event.damageHull)}% shields -${Math.round(event.damageShield)}% from ${attacker} **`,
             category: 'combat' as const,
-          }].slice(-MAX_LOG_ENTRIES),
-        );
+          }]);
       } else {
         const victim = event.victimName ?? shipName(event.victimId);
-        setLogLines(prev =>
-          [...prev, {
+        appendLines([{
             text: `${attacker} hits ${victim} (${event.weapon}, hull -${Math.round(event.damageHull)}%)`,
             category: 'combat' as const,
-          }].slice(-MAX_LOG_ENTRIES),
-        );
+          }]);
       }
     };
 
     const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null; attackerName?: string | null }) => {
       if (event.victimId === localShipId) {
-        setLogLines(prev =>
-          [...prev, { text: `** YOUR SHIP HAS BEEN DESTROYED! **`, category: 'combat' as const }].slice(-MAX_LOG_ENTRIES),
-        );
+        appendLines([{ text: `** YOUR SHIP HAS BEEN DESTROYED! **`, category: 'combat' as const }]);
       } else {
         const victim = players.find(p => p.shipId === event.victimId)?.name ?? event.victimUserid;
         // A planet's ion cannons leave no attacking ship — `fireion` sets the
@@ -210,14 +203,12 @@ function Terminal(): React.JSX.Element {
         // to 101 with no attacker (GEFUNCS.C:887), and a self-destruct has
         // none by definition. Saying "destroyed by unknown" invented an
         // assailant for a pilot who flew into a planet.
-        setLogLines(prev =>
-          [...prev, {
+        appendLines([{
             text: attacker
               ? `${victim} has been destroyed by ${attacker}!`
               : `${victim} has been destroyed!`,
             category: 'combat' as const,
-          }].slice(-MAX_LOG_ENTRIES),
-        );
+          }]);
       }
     };
 
@@ -235,8 +226,7 @@ function Terminal(): React.JSX.Element {
     // @see GECYBS.C:382-410 cyb_annoy, GEDROIDS.C:232-245 droid_annoy
     const handleAiTaunt = (event: { message?: string }) => {
       if (!event?.message) return;
-      setLogLines(prev =>
-        [...prev, { text: event.message as string, category: 'combat' as const }]
+      appendLines([{ text: event.message as string, category: 'combat' as const }]
           .slice(-MAX_LOG_ENTRIES),
       );
     };
@@ -252,12 +242,10 @@ function Terminal(): React.JSX.Element {
     const handleDecoyIntercept = (event: { defenderId: string; weapon: 'torpedo' | 'missile' }) => {
       if (event.defenderId !== localShipId) return;
       const what = event.weapon === 'missile' ? 'missile' : 'torpedo';
-      setLogLines(prev =>
-        [...prev, {
-          text: `The ${what} locked on to the decoy Sir! It has exploded destroying both!`,
-          category: 'combat' as const,
-        }].slice(-MAX_LOG_ENTRIES),
-      );
+      appendLines([{
+        text: `The ${what} locked on to the decoy Sir! It has exploded destroying both!`,
+        category: 'combat' as const,
+      }]);
     };
 
     socket.on('cybertron.taunt', handleAiTaunt);

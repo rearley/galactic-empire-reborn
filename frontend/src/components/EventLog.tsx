@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { EventLogLine } from '../types/contracts';
+import type { LogEntry } from '../types/logEntry';
 
 const MAX_ENTRIES = 500;
 /**
@@ -28,7 +28,7 @@ const CATEGORY_CLASS: Record<string, string> = {
 };
 
 interface EventLogProps {
-  lines: EventLogLine[];
+  lines: LogEntry[];
 }
 
 /**
@@ -103,9 +103,9 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
         className="flex-1 overflow-y-auto font-mono text-sm p-2 bg-black"
         data-testid="event-log"
       >
-        {capped.map((line, idx) => (
+        {capped.map((line) => (
           <div
-            key={line.id ?? idx}
+            key={line.id}
             // whitespace-pre-wrap keeps the column padding that who/ros/pla/pri
             // emit (padEnd/padStart) from being collapsed by the browser, while
             // still wrapping long narrative lines inside the panel.
