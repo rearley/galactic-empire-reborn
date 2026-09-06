@@ -4,7 +4,7 @@ import { applySectorChangeEffects } from './sector-change';
 import { GalaxyService } from '../galaxy/galaxy.service';
 import { Inject, Optional, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { COORD_SCALE, GESTAT_USER, MOVENGMIN, MOVENGUSE } from '../constants';
+import { COORD_SCALE, GESTAT_USER, MOVENGMIN, MOVENGUSE, USEENERGY_RESERVE } from '../constants';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
@@ -33,10 +33,14 @@ import { TELEDAM, UNIVWRAP, UNIVMAX } from '../constants';
 import { ShipClassCacheService } from './ship-class-cache.service';
 import { cdistance } from '../combat/combat-math';
 import {
+  SHIP_ENGINE_SHUTDOWN,
   SHIP_MISSILE_SHAKEN,
   SHIP_SPEED_REPORT,
+  SHIP_WARP_PROGRESS,
+  ShipEngineShutdownEvent,
   ShipMissileShakenEvent,
   ShipSpeedReportEvent,
+  ShipWarpProgressEvent,
 } from './speed-events';
 import { RANDOM, Random, gernd } from '../combat/random.port';
 
@@ -276,9 +280,11 @@ export class PhysicsTickService implements OnModuleInit {
     let speed2bForcedZero = false;
 
     if (speedChanged && accel.energyDebit > 0) {
-      // Per-debit floor — keeps energy from dropping below the original's
-      // fudge floor (constitution: never below MOVENGMIN-class safety).
-      const debit = tryEnergyDebit(ship.energy, accel.energyDebit, 0);
+      // `useenergy` holds back a 500-unit reserve — `if (ptr->energy >=
+      // amount+500)`, GEFUNCS.C:1505 — so acceleration cuts out below 620, not
+      // below 120. The port passed a floor of 0 here and let a captain spend
+      // into a reserve canon protects.
+      const debit = tryEnergyDebit(ship.energy, accel.energyDebit, USEENERGY_RESERVE);
       if (debit.ok) {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.speed = accel.newSpeed;
@@ -286,9 +292,19 @@ export class PhysicsTickService implements OnModuleInit {
         });
       } else {
         // Debit refused — force speed2b = 0 so the ship begins to coast down.
+        // Canon announces it: `prfmsg(NOACCEL,(int)ptr->speed)` on ALWAYS, so
+        // the captain cannot filter away the news that the engines quit.
+        // @see GEFUNCS.C:526-531
+        const shutdownSpeed = ship.speed;
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
           s.speed2b = 0;
         });
+        this.events.emit(SHIP_ENGINE_SHUTDOWN, {
+          shipId: shipKey(ship.userid, ship.shipno),
+          userid: ship.userid,
+          shipno: ship.shipno,
+          speed: shutdownSpeed,
+        } satisfies ShipEngineShutdownEvent);
         speedChanged = false;
         speed2bForcedZero = true;
       }
@@ -296,6 +312,25 @@ export class PhysicsTickService implements OnModuleInit {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.speed = accel.newSpeed;
       });
+    }
+
+    // The helm calls out each integer warp factor it passes, climbing and
+    // slowing alike, and says DEADSTOP instead of "warp 0" on the step that
+    // reaches a standstill. On the way DOWN canon adds 1 — the factor announced
+    // is the one being left, not the one entered.
+    // @see GEFUNCS.C:497-500 (climb), :556-566 (slow)
+    if (speedChanged && !accel.snapped) {
+      const fromWarp = Math.trunc(speedBefore / 1000);
+      const toWarp = Math.trunc(accel.newSpeed / 1000);
+      if (fromWarp !== toWarp) {
+        const climbing = accel.newSpeed > speedBefore;
+        this.events.emit(SHIP_WARP_PROGRESS, {
+          shipId: shipKey(ship.userid, ship.shipno),
+          userid: ship.userid,
+          shipno: ship.shipno,
+          warp: climbing ? toWarp : toWarp + 1,
+        } satisfies ShipWarpProgressEvent);
+      }
     }
 
     // Crossing a warp boundary can shake off missiles locked onto you.
