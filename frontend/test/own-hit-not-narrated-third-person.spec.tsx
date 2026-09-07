@@ -142,9 +142,44 @@ describe('a pilot is not told about their own shot in the third person', () => {
     expect(screen.getByText(/Cybertron 43319 hits Wanderer/)).toBeTruthy();
   });
 
-  it('still shows an INCOMING banner when the local ship is the victim', () => {
+  /**
+   * REVISED by design decision, not by defect — the victim half of the same
+   * call. This asserted that a pilot taking a hit sees
+   *
+   *     ** INCOMING TORPEDO! Hull -6% shields -15% from Cybertron 43319 **
+   *
+   * on top of canon's own `THIT2`, which the gateway already relays to the
+   * victim's user room. Two departures in one line: canon reports hull damage
+   * as a NUMBER nowhere in the game — not to the attacker (PHITHIM), not to the
+   * victim (THIT2 gives no magnitude at all), not even to you about your own
+   * ship (REP14 passes the damstr word, GECMDS.C:2037-2040) — and canon names
+   * the attacker at LAUNCH (TFIRE2, by scan letter) but deliberately not at
+   * impact.
+   *
+   * So the banner goes and canon's text stands alone: you are told you were
+   * hit and by what weapon, and `rep` tells you your condition in words.
+   *
+   * @see docs/DECISIONS.md 2026-09-07
+   */
+  it('renders no extra banner when the local ship is the victim — canon THIT2 stands alone', () => {
     fire('combat.hit', hit({ attackerId: 'Cybrg-208:1', attackerName: 'Cybertron 43319',
       victimId: LOCAL, weapon: 'torpedo', damageHull: 6, damageShield: 15 }));
-    expect(screen.getByText(/INCOMING TORPEDO/)).toBeTruthy();
+
+    expect(screen.queryByText(/INCOMING/)).toBeNull();
+    expect(screen.queryByText(/Hull -/)).toBeNull();
+  });
+
+  /**
+   * The line the player actually reads on being hit arrives on `event.log`,
+   * emitted by the gateway to the victim's user room with canon's own text.
+   * Pinned here so removing the banner cannot be mistaken for removing the
+   * notification.
+   */
+  it('canon THIT2 still reaches the victim over event.log', () => {
+    fire('event.log', {
+      category: 'combat',
+      text: 'We have taken a hit from a torpedo, Sir! Damage control has been notified.',
+    });
+    expect(screen.getByText(/We have taken a hit from a torpedo/)).toBeTruthy();
   });
 });

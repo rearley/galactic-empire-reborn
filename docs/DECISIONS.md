@@ -3688,7 +3688,22 @@ deflection magnitude, not hull damage.
 - torpedo / missile — replace it with `Sensors confirm a <weapon> strike on
   <ship>.` The strike is confirmed; nothing is assessed.
 
-Bystander lines and the victim's own INCOMING banner are unchanged.
+Bystander lines are unchanged.
+
+**AMENDED same day, on the player's call — the victim side goes canon too.**
+The port also rendered the victim an `** INCOMING TORPEDO! Hull -6% shields
+-15% from Cybertron 43319 **` banner on top of canon's `THIT2`, which the
+gateway already relays. That banner is now removed. Canon reports hull damage
+as a number NOWHERE in the game: not to the attacker (`PHITHIM` passes a
+damstr word), not to the victim (`THIT2` carries no magnitude at all), and not
+even to you about your own ship — `rep` sends `REP14` with the damstr word
+(GECMDS.C:2037-2040). Only shield CHARGE is ever numeric (`REP11B`).
+
+This corrects a claim made earlier in this same entry. "Exact knowledge of your
+own ship" was too strong: it holds for shield charge and not for hull. The rule
+is narrower and simpler — **hull condition is one of damstr's six words, always,
+for everyone, about everyone.** A pilot is told they were hit and by what
+weapon; `rep` tells them their condition, in words.
 
 **Reason:** Canon's silence is a design, not an omission. A torpedo flies for
 seconds and the target may leave scan range before it lands, so the intended

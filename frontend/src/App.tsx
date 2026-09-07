@@ -179,10 +179,21 @@ function Terminal(): React.JSX.Element {
       // command accepts — `sca sh` wants the ship name ("Cybrg-49340").
       const attacker = event.attackerName ?? shipName(event.attackerId);
       if (event.victimId === localShipId) {
-        appendLines([{
-            text: `** INCOMING ${event.weapon.toUpperCase()}! Hull -${Math.round(event.damageHull)}% shields -${Math.round(event.damageShield)}% from ${attacker} **`,
-            category: 'combat' as const,
-          }]);
+        // Nothing. The gateway already relays canon's own text for whatever hit
+        // you — THIT1/THIT2, MHIT1/MHIT2, PHITYOU/PHITDEF, MINE4 — over
+        // `event.log`, and this banner was a second telling of the same event
+        // with two departures baked in.
+        //
+        // Canon reports hull damage as a number NOWHERE: not to the attacker
+        // (PHITHIM passes a damstr word), not to the victim (THIT2 gives no
+        // magnitude at all), not even to you about your own ship — `rep` sends
+        // REP14 with the damstr word too (GECMDS.C:2037-2040). Shield charge
+        // gets a number; hull never does. And canon names the attacker at
+        // LAUNCH (TFIRE2, by scan letter) and deliberately not at impact.
+        //
+        // So: you are told you were hit and by what. `rep` tells you your
+        // condition, in words. @see docs/DECISIONS.md 2026-09-07
+        return;
       } else {
         // A pilot is in their own sector room, so this broadcast comes back to
         // the ship that fired it. `handlePhaserFired` above has always guarded
