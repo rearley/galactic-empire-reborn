@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 import { Landing } from '../../src/routes/Landing';
-import { PORT_RELEASE, PORT_RELEASE_DATE, FAITHFUL, CHANGED } from '../../src/content/port-notes';
+import { PORT_RELEASE, PORT_RELEASE_DATE, HOOKS, FAITHFUL, CHANGED } from '../../src/content/port-notes';
 
 function renderLanding() {
   return render(<MemoryRouter><Landing /></MemoryRouter>);
@@ -29,15 +29,38 @@ describe('Landing', () => {
     CHANGED.forEach((item) => expect(screen.getByText(item)).toBeInTheDocument());
   });
 
-  it('offers a way in', () => {
-    // Both the header nav link and the body's closing call to action are
-    // "Enlist" links to /register — a visitor who scrolled past the history
-    // and the faithful/changed lists should not have to scroll back up to
-    // find the only way in. Assert both exist rather than picking one.
+  it('leads with what the game is, before what the port is', () => {
+    // The page exists to make a stranger want to play. An earlier draft opened
+    // with the faithful/changed lists and cited C filenames — evidence for a
+    // claim nobody had asked about yet. The hooks come first now.
     renderLanding();
-    const enlistLinks = screen.getAllByRole('link', { name: /enlist/i });
-    expect(enlistLinks).toHaveLength(2);
-    enlistLinks.forEach((link) => expect(link).toHaveAttribute('href', '/register'));
+    HOOKS.forEach((item) => expect(screen.getByText(item)).toBeInTheDocument());
+  });
+
+  it('keeps the port evidence out of the player-facing copy', () => {
+    // Filenames like GECYBS.C and MBMGESHP.MSG are how the fidelity claims are
+    // verified, not why anyone would sign up. They belong in docs/, not here.
+    renderLanding();
+    const page = screen.getByRole('main').textContent ?? '';
+    expect(page).not.toMatch(/\.C\b|\.MSG\b|GECYBS|MBMGE/);
+  });
+
+  it('offers a way in, from the body and not only the header', () => {
+    // The requirement is that a visitor who has read to the bottom does not
+    // have to scroll back up to find the only way in — so this asserts a CTA
+    // exists INSIDE main, and that every Enlist link goes to /register.
+    //
+    // It used to assert exactly two. That was a trip-wire for deleting the
+    // body CTA, which had happened once, but it also failed the moment a
+    // third legitimate call to action was added. The count was never the
+    // requirement; a reachable way in is.
+    renderLanding();
+    const all = screen.getAllByRole('link', { name: /enlist/i });
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    all.forEach((link) => expect(link).toHaveAttribute('href', '/register'));
+
+    const inBody = within(screen.getByRole('main')).getAllByRole('link', { name: /enlist/i });
+    expect(inBody.length).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -1,34 +1,48 @@
 /**
- * Landing-page copy about the port itself.
+ * Landing-page copy.
  *
- * Sourced from docs/DECISIONS.md (119 entries, curated to these) and
- * GE/DOCS/GEREADME.DOC. Kept in one module so the claims can be reviewed as a
- * set rather than hunted through JSX — every line here is a promise to a player.
+ * Written for a visitor deciding whether to play, not for someone auditing the
+ * port. An earlier draft cited C filenames and message-file names: that was
+ * evidence for the claim "this is faithful", not a reason to sign up, and it
+ * read like a changelog. The evidence still exists — docs/DECISIONS.md,
+ * docs/GAME_MECHANICS.md and the balance tests — it just does not belong on the
+ * front door.
  *
- * Every line below was re-checked against docs/DECISIONS.md,
- * docs/GAME_MECHANICS.md and reference/ge-upstream/mbmgemp/GE/DOCS/GEREADME.DOC
- * as part of task 12 (2026-09-07) rather than transcribed from memory. See the
- * task report for the claim-by-claim verification.
+ * Every claim below is still checked against that record. Say less, and mean
+ * all of it: a page advertising fidelity is the worst place to overstate.
  */
 
 /** @see reference/ge-upstream/mbmgemp/GE/DOCS/GEREADME.DOC */
 export const PORT_RELEASE = '3.2e';
 export const PORT_RELEASE_DATE = '1994-08-06';
 
+/**
+ * The hooks. Specific, concrete, and each one true — these are the details
+ * people remember about this game twenty years later, and the reason a
+ * stranger keeps reading.
+ */
+export const HOOKS: readonly string[] = Object.freeze([
+  'The galaxy runs whether you are watching or not. Set a course, close the tab, come back to find yourself somewhere else entirely.',
+  'You cannot rage quit. Drop the connection while someone has a lock on you and your ship dies with you in it.',
+  'Cloaking drains energy the whole time it is up, so it is a decision, not a hiding place. Run dry at the wrong moment and you simply appear.',
+  'Hyperspace drops your shields on the way in and scatters every torpedo you had locked. It is an escape and a gamble at once.',
+  'Tax a colony too hard and the colonists revolt, take the planet, and keep your troops.',
+  'Cybertrons get meaner the better you are. Pass thirty kills and they stop being polite.',
+]);
+
 export const FAITHFUL: readonly string[] = Object.freeze([
-  'Every balance constant is read from the original C source and pinned by a test that re-reads it.',
-  'The ship class table is generated from MBMGESHP.MSG, the same file the 1994 server loaded at boot.',
-  'Combat math — phaser falloff, tonnage division, shield absorption, torpedo bleed-through — is ported line for line.',
-  'The 6-second physics tick and the 1-second movement tick are the original timings, including the quirk that shields regenerate on the slow one.',
-  'Cybertrons escalate with your kill count exactly as GECYBS.C does, and go mean at 30 kills.',
-  'The text you read in play is the original message file, not a rewrite.',
+  'The same numbers. Damage, energy, prices, ranges, repair rates — all of them the values the original shipped, not a modern rebalance.',
+  'The same ships. Every hull from the Interceptor you start in to the Dreadnought you save up for, with the stats they had in 1994.',
+  'The same combat. Phasers weaken with range and shields swallow them whole; torpedoes bleed through anyway. That is the original math, not an approximation of it.',
+  'The same words. The text on your screen is the text the game printed thirty years ago, typos and all.',
+  'The same six-second heartbeat the whole galaxy has always moved to.',
 ]);
 
 export const CHANGED: readonly string[] = Object.freeze([
-  'The galaxy is 201 sectors square rather than 601 — a smaller world so players can find each other.',
-  'Colonists eat as well as troops, so a planet has to be fed to grow.',
-  'Function keys are typed commands (fset f1 pha 0 0, then f1) because a browser cannot claim F11 or F12.',
-  'You log in with an email address; the original used a BBS account.',
-  'There is a web terminal instead of a modem, and the game runs continuously rather than while the BBS is up.',
-  'A handful of messages the original never printed have been added where silence read as a bug; each is listed in the project decision log.',
+  'The galaxy is smaller — 201 sectors square instead of 601 — so you will actually run into people.',
+  'It lives in a browser and it never closes. No dialling in, no waiting for the line to be free.',
+  'You sign in with an email address instead of a BBS account.',
+  'Colonists eat. Feed a planet or watch it starve, which the original only ever asked of troops.',
+  'Function keys are typed rather than pressed: set one with fset f1 pha 0 0, then just type f1.',
+  'A few messages were added where the original said nothing and the silence read as a bug.',
 ]);
