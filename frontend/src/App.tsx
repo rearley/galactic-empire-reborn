@@ -184,6 +184,24 @@ function Terminal(): React.JSX.Element {
             category: 'combat' as const,
           }]);
       } else {
+        // A pilot is in their own sector room, so this broadcast comes back to
+        // the ship that fired it. `handlePhaserFired` above has always guarded
+        // that; this did not, so a player watched themselves in the third
+        // person — and BEFORE their own narration, because the broadcast leaves
+        // the server inside the command handler while `command:result` is
+        // written only after it returns.
+        //
+        // Canon narrates a phaser hit to the FIRER (PHIT1/PHIT2,
+        // GECMDS.C:987-996) and we relay that, so the feed line is a duplicate.
+        // It is NOT a duplicate for torpedoes and missiles: canon tells the
+        // firer nothing at all there — `checktm` prints THIT/MHIT to the
+        // victim's channel only (GEFUNCS.C:1560, :1644) and credits the shooter
+        // through `acctm`, which is scoring, not a message. This line is the
+        // only confirmation our players get that one landed, and an
+        // unacknowledged shot is what made missiles feel broken in playtest.
+        const narratedToFirer = event.weapon === 'phaser' || event.weapon === 'hyper-phaser';
+        if (event.attackerId === localShipId && narratedToFirer) return;
+
         const victim = event.victimName ?? shipName(event.victimId);
         appendLines([{
             text: `${attacker} hits ${victim} (${event.weapon}, hull -${Math.round(event.damageHull)}%)`,
