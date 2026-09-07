@@ -105,6 +105,8 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-09-07 — Logout is site chrome, not a game command](#2026-09-07-logout-is-site-chrome-not-a-game-command)
 - [2026-09-07 — The roster query is extracted from `ros`, not from `rank-roster.ts`](#2026-09-07-the-roster-query-is-extracted-from-ros-not-from-rank-rosterts)
 - [2026-09-07 — The 10-day abandoned-signup sweep is PORT-ORIGINAL](#2026-09-07-the-10-day-abandoned-signup-sweep-is-port-original)
+- [2026-09-07 — `SCRFACT` is wired and kept at 100, a declared deviation from canon 35](#2026-09-07-scrfact-is-wired-and-kept-at-100-a-declared-deviation-from-canon-35)
+- [2026-09-07 — The container never shipped the sysop tuning file](#2026-09-07-the-container-never-shipped-the-sysop-tuning-file)
 
 <!-- /TOC -->
 
@@ -4051,3 +4053,93 @@ re-querying identity after the sweep runs.
 - *Key the sweep off `updatedAt` instead of `createdAt`.* Not adopted: the
   intent is "how long has this signup sat unfinished," which is measured from
   when the row was created, not from whatever last touched it.
+
+
+## 2026-09-07 — `SCRFACT` is wired and kept at 100, a declared deviation from canon 35
+
+**Context:** Deployment prep asked a simple question — where does a sysop set
+things on a live server? The answer was two places. `src/game/config/game-config.ts`
+holds 57 canon sysop options with defaults extracted from `MBMGEMSG.MSG`, a
+`config/game.config.json` file and environment overrides. Seven separate
+`.config.ts` files read `process.env` directly under their own names.
+
+Auditing the overlap found one setting implemented in both halves, and settable
+in neither. `score.config.ts` read a private `SCORE_F2` variable defaulting to
+100. `SYSOP_OPTIONS` carried the same option as `SCRFACT`, canon default 35,
+marked `implemented: false`. Setting `SCRFACT` anywhere did nothing, and the
+game deducted 100% of a victim's score on a kill where the original deducts 35%.
+
+```
+GEMAIN.C:603       score_f2 = numopt(SCRFACT,0,32700);
+MBMGEMSG.MSG:472   SCRFACT {Factor points to deduct from loser: 35} N 1 100
+```
+
+The 2026-09-03 audit that found 14 wired options wrongly flagged
+`implemented: false` could not have caught this one. `SCRFACT` *was* wired —
+under a different name, in a different file. Searching for the option's own name
+found nothing. Only merging the two systems surfaced it.
+
+**Decision:** `score.config.ts` resolves through the central manifest;
+`SCRFACT` is marked implemented and is the single name. The VALUE stays at
+**100**, declared in `config/game.config.json` and in the `DEVIATIONS` table
+that `test/balance/sysop-options-canon.balance.spec.ts` enforces.
+
+**Reason:** the deviation is real and worth keeping for now, but it was never
+chosen — it was an artefact of a second code path. Changing it to canon's 35
+would retroactively revalue every kill in a running game, roughly thirding the
+worth of a kill. That is the owner's balance call, not a refactor's side effect.
+What this changes is that it is a decision instead of an accident, and that it
+is finally settable.
+
+Merging also had to carry across input hygiene `score.config.ts` had earned:
+the central loader already rejected non-numeric and empty values, but read a
+whitespace-only value as zero (`Number('   ')` is 0), silently switching an
+option off. It now trims before testing for "set".
+
+Out-of-range values now clamp with a warning rather than throwing. That is
+canon — `numopt` clamps — and the old throw was a port invention.
+
+**Alternatives rejected:**
+- *Deploy at canon 35.* Correct on fidelity, but it changes live balance
+  mid-playtest. Offered and declined; revisit before the public server opens.
+- *Leave the two systems separate and just document it.* The divergence is not
+  cosmetic: one of the two names was inert, and nothing said which.
+- *Merge all seven `.config.ts` files into `SYSOP_OPTIONS`.* Not done, and not
+  wanted wholesale. The rest either chain to canon correctly (cloak, midnight,
+  galaxy, cybertron, attack) or hold C-source constants that are not sysop
+  options at all (droid). Only `SCRFACT` was broken.
+
+## 2026-09-07 — The container never shipped the sysop tuning file
+
+**Context:** `config/game.config.json` carries `UNIVMAX: 100` against a canon
+default of 300. The path resolver finds it correctly at
+`/app/config/game.config.json` in the image — but `backend/Dockerfile` copied
+`dist`, `node_modules`, `prisma` and `package.json`, and never `config/`.
+
+A missing tuning file is a legitimate state that falls back to canon defaults
+without complaint. So a containerised deployment would have generated a
+**601x601 galaxy instead of 201x201** — nine times the area, with absolute scan
+ranges unchanged around it — silently, and with the landing page advertising 201.
+
+This is the same failure `test/unit/config/config-path.spec.ts` documents
+(wrong path arithmetic from a compiled tree), reintroduced one layer up. The
+arithmetic was fixed; the build instruction feeding it was not.
+
+**Decision:** the Dockerfile copies `config/` into both stages, and a test reads
+the Dockerfile to assert it — the way the migration tests read `migration.sql`.
+`GE_CONFIG_PATH` is added ahead of the four derived paths so a deployment can
+state where the file is rather than rely on arithmetic it cannot see, and can
+mount a volume instead of rebuilding an image to retune.
+
+**Reason:** a build step that silently omits a file is exactly what does not
+show up in a passing suite. Asserting on the Dockerfile is the only way this
+class of bug fails in CI rather than on a server.
+
+**Alternatives rejected:**
+- *Collapse the four derived paths to one.* They are load-bearing: they are
+  what makes source runs, `ts-jest` runs and compiled runs all work with no
+  setup. `GE_CONFIG_PATH` gives deployment its single predictable answer
+  without taking that away.
+- *Make a missing config file fatal.* It would catch this, and break every
+  fresh checkout. The defaults are a complete, playable configuration by
+  design.

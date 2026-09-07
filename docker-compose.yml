@@ -24,8 +24,14 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://ge:ge@postgres:5432/ge?schema=public
-      # Override JWT_SECRET in production: JWT_SECRET=<long-random-string> docker compose up
-      JWT_SECRET: dev-change-me-in-production
+      # Required, no default on purpose. auth.module.ts throws when it is absent,
+      # but a default here means it is never absent — so the guard never fires
+      # and a shipped placeholder signs real player tokens. Compose fails with
+      # "variable is not set" instead, which is the point.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set — generate one with `openssl rand -base64 48`}
+      # Set to point at a mounted tuning file; without it the resolver derives
+      # the path from the image layout. @see docs/DECISIONS.md 2026-09-07
+      # GE_CONFIG_PATH: /config/game.config.json
       PGHOST: postgres
       PGUSER: ge
     ports:
