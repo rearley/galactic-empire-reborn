@@ -15,11 +15,17 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // This import will fail until src/auth/tokenStore.ts is created.
 import { getToken, setToken, clearToken } from '../../src/auth/tokenStore';
 
+// Reset both localStorage AND the module-level in-memory fallback before
+// every test in this file, regardless of which describe block it is in —
+// setToken() now populates an in-memory variable in addition to
+// localStorage, and that variable does not reset itself just because
+// localStorage.clear() ran.
+beforeEach(() => {
+  localStorage.clear();
+  clearToken();
+});
+
 describe('tokenStore', () => {
-  beforeEach(() => {
-    // Reset localStorage between tests so they are fully isolated.
-    localStorage.clear();
-  });
 
   it('getToken() returns null when nothing is stored', () => {
     expect(getToken()).toBeNull();
@@ -72,5 +78,75 @@ describe('tokenStore when localStorage throws', () => {
     });
     expect(() => clearToken()).not.toThrow();
     spy.mockRestore();
+  });
+});
+
+describe('tokenStore in-memory fallback', () => {
+  // Regression guard for a real bug: setToken() no-oping when localStorage
+  // throws meant nothing held the token anywhere. Register -> setToken
+  // no-ops -> ChooseUsername reads null -> sends "Bearer " -> 401. Login ->
+  // setToken no-ops -> /play -> RequireAuth bounces to /login. A silent loop
+  // with no error shown. The fix keeps the token in a module-level variable
+  // with localStorage as a write-through cache, so getToken() falls back to
+  // the in-memory value when storage is blocked.
+
+  it('getToken() returns the value set by setToken() even when every localStorage call throws', () => {
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+    setToken('memory-only-token');
+    expect(getToken()).toBe('memory-only-token');
+
+    getSpy.mockRestore();
+    setSpy.mockRestore();
+  });
+
+  it('overwriting the in-memory token replaces the previous value', () => {
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+    setToken('first');
+    setToken('second');
+    expect(getToken()).toBe('second');
+
+    setSpy.mockRestore();
+    getSpy.mockRestore();
+  });
+
+  it('clearToken() clears the in-memory fallback too, even when removeItem throws', () => {
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+    setToken('to-be-cleared');
+    clearToken();
+    expect(getToken()).toBeNull();
+
+    setSpy.mockRestore();
+    getSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
+  it('getToken() prefers the in-memory value over a (stale) working localStorage', () => {
+    // Write-through: setToken keeps localStorage and memory in sync in the
+    // normal case, but if they ever disagree the in-memory value — set most
+    // recently by this tab — must win over whatever storage happens to hold.
+    setToken('current-token');
+    localStorage.setItem('ge_jwt', 'stale-value-written-directly');
+    expect(getToken()).toBe('current-token');
   });
 });
