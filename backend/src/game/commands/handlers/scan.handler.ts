@@ -15,7 +15,7 @@ import { findShip } from '../helpers/find-ship';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
-import { ITEM_NAMES, I_MEN, I_TROOPS, I_MISSL, I_TORP, I_FLUX, I_FOOD, I_FIGHTER } from '../../constants/items';
+import { ITEM_NAMES, capitaliseItem, I_MEN, I_TROOPS, I_MISSL, I_TORP, I_FLUX, I_FOOD, I_FIGHTER } from '../../constants/items';
 import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
 import { scanDistanceUnits } from './helpers/scan-distance';
 import { scanShipColour } from './helpers/scan-ship-colour';
@@ -1089,7 +1089,9 @@ export class ScanHandlerService implements OnModuleInit {
         if (it && it.qty > 0n) {
           const selling = it.sell ? ' (selling)' : '';
           lines.push({
-            text: `  ${ITEM_NAMES[i]}:  ${it.qty}${selling}`,
+            // `gechrbuf[0] = toupper(gechrbuf[0])` on the owner's item list.
+            // @see GECMDS.C:2371-2372
+            text: `  ${capitaliseItem(ITEM_NAMES[i])}:  ${it.qty}${selling}`,
             category: 'info',
           });
         }

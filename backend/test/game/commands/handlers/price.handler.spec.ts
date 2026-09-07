@@ -152,7 +152,7 @@ describe('PriceHandlerService — unowned planet is an open shop', () => {
     const { handler } = makeHandler({ planet: makePlanet({ userid: null }) });
     const ship = makeShip({ where: 10 });
     const result = await handler.command.handler(ship, ['10', 'foo'], {}) as Lines;
-    expect(result.lines[0].text).toContain('Food');
+    expect(result.lines[0].text).toContain('food cases');
     expect(result.lines[0].category).toBe('success');
   });
 });
@@ -243,7 +243,7 @@ describe('PriceHandlerService — happy path (quoted form)', () => {
     const { handler } = makeHandler();
     const ship = makeShip({ where: 10, userid: 'buyer' });
     const result = await handler.command.handler(ship, ['10', 'foo'], {}) as Lines;
-    expect(result.lines[0].text).toContain('Food');
+    expect(result.lines[0].text).toContain('food cases');
     expect(result.lines[0].category).toBe('success');
   });
 

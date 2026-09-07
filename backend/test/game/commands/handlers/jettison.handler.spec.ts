@@ -59,7 +59,7 @@ describe('JettisonHandlerService — happy path (numeric amount)', () => {
     const { handler } = makeService(ship);
     const result = handler.command.handler(ship, ['10', 'food'], {}) as { lines: { text: string; category: string }[] };
     // JETT3 is '%s %s have been jettisoned, Sir!' — count first, then the item.
-    expect(result.lines[0].text).toBe('10 Food Cases have been jettisoned, Sir!');
+    expect(result.lines[0].text).toBe('10 food cases have been jettisoned, Sir!');
     expect(result.lines[0].category).toBe('success');
   });
 

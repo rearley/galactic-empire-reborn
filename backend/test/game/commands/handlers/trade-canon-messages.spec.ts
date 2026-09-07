@@ -89,8 +89,11 @@ describe('buy — canon messages', () => {
   it('confirms a purchase with BUY9, not a paraphrase', async () => {
     const svc = makeBuy({ ok: true, transferred: 100, unitPrice: 4, totalCost: 400n });
     const text = (await svc.command.handler(makeShip(), ['100', 'men'], {})).lines[0].text;
-    expect(text).toBe('100 Men purchased at the price of 4 each for a total of 400, Sir.');
-    expect(text).toBe(formatMessage(MessageId.BUY9, 100, 'Men', 4, 400));
+    // BUY9 interpolates item_name[] mid-sentence, and canon's table is lower
+    // case (GECMDS.C:95). Only the two COLUMN listings uppercase the first
+    // letter, at the call site (GECMDS.C:2065, :2372).
+    expect(text).toBe('100 men purchased at the price of 4 each for a total of 400, Sir.');
+    expect(text).toBe(formatMessage(MessageId.BUY9, 100, 'men', 4, 400));
   });
 
   it('names the number for sale in BUY3 instead of blaming a reserve', async () => {

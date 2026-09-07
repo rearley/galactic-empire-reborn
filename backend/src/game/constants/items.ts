@@ -39,10 +39,43 @@ export const I_MINE    = 11 as const;
 export const I_GOLD    = 12 as const;
 export const I_SPY     = 13 as const;
 
+/**
+ * Display names — canon's `item_name[]`, verbatim (GECMDS.C:95-108).
+ *
+ * Lower case on purpose. Canon interpolates these mid-sentence, as in the
+ * salvage list `prf(", %s %s", amt, item_name[i])` (GEFUNCS.C:1136), so the
+ * text reads ", 4 torpedos, 15 gold". The port Title-Cased all fourteen and
+ * every cargo line shouted "1 Mines", "2 Torpedoes". Two were also spelled
+ * differently from canon: "Torpedoes" for canon's "torpedos" and "Spies" for
+ * canon's "spy".
+ *
+ * Where a name must start a sentence or head a column, capitalise at the call
+ * site with {@link capitaliseItem} rather than changing the table.
+ *
+ * Pinned against the C source by test/balance/item-names-canon.balance.spec.ts.
+ */
 export const ITEM_NAMES: readonly string[] = Object.freeze([
-  'Men', 'Missiles', 'Torpedoes', 'Ion Cannons', 'Flux Pods', 'Food Cases',
-  'Fighters', 'Decoys', 'Troops', 'Zippers', 'Jammers', 'Mines', 'Gold', 'Spies',
+  'men', 'missiles', 'torpedos', 'ion cannons', 'flux pods', 'food cases',
+  'fighters', 'decoys', 'troops', 'zippers', 'jammers', 'mines', 'gold', 'spy',
 ]);
+
+/**
+ * Parse keywords — canon's `kwrd[]`, verbatim (GECMDS.C:80-93).
+ *
+ * A SEPARATE table from the display names, and the one every item command
+ * actually matches on: `genearas(kwrd[i], margv[n])` at GECMDS.C:3287, :4133,
+ * :4268, :4304, :4788 and :6111. Three characters each, which is why `buy 10
+ * tor` has always worked.
+ */
+export const ITEM_KEYWORDS: readonly string[] = Object.freeze([
+  'men', 'mis', 'tor', 'ion', 'flu', 'foo', 'fig',
+  'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy',
+]);
+
+/** An item name at the head of a sentence or a column. */
+export function capitaliseItem(name: string): string {
+  return name.length === 0 ? name : name[0].toUpperCase() + name.slice(1);
+}
 
 /**
  * Base price per item.
