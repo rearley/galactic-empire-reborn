@@ -10,6 +10,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -18,10 +19,17 @@ import { AuthValidationFilter, authValidationExceptionFactory } from './auth-val
 
 /**
  * HTTP auth endpoints. JWT is returned on both register and login.
+ *
+ * `ThrottlerGuard` is applied here only — scoped to this controller, not
+ * registered globally (`AppModule` has no `APP_GUARD`) — because this is
+ * the first internet-reachable, unauthenticated write surface in the app.
+ * See `auth.constants.ts` `AUTH_THROTTLE_*` for the limit and why.
+ *
  * @see specs/011-onboarding/contracts/http-auth.md
  */
 @Controller('auth')
 @UseFilters(AuthValidationFilter)
+@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
