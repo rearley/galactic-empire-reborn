@@ -23,6 +23,7 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { damstr } from '../../src/game/combat/combat-math';
 import { CombatHitEvent } from '../../src/game/combat/combat-events';
+import { PresenceService } from '../../src/public/presence.service';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
@@ -39,6 +40,7 @@ function build() {
     {} as never,                                   // shipClassCache
     {} as never,                                   // random
     { emit: jest.fn(), on: jest.fn() } as never,   // events
+    new PresenceService(),
   );
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),

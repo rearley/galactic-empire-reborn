@@ -19,6 +19,7 @@
  */
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 type Emit = { rooms: string[]; event: string };
 
@@ -27,7 +28,7 @@ function build() {
   const gateway = new GameGateway(
     {} as never, {} as never, {} as never, {} as never, {} as never,
     {} as never, {} as never, {} as never, mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),

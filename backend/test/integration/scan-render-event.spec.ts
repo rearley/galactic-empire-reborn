@@ -27,6 +27,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
 import { Socket } from 'socket.io';
+import { PresenceService } from '../../src/public/presence.service';
 
 /** Minimal mock socket that records emitted events. */
 interface EmittedCall {
@@ -66,7 +67,7 @@ function makeGateway(): GameGateway {
     scanHandler,
     { getTypeName: jest.fn() } as never,
     mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
 }
 

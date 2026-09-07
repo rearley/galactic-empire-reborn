@@ -25,6 +25,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let gateway: GameGateway;
@@ -130,7 +131,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       mockScanHandler,
       { getTypeName: jest.fn(), getMaxTons: jest.fn().mockReturnValue(5000) } as never,
       mockRandom,
-      mockEvents as never,
+      mockEvents as never, new PresenceService(),
     );
     (gateway as unknown as { server: unknown }).server = { to: () => ({ emit: () => undefined, except: () => ({ emit: () => undefined }) }), except: () => ({ emit: () => undefined, to: () => ({ emit: () => undefined }) }), emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },

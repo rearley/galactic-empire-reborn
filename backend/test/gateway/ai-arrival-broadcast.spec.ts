@@ -21,6 +21,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { CybertronSpawnedPayload } from '../../src/game/cybertron/cybertron-events';
 import { DroidSpawnedEvent } from '../../src/game/droid/droid-events';
+import { PresenceService } from '../../src/public/presence.service';
 
 interface Emit { rooms: string[]; except: string[]; event: string; payload: unknown }
 
@@ -35,7 +36,7 @@ function build(others: ShipState[] = [], roll = 0.5) {
   const gateway = new GameGateway(
     shipState, {} as never, {} as never, {} as never, {} as never,
     {} as never, {} as never, {} as never, { next: () => roll } as never,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
   (gateway as unknown as { server: unknown }).server = {
     to: (r: string) => chain([r], []),

@@ -12,6 +12,7 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { CombatTargetWarningEvent } from '../../src/game/combat/combat-events';
+import { PresenceService } from '../../src/public/presence.service';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
@@ -20,7 +21,7 @@ function build() {
   const gateway = new GameGateway(
     {} as never, {} as never, {} as never, {} as never, {} as never,
     {} as never, {} as never, {} as never, {} as never,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),

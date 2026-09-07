@@ -20,6 +20,7 @@ import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../../../src/game/combat/combat-events';
+import { PresenceService } from '../../../src/public/presence.service';
 
 describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
   let gateway: GameGateway;
@@ -38,7 +39,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockShipState = { removeFromGame: jest.fn(), get: jest.fn().mockReturnValue(undefined), findAllShips: () => [] } as unknown as ShipStateService;
-    gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
+    gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never, new PresenceService());
     (gateway as unknown as { server: unknown }).server = {
       to: toMock,
       emit: serverEmitMock,

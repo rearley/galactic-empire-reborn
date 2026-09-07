@@ -9,6 +9,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * FR-704: after `abandon` the captain stays authenticated but shipless and must
@@ -82,7 +83,7 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn().mockReturnValue('Interceptor') } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),

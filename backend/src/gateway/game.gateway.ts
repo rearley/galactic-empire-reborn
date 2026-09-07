@@ -26,6 +26,7 @@ import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
 import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
+import { PresenceService } from '../public/presence.service';
 import { shipLetter } from '../game/commands/helpers/find-ship';
 import {
   COMBAT_DECOY_INTERCEPT,
@@ -251,6 +252,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly shipClassCache: ShipClassCacheService,
     @Inject(RANDOM) private readonly random: Random,
     private readonly events: EventEmitter2,
+    private readonly presence: PresenceService,
   ) {}
 
   /**
@@ -281,6 +283,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userid = payload.sub;
     client.data.userid = userid;
     client.data.username = payload.username;
+    this.presence.arrive(userid);
 
     // Step 2: Look up ALL ships for this user, ordered by shipno (deterministic).
     // Replaces the previous non-deterministic findFirst — selection is now explicit.
@@ -676,6 +679,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleDisconnect(client: Socket): Promise<void> {
     this.logger.log(`disconnect ${client.id}`);
     const userid = client.data.userid as string | undefined;
+    // Before the cantexit branch below: that path can throw or return early,
+    // and a player who cannot be un-counted is a player the stats page reports
+    // as online forever.
+    if (userid !== undefined) this.presence.depart(userid);
     const activeShipNo = client.data.activeShipNo as number | undefined;
 
     if (userid !== undefined && activeShipNo !== undefined) {

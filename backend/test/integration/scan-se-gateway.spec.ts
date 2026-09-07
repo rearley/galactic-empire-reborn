@@ -30,6 +30,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult, ScanRenderEvent } from '../../src/game/commands/command.types';
 import { Socket } from 'socket.io';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
+import { PresenceService } from '../../src/public/presence.service';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ function makeGateway(scanHandler: ScanHandlerService): GameGateway {
     scanHandler,
     { getTypeName: jest.fn() } as never,
     mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
 }
 

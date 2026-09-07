@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * `outsect`/`outwar` deliver a transmission ONLY to ships carrying the sender's
@@ -56,7 +57,7 @@ describe('GameGateway — frequency-filtered broadcasts', () => {
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
 
     const roomEmit = jest.fn();

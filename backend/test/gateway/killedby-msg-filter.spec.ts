@@ -33,6 +33,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
   const build = (ships: Array<{ userid: string; msgFilter: boolean }>) => {
@@ -54,7 +55,7 @@ describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
 
     let pendingExcept: string[] = [];

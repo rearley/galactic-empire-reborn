@@ -9,6 +9,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { CYBERTRON_EVENT } from '../../src/game/cybertron/cybertron-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * A Cybertron's taunt is the player's ONLY warning that something is stalking
@@ -43,7 +44,7 @@ describe('GameGateway — a Cybertron taunt reaches the pilot it is aimed at', (
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     // The taunt goes out as ONE emit chained over two rooms (`.to(a).to(b)`),
     // because two separate emits double-delivered to a target standing in the
