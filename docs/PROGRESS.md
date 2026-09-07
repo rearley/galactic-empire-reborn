@@ -3540,3 +3540,135 @@ never referenced by any `.C` file — canon processes every due automaton each p
 applies `CYBMAXPERTICK = 2` in `onAiTick`. Not biting today (24 automatons, ~0.8 due/sec
 against a cap of 2), but it is an undocumented deviation and should either be removed or
 written into DECISIONS.md.
+
+## 2026-09-07 — public web presence: landing, email auth, stats, logout
+**Completed:** the full public-web-presence plan (13 tasks, SDD ledger at
+`.superpowers/sdd/2026-09-07-public-web-presence/progress.md`), ahead of the
+game's first deploy to a public <panel> subdomain:
+
+- Email became the login credential alongside the existing display handle.
+  `User.email`/`emailVerifiedAt` added; `username` made nullable; a raw
+  partial `lower()` unique index enforces case-insensitive email uniqueness
+  the way the existing `lower(username)` index already did for handles.
+- Registration split into two steps: `POST /auth/register` (email + password,
+  creates the row with `username = null`) and `POST /auth/username`
+  (authenticated, atomic claim via `updateMany`). `WsAuthGuard` now rejects a
+  username-less token with `USERNAME_REQUIRED` before a socket is ever
+  allowed to board a ship.
+- The nightly midnight job gained a fourth phase: an abandoned-signup sweep
+  deleting `passwordHash IS NOT NULL AND username IS NULL` rows older than
+  10 days (`ABANDONED_SIGNUP_DAYS`), backed by a real DB integration test in
+  addition to the white-box predicate test.
+- `react-router-dom` added — the only new frontend dependency — replacing
+  `App.tsx`'s single `if (!token)` branch with real routes: `/`, `/login`,
+  `/register`, `/register/name`, `/stats`, `/play` (behind `RequireAuth`),
+  and a catch-all redirect to `/`.
+- A full terminal-aesthetic landing page (`Landing.tsx`) covering what the
+  game is, its 1988 MajorBBS history, the exact port target (release 3.2e,
+  1994-08-06), curated faithful/changed lists, a typed-command primer, and an
+  Enlist call to action — copy curated down from 119 `DECISIONS.md` entries
+  and independently spot-checked by both the implementer and the reviewer
+  against source (CYB_BE_NICE, UNIVMAX 300 vs 100, the colonist-eating fix,
+  shield-vs-torpedo bleed-through, the `fset`/`f1` binding — all held).
+- Logout added as site chrome (ship-select option, header link on `/` and
+  `/stats`), not a game command — see `docs/DECISIONS.md` 2026-09-07.
+- `PublicModule`: `GET /public/stats` (unauthenticated, 15s in-memory cache)
+  returning commander count, online count, and a roster built from a query
+  extracted from `ros.handler.ts` — see the roster-extraction CORRECTION in
+  `docs/DECISIONS.md` 2026-09-07. `PresenceService` tracks a live
+  `Set<userid>` from the gateway's connect/disconnect hooks.
+
+**Tests:** every task landed test-first per the project's TDD standard.
+Backend: duplicate email vs duplicate username return distinct codes;
+case-insensitive email login; the constant-time bcrypt path still runs for an
+unknown email; the atomic username-claim race (same account twice, two
+accounts racing one name); `WsAuthGuard` rejects a username-less token
+(reachability traced — only three returning paths, none yield a non-null
+payload with a falsy username); `/public/stats` excludes Cybertrons from both
+the commander count and the roster (fixture: 33 rows, 24 Cybertrons, 9
+expected); the 15s cache serves a second call without re-querying and cannot
+be poisoned by an error path; the abandoned-signup sweep as both a white-box
+predicate test and a DB-backed integration test with four fixture rows.
+Frontend: `Landing` renders; `RequireAuth` redirects an anonymous visit to
+`/login` preserving the intended destination and redirects a username-less
+authenticated visit to `/register/name`; `Register` and `ChooseUsername` post
+the right bodies with the bearer token attached correctly; `Stats` renders a
+roster from a stubbed fetch; `logout` clears the token, disconnects the
+socket, and lands on `/`; `tokenStore` is hardened against a browser that
+throws on `localStorage` access. Full suite: backend 531→539 suites,
+5545→5582 tests (+8 suites, +37 tests); frontend 27→30 files, 182→206 tests
+(+3 files, +24 tests, net of some obsolete `AuthScreen` tests deleted along
+the way).
+
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-07 for the four dated
+entries this feature produced — email as the credential with a partial index,
+two-step registration and the `WsAuthGuard` gate, logout as site chrome with
+the `warhupa`/`cantexit` reasoning, the roster-query extraction (with its
+CORRECTION of the design's original `rank-roster.ts` claim), and the 10-day
+sweep as a PORT-ORIGINAL addition with no canon citation. Two mid-plan design
+defects were found and fixed by implementers rather than parked: `verifyJwt`
+narrowed to a lie between Task 2 signing `username: null` and Task 4 widening
+the type (accepted as a same-session, never-deployed-between window); and the
+Task 12 stats test's `findByText('2')` ambiguity (fixed by scoping the query
+to a testid before dispatch). A voice decision was surfaced rather than
+treated as a defect: `ChooseUsername`'s field label reads "Username" rather
+than the design's in-world "Commander name," because the test asserted
+`getByLabelText(/username/i)` — parked as the author's call, not reverted.
+
+**Next:** the actual <panel> deploy. `docs/DEPLOYMENT.md` (new, this task) is a
+first draft written from the codebase and needs correcting against the real
+server on first deploy — nginx `try_files`, the Socket.io `Upgrade` headers,
+required env vars, and confirming `GE_DEBUG_ENDPOINTS` is unset are the
+specific things it exists to get right the first time.
+
+**Known issues:**
+- **No email is ever sent.** There is no verification flow, no password
+  reset, and no notification of any kind. `emailVerifiedAt` exists on the
+  schema specifically so that adding sending later is a token table plus a
+  handler, not another `User` migration — but until that lands, a mistyped
+  or unreachable email address on an otherwise-complete account has no
+  recovery path.
+- **The marketing copy is not crawlable.** The landing page ships as
+  client-rendered JavaScript inside the existing SPA; there is a real
+  `<title>` and description meta in `index.html` but no server-rendered HTML
+  for a search crawler to index. Accepted as the cost of reusing the
+  existing frontend rather than standing up a separate static site.
+- **`PresenceService` is process-local.** The online count is an in-memory
+  `Set<userid>` populated by socket connect/disconnect events. A backend
+  restart empties it immediately — every currently-connected player reads as
+  offline in `/public/stats` until they reconnect, even though nothing about
+  their session actually changed. There is no cross-process or
+  restart-surviving presence store (deliberately: CLAUDE.md rules out Redis
+  or any external cache layer).
+- Deferred minors carried out of individual task reviews, worth knowing about
+  collectively: `isUniqueViolation`'s markers-array match is a substring
+  match over `meta.target`, sound today but could misclassify a future
+  unique constraint whose name or expression happens to contain
+  `'lower(email)'` as a substring; the validation filter's field-priority
+  order (email > username > password) and its "unrecognised property falls
+  back to `INVALID_PASSWORD`" default are undocumented, harmless with
+  today's two-field DTOs; the filter emits `message === ` the error code
+  string itself (pre-existing, not introduced here); a whitespace-only
+  username would pass `WsAuthGuard`'s falsy check (unreachable today —
+  `ChooseUsernameDto`'s regex excludes it and registration writes `null`,
+  but would matter if a future path ever writes `User.username` without that
+  regex); two `describe('WsAuthGuard')` blocks exist in different test trees
+  (cosmetic); if an account row is deleted between `WsAuthGuard`'s read and
+  the username-claim's `updateMany` write, the response reports
+  `USERNAME_ALREADY_SET` rather than "no such account" — narrow, but not
+  purely theoretical given the sweep above; `abandonedSignupsDeleted` is not
+  persisted to the `MidnightRun` ledger row (would need its own migration,
+  an intentional scope boundary); `User → Ship/Mail/MailStat` are
+  `onDelete: Restrict`, so a swept row that somehow came to own anything
+  would abort the whole midnight transaction with `P2003` — a real safety
+  net today, relevant only if a future change ever lets a username-less
+  account own a ship; `Login.tsx` branches on `!user?.username` rather than
+  the spec's literal `=== null` (behaviourally identical post-registration,
+  but less literal than the stated contract); a non-JSON error body (e.g. an
+  HTML 502 from a misconfigured proxy) falls through to a generic "Network
+  error" message rather than reporting the real failure; double-submit on
+  the auth forms is guarded only by `disabled={loading}`, matching existing
+  codebase convention rather than an explicit in-flight lock; and
+  `messages.ts` retains a few dead paraphrased entries the live code
+  bypasses (`IMPULSE1`/`CLOAK_HYPERSPACE`), pre-existing cleanup debt
+  unrelated to this feature.

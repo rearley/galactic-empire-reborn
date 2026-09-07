@@ -100,6 +100,11 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-09-02 — UNIVWRAP implemented, defaulting to canon NO](#2026-09-02-univwrap-implemented-defaulting-to-canon-no)
 - [2026-09-02 — Colonists will eat (fixing an inherited original bug)](#2026-09-02-colonists-will-eat-fixing-an-inherited-original-bug)
 - [2026-09-02 — Gold base price set to 1000, on wiki evidence only](#2026-09-02-gold-base-price-set-to-1000-on-wiki-evidence-only)
+- [2026-09-07 — Email as the login credential, with a partial lower() unique index](#2026-09-07-email-as-the-login-credential-with-a-partial-lower-unique-index)
+- [2026-09-07 — Two-step registration and the nullable username guarded by WsAuthGuard](#2026-09-07-two-step-registration-and-the-nullable-username-guarded-by-wsauthguard)
+- [2026-09-07 — Logout is site chrome, not a game command](#2026-09-07-logout-is-site-chrome-not-a-game-command)
+- [2026-09-07 — The roster query is extracted from `ros`, not from `rank-roster.ts`](#2026-09-07-the-roster-query-is-extracted-from-ros-not-from-rank-rosterts)
+- [2026-09-07 — The 10-day abandoned-signup sweep is PORT-ORIGINAL](#2026-09-07-the-10-day-abandoned-signup-sweep-is-port-original)
 
 <!-- /TOC -->
 
@@ -3792,3 +3797,257 @@ only makes an absence explicit. The player, asked directly, chose to keep it.
 
 **Scope:** the normal phaser and the hyper-phaser miss lines. Nothing else in
 the phaser path deviates.
+
+## 2026-09-07 — Email as the login credential, with a partial lower() unique index
+**Context:** Public-web-presence plan, Task 2. The game is moving to a public
+subdomain and the only credential was a display handle (`username`), which is
+unrecoverable if forgotten and gives a stranger no idea what to type to sign
+up. `User.userid` was already an opaque key with every foreign key (Ship,
+Mail, MailStat, planet ownership) pointing at it, and `username` a separate
+display handle — so adding a login credential touches no foreign key and is
+not an identity migration.
+
+**Decision:** Add `email String?` (nullable — the 24 Cybertron rows can never
+have one) and `emailVerifiedAt DateTime?` (written by nothing, read by
+nothing yet — it exists so a future verification flow is a token table plus a
+handler, not another `User` migration). Enforce case-insensitive uniqueness
+with a raw, partial SQL index, since Prisma's `@unique` can express neither
+`lower()` nor a `WHERE` clause:
+
+```sql
+CREATE UNIQUE INDEX user_email_lower_key
+  ON "User" (lower(email)) WHERE email IS NOT NULL;
+```
+
+`RegisterDto` and `LoginDto` become `{ email, password }`. The constant-time
+bcrypt path in `login` — always comparing against `DUMMY_BCRYPT_HASH` when the
+account is absent or has a null hash — is preserved exactly, now keyed on
+email instead of username.
+
+**Reason:** With two unique constraints on `User` (email, username), a
+duplicate-key failure must say which one was hit. Prisma surfaces the
+expression in `P2002.meta.target`, but empirically (confirmed live by the
+Task 2 implementer, not assumed) it can report either the index name or the
+raw expression — `['user_email_lower_key']` in some cases,
+`['lower(email)']` in others. `AuthService.isUniqueViolation` therefore
+matches against a **markers array**, `EMAIL_INDEX_MARKERS = ['user_email_lower_key', 'lower(email)']`,
+not a single string. The original plan told both this task and Task 3 to
+match on the index name alone, which would have made every real duplicate
+surface as an unhandled 500 instead of a 409 the moment Prisma chose the
+other form. Task 3 carries the same fix for `USERNAME_INDEX_MARKERS`.
+
+**Alternatives rejected:**
+- *A single generic "account exists" message covering both fields.* Rejected
+  as a worse registration experience — a player who mistyped an email they
+  already used and one who picked a taken display name need different next
+  steps.
+- *Backfilling email onto existing rows.* Not built. The database is wiped
+  when the game moves to <panel>, and the nine existing human rows are test
+  accounts, so there is nothing real to migrate.
+- *Matching `meta.target` on index name only.* This was the plan's original
+  design and is the bug the markers-array fix corrects — see Reason above.
+
+## 2026-09-07 — Two-step registration and the nullable username guarded by WsAuthGuard
+**Context:** Public-web-presence plan, Task 3 (registration split) and Task 4
+(the socket-side gate). Creating an account now needs an email and a password
+before a display handle exists at all, and canon's `username()`
+(`GEFUNCS.C:2596`) is called throughout combat and sector messaging — a ship
+with no display handle is not a safe thing to let onto the game board.
+
+**Decision:** `POST /auth/register` with `{ email, password }` creates the row
+with `username = null` and returns a JWT. `POST /auth/username` —
+authenticated — with `{ username }` sets it and returns a fresh token.
+`WsAuthGuard` rejects any token whose payload carries no username, with code
+`USERNAME_REQUIRED`, before a socket connection is allowed to proceed.
+
+The username-claim write is atomic: it is expressed as
+`updateMany({ where: { userid, username: null } })` and branches on the
+affected-row count, rather than a `findUnique` read followed by a separate
+`update`. A read-then-write version leaves a window where two concurrent
+requests carrying the same token and different names both pass the null
+check, and the last write wins — the unique index only prevents two
+*accounts* claiming one name, not one account being named twice.
+
+**Reason:** Creating the row at step 1 (rather than holding credentials
+client-side until both fields are known) means "that email is taken" surfaces
+immediately, instead of after the player has already invested time choosing a
+name. Gating the socket on a non-null username is what makes the nullable
+column safe: without `WsAuthGuard`'s check, a half-registered account could
+open a socket and board a ship with a null display handle reaching every
+combat and sector message in the game.
+
+**Alternatives rejected:**
+- *Single-step registration collecting email, password and username at once.*
+  Rejected because a taken username then surfaces at the same moment as a
+  taken email, and the two-request split was already needed to let
+  `WsAuthGuard` gate on username presence independently of credential
+  validity.
+- *Read-then-write username claim (`findUnique` then `update`).* This was the
+  original design; a code review during Task 3 found the race described
+  above and it was replaced with the atomic `updateMany` before the task
+  closed.
+- *Silently coercing a null username to the userid for display purposes.* An
+  early fix inside Task 1 made `login()` return
+  `username: user.username ?? user.userid`, which would have made a
+  half-registered account look complete to the frontend's `Login` screen,
+  routing it to `/play` where the socket then refuses it with
+  `USERNAME_REQUIRED` — a dead end. Not carried forward: Task 2 rewrote
+  `login()` to return `username: null` directly, and the frontend branches on
+  that null to route to `/register/name` instead.
+
+**Known gap, deferred:** if the account row is deleted between the guard read
+and the `updateMany` in an unlucky interleaving, the response reports
+`USERNAME_ALREADY_SET` rather than a more accurate "no such account". This is
+not purely theoretical — the abandoned-signup sweep below deletes
+username-less accounts at 10 days — but narrow enough that it was flagged to
+the final review rather than fixed in Task 3.
+
+## 2026-09-07 — Logout is site chrome, not a game command
+**Context:** Public-web-presence plan, Task 11. The port had no logout at
+all; the only way to end a session was to close the tab, leaving a stale JWT
+in `localStorage` and no way to switch accounts on a shared machine.
+
+**Decision:** Logout is added as **site chrome**, not a game command — an
+option on the ship-select screen, and a header link on `/` and `/stats`. It
+clears the stored token, disconnects the socket, and routes to `/`. It is
+deliberately **not reachable from inside the live terminal** while a ship is
+active.
+
+**Reason:** Canon's `x` command (`GEMAIN.C:2859 mnu_fightsub`) clears
+torpedo locks, saves, announces `EXIWAR2` to the sector, sets `GESTAT_AVAIL`
+and returns the player to the ship-select menu — that is canon's own exit
+from Galactic Empire, not a logoff. Logging off the BBS entirely was a
+separate action at the outer menu, one level up, which this port had never
+implemented because there was no "outer menu" to log off from. Disconnecting
+a live socket is `warhupa`, and with `cantexit > 0` (an active combat
+countdown) that destroys the hull outright. So the sequence has to be `x`
+first — which enforces `cantexit` itself and answers `CANTEXT` when it
+cannot — and only then logout from the ship-select screen or site header.
+This reproduces canon's real two-level exit (out of the game, then off the
+service) instead of collapsing it into one button that can blow up an active
+ship.
+
+**Alternatives rejected:**
+- *A single logout reachable from anywhere, including mid-flight.* Rejected
+  outright: it bypasses `cantexit` and would let a player evade a
+  self-destruct countdown or an active engagement by disconnecting, which
+  canon's own exit path is explicitly built to prevent.
+- *Making logout a typed game command (e.g. `logout`) alongside `x`.*
+  Rejected because logout is a site-level session concept, not something
+  canon's command table has room for, and the ship-select screen already sits
+  exactly at the point in the flow where canon's outer-menu logoff belongs.
+
+**Known gap, deferred (fixed same task):** the first cut of `tokenStore`
+called bare `localStorage.getItem`/`setItem`/`removeItem` with no
+`try/catch`. `SiteHeader` calls `tokenStore.getToken()` on the **landing
+page** — the first thing a stranger sees — and a browser that blocks site
+data (private windows, strict cookie settings) throws on any `localStorage`
+access, which would have put a blank page in front of every visitor whose
+browser happens to be configured that way. All three `tokenStore` functions
+were hardened with `try/catch` in the same task rather than deferred, because
+the alternative was undetectable without deliberately restrictive browser
+settings.
+
+## 2026-09-07 — The roster query is extracted from `ros`, not from `rank-roster.ts`
+**Context:** Public-web-presence plan, Task 5, `/public/stats`'s roster.
+
+**CORRECTION.** The design spec for this feature
+(`docs/superpowers/specs/2026-09-07-public-web-presence-design.md`) originally
+stated that the public roster would reuse `midnight/rank-roster.ts`, on the
+premise that doing so would keep the public board from ever disagreeing with
+the in-game `ros` command. That premise was wrong on both counts: `rankRoster`
+assigns `rospos` during the nightly midnight job and is not what `ros` uses
+at all; `ros.handler.ts` runs its own, independent Prisma query with canon's
+own predicate. Sharing `rank-roster.ts` would therefore have built a public
+board that could disagree with `ros` — the opposite of the stated goal. The
+correction was caught and written into the spec before implementation began,
+so no code was ever built against the wrong premise.
+
+**Decision:** Extract the shared selection from `ros.handler.ts` itself into
+a new pure module, `game/player/roster-query.ts`, exporting
+`ROSTER_WHERE` and `ROSTER_ORDER_BY`. `ros` is refactored to import and use
+these constants in the same task, with its existing (42, unmodified) test
+suite serving as the proof that the refactor is behaviour-preserving.
+`/public/stats`'s roster imports the same constants.
+
+**Reason:** Canon's predicate and ordering are preserved exactly: `score > 0`
+(`GECMDS.C:4038`), AI excluded via the `Cybrg-`, `@Droid-` and `@` userid
+prefixes, ordered score desc, then kills desc, then userid ascending. Having
+one module both call sites import makes "the public board agrees with `ros`"
+a structural fact rather than a hope maintained by two independently-edited
+queries staying in sync by hand.
+
+**Alternatives rejected:**
+- *Reuse `midnight/rank-roster.ts` as originally specified.* This is the
+  premise the correction above withdraws — it ranks for a different job
+  (`rospos` at midnight) and does not answer the same question `ros` does.
+- *Duplicate the predicate inline in the new `StatsService`.* Rejected for
+  the reason the shared module exists at all: two hand-maintained copies of
+  a canon predicate are two chances for one to drift, and this project has
+  already been burned by exactly that shape of bug.
+
+**Note, not a further correction:** the roster predicate and the
+`/public/stats` `commanders` count answer different questions and
+legitimately differ from each other. The roster is canon's scoreboard, which
+omits anyone who has never scored (`score > 0`). `commanders` counts
+`passwordHash IS NOT NULL` and includes players who have signed up but never
+flown. Both exclude the 24 Cybertron rows, but for different reasons and via
+different predicates.
+
+## 2026-09-07 — The 10-day abandoned-signup sweep is PORT-ORIGINAL
+**Context:** Public-web-presence plan, Task 8. Two-step registration (see the
+entry above) means an account can complete step 1 — email, password, a real
+row in `User` — and never complete step 2, holding an email address forever
+with no way to ever become a playable character.
+
+**Decision:** The nightly midnight job deletes any `User` row where
+`passwordHash IS NOT NULL`, **`username IS NULL`**, and `createdAt` is older
+than a named constant, `ABANDONED_SIGNUP_DAYS = 10`, alongside the existing
+`MAILDAYS`. This is **PORT-ORIGINAL** — canon has no concept of a two-step
+signup and nothing to model this against. There is no C source citation for
+this behavior because none exists; the 10-day figure and the sweep itself are
+this project's own invention, not a canon value that happened to move.
+
+All three conditions in the predicate are load-bearing, not incidental:
+`passwordHash IS NOT NULL` keeps the sweep away from the 24 Cybertron rows,
+whose usernames are also atypical and would otherwise look abandoned by
+accident. The null username is what marks an account as abandoned mid-signup
+in the first place — once step 2 completes, a real player's row can never
+match this predicate again regardless of age, so the sweep cannot reach a
+completed account no matter how it ages. Such a row owns no ships, planets or
+mail (those are only created once a player boards a ship after registration
+completes), so this is a plain delete with no cascade to reason about.
+
+**Reason:** An abandoned signup is not player data — it is an email address
+with no story, no way to log back in and finish becoming a character, and no
+reason to keep it. Deleting it is both a privacy courtesy (data one did not
+mean to keep isn't kept) and cleanliness for anyone querying `User` directly.
+Ten days was chosen as generous enough that a player who registered, got
+distracted, and came back the next weekend is unaffected, while still being a
+concrete bound rather than "forever."
+
+The predicate itself received extra scrutiny beyond the norm for this
+project's midnight additions: this is the only `DELETE` in the entire
+midnight job, and it runs unattended every night against a database holding
+a real, ongoing playtest. A white-box unit test asserting the shape of the
+`where` object can prove the code constructs the predicate it means to
+construct; it cannot prove Prisma renders `username: null` as `IS NULL` at
+the SQL level, or that the delete actually removes the rows intended and
+nothing else. A DB-backed integration test with four fixture rows (an
+abandoned signup past the cutoff, one short of it, a Cybertron of any age,
+and a fully-registered account of any age) was added specifically to close
+that gap, confirming both the SQL rendering and the survivor set by
+re-querying identity after the sweep runs.
+
+**Alternatives rejected:**
+- *No sweep — leave abandoned rows in place indefinitely.* Rejected: it
+  accumulates real email addresses attached to accounts that can never be
+  used, indefinitely, for no benefit.
+- *Trust the white-box unit test alone, without a DB integration test.* This
+  was the plan's original test list and is what the review flagged as
+  insufficient for the project's only unattended `DELETE` — see Reason above.
+  Fixed within the same task rather than deferred, given the destructive,
+  unattended nature of the job.
+- *Key the sweep off `updatedAt` instead of `createdAt`.* Not adopted: the
+  intent is "how long has this signup sat unfinished," which is measured from
+  when the row was created, not from whatever last touched it.

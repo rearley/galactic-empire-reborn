@@ -878,3 +878,54 @@ ScanPanel (frontend/src/components/ScanPanel.tsx)
   └── optional side panel (sidePanel rows) rendered right of grid for 'lo-full' mode
   └── mounted adjacent to ScanMap in App.tsx
 ```
+
+## PublicModule + frontend routing (public web presence, 2026-09-07)
+
+```
+PublicModule (backend/src/public/)
+  ├── StatsController   — GET /public/stats, unauthenticated, Cache-Control: 15s
+  ├── StatsService       — builds { commanders, online, roster } from Prisma +
+  │                        PresenceService; response cached in-memory 15s
+  │                        (Date.now()-based; cache cannot be poisoned by an
+  │                        error path since assignment is post-await)
+  └── PresenceService     — Set<userid>, add()/remove()/count(); fed entirely by
+                            GameGateway.handleConnection/handleDisconnect. A
+                            plain (non-dynamic) module, so PublicModule resolves
+                            to ONE PresenceService shared by the gateway and the
+                            stats endpoint. Process-local — a restart empties it
+                            immediately; not the channel registry (which
+                            includes AI) and not a raw socket count (which
+                            double-counts reconnects).
+
+game/player/roster-query.ts
+  └── ROSTER_WHERE / ROSTER_ORDER_BY — canon predicate and ordering extracted
+      from ros.handler.ts (score > 0, AI excluded by userid prefix, score
+      desc/kills desc/userid asc). Imported by BOTH ros.handler.ts and
+      StatsService so the public roster cannot silently disagree with `ros`.
+      See docs/DECISIONS.md 2026-09-07 for the CORRECTION this replaced
+      (the design originally, and wrongly, named midnight/rank-roster.ts).
+
+GameGateway additions (public web presence)
+  └── handleConnection → PresenceService.add(userid)
+  └── handleDisconnect  → PresenceService.remove(userid)
+```
+
+### Frontend routes (react-router-dom, added this feature)
+
+`frontend/src/main.tsx` wraps `<BrowserRouter>`; `App.tsx` lost its own
+`if (!token)` branch in favor of route-level gating.
+
+| Route | Element | Notes |
+|---|---|---|
+| `/` | `Landing` | Public marketing page; header carries login/register or logout depending on `tokenStore` state |
+| `/login` | `Login` | Email + password; on success routes to `location.state.from` (default `/play`), or to `/register/name` if the returned user has no username |
+| `/register` | `Register` | Email + password; posts to `POST /auth/register` |
+| `/register/name` | `ChooseUsername` | Authenticated; posts to `POST /auth/username` with the bearer token, stores the fresh token returned |
+| `/stats` | `Stats` | Public; renders `GET /public/stats` |
+| `/play` | `RequireAuth` wrapping `App` | Redirects an anonymous visit to `/login` (preserving the intended path in `location.state.from`); redirects an authenticated but username-less visit to `/register/name` |
+| `*` | redirect to `/` | Catch-all |
+
+`auth/tokenStore.ts` (`getToken`/`setToken`/`clearToken`) wraps every
+`localStorage` call in `try/catch` — hardened during this feature after
+`SiteHeader` started reading it on the landing page, where a browser that
+blocks site data would otherwise throw during render for every visitor.

@@ -29,10 +29,38 @@ a teamcode referencing a deleted team. Source: `WARUSR` in `GEMAIN.H`.
   uniqueness comes from a raw `LOWER(username)` expression index created in a migration.
   Backfilled from
   `userid` for pre-existing rows. A `LOWER(username)` expression index enforces case-insensitive
-  uniqueness across all login attempts. Cannot be NULL after migration.
+  uniqueness across all login attempts. ~~Cannot be NULL after migration.~~
+  **CORRECTION (2026-09-07, public-web-presence):** `username` is now
+  **nullable**. See the entry below — this line was true when written and is
+  no longer true.
 - `passwordHash String?` — bcrypt cost-12 hash of the password. Nullable at the DB level;
   rows with NULL hash cannot authenticate (pre-existing AI/seed accounts).
 - `createdAt DateTime @default(now())` — timestamp of account creation.
+
+**Public-web-presence additions (2026-09-07)**:
+- `email String?` — the login credential, replacing `username` in that role.
+  Nullable because the 24 Cybertron rows can never have one. Enforced
+  case-insensitive-unique by a raw partial index,
+  `CREATE UNIQUE INDEX user_email_lower_key ON "User" (lower(email)) WHERE email IS NOT NULL`
+  — a `WHERE email IS NOT NULL` clause, unlike the username index, because
+  Postgres already treats multiple NULLs as distinct in a plain unique index
+  but here the intent (only real emails are unique) is made explicit in the
+  index itself.
+- `emailVerifiedAt DateTime?` — written by nothing and read by nothing today.
+  It exists so that adding email verification later is a token table plus a
+  flow, not another `User` migration.
+- `username` **became nullable** in the same change. A row with
+  `username = null` means: this person completed step 1 of registration
+  (they have an account, an email, and a password) but never completed step
+  2 (choosing a display handle). Such an account cannot open a game socket —
+  `WsAuthGuard` rejects any token whose payload carries no username with
+  `USERNAME_REQUIRED` — so a null username can never reach a ship, combat, or
+  sector messaging. **The nightly midnight job deletes any such row once it
+  is 10 days old** (`passwordHash IS NOT NULL AND username IS NULL AND
+  createdAt < now() - 10 days`, `ABANDONED_SIGNUP_DAYS`) — a port-original
+  addition with no canon equivalent, since canon has no two-step signup to
+  abandon. See `docs/DECISIONS.md` 2026-09-07 for both the email-as-credential
+  and the abandoned-signup-sweep entries.
 
 **Unique indexes**:
 - `User_username_lower_idx` — `UNIQUE ON "User" (LOWER("username"))` (raw SQL; Prisma cannot
