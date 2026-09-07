@@ -136,10 +136,37 @@ describe('a pilot is not told about their own shot in the third person', () => {
     expect(line.textContent).not.toContain('%');
   });
 
-  it('still narrates someone ELSE landing a phaser hit', () => {
+  /**
+   * REVISED by design decision — the last of the three. This asserted that a
+   * bystander watching two other ships fight sees `X hits Y (phaser, hull -24%)`.
+   *
+   * Canon shows a bystander NOTHING about someone else's weapons fire. `PFIRED`
+   * goes `outprfge(FILTER, usrn)` — to the firer alone (GECMDS.C:943-944) — and
+   * every hit message is addressed to the firer or the victim. The sector-wide
+   * broadcasts canon does make are cloak collapse (GEFUNCS.C:1380), the
+   * self-destruct countdown (:1836), sector entry/exit (:717-722), radio
+   * traffic and the destruction energy burst. Combat is not among them: if you
+   * want to know whether the two ships off your bow are fighting, you scan
+   * them and read their damage.
+   *
+   * Both port lines go — the hit line here and `X fires phasers!` — leaving the
+   * energy burst on a kill as the only thing a third party is told, which is
+   * canon's own (`outrange(ALWAYS, ...)`).
+   *
+   * @see docs/DECISIONS.md 2026-09-07
+   */
+  it('says nothing to a bystander about a fight between two other ships', () => {
     fire('combat.hit', hit({ attackerId: 'Cybrg-208:1', attackerName: 'Cybertron 43319',
       victimId: 'other:1', victimName: 'Wanderer' }));
-    expect(screen.getByText(/Cybertron 43319 hits Wanderer/)).toBeTruthy();
+
+    expect(screen.queryByText(/Cybertron 43319 hits Wanderer/)).toBeNull();
+    expect(screen.queryByText(/hull -/)).toBeNull();
+  });
+
+  it('says nothing to a bystander when another ship fires phasers', () => {
+    fire('combat.phaser-fired', { shipId: 'Cybrg-208:1' });
+
+    expect(screen.queryByText(/fires phasers/)).toBeNull();
   });
 
   /**
