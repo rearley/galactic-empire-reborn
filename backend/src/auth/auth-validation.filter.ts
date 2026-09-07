@@ -26,6 +26,19 @@ export function authValidationExceptionFactory(errors: ValidationError[]): BadRe
 }
 
 /**
+ * Human-readable sentence for each validation `code` this filter emits.
+ * `code` is the contract the frontend and tests key off of — never change
+ * those strings. `message` is what a player actually reads, so it must read
+ * like something a person wrote, not the machine code (a stranger's first
+ * screen must not show them the literal text "INVALID_EMAIL").
+ */
+const VALIDATION_MESSAGES: Record<'INVALID_EMAIL' | 'INVALID_PASSWORD' | 'INVALID_USERNAME', string> = {
+  INVALID_EMAIL: 'Enter a valid email address.',
+  INVALID_PASSWORD: 'Password must be at least 8 characters.',
+  INVALID_USERNAME: 'Enter a valid username.',
+};
+
+/**
  * Reformats NestJS ValidationPipe errors on auth routes to our contract shape:
  * `{ code: 'INVALID_EMAIL' | 'INVALID_PASSWORD' | 'INVALID_USERNAME', message: string }`.
  *
@@ -58,6 +71,6 @@ export class AuthValidationFilter implements ExceptionFilter {
         ? 'INVALID_USERNAME'
         : 'INVALID_PASSWORD';
 
-    res.status(400).json({ code, message: `${code}` });
+    res.status(400).json({ code, message: VALIDATION_MESSAGES[code] });
   }
 }
