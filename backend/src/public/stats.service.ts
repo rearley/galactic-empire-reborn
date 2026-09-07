@@ -24,10 +24,21 @@ export interface PublicStats {
   roster: PublicRosterEntry[];
 }
 
+type CachedShape = { commanders: number; roster: PublicRosterEntry[] };
+
 @Injectable()
 export class StatsService {
-  private cached: { commanders: number; roster: PublicRosterEntry[] } | null = null;
+  private cached: CachedShape | null = null;
   private cachedAt = 0;
+
+  // The in-flight PROMISE, not the resolved value. Assigning `this.cached`
+  // only after its `await` left a window, on every cold (or just-expired)
+  // request, where N concurrent callers each saw `cached === null` and each
+  // ran both queries — for a public, unauthenticated, polled endpoint, that
+  // made the 15-second cache irrelevant to concurrent load. Caching the
+  // promise means every caller who arrives before it settles shares the one
+  // in-flight query instead of starting their own.
+  private pending: Promise<CachedShape> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -50,32 +61,56 @@ export class StatsService {
   async getStats(): Promise<PublicStats> {
     const now = Date.now();
     if (this.cached === null || now - this.cachedAt >= STATS_CACHE_MS) {
-      const [commanders, rows] = await Promise.all([
-        this.prisma.user.count({ where: { passwordHash: { not: null } } }),
-        this.prisma.user.findMany({
-          where: ROSTER_WHERE,
-          orderBy: ROSTER_ORDER_BY,
-          take: PUBLIC_ROSTER_LIMIT,
-          select: { userid: true, username: true, score: true, kills: true, planets: true },
-        }),
-      ]);
-
-      this.cached = {
-        commanders,
-        roster: rows.map((row, i) => ({
-          rank: i + 1,
-          username: row.username ?? row.userid,
-          score: row.score.toString(),
-          kills: row.kills,
-          planets: row.planets,
-        })),
-      };
-      this.cachedAt = now;
+      if (this.pending === null) {
+        this.pending = this.fetchAndCache(now).finally(() => {
+          this.pending = null;
+        });
+      }
+      // Every caller who arrives while a query is in flight awaits the same
+      // promise instead of starting a second one. A rejection propagates to
+      // every waiter and is never written into `this.cached` — see
+      // fetchAndCache — so a single failure does not get served for 15s.
+      const cached = await this.pending;
+      return { ...cached, online: this.presence.count() };
     }
 
     // Read outside the cache branch on purpose: online-now is what makes the
     // page feel alive, and freezing it for 15 seconds is the one thing this
     // cache must not do.
     return { ...this.cached, online: this.presence.count() };
+  }
+
+  /**
+   * Runs both queries and populates the resolved-value cache on success.
+   * Deliberately does NOT touch `this.cached` (or `this.cachedAt`) if either
+   * query rejects, so a transient DB failure is retried on the very next
+   * call rather than being remembered — successfully or not — for
+   * STATS_CACHE_MS.
+   */
+  private async fetchAndCache(now: number): Promise<CachedShape> {
+    const [commanders, rows] = await Promise.all([
+      this.prisma.user.count({ where: { passwordHash: { not: null } } }),
+      this.prisma.user.findMany({
+        where: ROSTER_WHERE,
+        orderBy: ROSTER_ORDER_BY,
+        take: PUBLIC_ROSTER_LIMIT,
+        select: { userid: true, username: true, score: true, kills: true, planets: true },
+      }),
+    ]);
+
+    const result: CachedShape = {
+      commanders,
+      roster: rows.map((row, i) => ({
+        rank: i + 1,
+        username: row.username ?? row.userid,
+        score: row.score.toString(),
+        kills: row.kills,
+        planets: row.planets,
+      })),
+    };
+
+    this.cached = result;
+    this.cachedAt = now;
+    return result;
   }
 }
