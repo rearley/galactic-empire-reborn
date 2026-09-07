@@ -15,13 +15,13 @@ describe('chooseUsername', () => {
     // those. Without a fresh token here the player finishes signup and still
     // cannot open a socket.
     const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
-    const update = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: 'rick' });
-    const svc = makeService({ findUnique, update });
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const svc = makeService({ findUnique, updateMany });
 
     const result = await svc.chooseUsername('usr_abc', { username: 'rick' });
 
-    expect(update).toHaveBeenCalledWith({
-      where: { userid: 'usr_abc' },
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { userid: 'usr_abc', username: null },
       data: { username: 'rick' },
     });
     expect(result.user).toEqual({ id: 'usr_abc', username: 'rick' });
@@ -30,13 +30,13 @@ describe('chooseUsername', () => {
 
   it('refuses a handle someone already holds', async () => {
     const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
-    const update = jest.fn().mockRejectedValue(
+    const updateMany = jest.fn().mockRejectedValue(
       Object.assign(new Error('unique violation'), {
         code: 'P2002',
         meta: { target: 'User_username_lower_idx' },
       }),
     );
-    const svc = makeService({ findUnique, update });
+    const svc = makeService({ findUnique, updateMany });
 
     await expect(svc.chooseUsername('usr_abc', { username: 'rick' }))
       .rejects.toMatchObject({ response: { code: 'USERNAME_TAKEN' } });
@@ -46,19 +46,38 @@ describe('chooseUsername', () => {
     // This endpoint completes signup. It is not a rename feature, and letting
     // it act as one would let a player shed a reputation mid-war.
     const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: 'rick' });
-    const update = jest.fn();
-    const svc = makeService({ findUnique, update });
+    const updateMany = jest.fn();
+    const svc = makeService({ findUnique, updateMany });
 
     await expect(svc.chooseUsername('usr_abc', { username: 'someoneelse' }))
       .rejects.toMatchObject({ response: { code: 'USERNAME_ALREADY_SET' } });
-    expect(update).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown userid rather than creating a row', async () => {
     const findUnique = jest.fn().mockResolvedValue(null);
-    const svc = makeService({ findUnique, update: jest.fn() });
+    const svc = makeService({ findUnique, updateMany: jest.fn() });
 
     await expect(svc.chooseUsername('usr_ghost', { username: 'rick' }))
       .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('refuses the claim when a concurrent request already won the race', async () => {
+    // The findUnique read above says username is still null — but by the time
+    // the write lands, a second request on the same token got there first.
+    // Correctness has to live in the write's WHERE clause (userid AND
+    // username: null), not in the earlier read: updateMany matching zero rows
+    // is the only signal that distinguishes "I won" from "someone beat me",
+    // and the service must report USERNAME_ALREADY_SET rather than success.
+    const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
+    const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+    const svc = makeService({ findUnique, updateMany });
+
+    await expect(svc.chooseUsername('usr_abc', { username: 'rick' }))
+      .rejects.toMatchObject({ response: { code: 'USERNAME_ALREADY_SET' } });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { userid: 'usr_abc', username: null },
+      data: { username: 'rick' },
+    });
   });
 });

@@ -127,6 +127,19 @@ export class AuthService {
    * handle — this completes registration, it is not a rename — and
    * ConflictException (USERNAME_TAKEN) on duplicate username (Prisma P2002
    * on `User_username_lower_idx`).
+   *
+   * The `findUnique` below is a friendly early return only — it makes the
+   * common-case NO_SUCH_USER / USERNAME_ALREADY_SET messages fast and clear,
+   * but it does NOT carry the correctness guarantee. Two concurrent requests
+   * on the same token could both pass that check before either write lands
+   * ("check-then-act"), and the unique index on username doesn't close that
+   * gap — it stops two accounts sharing a name, not one account being named
+   * twice. The guarantee instead comes from the WRITE: `updateMany` puts
+   * `username: null` in its own `where`, so the update only ever matches a
+   * row that still has no name. A `count` of 0 means either the account never
+   * existed (already caught above) or someone else's write won the race —
+   * both collapse to USERNAME_ALREADY_SET, which is correct either way since
+   * this endpoint's only job is "the account has *a* name now."
    */
   async chooseUsername(userid: string, dto: ChooseUsernameDto): Promise<AuthResult> {
     const existing = await this.prisma.user.findUnique({ where: { userid } });
@@ -141,8 +154,12 @@ export class AuthService {
       });
     }
 
+    let result: { count: number };
     try {
-      await this.prisma.user.update({ where: { userid }, data: { username: dto.username } });
+      result = await this.prisma.user.updateMany({
+        where: { userid, username: null },
+        data: { username: dto.username },
+      });
     } catch (err: unknown) {
       if (isUniqueViolation(err, USERNAME_INDEX_MARKERS)) {
         throw new ConflictException({
@@ -151,6 +168,13 @@ export class AuthService {
         });
       }
       throw err;
+    }
+
+    if (result.count === 0) {
+      throw new ConflictException({
+        code: 'USERNAME_ALREADY_SET',
+        message: 'This account already has a username.',
+      });
     }
 
     return {
