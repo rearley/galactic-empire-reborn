@@ -36,10 +36,16 @@ describe('balance-planet — regression pins', () => {
     expect(PLANTIME_MIN_SECONDS).toBe(4);
   });
 
+  /**
+   * Canon's item_name[] verbatim (GECMDS.C:95-108) — lower case, "torpedos",
+   * "spy". This snapshot used to carry a Title-Cased invention of the port's.
+   * test/balance/item-names-canon.balance.spec.ts is the stronger guard: it
+   * re-reads the C source rather than restating it here.
+   */
   it('ITEM_NAMES snapshot', () => {
     expect(ITEM_NAMES).toEqual([
-      'Men', 'Missiles', 'Torpedoes', 'Ion Cannons', 'Flux Pods', 'Food Cases',
-      'Fighters', 'Decoys', 'Troops', 'Zippers', 'Jammers', 'Mines', 'Gold', 'Spies',
+      'men', 'missiles', 'torpedos', 'ion cannons', 'flux pods', 'food cases',
+      'fighters', 'decoys', 'troops', 'zippers', 'jammers', 'mines', 'gold', 'spy',
     ]);
   });
 

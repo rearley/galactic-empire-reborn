@@ -6,7 +6,7 @@ import { ReportHandlerService } from '../../../src/game/commands/handlers/report
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
-import { NUMITEMS, I_FOOD, I_MEN, ITEM_NAMES, ITEM_TONS } from '../../../src/game/constants/items';
+import { NUMITEMS, I_FOOD, I_MEN, ITEM_NAMES, ITEM_TONS, capitaliseItem } from '../../../src/game/constants/items';
 
 const MAX_TONS = 500;
 
@@ -44,6 +44,12 @@ function makeService(maxTons = MAX_TONS) {
   return { service };
 }
 
+/**
+ * The cargo column shows `Food cases`, not `food cases`: canon leaves
+ * item_name[] lower case and uppercases the first character where it prints a
+ * column — `gechrbuf[0] = toupper(gechrbuf[0])`, GECMDS.C:2064-2065. Hence
+ * capitaliseItem() here rather than the raw table.
+ */
 describe('ReportHandlerService — cargo sub-command', () => {
   it('empty cargo shows REP_CARGO_NONE', async () => {
     const { service } = makeService();
@@ -73,7 +79,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
-    expect(result.lines.some(l => l.text.includes(ITEM_NAMES[I_FOOD]))).toBe(true);
+    expect(result.lines.some(l => l.text.includes(capitaliseItem(ITEM_NAMES[I_FOOD])))).toBe(true);
   });
 
   it('non-zero item does not show REP_CARGO_NONE', async () => {
@@ -104,7 +110,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     items[I_MEN] = 5n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     const cargoLines = result.lines.filter(l =>
-      l.text.includes(ITEM_NAMES[I_FOOD]) || l.text.includes(ITEM_NAMES[I_MEN]),
+      l.text.includes(capitaliseItem(ITEM_NAMES[I_FOOD])) || l.text.includes(capitaliseItem(ITEM_NAMES[I_MEN])),
     );
     expect(cargoLines).toHaveLength(2);
   });
@@ -116,7 +122,7 @@ describe('ReportHandlerService — cargo sub-command', () => {
     items[I_FOOD] = 10n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
     // I_MEN is 0 — should not appear
-    expect(result.lines.some(l => l.text.includes(ITEM_NAMES[I_MEN]))).toBe(false);
+    expect(result.lines.some(l => l.text.includes(capitaliseItem(ITEM_NAMES[I_MEN])))).toBe(false);
   });
 
   it('header contains REP01 with ship name', async () => {

@@ -8,32 +8,38 @@
  * @see GECMDS.C:genearas — prefix-match lookup used by buy/sell/transfer/jettison
  */
 
-import { ITEM_NAMES, I_GOLD } from '../../constants/items';
-
-/** Lower-cased canonical item keywords derived from ITEM_NAMES. */
-const CANONICAL_KEYWORDS: readonly string[] = Object.freeze(
-  ITEM_NAMES.map((n) => n.toLowerCase()),
-);
+import { ITEM_NAMES, ITEM_KEYWORDS, I_GOLD } from '../../constants/items';
 
 /**
- * Resolve a player-typed item keyword to a cargo-array index (0–13).
- * Accepts:
- *   - Case-insensitive prefix match against canonical item names (e.g. "tor" → I_TORP=2)
- *   - "gold" synonym for I_GOLD=12
+ * Resolve a player-typed item keyword to a cargo-array index (0-13).
  *
- * Returns the matched index, or -1 if no match (or ambiguous).
+ * Canon matches `genearas(kwrd[i], margv[n])` against the THREE-LETTER table
+ * (GECMDS.C:3287 and five other sites), which is why `buy 10 tor` works. We
+ * accept that and the full display name, because players type both:
+ *
+ *   input starts with the canon keyword   ->  "tor", "torpedoes", "torps"
+ *   display name starts with the input    ->  "torp", "torpedo", "torpedos"
+ *
+ * Both directions are needed. Canon's names are not the words players reach
+ * for — canon spells it "torpedos" and calls a spy "spy", so "torpedoes" and
+ * "spies" only resolve through the keyword arm; and "food" only resolves
+ * through the name arm, since the keyword is "foo".
+ *
+ * First match wins, in slot order, exactly as canon's loop does.
+ *
+ * @see GEMAIN.H kwrd[] table, GECMDS.C:80-108
  */
 export function resolveItemKeywordByName(raw: string): number {
-  const lower = raw.toLowerCase();
+  const lower = raw.trim().toLowerCase();
+  if (lower === '') return -1;
 
-  // Gold synonym.
-  if (lower === 'gold') return I_GOLD;
-
-  // Prefix match — return first match.
-  for (let i = 0; i < CANONICAL_KEYWORDS.length; i++) {
-    if (CANONICAL_KEYWORDS[i].startsWith(lower)) {
+  for (let i = 0; i < ITEM_KEYWORDS.length; i++) {
+    if (lower.startsWith(ITEM_KEYWORDS[i]) || ITEM_NAMES[i].startsWith(lower)) {
       return i;
     }
   }
   return -1;
 }
+
+/** Index of gold, re-exported for call sites that special-cased it. */
+export { I_GOLD };

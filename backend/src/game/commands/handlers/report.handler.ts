@@ -7,7 +7,7 @@ import { formatMessage, MessageId } from '../messages';
 import { PMINFIRE } from '../../constants';
 import { showarp } from '../../ship/showarp';
 import { ShipState } from '../../ship/ship-state.types';
-import { ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
+import { ITEM_NAMES, ITEM_TONS, NUMITEMS, capitaliseItem } from '../../constants/items';
 import { coord1, coord2 } from '../../physics/coord';
 
 
@@ -95,7 +95,12 @@ export class ReportHandlerService implements OnModuleInit {
         const itemTons = ITEM_TONS[i];
         const tons = qty * itemTons;
         totalTons += tons;
-        const name = ITEM_NAMES[i];
+        // Canon capitalises the first letter of a COLUMN entry at the call
+        // site, leaving the table itself lower case:
+        //   sprintf(gechrbuf,"%s%s%12ld", item_name[i], gedots(...), qty);
+        //   gechrbuf[0] = toupper(gechrbuf[0]);
+        // @see GECMDS.C:2064-2065
+        const name = capitaliseItem(ITEM_NAMES[i]);
         const dots = '.'.repeat(Math.max(1, 26 - name.length));
         lines.push({
           text: `${name}${dots}${qty.toLocaleString()}  (${itemTons} ton${itemTons !== 1 ? 's' : ''} ea)`,
