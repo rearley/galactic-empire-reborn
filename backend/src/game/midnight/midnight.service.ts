@@ -20,7 +20,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MidnightRepository, PhaseCounters } from './midnight.repository';
+import { MidnightRepository } from './midnight.repository';
 import { MidnightCounters, hasRunForToday, recordRun } from './midnight-run.ledger';
 import { ADVISORY_LOCK_KEY, ABANDONED_SIGNUP_DAYS } from './midnight.constants';
 import { loadMidnightConfig } from './midnight.config';
