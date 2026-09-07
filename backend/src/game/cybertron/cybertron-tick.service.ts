@@ -64,6 +64,7 @@ import {
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { selectPhaserVictims } from '../combat/firep';
+import { findFreeTorpSlot } from '../combat/projectile-slots';
 import { selectHyperVictims } from '../combat/firehp';
 import {
   CYBERTRON_SCORED_KILL,
@@ -818,7 +819,8 @@ export class CybertronTickService implements OnModuleInit {
     ddist: number,
     announce: boolean,
   ): void {
-    const emptySlot = (target.ltorpsChannel as number[]).findIndex((ch) => ch === 255 || ch === undefined);
+    // Bounded by MAXTORPS, never by the array's length — see findFreeTorpSlot.
+    const emptySlot = findFreeTorpSlot(target.ltorpsChannel);
     if (emptySlot === -1) return; // all slots full
     this.shipState.mutate(target.userid, target.shipno, (v) => {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);

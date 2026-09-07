@@ -3514,3 +3514,29 @@ See `docs/DECISIONS.md` 2026-09-06.
 mutable fixture array across cases — harmless while the schedule lived inside
 the service, a cross-test leak once it moved onto the planet. Changed to a
 factory. Worth watching for the same shape elsewhere.
+
+## 2026-09-07 — AI torpedoes never reached a player ship
+**Completed:** `cybLaunchTorpedo` and the droid `launchTorpedo` looked for a free
+incoming-torpedo tube with `ltorpsChannel.findIndex(ch => ch === 255 || ch === undefined)`.
+Canon walks a fixed `MISSILE ltorps[MAXTORPS]` struct array (GECMDS.C:1178-1184), so a
+ship nothing is chasing has three free tubes by construction. We store the same data as a
+Postgres `Int[]`, which defaults to `[]` and is grown lazily by whoever fires first — and
+`findIndex` over `[]` returns -1, the exact value both call sites read as "all tubes full".
+Only the *player* torpedo handler grows the arrays, so on a single-player world a pilot's
+`ltorpsChannel` stayed `[]` forever and **every AI torpedo ever aimed at them was discarded
+at the tube** — after the taunt had already printed. AI ships spawn with `[255,255,255]`
+(cybertron.repository.ts:199, droid-spawner.ts:178), which is why player torpedoes worked
+and the asymmetry stayed invisible. Both call sites now share
+`combat/projectile-slots.ts:findFreeTorpSlot`, bounded by MAXTORPS and never by array length.
+**Tests:** `test/game/cybertron/ai-torpedo-empty-slot-array.spec.ts` — fixture starts with
+`ltorpsChannel: []`, the shape Prisma actually returns. The sibling
+`ai-torpedo-warns-target.spec.ts` passed throughout because its fixture pre-pads
+`[255,255,255]`; a fixture that cannot occur in production is why this survived the audit.
+Full suite 525/5204 green.
+**Decisions made:** none — straight canon restoration.
+**Next:** deploy is held; the player was mid-flight when this landed.
+**Known issues:** `CYBMAXPERTICK`/`QUADMAXPERTICK` are *defined* in GEMAIN.H:180-181 but
+never referenced by any `.C` file — canon processes every due automaton each pass. The port
+applies `CYBMAXPERTICK = 2` in `onAiTick`. Not biting today (24 automatons, ~0.8 due/sec
+against a cap of 2), but it is an undocumented deviation and should either be removed or
+written into DECISIONS.md.

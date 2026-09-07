@@ -68,6 +68,7 @@ import {
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { aiCanHitTarget, cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
+import { findFreeTorpSlot } from '../combat/projectile-slots';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
 
@@ -615,7 +616,8 @@ export class DroidTickService implements OnModuleInit {
 
   /** Launch a torpedo at target. @see GEDROIDS.C:472-480 torp */
   private launchTorpedo(droid: ShipState, target: ShipState, ddist: number): void {
-    const emptySlot = target.ltorpsChannel.findIndex((ch) => ch === 255 || ch === undefined);
+    // Bounded by MAXTORPS, never by the array's length — see findFreeTorpSlot.
+    const emptySlot = findFreeTorpSlot(target.ltorpsChannel);
     if (emptySlot === -1) return;
     this.shipState.mutate(target.userid, target.shipno, (v) => {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
