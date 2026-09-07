@@ -28,6 +28,7 @@ import {
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /** Build a minimal CombatShipDestroyedEvent for testing. */
 const makeDestroyedEvent = (victimUserid: string, victimShipno: number): CombatShipDestroyedEvent => ({
@@ -119,7 +120,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
       mockScanHandler,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      mockEvents as never,
+      mockEvents as never, new PresenceService(),
     );
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room

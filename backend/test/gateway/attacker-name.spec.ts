@@ -9,6 +9,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { COMBAT_HIT } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * A combat notice has to name the attacker in a way the pilot can act on.
@@ -48,7 +49,7 @@ describe('GameGateway — combat notices name the attacking SHIP', () => {
       { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),

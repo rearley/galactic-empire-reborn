@@ -25,6 +25,7 @@ import {
   DroidSpawnedEvent,
   DroidKilledEvent,
 } from '../../src/game/droid/droid-events';
+import { PresenceService } from '../../src/public/presence.service';
 
 describe('GameGateway — droid event bridge', () => {
   let gateway: GameGateway;
@@ -52,7 +53,7 @@ describe('GameGateway — droid event bridge', () => {
       mockScanHandler,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
 
     // Inject the mock socket.io Server

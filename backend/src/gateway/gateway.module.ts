@@ -8,9 +8,10 @@ import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { OnboardingModule } from '../game/onboarding/onboarding.module';
 import { PhysicsModule } from '../game/physics/physics.module';
+import { PublicModule } from '../public/public.module';
 
 @Module({
-  imports: [ShipModule, CommandsModule, CombatModule, AuthModule, PrismaModule, OnboardingModule, PhysicsModule],
+  imports: [ShipModule, CommandsModule, CombatModule, AuthModule, PrismaModule, OnboardingModule, PhysicsModule, PublicModule],
   providers: [ConnectedShipsRegistry, GameGateway],
   exports: [GameGateway, ConnectedShipsRegistry],
 })

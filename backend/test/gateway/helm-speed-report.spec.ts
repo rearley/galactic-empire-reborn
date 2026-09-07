@@ -10,13 +10,14 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import type { ShipSpeedReportEvent } from '../../src/game/physics/speed-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 function build() {
   const sent: Array<{ room: string; text: string }> = [];
   const gateway = new GameGateway(
     {} as never, {} as never, {} as never, {} as never, {} as never,
     {} as never, {} as never, {} as never, mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
   (gateway as unknown as { server: unknown }).server = {
     to: (room: string) => ({

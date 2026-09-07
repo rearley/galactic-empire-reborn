@@ -52,6 +52,7 @@ import {
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 
@@ -590,7 +591,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room

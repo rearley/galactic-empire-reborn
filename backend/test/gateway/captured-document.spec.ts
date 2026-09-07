@@ -33,6 +33,7 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { PresenceService } from '../../src/public/presence.service';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
@@ -48,7 +49,7 @@ function build(planets: Array<{ name: string; xsect: number; ysect: number; plnu
     { planet: { findMany } } as unknown as PrismaService,
     {} as never, {} as never, {} as never,
     { next: () => roll } as never,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
   );
   (gateway as unknown as { server: unknown }).server = { to: (r: string) => chain([r]) };
   return { gateway, emits, findMany };

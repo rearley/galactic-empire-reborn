@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * Gravity wells and the neutral-zone self-destruct cancel both APPLY their
@@ -41,7 +42,7 @@ describe('GameGateway — gravity and destruct notices reach the pilot', () => {
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),

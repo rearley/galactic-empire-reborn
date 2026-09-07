@@ -22,6 +22,7 @@ import {
   CombatPhaserFiredEvent,
   CombatSubsystemDamagedEvent,
 } from '../../src/game/combat/combat-events';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * Verifies that the GameGateway forwards combat events to the firer/victim's
@@ -52,7 +53,7 @@ describe('GameGateway combat broadcasts', () => {
       mockScanHandler,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
@@ -173,7 +174,7 @@ describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
       mockScanHandler,
       { getTypeName: jest.fn() } as never,
       mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
     );
 
     const emitMock2 = jest.fn();

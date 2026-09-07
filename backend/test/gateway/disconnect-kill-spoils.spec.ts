@@ -21,6 +21,7 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { I_MEN, I_TROOPS, NUMITEMS } from '../../src/game/constants/items';
+import { PresenceService } from '../../src/public/presence.service';
 
 const I_FOOD = 1;
 
@@ -119,7 +120,7 @@ describe('GameGateway — disconnect kill awards spoils (canon killem)', () => {
       { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       mockClassCache,
       { next: () => 0 },
-      { emit: eventsEmitMock, on: jest.fn() } as never,
+      { emit: eventsEmitMock, on: jest.fn() } as never, new PresenceService(),
     );
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: () => undefined }),

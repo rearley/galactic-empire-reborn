@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
+import { PresenceService } from '../../src/public/presence.service';
 
 /**
  * Verifies the single-socket-per-ship invariant (FR-025a).
@@ -102,7 +103,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never);
+    gateway = new GameGateway(svc as ShipStateService, {} as CommandRouterService, registry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never, new PresenceService());
     (gateway as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
