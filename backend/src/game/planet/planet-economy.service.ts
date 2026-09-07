@@ -24,7 +24,7 @@ const MESG_SPYC2 = 32 as const;
  * this path, so the numbering is this port's and must stay stable.
  */
 const MESG_SPYM2 = 35 as const;
-import { applyEconomyTickWithLosses, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
+import { applyEconomyTickWithLosses, hasRealOwner, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
 /**
@@ -120,8 +120,20 @@ export class PlanetEconomyService {
       this.mailSpyIntel(next, spy);
     }
 
-    // Revolt only against an owned planet.
-    if (next.userid === null) return { state: next, revolted: false };
+    // Revolt only against a planet that still has a government to overthrow.
+    //
+    //   if (!sameas(plptr->userid,"**Free**"))    -- GEPLANET.C:342
+    //
+    // A colony revolts ONCE. Afterwards it keeps producing and feeding itself
+    // — the economy gate is `userid[0] != 0` (GEMAIN.C:2129) and "**Free**"
+    // passes it — but there is nothing left to depose and nobody to mail.
+    //
+    // This used to test `userid === null` alone, so a free planet revolted
+    // again on every qualifying tick: garrison divided by 2..9 each time, and
+    // a distress letter addressed to "**Free**", which has no User row. Two
+    // abandoned test colonies on the live server were ground down to 0 and 1
+    // troops before anyone noticed.
+    if (!hasRealOwner(next)) return { state: next, revolted: false };
 
     const men = Number(next.items[I_MEN].qty);
     const troops = Number(next.items[I_TROOPS].qty);

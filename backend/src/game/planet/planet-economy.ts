@@ -61,8 +61,16 @@ export function isOwnedOrFree(state: PlanetState): boolean {
   return state.userid !== null && state.userid !== '';
 }
 
-/** True when a real player owns it — the gate for TAX and revolt, not economy. */
-export function hasRealOwner(state: PlanetState): boolean {
+/**
+ * True when a real player owns it — the gate for TAX and revolt, not economy.
+ *
+ * Declared as a type predicate so callers get `userid: string` narrowed: the
+ * revolt path needs the owner's id to address the distress mail, and a plain
+ * boolean left it as `string | null` at the call site.
+ */
+export function hasRealOwner(
+  state: PlanetState,
+): state is PlanetState & { userid: string } {
   return isOwnedOrFree(state) && state.userid !== FREE_PLANET_OWNER;
 }
 
