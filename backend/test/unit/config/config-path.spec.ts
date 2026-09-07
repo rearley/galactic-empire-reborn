@@ -38,3 +38,37 @@ describe('candidateConfigPaths', () => {
     expect(paths.length).toBeGreaterThan(1);
   });
 });
+
+/**
+ * A deployment needs ONE predictable answer to "where is the config?", and it
+ * needs to be settable without rebuilding the image — Plesk and Docker mount a
+ * volume and inject environment, they do not rebuild to retune a galaxy.
+ *
+ * The four candidate paths are correct and stay: they are what makes source
+ * runs, ts-jest runs and compiled runs all work without setup. GE_CONFIG_PATH
+ * sits in FRONT of them so a deployment can be explicit instead of relying on
+ * path arithmetic it cannot see.
+ */
+describe('GE_CONFIG_PATH', () => {
+  it('takes priority over every derived path', () => {
+    const paths = candidateConfigPaths('/app/dist/src/game/config', {
+      GE_CONFIG_PATH: '/etc/ge/game.config.json',
+    });
+    expect(paths[0]).toBe('/etc/ge/game.config.json');
+  });
+
+  it('does not displace the derived paths — they remain as fallbacks', () => {
+    const paths = candidateConfigPaths('/app/dist/src/game/config', {
+      GE_CONFIG_PATH: '/etc/ge/game.config.json',
+    });
+    expect(paths).toContain('/app/config/game.config.json');
+    expect(paths.length).toBeGreaterThan(1);
+  });
+
+  it('is ignored when unset or empty, so nothing changes for local runs', () => {
+    const withEmpty = candidateConfigPaths('/app/dist/src/game/config', { GE_CONFIG_PATH: '' });
+    const without = candidateConfigPaths('/app/dist/src/game/config', {});
+    expect(withEmpty).toEqual(without);
+    expect(without[0]).toBe('/app/config/game.config.json');
+  });
+});
