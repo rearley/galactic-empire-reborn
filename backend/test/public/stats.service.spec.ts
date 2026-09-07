@@ -90,4 +90,51 @@ describe('getStats', () => {
     const { svc } = makeService([{ ...RICK, username: null }], 9);
     expect((await svc.getStats()).roster[0].username).toBe('usr_rick');
   });
+
+  // ── Finding 5 (final whole-branch review, 2026-09-07) ──────────────────
+  //
+  // `this.cached` was assigned AFTER the `await`, so N concurrent requests
+  // arriving in a cold window each ran both queries — the 15-second cache
+  // is not "the entire abuse story" for a public, unauthenticated endpoint
+  // hit by a page that polls. The fix caches the in-flight PROMISE, not the
+  // resolved value, so concurrent callers share one query.
+
+  it('deduplicates concurrent cold calls into a single pair of queries', async () => {
+    let resolveCount!: (v: number) => void;
+    let resolveFindMany!: (v: unknown[]) => void;
+    const countPromise = new Promise<number>((r) => { resolveCount = r; });
+    const findManyPromise = new Promise<unknown[]>((r) => { resolveFindMany = r; });
+    const count = jest.fn().mockReturnValue(countPromise);
+    const findMany = jest.fn().mockReturnValue(findManyPromise);
+    const prisma = { user: { count, findMany } } as unknown as PrismaService;
+    const svc = new StatsService(prisma, new PresenceService());
+
+    // Two callers arrive before either query has resolved.
+    const p1 = svc.getStats();
+    const p2 = svc.getStats();
+
+    resolveCount(9);
+    resolveFindMany([RICK]);
+    const [s1, s2] = await Promise.all([p1, p2]);
+
+    expect(count).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(s1.commanders).toBe(9);
+    expect(s2.commanders).toBe(9);
+  });
+
+  it('does not cache a rejected query — a later call retries instead of failing for 15s', async () => {
+    const findMany = jest.fn()
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce([RICK]);
+    const count = jest.fn().mockResolvedValue(9);
+    const prisma = { user: { findMany, count } } as unknown as PrismaService;
+    const svc = new StatsService(prisma, new PresenceService());
+
+    await expect(svc.getStats()).rejects.toThrow('db down');
+
+    const stats = await svc.getStats();
+    expect(stats.roster[0].username).toBe('rick');
+    expect(findMany).toHaveBeenCalledTimes(2);
+  });
 });
