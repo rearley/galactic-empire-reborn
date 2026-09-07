@@ -9,10 +9,9 @@ import { ConnectionIndicator } from './components/ConnectionIndicator';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
-import { AuthScreen } from './auth/AuthScreen';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { ShipSelectPrompt, type FleetEntry } from './onboarding/ShipSelectPrompt';
-import { getToken, setToken } from './auth/tokenStore';
+import { clearToken } from './auth/tokenStore';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
 import type { EventLogLine, ScanCell } from './types/contracts';
@@ -22,7 +21,8 @@ const MAX_LOG_ENTRIES = 500;
 
 /**
  * Root application component — five-region terminal UI (FR-002).
- * Gates on JWT token: renders AuthScreen when absent, terminal otherwise.
+ * Mounted only behind `RequireAuth` at /play, which already guarantees a
+ * valid token with a username, so App itself no longer branches on auth.
  * During onboarding (prompt:ship-name active) renders ShipNamePrompt, and
  * when a captain owns more than one hull (prompt:ship-select) renders the fleet
  * menu, instead of normal command input.
@@ -31,22 +31,23 @@ const MAX_LOG_ENTRIES = 500;
  * @see specs/010-react-frontend/spec.md FR-002
  */
 export function App(): React.JSX.Element {
-  const [token, setTokenState] = useState<string | null>(getToken());
-
   useEffect(() => {
-    onSocketAuthFailed(() => setTokenState(null));
-    if (getToken()) connectSocket();
-  }, []);
-
-  function handleAuthenticated(newToken: string): void {
-    setToken(newToken);
-    setTokenState(newToken);
+    // A token rejected mid-session (expired, or an account deleted by the
+    // midnight sweep) sends the player back to the front door rather than
+    // leaving a dead terminal on screen.
+    //
+    // A plain navigation rather than `useNavigate()` deliberately: App is
+    // exercised directly (no <Router> ancestor) by a number of existing
+    // Terminal-behaviour tests (test/App.spec.tsx, server-notices,
+    // own-hit-not-narrated-third-person), and `useNavigate` throws outside a
+    // Router context. A full reload on auth failure is also fine here — the
+    // player is being sent back to square one regardless.
+    onSocketAuthFailed(() => {
+      clearToken();
+      window.location.assign('/login');
+    });
     connectSocket();
-  }
-
-  if (!token) {
-    return <AuthScreen onAuthenticated={handleAuthenticated} />;
-  }
+  }, []);
 
   return <Terminal />;
 }

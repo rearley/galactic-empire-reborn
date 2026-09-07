@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-// Provide a stored token so App skips AuthScreen and renders the terminal
+// App no longer reads the token itself (RequireAuth gates /play on it before
+// App ever mounts) — this mock just keeps clearToken() a no-op for the
+// socket-auth-failure path exercised elsewhere.
 vi.mock('../src/auth/tokenStore', () => ({
   getToken: vi.fn(() => 'test-jwt-token'),
   setToken: vi.fn(),
