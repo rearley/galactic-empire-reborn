@@ -1,5 +1,6 @@
 import { ShipState } from '../ship/ship-state.types';
 import { MAXTORPS, MAXDECOY } from '../constants';
+import { FREE_SLOT_CHANNEL as NO_CHANNEL_SLOT } from '../combat/projectile-slots';
 
 /**
  * Apply the state change that crossing the hyperspace threshold causes.
@@ -51,9 +52,21 @@ export function applyHyperspaceTransition(
   if (cloakDropped) ship.cloak = 0;
   ship.where = 1;
 
+  // C zeroes the DISTANCE alone, because its flight loop tests distance for
+  // liveness: `if (tptr->distance > 1)` (GEFUNCS.C:1548). Ours tests the
+  // CHANNEL, so a distance-only clear left a slot that read as a live torpedo
+  // which had already arrived — `0 - TORPSPED` is negative, the still-flying
+  // branch is skipped, and the hit resolves. Canon's CANCEL became DETONATE
+  // NOW: the escape manoeuvre fired the torpedoes into you.
+  //
+  // Clearing the channel is also what frees the tube. `findFreeTorpSlot` looks
+  // for 255, so a distance-only clear would strand it permanently once the
+  // phantom hit stopped clearing it for us.
   for (let i = 0; i < MAXTORPS; i++) {
     if (ship.ltorpsDistance.length <= i) ship.ltorpsDistance.push(0);
+    if (ship.ltorpsChannel.length <= i) ship.ltorpsChannel.push(NO_CHANNEL_SLOT);
     ship.ltorpsDistance[i] = 0;
+    ship.ltorpsChannel[i] = NO_CHANNEL_SLOT;
   }
   for (let i = 0; i < Math.min(MAXDECOY, ship.decout.length); i++) {
     ship.decout[i] = 0;

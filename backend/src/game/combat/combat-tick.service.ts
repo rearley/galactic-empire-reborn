@@ -614,6 +614,18 @@ export class CombatTickService implements OnModuleInit {
       }
 
       const oldDist = carrier.ltorpsDistance[i] ?? 0;
+
+      // Canon's own liveness test, which we had only on the missile loop:
+      // `if (tptr->distance > 1)` (GEFUNCS.C:1548). A slot at distance 0 is
+      // DORMANT, not arrived — anything that cancels a torpedo does it by
+      // zeroing the distance, and without this guard `0 - TORPSPED` falls
+      // straight through to hit resolution and detonates the cancelled
+      // torpedo on the target.
+      if (oldDist <= 1) {
+        this.clearTorpSlot(carrier, i);
+        continue;
+      }
+
       const newDist = oldDist - TORPSPED;
 
       // Decoy intercept: one roll per LIVE decoy, and the slot that wins is
