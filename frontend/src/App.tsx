@@ -203,6 +203,29 @@ function Terminal(): React.JSX.Element {
         if (event.attackerId === localShipId && narratedToFirer) return;
 
         const victim = event.victimName ?? shipName(event.victimId);
+
+        // Ordnance you fired yourself: confirm the strike, assess nothing.
+        //
+        // Canon's silence here is deliberate, not an omission — every message
+        // about a torpedo after launch goes to the TARGET: the tracking alert
+        // (TORP1), the decoy intercept (TORDEST, GEFUNCS.C:1587-1588) and the
+        // impact (THIT1/THIT2). The firer is meant to `sca sh <name>` and read
+        // `Damage: severe damage` off the target, which is what the scan's
+        // damage line exists for. Handing the shooter a hull percentage removed
+        // the reason to type it, and was more precise than canon is ANYWHERE:
+        // the original reports another ship's condition only as one of damstr's
+        // six words (GECMDS.C:2110), never a number.
+        //
+        // So we keep the fact and drop the figure. Sensors register the strike;
+        // assessing it still costs a scan. @see docs/DECISIONS.md 2026-09-07
+        if (event.attackerId === localShipId) {
+          appendLines([{
+              text: `Sensors confirm a ${event.weapon} strike on ${victim}.`,
+              category: 'combat' as const,
+            }]);
+          return;
+        }
+
         appendLines([{
             text: `${attacker} hits ${victim} (${event.weapon}, hull -${Math.round(event.damageHull)}%)`,
             category: 'combat' as const,

@@ -98,9 +98,42 @@ describe('a pilot is not told about their own shot in the third person', () => {
     expect(screen.queryByText(/QuiteCat hits/)).toBeNull();
   });
 
-  it('KEEPS it for a torpedo — canon gives the firer nothing else', () => {
+  /**
+   * REVISED by design decision, not by defect. This case previously asserted
+   * that the firer keeps the full third-person feed line WITH its hull
+   * percentage, on the grounds that canon leaves them with nothing at all.
+   *
+   * Canon's silence turns out to be deliberate rather than an omission: every
+   * message about a torpedo after launch goes to the TARGET — the tracking
+   * alert (TORP1), the decoy intercept (TORDEST, `outprfge(FILTER, usrn)` where
+   * usrn is the carrier, GEFUNCS.C:1587-1588) and the impact (THIT1/THIT2). The
+   * firer is meant to `sca sh <name>` and read `Damage: severe damage` off the
+   * target. That is what the scan's damage line is FOR, and handing the shooter
+   * a percentage removed the reason to type it.
+   *
+   * So: confirm the strike, report nothing about it. Sensors know something
+   * connected; assessing it still costs a scan.
+   *
+   * @see docs/DECISIONS.md 2026-09-07 — firer-side ordnance confirmation
+   */
+  it('confirms a torpedo strike to the firer WITHOUT any damage figure', () => {
     fire('combat.hit', hit({ weapon: 'torpedo', damageHull: 23 }));
-    expect(screen.getByText(/QuiteCat hits Cybertron 43319 \(torpedo, hull -23%\)/)).toBeTruthy();
+
+    const line = screen.getByText(/Sensors confirm a torpedo strike/);
+    // Asserted whole, not by pattern: the ship's own NAME carries digits
+    // ("Cybertron 43319"), so a /\d/ guard against "no numbers" matches the
+    // target rather than the damage and passes for the wrong reason.
+    expect(line.textContent).toBe('Sensors confirm a torpedo strike on Cybertron 43319.');
+    expect(line.textContent).not.toContain('%');
+    expect(screen.queryByText(/QuiteCat hits/)).toBeNull();
+  });
+
+  it('does the same for a missile', () => {
+    fire('combat.hit', hit({ weapon: 'missile', damageHull: 40 }));
+
+    const line = screen.getByText(/Sensors confirm a missile strike/);
+    expect(line.textContent).toBe('Sensors confirm a missile strike on Cybertron 43319.');
+    expect(line.textContent).not.toContain('%');
   });
 
   it('still narrates someone ELSE landing a phaser hit', () => {
