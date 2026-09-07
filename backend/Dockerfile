@@ -13,6 +13,7 @@ RUN npx prisma generate
 # Build the NestJS application
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
+COPY config ./config
 RUN npm run build
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
@@ -26,6 +27,12 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+# The sysop tuning file. WORKDIR is /app and the entrypoint runs dist/src/main,
+# so the resolver looks for /app/config/game.config.json. Omitting this does not
+# fail: a missing file legitimately falls back to canon defaults, silently. That
+# is how a UNIVMAX of 100 became a 601x601 galaxy in a container.
+# @see test/unit/config/config-ships-in-image.spec.ts
+COPY --from=builder /app/config ./config
 COPY package*.json ./
 
 # Copy and set entrypoint

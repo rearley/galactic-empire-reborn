@@ -184,9 +184,23 @@ export interface LoadSources {
 export interface LoadOptions {
   /** Collect clamp warnings instead of only returning values. */
   collectWarnings?: boolean;
+  /** The tuning file this load came from, surfaced on the result. */
+  configPath?: string | null;
 }
 
-export type LoadResult = GameConfig & { warnings: string[] };
+export type LoadResult = GameConfig & {
+  warnings: string[];
+  /**
+   * The tuning file actually read, or null when none was found.
+   *
+   * A missing file is legitimate and falls back to canon defaults, which is
+   * why two separate bugs hid here — wrong path arithmetic from a compiled
+   * tree, then a Dockerfile that never shipped the file. Both ran on defaults
+   * in silence. Making a missing file fatal would break fresh checkouts; making
+   * the ANSWER visible costs nothing.
+   */
+  configPath: string | null;
+};
 
 /**
  * Resolve every option: default -> config file -> environment, then clamp.
@@ -248,7 +262,7 @@ export function loadGameConfig(sources: LoadSources, options: LoadOptions = {}):
     for (const w of warnings) console.warn(`[game-config] ${w}`);
   }
 
-  return Object.assign(resolved, { warnings });
+  return Object.assign(resolved, { warnings, configPath: options.configPath ?? null });
 }
 
 /**
@@ -311,11 +325,21 @@ export const DEFAULT_CONFIG_PATH = 'config/game.config.json';
  * Exported for tests: the bug was in path arithmetic, so the arithmetic is
  * what needs asserting.
  */
-export function candidateConfigPaths(fromDir: string): string[] {
+export function candidateConfigPaths(
+  fromDir: string,
+  env: Record<string, string | undefined> = process.env,
+): string[] {
   /* eslint-disable-next-line @typescript-eslint/no-require-imports */
   const path = require('path') as typeof import('path');
   const out: string[] = [];
   const push = (p: string): void => { if (!out.includes(p)) out.push(p); };
+
+  // An explicit deployment answer, ahead of all path arithmetic. Docker and
+  // <panel> mount a volume and inject environment; they do not rebuild an image
+  // to retune a galaxy. The derived paths below stay as fallbacks so source
+  // runs, ts-jest and compiled runs all keep working with no setup.
+  const explicit = env['GE_CONFIG_PATH'];
+  if (explicit !== undefined && explicit !== '') push(path.resolve(explicit));
 
   // dist/src/game/config -> backend, and src/game/config -> backend
   push(path.resolve(fromDir, '../../../..', DEFAULT_CONFIG_PATH));
@@ -337,7 +361,7 @@ export function resolveGameConfig(
   const path = require('path') as typeof import('path');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
-  const candidates = opts.path ? [opts.path] : candidateConfigPaths(__dirname);
+  const candidates = opts.path ? [opts.path] : candidateConfigPaths(__dirname, env);
   const found = candidates.find((p) => fs.existsSync(p));
 
   let file: Partial<Record<string, number>> = {};
@@ -346,7 +370,7 @@ export function resolveGameConfig(
     file = flattenConfigFile(raw);
   }
 
-  const result = loadGameConfig({ file, env }, { collectWarnings: true });
+  const result = loadGameConfig({ file, env }, { collectWarnings: true, configPath: found ?? null });
 
   // Say which file is in force, or that none is. Silence here is what let a
   // whole playtest be measured against a config the server never loaded.
