@@ -3658,3 +3658,61 @@ The first (gebemean rolled once instead of per weapon) was a port bug making
 Cybertrons *less* dangerous than canon; this one is a port deviation making them
 *more* so. They are not a matched pair — the first is now fixed to canon, this
 one is kept deliberately.
+
+## 2026-09-07 — The firer is told THAT their ordnance hit, never how hard
+**Context:** Canon tells a torpedo's firer nothing after launch. `TFIRE1`
+("Torpedoes fired sir!") is the last word they get; every subsequent message
+about that torpedo goes to the TARGET — the tracking alert `TORP1`, the decoy
+intercept `TORDEST` (`outprfge(FILTER, usrn)` where `usrn` is the carrier,
+GEFUNCS.C:1587-1588) and the impact `THIT1`/`THIT2`. There is no unused string
+in MBMGEMSG.MSG for a firer-side impact either; the vocabulary simply does not
+exist, because the code never asks for one. Missiles are the same.
+
+Phasers are the exception: `PHITHIM` reports the outcome to the firer, because
+a beam resolves instantly under the firer's own sensors.
+
+The port broke that asymmetry. It rendered a client-side kill-feed line,
+`QuiteCat hits Cybertron 43319 (torpedo, hull -23%)`, to everyone in the
+sector — the shooter included — and did it with a hull PERCENTAGE. Two problems:
+the shooter narrated themselves in the third person, ahead of their own
+narration; and the figure was more precise than canon is anywhere in the game.
+The original reports another ship's condition only as one of `damstr`'s six
+words (GECMDS.C:2110) — "no / very light / light / moderate / heavy / severe" —
+and the single integer in the whole damage message set is `PHITDEF`'s shield
+deflection magnitude, not hull damage.
+
+**Decision:** For ordnance the local ship fired:
+- phaser / hyper-phaser — drop the feed line entirely. Canon's `PHITHIM` and
+  `PDEFLECT` already narrate it and the port relays them; the feed line was a
+  duplicate arriving in the wrong order.
+- torpedo / missile — replace it with `Sensors confirm a <weapon> strike on
+  <ship>.` The strike is confirmed; nothing is assessed.
+
+Bystander lines and the victim's own INCOMING banner are unchanged.
+
+**Reason:** Canon's silence is a design, not an omission. A torpedo flies for
+seconds and the target may leave scan range before it lands, so the intended
+feedback loop is `sca sh <name>` → `Damage: severe damage`. That is what the
+scan's damage line is FOR, and handing the shooter a percentage removed the
+reason to type it. Confirming the hit without assessing it keeps the loop —
+"moderate" spans 25-49, so you still have to look — while avoiding the failure
+this port already hit once with missiles, where an unacknowledged shot read as
+a broken weapon.
+
+The underlying canon rule, made explicit here because it should govern future
+message work: **exact knowledge of your own ship, band knowledge of everyone
+else's.**
+
+**Alternatives rejected:**
+- *Full canon — say nothing to the firer.* Purest, and it does restore the scan
+  loop. Rejected because it reproduces the missile-feels-broken failure: a
+  torpedo fired at a ship that then leaves scan range becomes unknowable, and
+  playtest showed that reads as a defect rather than as design.
+- *Report `damstr` bands to the firer.* Considered and preferred at first.
+  Rejected on the player's reasoning: knowing something connected is what a
+  sensor suite plausibly gives you; grading the damage is what a scan is for.
+  Bands would also have half-replaced `sca sh` rather than leaving it intact.
+- *Keep the percentages.* Most precise thing in the game, in a game that never
+  shows a percentage.
+
+**Status:** port addition, not canon text. The string is ours.
