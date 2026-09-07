@@ -101,9 +101,12 @@ function migrationSql(nameFragment: string): string {
 
 describe('add_user_email migration', () => {
   const sql = migrationSql('add_user_email');
+  // The raw index ships as its own migration — editing an applied one would
+  // force a reset, and there is a live playtest in this database.
+  const indexSql = migrationSql('user_email_lower_index');
 
   it('creates a partial, case-insensitive unique index on email', () => {
-    const normalised = sql.replace(/\s+/g, ' ').toLowerCase();
+    const normalised = indexSql.replace(/\s+/g, ' ').toLowerCase();
     expect(normalised).toContain('create unique index');
     expect(normalised).toContain('user_email_lower_key');
     expect(normalised).toContain('lower(email)');
@@ -170,23 +173,39 @@ In `backend/prisma/schema.prisma`, model `User`:
 cd backend && npx prisma migrate dev --name add_user_email
 ```
 
-Then append the raw index to the generated `migration.sql`:
+That migration holds only the column changes. **Do not edit it** — Prisma has
+already recorded its checksum, and editing an applied migration forces a
+`migrate reset`, which would delete every ship, planet and score in the
+database. There is a live playtest in there.
+
+Instead add the raw index as its own migration:
+
+```bash
+cd backend && mkdir -p "prisma/migrations/$(date +%Y%m%d%H%M%S)_user_email_lower_index"
+```
+
+Write `migration.sql` inside it:
 
 ```sql
--- Prisma's @unique cannot express lower() or a WHERE clause, so the index that
--- actually enforces "one account per email address, case-insensitively" is
+-- Prisma's @unique can express neither lower() nor a WHERE clause, so the index
+-- that actually enforces "one account per email address, case-insensitively" is
 -- written by hand. Partial because the 24 Cybertron rows have no email.
+--
+-- Its own migration rather than an edit to the generated one: that file is
+-- already applied and checksummed, and editing it would force a migrate reset.
 CREATE UNIQUE INDEX "user_email_lower_key"
   ON "User" (lower(email)) WHERE email IS NOT NULL;
 ```
 
-Re-apply so the checksum matches the edited file:
+Apply it:
 
 ```bash
-cd backend && npx prisma migrate reset --force --skip-seed && npx prisma migrate dev
+cd backend && npx prisma migrate dev
 ```
 
-> Safe here only because the database is disposable pre-launch. If a real player's data is live, do NOT reset — write a second migration containing only the `CREATE UNIQUE INDEX` instead.
+Expected: `The following migration(s) have been applied` naming only the new
+directory. If Prisma instead offers to reset, **stop and say so** — something
+edited an applied migration, and answering yes destroys the playtest.
 
 - [ ] **Step 6: Run the test — expect green**
 
@@ -2944,7 +2963,7 @@ EOF
 **Type consistency.** `AuthResult.user.username` is `string | null` from Task 2 and used as such in Tasks 3 and 10. `verifyJwt` widens in Task 4 while `WsJwtPayload.username` stays `string`. `ROSTER_WHERE`/`ROSTER_ORDER_BY` are named identically in Tasks 5 and 7. `PublicRosterEntry.score` is a string in Task 7 and consumed as one in Task 12. `PresenceService.count()` is the only method Task 7 calls.
 
 **Known risks, called out rather than papered over.**
-1. Task 1 step 5 runs `migrate reset`. Safe only while the database is disposable. The step says so and gives the alternative.
+1. Task 1 splits the schema change and the raw index across two migrations specifically to avoid `migrate reset`. The database holds a live playtest (rick: 15,345 score, 31 kills, 3 planets). If Prisma ever offers to reset, stop.
 2. The real name of the username unique index is discovered in Task 1 step 3; Tasks 3 and 8 use `user_username_lower_key` as a placeholder and must be corrected to whatever that grep returns.
 3. Task 3 step 6 depends on how `jwt.strategy.ts` names the userid on `req.user`; the step says to match it rather than rename the strategy.
 4. Task 9 creates placeholder route components so the tree compiles before Tasks 10–12 fill them in — deliberate, and each is replaced in its own task.
