@@ -45,6 +45,7 @@ function makeMocks() {
     applyPerMemberTeamScore: jest.fn().mockResolvedValue(undefined),
     markEmptyTeamsRemoved: jest.fn().mockResolvedValue({ teamsReconciled: 0, teamsRemoved: 0 }),
     assignRosterPositions: jest.fn().mockResolvedValue(undefined),
+    purgeAbandonedSignups: jest.fn().mockResolvedValue(0),
   } as unknown as MidnightRepository;
 
   // Simulate recordRun — midnight-run.ledger function is called inside the transaction callback

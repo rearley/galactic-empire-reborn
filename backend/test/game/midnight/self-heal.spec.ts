@@ -45,6 +45,7 @@ describe('self-heal on startup (FR-001b)', () => {
     const runSpy = jest.spyOn(service, 'run').mockResolvedValue({
       usersUpdated: 0, planetsProcessed: 0, mailReportsCreated: 0,
       mailDeleted: 0, teamsReconciled: 0, teamsRemoved: 0,
+      abandonedSignupsDeleted: 0,
     });
 
     await app.init(); // triggers onApplicationBootstrap
