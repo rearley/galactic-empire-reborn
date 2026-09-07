@@ -5,6 +5,7 @@ import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { formatMessage, MessageId } from '../messages';
 import { MAXLIST } from '../../constants';
+import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../../player/roster-query';
 
 /** `ros all` — `j = 200` (GECMDS.C:4024). */
 const ROSTER_ALL_CAP = 200;
@@ -45,15 +46,8 @@ export class RosHandlerService {
       // (GECMDS.C:4038). Without it every dormant and never-flown account
       // padded the board, which is what filled the roster with e2e_* rows on
       // the shared development database.
-      where: {
-        score: { gt: 0n },
-        AND: [
-          { NOT: { userid: { startsWith: 'Cybrg-' } } },
-          { NOT: { userid: { startsWith: '@Droid-' } } },
-          { NOT: { userid: { startsWith: '@' } } },
-        ],
-      },
-      orderBy: [{ score: 'desc' }, { kills: 'desc' }, { userid: 'asc' }],
+      where: ROSTER_WHERE,
+      orderBy: ROSTER_ORDER_BY,
       take: limit,
       select: { userid: true, username: true, score: true, kills: true, planets: true, population: true },
     });
