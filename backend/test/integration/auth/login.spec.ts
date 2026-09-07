@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const request = require('supertest') as (app: unknown) => import('supertest').SuperTest<import('supertest').Test>;
 import { AppModule } from '../../../src/app.module';
@@ -23,7 +23,9 @@ describe('POST /auth/login', () => {
     }).compile();
 
     app = module.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+    // No app.useGlobalPipes() here — see register.spec.ts for why: it would
+    // shadow AuthController's own per-route ValidationPipe (and its
+    // field-aware exceptionFactory) with the default one.
     await app.init();
   }, 30000);
 
