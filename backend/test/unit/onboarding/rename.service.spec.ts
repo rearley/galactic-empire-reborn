@@ -138,6 +138,26 @@ describe('RenameService (T053)', () => {
         }),
       );
     });
+
+    it('escapes ILIKE wildcards in the requested name — isValidShipName allows % and _', async () => {
+      // "%"/"_" are printable ASCII in 0x21-0x7E, so isValidShipName accepts
+      // them, but `mode: 'insensitive'` renders as `shipname ILIKE $1` with
+      // the value used verbatim as the pattern: an unescaped "%" would match
+      // (and falsely block a rename against) any existing ship name.
+      const ship = makeShip({ shipname: 'OldName' });
+      const prisma = makePrisma(null);
+      const svc = new RenameService(prisma as never, makeShipStateService(ship) as never);
+
+      await svc.rename('u1', 1, 'a%b_c');
+
+      expect(prisma.ship.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            shipname: { equals: 'a\\%b\\_c', mode: 'insensitive' },
+          }),
+        }),
+      );
+    });
   });
 
   describe('Successful rename', () => {

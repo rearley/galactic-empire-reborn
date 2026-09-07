@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { isValidShipName } from './name-validator';
 import { shipKey } from '../ship/ship-state.types';
+import { escapeIlikePattern } from '../../prisma/ilike-escape';
 
 export type RenameResult =
   | { ok: true; oldName: string; newName: string; shipId: string }
@@ -51,10 +52,15 @@ export class RenameService {
       return { ok: true, oldName, newName, shipId: sid };
     }
 
-    // Check uniqueness (case-insensitive), excluding own ship
+    // Check uniqueness (case-insensitive), excluding own ship.
+    // `isValidShipName` allows any printable ASCII (0x21-0x7E), which
+    // includes `%` and `_`. `mode: 'insensitive'` renders as
+    // `shipname ILIKE $1` with the value used verbatim as the pattern, so an
+    // unescaped wildcard would falsely collide with an unrelated ship name.
+    // escapeIlikePattern makes the match exact-but-case-insensitive again.
     const conflict = await this.prisma.ship.findFirst({
       where: {
-        shipname: { equals: newName, mode: 'insensitive' },
+        shipname: { equals: escapeIlikePattern(newName), mode: 'insensitive' },
         NOT: { AND: [{ userid }, { shipno }] },
       },
     });
