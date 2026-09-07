@@ -110,13 +110,19 @@ describe('loadGameConfig', () => {
     // midnight.config, TOOCLOSE/CYBGOLD in cybertron.config, CLENGUSE in
     // cloak.config, SCRBONUS in player-score.service), and the count test
     // could not have caught it because the total never moved.
+    //
+    // That audit still missed SCRFACT, and could not have found it by this
+    // method: it WAS wired, in score.config.ts, but under a private SCORE_F2
+    // environment variable with its own hardcoded default. A search for the
+    // option's own name found nothing. Merging the two config systems is what
+    // surfaced it. @see docs/DECISIONS.md
     const unwired = Object.entries(SYSOP_OPTIONS)
       .filter(([, s]) => !s.implemented)
       .map(([n]) => n)
       .sort();
     expect(unwired).toEqual([
       'FREEBIES', 'HYPDST1', 'HYPDST2', 'MAXPLREC',
-      'NUMSHIPS', 'S00PLNUM', 'SCRFACT', 'SHOWOPT',
+      'NUMSHIPS', 'S00PLNUM', 'SHOWOPT',
     ]);
   });
 

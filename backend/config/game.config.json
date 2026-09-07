@@ -13,5 +13,8 @@
   ],
   "world": {
     "UNIVMAX": 100
+  },
+  "scoring": {
+    "SCRFACT": 100
   }
 }

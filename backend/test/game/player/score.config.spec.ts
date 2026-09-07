@@ -1,106 +1,66 @@
 /**
- * Tests for score.config.ts — SCORE_F2 env var loading and range validation.
- * @see GEMAIN.C:603  numopt(SCRFACT, 0, 32700)
+ * score.config used to own a private `SCORE_F2` environment variable with a
+ * hardcoded default of 100, while the sysop option table carried the same
+ * setting as `SCRFACT` with canon's default of 35, marked `implemented: false`.
+ * Neither half knew about the other: `SCRFACT` did nothing wherever you set it,
+ * and the game deducted 100 where the original deducts 35.
+ *
+ * The setting now resolves through the central manifest. These tests pin the
+ * integration — that `scoreF2` really is `SCRFACT` and not a second opinion.
+ *
+ * The input-hygiene rules this file used to guard (non-numeric rejected rather
+ * than yielding NaN, trailing garbage rejected rather than truncated,
+ * whitespace treated as unset rather than as zero) moved WITH the setting and
+ * are pinned in test/unit/config/config-env-hygiene.spec.ts. They were the
+ * reason merging needed care, so they are tested, not dropped.
+ *
+ * @see GEMAIN.C:603 — score_f2 = numopt(SCRFACT,0,32700)
+ * @see GE/REL/MBMGEMSG.MSG:472 — SCRFACT {...: 35} N 1 100
  */
-describe('score.config', () => {
-  const originalEnv = process.env['SCORE_F2'];
+import { resolveGameConfig } from '../../../src/game/config/game-config';
 
-  afterEach(() => {
-    // Restore original env var after each test
-    if (originalEnv === undefined) {
-      delete process.env['SCORE_F2'];
-    } else {
-      process.env['SCORE_F2'] = originalEnv;
-    }
-    // Clear module registry so next test gets a fresh import
-    jest.resetModules();
+const NO_FILE = { path: '/nonexistent/game.config.json' };
+
+describe('scoreF2 is SCRFACT, not a second opinion', () => {
+  it('is exactly the resolved SCRFACT constant', async () => {
+    const { scoreF2 } = await import('../../../src/game/player/score.config');
+    const { SCRFACT } = await import('../../../src/game/constants');
+    expect(scoreF2).toBe(SCRFACT);
   });
 
-  it('defaults to 100 when SCORE_F2 is not set', async () => {
-    delete process.env['SCORE_F2'];
-    await jest.isolateModulesAsync(async () => {
-      const { scoreF2 } = await import('../../../src/game/player/score.config');
-      expect(scoreF2).toBe(100);
-    });
+  it('deploys at 100 — a declared deviation from canon 35', async () => {
+    // config/game.config.json carries SCRFACT: 100. If that entry is ever
+    // removed this drops to canon's 35 and every kill's score transfer changes,
+    // so the deployed value is asserted rather than assumed.
+    const { scoreF2 } = await import('../../../src/game/player/score.config');
+    expect(scoreF2).toBe(100);
+  });
+});
+
+describe('SCRFACT resolves through the central manifest', () => {
+  it('falls back to canon 35 with no file and no environment', () => {
+    expect(resolveGameConfig({ ...NO_FILE, env: {} }).SCRFACT).toBe(35);
   });
 
-  it('reads SCORE_F2 from environment', async () => {
-    process.env['SCORE_F2'] = '250';
-    await jest.isolateModulesAsync(async () => {
-      const { scoreF2 } = await import('../../../src/game/player/score.config');
-      expect(scoreF2).toBe(250);
-    });
+  it('is settable from the environment under its canon name', () => {
+    expect(resolveGameConfig({ ...NO_FILE, env: { SCRFACT: '250' } }).SCRFACT).toBe(250);
   });
 
-  it('accepts 0 (minimum valid value)', async () => {
-    process.env['SCORE_F2'] = '0';
-    await jest.isolateModulesAsync(async () => {
-      const { scoreF2 } = await import('../../../src/game/player/score.config');
-      expect(scoreF2).toBe(0);
-    });
+  it('accepts the bounds canon clamps to', () => {
+    expect(resolveGameConfig({ ...NO_FILE, env: { SCRFACT: '0' } }).SCRFACT).toBe(0);
+    expect(resolveGameConfig({ ...NO_FILE, env: { SCRFACT: '32700' } }).SCRFACT).toBe(32700);
   });
 
-  it('accepts 32700 (maximum valid value)', async () => {
-    process.env['SCORE_F2'] = '32700';
-    await jest.isolateModulesAsync(async () => {
-      const { scoreF2 } = await import('../../../src/game/player/score.config');
-      expect(scoreF2).toBe(32700);
-    });
-  });
-
-  it('throws when SCORE_F2 is negative', async () => {
-    process.env['SCORE_F2'] = '-1';
-    await expect(
-      jest.isolateModulesAsync(async () => {
-        await import('../../../src/game/player/score.config');
-      }),
-    ).rejects.toThrow('SCORE_F2 out of range [0, 32700]: -1');
-  });
-
-  it('throws when SCORE_F2 exceeds 32700', async () => {
-    process.env['SCORE_F2'] = '32701';
-    await expect(
-      jest.isolateModulesAsync(async () => {
-        await import('../../../src/game/player/score.config');
-      }),
-    ).rejects.toThrow('SCORE_F2 out of range [0, 32700]: 32701');
-  });
-  /**
-   * `parseInt('abc')` is NaN, and both `NaN < 0` and `NaN > 32700` are false,
-   * so a non-numeric value slipped past the range guard and left scoreF2 = NaN.
-   * killScoreDeduction then returns NaN for every kill in the game, silently:
-   * nothing throws, nothing logs, and every score arithmetic downstream is
-   * poisoned. A misconfigured env var must fail at boot, not at the first kill.
-   */
-  it('throws when SCORE_F2 is not a number, rather than yielding NaN', async () => {
-    process.env['SCORE_F2'] = 'abc';
-    await expect(
-      jest.isolateModulesAsync(async () => {
-        await import('../../../src/game/player/score.config');
-      }),
-    ).rejects.toThrow(/SCORE_F2/);
-  });
-
-  it('throws on a trailing-garbage value rather than silently truncating it', async () => {
-    // parseInt('12abc') is 12 — in range, so the old guard accepted it and the
-    // operator's typo became a live, wrong score factor.
-    process.env['SCORE_F2'] = '12abc';
-    await expect(
-      jest.isolateModulesAsync(async () => {
-        await import('../../../src/game/player/score.config');
-      }),
-    ).rejects.toThrow(/SCORE_F2/);
-  });
-  /**
-   * `SCORE_F2=` (set but empty) is a misconfiguration, not a request for zero
-   * scoring — Number('') is 0, which would silently disable kill scoring
-   * altogether. An empty value means "not configured", so it defaults.
-   */
-  it('treats an empty SCORE_F2 as unset rather than as zero', async () => {
-    process.env['SCORE_F2'] = '   ';
-    await jest.isolateModulesAsync(async () => {
-      const { scoreF2 } = await import('../../../src/game/player/score.config');
-      expect(scoreF2).toBe(100);
-    });
+  it('CLAMPS out of range rather than throwing, because numopt clamps', () => {
+    // The old private loader threw on -1 and on 32701. That was a port
+    // invention: canon's numopt(SCRFACT,0,32700) clamps, and a clamp is
+    // reported as a warning naming the C reference. Per the project rule, a
+    // test encoding a deviation from canon is the thing that is wrong.
+    const low = resolveGameConfig({ ...NO_FILE, env: { SCRFACT: '-1' } });
+    const high = resolveGameConfig({ ...NO_FILE, env: { SCRFACT: '32701' } });
+    expect(low.SCRFACT).toBe(0);
+    expect(high.SCRFACT).toBe(32700);
+    expect(low.warnings.join(' ')).toMatch(/SCRFACT/);
+    expect(high.warnings.join(' ')).toMatch(/GEMAIN\.C:603/);
   });
 });

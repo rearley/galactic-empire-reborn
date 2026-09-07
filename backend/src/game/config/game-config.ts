@@ -167,8 +167,8 @@ export const SYSOP_OPTIONS = {
   PHATOWRP: { min: 0, max: 100, default: 5, canonDefault: 5, cReference: 'GEMAIN.C:598', implemented: true },
   MISENGFC: { min: 1, max: 2000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:600', implemented: true },
   SCRBONUS: { min: 0, max: 32700, default: 1000, canonDefault: 1000, cReference: 'GEMAIN.C:602', implemented: true },
-  SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: false,
-    note: 'No consumer. src/game/player/score.config.ts reads its own SCORE_F2 env var and defaults to 100, not to this option (canon 35), so the shipped score_f2 is not in force. Wiring it means editing score.config.ts.' },
+  SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: true,
+    note: 'Wired 2026-09-07. score.config.ts previously read a private SCORE_F2 env var defaulting to 100, independent of this option, so setting SCRFACT did nothing and the shipped score_f2 was never in force. It now resolves here. DEPLOYED AT 100 against canon 35 — a declared deviation, see config/game.config.json and docs/DECISIONS.md.' },
   CHGLOSER: { min: 0, max: 100, default: 2, canonDefault: 2, cReference: 'GEMAIN.C:605', implemented: true },} as const satisfies Record<string, SysopOption>;
 
 export type SysopOptionName = keyof typeof SYSOP_OPTIONS;
@@ -238,7 +238,10 @@ export function loadGameConfig(sources: LoadSources, options: LoadOptions = {}):
       origin = 'config file';
     }
 
-    const fromEnv = sources.env[name];
+    // Trim before testing for "set": Number('   ') is 0, so a whitespace-only
+    // value would read as a deliberate zero and silently switch the option off.
+    // score.config.ts learned this the hard way before it was folded in here.
+    const fromEnv = sources.env[name]?.trim();
     if (fromEnv !== undefined && fromEnv !== '') {
       const parsed = Number(fromEnv);
       if (!Number.isFinite(parsed)) {

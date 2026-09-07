@@ -52,6 +52,17 @@ const DEVIATIONS: Record<string, { value: number; reason: string }> = {
       'players they would never meet. Scan ranges are absolute, so galaxy size ' +
       'and scanner reach must be chosen together. See docs/DECISIONS.md.',
   },
+  SCRFACT: {
+    value: 100,
+    reason:
+      'Canon deducts 35% of the loser\'s score; this port has always deducted ' +
+      '100%. It was never a decision — score.config.ts implemented the option ' +
+      'privately as SCORE_F2 with a hardcoded default of 100, while SCRFACT sat ' +
+      'in this table marked implemented:false, so setting it did nothing. The ' +
+      'two halves were merged and the value KEPT, because changing it would ' +
+      'retroactively revalue every kill in a live game. Declared here rather ' +
+      'than left as an accident of a second code path. See docs/DECISIONS.md.',
+  },
 };
 
 /**
