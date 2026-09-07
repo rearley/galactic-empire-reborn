@@ -3731,3 +3731,37 @@ else's.**
   shows a percentage.
 
 **Status:** port addition, not canon text. The string is ours.
+
+## 2026-09-07 — A bystander is told nothing about a fight they are not in
+**Context:** Third and final pass over combat messaging, closing the same thread
+as the two entries above. The port rendered two client-side lines to everyone in
+a sector: `X fires phasers!` on COMBAT_PHASER_FIRED, and
+`X hits Y (phaser, hull -24%)` on COMBAT_HIT.
+
+**Decision:** Both removed. A player is told about combat only when they are the
+firer or the target.
+
+**Reason:** Canon addresses every combat message to one of the two participants.
+`PFIRED` goes `outprfge(FILTER, usrn)` — the firer alone (GECMDS.C:943-944);
+PHITHIM/PDEFLECT to the firer; PHITYOU/PHITDEF/THIT/MHIT/MINE4 to the victim.
+The sector- and range-wide broadcasts canon DOES make are cloak collapse
+(GEFUNCS.C:1380), the self-destruct countdown (:1836), sector entry and exit
+(:717-722), radio traffic, and the destruction energy burst (:1848-1860). Combat
+is deliberately not among them. To learn whether the two ships off your bow are
+fighting, you scan them and read their damage — the same loop the firer uses.
+
+The hit line also carried a hull percentage, which conflicts with the rule
+settled in the entry above: hull condition is one of damstr's six words, always,
+for everyone, about everyone.
+
+**Alternatives rejected:**
+- *Keep the lines, drop the percentage.* Would have left a sector-wide combat
+  feed canon has no equivalent for, and the information is free — a bystander
+  would learn who is fighting whom without spending a scan or entering range.
+- *Keep `X fires phasers!` only.* Same objection; it is the more informative of
+  the two, since it reveals a shooter who has not yet connected.
+
+**Consequence to watch:** on a populated server a player will no longer see
+combat happening beside them. That is canon, and it makes `sca` the instrument
+it was meant to be — but it is a real change in feel, and worth revisiting only
+with evidence from actual multiplayer, not from single-player intuition.
