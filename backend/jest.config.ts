@@ -5,6 +5,7 @@ const config: Config = {
   testEnvironment: "node",
   roots: [
     "<rootDir>/test/prisma-schema",
+    "<rootDir>/test/auth",
     "<rootDir>/test/unit",
     "<rootDir>/test/integration",
     "<rootDir>/test/e2e",

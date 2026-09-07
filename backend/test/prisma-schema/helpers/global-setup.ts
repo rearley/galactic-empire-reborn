@@ -48,4 +48,10 @@ export default async function globalSetup(): Promise<void> {
     `psql "${url}" -c 'CREATE UNIQUE INDEX IF NOT EXISTS "Ship_shipname_lower_idx" ON "Ship" (LOWER("shipname"))'`,
     psqlOpts
   );
+  // Partial because the Cybertron rows have no email — see
+  // prisma/migrations/20260907185450_user_email_lower_index/migration.sql.
+  execSync(
+    `psql "${url}" -c 'CREATE UNIQUE INDEX IF NOT EXISTS "user_email_lower_key" ON "User" (LOWER("email")) WHERE "email" IS NOT NULL'`,
+    psqlOpts
+  );
 }
