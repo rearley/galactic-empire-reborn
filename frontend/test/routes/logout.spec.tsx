@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { ShipSelectPrompt } from '../../src/onboarding/ShipSelectPrompt';
+import { SiteHeader } from '../../src/routes/SiteHeader';
 import { setToken, getToken, clearToken } from '../../src/auth/tokenStore';
 import { logout } from '../../src/auth/logout';
 
@@ -55,5 +57,26 @@ describe('ShipSelectPrompt', () => {
     render(<ShipSelectPrompt ships={SHIPS} onSelect={vi.fn()} error={null} />);
     expect(screen.getByTestId('ship-select')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /log ?out/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteHeader when localStorage throws', () => {
+  // SiteHeader.getToken() is called on the public landing page — the first
+  // thing a stranger sees. A browser that blocks storage (private mode,
+  // Chrome with site data blocked) must not blank that page.
+  it('renders the signed-out links rather than throwing', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+    expect(() =>
+      render(
+        <MemoryRouter>
+          <SiteHeader />
+        </MemoryRouter>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /enlist/i })).toBeInTheDocument();
+    spy.mockRestore();
   });
 });
