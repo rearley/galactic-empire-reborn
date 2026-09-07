@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 
 export interface WsJwtPayload {
   sub: string;
-  username: string | null;
+  username: string;
 }
 
 /**
@@ -35,6 +35,22 @@ export class WsAuthGuard {
     }
     try {
       const payload = await this.authService.verifyJwt(token);
+
+      // Two-step registration means a valid token can belong to an account that
+      // has credentials but no display handle yet. Canon's username()
+      // (GEFUNCS.C:2596) names a player throughout combat and sector messaging,
+      // so a null must never reach the game — this is the gate that makes the
+      // nullable column safe.
+      if (!payload.username) {
+        this.logger.warn(`WsAuthGuard: ${payload.sub} has no username — refusing`);
+        client.emit('error', {
+          code: 'USERNAME_REQUIRED',
+          message: 'Finish signing up by choosing a username.',
+        });
+        client.disconnect(true);
+        return null;
+      }
+
       return { sub: payload.sub, username: payload.username };
     } catch (err: unknown) {
       this.logger.warn(`WsAuthGuard: invalid token — ${String(err)}`);
