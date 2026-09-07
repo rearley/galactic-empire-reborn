@@ -2079,8 +2079,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
-    if (movingShip.speed >= 21000) return;
-
     const name = movingShip.shipname;
 
     // C tells the mover they moved, and tells the two sectors about them while
@@ -2089,12 +2087,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // sector" on every boundary crossing, because their socket joins the
     // destination room just above; and without MOVE1 nothing told them they had
     // changed sector at all.
+    //
+    // MOVE1 is UNCONDITIONAL. Only the two sector broadcasts carry the
+    // `ptr->speed < 21000.0` gate (GEFUNCS.C:714, :719); the mover's own line
+    // sits above it at :711-713. The port returned early on the gate and
+    // silenced all three, so a ship above warp 21 crossed boundaries with no
+    // running account of where it was. Nothing surfaced it until a hull that
+    // fast existed in play: the starting classes cap at warp 10 and it took a
+    // Dreadnought at warp 50 to find.
     if (socketId) {
       this.server.sockets.sockets.get(socketId)?.emit('event.log', {
         category: 'nav',
         text: `You have moved from sector (${fromSector.x}, ${fromSector.y}) to (${toSector.x}, ${toSector.y}).`,
       });
     }
+
+    // Gate: no SECTOR notices at high warp — you are through too fast to be
+    // seen. @see GEFUNCS.C:714, :719
+    if (movingShip.speed >= 21000) return;
 
     this.server
       .to(`sector:${fromSector.x}:${fromSector.y}`)

@@ -129,6 +129,58 @@ describe('GameGateway — sector transition notices', () => {
     expect((arrival!.payload as { shipName: string }).shipName).toBe('Wanderer');
   });
 
+  /**
+   * The 21,000 gate is on the two SECTOR broadcasts only. MOVE1 to the mover is
+   * unconditional:
+   *
+   *   prfmsg(MOVE1, from, to); outprfge(FILTER, usrn);      <- always
+   *   if (ptr->speed < 21000.0) { MOVE2 -> old sector }     <- gated
+   *   if (ptr->speed < 21000.0) { MOVE3 -> new sector }     <- gated
+   *   -- GEFUNCS.C:709-723
+   *
+   * The port put its `return` above all three, so a ship above warp 21 crossed
+   * boundaries in total silence and the pilot lost the only running account of
+   * where they were. Invisible until someone owned a hull that fast: the
+   * starting classes cap at warp 10, and it took a Dreadnought (warp 50) in
+   * play to surface it.
+   *
+   * Reported from play: "at higher warp I don't always get the 'I moved into a
+   * sector'".
+   */
+  describe('above warp 21 (GEFUNCS.C:714)', () => {
+    it('STILL tells the mover they changed sector', () => {
+      const { gateway, moverSocket } = build(30_000);
+      fire(gateway);
+
+      const texts = moverSocket.emit.mock.calls
+        .filter((c) => c[0] === 'event.log')
+        .map((c) => (c[1] as { text: string }).text);
+      expect(texts.join('\n')).toMatch(/\(4, ?3\).*\(5, ?3\)/);
+    });
+
+    it('but tells NEITHER sector about it', () => {
+      const { gateway, roomEmits } = build(30_000);
+      fire(gateway);
+
+      expect(roomEmits.filter((e) => e.event === 'sector:ship-entered')).toHaveLength(0);
+      expect(roomEmits.filter((e) => e.event === 'sector:ship-left')).toHaveLength(0);
+    });
+
+    it('exactly at 21,000 the sector notices stop — the test is `< 21000`', () => {
+      const { gateway, roomEmits } = build(21_000);
+      fire(gateway);
+
+      expect(roomEmits.filter((e) => e.event === 'sector:ship-entered')).toHaveLength(0);
+    });
+
+    it('just below 21,000 they still fire', () => {
+      const { gateway, roomEmits } = build(20_999);
+      fire(gateway);
+
+      expect(roomEmits.filter((e) => e.event === 'sector:ship-entered')).toHaveLength(1);
+    });
+  });
+
   it('still tells the old sector that someone left', () => {
     const { gateway, roomEmits } = build();
     fire(gateway);
@@ -138,12 +190,19 @@ describe('GameGateway — sector transition notices', () => {
     expect(departure!.room).toContain('sector:4:3');
   });
 
-  it('stays silent at high warp, for the sector and the mover alike', () => {
-    // GEFUNCS.C:714 — both notices are gated on speed < 21000.
+  /**
+   * CORRECTION 2026-09-07. This asserted silence "for the sector and the mover
+   * alike", and its comment claimed "both notices are gated on speed < 21000".
+   * Only the two SECTOR notices are. MOVE1 to the mover sits above the gate and
+   * is unconditional (GEFUNCS.C:711-713). The test was written from the same
+   * misreading as the code, so it held the defect in place — see the
+   * `above warp 21` block for what canon actually does.
+   */
+  it('at high warp the SECTORS hear nothing — the mover still does', () => {
     const { gateway, moverSocket, roomEmits } = build(21_000);
     fire(gateway);
 
     expect(roomEmits.filter((e) => e.event.startsWith('sector:ship-'))).toHaveLength(0);
-    expect(moverSocket.emit.mock.calls.filter((c) => c[0] === 'event.log')).toHaveLength(0);
+    expect(moverSocket.emit.mock.calls.filter((c) => c[0] === 'event.log')).toHaveLength(1);
   });
 });
