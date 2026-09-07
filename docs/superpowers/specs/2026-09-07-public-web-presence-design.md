@@ -34,8 +34,10 @@ Established by reading the codebase, not assumed:
    `GESTAT_AVAIL`, returning the player to the ship-select menu — canon's GE
    main menu. Logging off the BBS was a separate action at the outer menu. The
    port implemented the inner half only.
-6. **Ranking logic already exists** in `midnight/rank-roster.ts`, used by the
-   in-game `ros` command.
+6. **`ros` and the midnight job rank separately.** `midnight/rank-roster.ts`
+   assigns `rospos`; `ros.handler.ts` runs an independent Prisma query with
+   canon's own predicate. The public board must share the latter, not the
+   former. See the correction in section 5.
 
 ## 1. Routing
 
@@ -167,8 +169,22 @@ New `PublicModule` exposing unauthenticated `GET /public/stats`:
 - `commanders` counts `passwordHash IS NOT NULL`, and the roster filters the
   same way. This gets an explicit regression test with Cybertron fixtures — it
   is the most likely thing to silently break.
-- Ranking reuses `midnight/rank-roster.ts`, so the public board and the in-game
-  `ros` command cannot disagree.
+- **CORRECTION (2026-09-07, before implementation).** An earlier draft of this
+  section said the public board reuses `midnight/rank-roster.ts` so it could
+  not disagree with the in-game `ros` command. That was wrong on both counts.
+  `rankRoster` assigns `rospos` during the midnight job and is not what `ros`
+  uses; `ros.handler.ts` runs its own Prisma query. The shared selection is
+  therefore **extracted from `ros.handler.ts`** into a pure module both call —
+  `game/player/roster-query.ts` — preserving canon's predicate and ordering
+  exactly: `score > 0` (`GECMDS.C:4038`), AI excluded by the `Cybrg-`,
+  `@Droid-` and `@` userid prefixes, ordered score desc, then kills desc, then
+  userid ascending. `ros` is refactored onto it in the same task, with its
+  existing tests unchanged as the proof the refactor is behaviour-preserving.
+- Note that the roster predicate and the `commanders` count answer different
+  questions and legitimately differ. The roster is canon's scoreboard, which
+  omits anyone who has never scored. `commanders` is "how many people have
+  signed up", so it counts `passwordHash IS NOT NULL` and includes the
+  never-flown.
 - `online` comes from a new `PresenceService`: a `Set<userid>` the gateway adds
   to in `handleConnection` and removes in `handleDisconnect`. Not the channel
   registry, which contains AI; not a raw socket count, which double-counts
