@@ -2639,10 +2639,13 @@ const BODY = {
 
 describe('Stats', () => {
   it('shows the counts', async () => {
+    // Scoped to the counts block on purpose: '2' is also the rank cell of the
+    // second roster row, and an unscoped getByText('2') matches both and throws.
     mockStats(BODY);
     renderStats();
-    expect(await screen.findByText('9')).toBeInTheDocument();
-    expect(await screen.findByText('2')).toBeInTheDocument();
+    const counts = await screen.findByTestId('stat-counts');
+    expect(counts).toHaveTextContent('9');
+    expect(counts).toHaveTextContent('2');
   });
 
   it('renders every roster row', async () => {
@@ -2774,7 +2777,7 @@ export function Stats(): React.JSX.Element {
 
         {stats && (
           <>
-            <dl className="mb-8 flex gap-12">
+            <dl className="mb-8 flex gap-12" data-testid="stat-counts">
               <div>
                 <dt className="text-xs uppercase text-gray-500">Commanders</dt>
                 <dd className="text-2xl text-yellow-400">{stats.commanders}</dd>
