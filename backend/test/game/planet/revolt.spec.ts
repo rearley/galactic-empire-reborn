@@ -146,6 +146,47 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     expect(mailCreate).not.toHaveBeenCalled();
   });
 
+  /**
+   * Canon gates the whole revolt block on the planet not ALREADY being free:
+   *
+   *   if (!sameas(plptr->userid,"**Free**"))   -- GEPLANET.C:342
+   *
+   * A colony revolts once. After that it keeps producing and feeding itself
+   * (GEMAIN.C:2129 gates the economy on `userid[0] != 0`, and "**Free**"
+   * passes) but there is no government left to overthrow and no owner to
+   * mail.
+   *
+   * The port gated only on `userid === null`, so a free planet revolted again
+   * on every qualifying tick — dividing its garrison by 2..9 each time, and
+   * addressing a distress letter to "**Free**", which has no User row and
+   * threw a foreign-key error four times a day per colony.
+   *
+   * Observed on the live server: two abandoned test colonies ground down to
+   * 0 and 1 troops, with the matching errors in the log.
+   */
+  it('skips revolt when the planet has ALREADY revolted (GEPLANET.C:342)', async () => {
+    // taxrate 60, as in the first case — 120 zeroes `taxfact` and the storage
+    // ceilings wipe the stockpiles before the revolt branch is even reached,
+    // which would make this pass for the wrong reason.
+    const planet = makePlanet({ userid: FREE_PLANET_OWNER, taxrate: 60 });
+    planet.items[I_MEN].qty = 10000n;
+    planet.items[I_TROOPS].qty = 1000n;
+
+    const mailCreate = jest.fn().mockResolvedValue({});
+    const prisma = { mailStat: { create: mailCreate } } as never;
+    // Draws that WOULD revolt an owned planet: 1-in-10 gate hits, divisor roll.
+    const random = new FixedRandom([0, 0]);
+    const svc = new PlanetEconomyService(random, prisma);
+
+    const { state: next, revolted } = await svc.applyTick(planet);
+
+    expect(revolted).toBe(false);
+    expect(next.userid).toBe(FREE_PLANET_OWNER);
+    // The garrison is NOT cut a second time.
+    expect(next.items[I_TROOPS].qty).toBe(1000n);
+    expect(mailCreate).not.toHaveBeenCalled();
+  });
+
   it('skips revolt when troops sufficient to suppress (pressure <= troops)', async () => {
     // pressure = 0.35 * men = 0.35 * 100 = 35; troops = 1000 — easily suppressed.
     const planet = makePlanet({ userid: 'owner1', taxrate: 120 });

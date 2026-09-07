@@ -3765,3 +3765,30 @@ for everyone, about everyone.
 combat happening beside them. That is canon, and it makes `sca` the instrument
 it was meant to be — but it is a real change in feel, and worth revisiting only
 with evidence from actual multiplayer, not from single-player intuition.
+
+## 2026-09-07 — "Phasers fired — no targets in arc." is kept, as a declared deviation
+**Context:** Canon prints nothing when a phaser discharge reaches nobody. `firep`
+loops the ship table, finds no one inside `smallest(heading,deg) < percent+PHABIAS`,
+sets `phasr = 0` and returns (GECMDS.C:946-1006). The player sees `PFIRED`
+("Phasers fired at N percent power - focus M") and then silence. The only other
+message on that path is `NOFIREP`, which is for an undercharged bank, not an
+empty arc. The port adds a line the original does not have, and the same for
+the hyper-phaser.
+
+**Decision:** Keep it. Recorded here so it is deliberate rather than undeclared.
+
+**Reason:** On a text interface the alternative to this line is silence, which
+is indistinguishable from a dropped command — and this port has already shipped
+one bug where an unacknowledged shot read as a broken weapon (see the missile
+fractional-damage entry). It leaks nothing canon withholds: a deflection still
+reports differently from a miss (`PDEFLECT` names the commander), so the line
+only makes an absence explicit. The player, asked directly, chose to keep it.
+
+**Alternatives rejected:**
+- *Remove it for full fidelity.* Purest, and rejected on the above: the silence
+  it restores is not informative, it is ambiguous.
+- *Leave it undeclared.* Not an option under the project's own rule —
+  deviations are allowed only when deliberate AND written down.
+
+**Scope:** the normal phaser and the hyper-phaser miss lines. Nothing else in
+the phaser path deviates.
