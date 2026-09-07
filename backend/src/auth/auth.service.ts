@@ -91,9 +91,10 @@ export class AuthService {
       });
     }
 
+    const username = user.username ?? user.userid;
     return {
-      token: this.issueJwt(user.userid, user.username),
-      user: { id: user.userid, username: user.username },
+      token: this.issueJwt(user.userid, username),
+      user: { id: user.userid, username },
     };
   }
 

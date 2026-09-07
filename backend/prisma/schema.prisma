@@ -19,8 +19,15 @@ datasource db {
 model User {
   /// WARUSR.userid[UIDSIZ=30] — player login name, primary key
   userid        String   @id
-  /// Display handle chosen at registration; case-insensitive unique (lower index in migration)
-  username      String
+  /// Display handle chosen in step 2 of registration; case-insensitive unique
+  /// (lower index in migration). NULL means signup was abandoned after step 1 —
+  /// WsAuthGuard refuses such a token, and midnight sweeps the row at 10 days.
+  username      String?
+  /// Login credential. Nullable because the Cybertron rows in this table can
+  /// never have one; uniqueness is a partial lower() index, not @unique.
+  email         String?
+  /// Reserved for a future verification flow. Written by nothing today.
+  emailVerifiedAt DateTime?
   /// bcrypt hash of password; NULL rows cannot log in (backfill policy in DECISIONS.md)
   passwordHash  String?
   /// Registration timestamp
