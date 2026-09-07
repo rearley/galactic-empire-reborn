@@ -1120,12 +1120,13 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.PHITYOU]: CANON_MESSAGES.PHITYOU,
   [MessageId.PDEFLECT]: CANON_MESSAGES.PDEFLECT,
   [MessageId.PHITDEF]: CANON_MESSAGES.PHITDEF,
-  [MessageId.YOURDEAD]:
-    CANON_MESSAGES.YOURDEAD
-    + 'Damage control reports severe structural damage in critical systems!\n\n'
-    + 'Your private shuttle is waiting Sir!\n\n'
-    + 'You escape safely and are picked up by a Galactic Command Freighter\n'
-    + 'and transported back to their next stop, Zygor!',
+  // Complete in MBMGEMSG.MSG. It used to append a hand-typed copy of its own
+  // body, so a pilot read their own death notice twice — the second time with
+  // the WARNING banner missing, because that part sits above the duplicated
+  // span. Same defect as the shipyard NEW7/NEW10/NEW18/NEW28 entries, and the
+  // placeholder-count guard could not see it: YOURDEAD takes no arguments, so
+  // 0 == 0 passed. @see test/unit/canon-message-not-duplicated.spec.ts
+  [MessageId.YOURDEAD]: CANON_MESSAGES.YOURDEAD,
 
   // spy (feature 016) — GECMDS.C cmd_spy
   [MessageId.SPY1]: CANON_MESSAGES.SPY1,
