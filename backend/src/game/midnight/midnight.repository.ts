@@ -193,6 +193,29 @@ export class MidnightRepository {
    * @see GEMAIN.C:1175-1195 — phase-3 mail purge
    * @see GEMAIN.C:1160-1161 — MAILSTAT production records go through mailit()
    */
+  /**
+   * Delete accounts that began registration and never chose a username.
+   *
+   * All three conditions matter. `passwordHash IS NOT NULL` keeps the sweep
+   * away from the 24 Cybertron rows in this table. A null username is what
+   * marks the row as abandoned mid-signup — once step 2 completes it can never
+   * match again, so a real player is unreachable by this code at any age.
+   *
+   * Such a row owns no ships, planets or mail: those are only created once the
+   * player boards. This is a plain delete with no cascade to reason about.
+   */
+  async purgeAbandonedSignups(tx: TxClient, days: number, now: Date): Promise<number> {
+    const cutoff = new Date(now.getTime() - days * 86_400_000);
+    const result = await tx.user.deleteMany({
+      where: {
+        passwordHash: { not: null },
+        username: null,
+        createdAt: { lt: cutoff },
+      },
+    });
+    return result.count;
+  }
+
   async purgeMail(tx: TxClient, mailDays: number): Promise<number> {
     const cutoff = Math.floor(Date.now() / 1000) - mailDays * 86_400;
 

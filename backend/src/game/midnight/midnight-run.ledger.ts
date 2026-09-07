@@ -17,6 +17,7 @@ export interface MidnightCounters {
   mailDeleted: number;
   teamsReconciled: number;
   teamsRemoved: number;
+  abandonedSignupsDeleted: number;
 }
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;

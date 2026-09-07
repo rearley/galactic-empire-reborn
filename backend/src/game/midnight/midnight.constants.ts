@@ -107,3 +107,12 @@ export const MESG20: number = 20;
  * @see specs/009-midnight-job/research.md D2
  */
 export const ADVISORY_LOCK_KEY: bigint = 0x474D6E6967687400n;
+
+/**
+ * Days before an abandoned signup is deleted.
+ *
+ * PORT-ORIGINAL: canon has no such sweep — registration was a single BBS-level
+ * action with no half-finished state to clean up. Two-step signup creates one:
+ * an account with credentials and no username holds its email address forever.
+ */
+export const ABANDONED_SIGNUP_DAYS = 10;

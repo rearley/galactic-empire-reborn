@@ -22,7 +22,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MidnightRepository, PhaseCounters } from './midnight.repository';
 import { MidnightCounters, hasRunForToday, recordRun } from './midnight-run.ledger';
-import { ADVISORY_LOCK_KEY } from './midnight.constants';
+import { ADVISORY_LOCK_KEY, ABANDONED_SIGNUP_DAYS } from './midnight.constants';
 import { loadMidnightConfig } from './midnight.config';
 import { MIDNIGHT_COMPLETED, MidnightCompletedPayload } from './midnight-events';
 import { GAME_TIMEZONE, runDateValue } from './midnight-time';
@@ -147,6 +147,11 @@ export class MidnightService implements OnApplicationBootstrap {
         const { teamsReconciled, teamsRemoved } = await this.repo.markEmptyTeamsRemoved(tx);
         await this.repo.assignRosterPositions(tx);
 
+        this.logger.log('midnight: phase 5 — purge abandoned signups');
+        const abandonedSignupsDeleted = await this.repo.purgeAbandonedSignups(
+          tx, ABANDONED_SIGNUP_DAYS, new Date(),
+        );
+
         const completedAt = new Date();
         const durationMs = Date.now() - startMs;
 
@@ -157,6 +162,7 @@ export class MidnightService implements OnApplicationBootstrap {
           mailDeleted,
           teamsReconciled,
           teamsRemoved,
+          abandonedSignupsDeleted,
         };
 
         await recordRun(tx, today, completedAt, durationMs, phaseCounters);
