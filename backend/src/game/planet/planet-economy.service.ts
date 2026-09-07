@@ -47,6 +47,14 @@ import { PlanetState } from './planet-state.types';
  *
  * @see GEPLANET.C:341-380 revolt branch
  */
+/**
+ * Canon's own test for a mailbox nobody will ever read: a leading `*`.
+ * @see GEMAIN.C:1195-1196 (midnight purge), GEPLANET.C:377 ("**Free**")
+ */
+function isLiveRecipient(userid: string): boolean {
+  return userid.length > 0 && !userid.startsWith('*');
+}
+
 @Injectable()
 export class PlanetEconomyService {
   private readonly logger = new Logger(PlanetEconomyService.name);
@@ -298,6 +306,21 @@ export class PlanetEconomyService {
     count: number,
     klass: number = MAIL_CLASS_DISTRESS,
   ): Promise<void> {
+    // Canon writes the letter regardless — `mailit` takes `plptr->userid`
+    // verbatim, "**Free**" included — and the midnight job bins it unread:
+    //
+    //   if (gemsg->userto[0] == '*')   /* non-live player */
+    //       delbtv();
+    //   -- GEMAIN.C:1195-1196
+    //
+    // No player can hold a `*`-prefixed userid, so that mail is unreadable by
+    // construction. We store mail with a foreign key to User, which "**Free**"
+    // has no row for, so the insert threw on every tick an abandoned colony
+    // starved — caught and logged, but four times a day per colony, burying
+    // real errors. Skipping it is observationally identical to canon, and uses
+    // canon's own test for a non-live recipient.
+    if (!isLiveRecipient(userid)) return;
+
     await this.prisma.mailStat.create({
       data: {
         userid,
