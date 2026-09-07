@@ -151,6 +151,13 @@ export class MidnightService implements OnApplicationBootstrap {
         const abandonedSignupsDeleted = await this.repo.purgeAbandonedSignups(
           tx, ABANDONED_SIGNUP_DAYS, new Date(),
         );
+        // This is the only unattended DELETE in the system. The line above
+        // only announces the phase before it runs; without a line after it
+        // naming the count, nothing records what was actually removed short
+        // of decoding the final midnight.complete JSON summary. Persisting
+        // this to the MidnightRun row is deliberately out of scope (no
+        // migration for it) — this log line is the audit trail.
+        this.logger.log(`midnight: phase 5 — purged ${abandonedSignupsDeleted} abandoned signup(s)`);
 
         const completedAt = new Date();
         const durationMs = Date.now() - startMs;
