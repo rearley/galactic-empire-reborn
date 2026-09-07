@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { escapeIlikePattern } from '../../prisma/ilike-escape';
 
 @Injectable()
 export class TeamRepository {
@@ -10,10 +11,17 @@ export class TeamRepository {
    * concerned — its `teamtab` slot was freed — so its name must not resolve
    * here, or it stays joinable with its old password.
    * @see GECMDS.C:5277 cmd_team  @see GEMAIN.C:1293
+   *
+   * Team names are free text (no character restriction, see team-name.ts),
+   * and `mode: 'insensitive'` renders as `teamname ILIKE $1` with the value
+   * used verbatim as the pattern. Without escaping, a name like "%" would
+   * match every team, letting `TeamService.joinByPassword` be used to test
+   * one password against an arbitrary team. `escapeIlikePattern` makes `%`
+   * and `_` literal so only an exact (case-insensitive) name matches.
    */
   async findByNameLower(name: string): Promise<{ teamcode: bigint; teamname: string; password: string } | null> {
     return this.prisma.team.findFirst({
-      where: { teamname: { equals: name, mode: 'insensitive' }, removed: false },
+      where: { teamname: { equals: escapeIlikePattern(name), mode: 'insensitive' }, removed: false },
       select: { teamcode: true, teamname: true, password: true },
     });
   }

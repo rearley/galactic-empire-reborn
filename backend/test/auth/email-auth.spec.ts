@@ -63,8 +63,29 @@ describe('login', () => {
     const result = await svc.login({ email: 'RICK@Example.com', password: 'hunter2hunter2' });
 
     expect(result.user).toEqual({ id: 'usr_abc', username: 'rick' });
+    // Case-insensitivity comes from normalizing to lowercase before the query
+    // (stored emails are already lowercased by register), NOT from ILIKE /
+    // `mode: 'insensitive'` — that renders as `ILIKE $1` with the caller's
+    // string used unescaped AS THE PATTERN, so a wildcard in the input (e.g.
+    // "%@gmail.com") would match every account with one query.
     const where = findFirst.mock.calls[0][0].where;
-    expect(JSON.stringify(where)).toContain('insensitive');
+    expect(where).toEqual({ email: 'rick@example.com' });
+  });
+
+  it('does not treat SQL/ILIKE wildcards in the email as pattern characters', async () => {
+    // A regression guard for the credential-stuffing amplifier: `%` and `_`
+    // must be inert here. This only pins the query shape (mocked prisma can't
+    // exercise real ILIKE semantics) — the plain-equality where-clause above
+    // is what makes wildcards inert against a real Postgres `=`.
+    const findFirst = jest.fn().mockResolvedValue(null);
+    const svc = makeService({ findFirst });
+
+    await expect(svc.login({ email: '%@gmail.com', password: 'hunter2hunter2' }))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    const where = findFirst.mock.calls[0][0].where;
+    expect(where).toEqual({ email: '%@gmail.com' });
+    expect(JSON.stringify(where)).not.toContain('insensitive');
   });
 
   it('still runs bcrypt when the email is unknown, so timing does not leak membership', async () => {

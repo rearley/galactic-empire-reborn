@@ -196,8 +196,16 @@ export class AuthService {
    * of finishing step 2. A downstream login screen branches on the null.
    */
   async login(dto: LoginDto): Promise<AuthResult> {
+    // Plain equality, not `mode: 'insensitive'`. Prisma renders that as
+    // `ILIKE $1` with the caller's string used UNESCAPED as the pattern —
+    // `@IsEmail()` accepts `%`, so "%@gmail.com" would test one password
+    // against every matching account in a single query, and `findFirst`
+    // would return an arbitrary match. `register` already lowercases before
+    // storing, so the stored value is already canonical: normalizing here
+    // and comparing with `=` gets the same case-insensitive match with no
+    // pattern-matching involved.
     const user = await this.prisma.user.findFirst({
-      where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
+      where: { email: dto.email.trim().toLowerCase() },
     });
 
     // Always compare against something so an unknown email costs the same as a
