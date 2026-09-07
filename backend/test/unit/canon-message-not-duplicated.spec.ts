@@ -54,6 +54,29 @@ describe('a canon message is never re-typed onto itself', () => {
       countPlaceholders(canon[id] as string),
     );
   });
+
+  /**
+   * The placeholder count alone is not enough. YOURDEAD appended a hand-typed
+   * copy of its own body and slipped through, because it takes no arguments —
+   * 0 === 0. A pilot read their own death notice twice.
+   *
+   * So check the TEXT: an entry either matches canon exactly, or extends it —
+   * and a legitimate extension adds words canon does not already contain.
+   * Canon truncates some messages mid-sentence on purpose and leaves the
+   * caller to `prf` the rest (KILLGOT1 is the worked example), and those still
+   * pass, because their tail is new text rather than a repeat.
+   */
+  it.each(shared)('%s does not re-state text canon already carries', (id) => {
+    const entry = MESSAGE_STRINGS[id];
+    const source = canon[id] as string;
+    if (entry === source) return;
+
+    expect(entry.startsWith(source)).toBe(true);
+    const tail = entry.slice(source.length).trim();
+    if (tail.length === 0) return;
+    // A tail canon already contains is a duplicate, not an extension.
+    expect(source.includes(tail)).toBe(false);
+  });
 });
 
 describe('the Yardmaster reports the fitting exactly once (MBMGEMSG.MSG NEW10)', () => {
