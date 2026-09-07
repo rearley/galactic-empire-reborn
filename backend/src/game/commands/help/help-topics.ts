@@ -38,19 +38,32 @@ const CANON_COMMAND_PAGES: Readonly<Record<string, string>> = Object.freeze({
 /**
  * Canon's concept pages — the topics HELP INDEX lists separately from commands.
  *
- * Several run to MORE THAN ONE page: canon pages `planets` across HLPPLANT,
- * HLPPLAN2 and HLPPLAN3, and `battle` across HLPBATTL, HLPBATT2 and HLPBATT3.
- * Wiring only the first page hid real content — the explanation of what a
- * planet's RESOURCE rating actually does is on HLPPLANT, but the troops and
- * fighters detail is on HLPPLAN2, and a player looking for the second could
- * not find it.
+ * Each numbered section is its OWN topic, exactly as canon registers them:
+ *
+ *   {"planets", HLPPLANT}, {"planets2", HLPPLAN2}, {"planets3", HLPPLAN3},
+ *   {"battle",  HLPBATTL}, {"battle2",  HLPBATT2}, {"battle3",  HLPBATT3},
+ *   -- GECMDS.C:229-241
+ *
+ * `cmd_gehelp` prints exactly one message per lookup (GECMDS.C:461-470).
+ *
+ * CORRECTION 2026-09-07. This table used to map `planets` to all three ids at
+ * once and register no numbered entries, so `hel planets` dumped ~60 lines and
+ * `hel planets2` answered "Unknown help topic". The reasoning was that wiring
+ * only the first page would hide the rest — right worry, wrong fix. Canon does
+ * not hide the later sections, it PAGINATES them, and each page carries its own
+ * navigation: HLPPLANT ends "Type HELP PLANETS2 for more information on
+ * planets". Concatenating while leaving those topics unregistered made the
+ * game print an instruction its own parser rejected. Reported from play.
+ *
+ * @see test/unit/help-paginates-multipage-topics.spec.ts — re-reads every
+ *      "Type HELP <topic>" line in canon and fails on any that is unreachable.
  */
 const CANON_CONCEPT_PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   starting: ['HLPSTART'], galaxy: ['HLPGALXY'], sector: ['HLPSECTR'],
   communicate: ['HLPCOMMU'], moving: ['HLPNAVIG'],
-  planets: ['HLPPLANT', 'HLPPLAN2', 'HLPPLAN3'],
+  planets: ['HLPPLANT'], planets2: ['HLPPLAN2'], planets3: ['HLPPLAN3'],
   strategy: ['HLPSTRAT'],
-  battle: ['HLPBATTL', 'HLPBATT2', 'HLPBATT3'],
+  battle: ['HLPBATTL'], battle2: ['HLPBATT2'], battle3: ['HLPBATT3'],
   cybertron: ['HLPCYBER'], scoring: ['HLPSCORE'], wormholes: ['HLPWORM'],
 });
 
@@ -587,8 +600,8 @@ export function canonHelpPage(
 ): ReadonlyArray<string> | null {
   const q = query.toLowerCase();
 
-  // A concept may span several pages; join them so one `hel planets` shows the
-  // whole topic instead of its first third.
+  // One page per lookup, as canon does — the page tells the player how to reach
+  // the next one, and that instruction now resolves.
   const addendum = PORT_HELP_ADDENDA[q] ?? [];
 
   const concept = CANON_CONCEPT_PAGES[q] ?? CANON_CONCEPT_PAGES[`${q}s`];
