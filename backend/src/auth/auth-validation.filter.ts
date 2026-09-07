@@ -3,15 +3,38 @@ import {
   BadRequestException,
   Catch,
   ExceptionFilter,
+  ValidationError,
 } from '@nestjs/common';
 import { Response } from 'express';
 
 /**
- * Reformats NestJS ValidationPipe errors on auth routes to our contract shape:
- * `{ code: 'INVALID_USERNAME' | 'INVALID_PASSWORD', message: string }`.
+ * Custom `exceptionFactory` for the `ValidationPipe` on the auth routes.
  *
- * The standard ValidationPipe emits `{ statusCode, message: string[], error }`.
- * We need a single `code` field so the frontend can react without parsing message strings.
+ * The default factory flattens `ValidationError[]` down to a `string[]` of
+ * human messages and discards which DTO property actually failed. We need
+ * the property name intact so {@link AuthValidationFilter} can classify the
+ * failure by field rather than by scanning message text (which broke the day
+ * `RegisterDto`/`LoginDto` grew an `email` field: no message-substring rule
+ * had ever been written for it, so every email failure silently fell through
+ * to the `INVALID_PASSWORD` bucket).
+ */
+export function authValidationExceptionFactory(errors: ValidationError[]): BadRequestException {
+  return new BadRequestException({
+    properties: errors.map((e) => e.property),
+    message: 'Validation failed',
+  });
+}
+
+/**
+ * Reformats NestJS ValidationPipe errors on auth routes to our contract shape:
+ * `{ code: 'INVALID_EMAIL' | 'INVALID_PASSWORD' | 'INVALID_USERNAME', message: string }`.
+ *
+ * Classification reads the failing DTO property directly off the
+ * `properties` array produced by {@link authValidationExceptionFactory} —
+ * not by pattern-matching the validation message text, which is fragile and
+ * has already broken once (see that function's doc comment). `username`
+ * has no route today (`RegisterDto`/`LoginDto` are email-only), but a later
+ * task adds one that validates a username field and needs this code.
  */
 @Catch(BadRequestException)
 export class AuthValidationFilter implements ExceptionFilter {
@@ -26,12 +49,15 @@ export class AuthValidationFilter implements ExceptionFilter {
       return;
     }
 
-    // NestJS ValidationPipe default format: { statusCode, message: string[], error }
-    const messages = Array.isArray(body.message) ? (body.message as string[]) : [];
-    const hasUsernameError = messages.some(
-      (m) => m.toLowerCase().includes('username') || m.toLowerCase().includes('match')
-    );
-    const code = hasUsernameError ? 'INVALID_USERNAME' : 'INVALID_PASSWORD';
+    const properties = Array.isArray(body.properties) ? (body.properties as unknown[]) : [];
+    const failedFields = new Set(properties.map(String));
+
+    const code = failedFields.has('email')
+      ? 'INVALID_EMAIL'
+      : failedFields.has('username')
+        ? 'INVALID_USERNAME'
+        : 'INVALID_PASSWORD';
+
     res.status(400).json({ code, message: `${code}` });
   }
 }
