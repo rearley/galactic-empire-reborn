@@ -592,7 +592,7 @@ export enum MessageId {
  * %s = string arg, %d/%u = integer arg, %.1f = float arg.
  * @see specs/003-ship-commands/contracts/messages.md for per-message source anchors
  */
-const MESSAGE_STRINGS: Record<MessageId, string> = {
+export const MESSAGE_STRINGS: Record<MessageId, string> = {
   // impulse — GECMDS.C:482
   [MessageId.IMPFMT]: CANON_MESSAGES.IMPFMT,
   [MessageId.IMPULSE1]: CANON_MESSAGES.IMPULSE1,
@@ -1202,22 +1202,26 @@ const MESSAGE_STRINGS: Record<MessageId, string> = {
   // 36,666 rather than 40,000 legible to the player.
   // @see GECMDS.C:4606,4640,4668,4701; MBMGEMSG.MSG:3946,3960,3982,3986,3990,3996,4001
   [MessageId.NEW19]: CANON_MESSAGES.NEW19,
-  [MessageId.NEW7]:
-    CANON_MESSAGES.NEW7
-    + 'The Yardmaster Reports: For the meager sum of %s\n'
-    + 'your ship now has a Mark-%d Shield defense system.',
+  // These four are COMPLETE in MBMGEMSG.MSG and the generated values carry them
+  // whole. Each used to append a hand-typed copy of its own second half, which
+  // doubled the placeholder count: the template wanted four arguments, the call
+  // site passes two, and the player got the sentence twice with the numbers
+  // missing from the second copy —
+  //
+  //   The Yardmaster Reports: For the meager sum of 253,333
+  //   your ship now has a Mark-6 Phaser System.The Yardmaster Reports: For the
+  //   meager sum of
+  //   your ship now has a Mark- Phaser System.
+  //
+  // Found in play on `new phaser 6`. NEW7 had it for shields and NEW18/NEW28
+  // for the downgrade refund, on paths nobody had walked.
+  // @see test/unit/canon-message-not-duplicated.spec.ts
+  [MessageId.NEW7]: CANON_MESSAGES.NEW7,
   [MessageId.NEW29]: CANON_MESSAGES.NEW29,
-  [MessageId.NEW10]:
-    CANON_MESSAGES.NEW10
-    + 'The Yardmaster Reports: For the meager sum of %s\n'
-    + 'your ship now has a Mark-%d Phaser System.',
+  [MessageId.NEW10]: CANON_MESSAGES.NEW10,
   [MessageId.NEW17]: CANON_MESSAGES.NEW17,
-  [MessageId.NEW18]:
-    CANON_MESSAGES.NEW18
-    + "fee of %s C's %s has been deposited to your account, Sir.",
-  [MessageId.NEW28]:
-    CANON_MESSAGES.NEW28
-    + "fee of %s C's %s has been deposited to your account, Sir.",
+  [MessageId.NEW18]: CANON_MESSAGES.NEW18,
+  [MessageId.NEW28]: CANON_MESSAGES.NEW28,
 
   // maint password gate (feature 014) — GECMDS.C:4471 MAINT2, :4479 MAINT3
   [MessageId.MAINT2]: CANON_MESSAGES.MAINT2,
