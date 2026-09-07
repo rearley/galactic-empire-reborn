@@ -12,6 +12,7 @@ import { ScanPanel } from './components/ScanPanel';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
 import { ShipSelectPrompt, type FleetEntry } from './onboarding/ShipSelectPrompt';
 import { clearToken } from './auth/tokenStore';
+import { logout } from './auth/logout';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
 import type { EventLogLine, ScanCell } from './types/contracts';
@@ -328,6 +329,7 @@ function Terminal(): React.JSX.Element {
           ships={payload.ships ?? []}
           onSelect={(index) => emitPromptReply(index)}
           error={payload.error ?? null}
+          onLogout={() => logout()}
         />
       );
     }
