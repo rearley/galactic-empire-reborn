@@ -40,77 +40,71 @@ describe('POST /auth/register', () => {
   // Happy path
   // ---------------------------------------------------------------------------
 
-  it('201 with token and user on valid registration', async () => {
+  it('201 with token and a null username on valid registration — the handle comes in step 2', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'TestUser', password: 'password123' })
+      .send({ email: 'TestUser@Example.com', password: 'password123' })
       .expect(201);
 
     expect(typeof res.body.token).toBe('string');
     expect(res.body.token.length).toBeGreaterThan(0);
     expect(typeof res.body.user.id).toBe('string');
     expect(res.body.user.id.length).toBeGreaterThan(0);
-    // Username casing must be preserved exactly as supplied
-    expect(res.body.user.username).toBe('TestUser');
+    expect(res.body.user.username).toBeNull();
+  });
+
+  it('stores the email lowercased regardless of the case supplied', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'MixedCase@Example.COM', password: 'password123' })
+      .expect(201);
+
+    const row = await prisma.user.findFirst({ where: { email: 'mixedcase@example.com' } });
+    expect(row).not.toBeNull();
   });
 
   // ---------------------------------------------------------------------------
   // Validation failures → 400
   // ---------------------------------------------------------------------------
 
-  it('400 INVALID_PASSWORD when password is missing', async () => {
-    const res = await request(app.getHttpServer())
+  it('400 when password is missing', async () => {
+    await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'ValidUser' })
+      .send({ email: 'valid@example.com' })
       .expect(400);
-
-    expect(res.body.code).toBe('INVALID_PASSWORD');
   });
 
-  it('400 INVALID_USERNAME when username is too short (2 chars)', async () => {
-    const res = await request(app.getHttpServer())
+  it('400 when email is not a valid address', async () => {
+    await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'ab', password: 'password123' })
+      .send({ email: 'not-an-email', password: 'password123' })
       .expect(400);
-
-    expect(res.body.code).toBe('INVALID_USERNAME');
   });
 
-  it('400 INVALID_USERNAME when username contains a space', async () => {
-    const res = await request(app.getHttpServer())
+  it('400 when password is too short (7 chars)', async () => {
+    await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'bad name', password: 'password123' })
+      .send({ email: 'valid@example.com', password: 'short7c' })
       .expect(400);
-
-    expect(res.body.code).toBe('INVALID_USERNAME');
-  });
-
-  it('400 INVALID_PASSWORD when password is too short (7 chars)', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ username: 'ValidUser', password: 'short7c' })
-      .expect(400);
-
-    expect(res.body.code).toBe('INVALID_PASSWORD');
   });
 
   // ---------------------------------------------------------------------------
   // Conflict → 409
   // ---------------------------------------------------------------------------
 
-  it('409 USERNAME_TAKEN when registering the same username twice (case-insensitive)', async () => {
+  it('409 EMAIL_TAKEN when registering the same email twice (case-insensitive)', async () => {
     // First registration must succeed
     await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'Alice', password: 'password123' })
+      .send({ email: 'Alice@Example.com', password: 'password123' })
       .expect(201);
 
     // Second registration with different case must conflict
     const res = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'alice', password: 'password123' })
+      .send({ email: 'alice@example.com', password: 'password123' })
       .expect(409);
 
-    expect(res.body.code).toBe('USERNAME_TAKEN');
+    expect(res.body.code).toBe('EMAIL_TAKEN');
   });
 });

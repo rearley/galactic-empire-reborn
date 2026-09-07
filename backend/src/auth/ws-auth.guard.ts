@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 
 export interface WsJwtPayload {
   sub: string;
-  username: string;
+  username: string | null;
 }
 
 /**

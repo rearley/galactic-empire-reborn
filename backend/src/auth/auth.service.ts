@@ -10,11 +10,47 @@ import { BCRYPT_COST, DUMMY_BCRYPT_HASH } from './auth.constants';
 /** Shape returned by both register and login. */
 export interface AuthResult {
   token: string;
-  user: { id: string; username: string };
+  user: { id: string; username: string | null };
+}
+
+/**
+ * Names of the email unique index, in every shape Prisma has been observed to
+ * report in P2002's `meta.target`.
+ *
+ * `user_email_lower_key` is the index's real name (the `add_user_email`
+ * migration; @see Task 1 step 3). But it is a partial expression index
+ * (`ON "User" (lower(email)) WHERE email IS NOT NULL`), and Prisma's engine
+ * does not resolve expression indexes back to their name — verified live
+ * against ge_test, a duplicate email comes back with
+ * `meta: { target: ["lower(email)"] }`, not the index name. Matching on the
+ * name alone silently rethrows every real EMAIL_TAKEN case as a 500; both
+ * forms are matched here so the unit-test mocks (which use the name) and the
+ * live database (which reports the expression) both resolve correctly.
+ */
+const EMAIL_INDEX_MARKERS = ['user_email_lower_key', 'lower(email)'];
+
+/**
+ * Prisma reports every unique violation as P2002 and names the offending
+ * constraint (or, for an expression index, the expression itself) in
+ * meta.target. Two unique indexes now live on User, so this is the only way
+ * to tell which field the player must fix.
+ */
+function isUniqueViolation(err: unknown, markers: readonly string[]): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { code?: string; meta?: { target?: unknown } };
+  if (e.code !== 'P2002') return false;
+  const target = e.meta?.target;
+  const names = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+  return names.some((n) => markers.some((marker) => n.toLowerCase().includes(marker.toLowerCase())));
 }
 
 /**
  * Handles player registration, login, and JWT issuance.
+ *
+ * Registration is step 1 of a two-step signup: it creates the account by
+ * email + password with `username: null`. The in-game handle is chosen in
+ * step 2 (a separate endpoint), so `username` is nullable everywhere in
+ * this service's return shapes.
  *
  * Constant-time policy: bcrypt.compare is always called during login,
  * even when the user does not exist or has no password hash, to prevent
@@ -28,73 +64,67 @@ export class AuthService {
   ) {}
 
   /**
-   * Registers a new player account.
+   * Registers a new player account by email + password.
    *
    * Generates a random userid, hashes the supplied password, and persists
-   * a new User row. Throws ConflictException (USERNAME_TAKEN) on duplicate
-   * username (Prisma P2002).
+   * a new User row with `username: null`. Throws ConflictException
+   * (EMAIL_TAKEN) on duplicate email (Prisma P2002 on `user_email_lower_key`).
    */
   async register(dto: RegisterDto): Promise<AuthResult> {
     const userid = `usr_${randomBytes(12).toString('hex')}`;
     const hash = await bcrypt.hash(dto.password, BCRYPT_COST);
+    const email = dto.email.trim().toLowerCase();
 
     try {
       await this.prisma.user.create({
-        data: {
-          userid,
-          username: dto.username,
-          passwordHash: hash,
-          options: [],
-        },
+        data: { userid, email, username: null, passwordHash: hash, options: [] },
       });
     } catch (err: unknown) {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        'code' in err &&
-        (err as { code: string }).code === 'P2002'
-      ) {
+      if (isUniqueViolation(err, EMAIL_INDEX_MARKERS)) {
         throw new ConflictException({
-          code: 'USERNAME_TAKEN',
-          message: 'Username already taken.',
+          code: 'EMAIL_TAKEN',
+          message: 'An account with that email already exists.',
         });
       }
       throw err;
     }
 
-    return {
-      token: this.issueJwt(userid, dto.username),
-      user: { id: userid, username: dto.username },
-    };
+    return { token: this.issueJwt(userid, null), user: { id: userid, username: null } };
   }
 
   /**
-   * Authenticates a player by username and password.
+   * Authenticates a player by email and password.
    *
    * Always runs bcrypt.compare to ensure constant-time behaviour regardless
    * of whether the user exists or has a null passwordHash (prevents enumeration).
    * Throws UnauthorizedException (INVALID_CREDENTIALS) on any mismatch.
+   *
+   * Deliberately issues a token even when the account has not chosen a
+   * username yet (`username: null`) — that account completed step 1 of
+   * registration and abandoning at that point must not lock the player out
+   * of finishing step 2. A downstream login screen branches on the null.
    */
   async login(dto: LoginDto): Promise<AuthResult> {
     const user = await this.prisma.user.findFirst({
-      where: { username: { equals: dto.username, mode: 'insensitive' } },
+      where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
     });
 
-    // Constant-time path: always compare against something.
+    // Always compare against something so an unknown email costs the same as a
+    // known one. Without this the response time answers "is this address
+    // registered?" for anyone who cares to ask.
     const hashToCompare = user?.passwordHash ?? DUMMY_BCRYPT_HASH;
     const valid = await bcrypt.compare(dto.password, hashToCompare);
 
     if (!user || user.passwordHash === null || !valid) {
       throw new UnauthorizedException({
         code: 'INVALID_CREDENTIALS',
-        message: 'Invalid username or password.',
+        message: 'Invalid email or password.',
       });
     }
 
-    const username = user.username ?? user.userid;
     return {
-      token: this.issueJwt(user.userid, username),
-      user: { id: user.userid, username },
+      token: this.issueJwt(user.userid, user.username),
+      user: { id: user.userid, username: user.username },
     };
   }
 
@@ -103,8 +133,10 @@ export class AuthService {
    *
    * Payload: `{ sub: userid, username, iat, exp }` — iat and exp are
    * injected automatically by JwtService based on the module configuration.
+   * `username` is `null` for an account that has not completed step 2 of
+   * registration yet.
    */
-  issueJwt(userid: string, username: string): string {
+  issueJwt(userid: string, username: string | null): string {
     return this.jwtService.sign({ sub: userid, username });
   }
 
@@ -114,7 +146,7 @@ export class AuthService {
    * Propagates JsonWebTokenError and TokenExpiredError to the caller —
    * guard layers are responsible for converting these to HTTP responses.
    */
-  async verifyJwt(token: string): Promise<{ sub: string; username: string }> {
-    return this.jwtService.verifyAsync<{ sub: string; username: string }>(token);
+  async verifyJwt(token: string): Promise<{ sub: string; username: string | null }> {
+    return this.jwtService.verifyAsync<{ sub: string; username: string | null }>(token);
   }
 }

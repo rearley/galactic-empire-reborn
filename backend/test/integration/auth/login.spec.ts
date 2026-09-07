@@ -37,31 +37,31 @@ describe('POST /auth/login', () => {
   });
 
   // Helper: register a user via the HTTP endpoint.
-  async function registerUser(username: string, password: string): Promise<void> {
+  async function registerUser(email: string, password: string): Promise<void> {
     await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username, password })
+      .send({ email, password })
       .expect(201);
   }
 
   // ---------------------------------------------------------------------------
-  // Happy path — case-insensitive login, stored-casing username returned
+  // Happy path — case-insensitive login by email
   // ---------------------------------------------------------------------------
 
-  it('200 with token and stored-casing username on valid login', async () => {
-    await registerUser('Goliath', 'password123');
+  it('200 with token on valid login, case-insensitively', async () => {
+    await registerUser('Goliath@Example.com', 'password123');
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       // Login with all-lowercase — should still work
-      .send({ username: 'goliath', password: 'password123' })
+      .send({ email: 'goliath@example.com', password: 'password123' })
       .expect(200);
 
     expect(typeof res.body.token).toBe('string');
     expect(res.body.token.length).toBeGreaterThan(0);
-    // Returned username must be the stored casing ("Goliath"), not the request casing ("goliath")
-    expect(res.body.user.username).toBe('Goliath');
     expect(typeof res.body.user.id).toBe('string');
+    // Fresh registration has not chosen a handle yet — step 2 does that.
+    expect(res.body.user.username).toBeNull();
   });
 
   // ---------------------------------------------------------------------------
@@ -69,35 +69,35 @@ describe('POST /auth/login', () => {
   // ---------------------------------------------------------------------------
 
   it('401 INVALID_CREDENTIALS on wrong password', async () => {
-    await registerUser('SomePlayer', 'password123');
+    await registerUser('SomePlayer@Example.com', 'password123');
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'SomePlayer', password: 'wrongpassword' })
+      .send({ email: 'SomePlayer@Example.com', password: 'wrongpassword' })
       .expect(401);
 
     expect(res.body.code).toBe('INVALID_CREDENTIALS');
   });
 
-  it('401 INVALID_CREDENTIALS for unknown username', async () => {
+  it('401 INVALID_CREDENTIALS for unknown email', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'NoSuchUser', password: 'password123' })
+      .send({ email: 'nosuchuser@example.com', password: 'password123' })
       .expect(401);
 
     expect(res.body.code).toBe('INVALID_CREDENTIALS');
   });
 
   // ---------------------------------------------------------------------------
-  // Timing — unknown username must still run bcrypt (constant-time path)
+  // Timing — unknown email must still run bcrypt (constant-time path)
   // ---------------------------------------------------------------------------
 
-  it('unknown username login takes ≥ 100ms (bcrypt constant-time path)', async () => {
+  it('unknown email login takes ≥ 100ms (bcrypt constant-time path)', async () => {
     const start = Date.now();
 
     await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'GhostUser', password: 'password123' })
+      .send({ email: 'ghostuser@example.com', password: 'password123' })
       .expect(401);
 
     const elapsed = Date.now() - start;
@@ -115,7 +115,8 @@ describe('POST /auth/login', () => {
     await prisma.user.create({
       data: {
         userid: 'usr_nullhash_test',
-        username: 'NullHashUser',
+        email: 'nullhash@example.com',
+        username: null,
         passwordHash: null,
         options: [],
       },
@@ -123,9 +124,25 @@ describe('POST /auth/login', () => {
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'NullHashUser', password: 'password123' })
+      .send({ email: 'nullhash@example.com', password: 'password123' })
       .expect(401);
 
     expect(res.body.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  // ---------------------------------------------------------------------------
+  // A half-registered account (no username yet) must still get a token back
+  // ---------------------------------------------------------------------------
+
+  it('200 and a null username for an account that has not finished step 2', async () => {
+    await registerUser('HalfDone@Example.com', 'password123');
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'halfdone@example.com', password: 'password123' })
+      .expect(200);
+
+    expect(res.body.user.username).toBeNull();
+    expect(typeof res.body.token).toBe('string');
   });
 });
