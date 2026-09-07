@@ -12,6 +12,7 @@ interface Props {
   ships: FleetEntry[];
   onSelect: (index: number) => void;
   error: string | null;
+  onLogout?: () => void;
 }
 
 /**
@@ -24,7 +25,7 @@ interface Props {
  *
  * @see specs/030-multi-ship/task-7-brief.md T7
  */
-export function ShipSelectPrompt({ ships, onSelect, error }: Props): React.JSX.Element {
+export function ShipSelectPrompt({ ships, onSelect, error, onLogout }: Props): React.JSX.Element {
   const [value, setValue] = useState('');
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
@@ -59,6 +60,17 @@ export function ShipSelectPrompt({ ships, onSelect, error }: Props): React.JSX.E
         className="bg-black border border-gray-600 text-gray-100 px-2 py-1 w-24"
         autoFocus
       />
+      {onLogout && (
+        <p className="mt-4 text-xs text-gray-600">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="text-gray-400 underline hover:text-gray-200"
+          >
+            Log out
+          </button>
+        </p>
+      )}
     </div>
   );
 }
