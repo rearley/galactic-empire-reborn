@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { Stats } from '../../src/routes/Stats';
@@ -59,7 +59,7 @@ describe('Stats', () => {
     mockStats(BODY);
     renderStats();
     await vi.advanceTimersByTimeAsync(30_000);
-    await waitFor(() => expect((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1));
+    await vi.waitFor(() => expect((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1));
     vi.useRealTimers();
   });
 });

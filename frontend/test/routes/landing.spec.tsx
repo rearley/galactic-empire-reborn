@@ -30,8 +30,14 @@ describe('Landing', () => {
   });
 
   it('offers a way in', () => {
+    // Both the header nav link and the body's closing call to action are
+    // "Enlist" links to /register — a visitor who scrolled past the history
+    // and the faithful/changed lists should not have to scroll back up to
+    // find the only way in. Assert both exist rather than picking one.
     renderLanding();
-    expect(screen.getByRole('link', { name: /enlist/i })).toHaveAttribute('href', '/register');
+    const enlistLinks = screen.getAllByRole('link', { name: /enlist/i });
+    expect(enlistLinks).toHaveLength(2);
+    enlistLinks.forEach((link) => expect(link).toHaveAttribute('href', '/register'));
   });
 });
 

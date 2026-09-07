@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { SiteHeader } from './SiteHeader';
 import { PORT_RELEASE, PORT_RELEASE_DATE, FAITHFUL, CHANGED } from '../content/port-notes';
 
@@ -55,8 +56,13 @@ export function Landing(): React.JSX.Element {
 
         <hr className="my-8 border-gray-800" />
 
-        <p className="text-center text-sm text-gray-400">
-          Ready to take the helm? Use Enlist above to get your first ship.
+        <p className="text-center">
+          <Link
+            to="/register"
+            className="inline-block border border-yellow-400 px-6 py-2 uppercase tracking-widest text-yellow-400 hover:bg-yellow-400 hover:text-black"
+          >
+            Enlist
+          </Link>
         </p>
       </main>
     </div>
