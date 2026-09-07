@@ -1,10 +1,16 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChooseUsernameDto } from './dto/choose-username.dto';
 import { BCRYPT_COST, DUMMY_BCRYPT_HASH } from './auth.constants';
 
 /** Shape returned by both register and login. */
@@ -28,6 +34,22 @@ export interface AuthResult {
  * live database (which reports the expression) both resolve correctly.
  */
 const EMAIL_INDEX_MARKERS = ['user_email_lower_key', 'lower(email)'];
+
+/**
+ * Names of the username unique index, in every shape Prisma has been
+ * observed to report in P2002's `meta.target`.
+ *
+ * `User_username_lower_idx` is the index's real name (the
+ * `011_onboarding_auth` migration; `migration.sql:25`). It is an expression
+ * index (`ON "User" (LOWER("username"))`), and — as with the email index
+ * above — Prisma's engine reports expression indexes by the expression
+ * itself, not the index name: a duplicate username comes back with
+ * `meta: { target: ["lower(username)"] }`. Matching on the name alone would
+ * silently rethrow every real USERNAME_TAKEN case as a 500; both forms are
+ * matched here so the unit-test mocks (which use the name) and the live
+ * database (which reports the expression) both resolve correctly.
+ */
+const USERNAME_INDEX_MARKERS = ['User_username_lower_idx', 'lower(username)'];
 
 /**
  * Prisma reports every unique violation as P2002 and names the offending
@@ -90,6 +112,51 @@ export class AuthService {
     }
 
     return { token: this.issueJwt(userid, null), user: { id: userid, username: null } };
+  }
+
+  /**
+   * Step 2 of registration: attach a display handle to an account that has
+   * credentials but no name yet.
+   *
+   * Returns a FRESH token. The one minted at step 1 carries `username: null`,
+   * which WsAuthGuard refuses — without reissuing here the player would
+   * finish signing up and still be unable to open a socket.
+   *
+   * Throws NotFoundException (NO_SUCH_USER) if the userid does not exist,
+   * ConflictException (USERNAME_ALREADY_SET) if the account already has a
+   * handle — this completes registration, it is not a rename — and
+   * ConflictException (USERNAME_TAKEN) on duplicate username (Prisma P2002
+   * on `User_username_lower_idx`).
+   */
+  async chooseUsername(userid: string, dto: ChooseUsernameDto): Promise<AuthResult> {
+    const existing = await this.prisma.user.findUnique({ where: { userid } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NO_SUCH_USER', message: 'Account not found.' });
+    }
+
+    if (existing.username !== null) {
+      throw new ConflictException({
+        code: 'USERNAME_ALREADY_SET',
+        message: 'This account already has a username.',
+      });
+    }
+
+    try {
+      await this.prisma.user.update({ where: { userid }, data: { username: dto.username } });
+    } catch (err: unknown) {
+      if (isUniqueViolation(err, USERNAME_INDEX_MARKERS)) {
+        throw new ConflictException({
+          code: 'USERNAME_TAKEN',
+          message: 'That username is already taken.',
+        });
+      }
+      throw err;
+    }
+
+    return {
+      token: this.issueJwt(userid, dto.username),
+      user: { id: userid, username: dto.username },
+    };
   }
 
   /**
