@@ -122,14 +122,30 @@ and board a ship with a null display handle, and canon's `username()`
 (`GEFUNCS.C:2596`) is called throughout combat and sector messaging. This gate
 is what makes the nullable column safe and gets a direct test.
 
-Half-finished accounts squat an email address. That is housekeeping, not
-correctness; if it ever matters the midnight job can sweep username-less
-accounts older than a few days. Not built now.
+### Sweeping half-finished accounts
+
+An account that completes step 1 and never step 2 holds its email address
+forever. The midnight job therefore deletes any `User` with a non-null
+`passwordHash`, a **null username**, and `createdAt` older than **10 days**.
+
+All three conditions are load-bearing. `passwordHash IS NOT NULL` keeps the
+sweep away from the 24 Cybertron rows, whose usernames are also atypical. The
+null username is what marks the account as abandoned mid-signup: once step 2
+completes the row can never match again, so a real player is unreachable by
+this code regardless of age.
+
+Such a row owns no ships, planets or mail — those are only created after the
+player boards — so this is a plain delete with no cascade to reason about. The
+threshold is a named constant, `ABANDONED_SIGNUP_DAYS = 10`, alongside the
+existing `MAILDAYS`.
+
+Per the project's midnight rule the sweep must be idempotent: running it twice
+in one night deletes the same rows once and reports zero the second time.
 
 ## 4. Logout
 
 Added as **site chrome, not a game command** — an option on the ship-select
-screen and in the header on `/` and `/stats`. It clears the token, disconnects
+screen, and in the header on `/` and `/stats`. It clears the token, disconnects
 the socket, and routes to `/`.
 
 **It is deliberately not reachable from inside the live terminal.** Logging out
@@ -188,7 +204,10 @@ codes; login by email is case-insensitive; the constant-time path still runs
 bcrypt for an unknown email; `POST /auth/username` rejects a duplicate and a
 second call from an account that already has one; `WsAuthGuard` rejects a
 username-less token; `/public/stats` excludes Cybertrons and password-less
-rows; the cache serves a second call without re-querying.
+rows; the cache serves a second call without re-querying. The midnight sweep
+deletes an abandoned signup at 11 days, spares one at 9, spares a Cybertron of
+any age, spares a completed account of any age, and is idempotent across two
+runs.
 
 **Frontend.** Landing renders; `RequireAuth` redirects an anonymous visit to
 `/login`; an authenticated user without a username is redirected to
