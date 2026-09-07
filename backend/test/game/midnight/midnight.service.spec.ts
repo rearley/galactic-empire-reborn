@@ -13,10 +13,12 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { PrismaModule } from '../../../src/prisma/prisma.module';
 import { MidnightService } from '../../../src/game/midnight/midnight.service';
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
+import { ABANDONED_SIGNUP_DAYS } from '../../../src/game/midnight/midnight.constants';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PLTVCASH, PLTVDIV, MAIL_CLASS_PRODRPT } from '../../../src/game/midnight/midnight.constants';
 import { valuePlanet } from '../../../src/game/midnight/value-pl';
@@ -249,6 +251,38 @@ describe('US1 — score recalculation and rospos ranking', () => {
     const runs = await prisma.midnightRun.findMany();
     expect(runs).toHaveLength(1);
     expect(runs[0].durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('logs the abandoned-signup count AFTER the delete — the only unattended DELETE in the system must leave a record of what it removed', async () => {
+    // Finding 6 (final whole-branch review, 2026-09-07): phase 5's log line
+    // fired before the delete ran, with no count anywhere in it. Seed one
+    // signup old enough to be swept and confirm a log line names how many
+    // rows were actually purged.
+    await prisma.user.create({
+      data: {
+        userid: 'ghost_signup',
+        username: null,
+        passwordHash: 'hash',
+        email: 'ghost_signup@example.test',
+        createdAt: new Date(Date.now() - (ABANDONED_SIGNUP_DAYS + 1) * 86_400_000),
+        options: [],
+      },
+    });
+
+    const logSpy = jest.spyOn(Logger.prototype, 'log');
+
+    await service.run();
+
+    // Deliberately scoped to the phase-5 log line itself, not the final
+    // `midnight.complete` JSON summary (which already carries every counter,
+    // including this one, regardless of this fix) — otherwise this
+    // assertion would pass even against the old code.
+    const purgeLine = logSpy.mock.calls
+      .map((call) => String(call[0]))
+      .find((msg) => /^midnight: phase 5/.test(msg) && /purged/i.test(msg) && /\b1\b/.test(msg));
+    expect(purgeLine).toBeDefined();
+
+    logSpy.mockRestore();
   });
 
   it('silently skips planets with no matching User row', async () => {
