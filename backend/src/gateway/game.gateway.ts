@@ -1646,6 +1646,36 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         category: 'combat',
         text: formatMessage(MessageId.KILLEDBY, victimLabel, killerLabel),
       });
+    } else {
+      // DIED — the same announcement for a death no ship caused.
+      //
+      //     prfmsg(DIED,ptr->shipname,username(ptr));
+      //     outwar(ALWAYS,usrn,0);
+      //
+      // GEFUNCS.C:1262-1264, the `else` of the who-fired guard at :1104. A
+      // killer-less death is NOT silent in canon, which is what the port
+      // assumed: this covers a self-destruct, a gravity crash, and a colony's
+      // ion cannons, since `fireion` sets the victim's lastfired to -1
+      // (GEFUNCS.C:1797) and so takes this branch every time.
+      //
+      // Two differences from KILLEDBY, both canon's:
+      //   • the class is ALWAYS, not FILTER, so it reaches pilots who have
+      //     muted the galaxy feed (GEMAIN.C:2557-2561). Only the victim is
+      //     excluded, by outwar's own `usrn` argument.
+      //   • the subject is the SHIP name followed by `username()`, so an
+      //     automaton reads as "The X, Commanded by X" — canon's own output,
+      //     because username() returns the shipname for a CYBORG or DROID.
+      //
+      // The React client used to paper over this gap with a line of its own
+      // whose fallback printed the raw `Cybrg-NNN` userid — the internal
+      // account name username() exists to hide. @see GEFUNCS.C:2596-2604
+      const victimLabel = isAiUserid(event.victimUserid)
+        ? (victimShipName ?? event.victimUserid)
+        : (victimHandle ?? event.victimUserid);
+      this.server.except(`user:${event.victimUserid}`).emit('event.log', {
+        category: 'combat',
+        text: formatMessage(MessageId.DIED, victimShipName ?? victimLabel, victimLabel),
+      });
     }
 
     // The victor may capture the victim's colony list — one kill in six.

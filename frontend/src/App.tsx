@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LogEntry } from './types/logEntry';
+import { destructionLine } from './features/combat/destructionLine';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
@@ -234,29 +235,19 @@ function Terminal(): React.JSX.Element {
     };
 
     const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null; attackerName?: string | null }) => {
-      if (event.victimId === localShipId) {
-        appendLines([{ text: `** YOUR SHIP HAS BEEN DESTROYED! **`, category: 'combat' as const }]);
-      } else {
-        const victim = players.find(p => p.shipId === event.victimId)?.name ?? event.victimUserid;
-        // A planet's ion cannons leave no attacking ship — `fireion` sets the
-        // victim's lastfired to -1 — so `attackerId` is null and this used to
-        // fall through to "unknown", hiding the fact that someone's colony had
-        // defended itself. The server names the planet when it can.
-        const attacker = event.attackerId
-          ? shipName(event.attackerId)
-          : event.weapon === 'ion'
-            ? (event.attackerName ?? 'planetary defences')
-            : null;
-        // Some deaths genuinely have no killer — a gravity crash sets damage
-        // to 101 with no attacker (GEFUNCS.C:887), and a self-destruct has
-        // none by definition. Saying "destroyed by unknown" invented an
-        // assailant for a pilot who flew into a planet.
-        appendLines([{
-            text: attacker
-              ? `${victim} has been destroyed by ${attacker}!`
-              : `${victim} has been destroyed!`,
-            category: 'combat' as const,
-          }]);
+      // The server narrates deaths in canon's words now — KILLEDBY for a kill,
+      // DIED for a death nothing caused, YOURDEAD to the pilot who died — and
+      // all three arrive as ordinary event.log lines. Everything this handler
+      // used to compose was a SECOND line about the same death, and its
+      // fallback named the victim by userid, which for an automaton is the
+      // internal `Cybrg-NNN` account canon's username() hides.
+      // @see features/combat/destructionLine.ts
+      const victim = players.find(p => p.shipId === event.victimId)?.name
+        ?? shipName(event.victimId)
+        ?? 'A ship';
+      const line = destructionLine(event, victim);
+      if (line) {
+        appendLines([{ text: line, category: 'combat' as const }]);
       }
     };
 

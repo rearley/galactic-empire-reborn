@@ -134,10 +134,125 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     expect(excluded).toContain('user:usr_abc');
   });
 
-  it('says nothing when there is no killer — canon prints KILLEDBY inside the who-fired guard', () => {
+  it('does not use KILLEDBY when there is no killer — that is DIED\'s branch', () => {
     const texts = fire(event({
       attackerId: null, attackerShipKey: null, attackerUserid: null, attackerName: null, attackerChannel: -1,
     }));
     expect(texts.some((t) => t.includes('was destroyed by'))).toBe(false);
+  });
+});
+
+/**
+ * DIED — the OTHER half of canon's kill announcement.
+ *
+ * `killem` branches on whether a ship fired the fatal shot (GEFUNCS.C:1104):
+ *
+ *     if (who >= 0 && who < nships && who != usrn)   → KILLEDBY
+ *     else  prfmsg(DIED,ptr->shipname,username(ptr));
+ *           outwar(ALWAYS,usrn,0);                    (GEFUNCS.C:1262-1264)
+ *
+ * So a death with no killer is NOT silent — it is announced galaxy-wide, and
+ * with ALWAYS rather than FILTER, so it reaches even pilots who have muted the
+ * galaxy feed. That covers a self-destruct, a gravity crash, and a colony's ion
+ * cannons (fireion sets lastfired to -1, GEFUNCS.C:1797), which is every death
+ * that does not come from another ship.
+ *
+ * The port emitted nothing here. The React client filled the silence with a
+ * line of its own whose fallback printed `event.victimUserid` — the internal
+ * `Cybrg-NNN` account name that canon's `username()` exists precisely to hide.
+ * Reported from play: "Cybrg-222 has been destroyed!", a name no pilot should
+ * ever see.
+ */
+describe('GameGateway — DIED, the killer-less death', () => {
+  const build = () => {
+    const globalEmits: Array<{ event: string; payload: unknown }> = [];
+    const shipStateService = {
+      findAllShips: () => [{ userid: 'usr_muted', shipno: 1, msgFilter: true }],
+      findByUserid: () => [],
+      removeFromGame: jest.fn(),
+      get: (userid: string, shipno: number) => {
+        if (userid === 'Cybrg-222' && shipno === 1) return { userid, shipno, shipname: 'Cyberquad 44135', status: 2 } as never;
+        if (userid === 'usr_abc' && shipno === 2) return { userid, shipno, shipname: 'Defiant', status: 1 } as never;
+        return undefined;
+      },
+    } as unknown as ShipStateService;
+
+    const gateway = new GameGateway(
+      shipStateService,
+      { dispatch: jest.fn() } as unknown as CommandRouterService,
+      new ConnectedShipsRegistry(shipStateService),
+      { validate: jest.fn() } as unknown as WsAuthGuard,
+      { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
+      {} as unknown as OnboardingService,
+      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      { getTypeName: jest.fn() } as never,
+      mockRandom,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
+    );
+    const excluded: string[] = [];
+    (gateway as unknown as { server: unknown }).server = {
+      emit: (event: string, payload: unknown) => { globalEmits.push({ event, payload }); },
+      except: (rooms: string | string[]) => ({
+        emit: (event: string, payload: unknown) => {
+          excluded.push(...(Array.isArray(rooms) ? rooms : [rooms]));
+          globalEmits.push({ event, payload });
+        },
+      }),
+      to: () => ({ emit: () => undefined }),
+      sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
+    };
+    return { gateway, globalEmits, excluded };
+  };
+
+  const fire = (over: Partial<CombatShipDestroyedEvent>) => {
+    const { gateway, globalEmits, excluded } = build();
+    (gateway as unknown as { handleCombatShipDestroyed: (e: unknown) => void })
+      .handleCombatShipDestroyed({
+        victimId: 'Cybrg-222:1',
+        attackerId: null,
+        victimShipKey: 'Cybrg-222:1',
+        attackerShipKey: null,
+        victimUserid: 'Cybrg-222',
+        attackerUserid: null,
+        attackerName: null,
+        attackerChannel: -1,
+        weapon: null,
+        sector: { x: 6, y: 9 },
+        tickAt: new Date(),
+        loot: [],
+        scoreAwarded: 0,
+        ...over,
+      });
+    return {
+      texts: globalEmits.filter((g) => g.event === 'event.log')
+        .map((g) => (g.payload as { text: string }).text),
+      excluded,
+    };
+  };
+
+  it('announces an AI death by SHIP name, never by the Cybrg-NNN account', () => {
+    const joined = fire({}).texts.join('\n');
+    expect(joined).toContain('The Cyberquad 44135, Commanded by Cyberquad 44135 has been destroyed!!!');
+    expect(joined).not.toContain('Cybrg-222');
+  });
+
+  it('names a human by userid, as username() does for a non-automaton', () => {
+    const joined = fire({
+      victimId: 'usr_abc:2', victimShipKey: 'usr_abc:2', victimUserid: 'usr_abc',
+    }).texts.join('\n');
+    expect(joined).toContain('The Defiant, Commanded by usr_abc has been destroyed!!!');
+  });
+
+  it('reaches pilots who muted the galaxy feed — canon sends this one ALWAYS', () => {
+    // outwar(ALWAYS,...) bypasses the MSG_FILTER check that outwar(FILTER,...)
+    // honours. @see GEMAIN.C:2557-2567. Only the victim is excluded.
+    const { excluded } = fire({});
+    expect(excluded).not.toContain('user:usr_muted');
+    expect(excluded).toContain('user:Cybrg-222');
+  });
+
+  it('announces an ion-cannon kill, which has no attacking ship', () => {
+    expect(fire({ weapon: 'ion', attackerName: 'New Ceylon' }).texts.join('\n'))
+      .toContain('has been destroyed!!!');
   });
 });

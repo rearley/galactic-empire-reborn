@@ -597,6 +597,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
       to: jest.fn(() => ({ emit: jest.fn() })),
+      except: jest.fn(() => ({ emit: jest.fn() })),
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };
