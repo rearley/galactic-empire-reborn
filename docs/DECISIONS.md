@@ -4485,3 +4485,23 @@ small.
 
 **Tests:** `test/gateway/ship-loss-forensics.spec.ts` — fittings, cargo, cause,
 the closed-tab-versus-dropped-connection distinction, and the degraded path.
+
+## 2026-09-08 — A burst of log lines is not a scroll gesture
+**Context:** Playtest: "↓ jump to latest" flashed on during combat without the
+reader touching the log, and once stayed on, forcing a click to resume
+following.
+**Decision:** `EventLog` records the scroll position it writes itself (read back
+after the write, so it is the browser's clamped value) and ignores any scroll
+event still reporting that exact position.
+**Reason:** The scroll event for a programmatic write is dispatched in the NEXT
+frame's scroll steps, before that frame's rAF callbacks. A burst arriving in
+between grows `scrollHeight` while `scrollTop` still holds what we wrote, so
+distance-from-bottom reads the growth as reader movement. Whether that showed as
+a flicker or a stuck log depended on a race: the effect cleanup calls
+`cancelAnimationFrame` when sticky flips, so if the pending rAF had already
+fired the log recovered on the next event, and if the cleanup won it stopped
+following for good. One cause, two symptoms.
+**Alternatives rejected:** Raising `STICKY_THRESHOLD` again — the growth in one
+frame is unbounded during combat, so no fixed pixel tolerance is safe, and a
+larger one erodes the genuine scroll-up it exists to detect. Debouncing the
+handler — it would delay the reader's real gesture to paper over ours.
