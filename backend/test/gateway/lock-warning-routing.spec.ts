@@ -203,3 +203,94 @@ describe('helm narration routing (GEFUNCS.C:498, :528)', () => {
     expect(String((emits[0].payload as { text: string }).text)).toContain('3000');
   });
 });
+
+/**
+ * The letter is resolved from the VICTIM's scan table at delivery, not
+ * synthesised by whoever fired.
+ *
+ * Canon's `shpltr(usrn, ship)` (GEFUNCS.C:2578) walks `scantab[usrn]` looking
+ * for `ship`, and returns '?' when it is not there. The letter is therefore a
+ * fact about what the VICTIM has scanned — it is not a property of the
+ * attacker, and it does not exist until the victim runs `sca lo`.
+ *
+ * Found in play: a Base Star's torpedo warning said "Incoming torpedo from
+ * ship R", and `sca sh R` answered "No ship assigned letter R" because the
+ * pilot's scan table had no R in it. The Cybertron path was computing
+ * `String.fromCharCode(65 + channel % 26)` — a letter derived from the
+ * ATTACKER's channel number, which is not related to the victim's table at
+ * all. Two ways for that to be wrong: it names a letter the victim has never
+ * seen, or — worse — it names one that in the victim's table belongs to some
+ * OTHER ship, sending them to shoot at a bystander.
+ */
+describe('the attacker letter comes from the victim\'s scan table', () => {
+  function buildWithScan(scantab: Array<{ shipKey: string; letter: string }>) {
+    const emits: Emit[] = [];
+    const gateway = new GameGateway(
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+      {} as never,
+      { lettersFor: () => scantab } as never,
+      {} as never, {} as never,
+      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
+    );
+    const chain = (rooms: string[]) => ({
+      to: (r: string) => chain([...rooms, r]),
+      emit: (event: string, payload: unknown) => { emits.push({ rooms, event, payload }); },
+    });
+    (gateway as unknown as { server: unknown }).server = { to: (r: string) => chain([r]) };
+    return { gateway, emits };
+  }
+
+  it('uses the letter the victim has assigned to that attacker', () => {
+    const { gateway, emits } = buildWithScan([{ shipKey: 'Cybrg-9:9', letter: 'C' }]);
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      attackerId: 'Cybrg-9:9',
+      kind: 'torpedo-launched',
+      attackerLetter: 'Z', // whatever the emitter guessed is not consulted
+      tickAt: new Date('2026-09-08T12:00:00Z'),
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.TORP_INBOUND, 'C'),
+    });
+  });
+
+  it("says '?' when the victim has never scanned the attacker", () => {
+    // The reported bug. An unscanned attacker has no letter, and canon's
+    // shpltr says so rather than inventing one.
+    const { gateway, emits } = buildWithScan([]);
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      attackerId: 'Cybrg-9:9',
+      kind: 'torpedo-launched',
+      attackerLetter: 'R',
+      tickAt: new Date('2026-09-08T12:00:00Z'),
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.TORP_INBOUND, '?'),
+    });
+  });
+
+  it('leaves the emitter-supplied letter alone when there is no attackerId', () => {
+    // TORP1/MISSL1 carry no attacker at all — canon does not say who fired the
+    // thing tracking you — and `scanners-jammed` has no single firer either.
+    const { gateway, emits } = buildWithScan([{ shipKey: 'other:1', letter: 'A' }]);
+
+    fire(gateway, {
+      victimId: 'usr_victim:1',
+      kind: 'torpedo-inbound',
+      attackerLetter: '',
+      tickAt: new Date('2026-09-08T12:00:00Z'),
+    });
+
+    expect(emits[0].payload).toEqual({
+      category: 'combat',
+      text: formatMessage(MessageId.TORP_TRACKING, ''),
+    });
+  });
+});

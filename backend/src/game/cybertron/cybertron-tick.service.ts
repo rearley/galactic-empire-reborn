@@ -847,10 +847,17 @@ export class CybertronTickService implements OnModuleInit {
       this.events.emit(COMBAT_TARGET_WARNING, {
         victimId: shipKey(target.userid, target.shipno),
         attackerId: shipKey(ship.userid, ship.shipno),
-        attackerLetter: String.fromCharCode(65 + ((ship.channel ?? 0) % 26)),
+        // NOT computed here. This used to be
+        // `String.fromCharCode(65 + (ship.channel % 26))` — a letter derived
+        // from the ATTACKER's channel, which has nothing to do with the
+        // victim's scan table. It named ships the pilot had never scanned, and
+        // could have named a letter belonging to one of their other contacts.
+        // The gateway resolves it from `attackerId` against the victim's own
+        // scantab, as canon's shpltr does. @see GEFUNCS.C:2578
+        attackerLetter: '',
         kind: 'torpedo-launched',
         tickAt: new Date(),
-      } as CombatTargetWarningEvent);
+      } satisfies CombatTargetWarningEvent);
     }
   }
 

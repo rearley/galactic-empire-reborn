@@ -182,9 +182,28 @@ export interface CombatTargetWarningEvent {
     // burst reaches. @see GECMDS.C:1645
     | 'scanners-jammed';
   /**
+   * `${userid}:${shipno}` of the firer, when there is one.
+   *
+   * PREFER THIS over `attackerLetter`. The gateway resolves the letter from
+   * the VICTIM's scan table at delivery, because that is where the letter
+   * actually lives: canon's `shpltr(usrn, ship)` walks `scantab[usrn]` and
+   * returns '?' when the ship is not in it (GEFUNCS.C:2578). A letter is a
+   * fact about what the victim has scanned, not a property of the attacker,
+   * and it does not exist at all until they run `sca lo`.
+   *
+   * Absent for alerts with no single firer — TORP1/MISSL1 in flight, and the
+   * jammer burst.
+   */
+  attackerId?: string;
+  /**
    * The firer's scan letter as the victim sees it, canon's `%c`. Empty for the
    * in-flight alerts: TORP1 and MISSL1 take no argument — canon does not tell
    * you who fired the thing that is tracking you, only that it is.
+   *
+   * Only consulted when `attackerId` is absent. An emitter that knows the
+   * attacker should set `attackerId` and leave this empty rather than
+   * computing a letter itself — every emitter that tried got it wrong, because
+   * the emitter does not know what the victim has scanned.
    */
   attackerLetter: string;
   tickAt: Date;
