@@ -97,7 +97,10 @@ export function Landing(): React.JSX.Element {
           </p>
           <p className="mt-4 text-sm leading-relaxed text-gray-400">
             It takes about five minutes to learn and a long time to get good at, which was rather
-            the point in 1988.
+            the point in 1988. The{' '}
+            <Link to="/guide" className="text-yellow-400 hover:underline">player&apos;s guide</Link>{' '}
+            has the original&apos;s own documentation for every command, and says where this port
+            differs.
           </p>
         </section>
 
