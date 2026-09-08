@@ -133,6 +133,21 @@ export interface CombatShipDestroyedEvent {
   sector: { x: number; y: number };
   tickAt: Date;
   /** Items looted from victim — GEFUNCS.C:killem (1122-1136). Empty when no attacker or no transfer. */
+  /**
+   * Why the victim's socket closed, when the death came from the disconnect
+   * path — Socket.io's own reason string, verbatim.
+   *
+   * This is the ONLY thing that separates a rage-quit from bad luck, and the
+   * two are treated identically by the kill itself (both sit in
+   * CLIENT_SIDE_REASONS). 'client namespace disconnect' means the pilot closed
+   * the tab; 'ping timeout' and 'transport close' mean their connection died
+   * under them — a deploy, a flaky network, a laptop lid. A sysop asked to
+   * make someone whole needs to tell those apart, and the distinction is known
+   * for exactly one line before it would otherwise be discarded.
+   *
+   * Absent for every other cause of death.
+   */
+  victimDisconnectReason?: string;
   loot: Array<{ itemIndex: number; amount: bigint }>;
   /**
    * The victim's ship name and class, for the killer's salvage report:

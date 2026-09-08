@@ -168,8 +168,13 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     // trace at all: the hull row was deleted and noships decremented in
     // silence, so there was no way to tell a legitimate combat death from a
     // bug. The victim/attacker line is the record.
+    //
+    // WARN rather than LOG since 2026-09-08: the line now carries the full
+    // manifest of what was lost, and it is what a sysop greps for months later
+    // when asked to make someone whole — so it must survive a log level that
+    // filters routine chatter. @see test/gateway/ship-loss-forensics.spec.ts
     gateway = buildGateway(1);
-    const logSpy = jest.spyOn((gateway as unknown as { logger: { log: (m: string) => void } }).logger, 'log');
+    const logSpy = jest.spyOn((gateway as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn');
 
     gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
     await new Promise((r) => setImmediate(r));
