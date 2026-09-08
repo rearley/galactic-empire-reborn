@@ -16,6 +16,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CYBERTRON_CLASS_DEFAULTS } from '../../../src/game/cybertron/cybertron.config';
 
+/** Total AI hulls the config asks for, whatever the galaxy size scales it to. */
+function expectedTotal(): number {
+  return Object.values(CYBERTRON_CLASS_DEFAULTS)
+    .reduce((sum, cfg) => sum + cfg.tot_to_create, 0);
+}
+
 // ─── Minimal AI ship factory ──────────────────────────────────────────────────
 
 function makeAiShip(
@@ -155,35 +161,41 @@ describe('Boot-seed (Plan 2 T3) — onModuleInit fills Cybertron population at s
     // Act
     await svc.onModuleInit();
 
-    // Assert: all classes filled to tot_to_create (21:10, 22:5, 23:1, 24:6, 25:2 = 24)
-    expect(spawnCountForClass(21)).toBe(10);
-    expect(spawnCountForClass(22)).toBe(5);
-    expect(spawnCountForClass(23)).toBe(1);
-    expect(spawnCountForClass(24)).toBe(6);
-    expect(spawnCountForClass(25)).toBe(2);
-    expect(totalSpawns()).toBe(24);
+    // Assert: every class filled to ITS OWN tot_to_create, read from the config
+    // rather than transcribed. These used to be the literals 10/5/1/6/2 = 24,
+    // canon's counts, which made a boot-seeding test fail whenever the
+    // POPULATION was retuned — a fact about the galaxy's size, not about
+    // whether onModuleInit tops up correctly. The actual numbers are pinned in
+    // test/unit/cyb-population.spec.ts, which is where that belongs.
+    for (const [cls, cfg] of Object.entries(CYBERTRON_CLASS_DEFAULTS)) {
+      expect(spawnCountForClass(Number(cls))).toBe(cfg.tot_to_create);
+    }
+    expect(totalSpawns()).toBe(expectedTotal());
   });
 
   it('tops up only the deficit when some Cybertrons already exist', async () => {
     // Arrange: 3 class-21 ships already present in memory (simulates partial-hydration)
     delete process.env.CYBERTRON_BOOT_SEED;
-    const existing = [
-      { userid: 'Cybrg-200', shipno: 200, shpclass: 21 },
-      { userid: 'Cybrg-201', shipno: 201, shpclass: 21 },
-      { userid: 'Cybrg-202', shipno: 202, shpclass: 21 },
-    ];
+    // Sized from the cap, not fixed at 3: with class 21 scaled down to 3 hulls
+    // a hardcoded 3 is a FULL class, and "top up only the deficit" stops being
+    // the thing under test. One short of capacity always leaves exactly one.
+    const existing = Array.from(
+      { length: Math.max(0, CYBERTRON_CLASS_DEFAULTS[21].tot_to_create - 1) },
+      (_, i) => ({ userid: `Cybrg-${200 + i}`, shipno: 200 + i, shpclass: 21 }),
+    );
     const { svc, spawnCountForClass, totalSpawns } = buildHarness(2, existing);
 
     // Act
     await svc.onModuleInit();
 
-    // Assert: class 21 topped up by deficit only (10 - 3 = 7), others fully seeded
-    expect(spawnCountForClass(21)).toBe(7);
-    expect(spawnCountForClass(22)).toBe(5);
-    expect(spawnCountForClass(23)).toBe(1);
-    expect(spawnCountForClass(24)).toBe(6);
-    expect(spawnCountForClass(25)).toBe(2);
-    expect(totalSpawns()).toBe(21); // 7+5+1+6+2
+    // Assert: class 21 topped up by its DEFICIT only, every other class filled.
+    const deficit21 = CYBERTRON_CLASS_DEFAULTS[21].tot_to_create - existing.length;
+    expect(spawnCountForClass(21)).toBe(deficit21);
+    for (const [cls, cfg] of Object.entries(CYBERTRON_CLASS_DEFAULTS)) {
+      if (Number(cls) === 21) continue;
+      expect(spawnCountForClass(Number(cls))).toBe(cfg.tot_to_create);
+    }
+    expect(totalSpawns()).toBe(expectedTotal() - existing.length);
   });
 
   it('does nothing when CYBERTRON_BOOT_SEED is disabled', async () => {

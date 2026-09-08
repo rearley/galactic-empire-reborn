@@ -15,7 +15,8 @@
  * @see specs/007-cybertron-ai/plan.md R-6 (config split rationale)
  */
 
-import { CYBGOLD, TOOCLOSE } from '../constants';
+import { CYBGOLD, HYPDST1, HYPDST2, TOOCLOSE, UNIVMAX } from '../constants';
+import { CANON_TOT_TO_CREATE, scaleAiPopulation } from './cyb-population';
 export interface CybertronClassConfig {
   /** How many of this class should exist at steady state. @see GECYBS.C tot_to_create */
   tot_to_create: number;
@@ -38,13 +39,26 @@ export interface CybertronClassConfig {
  * @see GECYBS.C — global tooclose, hyperdist1, hyperdist2, cyb_gold read from config at boot
  * @see reference/wiki/cpu-ships.md — Make column = tot_to_create; hyperwarp >25 / brake <10
  */
-export const CYBERTRON_CLASS_DEFAULTS: Record<number, CybertronClassConfig> = {
-  21: { tot_to_create: 10, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
-  22: { tot_to_create: 5, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
-  23: { tot_to_create: 1, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
-  24: { tot_to_create: 6, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
-  25: { tot_to_create: 2, tooclose: TOOCLOSE, hyperdist1: 25, hyperdist2: 10, cyb_gold: CYBGOLD },
-};
+export const CYBERTRON_CLASS_DEFAULTS: Record<number, CybertronClassConfig> =
+  Object.fromEntries(
+    Object.entries(CANON_TOT_TO_CREATE).map(([cls, canonCount]) => [
+      Number(cls),
+      {
+        // Canon's count, scaled to the galaxy we actually run. A no-op at
+        // canon's UNIVMAX 300. @see ./cyb-population.ts for why this exists
+        // and why it scales linearly rather than by area.
+        tot_to_create: scaleAiPopulation(canonCount, UNIVMAX),
+        tooclose: TOOCLOSE,
+        // HYPDST1/HYPDST2 were hardcoded here as 25 and 10 — canon's values,
+        // so behaviour was right, but the sysop options of the same name had
+        // no consumer and tuning them did nothing. Now read from the option
+        // table like every other setting.
+        hyperdist1: HYPDST1,
+        hyperdist2: HYPDST2,
+        cyb_gold: CYBGOLD,
+      },
+    ]),
+  ) as Record<number, CybertronClassConfig>;
 
 /**
  * Build the resolved config for all AI classes, merging env overrides with defaults.

@@ -3709,3 +3709,38 @@ real usage line). Sweeping those would mean adopting canon's SHAPE, not its
 words, and is a separate decision nobody has taken. Also still open: eight
 sysop options remain `implemented: false`, and retiring `/debug/*` needs four
 Playwright specs migrated onto `sys` first.
+
+## 2026-09-08 — AI population follows the galaxy; two dead options wired
+
+**Completed:** `tot_to_create` now scales with `UNIVMAX` instead of sitting at
+canon's fixed 24. At our deployed 100 that is 9 Cybertrons (3/2/1/2/1); at
+canon's 300 it is a no-op and gives canon's 24 back. Also wired `HYPDST1` and
+`HYPDST2`, previously hard-coded at their canon values so behaviour was right
+but the sysop options were dead.
+
+The finding behind it: every per-kill number in the economy is canon-exact —
+verified against `GEFUNCS.C`, `GECMDS.C`, `GECYBS.C` and `GEDROIDS.C`,
+including that canon's on-kill cash grab is commented out and that only the
+Murdonian carries gold among droids. What was NOT canon was how often you meet
+a Cybertron: canon's fixed 24 hulls in our eighth-sized galaxy is ~9x canon's
+density, and since Cybertrons are where the gold is, that made credits-per-hour
+~9x canon. See `docs/DECISIONS.md` for the arithmetic and why scaling is linear
+rather than by area.
+
+**Tests:** `test/unit/cyb-population.spec.ts` (4 new). Two existing cybertron
+specs were decoupled from the population numbers — they had hardcoded canon's
+counts as fixtures while reading the live config for caps, so a retune failed
+tests that were about boot-seeding and class selection, not about tuning.
+
+**Decisions made:** droid population deliberately left unscaled — ephemeral,
+capped at 2 per class, gold-poor by canon, and they are the low-value target
+supply a new pilot needs. Five sysop options stay `implemented: false` on
+purpose; each configures something a web port has no equivalent for, and
+`NUMSHIPS` in particular only sizes a C array with no runtime gate behind it.
+
+**Next:** nothing outstanding from this pass.
+
+**Known issues:** the ~90 port-original strings (usage lines, table headers)
+stay as they are — reviewed and kept, since ours carry more than canon's
+"Type HELP X for the correct usage". Still open from before: retiring
+`/debug/*` needs four Playwright specs migrated onto `sys` first.

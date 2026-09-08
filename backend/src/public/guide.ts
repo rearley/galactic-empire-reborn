@@ -51,7 +51,12 @@ export interface Guide {
 export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze({
   'the-galaxy':
     'This galaxy is 201 sectors square. The original shipped 601. Scan ranges are ' +
-    'absolute, so a smaller map means you find people rather than drift past them.',
+    'absolute, so a smaller map means you find people rather than drift past them. ' +
+    'The Cybertron population is scaled down to match: the original put 24 of them ' +
+    'in its larger galaxy and we run 9, so you meet one about as often as a pilot ' +
+    'did in 1992. Left at 24 they would have been nine times thicker on the ground, ' +
+    'and since a Cybertron is where the gold is, the run to a Dreadnought would have ' +
+    'been nine times shorter than the original ever intended.',
   planets:
     'Colonists eat here. The original fed only troops, which let a colony grow ' +
     'forever on nothing — feed a planet or watch it starve.',

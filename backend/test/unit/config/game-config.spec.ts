@@ -120,9 +120,16 @@ describe('loadGameConfig', () => {
       .filter(([, s]) => !s.implemented)
       .map(([n]) => n)
       .sort();
+    // HYPDST1/HYPDST2 left this list on 2026-09-08. They were the subtlest
+    // kind of dead option: cybertron.config.ts hard-coded 25 and 10, which are
+    // canon's own values, so no behaviour was ever wrong and nothing a player
+    // could see would have exposed them. They simply did not respond to being
+    // set. The five that remain are not fixable — each configures something a
+    // web port has no equivalent for, and NUMSHIPS only SIZES a C array
+    // (`nships = nterms + numships`) with no runtime gate behind it, so
+    // "implementing" it would mean inventing a limit canon does not have.
     expect(unwired).toEqual([
-      'FREEBIES', 'HYPDST1', 'HYPDST2', 'MAXPLREC',
-      'NUMSHIPS', 'S00PLNUM', 'SHOWOPT',
+      'FREEBIES', 'MAXPLREC', 'NUMSHIPS', 'S00PLNUM', 'SHOWOPT',
     ]);
   });
 

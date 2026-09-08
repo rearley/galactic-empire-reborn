@@ -21,6 +21,7 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired](#2026-09-08--ai-population-scales-with-univmax-hypdst1hypdst2-wired)
 - [2026-09-08 — Eight surviving hand-written lines go back to canon, even where ours said more](#2026-09-08--eight-surviving-hand-written-lines-go-back-to-canon-even-where-ours-said-more)
 - [2026-09-05 — Invented text is replaced with canon; a branch canon lacks is deleted, not reworded](#2026-09-05--invented-text-is-replaced-with-canon-a-branch-canon-lacks-is-deleted-not-reworded)
 - [2026-09-05 — Midnight maintenance runs on a named game timezone, not the host's](#2026-09-05--midnight-maintenance-runs-on-a-named-game-timezone-not-the-hosts)
@@ -4250,3 +4251,78 @@ player can falsify in one session costs more than the hedge saves.
 `CANON_MESSAGES` byte for byte. Five existing tests asserted the old wording
 and were corrected, not exempted — a test that encodes a deviation from canon
 is wrong.
+
+## 2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired
+
+**Context:** a review of whether the economy can be short-circuited — "come in,
+take a few kills, own the best hull." Every per-kill number was checked against
+the C and all of them are exact:
+
+- canon's cash-grab on a kill is COMMENTED OUT (`GEFUNCS.C:1137-1140`); we
+  correctly do not do it;
+- cash moves player-to-player only, at `CHGLOSER` 2%, both sides human;
+- kills pay in ITEMS, divided by `rnd()%5+1`, men and troops excluded,
+  weight-gated by `chkweight`;
+- Cybertron gold is `rnd()%1200`, gold sells at 1000 cr less a `1+doll/1000`
+  fee, and among droids only the Murdonian carries any (`rnd()%250`).
+
+Expected value per kill therefore runs ~2,400 cr for a Vakory or a Scow,
+~62,000 for a Murdonian, ~275,000 for a Cybertron. And `GECMDS.C:4568` gates a
+hull purchase on CASH ALONE — no score gate, no kill gate. So canon really does
+let ~7 Cybertron kills buy a 2,000,000 cr Dreadnought. That is the original's
+design: the only brake is that the gold sits on things that can kill you.
+
+**The problem was not the payout. It was the density.** `tot_to_create` is a
+fixed per-class count in `GECYBS.C` — 24 hulls in total — and canon never
+scales it to the size of the galaxy. Canon puts those 24 in 601x601 = 361,201
+sectors. We deploy `UNIVMAX` at 100, which is 201x201 = 40,401 sectors: the
+same 24 hulls in an eighth of the area, so roughly NINE TIMES canon's density.
+With per-kill economics canon-exact, credits-per-hour was ~9x canon and the run
+to a Dreadnought ~9x shorter than 1992 ever allowed.
+
+This deviation was never chosen. It fell out of the `UNIVMAX` one, and it is
+the single biggest reason the economy would feel unlike the original.
+
+**Decision:** `tot_to_create` now scales LINEARLY with `UNIVMAX`, floored at one
+hull per class — `scaleAiPopulation` in `src/game/cybertron/cyb-population.ts`.
+At our 100 that gives 3/2/1/2/1 = **9 Cybertrons**. At canon's 300 it is a
+no-op and restores 10/5/1/6/2 = 24 exactly.
+
+Also wired `HYPDST1` and `HYPDST2`, which `cybertron.config.ts` hard-coded as
+25 and 10. Those are canon's values, so behaviour never diverged — but the
+sysop options of the same name had no consumer: they appeared in `sys`, clamped
+correctly, reported at boot, and changed nothing. A setting that looks live and
+is not is worse than one that is absent. Five options remain
+`implemented: false` and should stay that way; each configures something a web
+port does not have (`FREEBIES`, `SHOWOPT`, `MAXPLREC`, `S00PLNUM`) or, in
+`NUMSHIPS`' case, only SIZES a C array with no runtime gate behind it —
+implementing it would be an invention, not a port.
+
+**Reason for LINEAR rather than by area:** area is the honest model of density,
+but 24 x (100/300)^2 is under 3 hulls, which empties the galaxy of the thing
+players are meant to hunt. Linear keeps 9 — inside the range that felt right —
+and is still a no-op at canon's size, so raising `UNIVMAX` for a busier server
+later moves the population on its own with canon's numbers restored the moment
+the galaxy is canon's size again. That property is the point: the next person
+to change `UNIVMAX` does not have to remember this file exists.
+
+**Droid population is deliberately NOT scaled.** Droids are ephemeral, capped at
+`DROID_MAX_PER_CLASS` (2 each, 6 live), and canon gives gold to the Murdonian
+alone — the Vakory and the Scow carry none. They are the low-value target
+supply. Thinning them would leave a new pilot with nothing to shoot, and their
+being gold-poor is exactly what makes planets worth developing instead.
+
+**Alternatives rejected:**
+- *Scale by area.* Under 3 Cybertrons. Correct model, unplayable result.
+- *Pick a flat 9 and hardcode it.* Same numbers today, but it silently becomes
+  wrong the next time `UNIVMAX` moves, which is the failure this whole entry is
+  about.
+- *Cut the per-kill gold instead.* That breaks canon-exact economics to
+  compensate for a density problem — fixing the wrong variable, and it would
+  have made the Murdonian and the planet economy wrong too.
+
+**Tests:** `test/unit/cyb-population.spec.ts` pins the scaling (canon-exact at
+300, 9 at 100, never zero for a class canon populates, scales back up). Two
+older cybertron specs hardcoded canon's counts as fixtures while reading the
+live config for caps; they now derive from the config, so a retune cannot fail
+a test about boot-seeding or class selection.

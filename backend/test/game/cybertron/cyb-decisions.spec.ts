@@ -16,6 +16,7 @@ import {
   randomCybSkill,
 } from '../../../src/game/cybertron/cyb-decisions';
 import { CYBERTRON_CLASS_DEFAULTS } from '../../../src/game/cybertron/cybertron.config';
+import { CANON_TOT_TO_CREATE } from '../../../src/game/cybertron/cyb-population';
 import {
   CYB_BE_NICE,
   CYB_BE_EASY,
@@ -28,6 +29,25 @@ function seeded(seed: number): Mulberry32Adapter {
   return new Mulberry32Adapter(seed);
 }
 
+/**
+ * A capacity table for the selection tests, built from CANON's counts rather
+ * than the deployed ones.
+ *
+ * These tests exercise pickSpawnClass's LOGIC — does it skip a full class,
+ * does it find one with room — and they used to read the live
+ * CYBERTRON_CLASS_DEFAULTS while hardcoding {21:10, 22:5, ...} as the fixture
+ * counts. That coupled them to a tuning number: the moment tot_to_create
+ * started scaling with UNIVMAX the fixtures sat above the new caps and the
+ * tests failed for a reason that had nothing to do with the function.
+ * @see src/game/cybertron/cyb-population.ts
+ */
+const CANON_CAPS = Object.fromEntries(
+  Object.entries(CANON_TOT_TO_CREATE).map(([cls, n]) => [
+    Number(cls),
+    { ...CYBERTRON_CLASS_DEFAULTS[Number(cls)], tot_to_create: n },
+  ]),
+) as typeof CYBERTRON_CLASS_DEFAULTS;
+
 // ─── T013: pickSpawnClass + randomInitLoadout ──────────────────────────────
 
 describe('pickSpawnClass (T013)', () => {
@@ -38,7 +58,7 @@ describe('pickSpawnClass (T013)', () => {
     // We call 1000 times; all should return null (only 1% branch could fire but pick an "over-cap" class)
     let nonNulls = 0;
     for (let i = 0; i < 1000; i++) {
-      const r = pickSpawnClass(counts, CYBERTRON_CLASS_DEFAULTS, new Mulberry32Adapter(i));
+      const r = pickSpawnClass(counts, CANON_CAPS, new Mulberry32Adapter(i));
       if (r !== null) nonNulls++;
     }
     // 1% random-class branch can return any class even at cap, so ~10 of 1000 might be non-null
@@ -51,8 +71,8 @@ describe('pickSpawnClass (T013)', () => {
     // Run multiple times to get the normal branch
     let found: number | null = null;
     for (let i = 0; i < 100 && found === null; i++) {
-      const r = pickSpawnClass(counts, CYBERTRON_CLASS_DEFAULTS, new Mulberry32Adapter(i * 7 + 100));
-      if (r !== null && (counts.get(r) ?? 0) < CYBERTRON_CLASS_DEFAULTS[r].tot_to_create) {
+      const r = pickSpawnClass(counts, CANON_CAPS, new Mulberry32Adapter(i * 7 + 100));
+      if (r !== null && (counts.get(r) ?? 0) < CANON_CAPS[r].tot_to_create) {
         found = r;
       }
     }
@@ -64,7 +84,7 @@ describe('pickSpawnClass (T013)', () => {
     // Count how often we get non-null (all from random branch since caps are full)
     let fires = 0;
     for (let i = 0; i < 10000; i++) {
-      const r = pickSpawnClass(counts, CYBERTRON_CLASS_DEFAULTS, new Mulberry32Adapter(i));
+      const r = pickSpawnClass(counts, CANON_CAPS, new Mulberry32Adapter(i));
       if (r !== null) fires++;
     }
     // Expect ~1% = 100 ± some variance, allow 0.4%–2%
