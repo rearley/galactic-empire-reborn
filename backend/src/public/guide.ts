@@ -55,9 +55,6 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
   planets:
     'Colonists eat here. The original fed only troops, which let a colony grow ' +
     'forever on nothing — feed a planet or watch it starve.',
-  scoring:
-    'A kill transfers the whole of the loser\'s score. The original transferred 35 ' +
-    'percent. Deliberate, and recorded in the project decision log.',
   set:
     'Function keys are typed rather than pressed — `fset f1 pha 0 0`, then `f1` — ' +
     'because a browser will not give up F11 or F12.',

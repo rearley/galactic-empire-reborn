@@ -28,12 +28,16 @@ describe('scoreF2 is SCRFACT, not a second opinion', () => {
     expect(scoreF2).toBe(SCRFACT);
   });
 
-  it('deploys at 100 — a declared deviation from canon 35', async () => {
-    // config/game.config.json carries SCRFACT: 100. If that entry is ever
-    // removed this drops to canon's 35 and every kill's score transfer changes,
-    // so the deployed value is asserted rather than assumed.
+  it('deploys at canon 35', async () => {
+    // Was 100 for a day, as a declared deviation — but nobody had ever CHOSEN
+    // 100. It was an artefact of score.config.ts hardcoding its own default
+    // while SCRFACT sat in the option table marked unimplemented. Once that was
+    // understood, and while the public galaxy still had no scores in it, it
+    // went back to canon: MBMGEMSG.MSG:472 "Factor points to deduct from
+    // loser: 35". Asserted rather than assumed, because a silent change here
+    // revalues every kill in the game.
     const { scoreF2 } = await import('../../../src/game/player/score.config');
-    expect(scoreF2).toBe(100);
+    expect(scoreF2).toBe(35);
   });
 });
 

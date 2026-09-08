@@ -106,6 +106,7 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-09-07 — The roster query is extracted from `ros`, not from `rank-roster.ts`](#2026-09-07-the-roster-query-is-extracted-from-ros-not-from-rank-rosterts)
 - [2026-09-07 — The 10-day abandoned-signup sweep is PORT-ORIGINAL](#2026-09-07-the-10-day-abandoned-signup-sweep-is-port-original)
 - [2026-09-07 — `SCRFACT` is wired and kept at 100, a declared deviation from canon 35](#2026-09-07-scrfact-is-wired-and-kept-at-100-a-declared-deviation-from-canon-35)
+- [2026-09-08 — `SCRFACT` returns to canon 35 (AMENDS 2026-09-07)](#2026-09-08-scrfact-returns-to-canon-35-amends-2026-09-07)
 - [2026-09-07 — The container never shipped the sysop tuning file](#2026-09-07-the-container-never-shipped-the-sysop-tuning-file)
 
 <!-- /TOC -->
@@ -4143,3 +4144,43 @@ class of bug fails in CI rather than on a server.
 - *Make a missing config file fatal.* It would catch this, and break every
   fresh checkout. The defaults are a complete, playable configuration by
   design.
+
+
+## 2026-09-08 — `SCRFACT` returns to canon 35 (AMENDS 2026-09-07)
+
+**Context:** Yesterday's entry kept `SCRFACT` at 100 and declared it a
+deviation, on the reasoning that changing it would retroactively revalue every
+kill in a running game. That reasoning was sound at the time and is now spent:
+the public galaxy was hours old, and the owner, reading the guide, said plainly
+that canon's 35 is the better game.
+
+The deviation was never chosen. `score.config.ts` hardcoded its own default of
+100 while `SCRFACT` sat in the option table marked `implemented: false`, so the
+option was inert and nobody had ever picked the number. It was an artefact of
+two config systems, not a balance decision.
+
+**Decision:** `SCRFACT` is removed from `config/game.config.json` and falls back
+to canon's shipped 35 (`MBMGEMSG.MSG:472` — *"Factor points to deduct from
+loser: 35"*). It is removed from the enforced `DEVIATIONS` table and from
+`GUIDE_DEVIATIONS`, because it is no longer a deviation.
+
+**Reason:** it costs nothing now and cannot be done cheaply later. Checked
+before changing it: `SCRFACT` governs only the VICTIM's deduction. The
+attacker's award comes from `killScoreAward` and never touches it, and AI
+victims are skipped for deduction entirely — so hunting Cybertrons pays exactly
+the same before and after, and the one live score on the server (1000, from a
+Cybertron kill) is untouched. The factor only bites in player-versus-player,
+which has not happened yet on this server and will begin when a second person
+joins. Landing it now means no human score was ever earned at the wrong rate.
+
+**Alternatives rejected:**
+- *Keep 100 and leave it declared.* Honest, but it preserves a number nobody
+  chose, and every day of play makes it more expensive to correct.
+- *Change it later, before the public launch.* Same change, strictly more
+  cost: by then there is PvP score on the board earned at the wrong rate.
+- *Rescore existing accounts.* Nothing to rescore — the only score on the
+  server came from an AI kill, which this does not affect.
+
+**Correction to the record:** the 2026-09-07 entry describes the deviation as
+"real and worth keeping for now". Keep that text; this entry supersedes the
+decision, not the history of how it was found.
