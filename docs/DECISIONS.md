@@ -4593,3 +4593,34 @@ their strange transmissions, not self-destruction.
 — it would also disarm any countdown already persisted from before this fix,
 but it mutates a hot path on every boot to cover a case we have not confirmed
 exists. Left as a note instead.
+
+## 2026-09-08 — Two hydration paths disagreed about who is dead
+**Context:** `Cybrg-222:222`, a Sarten Obliterator holding 1,146 gold, was
+announced destroyed four seconds after a redeploy with `attacker=none`, and had
+been announced before. The production row explained it: `destruct = 0`,
+`damage = 110.62`, still present.
+**Decision:** `ShipStateService.onModuleInit` now queries
+`{ status: GESTAT_AUTO, damage: { lt: 100 } }`, the same rule
+`CybertronRepository.hydrateAll` already applied in code.
+**Reason:** Two boot paths load AI hulls and only one refused corpses. The
+Cybertron repository skipped `damage >= 100` and its comment names this exact
+failure — "otherwise runKillResolution re-processes the persisted kill on the
+first physics tick after boot and emits a phantom COMBAT_SHIP_DESTROYED to all
+clients" — but `ShipStateService` runs FIRST and took every GESTAT_AUTO row, so
+the corpse was in the map before the repository declined to add it. The boot log
+showed the disagreement plainly: 24 ships hydrated, then 23 Cybertrons.
+
+It repeated because the gateway never deletes an AI hull ("death/persistence
+owned by the AI layer"), so the row survives at damage >= 100 and the next
+restart replays the whole thing. Every deploy re-killed the same ship and told
+every player about it.
+
+The guard belongs in the query rather than in a loop: this path selects only
+AI hulls, so no player ship is affected, and filtering in SQL does not grow with
+the size of the graveyard.
+**Alternatives rejected:** Deleting AI hulls on death — it is the AI layer's job
+to recycle the slot (P-007), and `createSpawn`'s upsert depends on the row.
+Zeroing `damage` at death — that resurrects a ship that was destroyed.
+**Note:** the same-day shutdown drain is still right and still needed; it stops
+a kill being *owed* across a restart. This is the different failure of a kill
+already *taken* being replayed.

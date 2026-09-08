@@ -134,7 +134,15 @@ export class ShipStateService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     const [rows, classes] = await Promise.all([
-      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO }, include: { user: { select: { teamcode: true, options: true, kills: true, username: true, fkeys: true } } } }),
+      // `damage < 100` is not an optimisation — it is the same guard
+      // CybertronRepository.hydrateAll applies, and the two paths must agree
+      // about what is still in the game. This one runs FIRST, so without it a
+      // dead AI hull was already in the map by the time the Cybertron
+      // repository declined to add it; the next physics tick then re-killed it
+      // and announced a phantom kill to every client. The gateway never
+      // deletes an AI hull, so the row survives and it repeated on every
+      // restart. Seen in production 2026-09-08 (docs/DECISIONS.md).
+      this.prisma.ship.findMany({ where: { status: GESTAT_AUTO, damage: { lt: 100 } }, include: { user: { select: { teamcode: true, options: true, kills: true, username: true, fkeys: true } } } }),
       this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true, maxTons: true } }),
     ]);
     const maxWarpByClass = new Map(classes.map((c) => [c.classNumber, c.maxWarp]));

@@ -3775,3 +3775,16 @@ not the interruption.
 noted here was fixed the same day (docs/DECISIONS.md 2026-09-08). Any countdown
 already persisted on a live AI hull from before that fix is still armed; we have
 not confirmed one exists.
+
+## 2026-09-08 — the phantom kill, explained by the production row
+**Completed:** `ShipStateService` hydration now excludes AI hulls at
+`damage >= 100`, matching `CybertronRepository`. Ends the phantom
+COMBAT_SHIP_DESTROYED replayed on every restart.
+**Tests:** `test/game/ship/hydrate-skips-corpses.spec.ts` — 2 specs, both
+confirmed failing without the fix; the Prisma fake applies the damage filter so
+the assertions are about the resulting map, not about the mock.
+**Decisions made:** docs/DECISIONS.md 2026-09-08 (two hydration paths).
+**Next:** the orphaned production row for Cybrg-222:222 is still at damage
+110.62. It is now inert — nothing loads it — and the spawn tick will recycle the
+slot via createSpawn, which resets damage.
+**Known issues:** none outstanding.
