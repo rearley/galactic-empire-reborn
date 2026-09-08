@@ -155,10 +155,10 @@ export const SYSOP_OPTIONS = {
   // Recovered 2026-09-03: these read canonDefault null on the belief that no
   // shipped value existed. It did — we were reading GE/MSG, which has no
   // HYPDST blocks. GE/REL:512, :522.
-  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:529', implemented: false,
-    note: 'No consumer. cybertron.config.ts hard-codes hyperdist1: 25 (the same number) rather than reading this option, so a sysop tune has no effect.' },
-  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:530', implemented: false,
-    note: 'No consumer. cybertron.config.ts hard-codes hyperdist2: 10 rather than reading this option.' },
+  HYPDST1: { min: 1, max: 32000, default: 25, canonDefault: 25, cReference: 'GEMAIN.C:529', implemented: true,
+    note: 'Wired 2026-09-08. cybertron.config.ts hard-coded 25 — canon\'s value, so behaviour was always right, but the option was dead: it clamped, reported at boot and changed nothing. Now read through constants like every other setting.' },
+  HYPDST2: { min: 1, max: 32000, default: 10, canonDefault: 10, cReference: 'GEMAIN.C:530', implemented: true,
+    note: 'Wired 2026-09-08 alongside HYPDST1 — same story, same fix.' },
   PLATTRF1: { min: 5, max: 1000, default: 18, canonDefault: 18, cReference: 'GEMAIN.C:532', implemented: true },
   PLATTRF2: { min: 5, max: 1000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:535', implemented: true },
   PLATTRF3: { min: 5, max: 1000, default: 55, canonDefault: 55, cReference: 'GEMAIN.C:539', implemented: true },

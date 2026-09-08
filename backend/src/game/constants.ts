@@ -274,6 +274,19 @@ export const CYBGOLD = GAME_CONFIG.CYBGOLD;
  */
 export const TOOCLOSE = GAME_CONFIG.TOOCLOSE;
 
+/**
+ * Range above which a Cybertron closes on its target through hyperspace, and
+ * the band below which it brakes back out. Both are canon globals, read the
+ * same way for every automaton class (GECYBS.C).
+ *
+ * cybertron.config.ts hardcoded 25 and 10 — the right numbers, so behaviour
+ * never diverged, but the sysop options of the same name were dead: they
+ * appeared in `sys`, clamped correctly, reported at boot, and changed nothing.
+ * A setting that looks live and is not is worse than one that is absent.
+ */
+export const HYPDST1 = GAME_CONFIG.HYPDST1;
+export const HYPDST2 = GAME_CONFIG.HYPDST2;
+
 /** Days of mail retained by the midnight purge. Canon 3. */
 export const MAILDAYS = GAME_CONFIG.MAILDAYS;
 
