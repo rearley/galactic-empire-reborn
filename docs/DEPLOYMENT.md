@@ -1,12 +1,169 @@
 # Deployment
 
-> **FIRST DRAFT.** This file was written from the codebase during Task 13 of
-> the public-web-presence plan (2026-09-07), before the game had ever been
-> deployed to the real Plesk server. Every path, port and process-manager
-> detail below is a starting point, not a confirmed fact about that server.
-> Correct it in place — do not treat it as settled — the first time it is
-> actually deployed, and remove this notice once it has been verified against
-> reality.
+> **AMENDED 2026-09-08.** The original draft was written blind, from the
+> codebase, before anyone had looked at the target server. It has now been
+> checked against the real host over the Plesk MCP connection. The
+> **Target environment** section below is observed fact; the rest is amended
+> to match it. Nothing has been deployed yet — the steps are unrun.
+>
+> The blind draft assumed a generic nginx box running the repo's
+> `docker-compose.yml` as written, with its bundled Postgres container and
+> published ports. Three of those assumptions were wrong for this server, and
+> each is noted where it applies.
+
+## Target environment — observed, not assumed
+
+Checked on `makrdevelopment.com` on 2026-09-08.
+
+| | |
+|---|---|
+| Host | Ubuntu 24.04, Plesk |
+| Docker | 29.8.0, Compose plugin v5.5.1 |
+| Node on host | **none** — everything runs in containers |
+| PostgreSQL | **16.15, native on the host**, already running |
+| Subdomain | `ge.makrholdings.com`, exists, docroot holds a placeholder `index.html` |
+| Custom nginx | none yet — no `vhost_nginx.conf` for this domain |
+| Database | **not created yet.** Existing: `admin_daycompass`, `makr_candle`, `n8n_main` |
+
+### Three corrections to the blind draft
+
+**1. Do not run a Postgres container.** The host already runs PostgreSQL 16.15.
+The repo's `docker-compose.yml` bundles a `postgres` service — that is for local
+development. **The deployed compose file must not use it**, or the game will
+come up against an empty throwaway database beside the real one.
+
+**Reach it over host networking, not the Docker bridge.** `postgresql.conf` has
+`listen_addresses = 'localhost,172.17.0.1'` and `pg_hba.conf` has
+`host all all 172.17.0.0/16 md5`, which looks like a container on the default
+bridge can connect to `172.17.0.1`. **It cannot** — tested 2026-09-08, the
+connection TIMES OUT rather than being refused, so something upstream of
+Postgres drops bridge-to-host traffic. That `pg_hba` line is effectively dead.
+
+What works, and what every other app on this host already does, is
+`network_mode: host` with `127.0.0.1`. Verified:
+
+```bash
+docker run --rm --network host -e PGPASSWORD=... postgres:16-alpine \
+  psql -h 127.0.0.1 -U makr_ge -d makr_ge -At -c 'select current_database();'
+# -> makr_ge
+```
+
+**2. Follow the established app pattern on this host**, which is not what the
+repo's compose file does. Every existing app looks like:
+
+```yaml
+# /opt/<app>/docker-compose.yml
+services:
+  <app>:
+    image: ghcr.io/rearley/<app>:latest
+    container_name: <app>
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+```
+
+Images are built elsewhere, pushed to `ghcr.io/rearley/*`, and pulled here.
+**A `watchtower` container is running and will auto-pull new images**, so
+pushing a new tag redeploys without touching the server — worth knowing before
+pushing a half-finished image.
+
+Secrets live in `/opt/<app>/.env`, never in the compose file.
+
+**3. The frontend probably does not need a container.** Plesk's nginx already
+serves `ge.makrholdings.com` from its docroot. Building `frontend/dist` and
+placing it there is simpler than running the repo's frontend container and
+proxying to it — and it is what makes the `try_files` rule below apply, since
+Plesk's own nginx does the serving.
+
+## nginx on this host
+
+Plesk owns `nginx.conf` and regenerates it; custom rules go in
+`vhost_nginx.conf`, which Plesk includes inside the server block. The existing
+apps do exactly this — see
+`/var/www/vhosts/system/day-compass.com/conf/vhost_nginx.conf` for a working
+example on this server.
+
+For `ge.makrholdings.com`, create
+`/var/www/vhosts/system/ge.makrholdings.com/conf/vhost_nginx.conf`:
+
+```nginx
+# SPA deep links. Without this, /stats and /play 404 — Plesk's nginx looks for
+# files with those names and finds none. This is the single most likely thing
+# to be wrong on a first deploy.
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+# The game socket. The Upgrade/Connection headers are not optional: without
+# them Socket.io does not error, it silently falls back to HTTP long-polling.
+# The game still "works" and feels wrong, which is a bad failure to debug.
+location /socket.io/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 3600s;
+}
+
+location ^~ /auth/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location ^~ /public/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Apply with `plesk sbin nginx_control --reconfigure-domain ge.makrholdings.com`
+(or Plesk's "Apache & nginx Settings" panel), then `nginx -t` before reloading.
+
+**Rate limiting note.** The app throttles `/auth/*` per caller. Behind a proxy
+every request appears to come from the proxy unless `X-Forwarded-For` is
+trusted, so all visitors would share one bucket. The header is set above;
+confirm the app is configured to trust it before relying on the limit.
+
+## Database — created and verified 2026-09-08
+
+Role and database `makr_ge` exist on the host's PostgreSQL 16.15, owned by
+`makr_ge`, and a container using host networking connects to them successfully.
+
+```sql
+CREATE ROLE makr_ge LOGIN PASSWORD '...';
+CREATE DATABASE makr_ge OWNER makr_ge;
+```
+
+`/opt/ge/.env` therefore wants:
+
+```
+DATABASE_URL=postgresql://makr_ge:<password>@127.0.0.1:5432/makr_ge?schema=public
+```
+
+**A note on how this went wrong the first time.** A `makr_ge` database already
+existed — in **MySQL**, because that is what Plesk creates by default. This
+application cannot run on it, and not marginally: `schema.prisma` declares
+`provider = "postgresql"`, `User.options` and `User.fkeys` are native scalar
+arrays (`Int[]`, `String[]`) which MySQL has no type for, email uniqueness is a
+partial expression index (`UNIQUE (lower(email)) WHERE email IS NOT NULL`) which
+MySQL cannot express, team lookup uses Prisma's Postgres-only
+`mode: 'insensitive'`, and scores and cash are `BigInt`. The empty MySQL
+database was removed. **Check which engine you are looking at before assuming a
+database with the right name is the right database.**
+
+The schema is applied with `npx prisma migrate deploy`, never `migrate dev`.
 
 ## The two processes
 
