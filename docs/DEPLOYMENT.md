@@ -1,5 +1,9 @@
 # Deployment
 
+> **DEPLOYED 2026-09-08.** The stack is live at https://ge.makrholdings.com.
+> What follows is what actually worked, including the four things that did not
+> work first — see **Things that bit** at the end.
+>
 > **AMENDED 2026-09-08.** The original draft was written blind, from the
 > codebase, before anyone had looked at the target server. It has now been
 > checked against the real host over the Plesk MCP connection. The
@@ -305,3 +309,49 @@ are committed, versioned artifacts that are never edited after creation.
 - TLS termination point and certificate renewal (Let's Encrypt via Plesk is
   the presumed default, unconfirmed).
 - Log destination and rotation for the backend process.
+
+
+## Things that bit, and why
+
+Recorded because each cost a cycle and none was guessable from the codebase.
+
+**1. Port 3000 was already taken.** A node process serving MCP is bound to
+`*:3000`, and day-compass's nginx proxies `/mcp` to it. With
+`network_mode: host` the backend would have collided silently. GE runs on
+**3100**. Check `ss -lnt` before choosing a port on this host — host networking
+means every app shares one port space.
+
+**2. `duplicate location "/"`.** Plesk's generated `nginx.conf` already defines
+`location /` (proxying to Apache on `:7081`), so a prefix `location /` in
+`vhost_nginx.conf` makes the whole config fail to build — and it fails at
+`httpdmng --reconfigure-domain`, which reports the error only in its own output,
+while `nginx -t` still passes against the last good config. Plesk's own Docker
+extension solves this with **regex** locations (`location ~ ^/.*`), which are
+evaluated before prefix matches and do not collide. Do the same.
+
+**3. The frontend container crash-looped, 502ing every page.** Its nginx had
+`proxy_pass http://backend:3000`, and nginx resolves upstream names while
+PARSING config — then refuses to start when resolution fails. The backend is on
+host networking, so no `backend` name exists on the frontend's bridge. Fixed by
+resolving through a variable, which defers it to request time. A container that
+will not boot serves 502 on every route, including the ones needing no backend.
+
+**4. `docker-entrypoint.sh` polls `pg_isready` before migrating**, defaulting to
+host `postgres` and user `ge` — compose-network names that do not exist here.
+Without `PGHOST` and `PGUSER` in the environment the container waits forever,
+healthy-looking and doing nothing. Both are set in the stack's compose file.
+
+## Verifying a deploy
+
+```bash
+docker ps --filter name=ge- --format '{{.Names}} {{.Status}}'
+docker logs ge-backend 2>&1 | grep GameConfig     # must name the tuning file
+curl -s localhost:3100/health
+curl -sk https://ge.makrholdings.com/public/stats
+```
+
+The `GameConfig` line is the one worth reading every time. It prints either the
+tuning file it loaded and how many options it holds, or that it found none and
+is running on canon defaults. The second case is not an error and will not fail
+a health check — it is how a container once ran a 601x601 galaxy while everyone
+believed it was 201x201.
