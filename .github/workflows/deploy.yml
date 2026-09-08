@@ -4,6 +4,13 @@ name: Build and publish images
 # <panel> host pulls them. A watchtower container on that host watches :latest,
 # so a merge to master redeploys without anyone touching the server.
 #
+# Third-party actions are pinned to commit SHAs, not tags. This job holds
+# packages:write against a registry the production host pulls from, and a tag
+# like @v4 is mutable — whoever controls that action can repoint it, and the
+# next build would push whatever they wanted into ghcr, where watchtower would
+# deploy it within five minutes without anyone touching the server. The trailing
+# comment keeps the human-readable version visible.
+#
 # This runs in Actions rather than from a developer's machine on purpose: the
 # built-in GITHUB_TOKEN already carries packages:write, so nobody needs a
 # personal token with that scope, and the images are always built from what is
@@ -36,19 +43,19 @@ jobs:
             context: ./frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to ghcr
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.name }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ matrix.context }}
           push: true
