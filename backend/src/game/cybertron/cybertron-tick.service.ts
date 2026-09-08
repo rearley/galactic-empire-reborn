@@ -88,6 +88,7 @@ import {
   escalationKills,
 } from './cyb-decisions';
 import { pickTaunt, bandName, CYB_ANNOY_BANDS, type CybAnnoyBand } from './taunt-pool';
+import { cybWon } from './cyb-won';
 import { CombatTickService } from '../combat/combat-tick.service';
 import { CybertronControlService } from './cybertron-control.service';
 
@@ -1102,6 +1103,18 @@ export class CybertronTickService implements OnModuleInit {
     const shipno = parseInt(e.attackerShipKey.slice(colonIdx + 1), 10);
     if (isNaN(shipno)) return;
     void this.repository.incrementKills(shipno, e.attackerUserid);
+
+    // canon's cyb_won (GECYBS.C): release the claim, settle to warp 2, force a
+    // flush. Without it the claim only cleared incidentally on the next tick,
+    // via the "target left the game" branch, which assigns a RANDOM speed — so
+    // a Cybertron that had just killed someone might tear off at top speed
+    // instead of easing off as canon has it. @see src/game/cybertron/cyb-won.ts
+    this.shipState.mutate(e.attackerUserid, shipno, (s) => {
+      const won = cybWon(s);
+      s.cybmine = won.cybmine;
+      s.speed2b = won.speed2b;
+      s.cybupdate = won.cybupdate;
+    });
   }
 
   /**
