@@ -1476,8 +1476,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Returns the hull write so the shutdown drain can WAIT for it.
+   *
+   * On a live tick nothing awaits this — EventEmitter2's `emit` discards the
+   * return value, and the tick must not block on Postgres. At shutdown
+   * CombatTickService uses `emitAsync`, which does await it, and that is the
+   * difference between the hull row being deleted and the process exiting on
+   * top of it. A row left at damage >= 100 is re-killed on the next boot with
+   * the attacker long gone: no kill credit, no loot, the hold destroyed.
+   * @see combat-tick.service.ts beforeApplicationShutdown
+   */
   @OnEvent(COMBAT_SHIP_DESTROYED)
-  handleCombatShipDestroyed(event: CombatShipDestroyedEvent): void {
+  handleCombatShipDestroyed(event: CombatShipDestroyedEvent): Promise<void> {
     const keyParts = event.victimShipKey.split(':');
     const victimShipno = Number(keyParts[keyParts.length - 1]);
     // Read before the hull leaves memory a few lines below — the KILLEDBY
@@ -1525,9 +1536,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     //   • deleteMany (not delete) is a no-op when the row is already gone (race safety).
     //   • noships decrement is skipped when count=0 or when noships is already 0
     //     (underflow safety — mirrors C unsigned clamp behaviour).
+    let hullWrite: Promise<unknown> = Promise.resolve();
     if (!isNaN(victimShipno)) {
       const inMemoryStatus = this.shipStateService.get(event.victimUserid, victimShipno)?.status;
-      void this.prisma.$transaction(async (tx) => {
+      hullWrite = this.prisma.$transaction(async (tx) => {
         let status: number | undefined = inMemoryStatus;
         if (status === undefined) {
           const row = await tx.ship.findFirst({
@@ -1718,6 +1730,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // at a session that answered 'No active ship.' to everything." Death is
     // the same situation and never called it.
     void this.recoverAfterDeath(event.victimUserid);
+
+    // Everything above is synchronous; only the hull write is outstanding.
+    return hullWrite.then(() => undefined);
   }
 
   /**

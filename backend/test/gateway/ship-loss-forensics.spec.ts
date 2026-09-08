@@ -135,3 +135,67 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
     expect(logs.find((l) => l.includes('ship destroyed')) ?? '').toContain('usr_victim:2');
   });
 });
+
+/**
+ * The hull DELETE must be awaitable, or the shutdown drain cannot wait for it.
+ *
+ * `handleCombatShipDestroyed` fires its transaction with `void` — right for a
+ * live tick, which must not block on Postgres. But at shutdown that write is
+ * racing process exit, and losing means the row survives at damage >= 100 and
+ * the next boot re-kills the ship with nobody left to credit. That is the
+ * production incident this exists to prevent.
+ *
+ * CombatTickService's drain uses `emitAsync`, which awaits whatever the
+ * listeners RETURN — so the handler has to hand its write back.
+ * @see combat-tick.service.ts beforeApplicationShutdown
+ */
+describe('handleCombatShipDestroyed — awaitable by the shutdown drain', () => {
+  it('returns a promise that settles only once the hull write is done', async () => {
+    let resolveTx: (() => void) | undefined;
+    const txDone = new Promise<void>((r) => { resolveTx = r; });
+    let finished = false;
+
+    const prisma = {
+      $transaction: jest.fn().mockImplementation(async () => {
+        await txDone;
+        finished = true;
+      }),
+      shipClass: { findFirst: jest.fn() },
+    };
+
+    const gateway = new GameGateway(
+      {
+        get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
+        findAllShips: () => [],
+        removeFromGame: jest.fn(),
+      } as never,
+      {} as never, {} as never, {} as never,
+      prisma as never,
+      {} as never,
+      { clearScantab: jest.fn() } as never,
+      { getTypeName: () => 'Dreadnought' } as never,
+      {} as never,
+      { emit: jest.fn(), on: jest.fn() } as never,
+      new PresenceService(),
+    );
+    (gateway as unknown as { server: unknown }).server = {
+      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
+    };
+    const returned = (gateway as unknown as {
+      handleCombatShipDestroyed: (e: unknown) => unknown;
+    }).handleCombatShipDestroyed({
+      victimId: 'usr_victim:2', attackerId: null,
+      victimShipKey: 'usr_victim:2', attackerShipKey: null,
+      victimUserid: 'usr_victim', attackerUserid: null, attackerChannel: -1,
+      weapon: null, sector: { x: -4, y: 5 }, tickAt: new Date(),
+      loot: [], scoreAwarded: 0,
+    });
+
+    expect(returned).toBeInstanceOf(Promise);
+    expect(finished).toBe(false);
+    resolveTx?.();
+    await returned;
+    expect(finished).toBe(true);
+  });
+});

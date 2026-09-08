@@ -1,5 +1,5 @@
 import { tryEnergyDebit, cbearing } from '../physics/physics-math';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BeforeApplicationShutdown, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
 import { COMBAT_TARGET_WARNING, CombatTargetWarningEvent } from './combat-events';
 import { SHIP_PHASER_CHARGE, ShipPhaserChargeEvent } from '../ship/repair-events';
@@ -86,8 +86,15 @@ const MISSILE_DECOY_THRESHOLD = 3000;
  * @see GEFUNCS.C — combat handlers
  */
 @Injectable()
-export class CombatTickService implements OnModuleInit {
+export class CombatTickService implements OnModuleInit, BeforeApplicationShutdown {
   private unsubscribe?: Unsubscribe;
+
+  /**
+   * Non-null only while shutting down: the promises returned by the
+   * COMBAT_SHIP_DESTROYED listeners, so the drain can wait for their database
+   * work instead of racing process exit. @see beforeApplicationShutdown
+   */
+  private shutdownWrites: Promise<unknown>[] | null = null;
 
   constructor(
     private readonly tickService: TickService,
@@ -201,6 +208,62 @@ export class CombatTickService implements OnModuleInit {
    * @see GEFUNCS.C:killem (line 1103)
    * @see GEFUNCS.C:acctm  (line 1118)
    */
+  /**
+   * Announce a kill. On a live tick this is a plain synchronous emit; during
+   * shutdown it uses `emitAsync` and keeps the listeners' promises, because the
+   * hull DELETE and the score transfer are fire-and-forget and would otherwise
+   * lose their race with process exit. @see beforeApplicationShutdown
+   */
+  private emitDestroyed(event: CombatShipDestroyedEvent): void {
+    if (this.shutdownWrites) {
+      this.shutdownWrites.push(this.events.emitAsync(COMBAT_SHIP_DESTROYED, event));
+      return;
+    }
+    this.events.emit(COMBAT_SHIP_DESTROYED, event);
+  }
+
+  /**
+   * Settle kills that are owed before the process goes away.
+   *
+   * A ship dies on the PHYSICS tick once `damage >= 100`, so up to six seconds
+   * can pass between the shot that kills it and the kill being resolved. Stop
+   * the server inside that window and the corpse walks: `damage` is a persisted
+   * column, but the attacker's identity is not — `attackerSnapshot` is rebuilt
+   * each tick and `lastfiredBy` has no column, while `lastfired` holds a CHANNEL
+   * number that means nothing once everyone has reconnected. The first physics
+   * tick after boot then kills the ship with `attacker=none`, and since
+   * `resolveKillSpoils` needs an attacker, the kill, the score and the entire
+   * hold are destroyed rather than transferred.
+   *
+   * Seen in production on 2026-09-08: a Sarten Obliterator died four seconds
+   * after a watchtower redeploy carrying 1,146 gold, credited to nobody.
+   *
+   * Nest runs every `onModuleDestroy` before any `beforeApplicationShutdown`,
+   * and TickService stops its timers there, so this cannot race a live tick.
+   *
+   * Canon has no counterpart: its server did not redeploy underneath a fight.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
+    this.shutdownWrites = [];
+    try {
+      this.runKillResolution({
+        kind: TickKind.PHYSICS,
+        tickNumber: -1,
+        firedAt: new Date(),
+      });
+      const writes = this.shutdownWrites;
+      if (writes.length > 0) {
+        this.logger.log(`shutdown: settling ${writes.length} kill(s) before exit`);
+        await Promise.allSettled(writes);
+      }
+    } catch (err: unknown) {
+      // A failure here must not stop the process from shutting down.
+      this.logger.error(`shutdown kill drain failed: ${err instanceof Error ? err.stack : String(err)}`);
+    } finally {
+      this.shutdownWrites = null;
+    }
+  }
+
   private runKillResolution(ctx: TickContext): void {
     const ships = this.shipState
       .findAllShips()
@@ -311,7 +374,7 @@ export class CombatTickService implements OnModuleInit {
           loot,
           scoreAwarded,
         };
-        this.events.emit(COMBAT_SHIP_DESTROYED, event);
+        this.emitDestroyed(event);
 
         // Remove from active state map.
         this.shipState.removeFromGame(victim);

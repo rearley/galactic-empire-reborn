@@ -4538,3 +4538,34 @@ it would still double every kill announcement. Removing the client's line
 entirely — an ion kill would then lose the planet's name, which canon's DIED
 does not carry and which is the only way a defender learns their own colony
 made the kill; that one line survives as a documented deviation.
+
+## 2026-09-08 — Kills owed at shutdown are settled before the process exits
+**Context:** A Sarten Obliterator died on the deployed server four seconds
+after a watchtower redeploy, carrying 1,146 gold, with `attacker=none`. The
+forensics manifest added the day before is what made it legible.
+**Decision:** `CombatTickService.beforeApplicationShutdown` runs the
+kill-resolution pass once on the way out, emitting with `emitAsync` and awaiting
+the listeners, and the three COMBAT_SHIP_DESTROYED listeners now return their
+database work instead of voiding it.
+**Reason:** A ship dies on the PHYSICS tick once `damage >= 100`, so up to six
+seconds separate the fatal shot from the kill. `damage` is a persisted column;
+the attacker's identity is not — `attackerSnapshot` is rebuilt per tick,
+`lastfiredBy` has no column at all, and `lastfired` holds a channel number that
+means nothing after a restart. Stopping inside that window flushed a hull at
+damage >= 100 and left the first tick after boot to kill it with nobody to
+credit: `resolveKillSpoils` needs an attacker, so the kill, the score and the
+whole hold were destroyed rather than transferred.
+
+Nest runs every `onModuleDestroy` before any `beforeApplicationShutdown`, and
+TickService stops its timers in the former, so the drain cannot race a live
+tick. The gateway's hull DELETE stays fire-and-forget on the live path — a tick
+must not block on Postgres — but is now returned so the drain can await it;
+without that the process could exit on top of the write and leave exactly the
+row this fixes.
+
+Canon has no counterpart: its server did not redeploy underneath a fight.
+**Alternatives rejected:** Persisting `lastfiredBy` so a kill can be attributed
+after a restart — narrower, needs a migration, and still loses the loot when the
+attacker has since disconnected. Doing nothing and scheduling deploys around
+players — that is worth doing anyway, but it makes the loss rarer rather than
+impossible.
