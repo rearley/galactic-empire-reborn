@@ -91,6 +91,26 @@ export const GUIDE_CORRECTIONS: Readonly<Record<string, string>> = Object.freeze
     'thing a new pilot sees is three of the rare thing, sitting together. Out in ' +
     'the galaxy the description holds: roughly one body in six is a wormhole, ' +
     'which is exactly what WORMODDS 6 asks for.',
+  cybertrons:
+    'Two claims on this page are contradicted by the original\'s own ship table ' +
+    '(MBMGESHP.MSG), and this port follows the table. ' +
+    'FIRST, "the top speed of a Cybertron is warp 8.0 so they can be out run with ' +
+    'a faster ship" is true of the Cybertron Scout alone. The shipped maximum warp ' +
+    'is 8 for the Scout and the Sarten Attack Drone, 10 for the Cybertron Battle ' +
+    'Cruiser — the same as an Interceptor, so it can match your best speed and you ' +
+    'cannot simply outrun it — and 15 for the Sarten Obliterator, which is faster ' +
+    'than anything a player can buy. The Cybertron Base Star is warp 0: it cannot ' +
+    'move at all, and it also carries no torpedoes and will not engage a player ' +
+    'hull, so despite its taunts it is a fixture rather than a threat. ' +
+    'SECOND, "Cybertrons will not attack smaller ships unless first provoked" is ' +
+    'not what the code does. A Cybertron decides to be hostile if ANY of three ' +
+    'things hold (GECYBS.C gebemean): it is a "cyberquad", or you have passed 30 ' +
+    'kills, or a 1-in-3 roll comes up — and that roll is made afresh on every ' +
+    'pass. Cyberquad means a toughness factor of 1, which the table gives to the ' +
+    'Battle Cruiser, the Base Star and the Obliterator, so those three never ' +
+    'consult your kill count at all. The Scout\'s "lowest class it will attack" ' +
+    'is 0, meaning every class. A brand-new pilot in a starter Interceptor can ' +
+    'therefore be attacked unprovoked, and regularly is.',
   planets:
     'This page says anything you transfer to a planet "belongs to them, you cannot ' +
     'transfer it back". That is not what the original actually does. Its own ' +
