@@ -98,8 +98,13 @@ export const GUIDE_CORRECTIONS: Readonly<Record<string, string>> = Object.freeze
     'a faster ship" is true of the Cybertron Scout alone. The shipped maximum warp ' +
     'is 8 for the Scout and the Sarten Attack Drone, 10 for the Cybertron Battle ' +
     'Cruiser — the same as an Interceptor, so it can match your best speed and you ' +
-    'cannot simply outrun it — and 15 for the Sarten Obliterator, which is faster ' +
-    'than anything a player can buy. The Cybertron Base Star is warp 0: it cannot ' +
+    'cannot simply outrun it — and 15 for the Sarten Obliterator. So the advice ' +
+    'holds only once you have upgraded: the starter Interceptor is warp 10 and the ' +
+    'Heavy Freighter 8, and neither can escape an Obliterator, while a Freight ' +
+    'Barge merely ties it at 15. Every combat hull above the Interceptor does ' +
+    'outrun the whole Cybertron fleet — the Stealth Fighter makes warp 20, the ' +
+    'Destroyer and Star Cruiser 25, the Battle Cruiser and Frigate 30, the ' +
+    'Dreadnought 50. The Cybertron Base Star is warp 0: it cannot ' +
     'move at all, and it also carries no torpedoes and will not engage a player ' +
     'hull, so despite its taunts it is a fixture rather than a threat. ' +
     'SECOND, "Cybertrons will not attack smaller ships unless first provoked" is ' +
