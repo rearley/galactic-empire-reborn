@@ -38,9 +38,11 @@ export class PlnHandlerService {
     for (const row of rows) {
       // cmd_planet writes the row with a raw prf rather than a message id:
       //   prf("%-20s %5d %5d  %d \r", name, xsect, ysect, plnum)
-      // That is still canon, and the columns it produces line up under
-      // PLAMSG1's "Planet Name         sector planet" heading. The port's own
-      // "(x,y) #nnn" shape did not.
+      // That is still canon and the row is kept byte-for-byte; the port's own
+      // "(x,y) #nnn" shape was replaced by it. What the row does NOT line up
+      // under is canon's own PLAMSG1 heading, which labels three numbers with
+      // two words — see the PLN_HEADER note in messages.ts for why the heading
+      // is ours and the row is canon's.
       lines.push({
         text: formatMessage(MessageId.PLN_ROW, row.name.slice(0, 20), row.xsect, row.ysect, row.plnum),
         category: 'success' as const,
