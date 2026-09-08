@@ -21,6 +21,7 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-08 — WebSocket only; no long-polling fallback](#2026-09-08--websocket-only-no-long-polling-fallback)
 - [2026-09-08 — `pln`'s heading is ours; its data row stays canon's](#2026-09-08--plns-heading-is-ours-its-data-row-stays-canons)
 - [2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired](#2026-09-08--ai-population-scales-with-univmax-hypdst1hypdst2-wired)
 - [2026-09-08 — Eight surviving hand-written lines go back to canon, even where ours said more](#2026-09-08--eight-surviving-hand-written-lines-go-back-to-canon-even-where-ours-said-more)
@@ -4381,3 +4382,44 @@ label sits over the column it names, by slicing the header and the row at
 canon's own column spans. Asserting the header STRING would not have caught
 this — canon's string was perfectly well-formed, it just described a different
 table.
+
+## 2026-09-08 — WebSocket only; no long-polling fallback
+
+**Context:** `socketClient.ts` sets `transports: ['websocket']`, which skips
+Socket.io's default `['polling', 'websocket']` sequence — no HTTP long-poll
+fallback and no upgrade dance. Raised while investigating the disconnect
+window; confirmed deliberate rather than incidental.
+
+**Decision:** keep it. WebSocket or nothing.
+
+**Reason:** the fallback is worse than the failure it prevents. This is a text
+UI driven by a 1-second tick with sector-scoped broadcasts; over long-polling
+every tick becomes an HTTP round trip, and a player on that path would get a
+laggy, misleading experience while believing the game itself is bad. A clean
+"cannot connect" is more honest and easier to diagnose than a silently degraded
+session.
+
+**What it costs, stated plainly:** some corporate proxies and captive portals
+block WebSocket upgrades. Those clients could have connected via polling and now
+cannot connect at all. That is accepted.
+
+**If a connection complaint arrives, do NOT fix it by adding 'polling' to the
+transports list.** That trades one person's hard failure for every fallback
+player's degraded session, and the degradation is invisible from the server
+side. Diagnose the proxy instead.
+
+**Related:** this is also WHY the ~45s disconnect window exists. An open TCP
+socket can die silently — a closed laptop lid, a phone changing towers — so
+Socket.io's heartbeat (`pingInterval` 25s + `pingTimeout` 20s, both default) is
+the only thing that eventually notices. Holding a real socket is what makes the
+heartbeat necessary; it is not a separate problem.
+
+**Alternatives rejected:**
+- *Default `['polling', 'websocket']`.* Broadest reach, but see above.
+- *Polling as an explicit opt-in for blocked users.* A second code path,
+  exercised by almost nobody, that would rot. Revisit only if real players
+  actually turn out to be blocked.
+
+**Note:** the Playwright e2e specs pin `transports: ['websocket']` too, so tests
+and production agree on the transport rather than testing a path players never
+take.
