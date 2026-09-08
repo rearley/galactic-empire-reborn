@@ -3760,3 +3760,17 @@ gained `except`.
 **Known issues:** an ion kill now produces two lines for bystanders — canon's
 DIED plus our planet attribution. Deliberate; the second carries the colony's
 name, which DIED does not.
+
+## 2026-09-08 — kills owed at shutdown
+**Completed:** Shutdown drain for kills owed but not yet resolved, so a deploy
+landing mid-fight no longer destroys the kill credit and the victim's hold.
+**Tests:** 4 specs in `test/game/combat/shutdown-kill-drain.spec.ts` (drain
+kills, credits the attacker, waits for listener writes, leaves healthy ships
+alone) and 1 in `ship-loss-forensics.spec.ts` pinning that the gateway handler
+returns an awaitable hull write.
+**Decisions made:** docs/DECISIONS.md 2026-09-08.
+**Next:** deploy scheduling still worth doing — this makes the loss impossible,
+not the interruption.
+**Known issues:** `cybertron.repository.ts` createSpawn's update branch resets
+~24 fields but not `destruct`, so a recycled Cybertron slot inherits a
+self-destruct countdown. Real, unrelated to this incident, not yet fixed.

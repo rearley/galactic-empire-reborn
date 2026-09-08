@@ -53,7 +53,11 @@ export class ShipLossMailService implements OnModuleInit {
 
   onModuleInit(): void {
     this.events.on(COMBAT_SHIP_DESTROYED, (payload: CombatShipDestroyedEvent) => {
-      void this.handle(payload);
+      // Returned, not voided: `emit` on a live tick discards this, but the
+      // shutdown drain uses `emitAsync` and awaits it, so a kill settled on the
+      // way out still transfers the loss mail.
+      // @see game/combat/combat-tick.service.ts beforeApplicationShutdown
+      return this.handle(payload);
     });
   }
 

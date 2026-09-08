@@ -54,7 +54,11 @@ export class PlayerScoreService implements OnModuleInit {
 
   onModuleInit(): void {
     this.events.on(COMBAT_SHIP_DESTROYED, (payload: CombatShipDestroyedEvent) => {
-      void this.handleShipDestroyed(payload);
+      // Returned, not voided: `emit` on a live tick discards this, but the
+      // shutdown drain uses `emitAsync` and awaits it, so a kill settled on the
+      // way out still transfers the score and the cash penalty.
+      // @see game/combat/combat-tick.service.ts beforeApplicationShutdown
+      return this.handleShipDestroyed(payload);
     });
   }
 
