@@ -792,6 +792,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                   this.shipStateService.findAllShips().some((o) => o.channel === c)),
             attackerChannel: ship.lastfired,
             weapon: null,
+            // Socket.io's own reason, carried through so the log can tell a
+            // closed tab from a dropped connection. The kill above cannot use
+            // it — canon kills on any hangup with cantexit > 0 — but a sysop
+            // deciding whether to make someone whole absolutely can.
+            victimDisconnectReason: reason,
             sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
             tickAt: new Date(),
             loot,
@@ -1177,6 +1182,69 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * an @OnEvent handler would drop the broadcast for everyone in the sector.
    * A missing name costs a nicer label; a thrown one costs the whole event.
    */
+  /**
+   * One greppable line describing everything a destroyed hull was carrying.
+   *
+   * Must be called BEFORE the hull leaves the in-memory map, and must never
+   * throw: it runs inside the destruction handler, and losing the kill because
+   * the forensics failed would be far worse than losing the forensics.
+   */
+  private shipLossManifest(event: CombatShipDestroyedEvent): string {
+    const parts: string[] = [
+      'ship destroyed:',
+      `victim=${event.victimShipKey}`,
+      `attacker=${event.attackerShipKey ?? 'none'}`,
+      `cause=${event.weapon ?? 'unknown'}`,
+      `sector=(${event.sector.x},${event.sector.y})`,
+    ];
+
+    // Only present when the death came from the disconnect path. It is the one
+    // fact that separates "closed the tab" from "their network dropped", and
+    // the kill treats both identically.
+    if (event.victimDisconnectReason) {
+      parts.push(`disconnectReason='${event.victimDisconnectReason}'`);
+    }
+
+    try {
+      const keyParts = event.victimShipKey.split(':');
+      const shipno = Number(keyParts[keyParts.length - 1]);
+      const ship = Number.isFinite(shipno)
+        ? this.shipStateService.get(keyParts.slice(0, -1).join(':'), shipno)
+        : undefined;
+
+      if (ship) {
+        let className: string | undefined;
+        try {
+          className = this.shipClassCache.getTypeName(ship.shpclass);
+        } catch {
+          /* cache miss — the class NUMBER is the part that matters for restoring */
+        }
+        parts.push(
+          `name='${ship.shipname}'`,
+          `class=${ship.shpclass}${className ? `(${className})` : ''}`,
+          // The fittings are the expensive half of a loss: a Mark-6 phaser is
+          // ~253,000 credits of trade-ins, and nothing else records them.
+          `phaser=${ship.phasrtype}`,
+          `shield=${ship.shieldtype}`,
+        );
+
+        const cargo = (ship.items ?? [])
+          .map((qty, i) => ({ name: ITEM_NAMES[i] ?? `item${i}`, qty }))
+          .filter((e) => (e.qty ?? 0n) > 0n)
+          .map((e) => `${e.name}=${e.qty}`);
+        parts.push(`cargo=[${cargo.join(' ')}]`);
+      } else {
+        // A race, or an AI victim with no ShipState. Keep the identity line
+        // rather than dropping the record entirely.
+        parts.push('manifest=unavailable(hull-not-in-memory)');
+      }
+    } catch (err: unknown) {
+      parts.push(`manifest=unavailable(${err instanceof Error ? err.message : String(err)})`);
+    }
+
+    return parts.join(' ');
+  }
+
   private shipNameOf(shipKey: string): string | undefined {
     try {
       const parts = shipKey.split(':');
@@ -1427,9 +1495,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // A destroyed player ship has its hull row deleted and noships decremented.
     // Without this line that happens in complete silence, which made two ships
     // lost during playtesting impossible to tell apart from a bug.
-    this.logger.log(
-      `ship destroyed: victim=${event.victimShipKey} attacker=${event.attackerShipKey ?? 'none'}`,
-    );
+    //
+    // It logs the whole MANIFEST because the hull row is about to be deleted
+    // (canon's gepdb(GEDELETE)) and the ship-loss mail hardcodes `cash: 0n`
+    // and `itemqty: []` — so without this, nothing anywhere records what the
+    // pilot actually lost. A sysop asked to make someone whole after a bad
+    // death could previously learn only that something of theirs died.
+    //
+    // WARN, not LOG: this is the line someone goes looking for months later,
+    // and it must survive a log level that filters routine chatter.
+    // @see docs/DECISIONS.md 2026-09-08 — ship-loss forensics
+    this.logger.warn(this.shipLossManifest(event));
 
     // Delete the victim's hull row and decrement the fleet count atomically — but
     // ONLY for PLAYER ships. AI (status AUTO) hulls are managed by the AI layer

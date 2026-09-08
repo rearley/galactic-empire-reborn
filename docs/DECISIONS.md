@@ -21,6 +21,7 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-08 — A destroyed hull logs its full manifest, and why it died](#2026-09-08--a-destroyed-hull-logs-its-full-manifest-and-why-it-died)
 - [2026-09-08 — WebSocket only; no long-polling fallback](#2026-09-08--websocket-only-no-long-polling-fallback)
 - [2026-09-08 — `pln`'s heading is ours; its data row stays canon's](#2026-09-08--plns-heading-is-ours-its-data-row-stays-canons)
 - [2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired](#2026-09-08--ai-population-scales-with-univmax-hypdst1hypdst2-wired)
@@ -4423,3 +4424,64 @@ heartbeat necessary; it is not a separate problem.
 **Note:** the Playwright e2e specs pin `transports: ['websocket']` too, so tests
 and production agree on the transport rather than testing a path players never
 take.
+
+## 2026-09-08 — A destroyed hull logs its full manifest, and why it died
+
+**Context:** asked whether a sysop could make a player whole after a death that
+was not their fault — a deploy that bounced them, a flaky network, "call
+waiting" in the old idiom. The answer was no, on two counts.
+
+A destroyed hull row is DELETED, canon's `gepdb(GEDELETE)`, and nothing
+recorded what was on it. The ship-loss mail carries the cause, the sector and
+the killer's name but hardcodes `cash: 0n` and `itemqty: []`. The server log
+said only `ship destroyed: victim=… attacker=…`. So the class, the phaser and
+shield marks — the expensive part, a Mark-6 phaser being ~253,000 credits of
+trade-ins — and the cargo, gold included, were all unrecoverable.
+
+Worse for the case in question: `client.data.disconnectReason` distinguishes
+'client namespace disconnect' (the pilot closed the tab) from 'ping timeout'
+and 'transport close' (their connection died under them). All four sit in
+`CLIENT_SIDE_REASONS`, the `cantexit` kill fires identically, and the reason
+was discarded one line before it would have been the evidence.
+
+**Decision:** the destruction handler logs a single greppable line carrying the
+whole manifest — victim, attacker, cause, sector, disconnect reason when there
+is one, ship name, class, phaser and shield marks, and every non-zero cargo
+stack. At WARN, not LOG, because it is the line someone goes looking for months
+later and it must survive a level that filters routine chatter.
+
+    ship destroyed: victim=usr_a1b2:2 attacker=none cause=gravity sector=(-4,5)
+    disconnectReason='ping timeout' name='WildCat' class=8(Dreadnought)
+    phaser=6 shield=4 cargo=[missiles=3 torpedos=12 flux pods=5 food cases=40
+    decoys=2 jammers=1 mines=9 gold=814]
+
+It is built from the in-memory hull at the TOP of the handler, before the
+eviction a few lines below, and it can never throw: losing the kill because the
+forensics failed would be far worse than losing the forensics. A missing hull
+degrades to `manifest=unavailable(hull-not-in-memory)` with the identity kept.
+
+**Reason:** this is deliberately the CHEAP half of the problem. It changes no
+schema, adds no query surface, and starts working immediately — which matters
+because anything lost before it ships is already gone, including anything lost
+during the playtest week now under way. A `ShipLoss` table would be queryable,
+survive log rotation and could back a `sys` command, and remains the right
+answer later; it is not worth blocking the recoverability of the next bad death
+on designing it.
+
+**Alternatives rejected:**
+- *A ShipLoss table now.* Better end state, but a migration and a schema
+  decision stand between the problem and any fix at all.
+- *Put the manifest in the ship-loss mail.* It is the player's mail. A pilot
+  does not need an itemised list of what they lost, and `MailStat` has no shape
+  for it beyond the `itemqty` array, which would then mean something different
+  here than in every other mail type.
+- *Log at LOG level with everything else.* Filtered out exactly when it is
+  wanted.
+
+**Note on scope:** this records what was lost. It does not decide when a sysop
+SHOULD restore, and there is deliberately no restore tooling — a manual
+judgement with the evidence in hand is the right shape while the population is
+small.
+
+**Tests:** `test/gateway/ship-loss-forensics.spec.ts` — fittings, cargo, cause,
+the closed-tab-versus-dropped-connection distinction, and the degraded path.
