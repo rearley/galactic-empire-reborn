@@ -21,6 +21,7 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-08 — Eight surviving hand-written lines go back to canon, even where ours said more](#2026-09-08--eight-surviving-hand-written-lines-go-back-to-canon-even-where-ours-said-more)
 - [2026-09-05 — Invented text is replaced with canon; a branch canon lacks is deleted, not reworded](#2026-09-05--invented-text-is-replaced-with-canon-a-branch-canon-lacks-is-deleted-not-reworded)
 - [2026-09-05 — Midnight maintenance runs on a named game timezone, not the host's](#2026-09-05--midnight-maintenance-runs-on-a-named-game-timezone-not-the-hosts)
 - [2026-08-31 — the autopilot survives a speed order](#2026-08-31-the-autopilot-survives-a-speed-order)
@@ -4184,3 +4185,68 @@ joins. Landing it now means no human score was ever earned at the wrong rate.
 **Correction to the record:** the 2026-09-07 entry describes the deviation as
 "real and worth keeping for now". Keep that text; this entry supersedes the
 decision, not the history of how it was found.
+
+## 2026-09-08 — Eight surviving hand-written lines go back to canon, even where ours said more
+
+**Context:** the 2026-09-05 pass ("Invented text is replaced with canon") set
+the policy and cleared 128 invented lines. A sweep of the remaining message
+sites found eight it had missed. None of them appears in that entry's list of
+deliberate exceptions, so none of them was a decision — they were residue.
+
+The eight, and what canon says instead:
+
+| ours | canon |
+|---|---|
+| `Torpedo locked on <target>.` | `TFIRE1` — "Torpedoes fired sir!" |
+| `Missile locked on <target>.` | `MFIRE1` — "Missile fired sir!" |
+| `Welcome aboard, <shipname>.` (3 sites) | `WELCOM` — "Welcome aboard Commander %s, the con is yours. Type ? if you need assistance." |
+| `<old> renamed to <new>.` | `RENAME1` — "Your ship is now named The %s." |
+| `New <class> purchased and docked at Zygor…` | `NEW3` — "You are now the proud owner of a %s." |
+| `Insufficient credits. You need N cr but have M cr.` (hull) | `NEW4` |
+| `Insufficient credits. Need N cr, have M cr.` (phaser/shield) | `NEW11` / `NEW8` |
+
+**Decision:** all eight use canon's string.
+
+**Reason:** the rule is that canon wins, and these are the cases where the rule
+actually costs something — so they are the ones that test whether it is a rule.
+Every one of ours carried MORE information: the torpedo line named your target,
+the affordability lines quoted the shortfall, the rename showed both names. We
+gave that up. A port that keeps canon's words except where it thinks of a
+better sentence is a rewrite with a citation, and the landing page's "the same
+words" claim would be false in exactly the places a returning player would
+notice.
+
+Three consequences worth stating plainly:
+
+- **`WELCOM` is a net GAIN.** Ours had quietly dropped "Type ? if you need
+  assistance" — in a game that is entirely typed commands, the only pointer to
+  the help system a new pilot ever gets. It also greets the COMMANDER, not the
+  hull: `GEFUNCS.C:172` passes `waruptr->userid`. Canon's `tossingegame` prints
+  it on every boarding, first run and returning alike, which is why `WELBACK`
+  ("Welcome back Commander %s") is dead text in the `.MSG` — nothing calls it.
+- **The freshly-finalized `ShipState` has no username**, so the first-run
+  welcome falls back to the JWT handle on `client.data`. Without that fallback a
+  brand-new pilot is greeted by their internal user id.
+- **The purchase hint stayed, as its own line.** Canon buys you a hull and drops
+  you at the main menu where the fleet list waits; we stay in the cockpit, so
+  the new ship is invisible until you ask for it. The hint is PORT-ORIGINAL and
+  is kept separate from `NEW3` rather than folded into it. Its wording changed
+  too: it said "reconnect to fly her", which stopped being true when `x` began
+  returning to ship-select instead of disconnecting.
+
+**Alternatives rejected:**
+- *Keep ours where it is strictly more informative.* That is the argument for
+  every one of the 128 lines already removed, and it is how the port drifted in
+  the first place.
+- *Append canon's line to ours.* Doubles the output and reads like a bug.
+
+**Also:** the landing page claimed "the text on your screen is the text the game
+printed thirty years ago, typos and all". Softened to "wherever the original had
+a line for something, that is the line you get" — the port does add lines where
+canon printed nothing, which `CHANGED` already admits, and an absolute claim a
+player can falsify in one session costs more than the hedge saves.
+
+**Tests:** `test/unit/canon-wording-restored.spec.ts` pins all eight against
+`CANON_MESSAGES` byte for byte. Five existing tests asserted the old wording
+and were corrected, not exempted — a test that encodes a deviation from canon
+is wrong.

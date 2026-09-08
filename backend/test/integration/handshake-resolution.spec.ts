@@ -175,7 +175,11 @@ describe('GameGateway handshake resolution', () => {
         client,
         'command:result',
       );
-      expect(result.lines[0].text).toBe('Welcome aboard, USS Pioneer.');
+      // Canon's WELCOM greets the COMMANDER, not the hull, and this fixture's
+      // ShipState carries no username — so the JWT handle on client.data is
+      // what names them. @see GEFUNCS.C:172
+      expect(result.lines[0].text).toContain('Welcome aboard Commander');
+      expect(result.lines[0].text).toContain('Type ? if you need assistance');
       expect(result.lines[0].category).toBe('system');
     } finally {
       client.disconnect();

@@ -176,7 +176,7 @@ describe('missiles between two missile-capable ships (real services, no mocks)',
 
     const out = fire(firer, 50, target.shipname);
 
-    expect(out).toContain('Missile away');
+    expect(out).toContain('Missile fired sir!');
     // The slot lives on the TARGET, keyed by the firer's channel.
     expect(target.lmisslChannel[0]).toBe(firer.channel);
     expect(target.lmisslDistance[0]).toBeGreaterThan(0);
@@ -189,7 +189,7 @@ describe('missiles between two missile-capable ships (real services, no mocks)',
     const { firer, target } = pair();
     firer.shpclass = 1;
 
-    expect(fire(firer, 50, target.shipname)).not.toContain('Missile away');
+    expect(fire(firer, 50, target.shipname)).not.toContain('Missile fired sir!');
   });
 
   it('a missile that is NOT shaken runs in and damages the target', () => {

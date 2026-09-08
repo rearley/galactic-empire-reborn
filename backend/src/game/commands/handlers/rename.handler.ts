@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { RenameService } from '../../onboarding/rename.service';
+import { formatMessage, MessageId } from '../messages';
 
 /**
  * Handles `rename <name>` — lets a bound player rename their ship.
@@ -63,7 +64,7 @@ export class RenameHandlerService {
     return {
       lines: [
         {
-          text: `Ship renamed: ${result.oldName} → ${result.newName}`,
+          text: formatMessage(MessageId.RENAME1, result.newName),
           category: 'success',
         },
       ],

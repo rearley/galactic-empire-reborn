@@ -294,7 +294,8 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
   it('locks a near target', () => {
     const nearTarget = spawnTarget({ sectorsAway: 1 });
     const res = handler.command.handler(firer, [nearTarget.shipname, '5000'], ctx) as CommandResult;
-    expect(res.lines[0].text).toMatch(/away/i);
+    // Canon's MFIRE1. @see MBMGEMSG.MSG MFIRE1
+    expect(res.lines[0].text).toMatch(/Missile fired sir!/);
     expect(nearTarget.lmisslChannel[0]).toBe(firer.shipno);
   });
 });

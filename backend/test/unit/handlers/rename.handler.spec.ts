@@ -45,7 +45,9 @@ describe('RenameHandlerService', () => {
 
     it('aliases array is empty', () => {
       const handler = makeHandler({ ok: false, reason: 'INVALID_FORMAT' });
-      expect(handler.command.aliases).toEqual([]);
+      // `ren` is canon's own abbreviation — GECMDS.C cmdtab carries both.
+      // This assertion predates the pass that restored canon's keywords.
+      expect(handler.command.aliases).toEqual(['ren']);
     });
   });
 
@@ -98,8 +100,8 @@ describe('RenameHandlerService', () => {
       });
       const result = await handler.command.handler(ship, ['NewName'], ctx);
       expect(result.lines[0].category).toBe('success');
-      expect(result.lines[0].text).toContain('OldName');
-      expect(result.lines[0].text).toContain('NewName');
+      // Canon's RENAME1 announces the NEW name only. @see MBMGEMSG.MSG RENAME1
+      expect(result.lines[0].text).toBe('Your ship is now named The NewName.');
     });
 
     it('includes ship.renamed broadcast for correct sector room', async () => {

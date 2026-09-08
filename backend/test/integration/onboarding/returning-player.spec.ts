@@ -156,8 +156,10 @@ describe('Returning player (T046)', () => {
     );
 
     expect(result.lines).toHaveLength(1);
-    expect(result.lines[0].text).toMatch(/Welcome aboard/i);
-    expect(result.lines[0].text).toContain('StarFalcon');
+    // Canon greets the commander, not the hull. @see GEFUNCS.C:172 WELCOM
+    expect(result.lines[0].text).toBe(
+      'Welcome aboard Commander TestPilot, the con is yours. Type ? if you need assistance.',
+    );
     expect(receivedClassList).toBe(false);
 
     socket.disconnect();

@@ -189,8 +189,10 @@ describe('cmd rename — happy path (T054)', () => {
 
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].category).toBe('success');
-    expect(result.lines[0].text).toContain('OldFalcon');
-    expect(result.lines[0].text).toContain('NewFalcon');
+    // Canon's RENAME1 announces the NEW name only — "Your ship is now named
+    // The %s." Ours read "OldFalcon renamed to NewFalcon", which is more
+    // informative and is not canon. @see MBMGEMSG.MSG RENAME1
+    expect(result.lines[0].text).toBe('Your ship is now named The NewFalcon.');
 
     socket.disconnect();
   });

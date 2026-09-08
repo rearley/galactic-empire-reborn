@@ -28,7 +28,7 @@ test.describe('multi-ship fleet', () => {
     await sendCommand(page, 'orb 1');
     await expect(page.locator(LOG)).toContainText('Zygor');
     await sendCommand(page, 'new ship 2');
-    await expect(page.locator(LOG)).toContainText('purchased');
+    await expect(page.locator(LOG)).toContainText('proud owner');
 
     await reconnect(page);
 
@@ -50,12 +50,12 @@ test.describe('multi-ship fleet', () => {
 
   test('an out-of-range choice re-offers the menu instead of stranding the pilot', async ({ page, request }) => {
     const first = uniqueShipName('fleetB');
-    await startNewPilot(page, first);
+    const username = await startNewPilot(page, first);
 
     await grantCredits(request, first, SECOND_HULL_PRICE * 3);
     await sendCommand(page, 'orb 1');
     await sendCommand(page, 'new ship 2');
-    await expect(page.locator(LOG)).toContainText('purchased');
+    await expect(page.locator(LOG)).toContainText('proud owner');
 
     await reconnect(page);
     await expect(page.getByTestId('ship-select')).toBeVisible();
@@ -70,6 +70,6 @@ test.describe('multi-ship fleet', () => {
     await page.getByTestId('ship-select-input').fill('1');
     await page.getByTestId('ship-select-input').press('Enter');
     await expect(page.locator(INPUT)).toBeVisible();
-    await expect(page.locator(LOG)).toContainText(`Welcome aboard, ${first}.`);
+    await expect(page.locator(LOG)).toContainText(`Welcome aboard Commander ${username}`);
   });
 });

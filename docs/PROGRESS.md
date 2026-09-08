@@ -3672,3 +3672,40 @@ specific things it exists to get right the first time.
   `messages.ts` retains a few dead paraphrased entries the live code
   bypasses (`IMPULSE1`/`CLOAK_HYPERSPACE`), pre-existing cleanup debt
   unrelated to this feature.
+
+## 2026-09-08 — the last eight hand-written lines go back to canon
+
+**Completed:** eight message sites that answered in our own prose where canon
+has a string now use canon's: `TFIRE1`, `MFIRE1`, `WELCOM` (three call sites),
+`RENAME1`, `NEW3`, `NEW4`, and `NEW8`/`NEW11` on the phaser and shield
+affordability path. These were residue from the 2026-09-05 sweep, not
+decisions — see `docs/DECISIONS.md` for why each one was worth the information
+it cost us, and for the two things the change gained: `WELCOM` restores "Type ?
+if you need assistance", the only pointer a new pilot gets toward the help
+system, and it greets the commander rather than the hull, which is what
+`GEFUNCS.C:172` does.
+
+**Tests:** `test/unit/canon-wording-restored.spec.ts` pins all eight against
+`CANON_MESSAGES` byte for byte. Five existing tests asserted the old wording;
+they were corrected rather than exempted.
+
+**Decisions made:** the purchase confirmation keeps its port-original docking
+hint, but as its own line beside `NEW3` rather than folded into it — and the
+hint's wording changed, because "reconnect to fly her" stopped being true when
+`x` began returning to ship-select. That deviation is now noted on the guide's
+`new` page. The landing page's "the text on your screen is the text the game
+printed thirty years ago" was softened to "wherever the original had a line for
+something, that is the line you get": the port does add lines where canon
+printed nothing, and an absolute claim a player can falsify in one session is
+worse than the hedge.
+
+**Next:** nothing outstanding from this pass.
+
+**Known issues:** roughly 90 hand-written strings remain across the command
+handlers, but they are not the same class of thing — they are usage lines,
+table headers and column layouts, where canon either has no counterpart or has
+a differently-shaped one (`Type HELP NEW for the correct usage` in place of a
+real usage line). Sweeping those would mean adopting canon's SHAPE, not its
+words, and is a separate decision nobody has taken. Also still open: eight
+sysop options remain `implemented: false`, and retiring `/debug/*` needs four
+Playwright specs migrated onto `sys` first.

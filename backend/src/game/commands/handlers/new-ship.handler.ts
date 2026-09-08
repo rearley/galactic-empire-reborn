@@ -245,7 +245,9 @@ export class NewShipHandlerService {
     if (cash < shipClass.maxPrice) {
       return {
         lines: [{
-          text: `Insufficient credits. You need ${shipClass.maxPrice.toLocaleString()} cr but have ${cash.toLocaleString()} cr.`,
+          // Canon names the class and stops there; the port also quoted the
+          // shortfall. @see MBMGEMSG.MSG:3950 NEW4
+          text: formatMessage(MessageId.NEW4, shipClass.typeName),
           category: 'system',
         }],
       };
@@ -298,10 +300,20 @@ export class NewShipHandlerService {
 
     const remaining = cash - shipClass.maxPrice;
     return {
-      lines: [{
-        text: `New ${shipClass.typeName} purchased and docked at Zygor. Reconnect to fly her. Credits remaining: ${remaining.toLocaleString()}.`,
-        category: 'system',
-      }],
+      lines: [
+        // Canon's confirmation, verbatim. @see MBMGEMSG.MSG:3946 NEW3
+        { text: formatMessage(MessageId.NEW3, shipClass.typeName), category: 'system' },
+        // PORT-ORIGINAL, and kept as its OWN line rather than folded into the
+        // canon string: canon buys you a hull and drops you at the main menu,
+        // where the fleet list is waiting. We stay in the cockpit, so the new
+        // hull is invisible until you ask for it. `x` is now that ask — it
+        // used to say "reconnect", which stopped being true when `x` started
+        // returning to ship-select instead of disconnecting.
+        {
+          text: `She is docked at Zygor — type x to take her out. Credits remaining: ${remaining.toLocaleString()}.`,
+          category: 'info',
+        },
+      ],
     };
   }
 
@@ -399,8 +411,12 @@ export class NewShipHandlerService {
     // C tests `delta <= cash` AFTER printing the trade-in, so a captain who
     // cannot afford the fitting still hears what the old unit was worth.
     if (quote.cost > cash) {
+      // Canon names the Mark and nothing else. Ours quoted the shortfall,
+      // which is more useful and is not canon — and the trade-in line above
+      // has already told the player what moved the price.
+      // @see GECMDS.C:4671-4674 (NEW11), :4609-4612 (NEW8)
       lines.push({
-        text: `Insufficient credits. Need ${quote.cost.toLocaleString()} cr, have ${cash.toLocaleString()} cr.`,
+        text: formatMessage(kind === 'phaser' ? MessageId.NEW11 : MessageId.NEW8, newType),
         category: 'system',
       });
       return { lines };

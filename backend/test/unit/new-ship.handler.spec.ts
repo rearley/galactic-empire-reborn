@@ -164,8 +164,10 @@ describe('NewShipHandlerService', () => {
           data: expect.objectContaining({ cash: { decrement: 600_000n } }),
         }),
       );
-      expect(result.lines[0].text).toMatch(/Destroyer/);
-      expect(result.lines[0].text).toMatch(/docked at Zygor/i);
+      // Canon's NEW3 confirms the purchase; the docking hint is PORT-ORIGINAL
+      // and lives on its own line beside it. @see docs/DECISIONS.md 2026-09-08
+      expect(result.lines[0].text).toBe('You are now the proud owner of a Destroyer.');
+      expect(result.lines[1].text).toMatch(/docked at Zygor/i);
     });
 
     it('auto-names ship as "<TypeName> #N" using topshipno+1', async () => {
@@ -274,7 +276,8 @@ describe('NewShipHandlerService', () => {
         { loadShip: jest.fn() } as unknown as ShipStateService,
       );
       const result = await service.command.handler(makeShip(), ['ship', '4'], {});
-      expect(result.lines[0].text).toMatch(/insufficient/i);
+      // Canon's NEW4 names the class and does not quote the shortfall.
+      expect(result.lines[0].text).toBe("Sorry Sir, we don't have enough cash for a Destroyer.");
     });
   });
 
@@ -312,7 +315,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
     const result = await service.command.handler(makeShip(), ['ship', '4'], {});
 
     expect(calls).toBe(2);
-    expect(result.lines[0].text).toMatch(/purchased/i);
+    expect(result.lines[0].text).toMatch(/proud owner/i);
   });
 
   it('gives up with a readable message rather than an internal error', async () => {

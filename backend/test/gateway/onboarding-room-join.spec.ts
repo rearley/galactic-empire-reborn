@@ -35,6 +35,9 @@ describe('GameGateway — a new pilot joins their rooms', () => {
     handshake: { query: { userid: USERID } },
     data: {
       userid: USERID,
+      // handleConnection always sets this from the JWT; the finalize path needs
+      // it because a freshly-created ShipState has no username yet.
+      username: 'rick',
       onboarding: { step: 'AWAITING_NAME' as const },
     } as Record<string, unknown>,
     emit: jest.fn(),
@@ -110,7 +113,7 @@ describe('GameGateway — a new pilot joins their rooms', () => {
 
     const welcomes = sock.emit.mock.calls.filter(
       (c) => c[0] === 'command:result' &&
-        JSON.stringify(c[1]).includes('Welcome aboard, Newcomer'),
+        JSON.stringify(c[1]).includes('Welcome aboard Commander rick'),
     );
     expect(welcomes).toHaveLength(1);
     expect(sock.data.activeShipNo).toBe(1);

@@ -89,7 +89,7 @@ test.describe('combat — real UI, real backend', () => {
         await outfitShip(request, { shipname: ship, x: arena.x + 0.01, y: arena.y });
         await sendCommand(page, `loc ${targetName}`);
         await sendCommand(page, 'tor @');
-        return /Torpedo away/i.test(await page.locator(LOG).innerText());
+        return /Torpedoes fired sir!/i.test(await page.locator(LOG).innerText());
       }, { timeout: 60_000, intervals: [2_000] })
       .toBe(true);
   });
