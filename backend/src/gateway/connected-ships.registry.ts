@@ -35,6 +35,14 @@ export class ConnectedShipsRegistry {
    */
   upsert(shipId: string, socketId: string): string | undefined {
     const prior = this.byShipId.get(shipId);
+
+    // Re-registering the SAME socket is not a second session. The caller reads
+    // a returned id as "someone displaced this player" and disconnects it — so
+    // returning an unchanged id made a player displace themselves. `x` with a
+    // single hull did exactly that: unboard, auto-reboard, self-evict, dead
+    // window reading "Another session opened with your credentials".
+    if (prior === socketId) return undefined;
+
     if (prior !== undefined) {
       this.bySocketId.delete(prior);
     }

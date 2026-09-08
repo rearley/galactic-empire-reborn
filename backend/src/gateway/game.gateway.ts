@@ -334,7 +334,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       this.scanHandler.clearScantab(userid, shipno);
       await this.shipStateService.unboard(userid, shipno);
-      await this.presentShipEntry(client, userid, { noticeShipLoss: false });
+      // autoBoard: false — `x` means leave, so never put them straight back in,
+      // even with a single hull. @see test/gateway/exit-with-one-ship.spec.ts
+      await this.presentShipEntry(client, userid, { noticeShipLoss: false, autoBoard: false });
     } catch (err: unknown) {
       this.logger.error('Exit to ship entry failed:', err);
     }
@@ -424,7 +426,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async presentShipEntry(
     client: Socket,
     userid: string,
-    opts: { noticeShipLoss?: boolean } = {},
+    opts: { noticeShipLoss?: boolean; autoBoard?: boolean } = {},
   ): Promise<void> {
     // Abandoned hulls are not ships the captain can fly (FR-702). Boarding one
     // put the player behind the router's abandoned-ship gate with no way out.
@@ -469,8 +471,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    if (ships.length === 1) {
-      // Exactly one ship — auto-board it (original single-ship returning-player path).
+    // Auto-boarding a lone hull is a courtesy on CONNECT — a returning pilot
+    // should not pick from a menu of one. It is wrong after `x`, which in canon
+    // returns you to the main menu (GEMAIN.C:2859 mnu_fightsub) rather than
+    // putting you straight back in the chair. Callers that mean "leave the
+    // game" pass autoBoard: false and get the menu even for one ship, which is
+    // also the only screen offering logout.
+    if (ships.length === 1 && opts.autoBoard !== false) {
       await this.boardShipAndWelcome(client, userid, ships[0]);
       return;
     }
