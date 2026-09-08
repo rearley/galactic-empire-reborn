@@ -42,12 +42,34 @@ interface EventLogProps {
 export function EventLog({ lines }: EventLogProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const [stickyBottom, setStickyBottom] = useState(true);
+  /**
+   * The scroll position we last wrote ourselves, read back AFTER the write so
+   * it holds the browser's clamped value rather than the `scrollHeight` we
+   * asked for. `null` means the next scroll event is the reader's.
+   */
+  const writtenTop = useRef<number | null>(null);
+
+  /** Scroll to the bottom and remember where that landed. */
+  const scrollToBottom = (el: HTMLDivElement) => {
+    el.scrollTop = el.scrollHeight;
+    writtenTop.current = el.scrollTop;
+  };
 
   const capped = lines.slice(-MAX_ENTRIES);
 
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
+
+    // A scroll event still sitting at the position WE wrote is not the reader
+    // moving — it is the delayed event for our own write, and by the time it
+    // arrives a burst may have grown the log underneath it. Measuring distance
+    // then charges the reader for content they never scrolled past. @see
+    // test/eventlog-sticky.spec.tsx "does not offer to jump when only the
+    // content grew"
+    if (writtenTop.current !== null && el.scrollTop === writtenTop.current) return;
+    writtenTop.current = null;
+
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     setStickyBottom(distanceFromBottom <= STICKY_THRESHOLD);
   };
@@ -56,7 +78,7 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
   const jumpToLatest = () => {
     setStickyBottom(true);
     const el = containerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) scrollToBottom(el);
   };
 
   /**
@@ -71,7 +93,7 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
     if (!stickyBottom) return;
     const raf = requestAnimationFrame(() => {
       const el = containerRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) scrollToBottom(el);
     });
     return () => cancelAnimationFrame(raf);
   }, [lines, stickyBottom]);
