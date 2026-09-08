@@ -99,6 +99,8 @@ describe('lock → tor @ integration', () => {
     const torRes = torp.command.handler(alice, ['@'], ctx) as CommandResult;
     expect(torRes.lines[0].text).not.toMatch(/No target locked/i);
     // Firing drops shields first and says so, so this is no longer lines[0].
-    expect(torRes.lines.some((l) => /Torpedo away/.test(l.text))).toBe(true);
+    // Canon's TFIRE1 — "Torpedoes fired sir!" It does not name the target;
+    // ours did, and that was invented. @see MBMGEMSG.MSG TFIRE1
+    expect(torRes.lines.some((l) => /Torpedoes fired sir!/.test(l.text))).toBe(true);
   });
 });

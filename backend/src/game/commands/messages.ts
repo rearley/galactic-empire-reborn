@@ -228,6 +228,12 @@ export enum MessageId {
   SYS_UNKNOWN = 'SYS_UNKNOWN',
   SYS_FMT = 'SYS_FMT',
   SYS_HUH = 'SYS_HUH',
+  TFIRE1 = 'TFIRE1',
+  MFIRE1 = 'MFIRE1',
+  WELCOM = 'WELCOM',
+  RENAME1 = 'RENAME1',
+  NEW3 = 'NEW3',
+  NEW4 = 'NEW4',
   /** LOCK2 — to the TARGET when a fire-control lock is acquired on it. */
   LOCK_WARN_ACQUIRED = 'LOCK_WARN_ACQUIRED',
   /** LOCK4 — to the TARGET when a lock is ATTEMPTED and fails. */
@@ -553,6 +559,10 @@ export enum MessageId {
   NEW10 = 'NEW10',
   /** @see MBMGEMSG.MSG:3982 NEW17 — minimum install charge */
   NEW17 = 'NEW17',
+  /** @see MBMGEMSG.MSG:3966 NEW8 — cannot afford the shield fitting */
+  NEW8 = 'NEW8',
+  /** @see MBMGEMSG.MSG:3974 NEW11 — cannot afford the phaser fitting */
+  NEW11 = 'NEW11',
   /** @see MBMGEMSG.MSG:3986 NEW18 — shield downgrade refund */
   NEW18 = 'NEW18',
   /** @see MBMGEMSG.MSG:3990 NEW19 — trade-in credit on the old shield */
@@ -875,6 +885,12 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
    * @see GECMDS.C:4757
    */
   [MessageId.SYS_HUH]: 'Huh?',
+  [MessageId.TFIRE1]: CANON_MESSAGES.TFIRE1,
+  [MessageId.MFIRE1]: CANON_MESSAGES.MFIRE1,
+  [MessageId.WELCOM]: CANON_MESSAGES.WELCOM,
+  [MessageId.RENAME1]: CANON_MESSAGES.RENAME1,
+  [MessageId.NEW3]: CANON_MESSAGES.NEW3,
+  [MessageId.NEW4]: CANON_MESSAGES.NEW4,
   /**
    * Addressed to the ship being locked, never to the firer — canon's LOCK1
    * (the firer's own confirmation) is commented out in the original.
@@ -1221,6 +1237,8 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.NEW29]: CANON_MESSAGES.NEW29,
   [MessageId.NEW10]: CANON_MESSAGES.NEW10,
   [MessageId.NEW17]: CANON_MESSAGES.NEW17,
+  [MessageId.NEW8]: CANON_MESSAGES.NEW8,
+  [MessageId.NEW11]: CANON_MESSAGES.NEW11,
   [MessageId.NEW18]: CANON_MESSAGES.NEW18,
   [MessageId.NEW28]: CANON_MESSAGES.NEW28,
 

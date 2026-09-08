@@ -235,7 +235,10 @@ export class TorpedoHandlerService {
       lines: [
         ...(shieldLine ? [shieldLine] : []),
         {
-          text: `Torpedo away — locked on ${target.shipname}.`,
+          // canon tells the firer only that it fired (GECMDS.C TFIRE1); it has no
+          // lock-confirmation message at all. Ours named the target, which was
+          // more informative and not canon. @see docs/DECISIONS.md 2026-09-05
+          text: formatMessage(MessageId.TFIRE1).trim(),
           category: 'combat',
         },
       ],

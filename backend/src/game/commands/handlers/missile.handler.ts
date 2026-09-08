@@ -288,7 +288,8 @@ export class MissileHandlerService {
     return {
       lines: [
         {
-          text: `Missile away — charge ${charge}, locked on ${target.shipname}.`,
+          // As with torpedoes: canon confirms the launch and nothing else.
+          text: formatMessage(MessageId.MFIRE1).trim(),
           category: 'combat',
         },
       ],

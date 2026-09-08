@@ -584,8 +584,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Canon greets the COMMANDER, not the hull, and the greeting carries the
+    // only pointer a pilot ever gets to the help system. Ours named the ship
+    // and dropped the pointer. @see GEFUNCS.C:172 tossingegame — one WELCOM
+    // for every boarding, first run and returning alike (WELBACK is dead text
+    // in the .MSG; nothing prints it).
     client.emit('command:result', {
-      lines: [{ text: `Welcome aboard, ${activeShip.shipname}.`, category: 'system' }],
+      lines: [{
+        text: formatMessage(
+          MessageId.WELCOM,
+          activeShip.username ?? (client.data.username as string | undefined) ?? userid,
+        ).trim(),
+        category: 'system',
+      }],
     });
     client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
     // The F Key Map panel needs the captain's bindings at login, not just
@@ -972,7 +983,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // idea that `hel` exists, in a game that is entirely typed commands.
         client.emit('command:result', {
           lines: [
-            { text: `Welcome aboard, ${state.shipname}.`, category: 'system' },
+            {
+              text: formatMessage(
+                MessageId.WELCOM,
+                // The freshly-finalized ShipState carries no username yet, so the
+                // JWT's handle is the only place the commander's name lives on
+                // this path. Without it a brand-new pilot is greeted by their
+                // internal user id.
+                state.username ?? (client.data.username as string | undefined) ?? userid,
+              ).trim(),
+              category: 'system',
+            },
             {
               text: 'You are in the neutral zone at sector (0,0) — no one may fire here.',
               category: 'info',
@@ -1022,7 +1043,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 y: Math.floor(ship.ycoord),
               });
               client.emit('command:result', {
-                lines: [{ text: `Welcome aboard, ${ship.shipname}.`, category: 'system' }],
+                lines: [{
+                  text: formatMessage(
+                    MessageId.WELCOM,
+                    (client.data.username as string | undefined) ?? userid,
+                  ).trim(),
+                  category: 'system',
+                }],
               });
             }
             return;

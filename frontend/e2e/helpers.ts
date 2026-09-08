@@ -20,13 +20,19 @@ export function uniqueShipName(prefix: string): string {
   return `${prefix}${Date.now().toString(36).slice(-5)}${Math.floor(Math.random() * 100)}`.slice(0, 19);
 }
 
-/** Register a fresh pilot and complete onboarding, leaving the terminal ready. */
-export async function startNewPilot(page: Page, shipName: string): Promise<void> {
+/**
+ * Register a fresh pilot and complete onboarding, leaving the terminal ready.
+ * Returns the generated USERNAME — canon's welcome greets the commander, not
+ * the hull, so a caller that wants to assert on it needs the handle.
+ */
+export async function startNewPilot(page: Page, shipName: string): Promise<string> {
   await page.goto('/');
+
+  const username = uniqueName('e2e');
 
   // AuthScreen opens in login mode; the first /register/i control is the switch.
   await page.getByRole('button', { name: /register/i }).click();
-  await page.getByLabel(/username/i).fill(uniqueName('e2e'));
+  await page.getByLabel(/username/i).fill(username);
   await page.getByLabel(/password/i).fill('E2ePass123!');
   await page.getByRole('button', { name: /^register$/i }).click();
 
@@ -35,8 +41,11 @@ export async function startNewPilot(page: Page, shipName: string): Promise<void>
   await page.locator('input[type="text"]').fill(shipName);
   await page.locator('input[type="text"]').press('Enter');
 
-  await expect(page.locator(LOG)).toContainText(`Welcome aboard, ${shipName}.`);
+  // Canon's WELCOM. @see GEFUNCS.C:172 — `prfmsg(WELCOM, waruptr->userid)`
+  await expect(page.locator(LOG)).toContainText(`Welcome aboard Commander ${username}`);
   await expect(page.locator(INPUT)).toBeVisible();
+
+  return username;
 }
 
 /** Send a command and wait for the log to grow. */

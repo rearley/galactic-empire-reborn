@@ -34,7 +34,12 @@ export const FAITHFUL: readonly string[] = Object.freeze([
   'The same numbers. Damage, energy, prices, ranges, repair rates — all of them the values the original shipped, not a modern rebalance.',
   'The same ships. Every hull from the Interceptor you start in to the Dreadnought you save up for, with the stats they had in 1994.',
   'The same combat. Phasers weaken with range and shields swallow them whole; torpedoes bleed through anyway. That is the original math, not an approximation of it.',
-  'The same words. The text on your screen is the text the game printed thirty years ago, typos and all.',
+  // Was an unqualified "the text on your screen is the text the game printed
+  // thirty years ago". It is very nearly true and getting truer, but the port
+  // does add lines where the original printed nothing (see CHANGED), and an
+  // absolute claim that a player can falsify in one session costs more
+  // credibility than the word "wherever" saves. @see docs/DECISIONS.md 2026-09-05
+  'The same words. Wherever the original had a line for something, that is the line you get — typos and all.',
   'The same six-second heartbeat the whole galaxy has always moved to.',
 ]);
 

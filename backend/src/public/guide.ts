@@ -58,6 +58,12 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
   set:
     'Function keys are typed rather than pressed — `fset f1 pha 0 0`, then `f1` — ' +
     'because a browser will not give up F11 or F12.',
+  new:
+    'The original sold you a hull and dropped you back at the main menu, where ' +
+    'your fleet was listed and you picked the new ship straight away. This port ' +
+    'keeps you in the cockpit of the ship you flew in on, so a hull you have just ' +
+    'bought is docked at Zygor and invisible until you ask for it: type `x` to ' +
+    'come off the bridge and choose her from your fleet.',
   sca:
     'A port addition: `sca lo full` gives the full long-range view directly, ' +
     'without setting an option first. `set scanfull on` still works, on range scans, ' +

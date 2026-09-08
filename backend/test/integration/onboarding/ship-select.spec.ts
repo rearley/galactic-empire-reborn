@@ -478,7 +478,7 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
     // Assert on the welcome rather than boardMock: by this point the preceding
     // test has already warmed shipno 4 into the state map, so board() is
     // legitimately not called again (see the warm-cache case above).
-    expect(result.lines[0].text).toMatch(/Welcome aboard, Hawk/i);
+    expect(result.lines[0].text).toMatch(/Welcome aboard Commander/i);
 
     socket.disconnect();
   });
