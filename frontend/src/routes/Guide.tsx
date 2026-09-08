@@ -17,6 +17,7 @@ interface GuideEntry {
   title: string;
   body: string[];
   deviation?: string;
+  correction?: string;
 }
 interface GuideSection {
   title: string;
@@ -41,6 +42,23 @@ function useGuide(): { guide: Guide | null; error: boolean } {
   }, []);
 
   return { guide, error };
+}
+
+/**
+ * Where the ORIGINAL's help is wrong about the original's own code.
+ *
+ * Visually distinct from a deviation on purpose: one says "we changed this",
+ * the other says "the original was wrong about itself and we follow its code".
+ * Rendering them the same would either accuse the original of our change or
+ * claim credit for behaviour that was always canon.
+ */
+function Correction({ text }: { text: string }): React.JSX.Element {
+  return (
+    <p className="mt-4 border-l-2 border-sky-700 bg-sky-950/20 py-2 pl-4 text-sm text-sky-200">
+      <span className="mr-2 uppercase tracking-widest text-sky-500">The original is wrong here</span>
+      {text}
+    </p>
+  );
 }
 
 function Deviation({ text }: { text: string }): React.JSX.Element {
@@ -95,6 +113,7 @@ export function Guide(): React.JSX.Element {
                     {e.title}
                   </Link>
                   {e.deviation && <span className="ml-1 text-yellow-700" title="differs from the original">*</span>}
+                  {e.correction && <span className="ml-1 text-sky-700" title="the original's help is wrong here">†</span>}
                 </li>
               ))}
             </ul>
@@ -133,6 +152,7 @@ export function GuidePage(): React.JSX.Element {
         {entry && (
           <>
             <h1 className="mt-4 text-xl uppercase tracking-widest text-yellow-400">{entry.title}</h1>
+            {entry.correction && <Correction text={entry.correction} />}
             {entry.deviation && <Deviation text={entry.deviation} />}
             {/* pre: canon's help is column-aligned with spaces, which HTML collapses. */}
             <pre className="mt-6 overflow-x-auto whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
