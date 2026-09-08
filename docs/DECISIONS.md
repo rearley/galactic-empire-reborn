@@ -4505,3 +4505,36 @@ following for good. One cause, two symptoms.
 frame is unbounded during combat, so no fixed pixel tolerance is safe, and a
 larger one erodes the genuine scroll-up it exists to detect. Debouncing the
 handler — it would delay the reader's real gesture to paper over ours.
+
+## 2026-09-08 — DIED: the killer-less death was never announced
+**Context:** Playtest showed `Cybrg-222 has been destroyed!` — the internal
+account name of a Cybertron, which no pilot should ever see. Canon's
+`username()` (GEFUNCS.C:2596-2604) returns the SHIP name for a CYBORG or DROID
+class precisely so the `Cybrg-NNN` row that gives an automaton a database
+record stays off the screen.
+**Decision:** Wire canon's `DIED` (GEFUNCS.C:1263) in the gateway and stop the
+React client composing destruction lines of its own.
+**Reason:** `killem` branches at GEFUNCS.C:1104 on whether a ship fired the
+fatal shot: KILLEDBY if one did, DIED if none did. We had implemented only the
+first, so a self-destruct, a gravity crash and a colony's ion cannons — every
+death not caused by another ship — were announced by nothing. The client filled
+the gap with a line of its own whose fallback printed `victimUserid`. Once the
+server sends canon's words the client's line is also a duplicate: bystanders saw
+both KILLEDBY and the invented line for one kill, and the dying pilot saw both
+YOURDEAD and "YOUR SHIP HAS BEEN DESTROYED".
+
+Two details of DIED are canon and easy to get wrong: it goes out with `ALWAYS`,
+not `FILTER`, so it reaches pilots who have muted the galaxy feed
+(GEMAIN.C:2557-2561); and its subject is the ship name followed by
+`username()`, so an automaton reads "The Cyberquad 44135, Commanded by
+Cyberquad 44135" — canon's own output, because both arguments resolve to the
+shipname for an AI.
+
+This also corrects a comment we had written in the gateway claiming an ion kill
+is one "nobody hears about". Canon announces it; it simply takes the DIED
+branch, because `fireion` sets the victim's lastfired to -1 (GEFUNCS.C:1797).
+**Alternatives rejected:** Keeping the client's line and only fixing the name —
+it would still double every kill announcement. Removing the client's line
+entirely — an ion kill would then lose the planet's name, which canon's DIED
+does not carry and which is the only way a defender learns their own colony
+made the kill; that one line survives as a documented deviation.

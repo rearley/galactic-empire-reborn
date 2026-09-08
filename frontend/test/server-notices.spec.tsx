@@ -130,7 +130,13 @@ describe('server notices reach the event log', () => {
     expect(text).not.toContain('unknown');
   });
 
-  it('leaves an ordinary ship kill alone', () => {
+  /**
+   * The client no longer narrates a kill: the SERVER sends canon's KILLEDBY
+   * ("Commander X's ship was destroyed by Y!!!") as an ordinary event.log line,
+   * so a client line on top of it was a second line about one death.
+   * @see backend test/gateway/killedby-broadcast.spec.ts
+   */
+  it('stays silent on an ordinary ship kill — the server sent KILLEDBY', () => {
     render(<App />);
     fire('combat.ship-destroyed', {
       victimId: 'usr_raider:2',
@@ -139,27 +145,33 @@ describe('server notices reach the event log', () => {
       weapon: 'phaser',
       attackerName: null,
     });
-    expect(screen.getByTestId('event-log').textContent).toContain('destroyed by');
+    expect(screen.getByTestId('event-log').textContent ?? '').not.toContain('destroyed');
   });
 
   /**
    * Not every death has a killer. A gravity crash sets damage to 101 with no
-   * attacker (GEFUNCS.C:887) and a self-destruct has none by definition, so
-   * both arrived with attackerId null and weapon null — and the client
-   * announced "destroyed by unknown", inventing an assailant for a pilot who
-   * simply flew into a planet.
+   * attacker (GEFUNCS.C:887) and a self-destruct has none by definition. The
+   * client used to announce "destroyed by unknown", inventing an assailant, and
+   * was then changed to compose a bare line naming the victim by USERID — which
+   * for an automaton printed the internal `Cybrg-NNN` account that canon's
+   * username() exists to hide. Reported from play: "Cybrg-222 has been
+   * destroyed!".
+   *
+   * Canon covers this case itself with DIED (GEFUNCS.C:1263), sent galaxy-wide
+   * by the server, so the client says nothing at all and has no fallback left
+   * to leak a name through.
    */
-  it('does not invent a killer for a death that had none', () => {
+  it('stays silent on a killer-less death — the server sent DIED', () => {
     render(<App />);
     fire('combat.ship-destroyed', {
-      victimId: 'usr_clumsy:1',
-      victimUserid: 'usr_clumsy',
+      victimId: 'Cybrg-222:1',
+      victimUserid: 'Cybrg-222',
       attackerId: null,
       weapon: null,
       attackerName: null,
     });
     const text = screen.getByTestId('event-log').textContent ?? '';
     expect(text).not.toContain('unknown');
-    expect(text).toContain('destroyed');
+    expect(text).not.toContain('Cybrg-222');
   });
 });

@@ -52,7 +52,7 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
     logger.log = (m: string) => { logs.push(m); };
     logger.warn = (m: string) => { logs.push(m); };
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, logs };
@@ -128,7 +128,7 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
     logger.log = (m: string) => { logs.push(m); };
     logger.warn = (m: string) => { logs.push(m); };
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     destroy(gateway);

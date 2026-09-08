@@ -3744,3 +3744,19 @@ purpose; each configures something a web port has no equivalent for, and
 stay as they are — reviewed and kept, since ours carry more than canon's
 "Type HELP X for the correct usage". Still open from before: retiring
 `/debug/*` needs four Playwright specs migrated onto `sys` first.
+
+## 2026-09-08 — canon's DIED, and the event log's phantom scroll
+**Completed:** `EventLog` no longer mistakes a burst of lines for the reader
+scrolling away (it remembers the scroll position it wrote and ignores the
+delayed event reporting it). Canon's `DIED` announcement wired for every death
+with no killer ship; the React client stopped composing destruction lines,
+keeping only the ion-kill attribution canon lacks.
+**Tests:** 3 frontend specs for the burst race (all confirmed failing against
+the old component), 5 for `destructionLine`, 4 gateway specs for DIED including
+the ALWAYS class and the AI naming. Three gateway/integration server doubles
+gained `except`.
+**Decisions made:** see docs/DECISIONS.md 2026-09-08 (both entries).
+**Next:** nothing outstanding from these.
+**Known issues:** an ion kill now produces two lines for bystanders — canon's
+DIED plus our planet attribution. Deliberate; the second carries the colony's
+name, which DIED does not.

@@ -126,6 +126,8 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
       to: jest.fn(() => ({ emit: jest.fn() })),
+      // Canon's DIED goes out with except(victim) — GEFUNCS.C:1263.
+      except: jest.fn(() => ({ emit: jest.fn() })),
       emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };

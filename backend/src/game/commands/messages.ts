@@ -547,6 +547,11 @@ export enum MessageId {
   BUY9 = 'BUY9',
   /** @see MBMGEMSG.MSG:2122 KILLEDBY — galaxy-wide kill announcement */
   KILLEDBY = 'KILLEDBY',
+  /**
+   * The other half of the same announcement: a death with no killer ship.
+   * @see GEFUNCS.C:1262-1264 killem's else branch
+   */
+  DIED = 'DIED',
   /** @see MBMGEMSG.MSG:2226 SPEEDIS — helm answers a speed change */
   /** @see GE/REL/MBMGEMSG.MSG:2630 MISSL2 — a warp jump shook the missile off */
   MISSL2 = 'MISSL2',
@@ -1221,6 +1226,7 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   // GESTAT_AUTO branch, so an AI kill is announced exactly like a player one.
   // @see GEFUNCS.C:1116, MBMGEMSG.MSG:2122
   [MessageId.KILLEDBY]: CANON_MESSAGES.KILLEDBY,
+  [MessageId.DIED]: CANON_MESSAGES.DIED,
   // Helm answers the throttle. @see MBMGEMSG.MSG:2120, :1960
   // The second slot is %s, not canon's %d, so the hundredths keep their
   // leading zero -- "warp 9 point 05", not "warp 9 point 5". Canon's own two
