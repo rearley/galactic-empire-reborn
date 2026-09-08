@@ -82,8 +82,9 @@ describe('PlnHandlerService — listing (T032)', () => {
     const row = result.lines[1].text;
     // cmd_planet writes the row inline rather than through the MSG file:
     //   prf("%-20s %5d %5d  %d \r", name, xsect, ysect, plnum)
-    // Its columns are what line up under PLAMSG1's heading, "Planet Name
-    // sector planet". The port's "( 5,10)  #  3" shape did not.
+    // The ROW is canon and stays canon; only the heading above it is ours,
+    // because canon's labels three numbers with two words. See the alignment
+    // test below. The port's "( 5,10)  #  3" shape was what this replaced.
     // 20-wide name, then %5d %5d and the plain plnum: 9 chars of name padded
     // to 20, a separator space, then '    5'.
     expect(row).toBe('My Planet            ' + '    5' + '    10' + '  3 ');
@@ -185,5 +186,49 @@ describe('PlnHandlerService — performance (T034, SC-005)', () => {
     const elapsed = performance.now() - start;
 
     expect(elapsed).toBeLessThan(200);
+  });
+});
+
+/**
+ * Canon's PLAMSG1 heading is "Planet Name         sector planet" — two labels
+ * over a row that prints THREE numbers (xsect, ysect, plnum). 'sector' lands
+ * over the X, 'planet' lands over the Y SECTOR, and the planet number falls
+ * under nothing. A player read it exactly that way in play and reported the
+ * sector numbers as wrong; they were right, and the data was fine.
+ *
+ * So the heading is port-original and the row stays byte-for-byte canon. This
+ * pins the thing that was actually broken: that each label sits over the column
+ * it names. Asserting the header STRING would not — the old one was a perfectly
+ * good string, it just described a different table.
+ */
+describe('pln heading labels sit over the columns they name', () => {
+  it('puts x, y and # over the three numbers canon prints', async () => {
+    const { handler } = makeHandler([
+      { name: 'Colony #1', xsect: -4, ysect: 5, plnum: 1 },
+    ]);
+    const result = await handler.command.handler(makeShip(), [], {}) as Lines;
+    const [header, row] = [result.lines[0].text, result.lines[1].text];
+
+    // Column spans come from canon's own format: %-20s, ' ', %5d, ' ', %5d,
+    // '  ', %d — so X is [21,26), Y is [27,32) and the planet number is at 34.
+    const xCol = [21, 26] as const;
+    const yCol = [27, 32] as const;
+
+    expect(row.slice(...xCol).trim()).toBe('-4');
+    expect(row.slice(...yCol).trim()).toBe('5');
+    expect(row.charAt(34)).toBe('1');
+
+    expect(header.slice(...xCol).trim()).toBe('x');
+    expect(header.slice(...yCol).trim()).toBe('y');
+    expect(header.charAt(34)).toBe('#');
+  });
+
+  it('no longer claims the planet number is a sector', async () => {
+    const { handler } = makeHandler([
+      { name: 'Colony #1', xsect: -4, ysect: 5, plnum: 1 },
+    ]);
+    const result = await handler.command.handler(makeShip(), [], {}) as Lines;
+    // The specific misreading: "planet" printed above the Y sector.
+    expect(result.lines[0].text).not.toContain('sector planet');
   });
 });

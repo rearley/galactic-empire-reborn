@@ -21,6 +21,7 @@ Newest last. Every entry carries context, reasoning and the alternatives that
 were rejected — the last of those is usually the part worth reading.
 
 - [2026-08-31 — the galaxy is centred on the origin, superseding the 0-based grid](#2026-08-31-the-galaxy-is-centred-on-the-origin-superseding-the-0-based-grid)
+- [2026-09-08 — `pln`'s heading is ours; its data row stays canon's](#2026-09-08--plns-heading-is-ours-its-data-row-stays-canons)
 - [2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired](#2026-09-08--ai-population-scales-with-univmax-hypdst1hypdst2-wired)
 - [2026-09-08 — Eight surviving hand-written lines go back to canon, even where ours said more](#2026-09-08--eight-surviving-hand-written-lines-go-back-to-canon-even-where-ours-said-more)
 - [2026-09-05 — Invented text is replaced with canon; a branch canon lacks is deleted, not reworded](#2026-09-05--invented-text-is-replaced-with-canon-a-branch-canon-lacks-is-deleted-not-reworded)
@@ -4326,3 +4327,57 @@ being gold-poor is exactly what makes planets worth developing instead.
 older cybertron specs hardcoded canon's counts as fixtures while reading the
 live config for caps; they now derive from the config, so a retune cannot fail
 a test about boot-seeding or class selection.
+
+## 2026-09-08 — `pln`'s heading is ours; its data row stays canon's
+
+**Context:** a player ran `pln`, saw
+
+    Planet Name         sector planet
+    Colony #1               -4     5  1
+
+and reported the sector numbers as wrong. They were not: the port's output is
+byte-for-byte identical to canon. The heading is what is wrong, and it is wrong
+in canon.
+
+`cmd_planet` writes the row with a raw `prf`, not a message id:
+
+    prf("%-20s %5d %5d  %d \r", planet.name, planet.xsect, planet.ysect, planet.plnum)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^  three numbers
+
+and heads it with `PLAMSG1`, `Planet Name         sector planet` — **two labels
+for three numbers**. `sector` lands over the X, `planet` lands over the Y
+SECTOR, and the planet number falls under no label at all. Read as written the
+line says sector -4, planet 5, and a stray 1. The truth is sector (-4, 5),
+planet 1, which is where that pilot actually was.
+
+**Decision:** the heading becomes port-original —
+`Planet Name              x     y  #` — and the data row stays byte-for-byte
+canon. Same widths, same positions, same trailing space. Only the labels move,
+so each sits over the column it names.
+
+**Reason:** this is the "shape" decision of 2026-09-08 applied to a concrete
+case — what is displayed stays canon, how it is LABELLED is ours. Canon's
+heading is not a design choice we are overriding; it is a formatting bug in the
+original that misinforms a reader on first contact, which is exactly how it was
+found. The label is also not one of canon's *words* in the sense the landing
+page promises: no prose changes, no message text is paraphrased, and the row a
+player would compare against a 1992 screenshot is unchanged.
+
+Note what was NOT done: the row was not widened to fit longer labels. Wider
+columns would move every number and break that comparison, to buy nothing the
+short labels do not already deliver.
+
+**Alternatives rejected:**
+- *Keep canon's heading and document it in the guide.* This is how the warp-8
+  and "unless provoked" claims were handled, and it is right for PROSE the
+  player reads once. A column heading is read every time the command is run,
+  by someone who will not have the guide open, and it is misread in the
+  direction of thinking the game is broken.
+- *Drop the heading.* Loses the only cue that the two middle columns are a
+  coordinate pair.
+
+**Tests:** `test/game/commands/handlers/pln.handler.spec.ts` pins that each
+label sits over the column it names, by slicing the header and the row at
+canon's own column spans. Asserting the header STRING would not have caught
+this — canon's string was perfectly well-formed, it just described a different
+table.

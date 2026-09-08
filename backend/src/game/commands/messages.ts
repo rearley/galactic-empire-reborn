@@ -1185,7 +1185,24 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   [MessageId.ATT_GROUND_AA]: CANON_MESSAGES.ATTACKF8,
 
   // pln (feature 014) — GECMDS.C cmd_pln
-  [MessageId.PLN_HEADER]: CANON_MESSAGES.PLAMSG1,
+  // PORT-ORIGINAL, and a DELIBERATE deviation from canon's PLAMSG1.
+  //
+  // Canon's heading is 'Planet Name         sector planet' — two labels over a
+  // row that prints THREE numbers, `prf("%-20s %5d %5d  %d", name, xsect,
+  // ysect, plnum)` (GECMDS.C:4078). The columns do not line up with it:
+  //
+  //   Planet Name         sector planet
+  //   Colony #1               -4     5  1
+  //
+  // 'sector' sits over the X, 'planet' sits over the Y SECTOR, and the actual
+  // planet number falls under no label at all. Read as written it says sector
+  // -4, planet 5, and a stray 1; the truth is sector (-4, 5), planet 1. Found
+  // in play, by a player reading it exactly that way.
+  //
+  // The DATA ROW stays byte-for-byte canon — same widths, same positions, same
+  // spacing (see PLN_ROW). Only the labels move, so they land over the columns
+  // they name. @see docs/DECISIONS.md 2026-09-08
+  [MessageId.PLN_HEADER]: 'Planet Name              x     y  #',
   [MessageId.PLN_NONE]: CANON_MESSAGES.PLAMSG2,
   [MessageId.PLN_ROW]: '%-20s %5d %5d  %d ', // GECMDS.C:cmd_planet prf — canon's row, inline in the C rather than the MSG file
 
