@@ -6,6 +6,7 @@ import { EventLog } from './components/EventLog';
 import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
 import { ConnectionIndicator } from './components/ConnectionIndicator';
+import { BUILD_VERSION } from './version';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
@@ -343,7 +344,15 @@ function Terminal(): React.JSX.Element {
 
       {/* Top bar: title + connection indicator (FR-002, FR-022) */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-1">
-        <span className="text-xs text-gray-500 uppercase tracking-widest">Galactic Empire</span>
+        <span className="text-xs text-gray-500 uppercase tracking-widest">
+          Galactic Empire
+          {/* Build identity. Deploys are hands-off, so this is the only way to
+              tell whether what you are looking at is the change you pushed.
+              @see src/version.ts */}
+          <span className="ml-2 normal-case tracking-normal text-gray-700" title="build">
+            {BUILD_VERSION}
+          </span>
+        </span>
         <ConnectionIndicator status={status} />
       </div>
 

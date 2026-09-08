@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PresenceService } from './presence.service';
 import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../game/player/roster-query';
+import { buildVersion, releaseVersion } from './build-version';
 
 /** Long enough that polling costs nothing; short enough to feel live. */
 export const STATS_CACHE_MS = 15_000;
@@ -22,6 +23,12 @@ export interface PublicStats {
   commanders: number;
   online: number;
   roster: PublicRosterEntry[];
+  /**
+   * The backend's own build, so a UI header showing the FRONTEND's build cannot
+   * quietly misrepresent what the game engine is running. The two images roll
+   * independently; when they disagree, this is where it shows.
+   */
+  version: string;
 }
 
 type CachedShape = { commanders: number; roster: PublicRosterEntry[] };
@@ -71,13 +78,16 @@ export class StatsService {
       // every waiter and is never written into `this.cached` — see
       // fetchAndCache — so a single failure does not get served for 15s.
       const cached = await this.pending;
-      return { ...cached, online: this.presence.count() };
+      return this.withLiveFields(cached);
     }
 
     // Read outside the cache branch on purpose: online-now is what makes the
     // page feel alive, and freezing it for 15 seconds is the one thing this
     // cache must not do.
-    return { ...this.cached, online: this.presence.count() };
+    // Read outside the cache branch, like `online`: a redeploy replaces the
+    // process, so a stale version would only ever be wrong for 15 seconds —
+    // but those are exactly the 15 seconds someone is watching for a deploy.
+    return this.withLiveFields(this.cached);
   }
 
   /**
@@ -87,6 +97,23 @@ export class StatsService {
    * call rather than being remembered — successfully or not — for
    * STATS_CACHE_MS.
    */
+  /**
+   * The two fields that must never come from the cache.
+   *
+   * `online` is what makes the page feel alive; freezing it for 15 seconds is
+   * the one thing this cache must not do. `version` is the same concern in
+   * reverse — a redeploy replaces the process, so a cached value could only be
+   * wrong for 15 seconds, but those are exactly the seconds someone is
+   * refreshing to see whether their deploy landed.
+   */
+  private withLiveFields(cached: { commanders: number; roster: PublicRosterEntry[] }): PublicStats {
+    return {
+      ...cached,
+      online: this.presence.count(),
+      version: `${releaseVersion(process.env)} · ${buildVersion(process.env)}`,
+    };
+  }
+
   private async fetchAndCache(now: number): Promise<CachedShape> {
     const [commanders, rows] = await Promise.all([
       this.prisma.user.count({ where: { passwordHash: { not: null } } }),
