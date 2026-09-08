@@ -18,7 +18,9 @@ export class RenameHandlerService {
   get command(): Command {
     return {
       keyword: 'rename',
-      aliases: [],
+      // canon's own keyword (GECMDS.C cmdtab). Shipping only the long form
+      // made the command untypeable by the name the original uses.
+      aliases: ['ren'],
       minArgs: 1,
       argMissingMessage: 'Usage: rename <new-name>',
       handler: (
