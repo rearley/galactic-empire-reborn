@@ -454,6 +454,44 @@ export class ScanHandlerService implements OnModuleInit {
    * @see GECMDS.C:3019 printmapfull
    * @see specs/015-scan-modes/plan.md §T032
    */
+
+  /**
+   * The scantab side panel — canon's `printmapfull()` (GECMDS.C:3019).
+   *
+   * Shared by `scan ra` (when SCANFULL is on, GECMDS.C:2571) and by this
+   * port's `scan lo full`. It was written inline in the latter, which is how
+   * SCANFULL came to be a settable option that no rendering code consulted.
+   */
+  private buildSidePanel(
+    ship: ShipState,
+    scantab: ReturnType<typeof buildScantab>,
+    allShips: ShipState[],
+  ): SidePanelRow[] {
+    return scantab.map((entry) => {
+      const other = allShips.find((s) => `${s.userid}#${s.shipno}` === entry.shipKey);
+      const row: SidePanelRow = {
+        letter: entry.letter,
+        // RAW units, as C prints them: `spr("%ld",(long)(sptr->ship[i].dist))`
+        // at GECMDS.C:5985. Dividing by 10 000 collapsed the only continuous
+        // range readout in the game to a single digit -- a droid closing from
+        // 14 900 to 10 100 read "1" both times, and anything inside half a
+        // sector read "0" -- exactly when a new pilot is deciding to fight or
+        // run. docs/DECISIONS.md D7 already specifies a right-justified 6-char
+        // field, which only makes sense for the raw magnitude.
+        distance: Math.trunc(entry.dist),
+        bearing: entry.bearing,
+        // Already relative and signed from scantab; see its `heading` docs.
+        heading: entry.heading,
+        speedDisplay: showarp(entry.speed),
+      };
+      // GECMDS.C:3064 — the name row is printed only when SCANNAMES is set.
+      if (ship.scanNames && other) {
+        row.name = other.shipname;
+      }
+      return row;
+    });
+  }
+
   private scanLoFull(ship: ShipState): CommandResult {
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
@@ -486,28 +524,7 @@ export class ScanHandlerService implements OnModuleInit {
     });
 
     // Build side-panel rows (sorted by ascending distance — scantab is already sorted)
-    const sidePanel: SidePanelRow[] = newScantab.map(entry => {
-      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
-      const row: SidePanelRow = {
-        letter: entry.letter,
-        // RAW units, as C prints them: `spr("%ld",(long)(sptr->ship[i].dist))`
-        // at GECMDS.C:5985. Dividing by 10 000 collapsed the only continuous
-        // range readout in the game to a single digit -- a droid closing from
-        // 14 900 to 10 100 read "1" both times, and anything inside half a
-        // sector read "0" -- exactly when a new pilot is deciding to fight or
-        // run. docs/DECISIONS.md D7 already specifies a right-justified 6-char
-        // field, which only makes sense for the raw magnitude.
-        distance: Math.trunc(entry.dist),
-        bearing: entry.bearing,
-        // Already relative and signed from scantab; see its `heading` docs.
-        heading: entry.heading,
-        speedDisplay: showarp(entry.speed),
-      };
-      if (ship.scanNames && other) {
-        row.name = other.shipname;
-      }
-      return row;
-    });
+    const sidePanel = this.buildSidePanel(ship, newScantab, allShips);
 
     const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
     const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
@@ -629,7 +646,18 @@ export class ScanHandlerService implements OnModuleInit {
 
     return {
       lines: [{ text: header, category: 'info' }],
-      scanRender: { kind: 'ra', mode, cells, header },
+      // GECMDS.C:2571 — `if (waruptr->options[SCANFULL]) printmapfull(); else
+      // printmap();`. SCANFULL is read in scan_ra and NOWHERE else: scan_se
+      // (:2635) and scan_lo (:2723) call printmap() unconditionally. Omitting
+      // the panel entirely, rather than sending an empty one, is what keeps
+      // the option's two states distinguishable to the client.
+      scanRender: {
+        kind: 'ra',
+        mode,
+        cells,
+        header,
+        ...(ship.scanFull ? { sidePanel: this.buildSidePanel(ship, newScantab, allShips) } : {}),
+      },
     };
   }
 
