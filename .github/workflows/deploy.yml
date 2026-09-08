@@ -47,6 +47,12 @@ jobs:
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # The release number lives in one place, at the repo root, so both images
+      # cannot disagree about what release they are.
+      - name: Read VERSION
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Log in to ghcr
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
@@ -59,6 +65,12 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          # Baked into the image so the running app can say which commit it is.
+          # Same value as the :sha tag below, so a version on screen names a
+          # pullable image, which is what makes it useful for rolling back.
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=${{ steps.version.outputs.value }}
           # :latest is what watchtower follows; the sha tag is what makes a bad
           # deploy recoverable — pin the compose file to a sha to roll back.
           tags: |

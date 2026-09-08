@@ -387,6 +387,33 @@ parallel agents). They are complementary, not competing.
 9. `009-midnight-job` — Scoring, production reports, mail purge
 10. `010-react-frontend` — Terminal UI, ASCII map, command input, event log
 
+## Versioning — bump `VERSION` with anything that deploys
+
+`VERSION` at the repo root is the release number. It is read once by the build
+workflow and baked into BOTH images, so the two can never disagree about what
+release they are.
+
+**Bump it in the same commit as any change that will be deployed.** Not in a
+follow-up, not at the end of a session — in the commit, because a version that
+lags is worse than no version: it says a deploy landed when it did not.
+
+- **patch** — a fix, a canon correction, a copy change
+- **minor** — a new command, a new page, a mechanic
+- **major** — reserved; the port reaching parity with canon is not a `1.0`
+  until a returning player says it is
+
+The UI header shows `v<VERSION> · <short git SHA>`, and `/public/stats`
+reports the same pair for the backend. Two values because they fail
+differently: `VERSION` is meaningful but hand-maintained, so it goes stale the
+moment someone forgets — `backend/package.json` sat at `0.0.1` for fifty
+commits, which is exactly the failure this rule exists to prevent. The SHA is
+derived from the commit and cannot be forgotten, but says nothing about what
+the release IS.
+
+If you add a new deployable image or a second build path, wire `GIT_SHA` and
+`APP_VERSION` through it. A version that silently falls back to `dev` in
+production is worse than none, because it looks like it is working.
+
 ## Living Documentation (always keep current)
 
 These files in `docs/` are the handoff point between Claude Code sessions

@@ -35,6 +35,13 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/config ./config
 COPY package*.json ./
 
+# Build identity, reported on /public/stats. Read at RUNTIME here (unlike the
+# frontend, where Vite inlines it at build time), so these are plain ENV.
+ARG GIT_SHA=""
+ARG APP_VERSION=""
+ENV GIT_SHA=$GIT_SHA
+ENV APP_VERSION=$APP_VERSION
+
 # Copy and set entrypoint
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
