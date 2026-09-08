@@ -66,11 +66,17 @@ export function warnTarget(
   kind: CombatTargetWarningEvent['kind'],
   deps: Pick<LockOutcomeDeps, 'events' | 'lettersFor'>,
 ): void {
-  const targetLetters = deps.lettersFor(target.userid, target.shipno);
+  // The letter is resolved by the GATEWAY, from `attackerId`, against the
+  // victim's scan table at the moment of delivery — canon evaluates
+  // `shpltr(shpnum, usrn)` inside the prfmsg to that user (GECMDS.C:1198).
+  // One mechanism, so no emitter can get it wrong again; the AI path did,
+  // naming letters that belonged to other contacts. `attackerLetter` stays
+  // empty rather than being computed twice.
   deps.events.emit(COMBAT_TARGET_WARNING, {
     victimId: shipKey(target.userid, target.shipno),
+    attackerId: shipKey(firer.userid, firer.shipno),
     kind,
-    attackerLetter: shipLetter(targetLetters, `${firer.userid}:${firer.shipno}`),
+    attackerLetter: '',
     tickAt: new Date(),
   } satisfies CombatTargetWarningEvent);
 }

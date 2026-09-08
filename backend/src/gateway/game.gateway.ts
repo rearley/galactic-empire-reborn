@@ -1744,9 +1744,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'missile-inbound': MessageId.MISSILE_TRACKING,
       'scanners-jammed': MessageId.JAMMER3_JAMMED,
     }[event.kind];
+
+    // Canon resolves the letter AT PRINT TIME, against the scan table of the
+    // user being printed to: `prfmsg(TFIRE2, shpltr(shpnum, usrn))` where
+    // `shpnum` is the victim (GECMDS.C:1198). `shpltr` walks that victim's
+    // scantab and answers '?' if the firer is not in it (GEFUNCS.C:2578).
+    //
+    // So do it here, where the viewer is known, rather than trusting whatever
+    // the emitter computed. The Cybertron path had been deriving the letter
+    // from the ATTACKER's channel number, which produced warnings naming ships
+    // the pilot had never scanned ("Incoming torpedo from ship R" with no R on
+    // the scan) and could just as easily have named a letter belonging to a
+    // DIFFERENT contact in their table.
+    const letter = event.attackerId
+      ? shipLetter(
+          this.scanHandler.lettersFor(useridOf(event.victimId), shipnoOf(event.victimId)),
+          event.attackerId,
+        )
+      : event.attackerLetter;
+
     this.server.to(`user:${useridOf(event.victimId)}`).emit('event.log', {
       category: 'combat',
-      text: formatMessage(messageId, event.attackerLetter),
+      text: formatMessage(messageId, letter),
     });
   }
 
