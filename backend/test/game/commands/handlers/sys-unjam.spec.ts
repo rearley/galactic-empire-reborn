@@ -2,6 +2,8 @@ import { CommandResult, CommandContext } from '../../../../src/game/commands/com
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
+import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
@@ -39,7 +41,14 @@ function makeHarness(ships: ShipState[]) {
       return s;
     },
   } as unknown as ShipStateService;
-  return new SysHandlerService(shipState);
+  // prisma and cybControl are unused by the paths these specs exercise (the
+  // gate, and unjam); passing a real CybertronControlService rather than a mock
+  // because it has no dependencies and a mock would only test itself.
+  return new SysHandlerService(
+    shipState,
+    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    new CybertronControlService(),
+  );
 }
 
 const ctx: CommandContext = {};
@@ -56,26 +65,26 @@ describe('SysHandlerService — `sys unjam`', () => {
     else process.env.GE_SYSOP_USERNAME = saved;
   });
 
-  it('happy path — clears jammer immediately', () => {
+  it('happy path — clears jammer immediately', async () => {
     const alice = makeShip({ jammer: 15 });
     const h = makeHarness([alice]);
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['unjam'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
     expect(alice.jammer).toBe(0);
   });
 
-  it('idempotent — works when jammer already 0', () => {
+  it('idempotent — works when jammer already 0', async () => {
     const alice = makeShip({ jammer: 0 });
     const h = makeHarness([alice]);
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['unjam'], ctx) as CommandResult;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
     expect(alice.jammer).toBe(0);
   });
 
-  it('unknown subcommand → SYS_UNKNOWN', () => {
+  it('unknown subcommand → "Huh?", as canon falls through (GECMDS.C:4985)', async () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
-    const result = h.command.handler(alice, ['bogus'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNKNOWN));
+    const result = await h.command.handler(alice, ['bogus'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
   });
 });
