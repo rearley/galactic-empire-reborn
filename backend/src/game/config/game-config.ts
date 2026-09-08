@@ -168,7 +168,7 @@ export const SYSOP_OPTIONS = {
   MISENGFC: { min: 1, max: 2000, default: 100, canonDefault: 100, cReference: 'GEMAIN.C:600', implemented: true },
   SCRBONUS: { min: 0, max: 32700, default: 1000, canonDefault: 1000, cReference: 'GEMAIN.C:602', implemented: true },
   SCRFACT: { min: 0, max: 32700, default: 35, canonDefault: 35, cReference: 'GEMAIN.C:603', implemented: true,
-    note: 'Wired 2026-09-07. score.config.ts previously read a private SCORE_F2 env var defaulting to 100, independent of this option, so setting SCRFACT did nothing and the shipped score_f2 was never in force. It now resolves here. DEPLOYED AT 100 against canon 35 — a declared deviation, see config/game.config.json and docs/DECISIONS.md.' },
+    note: 'Wired 2026-09-07. score.config.ts previously read a private SCORE_F2 env var defaulting to 100, independent of this option, so setting SCRFACT did nothing and the shipped score_f2 was never in force. Deployed at 100 for one day as a declared deviation, then returned to canon 35 on 2026-09-08 once it was clear nobody had ever chosen 100 — see docs/DECISIONS.md.' },
   CHGLOSER: { min: 0, max: 100, default: 2, canonDefault: 2, cReference: 'GEMAIN.C:605', implemented: true },} as const satisfies Record<string, SysopOption>;
 
 export type SysopOptionName = keyof typeof SYSOP_OPTIONS;

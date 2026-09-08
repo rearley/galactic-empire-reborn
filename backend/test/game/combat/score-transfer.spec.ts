@@ -163,15 +163,17 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
       ),
     };
     const repo = buildRepo(prisma);
-    // 750/100 = 7, * scoreF2 100 = 700.
+    // 750/100 = 7 (integer), * SCRFACT 35 = 245. Canon's shipped factor
+    // (MBMGEMSG.MSG:472); this asserted 100 while the port ran a deviation
+    // nobody had chosen, which made a kill worth nearly three times canon.
     await repo.transferKillScore('attacker', 'victim', 750, false, false);
 
     const victimCall = updateMock.mock.calls.find(
       (c: unknown[]) => (c[0] as { where: { userid: string } }).where.userid === 'victim',
     );
     const data = (victimCall![0] as { data: { score: bigint; klscore: bigint } }).data;
-    expect(data.score).toBe(4300n);
-    expect(data.klscore).toBe(4300n);
+    expect(data.score).toBe(4755n);
+    expect(data.klscore).toBe(4755n);
   });
 
   it('skips victim deduction when isAiVictim=true', async () => {
