@@ -414,6 +414,30 @@ If you add a new deployable image or a second build path, wire `GIT_SHA` and
 `APP_VERSION` through it. A version that silently falls back to `dev` in
 production is worse than none, because it looks like it is working.
 
+## The player's guide — only one part of it can rot
+
+The public guide at `/guide` is GENERATED from `CANON_HELP`, the same help the
+game serves to `hel`. Command and concept pages need no maintenance and must
+not be hand-edited: two hand-written descriptions of one game is how a wiki
+ends up contradicting the game it documents.
+
+**The one hand-maintained part is `GUIDE_DEVIATIONS`** in
+`backend/src/public/guide.ts` — the notes saying where this port differs from
+the original, which canon cannot know.
+
+**When you add a deviation to `docs/DECISIONS.md`, ask whether a player would
+notice it. If they would, add it to `GUIDE_DEVIATIONS` on the page they would
+be reading when it bites.** A deviation a player meets in play and cannot find
+documented makes every other claim on the site less believable — and the
+landing page explicitly promises we are honest about these.
+
+Keep the notes short and concrete: what differs, and the original's value. A
+test asserts every entry attaches to a slug that exists, because a note on an
+unreachable page is a note nobody reads.
+
+If a new canon help topic becomes reachable, add it to `CONCEPTS` or `COMMANDS`
+in the same file — those lists decide what appears, not `CANON_HELP` itself.
+
 ## Living Documentation (always keep current)
 
 These files in `docs/` are the handoff point between Claude Code sessions

@@ -9,6 +9,7 @@ import { Login } from './routes/Login';
 import { Register } from './routes/Register';
 import { ChooseUsername } from './routes/ChooseUsername';
 import { Stats } from './routes/Stats';
+import { Guide, GuidePage } from './routes/Guide';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('No #root element found');
@@ -22,6 +23,8 @@ createRoot(rootElement).render(
         <Route path="/register" element={<Register />} />
         <Route path="/register/name" element={<ChooseUsername />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/guide" element={<Guide />} />
+        <Route path="/guide/:slug" element={<GuidePage />} />
         <Route path="/play" element={<RequireAuth><App /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
