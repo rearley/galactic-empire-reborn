@@ -17,7 +17,9 @@ import { I_FLUX } from '../../constants/items';
  */
 export const fluxCommand: Command = {
   keyword: 'flux',
-  aliases: [],
+  // canon's own keyword (GECMDS.C cmdtab). Shipping only the long form
+  // made the command untypeable by the name the original uses.
+  aliases: ['flu'],
   minArgs: 0,
   argMissingMessage: formatMessage(MessageId.FLUX_FMT),
   handler(ship: ShipState, _args: string[], _ctx: CommandContext): CommandResult {
