@@ -3771,6 +3771,7 @@ returns an awaitable hull write.
 **Decisions made:** docs/DECISIONS.md 2026-09-08.
 **Next:** deploy scheduling still worth doing — this makes the loss impossible,
 not the interruption.
-**Known issues:** `cybertron.repository.ts` createSpawn's update branch resets
-~24 fields but not `destruct`, so a recycled Cybertron slot inherits a
-self-destruct countdown. Real, unrelated to this incident, not yet fixed.
+**Known issues:** none outstanding — the `createSpawn` `destruct` omission
+noted here was fixed the same day (docs/DECISIONS.md 2026-09-08). Any countdown
+already persisted on a live AI hull from before that fix is still armed; we have
+not confirmed one exists.
