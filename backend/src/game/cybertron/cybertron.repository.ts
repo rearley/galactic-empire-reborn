@@ -192,6 +192,13 @@ export class CybertronRepository {
           jammer: 0,
           repair: 0,
           cantexit: 0,
+          // A recycled slot inherits the previous occupant's countdown without
+          // this, and destructTick acts on any value above zero — so a brand
+          // new Cybertron detonates for something the ship before it did.
+          // Canon assigns `destruct` nonzero in exactly one place, cmd_destruct
+          // on the caller's OWN ship (GECMDS.C:5031), and zeroes it for every
+          // new hull (GEFUNCS.C:256 initshp). An automaton never sets it.
+          destruct: 0,
           lastfired: 0,
           lock: 0,
           ltorpsChannel: [255, 255, 255],

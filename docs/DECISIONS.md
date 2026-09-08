@@ -4569,3 +4569,27 @@ after a restart — narrower, needs a migration, and still loses the loot when t
 attacker has since disconnected. Doing nothing and scheduling deploys around
 players — that is worth doing anyway, but it makes the loss rarer rather than
 impossible.
+
+## 2026-09-08 — A recycled Cybertron slot no longer inherits a destruct timer
+**Context:** Found while investigating the Obliterator death. Unrelated to that
+incident's cause, but the same shape of latent defect.
+**Decision:** `createSpawn`'s upsert `update` branch resets `destruct` to 0
+along with the two dozen fields it already reset.
+**Reason:** The branch exists because a dead Cybertron's row is not always
+deleted (P-007), so the slot's next occupant must get a clean hull. It cleared
+damage, energy, speed, shields, cloak, cantexit, lastfired, the projectile
+arrays, kills and hostile — but not `destruct`, and
+`ShipManagementTickService.destructTick` acts on any value above zero. A brand
+new Cybertron could therefore detonate seconds after spawning for something the
+previous ship did, and the death would surface as `attacker=none cause=unknown`
+with no way to explain it.
+
+Canon assigns `destruct` nonzero in exactly one place across the whole original
+— `cmd_destruct` (GECMDS.C:5031), on the calling player's own ship — and zeroes
+it for every new hull (GEFUNCS.C:256). An automaton never sets it, which is why
+canon's help calling Cybertrons prone to "malfunction" (MBMGEHLP.MSG:416) means
+their strange transmissions, not self-destruction.
+**Alternatives rejected:** Zeroing `destruct` for AI ships at hydration as well
+— it would also disarm any countdown already persisted from before this fix,
+but it mutates a hot path on every boot to cover a case we have not confirmed
+exists. Left as a note instead.
