@@ -9,6 +9,9 @@ import { ITEM_NAMES, NUMITEMS } from '../../constants/items';
 import { parseTaxRate } from './helpers/tax-rate';
 import { MAXPLNTS } from '../../constants';
 import { describeTradeAccess } from './helpers/trade-access-label';
+import { isPrintableBeacon } from '../../ship/beacon';
+/** BEACONMSGSZ — GEMAIN.H. The adm help already advertises 75. */
+const BEACON_MAX = 75;
 
 /**
  * Handles the `admin` / `adm` command — planet owner configuration.
@@ -183,8 +186,23 @@ export class AdminHandlerService {
         break;
       }
       case 'beacon': {
-        const value = args.slice(1).join(' ');
-        change = { type: 'beacon', value };
+        // Sanitise on WRITE as well as on read. This is the one place in the
+        // game where text written by one player is rendered on another
+        // player's screen, so a control character here is a terminal escape
+        // sequence delivered to every ship that flies past. Canon strips it at
+        // read time by blanking the whole beacon (GEMAIN.C:1817-1824); doing it
+        // on write too means the operator sees the rejection rather than
+        // wondering later why their beacon never appears.
+        const raw = args.slice(1).join(' ');
+        if (raw !== '' && !isPrintableBeacon(raw)) {
+          return {
+            lines: [{
+              text: 'Beacon message must be plain printable text, Sir!',
+              category: 'system' as const,
+            }],
+          };
+        }
+        change = { type: 'beacon', value: raw.slice(0, BEACON_MAX) };
         break;
       }
       case 'password': {

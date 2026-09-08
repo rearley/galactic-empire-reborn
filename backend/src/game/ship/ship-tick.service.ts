@@ -38,6 +38,9 @@ import { SHIELDDM,
   ENGRECHG,
   REPAIRRATE,
 } from '../constants';
+import { isPrintableBeacon, shouldAnnounceBeacon } from './beacon';
+import { PLANET_BEACON, PlanetBeaconEvent } from './beacon-events';
+import { MAXPLANETS } from '../constants';
 
 /**
  * Drives the 1-second SHIP_UPDATE tick for all active ships.
@@ -178,6 +181,8 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       case 'noop':
         break;
     }
+
+    this.maybeAnnounceBeacon(ship);
   }
 
   /**
@@ -404,6 +409,51 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
    *
    * @see GEFUNCS.C:1785-1812 fireion, GEFUNCS.C:797-798 the checkdist call
    */
+
+  /**
+   * A colony hailing a ship loitering in its sector.
+   *
+   *   if (samesect(&beacon[usrn].coord, &ptr->coord))
+   *     if (beacon[usrn].beacon[0] != 0 && gernd()%10 == 0)
+   *       prfmsg(BEAC01, plnum, beacon);
+   *   — GEFUNCS.C:808-813
+   *
+   * `adm beacon <message>` has always stored the text and nothing ever showed
+   * it, so the admin command advertised a feature that did nothing.
+   *
+   * Canon caches one beacon per user at sector-load time; we look the sector up
+   * directly, which needs no cache and cannot go stale. The 1-in-10 roll is
+   * canon's and is the point: an occasional hail from a colony you are near,
+   * not a banner the moment you cross a boundary.
+   *
+   * Printability is re-checked at read time as well as on write. Canon does the
+   * same (GEMAIN.C:1817-1824) and for the same reason — this is the one place
+   * where text written by one player renders on another player's screen.
+   */
+  private maybeAnnounceBeacon(ship: ShipState): void {
+    if (!this.planets || !this.events) return;
+
+    const xsect = Math.floor(ship.xcoord);
+    const ysect = Math.floor(ship.ycoord);
+
+    for (let plnum = 1; plnum <= MAXPLANETS; plnum++) {
+      const planet = this.planets.get(xsect, ysect, plnum);
+      const message = planet?.beacon?.trim();
+      if (!message || !isPrintableBeacon(message)) continue;
+
+      // Roll only once a beacon is actually found, so sectors without one do
+      // not consume rolls and change the sequence for everything else.
+      if (!shouldAnnounceBeacon(this.rng2)) return;
+
+      this.events.emit(PLANET_BEACON, {
+        shipId: `${ship.userid}:${ship.shipno}`,
+        plnum,
+        message,
+      } satisfies PlanetBeaconEvent);
+      return;
+    }
+  }
+
   private fireIon(ship: ShipState): void {
     if (ship.hostile <= 1 || !this.planets) return;
 

@@ -76,6 +76,7 @@ import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
 import { shouldBroadcastTransition } from './transition-visibility';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
+import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1298,6 +1299,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * be dropped entirely behind a stale TODO, so a pilot's first sign of
    * trouble was a dead warp drive. @see ship/overspeed-events.ts
    */
+  /**
+   * A colony's beacon, to the one captain who rolled it.
+   *
+   * Routed to `user:` and not the sector room on purpose: canon rolls per ship
+   * inside the per-user movement path (GEFUNCS.C:809-813), so two pilots in the
+   * same sector hear it on different ticks. A room broadcast would have the
+   * colony shout at everyone in unison — a different, worse thing.
+   */
+  @OnEvent(PLANET_BEACON)
+  handlePlanetBeacon(event: PlanetBeaconEvent): void {
+    this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
+      category: 'info',
+      text: `*** Beacon Message from Planet # ${event.plnum} ${event.message}`,
+    });
+  }
+
   @OnEvent(SHIP_OVERSPEED)
   handleShipOverspeed(event: ShipOverspeedEvent): void {
     this.server.to(`user:${useridOf(event.shipId)}`).emit('event.log', {
