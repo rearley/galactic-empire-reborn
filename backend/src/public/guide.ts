@@ -73,6 +73,13 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
  * where to check.
  */
 export const GUIDE_CORRECTIONS: Readonly<Record<string, string>> = Object.freeze({
+  wormholes:
+    'This page calls wormholes "fairly rare" and never mentions that the neutral ' +
+    'zone has three permanent ones — Kayriez, Lydorian and Tryklon Portals, placed ' +
+    'by the original\'s own sector-zero table rather than generated. So the first ' +
+    'thing a new pilot sees is three of the rare thing, sitting together. Out in ' +
+    'the galaxy the description holds: roughly one body in six is a wormhole, ' +
+    'which is exactly what WORMODDS 6 asks for.',
   planets:
     'This page says anything you transfer to a planet "belongs to them, you cannot ' +
     'transfer it back". That is not what the original actually does. Its own ' +
