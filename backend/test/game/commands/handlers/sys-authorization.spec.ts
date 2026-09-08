@@ -31,6 +31,8 @@ import { CommandResult, CommandContext } from '../../../../src/game/commands/com
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
+import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
@@ -67,7 +69,14 @@ function makeHarness(ships: ShipState[]) {
       return s;
     },
   } as unknown as ShipStateService;
-  return new SysHandlerService(shipState);
+  // prisma and cybControl are unused by the paths these specs exercise (the
+  // gate, and unjam); passing a real CybertronControlService rather than a mock
+  // because it has no dependencies and a mock would only test itself.
+  return new SysHandlerService(
+    shipState,
+    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    new CybertronControlService(),
+  );
 }
 
 const ctx: CommandContext = {};
@@ -79,62 +88,62 @@ describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
     else process.env.GE_SYSOP_USERNAME = saved;
   });
 
-  it('refuses an ordinary player with "Huh?" and does NOT clear their jammer', () => {
+  it('refuses an ordinary player with "Huh?" and does NOT clear their jammer', async () => {
     delete process.env.GE_SYSOP_USERNAME;
     const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
     const h = makeHarness([alice]);
 
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
     expect(alice.jammer).toBe(15);
   });
 
-  it('refuses before dispatch, so an unknown subcommand also answers "Huh?"', () => {
+  it('refuses before dispatch, so an unknown subcommand also answers "Huh?"', async () => {
     delete process.env.GE_SYSOP_USERNAME;
     const alice = makeShip({ userid: 'usr_a1', username: 'Alice' });
     const h = makeHarness([alice]);
 
-    const result = h.command.handler(alice, ['bogus'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['bogus'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
   });
 
-  it('a username in GE_SYSOP_USERNAME is a sysop and may unjam', () => {
+  it('a username in GE_SYSOP_USERNAME is a sysop and may unjam', async () => {
     process.env.GE_SYSOP_USERNAME = 'root,Alice';
     const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
     const h = makeHarness([alice]);
 
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
     expect(alice.jammer).toBe(0);
   });
 
-  it('the allowlist is exact — a non-listed username is still refused', () => {
+  it('the allowlist is exact — a non-listed username is still refused', async () => {
     process.env.GE_SYSOP_USERNAME = 'root';
     const mallory = makeShip({ userid: 'usr_m1', username: 'Mallory', jammer: 15 });
     const h = makeHarness([mallory]);
 
-    const result = h.command.handler(mallory, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(mallory, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
     expect(mallory.jammer).toBe(15);
   });
-  it('matches the username case-insensitively, as registration does', () => {
+  it('matches the username case-insensitively, as registration does', async () => {
     // username is case-insensitively unique (schema.prisma User.username), so
     // the allowlist must not care about the case the operator typed in .env.
     process.env.GE_SYSOP_USERNAME = 'rick';
     const rick = makeShip({ userid: 'usr_r1', username: 'Rick', jammer: 15 });
     const h = makeHarness([rick]);
 
-    const result = h.command.handler(rick, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(rick, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_UNJAM));
     expect(rick.jammer).toBe(0);
   });
 
-  it('a matching USERID does not grant sysop — only the username counts', () => {
+  it('a matching USERID does not grant sysop — only the username counts', async () => {
     // Guards the whole point of the change: userids are random per
     // registration, so treating one as an allowlist entry would be a
     // configuration that silently stops working after a reset.
@@ -142,19 +151,19 @@ describe('SysHandlerService — canon sysop gate (GECMDS.C:4752-4760)', () => {
     const alice = makeShip({ userid: 'usr_a1', username: 'Alice', jammer: 15 });
     const h = makeHarness([alice]);
 
-    const result = h.command.handler(alice, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(alice, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
     expect(alice.jammer).toBe(15);
   });
 
-  it('a ship with no cached username is never a sysop', () => {
+  it('a ship with no cached username is never a sysop', async () => {
     process.env.GE_SYSOP_USERNAME = 'Alice';
     const ghost = makeShip({ userid: 'usr_g1', jammer: 15 });
     delete (ghost as { username?: string }).username;
     const h = makeHarness([ghost]);
 
-    const result = h.command.handler(ghost, ['unjam'], ctx) as CommandResult;
+    const result = await h.command.handler(ghost, ['unjam'], ctx) as CommandResult;
 
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SYS_HUH));
     expect(ghost.jammer).toBe(15);

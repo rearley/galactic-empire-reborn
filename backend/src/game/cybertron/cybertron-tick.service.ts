@@ -89,6 +89,7 @@ import {
 } from './cyb-decisions';
 import { pickTaunt, bandName, CYB_ANNOY_BANDS, type CybAnnoyBand } from './taunt-pool';
 import { CombatTickService } from '../combat/combat-tick.service';
+import { CybertronControlService } from './cybertron-control.service';
 
 /**
  * Drives the Cybertron/Sartern AI state machine on every PHYSICS tick.
@@ -121,6 +122,7 @@ export class CybertronTickService implements OnModuleInit {
     private readonly repository: CybertronRepository,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
+    @Optional() private readonly cybControl?: CybertronControlService,
     @Optional() private readonly combatTick?: CombatTickService,
     // Optional so the many hand-built test harnesses keep working; a Cybertron
     // with no registry simply never sweeps, which is the pre-existing behaviour.
@@ -225,6 +227,12 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   private onAiTick(ctx: TickContext): void {
+    // `sys cybpause nnn` — canon's cybhaltflg (GECMDS.C:4972). Returning before
+    // the countdown, not just before the decisions, is deliberate: canon halts
+    // the AI outright, and letting `tick` keep draining would make every
+    // Cybertron act at once the instant the pause lifted.
+    if (this.cybControl?.isPaused()) return;
+
     const ships = this.selectAiShips();
 
     const due: ShipState[] = [];

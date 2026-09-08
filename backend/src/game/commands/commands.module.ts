@@ -69,9 +69,10 @@ import { PhysicsModule } from '../physics/physics.module';
 import { CombatModule } from '../combat/combat.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { MailModule } from '../mail/mail.module';
+import { CybertronControlModule } from '../cybertron/cybertron-control.module';
 
 @Module({
-  imports: [ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule, TeamModule],
+  imports: [CybertronControlModule, ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule, TeamModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,
