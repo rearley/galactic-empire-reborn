@@ -21,6 +21,13 @@ export interface GuideEntry {
   body: readonly string[];
   /** How this port differs from canon on this topic, if it does. */
   deviation?: string;
+  /**
+   * Where canon's own help contradicts canon's own CODE, and the code wins.
+   * Distinct from `deviation`: we changed nothing, the original was wrong
+   * about itself. Conflating the two would either accuse the original of a
+   * change we made, or claim credit for behaviour that was always canon.
+   */
+  correction?: string;
 }
 
 export interface GuideSection {
@@ -58,6 +65,25 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'A port addition: `sca lo full` gives the full long-range view directly, ' +
     'without setting an option first. `set scanfull on` still works, on range scans, ' +
     'exactly as the original does it.',
+});
+
+/**
+ * Where the original's help is wrong about the original's own behaviour.
+ *
+ * The project rule is that in-game help states INTENT and the C source states
+ * truth; help is never authoritative. These are the places a player would
+ * otherwise be actively misled, so the page says what the code does and cites
+ * where to check.
+ */
+export const GUIDE_CORRECTIONS: Readonly<Record<string, string>> = Object.freeze({
+  planets:
+    'This page says anything you transfer to a planet "belongs to them, you cannot ' +
+    'transfer it back". That is not what the original actually does. Its own ' +
+    'TRANSFER page documents `transfer up`, and the code implements it (GECMDS.C ' +
+    'trans_up), gated on a comment that reads "you must own this planet or NOBODY ' +
+    'must own it to xfer up". So you can always retrieve items from a planet you ' +
+    'own, or from one nobody has claimed. Buying applies to someone ELSE\'s planet. ' +
+    'This port follows the code, not the help.',
 });
 
 /** Canon's concept pages, in the order a new player should meet them. */
@@ -103,7 +129,14 @@ function clean(body: readonly string[] | undefined): string[] {
 
 function entry(slug: string, title: string, id: string): GuideEntry {
   const deviation = GUIDE_DEVIATIONS[slug];
-  return { slug, title, body: clean(CANON_HELP[id]), ...(deviation ? { deviation } : {}) };
+  const correction = GUIDE_CORRECTIONS[slug];
+  return {
+    slug,
+    title,
+    body: clean(CANON_HELP[id]),
+    ...(deviation ? { deviation } : {}),
+    ...(correction ? { correction } : {}),
+  };
 }
 
 export function buildGuide(): Guide {

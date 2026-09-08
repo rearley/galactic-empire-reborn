@@ -435,6 +435,19 @@ Keep the notes short and concrete: what differs, and the original's value. A
 test asserts every entry attaches to a slug that exists, because a note on an
 unreachable page is a note nobody reads.
 
+`GUIDE_CORRECTIONS`, in the same file, is a SEPARATE list for where the
+original's help is wrong about the original's own code. Keep the two apart:
+one says "we changed this", the other says "the original was wrong about
+itself and we follow its code". Conflating them either accuses the original of
+our change or claims credit for behaviour that was always canon. A page can
+carry both — `planets` does.
+
+That list exists because canon's help states INTENT and its C source states
+truth. `HLPPLANT` claims items transferred to a planet "cannot" be transferred
+back; `HLPTRA` documents `transfer up` and `GECMDS.C trans_up` implements it.
+When play turns up another of these, check the C source, follow it, and add
+the note rather than editing canon's text — the text is the historical record.
+
 If a new canon help topic becomes reachable, add it to `CONCEPTS` or `COMMANDS`
 in the same file — those lists decide what appears, not `CANON_HELP` itself.
 
