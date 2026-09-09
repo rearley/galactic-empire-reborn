@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 68 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
 - [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
 - [2026-09-09 — the docs said work was outstanding that had been done for months](#2026-09-09--the-docs-said-work-was-outstanding-that-had-been-done-for-months)
 - [Backlog — before going public: account-enumeration hardening](#backlog--before-going-public-account-enumeration-hardening)
@@ -4113,3 +4114,87 @@ is dead. Either the public repository lands before the next frontend deploy, or
 the `/provenance` route comes out of `main.tsx` until it does. Note also that
 the current private remote is spelled `galatic-empire-reborn`; the constant uses
 the corrected spelling on the assumption the public one will be a new repository.
+
+## Backlog — going public: the decision, and what has to be true first
+
+Raised 2026-09-09. **Nothing here is started, and nothing should be.** Rick is
+reviewing the repository before choosing. This section exists so the reasoning
+survives the gap.
+
+### Where it stands
+
+The licence is chosen and committed: **AGPL-3.0-or-later**, with `LICENSE`,
+`NOTICE`, the generated-file headers and the `/provenance` page all in place.
+See `docs/DECISIONS.md` 2026-09-09.
+
+**Nothing has been distributed.** The repository is private, no images are
+published, and no player has been offered the source. That matters more than it
+sounds: a copyleft grant is irrevocable for the version it goes out on, so the
+licence choice is still genuinely open right now and will not be once the repo
+is public.
+
+### Open question 1 — is AGPL still the right answer
+
+Both options satisfy the inbound GPL-2.0-or-later terms.
+
+| | What it asks of us | What it gives up |
+|---|---|---|
+| **AGPL-3.0-or-later** (current) | Anyone playing is entitled to the source of the running service | Nothing extra beyond GPL; the network clause is the whole difference |
+| **GPL-3.0-or-later** | Nothing at all for running a public service; obligations start when we ship code or images | The reciprocity that matches how this software is actually used |
+
+Neither prevents charging for accounts, taking donations, or selling hosting.
+Copyleft constrains the code, not the money. What either gives up is
+exclusivity — someone else may stand up their own instance — and that was
+already true before this port existed, because Murdock released his source.
+
+### Open question 2 — one repository or two
+
+Rick's constraint: **he does not want to maintain multiple repositories.** That
+settles it in favour of one, and one is also less work than the status quo — a
+push already is the deploy, so a public repo means the same push that ships a
+bug fix satisfies the source offer. No sync step, and no way for published
+source to drift from what is running.
+
+Remaining sub-choice, to be made after reviewing the tree:
+
+- **Squash this repository and flip it public.** Simplest. But `.gitignore`
+  does not untrack anything already tracked, so the tree has to be rebuilt, and
+  force-pushing over history is not the same as history never existing —
+  GitHub keeps unreachable objects addressable by SHA for a period.
+- **New public repository, this one stays private.** Cleanest break from the
+  587-commit history, including the commit that once held the database
+  password (rotated and dead, but still). Costs one repository creation and
+  nothing after that if the private one is retired rather than maintained.
+
+### Must be true before publishing, either way
+
+1. **The `/provenance` route currently ships a dead link.** `SOURCE_URL` points
+   at a repository that does not exist. Either the public repo lands first, or
+   the route comes out of `main.tsx`. This is the only item that is already
+   live in the codebase.
+2. **Do the loopback bind.** The security review says the game's port is safe by
+   one mechanism. Publishing that sentence is only a problem while it is true.
+   Fix it and the audit becomes publishable.
+3. **Redact `docs/DEPLOYMENT.md`.** It should describe asking the container
+   where its config lives, which is already the better procedure. The compose
+   path and container names move to a local file outside the repository.
+4. **Decide on the commit author email.** Every commit carries
+   `1328538+rearley@users.noreply.github.com`, and squashing to one commit still leaves it on that
+   commit. GitHub's noreply address is the alternative.
+5. **Check the Actions run history.** Workflow *files* are harmless here —
+   `deploy.yml` triggers on push and manual dispatch only, never on pull
+   requests, and uses only the auto-provisioned token. But on a public
+   repository the *run logs* become world-readable, and existing history
+   carries over. Secrets are masked; hostnames and deploy output are not.
+6. **Note the remote spelling.** The private remote is
+   `rearley/galatic-empire-reborn`; `SOURCE_URL` assumes a corrected
+   `galactic-empire-reborn`. One of the two has to move.
+
+### Not reasons to delay
+
+Repository secrets are never exposed by making a repository public. `.claude/`
+is already gitignored, so no session data or settings are in the tree. Git
+history is not required by either licence — what is owed is the corresponding
+source of the version being run, not how it was written. And the enumeration
+finding in the security review stops being a secret the moment the source is
+public, since it is four lines of `auth.service.ts`.
