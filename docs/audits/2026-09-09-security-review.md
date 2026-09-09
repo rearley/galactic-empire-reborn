@@ -4,7 +4,7 @@
      serialization plus conditional debits) and were deliberately not attempted
      as "easy fixes". See the status banner below and §5. -->
 
-## Status — updated 2026-09-09, v0.9.1
+## Status — updated 2026-09-09, v0.11.0
 
 | # | Finding | Status |
 |---|---|---|
@@ -14,17 +14,35 @@
 | M4 | `sector:join` subscribes to any sector room | **FIXED** — handlers deleted, along with `validateCoord`/`SectorPayload`; `test/integration/game-gateway.spec.ts` |
 | M5 | Auth throttling keys on the proxy's IP | **FIXED** — `trust proxy: 'loopback'` via `src/http-security.ts`; `test/unit/trust-proxy.spec.ts` (2) |
 | lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
+| §5.1 | Command dispatch not serialized per socket | **FIXED (Part A)** — per-socket promise chain; `test/gateway/command-serialization.spec.ts` (5) |
 
-**Part B is done; Part A is not.** Part B made the invariants Postgres's job:
+**Every CONFIRMED finding is closed.** What remains below are unconfirmed leads
+and two host-level items only the owner can do. None of the remainder is a path
+to another player's account or assets; they are availability and hardening.
+
+### Leads reassessed after Part A
+
+| Lead | Now |
+|---|---|
+| One socket exhausting the DB pool by flooding commands | **Largely closed** by Part A — a socket can have one command in flight. Message-level flooding (CPU, memory) is untouched. |
+| `sen` as an unthrottled broadcast primitive | **OPEN.** `sen.handler` makes no DB call, so serialization does not slow it; a client can still spam sequentially. Payload is capped at 200 chars. |
+| Unlimited concurrent sockets per account | **OPEN.** The MAXPLRS seat cap (`game.gateway.ts:290`) bounds ships in flight, not sockets before boarding. |
+| Backend container runs as root | **OPEN.** No `USER` directive in `backend/Dockerfile`. Low, and partly a deployment choice. |
+| Cargo tonnage from a stale snapshot | **Closed in practice** — the same-socket race is gone with Part A, and ship item counts can no longer go negative, which was what manufactured phantom capacity. |
+| `/auth/register` email enumeration | **Won't fix, deliberately.** A signup form that will not say "already registered" is a worse product, and the address is the login identifier. Recorded so it is not re-raised. |
+
+**Both parts are done.** Part B made the invariants Postgres's job:
 every cash debit re-checks the balance in the same statement that spends it, and
 `depositToPlanet` takes the cargo from the hull inside the planet lock the way
 `sell()` always did. That holds regardless of scheduling, of two sockets on one
 account, or of a tick interleaving with a command.
 
-Part A — serializing command dispatch per socket (§5 item 1) — remains open by
-choice, as a separate change so any latency effect is attributable. It is now a
-robustness measure rather than the thing standing between a player and free
-credits.
+Part A — serializing command dispatch per socket (§5 item 1) — followed in
+v0.11.0 as a separate change so any latency effect would be attributable. Cost
+measured rather than assumed: every combat and navigation command makes zero
+database calls, so the queue adds one microtask and a pilot can only wait behind
+a trade or admin verb, which needs orbit. The ticks are deliberately outside the
+queue, so the world does not pause while a command is queued.
 
 Both fixes were verified in both directions: the two new specs fail against the
 unfixed code (5 of 8 cases) and pass against it. They run on a REAL Postgres,
