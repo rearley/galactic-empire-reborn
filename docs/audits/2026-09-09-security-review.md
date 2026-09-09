@@ -16,8 +16,39 @@
 | lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
 | §5.1 | Command dispatch not serialized per socket | **FIXED (Part A)** — per-socket promise chain; `test/gateway/command-serialization.spec.ts` (5) |
 
-**Every finding and every actionable lead is closed.** One host-level item
-remains: rotate the database password. One lead is deliberately left alone.
+**Every finding and every actionable lead is closed**, and the one host-level
+item is now done too — see the rotation below. One lead is deliberately left
+alone.
+
+### Database password — ROTATED 2026-09-09
+
+The old value was exposed twice: committed to this repo at `522774f` (private,
+but permanent in history), and later a fragment of it landed in a session
+transcript via a `psql` error. Rotated the same day.
+
+Verified by proving the **old** password no longer authenticates, rather than by
+watching the new one work — a backend that never reconnected would also report
+healthy, so the negative test is the one that carries information:
+
+```
+FATAL:  password authentication failed for user "<dbuser>"
+```
+
+with `/health` returning `{"status":"ok","database":"up"}` and the public site
+answering 200 on `/public/stats`. The compose backup holding the old value was
+deleted afterwards.
+
+**The rotation corrected a documentation error worth knowing about.**
+`docs/DEPLOYMENT.md` said the secret lived in `/opt/ge/.env`. That path has
+never existed. GE is managed by the <panel> Docker extension, so `DATABASE_URL`
+and `JWT_SECRET` sit inline in
+`/opt/<panel-path>/<redacted-stack-path>`. Anyone following the doc
+during an incident would have searched the wrong filesystem. The doc now says
+where the value is and, more usefully, how to ask the container instead of
+trusting a written path.
+
+Procedure, verification commands and the URL-encoding trap are recorded under
+"Rotating the database password" in `docs/DEPLOYMENT.md`.
 
 ### `:3100` exposure — CHECKED 2026-09-09, not exposed
 
@@ -238,6 +269,6 @@ ss -lnt | grep 3100
 4. **Delete the `sector:join` / `sector:leave` handlers** (`game.gateway.ts:1154-1210`). Nothing calls them. Five-minute fix, removes M4 entirely.
 5. **Scope the `__player_snapshot__` broadcast** (`game.gateway.ts:2524`) — per-socket fan-out through `scopePlayers`, or replace it with a name-only delta. This is the last hole in the v0.7.1–v0.8.1 position-disclosure work.
 6. **`app.set('trust proxy', 'loopback')` in `main.ts`**, then verify with a quick 15-request burst from two different source IPs that only the offender gets 429. Also resolve the `docs/DEPLOYMENT.md:137-141` note while it's fresh.
-7. **Confirm the host firewall** on `:3100` (see above), and close out the tracked DB-password rotation.
+7. **Confirm the host firewall** on `:3100`, and rotate the DB password. ~~Both~~ — **both done 2026-09-09**; see the two sections at the top of this file.
 
 Items 1–3 are economy integrity and matter most for a persistent shared world; 4–5 are the disclosure cleanup; 6 is availability.
