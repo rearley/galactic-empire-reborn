@@ -253,8 +253,6 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
     "body": [
       "Maintenance & Repair",
       "  mai [password]     — hire a repair crew at the planet you are orbiting",
-      "  set auto-repair on — hire one automatically when you are damaged AND",
-      "                       orbiting a planet that will take the job",
       "  rep sys            — current hull damage and repair progress",
       "",
       "A damaged hull mends very slowly on its own - 0.6 damage a minute, so a",
@@ -405,8 +403,6 @@ exports[`Help topic snapshots maintenance topic body matches snapshot 1`] = `
 [
   "Maintenance & Repair",
   "  mai [password]     — hire a repair crew at the planet you are orbiting",
-  "  set auto-repair on — hire one automatically when you are damaged AND",
-  "                       orbiting a planet that will take the job",
   "  rep sys            — current hull damage and repair progress",
   "",
   "A damaged hull mends very slowly on its own - 0.6 damage a minute, so a",
