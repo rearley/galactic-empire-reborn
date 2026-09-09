@@ -33,7 +33,13 @@ function mount() {
   return { ...view, el, lines };
 }
 
+/**
+ * A READER scrolling. The wheel event is not decoration: auto-scroll only
+ * disengages on evidence a person moved the log, because the browser moves it
+ * too (scroll anchoring against the FIFO cap). @see EventLog readerMoved
+ */
 const setScroll = (el: HTMLElement, top: number) => {
+  fireEvent.wheel(el);
   Object.defineProperty(el, 'scrollTop', { value: top, writable: true });
   fireEvent.scroll(el);
 };
@@ -164,9 +170,112 @@ describe('EventLog during a burst', () => {
     rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
     await nextFrame();
 
+    fireEvent.wheel(el);
     el.scrollTop = 100;
     fireEvent.scroll(el);
 
     expect(screen.getByTestId('jump-to-latest')).toBeTruthy();
+  });
+});
+
+/**
+ * The browser moves scrollTop too, and that is not the reader scrolling.
+ *
+ * The first fix compared scrollTop against the value we last wrote: equal means
+ * the event is ours, different means the reader's. That covers a burst arriving
+ * before the scroll event is dispatched, but not the case where the BROWSER
+ * changes scrollTop on its own — and it does, for two reasons here.
+ *
+ * The log is FIFO-capped at MAX_ENTRIES, so once it fills, every new line
+ * removes one from the top. Content changing ABOVE the viewport is exactly what
+ * Chrome's scroll anchoring exists to compensate for: it adjusts scrollTop to
+ * hold the visible text still, and dispatches a scroll event carrying a value
+ * we never wrote. Distance-from-bottom then reads as "the reader is far up" and
+ * auto-scroll disengages — mid-battle, once the log is full, which is when the
+ * cap first bites. Reported from play twice: a flash the first time, and this
+ * time the control stayed.
+ *
+ * Two changes. `overflow-anchor: none` stops the browser fighting a log that is
+ * pinned to the bottom by design, and disengaging now requires evidence that a
+ * PERSON moved it — a wheel, a touch, a key, or a pointer on the scrollbar —
+ * rather than pixel arithmetic that cannot tell who did the scrolling.
+ */
+describe('EventLog — only a person turns auto-scroll off', () => {
+  const fireIntent = (el: HTMLElement) => fireEvent.wheel(el);
+
+  it('ignores a scroll the reader did not cause, however far from the bottom', async () => {
+    const { el, rerender, lines, grow } = mountWithClamping();
+    rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
+    await nextFrame();
+
+    // Scroll anchoring: the cap dropped lines off the top, so the browser moved
+    // scrollTop to hold the text still. Nobody touched the mouse.
+    grow(1200);
+    el.scrollTop = 620;
+    fireEvent.scroll(el);
+
+    expect(screen.queryByTestId('jump-to-latest')).toBeNull();
+  });
+
+  it('still stops following when the reader wheels up', async () => {
+    const { el, rerender, lines } = mountWithClamping();
+    rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
+    await nextFrame();
+
+    fireIntent(el);
+    el.scrollTop = 100;
+    fireEvent.scroll(el);
+
+    expect(screen.getByTestId('jump-to-latest')).toBeTruthy();
+  });
+
+  it('stops following when the reader drags the scrollbar', async () => {
+    const { el, rerender, lines } = mountWithClamping();
+    rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
+    await nextFrame();
+
+    fireEvent.pointerDown(el);
+    el.scrollTop = 100;
+    fireEvent.scroll(el);
+
+    expect(screen.getByTestId('jump-to-latest')).toBeTruthy();
+  });
+
+  it('stops following when the reader pages up with the keyboard', async () => {
+    const { el, rerender, lines } = mountWithClamping();
+    rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
+    await nextFrame();
+
+    fireEvent.keyDown(el, { key: 'PageUp' });
+    el.scrollTop = 100;
+    fireEvent.scroll(el);
+
+    expect(screen.getByTestId('jump-to-latest')).toBeTruthy();
+  });
+
+  it('one nudge does not arm every later scroll', async () => {
+    // Intent is spent on the scroll it caused. Otherwise a single wheel event
+    // early in a session leaves the log able to disengage on its own for good.
+    const { el, rerender, lines, grow } = mountWithClamping();
+    rerender(<EventLog lines={[...lines, { text: 'a', category: 'combat', id: 1 }]} />);
+    await nextFrame();
+
+    fireIntent(el);
+    el.scrollTop = 560; // within tolerance — still following
+    fireEvent.scroll(el);
+    expect(screen.queryByTestId('jump-to-latest')).toBeNull();
+
+    grow(1200);
+    el.scrollTop = 620;
+    fireEvent.scroll(el);
+
+    expect(screen.queryByTestId('jump-to-latest')).toBeNull();
+  });
+
+  it('tells the browser not to anchor a log that is pinned to the bottom', () => {
+    // jsdom does not lay out, so scroll anchoring cannot be exercised here —
+    // this pins the declaration that disables it. @see the block comment above.
+    const { el } = mountWithClamping();
+    expect(el.style.overflowAnchor).toBe('none');
   });
 });

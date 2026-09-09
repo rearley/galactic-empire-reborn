@@ -48,6 +48,23 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
    * asked for. `null` means the next scroll event is the reader's.
    */
   const writtenTop = useRef<number | null>(null);
+  /**
+   * Whether a PERSON caused the scroll event we are about to handle.
+   *
+   * Pixel arithmetic cannot tell who moved the log. The browser moves it too:
+   * this list is FIFO-capped, so once it fills, every new line drops one off
+   * the top — and content changing above the viewport is precisely what
+   * Chrome's scroll anchoring compensates for, by adjusting `scrollTop` and
+   * dispatching a scroll event carrying a value we never wrote. Read as
+   * distance-from-bottom that says "the reader has scrolled away", and
+   * auto-scroll disengaged mid-battle once the cap first bit.
+   *
+   * So the mode only changes on evidence of intent: a wheel, a touch, a key,
+   * or a pointer on the scrollbar. Spent on the scroll it causes, or one nudge
+   * would arm every later browser-driven scroll for the rest of the session.
+   */
+  const readerMoved = useRef(false);
+  const noteIntent = () => { readerMoved.current = true; };
 
   /** Scroll to the bottom and remember where that landed. */
   const scrollToBottom = (el: HTMLDivElement) => {
@@ -70,12 +87,18 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
     if (writtenTop.current !== null && el.scrollTop === writtenTop.current) return;
     writtenTop.current = null;
 
+    // Nobody touched anything: this is the browser's own adjustment, and it is
+    // not a request to stop following. @see readerMoved
+    if (!readerMoved.current) return;
+    readerMoved.current = false;
+
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     setStickyBottom(distanceFromBottom <= STICKY_THRESHOLD);
   };
 
   /** Resume following, and go to the bottom now. */
   const jumpToLatest = () => {
+    readerMoved.current = false;
     setStickyBottom(true);
     const el = containerRef.current;
     if (el) scrollToBottom(el);
@@ -122,6 +145,17 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
       <div
         ref={containerRef}
         onScroll={handleScroll}
+        onWheel={noteIntent}
+        onTouchMove={noteIntent}
+        onKeyDown={noteIntent}
+        onPointerDown={noteIntent}
+        /*
+         * Scroll anchoring holds visible text still when content above changes
+         * — the right call for an article, the wrong one for a log that is
+         * pinned to its bottom and drops lines off its top. It fights the pin
+         * and fires scroll events nobody asked for. @see readerMoved
+         */
+        style={{ overflowAnchor: 'none' }}
         className="flex-1 overflow-y-auto font-mono text-sm p-2 bg-black"
         data-testid="event-log"
       >

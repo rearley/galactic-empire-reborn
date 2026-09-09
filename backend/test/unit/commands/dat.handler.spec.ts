@@ -2,8 +2,30 @@ import { DatHandlerService } from '../../../src/game/commands/handlers/dat.handl
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
-import { CommandContext } from '../../../src/game/commands/command.types';
+import { CommandContext, CommandResult } from '../../../src/game/commands/command.types';
 
+/**
+ * `dat` reports YOUR OWN ship. It never reported anyone else's.
+ *
+ * Canon's cmd_data (GECMDS.C:5829) is a machine-readable dump for a front-end
+ * terminal program: gated behind `dat qazwsx <report|scan|sector>` — anything
+ * else returns INVCMD — and every field it prints comes from `warsptr` and
+ * `waruptr`, the CALLER's ship and the CALLER's user record. It has no target
+ * argument and touches no other ship.
+ *
+ * The port recast it as `dat <fragment>`, "a player-facing scouting verb"
+ * (spec 012 D1), which returned for any ship in the galaxy, at unlimited range,
+ * silently, with no notice to the target: exact sector, heading, speed, energy,
+ * damage, kills AND the full cargo manifest including gold. Canon has no way to
+ * learn another ship's cargo at all — `spy` is planet-only, orbit-only, and
+ * consumes an I_SPY item (GECMDS.C cmd_spy). It also matched on `!s.cloak`
+ * rather than `cloak < 10`, so a ship spinning up its cloak was still exposed,
+ * and it did not exclude AI, so every Cybertron's hold was public too.
+ *
+ * Reported from play: "not sure I like the command dat <fragment> as that gives
+ * full info on another players ship". What a pilot may learn about someone
+ * else's ship is what `sca sh` shows — range-gated, and it announces itself.
+ */
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     userid: 'u1', shipno: 1, shipname: 'Alpha',
@@ -29,93 +51,84 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 function makeHandler(ships: ShipState[], teamname?: string): DatHandlerService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
   const prismaMock = {
-    team: {
-      findFirst: jest.fn().mockResolvedValue(teamname ? { teamname } : null),
-    },
+    team: { findFirst: jest.fn().mockResolvedValue(teamname ? { teamname } : null) },
   } as unknown as PrismaService;
   return new DatHandlerService(shipSvc, prismaMock);
 }
 
 const ctx: CommandContext = {};
+const run = async (h: DatHandlerService, ship: ShipState, args: string[] = []) =>
+  ((await h.command.handler(ship, args, ctx)) as CommandResult).lines.map((l) => l.text).join('\n');
 
-describe('DatHandlerService', () => {
-  describe('command metadata', () => {
-    it('keyword is "dat"', () => {
-      expect(makeHandler([]).command.keyword).toBe('dat');
-    });
-
-    it('minArgs is 1', () => {
-      expect(makeHandler([]).command.minArgs).toBe(1);
-    });
-
-    it('argMissingMessage mentions usage', () => {
-      expect(makeHandler([]).command.argMissingMessage).toMatch(/Usage: dat/i);
-    });
+describe('DatHandlerService — command metadata', () => {
+  it('keyword is "dat"', () => {
+    expect(makeHandler([]).command.keyword).toBe('dat');
   });
 
-  describe('FR-004: case-insensitive substring match', () => {
-    it('matches by lowercase fragment', async () => {
-      const ship = makeShip({ shipname: 'StarFighter' });
-      const handler = makeHandler([ship]);
-      const result = await handler.command.handler(makeShip(), ['star'], ctx);
-      expect(result.lines.some((l) => l.text.includes('StarFighter'))).toBe(true);
-    });
+  it('takes no arguments — canon’s dat has no target', () => {
+    expect(makeHandler([]).command.minArgs).toBe(0);
+  });
+});
 
-    it('self-match is allowed', async () => {
-      const ship = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', cloak: 0 });
-      const handler = makeHandler([ship]);
-      const result = await handler.command.handler(ship, ['alp'], ctx);
-      expect(result.lines.some((l) => l.text.includes('Alpha'))).toBe(true);
-    });
+describe('`dat` reports the caller’s own ship', () => {
+  it('names the ship you are flying', async () => {
+    const me = makeShip({ shipname: 'WildCat' });
+    expect(await run(makeHandler([me]), me)).toContain('WildCat');
   });
 
-  describe('FR-005: cloak filters as not-found', () => {
-    it('returns "Ship not found." for cloaked ship', async () => {
-      const ship = makeShip({ shipname: 'Ghost', cloak: 1 });
-      const handler = makeHandler([ship]);
-      const result = await handler.command.handler(makeShip(), ['ghost'], ctx);
-      expect(result.lines[0].text).toBe('Ship not found.');
-    });
+  it('gives your own position, heading and speed', async () => {
+    const me = makeShip();
+    const out = await run(makeHandler([me]), me);
+    expect(out).toContain('(5,3)');
+    expect(out).toMatch(/Heading:\s*45/);
   });
 
-  describe('FR-006: all 14 cargo slots rendered', () => {
-    it('renders Men through Spy cargo lines', async () => {
-      const ship = makeShip();
-      const handler = makeHandler([ship]);
-      const result = await handler.command.handler(makeShip(), ['alp'], ctx);
-      const allText = result.lines.map((l) => l.text).join('\n');
-      expect(allText).toContain('Men');
-      expect(allText).toContain('Missiles');
-      expect(allText).toContain('Torpedos');
-      expect(allText).toContain('Gold');
-      expect(allText).toContain('Spy');
-    });
+  it('gives your own cargo, gold included', async () => {
+    const me = makeShip();
+    const out = await run(makeHandler([me]), me);
+    expect(out).toMatch(/Gold:\s*13/);
   });
 
-  describe('FR-007: no match returns Ship not found', () => {
-    it('returns system line for unknown fragment', async () => {
-      const handler = makeHandler([makeShip()]);
-      const result = await handler.command.handler(makeShip(), ['zzz'], ctx);
-      expect(result.lines[0].text).toBe('Ship not found.');
-      expect(result.lines[0].category).toBe('system');
-    });
+  it('names your team when you have one', async () => {
+    const me = makeShip({ teamcode: 4n });
+    expect(await run(makeHandler([me], 'Red Fleet'), me)).toContain('Red Fleet');
+  });
+});
+
+describe('`dat` cannot be pointed at anyone else', () => {
+  const me = () => makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha' });
+  const them = () => makeShip({
+    userid: 'u2', shipno: 1, shipname: 'StarFighter', xcoord: 40, ycoord: -12,
+    items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 999n, 0n],
   });
 
-  describe('team name resolved when teamcode present', () => {
-    it('shows team name in the stat block', async () => {
-      const ship = makeShip({ shipname: 'Alpha', teamcode: 42n });
-      const handler = makeHandler([ship], 'Pirates');
-      const result = await handler.command.handler(makeShip(), ['alp'], ctx);
-      const allText = result.lines.map((l) => l.text).join('\n');
-      expect(allText).toContain('Pirates');
-    });
+  it('refuses a ship-name argument instead of scouting with it', async () => {
+    const out = await run(makeHandler([me(), them()]), me(), ['star']);
+    expect(out).not.toContain('StarFighter');
+    expect(out).not.toContain('999');
+  });
 
-    it('shows em-dash when no team', async () => {
-      const ship = makeShip({ shipname: 'Loner', teamcode: undefined });
-      const handler = makeHandler([ship]);
-      const result = await handler.command.handler(makeShip(), ['lon'], ctx);
-      const allText = result.lines.map((l) => l.text).join('\n');
-      expect(allText).toContain('—');
+  it('points the pilot at the command that CAN look at another ship', async () => {
+    const out = await run(makeHandler([me(), them()]), me(), ['star']);
+    expect(out).toMatch(/sca sh/);
+  });
+
+  it('never discloses another ship’s cargo, however it is called', async () => {
+    const handler = makeHandler([me(), them()]);
+    for (const args of [[], ['star'], ['StarFighter'], ['u2'], ['']]) {
+      const out = await run(handler, me(), args);
+      expect(out).not.toContain('999');
+      expect(out).not.toContain('StarFighter');
+    }
+  });
+
+  it('does not leak an AI ship’s hold either', async () => {
+    const cyb = makeShip({
+      userid: 'Cybrg-9', shipno: 1, shipname: 'Cybertron 42473', status: 2,
+      items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 471n, 0n],
     });
+    const out = await run(makeHandler([me(), cyb]), me(), ['cyber']);
+    expect(out).not.toContain('471');
+    expect(out).not.toContain('Cybertron 42473');
   });
 });
