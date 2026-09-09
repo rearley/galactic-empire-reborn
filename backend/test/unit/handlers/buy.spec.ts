@@ -156,7 +156,10 @@ describe('BuyHandlerService', () => {
       expect.objectContaining({ data: { cash: 0n } }),
     );
     // and the buy is priced against 0, not -500
-    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 0n);
+    // The trailing argument is the conditional debit — the check and the
+    // decrement in one statement, so Postgres refuses an overdraft however many
+    // commands are in flight. @see docs/audits/2026-09-09-security-review.md M1
+    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 0n, expect.any(Function));
   });
 
   it('passes the buyer balance through to the trade calculation', async () => {
@@ -165,7 +168,7 @@ describe('BuyHandlerService', () => {
 
     await svc.command.handler(makeShip(), ['10', 'food'], {});
 
-    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 4_321n);
+    expect(buyMock).toHaveBeenCalledWith(expect.anything(), 'u1', expect.any(Number), 10, expect.any(Number), 4_321n, expect.any(Function));
   });
 
   it('reports insufficient credits rather than completing the purchase', async () => {

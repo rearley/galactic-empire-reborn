@@ -8,17 +8,28 @@
 
 | # | Finding | Status |
 |---|---|---|
-| M1 | Credit-balance TOCTOU across purchase handlers | **OPEN** |
-| M2 | `transfer down` duplicates items onto a planet | **OPEN** |
+| M1 | Credit-balance TOCTOU across purchase handlers | **FIXED (Part B)** — conditional debits at all five sites; `test/integration/economy-race-cash.spec.ts` (4) |
+| M2 | `transfer down` duplicates items onto a planet | **FIXED (Part B)** — deposit takes the cargo inside the planet lock; `test/integration/economy-race-transfer.spec.ts` (4) |
 | M3 | Unscoped galaxy-wide `player.snapshot` | **FIXED** — `emitScopedSnapshotToAll` fans out per socket through `scopePlayers`; `test/gateway/snapshot-broadcast-scoping.spec.ts` (5) |
 | M4 | `sector:join` subscribes to any sector room | **FIXED** — handlers deleted, along with `validateCoord`/`SectorPayload`; `test/integration/game-gateway.spec.ts` |
 | M5 | Auth throttling keys on the proxy's IP | **FIXED** — `trust proxy: 'loopback'` via `src/http-security.ts`; `test/unit/trust-proxy.spec.ts` (2) |
 | lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
 
-M1 and M2 are the same defect wearing two hats — a read, an await, then a write,
-with nothing serializing one socket's commands. They are left open deliberately:
-the fix touches the economy on a live world and wants doing as one considered
-change, not as a quick win. §5 item 1 is still the right first move.
+**Part B is done; Part A is not.** Part B made the invariants Postgres's job:
+every cash debit re-checks the balance in the same statement that spends it, and
+`depositToPlanet` takes the cargo from the hull inside the planet lock the way
+`sell()` always did. That holds regardless of scheduling, of two sockets on one
+account, or of a tick interleaving with a command.
+
+Part A — serializing command dispatch per socket (§5 item 1) — remains open by
+choice, as a separate change so any latency effect is attributable. It is now a
+robustness measure rather than the thing standing between a player and free
+credits.
+
+Both fixes were verified in both directions: the two new specs fail against the
+unfixed code (5 of 8 cases) and pass against it. They run on a REAL Postgres,
+because the race lives in the gap between a read and a write that a mocked
+client does not have.
 
 The `COMBAT_SHIP_DESTROYED` lead was verified and turned out real: the handler
 spread the whole internal event into a galaxy-wide emit, publishing every kill's

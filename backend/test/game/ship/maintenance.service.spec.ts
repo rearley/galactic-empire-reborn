@@ -69,6 +69,10 @@ function makeService(opts: {
     user: {
       findUnique: jest.fn().mockResolvedValue({ cash }),
       update: jest.fn().mockResolvedValue({}),
+      // The debit is conditional now — the balance is re-checked in the same
+      // statement that spends it. `count` is how the caller learns whether the
+      // money actually moved. @see docs/audits/2026-09-09-security-review.md M1
+      updateMany: jest.fn().mockResolvedValue({ count: cash >= 0n ? 1 : 0 }),
     },
   } as unknown as PrismaService;
 
@@ -316,8 +320,8 @@ describe('MaintenanceService — applyMaintenance', () => {
     const { svc, mockPrisma } = makeService();
     const ship = makeShip({ damage: 30 });
     await svc.applyMaintenance(ship, BigInt(MAINT_COST_NORMAL), 11);
-    expect(mockPrisma.user.update).toHaveBeenCalledWith({
-      where: { userid: 'u1' },
+    expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+      where: { userid: 'u1', cash: { gte: BigInt(MAINT_COST_NORMAL) } },
       data: { cash: { decrement: BigInt(MAINT_COST_NORMAL) } },
     });
   });

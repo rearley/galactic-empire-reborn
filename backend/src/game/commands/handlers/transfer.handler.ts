@@ -73,18 +73,22 @@ export class TransferHandlerService {
       return { lines: [{ text: formatMessage(MessageId.TRAN_NOT_ORBIT), category: 'system' }] };
     }
 
-    const result = await this.planetState.depositToPlanet(key, ship.userid, itemIndex, BigInt(qty));
+    // The cargo check and the decrement both happen inside the planet lock now,
+    // so the synchronous `have < qty` test above is a fast path rather than the
+    // guarantee. @see docs/audits/2026-09-09-security-review.md M2
+    const result = await this.planetState.depositToPlanet(
+      key, ship.userid, ship.shipno, itemIndex, BigInt(qty),
+    );
     if (!result.ok) {
+      if (result.reason === 'INSUFFICIENT_CARGO') {
+        return { lines: [{ text: formatMessage(MessageId.TRAN_NO_CARGO), category: 'system' }] };
+      }
       // TRANSFR4 — "We don't own this planet." Canon's refusal for the down
       // leg; the port answered TRANSFR3, "We are not in orbit", which is a
       // false statement about a ship that is standing in orbit.
       // @see GECMDS.C:3348
       return { lines: [{ text: formatMessage(MessageId.TRAN_DOWN_NOT_OWNER), category: 'system' }] };
     }
-
-    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      s.items[itemIndex] = (s.items[itemIndex] ?? 0n) - BigInt(qty);
-    });
 
     return {
       lines: [{

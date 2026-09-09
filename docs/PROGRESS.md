@@ -3933,3 +3933,20 @@ named "payload is forwarded intact" and pinned the leak.
 **Next:** M1/M2, the economy races. Still one considered change.
 **Known issues:** unchanged; see the status table in
 `docs/audits/2026-09-09-security-review.md`.
+
+## 2026-09-09 — Part B: the economy races are closed
+**Completed:** M1 and M2 from the security review. Conditional cash debits at
+all five sites, and `depositToPlanet` now takes the cargo from the hull inside
+the planet lock. Deployment NOT yet discussed — this is built and verified on
+dev only.
+**Tests:** `economy-race-cash.spec.ts` (4) and `economy-race-transfer.spec.ts`
+(4), both against a REAL Postgres, because the race lives in a gap a mocked
+client does not have. Verified in both directions: 5 of the 8 cases fail against
+the unfixed code. Nine existing specs updated for the new signatures.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09.
+**Next:** Part A (per-socket dispatch serialization) as a separate change, and
+a read-only look at production `User.cash` and planet item rows for values that
+suggest the duplication was already hit.
+**Known issues:** Part A open by choice. `planet-trade-concurrent.spec.ts` still
+uses a mocked Prisma and tests the lock's logic, not database concurrency — it
+is not a regression guard for any of this.

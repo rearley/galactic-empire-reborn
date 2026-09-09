@@ -4774,3 +4774,35 @@ longer drops. `ShipManagementTickService` owns the collapse.
 **Reason:** Canon's `shieldstat()` (GEFUNCS.C:1340-1348) is one function with
 one narration. Two implementations of one rule cannot both be right, and the
 silent one loses by construction.
+
+## 2026-09-09 — Economy invariants belong to Postgres, not to the scheduler
+**Context:** M1/M2 of the security review. `buy` read the balance with a bare
+`findUnique`, awaited the planet transaction, then decremented unconditionally;
+`tra down` checked cargo synchronously, awaited the deposit, then decremented
+the hull. Nothing serializes one socket's commands — the gateway fires
+`dispatch` and only `.then()`s it — so twenty packets all reach the first await
+before any resolves. Measured on a real database: a 1,000-credit balance went to
+**−19,000**, and a 100-gold hold put **1,000 gold** on a planet and went to −900.
+Both debts die with the hull; the goods do not.
+
+**Decision:** Part B — make each invariant a single statement Postgres enforces.
+- Every cash debit is `updateMany({ where: { userid, cash: { gte: cost } } })`
+  and `count === 0` means refused. Sites: `buy` (via a `debitBuyer` callback
+  invoked inside the planet lock, before any goods move), `new ship` (which also
+  moved to an interactive transaction so the fleet cap is in the same WHERE),
+  and `maintenance`.
+- `depositToPlanet` re-reads the hull and decrements it INSIDE `runSerialized`,
+  copying `PlanetStateService.sell()`, and clamps at zero.
+
+**Reason:** A lock that does not cover the value being checked is not a lock.
+The planet lock was held while the ship's cargo was read outside it, and the
+cash gate was evaluated against a snapshot taken before the lock existed.
+
+**Alternatives rejected:** Serializing dispatch per socket alone (Part A) — it
+narrows the window but leaves the invariant unenforced against a second socket
+on the same account or a tick interleaving with a command. Deferred as a
+separate change.
+
+**Note on the clamp:** `buy.handler`'s negative-balance reset to zero is canon
+(GECMDS.C:4205-4207) and stays. Canon was safe because MajorBBS ran one command
+per user; the clamp is not the defect and should now be unreachable.

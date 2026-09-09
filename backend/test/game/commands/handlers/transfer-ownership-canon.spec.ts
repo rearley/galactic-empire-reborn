@@ -84,7 +84,15 @@ const KEY = '20:20:1';
 function planetServiceWith(over: { userid: string | null }) {
   const svc = new RealPlanetStateService(
     { planet: { update: jest.fn().mockResolvedValue({}) } } as never,
-    { findAllShips: () => [] } as never,
+    // depositToPlanet now takes the cargo from the hull inside the planet
+    // lock, so the ship layer has to answer for real.
+    // @see docs/audits/2026-09-09-security-review.md M2
+    {
+      findAllShips: () => [],
+      get: () => ({ items: Array.from({ length: NUMITEMS }, () => 1000n) }),
+      mutate: (_u: string, _n: number, fn: (s: { items: bigint[] }) => void) =>
+        fn({ items: Array.from({ length: NUMITEMS }, () => 1000n) }),
+    } as never,
   );
   const items = Array.from({ length: NUMITEMS }, () => ({
     qty: 1000n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
@@ -105,7 +113,7 @@ describe('tra down/up ownership (GECMDS.C:3323, :3374)', () => {
     // has to be asserted — a stubbed planet layer would only be testing the stub.
     const svc = planetServiceWith({ userid: 'someone-else' });
 
-    const res = await svc.depositToPlanet(KEY, 'trader', I_FOOD, 10n);
+    const res = await svc.depositToPlanet(KEY, 'trader', 1, I_FOOD, 10n);
 
     expect(res).toEqual({ ok: true });
   });
