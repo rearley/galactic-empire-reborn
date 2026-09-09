@@ -25,7 +25,9 @@ describe('the runtime image ships the sysop config', () => {
     // Split on the second FROM: only the runtime stage's COPYs reach the image.
     const stages = DOCKERFILE.split(/^FROM /m);
     const runtime = stages[stages.length - 1];
-    expect(runtime).toMatch(/COPY\s+(--from=\S+\s+)?\S*config\S*\s+\.\/config/);
+    // Any number of COPY flags — `--from` and `--chown` both appear now that
+    // the runtime image drops to the `node` user.
+    expect(runtime).toMatch(/COPY\s+(--\S+\s+)*\S*config\S*\s+\.\/config/);
   });
 
   it('lands it where the resolver actually looks, given the image WORKDIR', () => {
