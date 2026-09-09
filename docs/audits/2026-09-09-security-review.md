@@ -13,14 +13,25 @@
 | M3 | Unscoped galaxy-wide `player.snapshot` | **FIXED** — `emitScopedSnapshotToAll` fans out per socket through `scopePlayers`; `test/gateway/snapshot-broadcast-scoping.spec.ts` (5) |
 | M4 | `sector:join` subscribes to any sector room | **FIXED** — handlers deleted, along with `validateCoord`/`SectorPayload`; `test/integration/game-gateway.spec.ts` |
 | M5 | Auth throttling keys on the proxy's IP | **FIXED** — `trust proxy: 'loopback'` via `src/http-security.ts`; `test/unit/trust-proxy.spec.ts` (2) |
+| lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
 
 M1 and M2 are the same defect wearing two hats — a read, an await, then a write,
 with nothing serializing one socket's commands. They are left open deliberately:
 the fix touches the economy on a live world and wants doing as one considered
 change, not as a quick win. §5 item 1 is still the right first move.
 
-Unconfirmed leads are unchanged and still unverified, except the two that M4
-subsumed.
+The `COMBAT_SHIP_DESTROYED` lead was verified and turned out real: the handler
+spread the whole internal event into a galaxy-wide emit, publishing every kill's
+exact sector, both internal account keys, the destroyed hull's cargo and the
+victim's socket disconnect reason. The client renders four fields; it now
+receives four.
+
+The remaining unconfirmed leads are unchanged and still unverified, except the
+two that M4 subsumed. Of them, `/auth/register`'s EMAIL_TAKEN-vs-201
+enumeration is real but is a deliberate trade — a signup form that will not say
+"that address is already registered" is a worse product for a private-beta game,
+and the address is already the login identifier. Not changed; noted so it is not
+re-raised.
 
 
 # Security Review — Galactic Empire Reborn

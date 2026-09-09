@@ -197,7 +197,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
 
     expect(serverEmitMock).toHaveBeenCalledWith(
       COMBAT_SHIP_DESTROYED,
-      expect.objectContaining({ victimUserid: 'user1' }),
+      expect.objectContaining({ victimId: 'user1:1' }),
     );
   });
 
