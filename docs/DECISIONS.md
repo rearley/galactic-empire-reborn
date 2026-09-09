@@ -4898,12 +4898,33 @@ republisher cannot relicense an upstream author's work by placing a file beside
 it; Murdock's per-file notices are the grant. Inbound terms are therefore
 GPL-2.0-or-later.
 
-**Where the AGPL claim comes from, and why it is not wrong exactly.** Elwynor
-Technologies maintain a genuinely separate port of Galactic Empire to 32-bit
-Worldgroup and The Major BBS V10, at `github.com/elwynor/elwge`, and it *is*
-AGPL-3.0. They state they arranged to take over the MBM products and released
-their port publicly in 2021. So the advice was accurate about a real project.
-It was about a different codebase. Nothing from `elwge` is used here.
+**Where the AGPL claim comes from.** Amended 2026-09-09, after the source of
+the heads-up became clear: it came from ManicPop.org in the `ge-next` Discord,
+and `github.com/manicpop/ge-next` is a 2024 fork of **the same `bsimser/ge`
+upstream this project vendored**. So the first reading of this entry — "they
+were talking about a different codebase" — was wrong and is withdrawn.
+
+Their position is about who holds the rights today, not about who copied what.
+`ge-next` licenses itself AGPL-3.0-or-later, claims copyright over its own
+modifications only, and attributes the underlying work as "Galactic Empire,
+copyright (c) 2025 Elwynor Technologies". Elwynor state they took over the MBM
+products and released their own 32-bit Worldgroup port publicly in 2021.
+
+Two things follow, and they are separate questions:
+
+- **Compliance.** Murdock's per-file GPL grant runs with the code and cannot be
+  withdrawn by a later owner. Who holds the copyright now does not change what
+  this project is permitted to do.
+- **Credit.** It does change who is owed acknowledgement. `NOTICE`, the README,
+  `CLAUDE.md` and the `/provenance` page now name Elwynor as the game's current
+  stewards, alongside the unchanged statement that no code, data or fix from
+  their port is used here. Both halves have to stand together: the first alone
+  would credit them for work they did not do, the second alone reads as a
+  brush-off. `provenance.spec.tsx` pins both.
+
+Neither Elwynor's acquisition nor `ge-next`'s copyright line was verified — both
+are stated claims, taken at face value for the purpose of giving credit, which
+costs nothing if true and nothing if not.
 
 **Decision:** this port is licensed **AGPL-3.0-or-later**. `LICENSE` carries the
 canonical FSF text; `NOTICE` carries the attribution chain, the list of what is

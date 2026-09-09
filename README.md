@@ -260,8 +260,10 @@ The Affero variant is deliberate. The plain GPL asks nothing of someone who only
 public network service, and that is exactly what this is, so anyone playing is entitled to
 the source of what they are playing.
 
-**This is not Elwynor Technologies' port.** Elwynor maintain a separate port of Galactic
-Empire to 32-bit Worldgroup and The Major BBS V10 at
-[elwynor/elwge](https://github.com/elwynor/elwge), also AGPL. No code, data or fix from it
-is used here; what this project reads is Murdock's original DOS-era C source. The `/provenance`
-page on the running site says the same thing to players.
+**Elwynor Technologies** maintain Galactic Empire today, and are acknowledged as the game's
+current stewards. **This is not their port.** Elwynor's own port, to 32-bit Worldgroup and
+The Major BBS V10, is at [elwynor/elwge](https://github.com/elwynor/elwge), also AGPL; a
+further fork, [manicpop/ge-next](https://github.com/manicpop/ge-next), is also AGPL. No
+code, data or fix from either is used here. What this project reads is Murdock's original
+DOS-era C source, under the licence he wrote into its headers. The `/provenance` page on the
+running site says the same thing to players.

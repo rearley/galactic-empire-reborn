@@ -56,7 +56,13 @@ describe('Provenance', () => {
     renderPage();
     const elwynor = NOT_PORTED.find((i) => /Elwynor/.test(i.what));
     expect(elwynor).toBeDefined();
-    expect(elwynor?.detail).toMatch(/No code, data or bug fix from it is used here/);
+    expect(elwynor?.detail).toMatch(/no code, data or bug fix from it is used here/i);
+    // Both halves, or the page reads as a brush-off. Elwynor state they took
+    // over the original publisher's products and they maintain the game today,
+    // so the page acknowledges that in the same breath as declining the credit
+    // for code we did not use. Added after the person who raised this turned
+    // out to have forked the same upstream we did, not a different one.
+    expect(elwynor?.detail).toMatch(/current stewards/);
     expect(screen.getByText(elwynor!.detail)).toBeInTheDocument();
   });
 

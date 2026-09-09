@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 68 entries.
+Append-only, **newest at the bottom**. 69 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 68 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
 - [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
 - [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
 - [2026-09-09 — the docs said work was outstanding that had been done for months](#2026-09-09--the-docs-said-work-was-outstanding-that-had-been-done-for-months)
@@ -4198,3 +4199,38 @@ history is not required by either licence — what is owed is the corresponding
 source of the version being run, not how it was written. And the enumeration
 finding in the security review stops being a secret the moment the source is
 public, since it is four lines of `auth.service.ts`.
+
+## 2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning
+
+**Completed:** `NOTICE`, `README.md`, `CLAUDE.md` and the `/provenance` page now
+name Elwynor Technologies as Galactic Empire's current stewards, alongside the
+unchanged statement that no code, data or fix from their port is used here. Both
+halves have to stand together: the first alone credits them for work they did
+not do, the second alone reads as a brush-off. `NOTICE` also names
+`manicpop/ge-next` and lists all seven generated files carrying Murdock's
+copyright, where it had listed two.
+
+**The correction.** Yesterday's licensing entry said the heads-up "was about a
+different codebase". That was wrong. It came from ManicPop.org in the `ge-next`
+Discord, and `ge-next` is a 2024 fork of the same `bsimser/ge` upstream this
+project vendored. Their position is about who holds the rights today, not about
+who copied what: `ge-next` attributes the underlying work as "copyright (c) 2025
+Elwynor Technologies" and licenses itself AGPL-3.0-or-later, which is exactly
+what this port independently chose.
+
+So on the licence, we already agreed with them. Only the attribution line
+differed, and it was cheap to align.
+
+Compliance and credit are still separate questions, and the entry in
+`docs/DECISIONS.md` now says so: Murdock's per-file GPL grant runs with the code
+and cannot be withdrawn by a later owner, so who holds the copyright now changes
+who is owed acknowledgement, not what this project may do.
+
+**Tests:** `provenance.spec.tsx` gains an assertion that the Elwynor entry names
+them as current stewards, so the acknowledgement cannot be dropped by a later
+copy edit. Written failing first. Frontend 255 across 36 files.
+
+**Next:** —
+**Known issues:** unchanged. The going-public decision is still open, and
+`/provenance` still ships a link to a repository that does not exist. See the
+"Backlog — going public" section above.

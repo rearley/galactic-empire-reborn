@@ -67,7 +67,7 @@ export const NOT_PORTED: readonly { what: string; detail: string }[] = Object.fr
   {
     what: 'Elwynor Technologies’ 32-bit port',
     detail:
-      'Elwynor maintain a separate port of Galactic Empire to 32-bit Worldgroup and The Major BBS V10, released publicly in 2021 and licensed under the AGPL. It is a different codebase from this one. No code, data or bug fix from it is used here. What this port reads is Murdock’s original DOS-era C source.',
+      'Elwynor maintain a separate port of Galactic Empire to 32-bit Worldgroup and The Major BBS V10, released publicly in 2021 and licensed under the AGPL. They state they took over the original publisher’s products, and they are the game’s current stewards. Their port is a different codebase from this one: no code, data or bug fix from it is used here. What this port reads is Murdock’s original DOS-era C source, under the licence he placed in its headers.',
   },
   {
     what: 'The BBS platform',
