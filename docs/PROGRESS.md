@@ -8,6 +8,8 @@ Append-only, **newest at the bottom**. 66 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [Backlog — before going public: account-enumeration hardening](#backlog--before-going-public-account-enumeration-hardening)
+- [2026-09-09 — DB password rotated, and the enumeration question worked through](#2026-09-09--db-password-rotated-and-the-enumeration-question-worked-through)
 - [2026-09-05 — the systematic message sweep, and midnight moved to ET](#2026-09-05--the-systematic-message-sweep-and-midnight-moved-to-et)
 - [2026-09-04 (evening) — the owner played, and it found what the suite could not](#2026-09-04-evening--the-owner-played-and-it-found-what-the-suite-could-not)
 - [2026-09-04 — round 6, and the fix that broke persistence](#2026-09-04-round-6-and-the-fix-that-broke-persistence)
@@ -3981,3 +3983,63 @@ after the static test had already passed.
 **Known issues:** two host-level items remain and are the owner's: confirm the
 firewall on `:3100`, and rotate the database password. `/auth/register`
 enumeration stays as a deliberate won't-fix.
+
+## 2026-09-09 — DB password rotated, and the enumeration question worked through
+**Completed:** rotated the production database password, closing the last
+host-level item from the security review. Corrected `docs/DEPLOYMENT.md`, which
+pointed at `/opt/ge/.env` — a path that has never existed on this host.
+**Tests:** none applicable (host operation + docs). Verified by proving the OLD
+password FAILS to authenticate, not by watching the new one work: a backend that
+never reconnected reports healthy too.
+**Decisions made:** the `/auth/register` enumeration stays a won't-fix **for the
+beta**, but the reasoning was re-derived properly and now has a condition
+attached — see the backlog item below.
+**Next:** the pre-public account hardening below.
+**Known issues:** `:3100` is safe by ONE mechanism (the iptables default DROP
+policy); the loopback bind is offered and not done.
+
+## Backlog — before going public: account-enumeration hardening
+
+Raised by the owner 2026-09-09, after working through why the cheap versions of
+this fix are fake. **Not to be started for the beta.** The trigger is opening
+signup beyond people who already know each other.
+
+**The leak.** `/auth/register` answers 201 for a free address and `EMAIL_TAKEN`
+for a taken one (`auth.service.ts:105`). Anyone can therefore test any address
+and learn whether that person plays here. Most consumer apps do exactly this;
+it is rated low for that reason.
+
+**Why the cheap fixes do not work.** Two were proposed and both were talked
+through to the point of failure, which is worth recording so they are not
+re-proposed:
+
+1. *Say "complete" and redirect to login.* The attacker logs in with the
+   password they just chose. It works for a free address and fails for a taken
+   one. The oracle moved from one request to two.
+2. *Say "complete" and email the real owner.* Same hole while registration still
+   creates a usable account — and the owner spotted it unprompted: no email, no
+   login, therefore taken.
+
+The general shape: **any design where a taken address and a free address end in
+different observable states will leak, whatever the form says.** The attacker
+looks at the state afterwards. The silent design works only because it moves the
+difference into an inbox the attacker cannot read.
+
+**What the real fix requires**, all of it, or none of it is worth doing:
+
+- Registration stops issuing a usable session. It currently returns a JWT
+  immediately and drops the player into username selection, which is precisely
+  why the message alone cannot be fixed.
+- Email verification: send, expire, click to activate.
+- One neutral response on all three of register, resend-verification and
+  password-reset. Plugging signup while reset still says "no account with that
+  email" buys nothing.
+- Constant-time responses. Sending mail is slow; the branch that sends is
+  measurably slower than the branch that does not, and the oracle returns as a
+  timing difference. Queue the send and return immediately. Login already does
+  the equivalent with its `DUMMY_BCRYPT_HASH` compare.
+
+**Cost:** a verification step between a new player and their first ship. For a
+beta whose roster is a few people who know each other, that is friction bought
+with no safety. At public scale the roster becomes worth harvesting and the
+reset flow has to exist anyway, which is what makes the silent version bearable.
