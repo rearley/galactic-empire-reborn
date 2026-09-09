@@ -74,9 +74,9 @@ function harness(ships: ShipState[]) {
       const s = map.get(shipKey(u, n)); if (s) { fn(s); s.dirty = true; } return s;
     },
   } as never;
-  const subs: Array<(c: TickContext) => void> = [];
+  const subs: Array<{ k: TickKind; f: (c: TickContext) => void }> = [];
   const tickService = {
-    subscribe: (_k: TickKind, f: (c: TickContext) => void) => { subs.push(f); return () => {}; },
+    subscribe: (k: TickKind, f: (c: TickContext) => void) => { subs.push({ k, f }); return () => {}; },
   } as never;
   const cache = new ShipClassCacheService({} as never);
   cache.setForTest(1, { maxAcceleration: 2000, maxWarp: 10 });
@@ -93,8 +93,17 @@ function harness(ships: ShipState[]) {
   return {
     warps, shutdowns,
     tick: () => {
-      const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: ++n, firedAt: new Date() };
-      for (const f of subs) f(ctx);
+      // One canon MOVEMENT STEP is three seconds: warrti2a runs on the
+      // 1-second timer and strides the fleet by 3, so each ship rotates,
+      // accelerates and moves once per three ticks (GEMAIN.C:2462-2493).
+      // Firing three advances every ship exactly once, whichever third it
+      // belongs to. This fired once and relied on the ship being first in the
+      // list — which stopped being true when the stride moved onto the ship's
+      // own channel, as canon's `zothusn` always was.
+      for (let i = 0; i < 3; i++) {
+        const ctx: TickContext = { kind: TickKind.SHIP_UPDATE, tickNumber: ++n, firedAt: new Date() };
+        for (const s of subs) if (s.k === TickKind.SHIP_UPDATE) s.f(ctx);
+      }
     },
   };
 }

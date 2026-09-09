@@ -4692,3 +4692,33 @@ list in canon at any range, by any command.
 nothing in a browser parses `UD1:` lines, so the readable format stays and only
 the subject changes. Deleting the command — `rep` does not show the hold in one
 block, and the verb is still useful pointed at yourself.
+
+## 2026-09-09 — The movement stride is indexed by the ship, not by the fleet
+**Context:** A playtest report of a chased Cybertron that "jumped distances"
+turned out to be a misread scan, but looking for it found a real defect.
+
+Canon strides the ship table by 3 on the 1-second timer, indexed by `zothusn` —
+the ship's own table slot, fixed for as long as it is in the game
+(GEMAIN.C:2462-2493). The port strided on POSITION in a freshly sorted snapshot
+instead. Position is a property of the fleet, not the ship: every ship after a
+departure shifts down a slot, every ship after an arrival shifts up. A ship
+moving on clicker 0 silently becomes a clicker-1 ship, and depending on where in
+the cycle the change lands it either moves twice in consecutive seconds — a
+double-length step — or waits up to five seconds and lurches.
+
+Cybertrons die and respawn constantly and players board and unboard, so it fired
+often. Rotation, acceleration and the self-destruct countdown ride the same
+strided loop, so all four stuttered together.
+
+**Decision:** Stride on `ShipState.channel`, this port's `usrnum` — acquired on
+the same line that inserts a ship into the map (`ShipStateService.enter`) and
+held until it leaves. Ships constructed outside that path (test doubles only)
+fall back to slot 0.
+
+**Reason:** Canon's cadence is a property of the ship. Anything derived from
+list position reintroduces the coupling.
+
+**Alternatives rejected:** Hashing the ship key as the fallback — better load
+smoothing for channel-less doubles, but it made every single-ship harness
+non-deterministic about which second its ship moves, for no production benefit
+since production ships always have a channel.
