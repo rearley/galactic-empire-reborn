@@ -12,6 +12,7 @@ import { cbearing } from '../../physics/physics-math';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX, GESTAT_AUTO } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { findShip } from '../helpers/find-ship';
+import { displayName } from '../../ship/display-name';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
@@ -899,7 +900,10 @@ export class ScanHandlerService implements OnModuleInit {
     const lines: CommandResult['lines'] = [
       { text: formatMessage(MessageId.SCAN01, target.shipname), category: 'info' },
       { text: formatMessage(MessageId.SCAN01A, targetClass?.typeName ?? `class ${target.shpclass}`), category: 'info' },
-      { text: formatMessage(MessageId.SCAN02, target.userid), category: 'info' },
+      // canon `prfmsg(SCAN02,username(wptr))` — the pilot's HANDLE, or the hull
+      // name for AI. Printing `target.userid` put our synthetic account key on
+      // a friend's scan report. @see GECMDS.C:2229, ship/display-name.ts
+      { text: formatMessage(MessageId.SCAN02, displayName(target)), category: 'info' },
     ];
     // `if (warusroff(shpnum)->teamcode > 0)` — omitted entirely for a loner.
     if ((target.teamcode ?? 0n) > 0n) {
