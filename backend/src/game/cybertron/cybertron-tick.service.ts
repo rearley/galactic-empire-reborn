@@ -26,6 +26,7 @@ import {
   DECOYTIME,
   WARP_THRESHOLD,
   MAXTORPS,
+  TORFACT,
   CYB_BE_NICE,
   CYB_BE_EASY,
   CYBSLO,
@@ -50,6 +51,7 @@ import {
   aiCanHitTarget,
   phaserDamage,
   shieldhit,
+  torpedoLockSucceeds,
 } from '../combat/combat-math';
 import {
   COMBAT_PHASER_FIRED,
@@ -706,7 +708,14 @@ export class CybertronTickService implements OnModuleInit {
     const torpCount = rollTorpedoCount(
       tough, escalationKills(target), cls?.hasTorpedo ?? false, meanForTorps, CYB_BE_EASY, this.random,
     );
-    for (let i = 0; i < torpCount && i < MAXTORPS; i++) {
+    // Canon runs `torp()` per tube and `torp()` opens with `lockon()`, so the
+    // AI is bound by the same arithmetic as a player: a target at warp is a
+    // hard zero, and the firer's own speed drives the term negative above
+    // roughly warp 3.5. The port used to skip this entirely, which let an
+    // Obliterator at warp 14 volley a Dreadnought to death.
+    // @see GECYBS.C:538 -> GECMDS.C:1188 torp -> lockon
+    const canLock = torpedoLockSucceeds(ship.speed, target.speed, ddist / 10_000, TORFACT);
+    for (let i = 0; canLock && i < torpCount && i < MAXTORPS; i++) {
       // Refill one torp slot before launching (@see GECYBS.C:534)
       if (Number(ship.items[I_TORP]) < 1) {
         ship.items = [...ship.items] as typeof ship.items;

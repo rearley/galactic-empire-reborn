@@ -107,11 +107,37 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     expect(alice.dirty).toBe(false);
   });
 
-  it('rejects when ship.speed >= WARP_THRESHOLD (TOR_WARP)', () => {
-    const alice = makeShip({ speed: WARP_THRESHOLD });
+  /**
+   * Canon's TORP2 is the HYPERSPACE refusal — "That would simply waste a
+   * torpedo in hyperspace Sir!" — gated on `warsptr->where == 1`
+   * (GECMDS.C:1118). The port wired that message to the firer's SPEED
+   * instead, which invented a rule canon does not have and hid the rule it
+   * does. A pilot at warp 1 was refused, told they were in hyperspace, and
+   * meanwhile could fire freely while actually in hyperspace.
+   *
+   * Cost a Dreadnought in play: the pilot held sub-warp believing warp made
+   * torpedoes impossible for BOTH sides, which is half right. It stops you
+   * being HIT (`if (wptr->speed > 999) fact = 0`), and it never stopped you
+   * firing.
+   */
+  it('rejects in hyperspace, which is what canon TORP2 actually says', () => {
+    const alice = makeShip({ where: 1 });
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob'], ctx) as CommandResult;
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.TOR_WARP));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.TOR_HYPERSPACE));
+  });
+
+  /**
+   * The other half of the same correction. Canon puts no gate on the FIRER's
+   * speed at all — it prices speed into the lock instead:
+   * `fact = (1.2 - (firer+target)/5000) * ((5-dist)/tor_fact)`. At warp 1 a
+   * pilot can still lock out to 2.2 sectors. @see GECMDS.C:1378-1395
+   */
+  it('allows firing at warp 1 — canon prices speed into the lock, it does not forbid it', () => {
+    const alice = makeShip({ speed: 1_000 });
+    const h = makeHarness([alice]);
+    const result = h.handler.command.handler(alice, ['Bob'], ctx) as CommandResult;
+    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.TOR_HYPERSPACE));
   });
 
   it('rejects when ship.cloak > 0 (TOR_CLOAK)', () => {

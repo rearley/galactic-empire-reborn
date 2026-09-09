@@ -195,7 +195,7 @@ export enum MessageId {
 
   // torpedo (feature 006b) — GECMDS.C:cmd_torpedo
   TOR_NOTOR = 'TOR_NOTOR',
-  TOR_WARP = 'TOR_WARP',
+  TOR_HYPERSPACE = 'TOR_HYPERSPACE',
   TOR_CLOAK = 'TOR_CLOAK',
   TOR_NOAMMO = 'TOR_NOAMMO',
   TOR_FULL = 'TOR_FULL',
@@ -820,7 +820,7 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // torpedo (feature 006b)
   [MessageId.TOR_NOTOR]: CANON_MESSAGES.TORP3,
-  [MessageId.TOR_WARP]: CANON_MESSAGES.TORP2,
+  [MessageId.TOR_HYPERSPACE]: CANON_MESSAGES.TORP2,
   [MessageId.TOR_CLOAK]: CANON_MESSAGES.PCLOKUP,
   [MessageId.TOR_NOAMMO]: CANON_MESSAGES.NOTORPS,
   [MessageId.TOR_FULL]: 'Target already has maximum torpedoes incoming.',
