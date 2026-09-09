@@ -451,7 +451,9 @@ ship-side cargo decrement happening inside the same `runSerialized` call.
 
 `applyEconomyTick(state): PlanetState` (pure, `planet-economy.ts`) ports GEPLANET.C:multiply.
 Troop starvation → food consumption → men starvation → gold-to-cash → per-item production
-(qty formula × envFact × taxfact × optional cash-boost) → tax accrual. Revolt deferred to feature 006.
+(qty formula × envFact × taxfact × optional cash-boost) → tax accrual. The revolt
+branch (FR-028) and both halves of `check_spy` live in `PlanetEconomyService`,
+which wraps this pure function.
 
 ## PhysicsModule (feature 006a)
 
@@ -801,8 +803,8 @@ Pure decision modules (game/droid/)
 DroidModule event bus topology:
   Emitters (droid-tick.service.ts):
     droid.annoy    → GameGateway: target socket + sector room
-    droid.spawned  → (informational; not yet bridged to client)
-    droid.killed   → (informational; not yet bridged to client)
+    droid.spawned  → GameGateway → client sector roster (useSectorRoster.ts)
+    droid.killed   → GameGateway → client sector roster (useSectorRoster.ts)
 
   Listener (droid-tick.service.ts):
     combat.ship-destroyed (victimUserid starts with '@Droid-') → cleanup + droid.killed

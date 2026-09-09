@@ -36,6 +36,9 @@ galactic-empire-reborn/
   README.md
 ```
 
+`CLAUDE.md` files also sit in `reference/`, `docs/`, `backend/prisma/`,
+`backend/src/game/` and `backend/src/public/`. See the table below.
+
 ## Architecture Decisions (do not change without discussion)
 
 ### State Management
@@ -45,131 +48,55 @@ This in-memory state is the source of truth during gameplay.
 Postgres is the durable store — flushed async, not on every tick.
 **No Redis. No external cache layer.**
 
-### Tick Engine
+### Directory-scoped instructions
 
-- **Ship update tick**: 1 second (`setInterval(…, 1000)`) — **movement**:
-  rotate, accelerate, move, and the self-destruct countdown. Canon runs these
-  from `warrti2a`, registered on `TICKTIME2` (1s) and striding the ship table by
-  3 (`zothusn += 3`, `clicker = (clicker+1)%3`), so **each ship moves once every
-  3 seconds** (`GEMAIN.C:2462-2493`). Also: energy regen and the DB flush.
-- **Physics tick**: 6 seconds (`setInterval(…, 6000)` in `TickService`) — canon's
-  `warrtia`: mines, flux, repair, shields (`shieldchg`), cloak, torpedo/missile/
-  decoy flight (`checktm`, including the `hypha` and `cantexit` countdowns), ion
-  cannons, phaser recharge and damage control (`GEMAIN.C` warrtia).
+Detail that only matters when you are working in one place lives next to that
+place, so this file stays short. Each of these is loaded automatically when you
+touch files in its directory:
 
-  **This table used to have the two backwards on movement** — it said the
-  6-second tick "moves ships". `positionIntegration` carries canon's per-CALL
-  displacement with no `dt` term, so every ship flew at exactly HALF canon's
-  speed, turned half as fast, took twice as long to reach an ordered warp and
-  twice as long to self-destruct. The code was correct against this file and
-  wrong against canon; the 2026-09-05 audit found it. If you are tempted to move
-  something between these two timers, find it in `GEMAIN.C` first — canon's
-  split is not intuitive (shields regenerate on the SLOW tick, movement on the
-  fast one).
-- **Midnight job**: `@Cron('0 0 * * *')` — recalculate scores, send planet
-  production reports to players, purge mail older than 3 days (`MAILDAYS`,
-  GEMAIN.C:497 — 7 is the clamp ceiling, not the default), rebuild team
-  scores. Must be idempotent and wrapped in a Postgres transaction.
+| File | Covers |
+|---|---|
+| `reference/CLAUDE.md` | **Read before opening anything under `/reference/`.** Maps every file in the vendored distribution and says which copy of each data file is the real one |
+| `backend/src/game/CLAUDE.md` | The two tick timers, `UNIVMAX` vs the scan viewport, the droid combat table, the module map |
+| `backend/prisma/CLAUDE.md` | Migration rules, generated seeds, columns that were dropped and why |
+| `backend/src/public/CLAUDE.md` | The generated player guide, deviations and corrections, the landing page's accepted limits |
+| `docs/CLAUDE.md` | What each living doc is for, its format, and where open work is tracked |
 
-### Galaxy
+The rules in those files are not optional because they are not in this one.
+Three of them exist specifically because the same mistake was made more than
+once.
 
-- **`MAXX=30` / `MAXY=15` are NOT the size of the galaxy.** They are the
-  character dimensions of the ASCII scan map — `map[MAXY][MAXX]`, centred with
-  `map[MAXY/2][MAXX/2] = '*'` (`GECMDS.C:2569`), with the scan's range divided
-  across them as `xfactor = range/(MAXX-1.0)` (`GECMDS.C:2526-2527`). They are a
-  viewport, and they never move.
-- The galaxy is a square running `-UNIVMAX..+UNIVMAX` on both axes
-  (`univmax = numopt(UNIVMAX,10,32767)`, `GEMAIN.C:474`). Canon's default is
-  **300**; we deploy at **100** — a deliberate, documented deviation, see
-  `docs/DECISIONS.md`.
-- Anything expressed in sectors that must stay proportional to the world —
-  scan projection above all — is therefore **coupled to `UNIVMAX`** and has to
-  move with it. Reading `MAXX`/`MAXY` as the galaxy is a mistake this project
-  has now made three times: it once capped every weapon gate at 7.5 sectors,
-  and in round 6 it produced three false defect reports in a single session.
-- Ships use floating-point x/y coordinates within the universe (`COORD` struct)
-- Procedurally generated on first boot — not converted from original Btrieve `.DAT` files
-- Must include: neutral zone at origin, wormholes, varied sector types, planet placement
+### The parts most often got wrong
 
-### AI Ships
+**State**: see `### State Management` above. No Redis, no external cache layer.
 
-Two types — both driven entirely by the server tick, no client involvement:
+**Ticks**: two heartbeats. The **1-second** tick moves ships — rotate,
+accelerate, move, self-destruct countdown, energy regen, DB flush. The
+**6-second** tick runs everything else — shields, cloak, mines, projectile
+flight, phaser recharge, damage control. **Movement is on the fast tick and
+shields are on the slow one**; this file once had them backwards and every ship
+in the game flew at half speed. Before moving anything between the two, find it
+in `GEMAIN.C`. Derivation in `backend/src/game/CLAUDE.md`.
 
-- **Cybertrons**: Persistent (saved to DB between sessions). Escalating
-  difficulty based on player kill count (`CYB_BE_NICE=30`, `CYB_BE_EASY=60`
-  from `GEMAIN.H`). Have skill variance (`cybskill`), accumulate gold, respect
-  neutral zone. See `GECYBS.C` for full behavior logic.
-- **Droids**: Ephemeral (not persisted, respawn fresh). Simpler behavior.
-  Classes 31 (Lydorian Garbage Scow), 32 (Murdonian Transport) and 33 (Vakory
-  Survey Drone). See `GEDROIDS.C`.
+**Galaxy**: `MAXX=30` / `MAXY=15` are the character dimensions of the ASCII scan
+map. They are **not** the size of the galaxy. The galaxy runs
+`-UNIVMAX..+UNIVMAX`; canon defaults to 300 and we deploy at 100, a documented
+deviation. Anything measured in sectors is coupled to `UNIVMAX`. This has been
+misread three times. Derivation in `backend/src/game/CLAUDE.md`.
 
-  **The starter target is the VAKORY DRONE (33) — not the Scow, and certainly
-  not the Murdonian.** This file has now been wrong about this twice. It first
-  called the Murdonian "a heavily armed freighter that serves as a PvE target
-  for new players"; it was then corrected to the Scow, on arithmetic computed
-  with `PFIRDST` 7 — a value taken from the stale `GE/MSG/` copy of the option
-  database. The shipped value is 5, and the answer moves again.
+**AI ships**: Cybertrons are persistent and escalate with player kill count;
+Droids are ephemeral. **The starter PvE target is the Vakory Survey Drone (33)**
+— a stock Interceptor cannot beat the Lydorian Scow at any range. The
+arithmetic, and the two times this file got it wrong, are in
+`backend/src/game/CLAUDE.md`. Recompute it from the code rather than recalling
+it.
 
-  Phaser damage is divided by `1.0 + max_tons/TONFACT`, `TONFACT 15000`
-  (GECMDS.C:962-969, GEMAIN.H:102), and shields absorb it whole
-  (GECMDS.C:986-997 never touches `wptr->damage` in the SHIELDUP branch). What
-  decides a fight is therefore whether one shot strips more shield than the
-  target regenerates before your bank is hot again — `shieldchg` puts back
-  `shieldtype*3` per tick (GEFUNCS.C:2510) while `preload` is
-  `phasrtype * PRELOAD` (GEFUNCS.C:1031), so a Mark-1 fires every 36s and a
-  Mark-2 every 18s.
+**Galaxy generation**: procedural on first boot, not converted from the original
+Btrieve `.DAT` files. Must include a neutral zone at origin, wormholes, varied
+sector types and planet placement. Ships use floating-point x/y (`COORD`).
 
-  At point-blank range, focus 1. Note the targets do NOT all carry the same
-  shield: the Scow and the Vakory are Mark-1 (`S31SHLD 1`, `S33SHLD 1`) but the
-  Murdonian is Mark-2 (`S32SHLD 2`, MBMGESHP.MSG:7146), and `shieldchg` puts
-  back `type*3` per tick — so the Murdonian regenerates twice as fast as the
-  other two, and a table that assumes one shield for all three understates it.
-
-  | target | tons | shield | stock Mark-1 | with a Mark-2 |
-  |---|---|---|---|---|
-  | Vakory Survey Drone (33) | 100 | Mk-1 | strips 22 vs 18 regen — **wins** | — |
-  | Lydorian Scow (31) | 10,000 | Mk-1 | 12 vs 18 — **can never get through** | 19 vs 9 — wins |
-  | Murdonian Transport (32) | 30,000 | **Mk-2** | 6 vs 36 — hopeless | 9 vs 18 — still cannot strip it, and out-gunned 5:1 |
-
-  So a *stock* Interceptor cannot beat a Scow at any range or cadence, and the
-  Vakory is the only thing it can actually kill. One phaser upgrade (list
-  10,000, ~6,666 after trade-in) opens the Scow up. `hel combat` says all of
-  this in-world, without the table.
-
-  Recompute this section from the code if `PFIRDST`, `PRELOAD`, `TONFACT` or the
-  shield constants ever move — it has been wrong every time someone reasoned
-  about it from memory.
-
-### WebSocket / Real-time
-
-- One `GameGateway` using Socket.io
-- Players join a Socket.io room for their current sector on entry
-- Players leave sector room and join new one on warp/move
-- Physics tick broadcasts sector-scoped events to relevant rooms only
-- Global events (kills, major announcements) broadcast to all
-
-### NestJS Module Structure
-
-```
-backend/src/
-  game/
-    tick/           ← TickService — drives the 1s and 6s game loops
-    ship/           ← ShipStateService — in-memory state Map + async DB flush;
-                      ShipTickService, MaintenanceService, ShipChannelRegistry
-    planet/         ← PlanetStateService, PlanetEconomyService,
-                      PlanetTickService, PlanetAttackService
-    combat/         ← CombatTickService (phasors, torps, missiles, mines),
-                      MineRegistry, MineRepository
-    galaxy/         ← GalaxyService + procedural generator
-    commands/       ← CommandRouterService — routes player text input to
-                      handlers in commands/handlers/
-    cybertron/      ← CybertronTickService + CybertronRepository
-    droid/          ← DroidTickService + DroidSpawner
-    midnight/       ← MidnightService — nightly maintenance cron
-  gateway/          ← GameGateway (WebSocket, Socket.io)
-  auth/             ← Player authentication
-  prisma/           ← PrismaService
-```
+**WebSocket**: one `GameGateway`. Players join a Socket.io room per sector.
+Sector-scoped events go to rooms; kills and major announcements go to all.
 
 ## Reference Source
 
@@ -280,15 +207,30 @@ Testing is not optional. No feature is complete without tests.
 - TypeScript strict mode — no `any`, no implicit types
 - All public service methods must have JSDoc that references the original C
   source function where applicable (e.g. `@see GEFUNCS.C:cdistance`)
-- **Prisma migrations are source-controlled artifacts — never add `prisma/migrations/`
-  to `.gitignore`.** They must be committed alongside the schema change that produced
-  them. `prisma migrate deploy` in CI/production depends on this history existing.
-- Prisma migrations are never edited after creation — always add new ones
-- **Never use `prisma db push` or apply schema changes directly to the DB without
-  creating a migration file first.** Always use `prisma migrate dev --name <name>`
-  so the change is captured as a versioned migration.
+- **Never `prisma db push`. Never `prisma migrate reset`.** Schema changes go
+  through `prisma migrate dev --name <name>`, and migrations are committed, never
+  edited. Full rules in `backend/prisma/CLAUDE.md`
 - Docker Compose must work for both development and production
 - No feature ships without passing CI
+
+## Documentation
+
+`docs/` is living documentation and is updated at the end of every implement
+session, in the same commit as the change. `docs/CLAUDE.md` says what each file
+is for and gives the format for each.
+
+Two rules worth knowing before you get there:
+
+- **Open work is tracked in three places only** — the newest entries in
+  `docs/PROGRESS.md`, the files in `docs/audits/`, and `docs/DECISIONS.md`.
+  Anything elsewhere that reads like an open item is stale, and closing it in
+  place is part of the job.
+- **Keep won't-fix decisions, deliberate deviations, and expensive research**,
+  even once the work is done. Rewrite the note to record what was decided and
+  why; do not delete it.
+
+A deviation a player would actually notice also belongs in `GUIDE_DEVIATIONS` —
+see `backend/src/public/CLAUDE.md`.
 
 ## Spec-Driven Development
 
@@ -372,20 +314,12 @@ parallel agents). They are complementary, not competing.
 - Verification before completion: run the actual commands, don't
   claim success from a clean diff
 - Update `docs/PROGRESS.md` etc. at end of every implement session
-  (already required below)
+  (already required by the Documentation section above)
 
-**Planned feature sequence:**
-1. `001-prisma-schema` — DB schema from GEMAIN.H structs
-2. `002-tick-engine` — NestJS game loop + GameGateway skeleton
-3. `003-ship-commands` — CommandRouterService + basic commands (scan, report, rotate, impulse, warp)
-4. `004-galaxy-generator` — Procedural `-UNIVMAX..+UNIVMAX` galaxy (201x201 at our
-   UNIVMAX=100) + sector types
-5. `005-planet-system` — Planet mechanics, orbit, buy/sell, colonization
-6. `006-combat` — Phasors first, then torpedoes, missiles, mines
-7. `007-cybertron-ai` — Persistent Cybertron behavior
-8. `008-droid-ai` — Ephemeral Droid + Murdonian Transport
-9. `009-midnight-job` — Scoring, production reports, mail purge
-10. `010-react-frontend` — Terminal UI, ASCII map, command input, event log
+**The numbered feature sequence is finished.** `specs/001-*` through
+`specs/022-fidelity-audit-v2` all shipped; see the roadmap section in
+`docs/PROGRESS.md`. Work since then is ad-hoc under rules 2 and 3 above, and a
+new `specs/NNN-*` folder is warranted only for genuinely new features.
 
 ## Versioning — bump `VERSION` with anything that deploys
 
@@ -413,100 +347,6 @@ the release IS.
 If you add a new deployable image or a second build path, wire `GIT_SHA` and
 `APP_VERSION` through it. A version that silently falls back to `dev` in
 production is worse than none, because it looks like it is working.
-
-## The player's guide — only one part of it can rot
-
-The public guide at `/guide` is GENERATED from `CANON_HELP`, the same help the
-game serves to `hel`. Command and concept pages need no maintenance and must
-not be hand-edited: two hand-written descriptions of one game is how a wiki
-ends up contradicting the game it documents.
-
-**The one hand-maintained part is `GUIDE_DEVIATIONS`** in
-`backend/src/public/guide.ts` — the notes saying where this port differs from
-the original, which canon cannot know.
-
-**When you add a deviation to `docs/DECISIONS.md`, ask whether a player would
-notice it. If they would, add it to `GUIDE_DEVIATIONS` on the page they would
-be reading when it bites.** A deviation a player meets in play and cannot find
-documented makes every other claim on the site less believable — and the
-landing page explicitly promises we are honest about these.
-
-Keep the notes short and concrete: what differs, and the original's value. A
-test asserts every entry attaches to a slug that exists, because a note on an
-unreachable page is a note nobody reads.
-
-`GUIDE_CORRECTIONS`, in the same file, is a SEPARATE list for where the
-original's help is wrong about the original's own code. Keep the two apart:
-one says "we changed this", the other says "the original was wrong about
-itself and we follow its code". Conflating them either accuses the original of
-our change or claims credit for behaviour that was always canon. A page can
-carry both — `planets` does.
-
-That list exists because canon's help states INTENT and its C source states
-truth. `HLPPLANT` claims items transferred to a planet "cannot" be transferred
-back; `HLPTRA` documents `transfer up` and `GECMDS.C trans_up` implements it.
-When play turns up another of these, check the C source, follow it, and add
-the note rather than editing canon's text — the text is the historical record.
-
-If a new canon help topic becomes reachable, add it to `CONCEPTS` or `COMMANDS`
-in the same file — those lists decide what appears, not `CANON_HELP` itself.
-
-## Living Documentation (always keep current)
-
-These files in `docs/` are the handoff point between Claude Code sessions
-and the Claude Project used for planning. **Update them at the end of every
-implement session — do not skip this step.**
-
-| File | Purpose | Update when |
-|------|---------|-------------|
-| `docs/ARCHITECTURE.md` | Module map, responsibilities, data flow | Any structural change |
-| `docs/DECISIONS.md` | Why things are the way they are | Any architecture decision |
-| `docs/PROGRESS.md` | What's built, what's next, known issues | Every completed feature |
-| `docs/DATA_MODEL.md` | Entities, fields, relationships in plain English | Schema changes |
-| `docs/GAME_MECHANICS.md` | Implemented mechanics with C source references | Each mechanic lands |
-
-### docs/ARCHITECTURE.md format
-
-Plain text module map. Keep it current — no diagrams needed. Example:
-
-```
-GameGateway (gateway/)
-  └── receives player commands via Socket.io
-  └── routes to CommandRouterService
-  └── broadcasts tick events to sector rooms
-
-TickService (game/tick/)
-  └── drives 1s ship update tick
-  └── drives 6s physics tick
-  └── subscribers act on it: ShipTickService, CombatTickService,
-      CybertronTickService, DroidTickService
-
-ShipStateService (game/ship/)
-  └── owns in-memory Map<shipId, ShipState>
-  └── flushes to Postgres async every 30s or on significant state change
-  └── source of truth for all active ship state
-```
-
-### docs/DECISIONS.md format
-
-```
-## [date] — Decision title
-**Context:** why this came up
-**Decision:** what was decided
-**Reason:** why
-**Alternatives rejected:** what else was considered and why not
-```
-
-### docs/PROGRESS.md format
-
-```
-## [date] — feature name
-**Completed:** what was built
-**Tests:** what is covered and at what level
-**Decisions made:** any deviations from plan
-**Next:** what comes next
-**Known issues:** anything deferred
-```
 
 ## Fidelity Goals
 

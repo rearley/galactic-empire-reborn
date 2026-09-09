@@ -94,12 +94,16 @@ control fields. Source: `WARSHP` in `GEMAIN.H`.
   `ShipStateService.flush()` skips entries where `isEphemeral === true` — zero Prisma calls for
   Droids. `removeFromGame` also skips the Prisma delete. Not persisted to the DB schema.
 
-**Feature 013 additions**:
-- `autoShield Boolean @default(false)` — player-toggled flag; when true the ship management tick
-  should auto-raise shields (wiring to repair tick deferred to feature 019).
-- `autoRepair Boolean @default(false)` — player-toggled flag; when true the ship management tick
-  should queue repair automatically (wiring deferred to feature 019).
-  Both columns added via migration `20260506235607_ship_auto_flags`.
+**Two columns have been added and then dropped.** Both were port inventions with
+no counterpart in `WARSHP`, and both are recorded here so the migrations are not
+mistaken for accidents:
+
+- `autoShield` / `autoRepair` — added by feature 013
+  (`20260506235607_ship_auto_flags`), dropped 2026-09-09
+  (`20260909034154_drop_invented_auto_flags`). Auto-shield contradicted canon's
+  own help (HLPSHI: shields "WILL NOT be automatically raised after the
+  firing"); auto-repair spent the pilot's cash unasked. @see
+  docs/GAME_MECHANICS.md "Auto-shield and auto-repair"
 
 `navTargetX` and `navTargetY` were added by feature 016 for a port-original
 autopilot and dropped on 2026-09-05 by migration
@@ -113,14 +117,16 @@ autopilot and dropped on 2026-09-05 by migration
 ## User.options index map (feature 015)
 
 `User.options Int[]` is a 30-element array mapping directly to `GEMAIN.H WARUSR.options[30]`.
-The first two indices are assigned display-option flags by feature 015:
+The first four indices carry canon's four `set` options (`NUMOPTS 4`, GECMDS.C cmd_set):
 
 | Index | Flag | Values | Source |
 |-------|------|--------|--------|
 | 0 | SCANNAMES | 0 = off (default), 1 = on | GEMAIN.H options[] SCANNAMES |
 | 1 | SCANHOME | 0 = off (default), 1 = on | GEMAIN.H options[] SCANHOME |
+| 2 | SCANFULL | 0 = off (default), 1 = on | GEMAIN.H options[] SCANFULL |
+| 3 | MSG_FILTER | 0 = off (default), 1 = on | GEMAIN.H options[] MSG_FILTER |
 
-Indices 2–29 are unassigned and default to 0. The array is initialized to all-zeros for new
+Indices 4–29 are unassigned and default to 0. The array is initialized to all-zeros for new
 users (no migration required — the existing column already has a default in the Prisma schema).
 
 `SetHandlerService` updates these values via `prisma.user.update({ where: { userid }, data: { options: updatedArray } })` and also updates the in-memory `ShipState` so subsequent scan commands read the correct setting without a DB round-trip.

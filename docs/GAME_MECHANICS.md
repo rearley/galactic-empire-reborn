@@ -16,7 +16,7 @@ an index from mechanic to original source.
 - [Universe Edge — wrap or wall (feature 019 — US1; corrected 2026-09-02)](#universe-edge-wrap-or-wall-feature-019-us1-corrected-2026-09-02)
 - [Overspeed Engine Damage (feature 019 — US2)](#overspeed-engine-damage-feature-019-us2)
 - [Auto-Repair Tick (feature 019 — US3)](#auto-repair-tick-feature-019-us3)
-- [Auto-Shield Tick (feature 019 — US4)](#auto-shield-tick-feature-019-us4)
+- [Auto-shield and auto-repair — REMOVED 2026-09-09](#auto-shield-and-auto-repair--removed-2026-09-09)
 - [AI Kill Scoring (feature 019 — US5)](#ai-kill-scoring-feature-019-us5)
 - [Droid Presence Bridge (feature 019 — US6)](#droid-presence-bridge-feature-019-us6)
 - [Command dispatch (feature 003)](#command-dispatch-feature-003)
@@ -250,19 +250,27 @@ On `TickKind.SHIP_UPDATE`, if `ship.autoRepair === true` and all gates pass, `ru
 
 ---
 
-## Auto-Shield Tick (feature 019 — US4)
+## Auto-shield and auto-repair — REMOVED 2026-09-09
 
-**Port-original QoL feature — no C source equivalent.**
+Feature 019 added two port-original convenience options with no C source
+equivalent: `set auto-shield`, which re-raised shields after a warp exit or a
+self-fired torpedo, and `set auto-repair`, which hired a repair crew for you
+whenever you orbited a planet that would take the job.
 
-`decideAutoShield(ship)` returns `'raise'` when all of these hold:
-- `ship.autoShield === true`
-- `ship.shieldstat === 0` (shields currently down)
-- `ship.cantexit === 0` (not in combat lock)
-- At least one trigger flag is set: `recentlyWarpedExit` or `recentlySelfFiredTorp`
+**Both are gone**, along with the `Ship.autoShield` / `Ship.autoRepair` columns
+(migration `20260909034154_drop_invented_auto_flags`). Kept here because the
+reasoning is worth not relearning:
 
-On `'raise'`, `ShipTickService` sets `shieldstat = 1` and clears the trigger flag.
-Trigger flags are in-memory only (not persisted to Postgres). Sources: warp-exit path in
-`physics-tick.service.ts` sets `recentlyWarpedExit = true`; torpedo-launch handler sets `recentlySelfFiredTorp = true`.
+- Auto-shield **reversed a rule canon states in its own help.** HLPSHI: "They
+  WILL NOT be automatically raised after the firing." Losing your shields is
+  meant to cost you the tempo of raising them again.
+- Auto-repair **spent the pilot's cash without being asked**, on a schedule the
+  pilot could not see.
+
+Canon's `set` has exactly four options (`NUMOPTS 4`, GECMDS.C cmd_set), which is
+what the port now has. `test/unit/help-accuracy.spec.ts` fails if the help ever
+names a fifth again — `hel maintenance` went on advertising `set auto-repair on`
+for months after the option was deleted.
 
 ---
 
@@ -323,13 +331,20 @@ on unhandled throws.
 Keywords: `rotate`, `rot`  
 Argument: degrees (integer, -180..180)
 
-Sets `ship.degrees` to the requested heading delta and marks the ship dirty.
-The rotation takes effect on the next physics tick (TICKTIME=6s) when the tick
-engine applies heading changes — not implemented until feature 006.
+Sets `ship.head2b` to the requested heading and marks the ship dirty. The turn
+is applied by `applyRotation` in `PhysicsTickService`, which runs on the
+**1-second** SHIP_UPDATE tick, not the 6-second one — canon registers
+`rotateship` on TICKTIME2 (GEMAIN.C:2476-2483). Rotation runs in orbit too;
+`rotateship` has no `where` test, only `moveship` does.
 
 Balance constants from GEMAIN.H:
-- `ROTENGUSE = 30` — energy consumed per rotation (gate deferred to feature 006)
-- `ROTAMT = 20` — maximum degrees per tick (gate deferred to feature 006)
+- `ROTENGUSE = 30` — energy consumed per rotation. Debited by the COMMAND, not
+  the tick: `tryEnergyDebit` in `rotate.handler.ts` refuses the turn and emits
+  NOROTPW when the ship cannot pay. `useenergy` keeps a 500-unit reserve on top
+  of the cost, so a ship is refused while it still holds ROTENGUSE
+  (GEFUNCS.C:1500-1515).
+- `ROTAMT = 20` — canon's per-tick step. **Deliberate deviation:** the port
+  turns at `max_accel/10` per tick instead. @see docs/DECISIONS.md 2026-05-02
 
 Error messages:
 - `ROTFMT` — missing/invalid format
@@ -349,7 +364,11 @@ Sets `ship.percent` and `ship.speed2b = 1000 * (percent / 100)`. The speed chang
 is staged in `speed2b` (desired speed) and applied on the next physics tick.
 
 Balance constants from GEMAIN.H:
-- `ACCENGAMT = 120` — energy used per acceleration tick (gate deferred to feature 006)
+- `ACCENGAMT = 120` — energy used per acceleration tick. **STILL OPEN.** The
+  constant is declared in `constants.ts` and has no consumer in production code;
+  nothing debits energy for acceleration. Canon gates the speed change on
+  `useenergy(ACCENGAMT)` in `accel` (GEFUNCS.C:469-573). Not recorded in
+  DECISIONS.md as a deliberate deviation, so it is a gap, not a choice.
 
 Error messages:
 - `IMPFMT` — missing/invalid format
@@ -375,9 +394,9 @@ per GECMDS.C:
 | WARP03 | `speed > topspeed * 1.5` | Way over max speed | Reject |
 | WARP04 | `speed > topspeed` | Over max speed | Warn + apply |
 
-WARP04 is warn-and-apply (not reject) per GECMDS.C:614-619. The distinction between
-the class max_warp and topspeed (skill-adjusted) is deferred to feature 006; currently
-`ship.topspeed` serves as the unified proxy.
+WARP04 is warn-and-apply (not reject) per GECMDS.C:614-619. The class `maxWarp`
+and the skill-adjusted `topspeed` are now separate: `ShipStateService` loads
+`maxWarp` per class and stores both on the ship state.
 
 Error messages: `WARP01`–`WARP04`, `ENGFIRE` (success)
 
@@ -484,9 +503,9 @@ REP12–REP14 (cloak/training/emulate gates if applicable).
 
 `report sys` — system summary: damage, energy, kills. Lines: REP15–REP21.
 
-`report cargo` — item inventory. Stub (TODO feature 005 planet items). Lines: REP22–REP27.
+`report cargo` — item inventory. Implemented; lines REP22–REP27 in `report.handler.ts`.
 
-`report wpns` — weapon loadout. Stub (TODO feature 006 combat). Lines: REP28–REP32.
+`report wpns` — weapon loadout. Implemented; lines REP28–REP32 in `report.handler.ts`.
 
 ShipClass data (typeName, hasCloak) is pre-cached on module init via Prisma.
 
@@ -734,8 +753,10 @@ every sweep — as the port did until 2026-08-31 — made the economy about 33x 
    - `prod = manhours[i] × envFact × tfact × (cashBoost if applicable)`
    - `qty = min(qty + prod × men.qty / 1000, maxpl[i])`
    - `tax += taxrate / 1200 × men.qty` (after last item)
-6. **Production-report mail deferred to feature 009** (GEPLANET.C:313-326 cap + mail emit).
-7. **Revolt and `check_spy` deferred to feature 006** (GEPLANET.C:341+).
+6. **Production-report mail** (GEPLANET.C:313-326 cap + mail emit) — implemented
+   by the midnight job; see `midnight/mailstat-builder.ts`.
+7. **Revolt and `check_spy`** (GEPLANET.C:341+) — both implemented in
+   `planet-economy.service.ts`, including the SPYM2 intel report.
 
 Zero-population planets produce nothing (`if men.qty == 0 → break` before production loop).
 
@@ -1020,7 +1041,9 @@ the intended target. The `cantexit` timer is still set (battle-lock persists).
 The neutral zone is checked using `isInNeutralZone(coord)` from `backend/src/game/combat/neutral-zone.ts`
 (extracted in feature 023 from the inline check in `combat-tick.service.ts` so all handlers share one predicate).
 
-Mine deployment in the neutral zone (C-004) is separately deferred.
+Mine deployment in the neutral zone (C-004) is implemented: `mine.handler.ts`
+refuses with MIN_NEUTRAL, and the check precedes the cloak gate in canon's order
+(GECMDS.C:1727-1746).
 
 ---
 
@@ -1033,7 +1056,8 @@ A cloaked ship cannot fire phasers or missiles. Torpedo already had this gate (G
 With feature 023, all three player weapon commands are now consistent: the firer must be uncloaked
 (`ship.cloak === 0`) to fire. The gate is checked before arc/target resolution.
 
-Mine handler cloak gate (C-004) remains deferred.
+The mine handler carries the same gate (`mine.handler.ts`, MIN_CLOAK) — a plain
+refusal with no self-zap, after the neutral-zone check.
 
 ---
 
@@ -1482,8 +1506,10 @@ After each tick's combat passes, `CombatTickService` checks every ship for `dama
 - **Score transfer** (GEFUNCS.C:killem 1143-1185): `scr = shipClass.points` for victim's class.
   `attacker.score += scr` and `attacker.klscore += scr` (DB). `victim.score -= scr` and
   `victim.klscore -= scr` (floored at 0, never negative). AI victims (`Cybrg-*`, `Droid-*`)
-  are never penalised. rospos bonus and chgloser cash penalty deferred to feature 009.
-  Handled by `PlayerScoreService` → `PlayerScoreRepository.transferKillScore`.
+  are never penalised. The rospos bonus and the chgloser cash penalty are
+  implemented; rospos is a User column the midnight job assigns
+  (GEMAIN.C:1302-1332). Handled by `PlayerScoreService` →
+  `PlayerScoreRepository.transferKillScore`.
 - Emit `COMBAT_SHIP_DESTROYED` (galaxy-wide broadcast) with `loot` and `scoreAwarded` fields.
 - Call `ShipStateService.removeFromGame(victim)`.
 - Walk every other active ship's `ltorps[]`/`lmissl[]`; clear any slot whose `.channel == deadShip.channel`
@@ -2082,16 +2108,12 @@ resolves to 0, which fails the guard); ship must actually hold the requested amo
 
 **Source**: GECMDS.C:5190 `cmd_set`; GEMAIN.H `options[]`
 
-**Syntax**: `set auto-shield on|off` / `set auto-repair on|off` / `set scannames on|off` /
-`set scanhome on|off` / `set ?` (alias: `set`)
+**Syntax**: `set scannames on|off` / `set scanhome on|off` / `set scanfull on|off` /
+`set filter on|off` / `set ?` (alias: `set`)
 
-`SetHandlerService` manages six flags across two storage locations:
-
-**Ship-level flags** (persisted on the `Ship` DB row via `autoShield`/`autoRepair` columns):
-- `auto-shield` → `Ship.autoShield` — when on, the ship management tick should auto-raise
-  shields (tick consumer wiring deferred to feature 019).
-- `auto-repair` → `Ship.autoRepair` — when on, the ship management tick should queue repair
-  automatically (tick consumer wiring deferred to feature 019).
+`SetHandlerService` manages canon's four options — `NUMOPTS 4`, GECMDS.C
+cmd_set. The port's two invented ship-level flags were removed on 2026-09-09;
+see "Auto-shield and auto-repair" above for why.
 
 **User-level display options** (persisted in `User.options Int[]` at fixed indices, feature 015):
 - `scannames` → `User.options[0]` — when on, ship names appear in the `sca lo full` side panel.
@@ -2100,11 +2122,16 @@ resolves to 0, which fails the guard); ship must actually hold the requested amo
   (the frontend ScanPanel replaces the previous card rather than appending). When off, scans
   append. Source: GEMAIN.H `options[]` SCANHOME flag. **D3 deviation**: the original used ANSI
   cursor-home escape codes; this port uses a typed boolean field on the wire event.
+- `scanfull` → `User.options[2]` — when on, `sca lo` renders the full side panel.
+- `filter` → `User.options[3]` — when on, open hails on other frequencies are
+  suppressed. Source: GEMAIN.H `options[]` MSG_FILTER flag.
 
 `set ?` returns the current state of all four flags.
 
-Flags are persisted immediately via `ShipStateService.mutate` (ship flags) or a direct Prisma
-`User.update` (display options) + the 1s dirty flush (ship flags only).
+All four are user-level, so each write is a direct Prisma `User.update` plus an
+in-memory `ShipStateService.mutate` to keep the cached copy in step. Nothing here
+rides the 1s dirty flush any more — that path existed for the two removed ship
+columns.
 
 ---
 
@@ -2255,7 +2282,9 @@ GECYBS.C set it as a wander/evade timer and no player path touches it.
 
 Player in orbit of an enemy planet (`where >= 10`, not self-owned, not neutral zone, not wormhole) with one `I_SPY` item (index 13) plants a spy. Sets `planet.spyowner = ship.userid`, decrements `items[I_SPY]` by 1. A subsequent `scan pl <name>` by the spy owner reveals the planet's full item inventory (spy intel block). Prior spy is silently overwritten by a new spy.
 
-**Known issue (A1)**: explicit spy removal mechanic (`FR-013`) is not implemented; `spyowner` is cleared only by overwrite or ownership change.
+**Known issue (A1), still open**: there is no explicit spy-removal command
+(`FR-013`); `spyowner` is cleared only by overwrite, by ownership change, or by
+`check_spy` catching the operative.
 
 ---
 

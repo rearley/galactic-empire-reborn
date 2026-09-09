@@ -4,9 +4,11 @@ An 18-way survey of the original C source against `backend/src`, each claimed
 gap then put to an adversarial verifier whose only instruction was to refute it
 by finding the implementation. **72 of 74 verified gaps survived.**
 
-This is a **finding list, not a work order.** Nothing here has been changed. Each
-item needs a decision: implement it, or record it in `DECISIONS.md` as a
-deliberate deviation. CLAUDE.md permits the second, but not silence.
+This was a **finding list, not a work order** when it was written. It has since
+been worked through — see the CLOSED note below — so **every numbered finding
+in the body of this file is a snapshot of the code as it stood on 2026-09-05,
+not a description of the code today.** Read the body for the canon citations and
+the reasoning; do not read it for current status.
 
 ---
 
@@ -41,9 +43,10 @@ names. The correct check is to map the token through `messages.ts` and grep the
   connecting to the gateway *is* entering it. Its ATTACK7 half is covered by the
   first arm of the chain.
 
-The one item left open by choice is the `ITEM_NAMES` spelling divergence
-("Torpedoes"/"Gold" against canon's "torpedos"/"gold"), which is a change of its
-own and is recorded in `PROGRESS.md`.
+The `ITEM_NAMES` spelling divergence ("Torpedoes"/"Gold" against canon's
+"torpedos"/"gold") was left open here as a change of its own. It has since been
+made: the table is canon's, lower-cased and verbatim, and is pinned by
+`test/balance/item-names-canon.balance.spec.ts`. Nothing in this file is open.
 
 ---
 
