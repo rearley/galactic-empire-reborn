@@ -114,6 +114,19 @@ function isShipnameCollision(err: unknown): boolean {
  */
 const ZYGOR_PLNUM = 1;
 
+/**
+ * The buyer could not afford the hull, or was at the fleet cap, at the moment
+ * the money was actually taken. Thrown inside the purchase transaction so the
+ * half-created ship rolls back with it.
+ * @see docs/audits/2026-09-09-security-review.md M1
+ */
+export class InsufficientFundsError extends Error {
+  constructor() {
+    super('INSUFFICIENT_FUNDS');
+    this.name = 'InsufficientFundsError';
+  }
+}
+
 @Injectable()
 export class NewShipHandlerService {
   constructor(
@@ -283,6 +296,12 @@ export class NewShipHandlerService {
         );
         created = true;
       } catch (err: unknown) {
+        // Lost the race for the money or the last fleet slot. The balance and
+        // MAXSHIPS were both checked above against values read before the
+        // transaction; this is the same check re-run where it counts.
+        if (err instanceof InsufficientFundsError) {
+          return { lines: [{ text: formatMessage(MessageId.NEW4, shipClass.typeName), category: 'system' }] };
+        }
         if (!isShipnameCollision(err)) throw err;
       }
     }
@@ -463,8 +482,24 @@ export class NewShipHandlerService {
     items: bigint[],
     at: { x: number; y: number },
   ): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.ship.create({
+    await this.prisma.$transaction(async (tx) => {
+      // Cash and the fleet cap are re-checked in the same statement that
+      // spends and increments them. Both were read before this call and both
+      // were racable: two `new ship` commands in flight together read one
+      // balance, passed one MAXSHIPS check, and both committed. Interactive
+      // rather than array form so a refusal can roll the hull back.
+      // @see docs/audits/2026-09-09-security-review.md M1
+      const { count } = await tx.user.updateMany({
+        where: { userid, cash: { gte: shipClass.maxPrice }, noships: { lt: MAXSHIPS } },
+        data: {
+          cash: { decrement: shipClass.maxPrice },
+          noships: { increment: 1 },
+          topshipno: shipno,
+        },
+      });
+      if (count === 0) throw new InsufficientFundsError();
+
+      await tx.ship.create({
         data: {
           userid,
           shipno,
@@ -499,15 +534,7 @@ export class NewShipHandlerService {
           freq: [0, 0, 0],
           items,
         } as never,
-      }),
-      this.prisma.user.update({
-        where: { userid },
-        data: {
-          cash: { decrement: shipClass.maxPrice },
-          noships: { increment: 1 },
-          topshipno: shipno,
-        },
-      }),
-    ]);
+      });
+    });
   }
 }

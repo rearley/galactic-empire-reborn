@@ -114,14 +114,23 @@ export class MaintenanceService {
    *
    * @see GECMDS.C:4452 cmd_maint — debit + repair queue mutation
    */
-  async applyMaintenance(ship: ShipState, price: bigint, repairAmt: number): Promise<void> {
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
+  async applyMaintenance(ship: ShipState, price: bigint, repairAmt: number): Promise<boolean> {
+    // The balance check in `evaluateGates` ran before an await, so it is a
+    // snapshot: two `mai` commands in flight together both passed it and both
+    // decremented. The check is repeated here in the same statement that
+    // spends, which is the only place it cannot be raced. The repair is queued
+    // only if the money actually moved.
+    // @see docs/audits/2026-09-09-security-review.md M1
+    const { count } = await this.prisma.user.updateMany({
+      where: { userid: ship.userid, cash: { gte: price } },
       data: { cash: { decrement: price } },
     });
+    if (count === 0) return false;
+
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.repair = repairAmt;
     });
+    return true;
   }
 
   /**
@@ -135,7 +144,8 @@ export class MaintenanceService {
   async runMaintenance(ship: ShipState, passwordArg?: string): Promise<GateResult> {
     const gate = await this.evaluateGates(ship, passwordArg);
     if (gate.ok) {
-      await this.applyMaintenance(ship, gate.price, gate.repairAmt);
+      const paid = await this.applyMaintenance(ship, gate.price, gate.repairAmt);
+      if (!paid) return { ok: false, reason: 'insufficient-cash' };
     }
     return gate;
   }

@@ -105,6 +105,11 @@ export class BuyHandlerService {
       qty,
       capacityRemaining,
       buyerCash,
+      // The debit re-checks the balance in the same statement that decrements
+      // it, so Postgres enforces affordability rather than the scheduler.
+      // `buyerCash` above was read before the planet lock and twenty concurrent
+      // buys all saw the same value. @see docs/audits/2026-09-09-security-review.md M1
+      (totalCost) => this.debitBuyer(ship.userid, totalCost),
     );
 
     if (!result.ok) {
@@ -142,12 +147,6 @@ export class BuyHandlerService {
       s.items[itemIndex] = (s.items[itemIndex] ?? 0n) + BigInt(result.transferred);
     });
 
-    // Deduct cash from user
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { decrement: result.totalCost } },
-    });
-
     const lines: CommandResult['lines'] = [];
     // BUYPAS4 — C greets a team-mate before the purchase confirmation.
     if (welcome) {
@@ -172,4 +171,27 @@ export class BuyHandlerService {
       ],
     };
   }
+
+  /**
+   * Take `totalCost` from the buyer, but only if they still have it.
+   *
+   * `updateMany` with the balance in the WHERE clause makes the check and the
+   * decrement one statement, so Postgres refuses an overdraft no matter how
+   * many commands are in flight. The old code read the balance, awaited the
+   * planet transaction, then decremented unconditionally — twenty concurrent
+   * `buy` packets all read 1,000 credits, all passed, and all committed,
+   * leaving −19,000. The canon clamp at the top of this handler
+   * (GECMDS.C:4205-4207) then wrote that debt off on the next purchase.
+   *
+   * @returns false when the buyer could not afford it; nothing is written.
+   * @see test/integration/economy-race-cash.spec.ts
+   */
+  private async debitBuyer(userid: string, totalCost: bigint): Promise<boolean> {
+    const { count } = await this.prisma.user.updateMany({
+      where: { userid, cash: { gte: totalCost } },
+      data: { cash: { decrement: totalCost } },
+    });
+    return count > 0;
+  }
+
 }

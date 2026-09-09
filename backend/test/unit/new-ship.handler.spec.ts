@@ -76,6 +76,7 @@ function makeService(
   topshipno = 1,
   cash = 1_000_000n,
 ) {
+  const self: { value: unknown } = { value: undefined };
   const prismaMock = {
     shipClass: {
       findMany: jest.fn().mockResolvedValue([PLAYER_CLASS_4]),
@@ -117,10 +118,25 @@ function makeService(
     user: {
       findUnique: jest.fn().mockResolvedValue({ userid: 'u-test', cash, noships, topshipno }),
       update: jest.fn().mockResolvedValue({ userid: 'u-test', cash: cash - 600_000n, noships: noships + 1, topshipno: topshipno + 1 }),
+      // The purchase debit is conditional now: the balance and the MAXSHIPS cap
+      // are re-checked in the same statement that spends and increments them,
+      // and `count` is how the caller learns whether it won the race.
+      // @see docs/audits/2026-09-09-security-review.md M1
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    $transaction: jest.fn().mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops)),
+    // Interactive form: the transaction body needs to branch on that count, so
+    // it is a callback rather than an array of operations. `self` is the same
+    // mock, handed in as the transaction client.
+    $transaction: jest.fn().mockImplementation(
+      async (arg: unknown) =>
+        typeof arg === 'function'
+          ? (arg as (tx: unknown) => Promise<unknown>)(self.value)
+          : Promise.all(arg as Promise<unknown>[]),
+    ),
     ...prismaOverrides,
   };
+
+  self.value = prismaMock;
 
   const shipStateMock: Pick<ShipStateService, 'loadShip'> = {
     loadShip: jest.fn(),
@@ -158,9 +174,15 @@ describe('NewShipHandlerService', () => {
       const { service, prismaMock } = makeService();
       const result = await service.command.handler(makeShip(), ['ship', '4'], {});
       expect(prismaMock.ship.create).toHaveBeenCalledTimes(1);
-      expect(prismaMock.user.update).toHaveBeenCalledWith(
+      // Conditional: the balance and the fleet cap are in the WHERE clause, so
+      // the check and the spend are one statement and cannot be raced.
+      // @see docs/audits/2026-09-09-security-review.md M1
+      expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userid: 'u-test' },
+          where: expect.objectContaining({
+            userid: 'u-test',
+            cash: { gte: 600_000n },
+          }),
           data: expect.objectContaining({ cash: { decrement: 600_000n } }),
         }),
       );
@@ -186,6 +208,7 @@ describe('NewShipHandlerService', () => {
       expect(result.lines[0].text).toMatch(/You already have \d+ ships, the maximum permitted!/i);
       expect(prismaMock.ship.create).not.toHaveBeenCalled();
       expect(prismaMock.user.update).not.toHaveBeenCalled();
+      expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
   });
@@ -197,7 +220,7 @@ describe('NewShipHandlerService', () => {
       await service.command.handler(makeShip(), ['ship', '4'], {});
       const createCall = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
       expect(createCall.data['shipno']).toBe(4);
-      expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             noships: { increment: 1 },
@@ -305,12 +328,16 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 
   it('retries under a different name instead of failing the purchase', async () => {
     let calls = 0;
-    const $transaction = jest.fn().mockImplementation(async (ops: Promise<unknown>[]) => {
+    let inner: unknown;
+    const $transaction = jest.fn().mockImplementation(async (arg: unknown) => {
       calls += 1;
       if (calls === 1) throw p2002;
-      return Promise.all(ops);
+      return typeof arg === 'function'
+        ? (arg as (tx: unknown) => Promise<unknown>)(inner)
+        : Promise.all(arg as Promise<unknown>[]);
     });
-    const { service } = makeService({ $transaction });
+    const { service, prismaMock } = makeService({ $transaction });
+    inner = prismaMock;
 
     const result = await service.command.handler(makeShip(), ['ship', '4'], {});
 

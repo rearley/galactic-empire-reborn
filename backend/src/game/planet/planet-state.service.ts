@@ -345,6 +345,19 @@ export class PlanetStateService implements OnModuleInit {
     requestedQty: number,
     buyerCargoCapacityRemaining: number,
     buyerCash: bigint,
+    /**
+     * Take the money. Returns false when the buyer could not afford it AT THE
+     * MOMENT OF THE WRITE — `buyerCash` above is a snapshot read before this
+     * lock was taken, and twenty concurrent `buy` commands all read the same
+     * one. Called inside the critical section and BEFORE any goods move, so a
+     * refusal costs nothing to unwind.
+     *
+     * Optional: the many unit harnesses that call `buy()` directly do not model
+     * a wallet, and without one the pre-check on `buyerCash` is the only gate —
+     * exactly the behaviour they were written against.
+     * @see docs/audits/2026-09-09-security-review.md M1
+     */
+    debitBuyer?: (totalCost: bigint) => Promise<boolean>,
   ): Promise<
     | { ok: true; transferred: number; unitPrice: number; totalCost: bigint }
     // `available` is the count C prints in BUY3 — see planet-trade.ts.
@@ -375,6 +388,15 @@ export class PlanetStateService implements OnModuleInit {
       });
 
       if (!outcome.ok) return outcome;
+
+      // Money first, conditionally, and inside the lock. `buyerCash` is a
+      // snapshot taken before this critical section, so it cannot be trusted to
+      // still be true; the debit re-checks against the live row in the same
+      // statement that decrements it. Goods move only once it succeeds.
+      if (debitBuyer && outcome.totalCost > 0n) {
+        const paid = await debitBuyer(outcome.totalCost);
+        if (!paid) return { ok: false as const, reason: 'INSUFFICIENT_FUNDS' as const };
+      }
 
       if (outcome.mutatePlanet) {
         state.items[itemIndex].qty -= BigInt(outcome.transferred);
@@ -666,12 +688,31 @@ export class PlanetStateService implements OnModuleInit {
   async depositToPlanet(
     key: string,
     requesterUserid: string,
+    requesterShipno: number,
     itemIndex: number,
     qty: bigint,
-  ): Promise<{ ok: true } | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' }> {
+  ): Promise<{ ok: true } | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' | 'INSUFFICIENT_CARGO' }> {
     return this.runSerialized(key, async () => {
       const state = this.map.get(key);
       if (!state) return { ok: false as const, reason: 'NOT_FOUND' as const };
+
+      // Re-read the source hull and take the cargo INSIDE the critical section,
+      // exactly as `sell()` does above. This used to add to the planet without
+      // looking at the ship at all, and the handler decremented afterwards — so
+      // ten `tra down` commands in flight together all passed one check against
+      // one snapshot, the planet gained ten lots and the hold went negative.
+      // The debt then died with the hull while the goods did not.
+      // @see docs/audits/2026-09-09-security-review.md M2
+      const ship = this.ships.get(requesterUserid, requesterShipno);
+      const have = ship?.items[itemIndex] ?? 0n;
+      if (!ship || have < qty) {
+        return { ok: false as const, reason: 'INSUFFICIENT_CARGO' as const };
+      }
+      this.ships.mutate(requesterUserid, requesterShipno, (s) => {
+        const current = s.items[itemIndex] ?? 0n;
+        // Never below zero, whatever else has happened to the hold.
+        s.items[itemIndex] = current > qty ? current - qty : 0n;
+      });
 
       state.items[itemIndex].qty += qty;
 
