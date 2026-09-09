@@ -4944,6 +4944,15 @@ page and its `SOURCE_URL` constant carry a comment saying the page must not be
 deployed while the link is dead. Going public, or arranging another route to
 the corresponding source, is the open item.
 
+**This decision is still reversible, and only until publication.** Nothing has
+been distributed — private repository, no published images, no player offered
+the source — so the choice between AGPL-3.0 and GPL-3.0 is genuinely open as of
+2026-09-09 and will not be once the repo is public, because a copyleft grant
+cannot be withdrawn from the version it goes out on. The full decision brief,
+including the one-repo-or-two question and the six things that must be true
+before publishing, is in the "Backlog — going public" section of
+`docs/PROGRESS.md`.
+
 **Not legal advice.** This entry records what the licence files say and what was
 decided on that basis. Whether a TypeScript reimplementation written from GPL C
 source is a derivative work is a judgement, not a fact that was checked; the
