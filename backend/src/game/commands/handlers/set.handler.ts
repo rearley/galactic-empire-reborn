@@ -20,39 +20,23 @@ interface SetOption {
 /**
  * Handles `set <option> <on|off>` and `set ?`.
  *
- * Options: auto-shield, auto-repair, scannames, scanhome.
+ * Options: canon's four — scannames, scanhome, scanfull, filter.
+ * `auto-shield` and `auto-repair` were port inventions and are gone: canon's
+ * help forbids the first outright (HLPSHI, "They WILL NOT be automatically
+ * raised after the firing") and the second spent the pilot's cash unasked.
+ * @see test/game/commands/handlers/set-canon-options.spec.ts
  * `set ?` lists all options with their current values on one pipe-separated line.
  *
  * scannames/scanhome are persisted via Prisma write-through (User.options[0/1])
  * in addition to updating the in-memory ShipState cache.
  *
- * @see GECMDS.C:5190 cmd_set (canonical — option set reinterpreted)
+ * @see GECMDS.C cmd_set — `#define NUMOPTS 4`
  * @see research.md D4
  * @see contracts/scan-render.md §4
  */
 @Injectable()
 export class SetHandlerService {
   private readonly registry: SetOption[] = [
-    {
-      name: 'auto-shield',
-      label: 'auto-shield',
-      get: (ship): boolean => !!ship.autoShield,
-      set: (ship, value, shipState) => {
-        shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.autoShield = value;
-        });
-      },
-    },
-    {
-      name: 'auto-repair',
-      label: 'auto-repair',
-      get: (ship): boolean => !!ship.autoRepair,
-      set: (ship, value, shipState) => {
-        shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.autoRepair = value;
-        });
-      },
-    },
     {
       name: 'scannames',
       label: 'scannames',

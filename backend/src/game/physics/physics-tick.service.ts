@@ -451,13 +451,6 @@ export class PhysicsTickService implements OnModuleInit {
         sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
       };
       this.events.emit(PHYSICS_HYPERSPACE, payload);
-
-      // Set auto-shield warp-exit trigger (T024 — consumed by ShipTickService.processShip).
-      if (accel.hyperspaceEvent === 'exit') {
-        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.recentlyWarpedExit = true;
-        });
-      }
     }
 
     // 3. Position integration (US1). Uses the *current* heading + speed.

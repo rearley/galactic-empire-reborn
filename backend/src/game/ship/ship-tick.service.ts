@@ -29,7 +29,6 @@ import {
   overspeedMessage,
 } from './overspeed-events';
 import { MaintenanceService } from './maintenance.service';
-import { decideAutoShield } from './auto-shield';
 import { SHIELDDM,
   SHMINPWR,
   SHENGUSE,
@@ -49,8 +48,6 @@ import { MAXPLANETS } from '../constants';
  *
  * Per-tick per-ship pipeline:
  *  1. Overspeed engine break evaluation (US2, FR-003/004)
- *  2. Auto-repair (US3, FR-005) when ship.autoRepair === true
- *  3. Auto-shield (US4, FR-006) when ship.autoShield === true
  *
  * Pattern parallels PhysicsTickService. Faults are isolated per ship.
  *
@@ -325,19 +322,22 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    // 4. Shield status — GEFUNCS.C:1336-1352 shieldstat
-    // Raised shields either collapse for want of power or charge; the debit in
-    // shieldchg happens at the TOP of the function, before the charge test, so
-    // holding a fully-charged shield up still costs `type * SHENGUSE`.
-    // @see GEFUNCS.C:2497-2499
-    if (ship.shieldstat === 1) {
-      if (ship.energy < SHMINPWR) {
-        // SHDNNOP — not enough power to hold them up at all.
-        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.shieldstat = 0;
-          s.shield = 0;
-        });
-      } else if (ship.shieldtype > 0 && ship.shieldtype < 20) {
+    // 4. Shield CHARGING — the else branch of GEFUNCS.C:1340-1348 shieldstat.
+    // The debit in shieldchg happens at the TOP of that function, before the
+    // charge test, so holding a fully-charged shield up still costs
+    // `type * SHENGUSE`. @see GEFUNCS.C:2497-2499
+    //
+    // The COLLAPSE branch — energy below SHMINPWR — is not here. It lives in
+    // ShipManagementTickService.shieldPowerTick, which also emits SHDNNOP
+    // ("Shields have come down due to lack of power, Sir!!!"). This service
+    // used to drop them here as well, silently, and both ran on the same
+    // 6-second tick: whichever went first won, and the loser saw
+    // `shieldstat !== SHIELDUP` and returned. When the silent one went first a
+    // pilot lost their shields with nothing on screen. Canon has one
+    // implementation and it always narrates.
+    // @see test/game/ship/shield-power-collapse.spec.ts
+    if (ship.shieldstat === 1 && ship.energy >= SHMINPWR) {
+      if (ship.shieldtype > 0 && ship.shieldtype < 20) {
         const maxCharge = 40 + ship.shieldtype * 10;
         let reachedFull = false;
         let charging = false;
@@ -372,26 +372,9 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       s.energy = s.energy < ENGYMAX ? Math.min(ENGYMAX, s.energy + ENGRECHG) : ENGYMAX;
     });
 
-    // 5. Auto-repair (US3, FR-005).
-    if (ship.autoRepair === true) {
-      void this.maintenanceService.runAutoRepair(ship);
-    }
-
     // 6. Ion cannons — a planet you have attacked shoots back.
     // @see GEFUNCS.C:1785-1812 fireion, called from warrtia (GEMAIN.C:2265)
     this.fireIon(ship);
-
-    // 7. Auto-shield (US4, FR-006).
-    if (ship.autoShield === true && ship.shieldstat === 0) {
-      const decision = decideAutoShield(ship);
-      if (decision.action === 'raise') {
-        this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-          s.shieldstat = 1;
-          s.recentlyWarpedExit = false;
-          s.recentlySelfFiredTorp = false;
-        });
-      }
-    }
   }
   /**
    * A planet the pilot has attacked fires its ion cannons at them.

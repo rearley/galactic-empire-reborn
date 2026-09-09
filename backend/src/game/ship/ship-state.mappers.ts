@@ -64,8 +64,6 @@ export function prismaShipToState(row: Ship): ShipState {
     // ShipClass.maxTons. Hard-coding 1000 silently overrode per-class caps
     // on the gateway reconnect path. @see specs/022-fidelity-audit-v2/findings.md P-002
     warncntr: row.warncntr,
-    autoShield: row.autoShield,
-    autoRepair: row.autoRepair,
     scanNames: false,
     scanHome: false,
     scanFull: false,
@@ -100,8 +98,6 @@ const IN_MEMORY_ONLY = [
   'scanHome',
   'scanFull',
   'msgFilter',
-  'recentlyWarpedExit',
-  'recentlySelfFiredTorp',
   'maxTons',
   'maxWarp',
   // Resolved lock target written by `loc`; the DB column `lock` holds the

@@ -140,16 +140,4 @@ export class MaintenanceService {
     return gate;
   }
 
-  /**
-   * Auto-repair tick consumer (US3): run maintenance silently for ships with
-   * autoRepair=true. No player-facing message on success.
-   * Only queues a repair if one is not already in progress (repair === 0).
-   *
-   * @see specs/019-physics-polish/research.md R3
-   */
-  async runAutoRepair(ship: ShipState): Promise<void> {
-    // Don't double-queue if a repair is already in progress
-    if (ship.repair > 0) return;
-    await this.runMaintenance(ship);
-  }
 }

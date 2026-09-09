@@ -334,18 +334,3 @@ describe('MaintenanceService — applyMaintenance', () => {
 // runAutoRepair — skips if repair already in progress
 // ---------------------------------------------------------------------------
 
-describe('MaintenanceService — runAutoRepair', () => {
-  it('does not run if repair > 0 (repair already queued)', async () => {
-    const { svc, mockPrisma } = makeService();
-    const ship = makeShip({ damage: 30, repair: 5 });
-    await svc.runAutoRepair(ship);
-    expect(mockPrisma.user.update).not.toHaveBeenCalled();
-  });
-
-  it('runs maintenance when repair === 0', async () => {
-    const { svc, mockPrisma } = makeService();
-    const ship = makeShip({ damage: 30, repair: 0 });
-    await svc.runAutoRepair(ship);
-    expect(mockPrisma.user.update).toHaveBeenCalled();
-  });
-});

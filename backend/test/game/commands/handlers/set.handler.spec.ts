@@ -1,6 +1,8 @@
 /**
  * T031 — Unit spec for SetHandlerService.
- * Covers both options on/off, set ? listing, unknown option, bad toggle.
+ * Covers the canon options, the set ? listing, unknown option and bad toggle.
+ * The invented `auto-shield` / `auto-repair` options are gone; their absence is
+ * pinned by set-canon-options.spec.ts.
  * @see GECMDS.C:5190 cmd_set (semantics reinterpreted — see research.md D4)
  * @see contracts/commands.md §set
  */
@@ -32,8 +34,6 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
-    autoShield: false,
-    autoRepair: false,
     ...overrides,
   };
 }
@@ -57,73 +57,23 @@ function makeService(ship: ShipState) {
 }
 
 // ---------------------------------------------------------------------------
-// auto-shield option
-// ---------------------------------------------------------------------------
-
-describe('SetHandlerService — auto-shield', () => {
-  it('set auto-shield on → autoShield=true, returns SET_OK_ON (SC-007)', async () => {
-    const ship = makeShip({ autoShield: false });
-    const { handler } = makeService(ship);
-    const result = await (handler.command.handler(ship, ['auto-shield', 'on'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
-    expect(ship.autoShield).toBe(true);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_OK_ON, 'auto-shield'));
-    expect(result.lines[0].category).toBe('success');
-  });
-
-  it('set auto-shield off → autoShield=false, returns SET_OK_OFF', async () => {
-    const ship = makeShip({ autoShield: true });
-    const { handler } = makeService(ship);
-    const result = await (handler.command.handler(ship, ['auto-shield', 'off'], {}) as Promise<{ lines: { text: string }[] }>);
-    expect(ship.autoShield).toBe(false);
-    expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_OK_OFF, 'auto-shield'));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// auto-repair option
-// ---------------------------------------------------------------------------
-
-describe('SetHandlerService — auto-repair', () => {
-  it('set auto-repair on → autoRepair=true', async () => {
-    const ship = makeShip({ autoRepair: false });
-    const { handler } = makeService(ship);
-    await (handler.command.handler(ship, ['auto-repair', 'on'], {}) as Promise<unknown>);
-    expect(ship.autoRepair).toBe(true);
-  });
-
-  it('set auto-repair off → autoRepair=false', async () => {
-    const ship = makeShip({ autoRepair: true });
-    const { handler } = makeService(ship);
-    await (handler.command.handler(ship, ['auto-repair', 'off'], {}) as Promise<unknown>);
-    expect(ship.autoRepair).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // set ? status listing
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — set ? listing', () => {
-  it('returns status line with all 6 options (all off)', async () => {
-    const ship = makeShip({ autoShield: false, autoRepair: false, scanNames: false, scanHome: false, scanFull: false, msgFilter: false });
+  it('lists canon\u2019s four options, all off', async () => {
+    const ship = makeShip({ scanNames: false, scanHome: false, scanFull: false, msgFilter: false });
     const { handler } = makeService(ship);
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
+    expect(result.lines[0].text).toBe('scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
     expect(result.lines[0].category).toBe('info');
   });
 
-  it('returns status line with shield ON, repair OFF', async () => {
-    const ship = makeShip({ autoShield: true, autoRepair: false, scanNames: false, scanHome: false });
+  it('reflects the ones that are on', async () => {
+    const ship = makeShip({ scanNames: true, scanHome: false, scanFull: true, msgFilter: false });
     const { handler } = makeService(ship);
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
-  });
-
-  it('returns status line with both legacy flags ON', async () => {
-    const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: false, scanHome: false });
-    const { handler } = makeService(ship);
-    const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
+    expect(result.lines[0].text).toBe('scannames: ON | scanhome: OFF | scanfull: ON | filter: OFF');
   });
 });
 
@@ -143,7 +93,7 @@ describe('SetHandlerService — rejection paths', () => {
   it('valid option but missing toggle arg → SET_FMT', async () => {
     const ship = makeShip();
     const { handler, mockShipState } = makeService(ship);
-    const result = await (handler.command.handler(ship, ['auto-shield'], {}) as Promise<{ lines: { text: string }[] }>);
+    const result = await (handler.command.handler(ship, ['scanfull'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_FMT));
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
@@ -151,7 +101,7 @@ describe('SetHandlerService — rejection paths', () => {
   it('valid option with invalid toggle value → SET_FMT', async () => {
     const ship = makeShip();
     const { handler, mockShipState } = makeService(ship);
-    const result = await (handler.command.handler(ship, ['auto-shield', 'maybe'], {}) as Promise<{ lines: { text: string }[] }>);
+    const result = await (handler.command.handler(ship, ['scanfull', 'maybe'], {}) as Promise<{ lines: { text: string }[] }>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SET_FMT));
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });

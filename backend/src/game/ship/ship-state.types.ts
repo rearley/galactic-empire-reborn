@@ -148,11 +148,6 @@ export interface ShipState {
   maxWarp?: number;
   warncntr: number;
 
-  /** Auto-shield flag — toggled by `set auto-shield on/off`. @see GECMDS.C:5190 cmd_set */
-  autoShield?: boolean;
-  /** Auto-repair flag — toggled by `set auto-repair on/off`. @see GECMDS.C:5190 cmd_set */
-  autoRepair?: boolean;
-
   /**
    * Show ship names on scan lo overlay. Derived from User.options[0].
    * @see GEMAIN.H:233 SCANNAMES
@@ -231,22 +226,6 @@ export interface ShipState {
    * User row.
    */
   userKills?: number;
-
-  /**
-   * Transient auto-shield trigger — set when the ship exits warp (hyperspace=exit).
-   * Consumed and cleared by ShipTickService.processShip on the next SHIP_UPDATE tick.
-   * In-memory only, no schema impact.
-   * @see specs/019-physics-polish/plan.md §T024 trigger-flag attachment sites
-   */
-  recentlyWarpedExit?: boolean;
-
-  /**
-   * Transient auto-shield trigger — set when the ship fires a self-torpedo.
-   * Consumed and cleared by ShipTickService.processShip on the next SHIP_UPDATE tick.
-   * In-memory only, no schema impact.
-   * @see specs/019-physics-polish/plan.md §T024 trigger-flag attachment sites
-   */
-  recentlySelfFiredTorp?: boolean;
 }
 
 // Ensure ShipState is compatible with Prisma's Ship shape (minus dirty).

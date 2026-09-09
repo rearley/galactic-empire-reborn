@@ -136,10 +136,14 @@ describe('ShipTickService — fault isolation', () => {
 
     let callCount = 0;
     (mockShipState.findAllShips as jest.Mock).mockReturnValue(ships);
-    (mockMaintService.runAutoRepair as jest.Mock).mockImplementation((ship: ShipState) => {
+    // Fault isolation used to be provoked through the auto-repair hook. That
+    // was a port invention and is gone, so the throw now comes from the state
+    // mutation every ship makes — same contract: one bad ship must not abort
+    // the batch.
+    (mockShipState.mutate as jest.Mock).mockImplementation((uid: string) => {
       callCount++;
-      if (ship.userid === 'boom') throw new Error('boom!');
-      return Promise.resolve();
+      if (uid === 'boom') throw new Error('boom!');
+      return undefined;
     });
 
     svc.onModuleInit();
