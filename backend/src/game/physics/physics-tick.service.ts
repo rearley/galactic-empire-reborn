@@ -81,6 +81,24 @@ const NO_CHANNEL_SLOT = 255;
  */
 const PHYSICS_STRIDE = 3;
 
+/**
+ * Canon's `zothusn` for a ship — the fixed slot its movement cadence hangs on.
+ *
+ * `channel` is the real answer, and every ship in the map holds one:
+ * `ShipStateService.enter` acquires it on the same line that inserts the ship.
+ * The fallback therefore only covers hand-built test harnesses that construct
+ * ShipState objects directly. Slot 0 rather than a hash of the key, so those
+ * harnesses stay deterministic — a single ship moves on the first tick, which
+ * is what every one of them is written to expect. Cadence is preserved either
+ * way; only the load smoothing differs, and it does not apply in production.
+ *
+ * What must NOT be used here is anything derived from list position. That was
+ * the bug: position shifts whenever any other ship spawns or dies.
+ */
+function strideSlot(ship: ShipState): number {
+  return ship.channel ?? 0;
+}
+
 @Injectable()
 export class PhysicsTickService implements OnModuleInit {
   private readonly logger = new Logger(PhysicsTickService.name);
@@ -167,6 +185,20 @@ export class PhysicsTickService implements OnModuleInit {
    * in canon to smooth load across the 1-second timer; keeping it (rather than
    * moving the whole fleet every third second) preserves both the cadence and
    * the smoothing. @see GEMAIN.C:2472-2489
+   *
+   * `zothusn` is the ship's own table slot, fixed while it is in the game, so
+   * canon's cadence is a property of the SHIP. This strided on POSITION in the
+   * sorted snapshot instead, which is a property of the fleet: every ship after
+   * a departure shifted down a slot and every ship after an arrival shifted up,
+   * changing which second it belonged to. Depending on where in the cycle the
+   * change landed a ship then moved twice in consecutive seconds — a
+   * double-length step — or waited up to five seconds and lurched. Cybertrons
+   * die and respawn constantly, so it fired often; reported from play as a
+   * chased ship that "jumped distances". Rotation, acceleration and the
+   * self-destruct countdown ride the same loop and stuttered with it.
+   *
+   * `channel` is this port's `usrnum`: allocated once on entering the game and
+   * held until the ship leaves. @see ship-state.types.ts, ship-channel.registry.ts
    */
   advanceAll(ctx: TickContext): void {
     // Boot race: movement runs on the 1-second timer, which can fire before
@@ -191,7 +223,7 @@ export class PhysicsTickService implements OnModuleInit {
         return ka < kb ? -1 : ka > kb ? 1 : 0;
       });
 
-    const ships = all.filter((_, i) => i % PHYSICS_STRIDE === this.clicker);
+    const ships = all.filter((s) => strideSlot(s) % PHYSICS_STRIDE === this.clicker);
     this.clicker = (this.clicker + 1) % PHYSICS_STRIDE;
 
     for (const ship of ships) {

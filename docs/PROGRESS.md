@@ -3850,3 +3850,19 @@ a wheel event because a reader scroll is no longer just a scroll event.
 **Decisions made:** see `docs/DECISIONS.md` 2026-09-09 (both entries).
 **Next:** —
 **Known issues:** none from this pair.
+
+## 2026-09-09 — movement cadence no longer depends on who else is alive
+**Completed:** `PhysicsTickService.advanceAll` strided the fleet by position in
+a sorted snapshot rather than by the ship's own slot, so any spawn or death
+re-assigned every later ship to a different second — a double-length step for
+some, a stalled cycle for others. Now strided on `ShipState.channel`, canon's
+`zothusn`.
+**Tests:** `stride-stability.spec.ts` (4). The assertion that matters is the GAP
+between one ship's consecutive moves — always exactly 3 — because counting moves
+per fixed window misses a slot shift most of the time. Verified by stashing the
+fix: 3 of the 4 fail without it.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09.
+**Next:** —
+**Known issues:** four single-ship physics harnesses fired one tick and relied on
+their ship being first in the list; they now fire three, which is one canon
+movement step, and are kind-aware so countdowns do not run three times with it.

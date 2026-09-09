@@ -49,7 +49,11 @@ const SPEED = 6_500; // one step = 6500/65000 = 0.1 sectors along the heading
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
-    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1,
+    // Channel 3 puts a lone ship in the first third, so a harness that fires a
+    // single second still moves it. Canon's stride is indexed by the ship's own
+    // table slot (`zothusn`), and this port's equivalent is `channel` — every
+    // ship in the map holds one. @see physics-tick.service.ts strideSlot
+    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1, channel: 3,
     heading: 0, head2b: 0, speed: SPEED, speed2b: SPEED,
     xcoord: 20, ycoord: 20, damage: 0, energy: 5_000_000,
     phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
@@ -166,7 +170,9 @@ describe('movement cadence — canon moves each ship every 3s (GEMAIN.C:2462-249
   });
 
   it('advances no ship twice in the same three-second window', () => {
-    const fleet = Array.from({ length: 3 }, (_, i) => makeShip({ userid: `u${i}`, shipno: 1 }));
+    // Distinct channels, as a real fleet has: the stride spreads them across
+    // the three seconds, which is the load-smoothing this asserts.
+    const fleet = Array.from({ length: 3 }, (_, i) => makeShip({ userid: `u${i}`, shipno: 1, channel: i + 1 }));
     const start = fleet.map((s) => s.ycoord);
     const { second } = harness(fleet);
 
