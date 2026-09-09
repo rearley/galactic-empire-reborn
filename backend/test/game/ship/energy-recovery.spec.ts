@@ -69,7 +69,7 @@ function makeHarness(ships: ShipState[]) {
       return s;
     },
   } as unknown as ShipStateService;
-  const maint = { runAutoRepair: jest.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
+  const maint = {} as unknown as MaintenanceService;
   const svc = new ShipTickService(tick, state, maint);
   svc.onModuleInit();
   let n = 0;
@@ -134,10 +134,14 @@ describe('holding shields up costs power — GEFUNCS.C:1336-1352, 2497-2499', ()
     expect(ship.energy).toBe(50000 - shieldtype * SHENGUSE + ENGRECHG);
   });
 
-  it('collapses shields outright below SHMINPWR', () => {
+  it('leaves the collapse below SHMINPWR to the service that narrates it', () => {
+    // The COLLAPSE is ShipManagementTickService.shieldPowerTick's, because it
+    // is the one that emits SHDNNOP. This service used to drop them silently
+    // as well, and whichever ran first won.
+    // @see test/game/ship/shield-power-collapse.spec.ts
     const ship = makeShip({ shieldstat: 1, shieldtype: 3, shield: 60, energy: SHMINPWR - 1 });
     makeHarness([ship]).firePhysics();
-    expect(ship.shieldstat).toBe(0);
-    expect(ship.shield).toBe(0);
+    expect(ship.shieldstat).toBe(1);
+    expect(ship.shield).toBe(60);
   });
 });

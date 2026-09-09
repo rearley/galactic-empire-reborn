@@ -49,8 +49,6 @@ function fullState(): ShipState {
     channel: 7,
     teamcode: 3n,
     isEphemeral: false,
-    recentlyWarpedExit: false,
-    recentlySelfFiredTorp: false,
     lastfiredBy: { channel: 9, name: 'Killer' },
     deathCause: { kind: 'gravity', what: 'Zygor' },
     userKills: 4,

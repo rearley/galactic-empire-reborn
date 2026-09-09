@@ -4722,3 +4722,55 @@ list position reintroduces the coupling.
 smoothing for channel-less doubles, but it made every single-ship harness
 non-deterministic about which second its ship moves, for no production benefit
 since production ships always have a channel.
+
+## 2026-09-09 — `set auto-shield` and `set auto-repair` removed
+**Context:** Playtest question — "is `set auto-shield on` canon, and if so what
+does it actually do?" It is not. `cmd_set` has `#define NUMOPTS 4` and exactly
+four names: scannames, scanhome, scanfull, filter. Both extra options were port
+inventions (spec 019 US3/US4), and neither was a harmless convenience.
+
+`auto-shield` reversed a rule canon states in capitals in its own help:
+"NOTE: When firing a weapon with the shields up, the shields will be
+automatically lowered. They WILL NOT be automatically raised after the firing."
+(MBMGEHLP.MSG HLPSHI). Canon drops shields to fire — GECMDS.C:930 phaser, :1130
+torpedo, :1241 missile — and leaves them down; that cost is the design. It also
+never worked as written: `torpedo.handler.ts` set the trigger and
+`cantexit = FIRETICKS` in the same mutate, and `decideAutoShield` bails while
+the battle lock is up, so the flag latched and shields popped up whenever the
+fight ended instead.
+
+`auto-repair` silently ran `mai` on a tick, charging the pilot cash with no
+price quoted. Canon's maintenance is a command you issue, with the bill in
+front of you (cmd_maint, MAINT5).
+
+**Decision:** Both options gone, with their flags, their trigger fields and the
+`autoShield`/`autoRepair` columns.
+
+**Reason:** An invention that contradicts an explicit canon design statement is
+not a QoL feature. `GECMDS.C:1172` and `:1332` do call `shieldup` after firing,
+but the preceding `shielddn` sets `shieldstat = SHIELDDN`, so the `== SHIELDUP`
+test above them can never be true — vestigial code, not evidence of intent, and
+the help settles it either way.
+
+**Alternatives rejected:** Keeping them and documenting the deviation — a
+deviation that reverses a stated rule is not made acceptable by a footnote.
+Fixing auto-shield's `cantexit` guard so it worked as advertised — that would
+have made the contradiction complete rather than partial.
+
+## 2026-09-09 — One owner for the shield power collapse
+**Context:** Chasing the above, the low-energy collapse turned out to be
+implemented TWICE, both on the 6-second tick:
+`ShipManagementTickService.shieldPowerTick`, which drops shields and emits
+SHDNNOP ("Shields have come down due to lack of power, Sir!!!"), and
+`ShipTickService.processRestorativeTick`, which dropped them silently.
+
+Whichever ran first won; the loser then saw `shieldstat !== SHIELDUP` and
+returned. When the silent one went first, a pilot lost their shields with
+nothing on screen — and the outcome depended on module init order.
+
+**Decision:** `ShipTickService` keeps the CHARGE half of canon's branch and no
+longer drops. `ShipManagementTickService` owns the collapse.
+
+**Reason:** Canon's `shieldstat()` (GEFUNCS.C:1340-1348) is one function with
+one narration. Two implementations of one rule cannot both be right, and the
+silent one loses by construction.

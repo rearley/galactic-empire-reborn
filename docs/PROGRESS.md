@@ -3866,3 +3866,24 @@ fix: 3 of the 4 fail without it.
 **Known issues:** four single-ship physics harnesses fired one tick and relied on
 their ship being first in the list; they now fire three, which is one canon
 movement step, and are kind-aware so countdowns do not run three times with it.
+
+## 2026-09-09 — two invented `set` options removed; shield collapse gets one owner
+**Completed:** `set auto-shield` and `set auto-repair` deleted — canon's `set`
+has four options and neither was among them; auto-shield reversed a rule canon
+states in capitals (HLPSHI) and auto-repair spent the pilot's cash unasked.
+Removed the options, `ShipState.autoShield`/`autoRepair`, the
+`recentlyWarpedExit`/`recentlySelfFiredTorp` triggers and their two attachment
+sites, `auto-shield.ts`, `MaintenanceService.runAutoRepair`, and the two DB
+columns (migration `20260909034154_drop_invented_auto_flags`). Separately, the
+low-energy shield collapse was implemented twice on the same tick — one copy
+narrated, one was silent — and now has a single owner.
+**Tests:** `set-canon-options.spec.ts` (5 — both options rejected, the listing
+and usage line carry only canon's four); `shield-power-collapse.spec.ts` (3 —
+no silent drop, no charging below the floor, normal charging above it). Six
+existing specs updated and three deleted; help snapshots regenerated.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09 (two entries).
+**Next:** act on the security review in `docs/audits/2026-09-09-security-review.md`.
+**Known issues:** the security review is filed but NOT acted on. Six confirmed
+medium findings, none critical or high. Its own recommended order is in §5; the
+single highest-value item is serializing command dispatch per socket, which
+closes the economy race findings together.

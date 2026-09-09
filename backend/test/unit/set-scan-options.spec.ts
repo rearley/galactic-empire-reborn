@@ -40,8 +40,6 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
     minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
     dirty: false,
-    autoShield: false,
-    autoRepair: false,
     ...overrides,
   };
 }
@@ -190,32 +188,32 @@ describe('SetHandlerService — scanhome option', () => {
 // ---------------------------------------------------------------------------
 
 describe('SetHandlerService — set ? listing format', () => {
-  it('lists all 4 options pipe-separated with correct ON/OFF values', async () => {
-    const ship = makeShip({ autoShield: true, autoRepair: false, scanNames: true, scanHome: false });
+  it('lists canon\u2019s four options pipe-separated with correct ON/OFF values', async () => {
+    const ship = makeShip({ scanNames: true, scanHome: false });
     const { handler } = makeService(ship);
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string; category: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: OFF | scannames: ON | scanhome: OFF | scanfull: OFF | filter: OFF');
+    expect(result.lines[0].text).toBe('scannames: ON | scanhome: OFF | scanfull: OFF | filter: OFF');
     expect(result.lines[0].category).toBe('info');
   });
 
   it('all options off', async () => {
-    const ship = makeShip({ autoShield: false, autoRepair: false, scanNames: false, scanHome: false });
+    const ship = makeShip({ scanNames: false, scanHome: false });
     const { handler } = makeService(ship);
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: OFF | auto-repair: OFF | scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
+    expect(result.lines[0].text).toBe('scannames: OFF | scanhome: OFF | scanfull: OFF | filter: OFF');
   });
 
   it('all options on', async () => {
-    const ship = makeShip({ autoShield: true, autoRepair: true, scanNames: true, scanHome: true, scanFull: true, msgFilter: true });
+    const ship = makeShip({ scanNames: true, scanHome: true, scanFull: true, msgFilter: true });
     const { handler } = makeService(ship);
 
     const result = await (handler.command.handler(ship, ['?'], {}) as Promise<{ lines: { text: string }[] }>);
 
-    expect(result.lines[0].text).toBe('auto-shield: ON | auto-repair: ON | scannames: ON | scanhome: ON | scanfull: ON | filter: ON');
+    expect(result.lines[0].text).toBe('scannames: ON | scanhome: ON | scanfull: ON | filter: ON');
   });
 });
 
@@ -289,8 +287,12 @@ describe('SetHandlerService — Prisma write-through correctness', () => {
     });
   });
 
-  it('scannames does not call Prisma for auto-shield (non-persisted option)', async () => {
-    const ship = makeShip({ autoShield: false });
+  it('an unknown option touches Prisma not at all', async () => {
+    // Was "does not call Prisma for auto-shield (non-persisted option)". That
+    // option was a port invention and is gone; the property that mattered —
+    // a rejected option must not write — is now checked against a name canon
+    // never had either.
+    const ship = makeShip({});
     const { handler, mockPrisma } = makeService(ship);
 
     await (handler.command.handler(ship, ['auto-shield', 'on'], {}) as Promise<unknown>);

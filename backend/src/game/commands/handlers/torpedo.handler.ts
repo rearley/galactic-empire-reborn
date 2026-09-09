@@ -223,12 +223,12 @@ export class TorpedoHandlerService {
     const shieldLine = dropShieldsForFire(ship, (fn) =>
       this.shipState.mutate(ship.userid, ship.shipno, fn));
 
-    // Mutate firer — decrement ammo, set battle-lock.
-    // recentlySelfFiredTorp triggers auto-shield raise on next SHIP_UPDATE tick (T024).
+    // Mutate firer — decrement ammo, set battle-lock. Shields stay DOWN:
+    // canon's help is explicit that they "WILL NOT be automatically raised
+    // after the firing" (HLPSHI), and that cost is the design.
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.items[I_TORP] = (s.items[I_TORP] ?? 0n) - 1n;
       s.cantexit = FIRETICKS;
-      s.recentlySelfFiredTorp = true;
     });
 
     return {

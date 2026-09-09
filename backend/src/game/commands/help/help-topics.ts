@@ -454,7 +454,7 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  rep <nav|sys|inv|cargo|wpns|acc>  — ship status report',
       '  clo on|off         — toggle cloak',
       '  mai [password]     — repair hull damage in orbit (see "hel maintenance")',
-      '  set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
+      '  set <scannames|scanhome|scanfull|filter> <on|off>',
       '  new ship <class>   — buy a hull at Zygor (from orbit)',
       '  new phaser <type>  — upgrade phasers',
       '  new shield <type>  — upgrade shields',

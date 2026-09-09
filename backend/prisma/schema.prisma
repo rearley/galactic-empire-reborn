@@ -187,10 +187,6 @@ model Ship {
   topspeed        Int    @default(0)
   /// WARSHP.warncntr
   warncntr        Int    @default(0)
-  /// Auto-shield flag — ship management feature (013); no WARSHP canonical equivalent
-  autoShield      Boolean @default(false)
-  /// Auto-repair flag — ship management feature (013); no WARSHP canonical equivalent
-  autoRepair      Boolean @default(false)
 
   user User @relation(fields: [userid], references: [userid])
 

@@ -1088,7 +1088,9 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   // set (feature 013/015) — GECMDS.C:5190 cmd_set reinterpreted
   [MessageId.SET_OK_ON]: 'Option %s set ON.',
   [MessageId.SET_OK_OFF]: 'Option %s set OFF.',
-  [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <auto-shield|auto-repair|scannames|scanhome> <on|off>',
+  // Canon's four and only canon's four: `#define NUMOPTS 4` with scannames,
+  // scanhome, scanfull, filter. @see GECMDS.C cmd_set
+  [MessageId.SET_UNKNOWN]: 'Unknown option. Usage: set <scannames|scanhome|scanfull|filter> <on|off>',
   [MessageId.SET_STATUS]: '%s',
   [MessageId.SET_FMT]: CANON_MESSAGES.SETFMT,
 
