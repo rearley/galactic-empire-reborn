@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 71 entries.
+Append-only, **newest at the bottom**. 72 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — `sys kill` could not name an AI hull](#2026-09-09--sys-kill-could-not-name-an-ai-hull)
 - [2026-09-09 — AI torpedoes never passed a lock check, and the player's gate was the wrong rule](#2026-09-09--ai-torpedoes-never-passed-a-lock-check-and-the-players-gate-was-the-wrong-rule)
 - [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
 - [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
@@ -4348,3 +4349,50 @@ they are not "fixed" later by mistake:
 - **"Incoming torpedo from ship ?" is canon.** `shpltr` returns `'?'` when the
   ship is not in the viewer's scan table (`GEFUNCS.C:2578-2591`). It means you
   have not scanned the attacker, not that the game lost track of it.
+
+## 2026-09-09 — `sys kill` could not name an AI hull
+
+**Found in play.** A surplus Sarten Obliterator needed removing from the live
+galaxy and `sys kill Cybrg-223` answered "Not found" for a ship `sys list` was
+printing on screen.
+
+**Canon matches the ship record's userid:**
+
+```
+for (othusn=0; othusn < nships ; othusn++)
+    if (genearas(margv[2], warshpoff(othusn)->userid))
+        { warshpoff(othusn)->damage = 101; ... }        GECMDS.C:4801-4813
+```
+
+The port matched `ShipState.username`. That works for a player, whose handle is
+hydrated at board time, and fails for every automaton, because nothing boards
+one and the field is never populated in memory.
+
+Canon has no such split. `username()` returns `ptr->userid` for a player and
+`ptr->shipname` for an automaton (`GEFUNCS.C:2593-2604`), and `sys kill` does not
+call it at all. This port separates the login id (`usr_<hex>`, minted at
+registration and never displayed) from the handle, so matching **either** is
+what restores canon's single behaviour: the handle names players, the userid
+names AI.
+
+**Tests:** `test/game/commands/handlers/sys-kill.spec.ts` (5), written failing
+first. One case exists purely to document the blast radius: `genearas` is a
+prefix match, so `sys kill Cybrg-2` kills every automaton in the galaxy at once.
+That is canon and is deliberately unchanged. Full suite 5,787 across 575 files.
+
+**Why it mattered now.** The AI population deviation is being unwound by
+attrition rather than by pruning code — players hunt the surplus down and the
+spawner does not replace anything above target. That works for Scouts,
+Cyberquads and Drones. It cannot work for the Obliterator: 500 points for a hull
+that divides phaser damage by seventeen and cuts every projectile to a fifth, so
+nobody will ever choose the fight. Without a working `sys kill` the surplus was
+permanent.
+
+Live counts at the time were 24 hulls against a configured 9 — canon's unscaled
+figures in a galaxy an eighth of canon's area. Galaxy size is NOT the lever
+here; there are live players and a planted colony, so UNIVMAX cannot move.
+
+**Next:** —
+**Known issues:** the surplus stands at seven Scouts, three Cyberquads and four
+Drones over target, which is the population players are meant to be working
+through and is deliberately left to attrition.

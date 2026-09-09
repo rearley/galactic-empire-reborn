@@ -286,16 +286,31 @@ export class SysHandlerService {
     const target = needle?.trim().toLowerCase();
     if (!target) return SysHandlerService.huh();
 
+    // Canon matches the ship record's USERID, not a display name:
+    //   if (genearas(margv[2], warshpoff(othusn)->userid))   -- GECMDS.C:4807
+    //
+    // In canon those are the same string. Here they are not: this port mints
+    // `usr_<hex>` as the login id and keeps the handle separately, so a player
+    // can only be named by their handle and an AI hull can only be named by
+    // its userid — nothing boards an automaton, so `username` is never
+    // hydrated on one. Matching EITHER is what restores canon's single
+    // behaviour. Before this, `sys kill Cybrg-223` answered "Not found" for a
+    // ship `sys list` was printing.
+    //
+    // `genearas` is a PREFIX match and that is kept, so `sys kill Cybrg-2`
+    // kills every automaton in the galaxy. @see test/…/sys-kill.spec.ts
     const hits = this.shipState
       .findAllShips()
-      .filter((s) => (s.username ?? '').toLowerCase().startsWith(target));
+      .filter((s) =>
+        (s.username ?? '').toLowerCase().startsWith(target)
+        || s.userid.toLowerCase().startsWith(target));
 
     if (hits.length === 0) return SysHandlerService.say('Not found');
 
     for (const victim of hits) {
       this.shipState.mutate(victim.userid, victim.shipno, (s) => { s.damage = 101; });
     }
-    this.audit(ship, 'kill', rest, `killed ${hits.length}: ${hits.map((h) => `${h.username}#${h.shipno}`).join(', ')}`);
+    this.audit(ship, 'kill', rest, `killed ${hits.length}: ${hits.map((h) => `${h.username ?? h.userid}#${h.shipno}`).join(', ')}`);
     return SysHandlerService.say(...hits.map((h) => `Killed ${h.username ?? h.userid}`));
   }
 

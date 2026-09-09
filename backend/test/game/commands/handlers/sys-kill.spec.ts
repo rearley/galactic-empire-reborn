@@ -1,0 +1,144 @@
+/**
+ * `sys kill` matches the ship record's USERID, as canon does.
+ *
+ *   for (othusn=0; othusn < nships ; othusn++)
+ *     if (genearas(margv[2], warshpoff(othusn)->userid))
+ *       { warshpoff(othusn)->damage = 101; ... }
+ *   -- GECMDS.C:4801-4813
+ *
+ * The port matched `ShipState.username` instead. That works for a player,
+ * whose display handle is hydrated at board time, and fails for every AI hull,
+ * because nothing boards one — so the field is undefined in memory and the
+ * filter never matches. `sys kill Cybrg-223` answered "Not found" for a ship
+ * plainly listed by `sys list`.
+ *
+ * Canon has no such split: `username()` returns `ptr->userid` for a player and
+ * `ptr->shipname` for an automaton (GEFUNCS.C:2593-2604), and `sys kill` does
+ * not call it at all — it reads `userid` off the record. This port separates
+ * the login id (`usr_<hex>`, minted at registration) from the display handle,
+ * so matching EITHER is what restores canon's single behaviour: the handle
+ * covers players, the userid covers AI.
+ *
+ * Found the first time a sysop tried to remove a surplus AI hull from a live
+ * galaxy and had no way to name it.
+ */
+
+import { CommandResult, CommandContext } from '../../../../src/game/commands/command.types';
+import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
+import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
+import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
+import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
+
+function makeShip(over: Partial<ShipState> = {}): ShipState {
+  return {
+    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
+    heading: 0, head2b: 0, speed: 0, speed2b: 0,
+    xcoord: 0, ycoord: 0, damage: 0, energy: 100000,
+    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
+    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
+    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+    where: 0, ltorpsChannel: [], ltorpsDistance: [],
+    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
+    decout: [], jammer: 0, freq: [0, 0, 0],
+    items: [],
+    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
+    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
+    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
+    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    username: 'Sysop',
+    dirty: false, ...over,
+  };
+}
+
+function makeHarness(ships: ShipState[]) {
+  const shipMap = new Map<string, ShipState>();
+  for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
+  const shipState = {
+    findAllShips: () => Array.from(shipMap.values()),
+    mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
+      const s = shipMap.get(shipKey(userid, shipno));
+      if (!s) return undefined;
+      fn(s);
+      s.dirty = true;
+      return s;
+    },
+  } as unknown as ShipStateService;
+  return new SysHandlerService(
+    shipState,
+    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    new CybertronControlService(),
+  );
+}
+
+const ctx: CommandContext = {};
+
+/** An AI hull as it actually sits in the state map: userid set, username absent. */
+function cybertron(userid: string, shipno: number, shipname: string): ShipState {
+  const s = makeShip({ userid, shipno, shipname, shpclass: 25, status: 2 });
+  delete (s as { username?: string }).username;
+  return s;
+}
+
+describe('SysHandlerService — `sys kill`', () => {
+  const saved = process.env.GE_SYSOP_USERNAME;
+  beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'Sysop'; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.GE_SYSOP_USERNAME;
+    else process.env.GE_SYSOP_USERNAME = saved;
+  });
+
+  it('kills an AI hull named by its userid, which is all a sysop can see', async () => {
+    const sysop = makeShip();
+    const sob = cybertron('Cybrg-223', 223, 'SOBx949782');
+    const h = makeHarness([sysop, sob]);
+    const result = await h.command.handler(sysop, ['kill', 'Cybrg-223'], ctx) as CommandResult;
+    expect(result.lines[0].text).not.toBe('Not found');
+    expect(sob.damage).toBe(101);
+  });
+
+  it('still kills a player named by their display handle', async () => {
+    // The port's userid is `usr_<hex>`, minted at registration and never shown,
+    // so the handle is the only name a sysop could type for a player.
+    const sysop = makeShip();
+    const victim = makeShip({ userid: 'usr_deadbeef', shipno: 1, username: 'Wasp' });
+    const h = makeHarness([sysop, victim]);
+    await h.command.handler(sysop, ['kill', 'Wasp'], ctx);
+    expect(victim.damage).toBe(101);
+  });
+
+  it('leaves everything else alone', async () => {
+    const sysop = makeShip();
+    const a = cybertron('Cybrg-222', 222, 'SOBx949345');
+    const b = cybertron('Cybrg-223', 223, 'SOBx949782');
+    const h = makeHarness([sysop, a, b]);
+    await h.command.handler(sysop, ['kill', 'Cybrg-223'], ctx);
+    expect(b.damage).toBe(101);
+    expect(a.damage).toBe(0);
+    expect(sysop.damage).toBe(0);
+  });
+
+  it('answers "Not found" for a name nothing carries', async () => {
+    const sysop = makeShip();
+    const h = makeHarness([sysop, cybertron('Cybrg-223', 223, 'SOBx949782')]);
+    const result = await h.command.handler(sysop, ['kill', 'Nobody'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe('Not found');
+  });
+
+  /**
+   * Canon's `genearas` is a PREFIX match and this port keeps that, which makes
+   * `sys kill Cybrg-2` a command that kills every automaton in the galaxy at
+   * once. That is canon's behaviour and is deliberately not changed here; the
+   * case exists so the blast radius is documented rather than discovered.
+   */
+  it('matches on a PREFIX — a short name is a wide net, exactly as in canon', async () => {
+    const sysop = makeShip();
+    const a = cybertron('Cybrg-222', 222, 'SOBx949345');
+    const b = cybertron('Cybrg-223', 223, 'SOBx949782');
+    const h = makeHarness([sysop, a, b]);
+    await h.command.handler(sysop, ['kill', 'Cybrg-22'], ctx);
+    expect(a.damage).toBe(101);
+    expect(b.damage).toBe(101);
+  });
+});
