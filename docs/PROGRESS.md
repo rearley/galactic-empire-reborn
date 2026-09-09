@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 70 entries.
+Append-only, **newest at the bottom**. 71 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — AI torpedoes never passed a lock check, and the player's gate was the wrong rule](#2026-09-09--ai-torpedoes-never-passed-a-lock-check-and-the-players-gate-was-the-wrong-rule)
 - [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
 - [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
 - [2026-09-09 — the docs said work was outstanding that had been done for months](#2026-09-09--the-docs-said-work-was-outstanding-that-had-been-done-for-months)
@@ -4278,3 +4279,72 @@ is no canon path that reaches everyone and cannot be filtered.**
 port-original, so it needs a `docs/DECISIONS.md` entry and a `GUIDE_DEVIATIONS`
 note before it is built. Not started. It is the same feature as the parked
 deploy-notice half of deploy scheduling.
+
+## 2026-09-09 — AI torpedoes never passed a lock check, and the player's gate was the wrong rule
+
+**Found in play**, at the cost of a 2,000,000-credit Dreadnought. A Sarten
+Obliterator at warp 14.03 put torpedo after torpedo into `BigCat` across a
+3.5-sector approach. Canon cannot produce a single one of them.
+
+**Canon has ONE torpedo path.** The player's `tor` runs `cmd_torp` for its
+command-level gates and then calls `torp()`; a Cybertron calls `torp()` at
+`GECYBS.C:538` and a Droid at `GEDROIDS.C:482`. The first line of `torp()` is
+`lockon()`. The AI has no privileges whatsoever.
+
+`lockon`'s torpedo arithmetic (`GECMDS.C:1378-1395`):
+
+```
+if (wptr->speed > 999) fact = 0;                       /* TARGET at warp */
+else fact = (1.2 - (firer.speed + target.speed)/5000)
+          * ((5.0 - dist)/tor_fact);
+lock succeeds only when fact > .7
+```
+
+Two consequences that ARE torpedo tactics, and neither was implemented:
+
+- **A ship at warp 1 or above cannot be hit by a torpedo at all.**
+- **A ship above roughly warp 3.5 cannot fire one**, because the firer's own
+  speed drives the term negative. At warp 14.03 it is -1.61 before distance is
+  considered.
+
+**Three defects, all fixed:**
+
+1. `cybLaunchTorpedo` and the Droid equivalent wrote straight into the victim's
+   `ltorps` arrays with no lock test — no speed, no distance, no threshold. Both
+   now go through `torpedoLockSucceeds`, a new shared helper next to `lockFact`
+   so all three paths use one function and cannot drift apart again.
+2. The player's torpedo command gated on the FIRER's speed (`>= WARP_THRESHOLD`),
+   a rule canon does not have. Canon prices speed into the lock instead; at warp
+   1 a pilot can still lock out to 2.2 sectors. Gate removed.
+3. That gate emitted canon's TORP2 — "That would simply waste a torpedo in
+   hyperspace Sir!" — which is the `where == 1` refusal (`GECMDS.C:1118`), and
+   the real hyperspace gate was missing entirely. So the port refused you at warp
+   while telling you that you were in hyperspace, and let you fire freely while
+   actually in hyperspace. `MessageId.TOR_WARP` is renamed `TOR_HYPERSPACE` and
+   gated on the new `WHERE_HYPERSPACE` constant; the misleading name is what let
+   this hide.
+
+**Tests:** `test/game/cybertron/ai-torpedo-lock-gate.spec.ts` (5), written
+failing first — attacker at warp, attacker above warp 3.5, target at warp, and
+beyond the lock envelope, plus a baseline that must keep firing. The player
+gate's test was rewritten from asserting the bug to asserting canon, and gained
+a case that firing at warp 1 is allowed. Full suite 5,782 across 574 files.
+
+**NOT deployed.** Committed locally and deliberately not pushed — a push builds
+and ships, and there was a player in the world at the time.
+
+**Decisions made:** none new; this is canon restoration, not a deviation.
+
+**Next:** —
+**Known issues:** two things checked during this and found CORRECT, recorded so
+they are not "fixed" later by mistake:
+
+- **A Cybertron shooting a hull it would never hunt is canon.** `lowest_to_attk`
+  gates only which ship it CLAIMS as `cybmine` for pursuit (`GECYBS.C:711`). The
+  engagement loop at `GECYBS.C:274-296` walks every ship in scan range and
+  attacks anything inside `tooclose + rndm(tooclose)` regardless of class. So the
+  Obliterator killing an Interceptor that closed to within half a sector is
+  correct behaviour, even though it would never have chased one.
+- **"Incoming torpedo from ship ?" is canon.** `shpltr` returns `'?'` when the
+  ship is not in the viewer's scan table (`GEFUNCS.C:2578-2591`). It means you
+  have not scanned the attacker, not that the game lost track of it.

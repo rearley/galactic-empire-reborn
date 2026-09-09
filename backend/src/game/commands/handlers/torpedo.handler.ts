@@ -13,7 +13,7 @@ import { isInNeutralZone } from '../../combat/neutral-zone';
 import { findShip, shipLetter } from '../helpers/find-ship';
 import { CombatTargetWarningEvent } from '../../combat/combat-events';
 import { applyLockOutcome, warnTarget } from '../../combat/lock-outcome';
-import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WARP_THRESHOLD } from '../../constants';
+import { FIRETICKS, MAXTORPS, SE100DAM, TORFACT, WHERE_HYPERSPACE } from '../../constants';
 import { I_TORP } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
 
@@ -27,7 +27,7 @@ import { dropShieldsForFire } from '../../combat/shield-drop';
  *
  * Validations (mirror GECMDS.C:cmd_torpedo, GECMDS.C:torp 1178–1206):
  *   1. ShipClass.hasTorpedo === true → else TOR_NOTOR
- *   2. firer.speed < WARP_THRESHOLD  → else TOR_WARP
+ *   2. firer.where !== hyperspace    → else TOR_HYPERSPACE (canon TORP2)
  *   3. firer.cloak === 0             → else TOR_CLOAK
  *   4. firer.items[I_TORP] > 0n      → else TOR_NOAMMO
  *   5. firer.jammer === 0            → else JAMMER4 (FR-017)
@@ -106,9 +106,16 @@ export class TorpedoHandlerService {
       return { lines: [{ text: formatMessage(MessageId.TOR_NOTOR), category: 'system' }] };
     }
 
-    // 2. Warp gate
-    if (ship.speed >= WARP_THRESHOLD) {
-      return { lines: [{ text: formatMessage(MessageId.TOR_WARP), category: 'system' }] };
+    // 2. Hyperspace gate — `if (warsptr->where == 1) prfmsg(TORP2)`, "That
+    // would simply waste a torpedo in hyperspace Sir!" (GECMDS.C:1118).
+    //
+    // This used to gate on the firer's SPEED and show the same message, which
+    // invented a rule canon does not have and hid the one it does. Canon puts
+    // NO gate on the firer's speed; it prices speed into the lock instead
+    // (see the lock-quality gate below), so warp 1 still reaches 2.2 sectors.
+    // The rule about warp is on the TARGET: `if (wptr->speed > 999) fact = 0`.
+    if (ship.where === WHERE_HYPERSPACE) {
+      return { lines: [{ text: formatMessage(MessageId.TOR_HYPERSPACE), category: 'system' }] };
     }
 
     // 3. Cloak gate

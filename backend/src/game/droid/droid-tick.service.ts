@@ -40,6 +40,7 @@ import {
   HPBEAMW,
   JAMTIME,
   MAXTORPS,
+  TORFACT,
   WARP_THRESHOLD,
   SHIELDDM,
   AI_MINE_TIMER,
@@ -66,7 +67,7 @@ import {
   CombatHitEvent,
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
-import { aiCanHitTarget, cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, withinArc } from '../combat/combat-math';
+import { aiCanHitTarget, cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, torpedoLockSucceeds, withinArc } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 import { findFreeTorpSlot } from '../combat/projectile-slots';
 
@@ -379,7 +380,12 @@ export class DroidTickService implements OnModuleInit {
       // its phaser below PMINFIRE still shoots back. Nesting it inside the
       // 'normal' branch let a player suppress torpedoes by draining the phaser.
       // @see GEDROIDS.C:476-483
-      for (let i = 0; i < fb.torpCount; i++) {
+      // GEDROIDS.C:482 calls `torp()`, and `torp()` opens with `lockon()` —
+      // a Droid is bound by the same lock arithmetic as a player. A target at
+      // warp is a hard zero; the firer's own speed kills the term above
+      // roughly warp 3.5. @see GECMDS.C:1378-1395
+      const canLock = torpedoLockSucceeds(droid.speed, fb.target.speed, fb.ddist / 10_000, TORFACT);
+      for (let i = 0; canLock && i < fb.torpCount; i++) {
         // Replenish before fire @see GEDROIDS.C:480
         droid.items = [...droid.items] as typeof droid.items;
         droid.items[I_TORP] = BigInt(Math.floor(this.random.next() * 5) + 1);

@@ -70,6 +70,17 @@ export const ROTENGUSE = 30 as const;
 export const WARP_THRESHOLD = 1000 as const;
 
 /**
+ * `WARSHP.where == 1` — the ship is in hyperspace. 0 is normal space and
+ * `10 + plnum` is orbit, so 1 is the only other state.
+ *
+ * Named because it was not: the torpedo handler used to gate on SPEED and
+ * emit canon's hyperspace refusal, so the rule canon actually has went
+ * missing behind a rule it does not.
+ * @see GEFUNCS.C:603 (hyperspace entry), GECMDS.C:1118 (torpedo refusal)
+ */
+export const WHERE_HYPERSPACE = 1 as const;
+
+/**
  * Position-integration denominator: `dx = speed * sin(deg) / 65000`.
  * @see GEFUNCS.C:648-649 moveship
  */

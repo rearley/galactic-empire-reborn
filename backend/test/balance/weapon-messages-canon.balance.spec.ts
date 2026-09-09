@@ -30,7 +30,7 @@ const MAPPING: ReadonlyArray<readonly [MessageId, string, string]> = [
   [MessageId.MIN_JAMMED, 'MINE2', 'laymine returned 0 — the table is full'],
   // cmd_torp — GECMDS.C
   [MessageId.TOR_NOTOR, 'TORP3', 'max_torps == 0'],
-  [MessageId.TOR_WARP, 'TORP2', 'where == 1'],
+  [MessageId.TOR_HYPERSPACE, 'TORP2', 'where == 1'],
   [MessageId.TOR_CLOAK, 'PCLOKUP', 'cloak > 0'],
   [MessageId.TOR_NOAMMO, 'NOTORPS', 'items[I_TORPEDO] == 0'],
   [MessageId.TOR_FMT, 'NOSHIP', 'no target named — canon does NOT print a usage line'],

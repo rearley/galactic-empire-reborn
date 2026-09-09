@@ -582,6 +582,38 @@ export function lockFact(
 }
 
 /**
+ * The lock threshold canon compares `fact` against: `if (fact > .7)`.
+ * @see GECMDS.C:1395
+ */
+export const LOCK_MIN_FACT = 0.7;
+
+/**
+ * Does a torpedo lock hold? The single test every torpedo in the game must
+ * pass, whoever fires it.
+ *
+ * Canon has ONE torpedo path: `cmd_torp` and both AI brains call `torp()`
+ * (GECYBS.C:538, GEDROIDS.C:482), and `torp()` opens with `lockon()`. The AI
+ * has no privileges here. This helper exists so that stays true — the port
+ * previously let Cybertrons and Droids write into a victim's tube array
+ * directly, with no speed, distance or jammer test, which let an Obliterator
+ * at warp 14 kill a Dreadnought with a volley canon could never have fired.
+ *
+ * Two consequences worth remembering, because they ARE torpedo tactics:
+ * a ship at warp 1 or above cannot be hit by one, and a ship above roughly
+ * warp 3.5 cannot fire one.
+ *
+ * @see GECMDS.C:1378-1395 lockon
+ */
+export function torpedoLockSucceeds(
+  firerSpeed: number,
+  targetSpeed: number,
+  distSectors: number,
+  factor: number,
+): boolean {
+  return lockFact('torpedo', firerSpeed, targetSpeed, distSectors, factor) > LOCK_MIN_FACT;
+}
+
+/**
  * Roll for decoy intercept: a 1-in-`decodds` chance, matching C exactly.
  *
  * GEFUNCS.C:1585 (and :1670 for missiles) rolls `gernd() % decodds == 0`. This
