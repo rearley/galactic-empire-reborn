@@ -110,10 +110,12 @@ Three rules follow, and none of them are optional:
 - **Anything generated from canon carries a copyright header naming Murdock.**
   Seven files do today, and the six `tools/extract-*.mjs` scripts emit it. If you
   add a generator, emit it too.
-- **Elwynor Technologies' port is a different codebase.** They maintain an AGPL
-  port to 32-bit Worldgroup at `github.com/elwynor/elwge`. Nothing from it is
-  used here, and this project has already been asked about it once. Do not copy
-  a fix from it, and do not credit them for this. @see `NOTICE`
+- **Credit Elwynor as stewards, not as this port's authors.** They maintain
+  Galactic Empire today and have their own AGPL port at
+  `github.com/elwynor/elwge`; `github.com/manicpop/ge-next` is a further AGPL
+  fork. Both descend from the same republished copy we vendored. Nothing from
+  either is used here. Do not copy a fix from them, and do not credit them for
+  this port's code. @see `NOTICE`
 - **The MIT file in the republished upstream does not govern.** A republisher
   cannot relicense the author's work by adding a file beside it. Treat inbound
   terms as GPL-2.0-or-later.
