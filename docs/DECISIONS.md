@@ -4624,3 +4624,40 @@ Zeroing `damage` at death — that resurrects a ship that was destroyed.
 **Note:** the same-day shutdown drain is still right and still needed; it stops
 a kill being *owed* across a restart. This is the different failure of a kill
 already *taken* being replayed.
+
+## 2026-09-09 — Another player's position is scoped to your own sector
+**Context:** Playtest question: "when someone is online, it will always tell
+others their sector? was that canon?" It was not. Canon's `who` (GECMDS.C:5162)
+prints your own BBS id back at you — three lines, no roster. `ros`
+(cmd_geroster, GECMDS.C:4008) lists userid, score, kills, planets and
+population, with no coordinates anywhere. A live player's position came from
+`sca`, which is gated on your scan range AND fires SCAN1/SCAN2/SCAN3 at the
+target so they know they were looked at, or from `spy` — which is planet-only
+and consumes an item. There is no canon command that quietly says where someone
+is.
+
+This port had two. `who` printed every player's exact sector, and the player
+panel was a live tracker: `player.snapshot` carried everyone's sector and
+`physics.sector-transition` was `server.emit`-ed to every socket carrying the
+mover's raw x/y — finer than a sector — on every boundary crossing. Free,
+unlimited-range, silent intelligence, and it left `sca` with nothing to offer
+against a player.
+
+**Decision:** Names stay public; positions are scoped to the viewer's own
+sector. `who` prints `(  -,  -)` for anyone elsewhere; the panel renders an em
+dash. `physics.sector-transition` now goes to the mover alone — its one
+consumer is their own ScanMap (FR-013) — and the panel is driven by a new
+`player.sector` event whose audience the gateway scopes per sector room.
+
+**Reason:** The gate has to sit on the wire. Filtering in the UI would leak
+straight back out through devtools, so the client must never HOLD a position it
+may not show. Same-sector is the right line because a scan would have found them
+there anyway, so nothing is revealed that play would not have.
+
+**Alternatives rejected:** Canon-strict (drop the column entirely) — the panel
+is nearly empty in a small galaxy and the roster is the reason it exists. Keep
+it and document it — a deviation this large is not made acceptable by a footnote,
+and it devalues `sca` as a verb.
+
+**Known deviation both ways:** canon shows no positions at all. Noted on the
+`sca` guide page, the only slug a player reads before scanning.

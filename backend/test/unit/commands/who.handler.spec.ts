@@ -215,3 +215,60 @@ describe('WhoHandlerService — players only, not the whole galaxy', () => {
     expect(rows(build([me, hidden]), me).join('\n')).not.toContain('Phantom');
   });
 });
+
+/**
+ * `who` must not be a galaxy-wide position feed.
+ *
+ * Canon has no command that reveals a live player's position. `who`
+ * (GECMDS.C:5162) prints your own BBS id; `ros` (cmd_geroster, GECMDS.C:4008)
+ * lists userid, score, kills, planets and population and NO coordinates. A
+ * player's position was found by `sca` — range-gated, and it fires SCAN1/2/3 at
+ * the target so reconnaissance is never silent — or by `spy`.
+ *
+ * Our `who` is a deliberate reinterpretation (spec 012 D1), but printing every
+ * player's exact sector made it free, unlimited-range, silent intelligence and
+ * left `sca` with nothing to offer against a player. The roster stays; the
+ * position is now scoped to your OWN sector, where you would see them on a
+ * scan anyway.
+ */
+describe('`who` — position is scoped to your own sector', () => {
+  const rows = (r: import('../../../src/game/commands/command.types').CommandResult) =>
+    r.lines.filter((l) => l.category === 'info').map((l) => l.text);
+
+  it('shows the sector of a player sharing your own', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', xcoord: 5.4, ycoord: 3.9 });
+    const near = makeShip({ userid: 'u2', shipno: 1, shipname: 'Bravo', xcoord: 5.1, ycoord: 3.2 });
+    const svc = new WhoHandlerService({ findAllShips: () => [me, near] } as unknown as ShipStateService);
+    const line = rows(svc.command.handler(me, [], ctx) as never).find((t) => t.includes('Bravo')) ?? '';
+
+    expect(line).toContain('(  5,  3)');
+  });
+
+  it('withholds the sector of a player elsewhere in the galaxy', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', xcoord: 5.4, ycoord: 3.9 });
+    const far = makeShip({ userid: 'u2', shipno: 1, shipname: 'Bravo', xcoord: -12.0, ycoord: 40.0 });
+    const svc = new WhoHandlerService({ findAllShips: () => [me, far] } as unknown as ShipStateService);
+    const line = rows(svc.command.handler(me, [], ctx) as never).find((t) => t.includes('Bravo')) ?? '';
+
+    expect(line).not.toContain('-12');
+    expect(line).not.toContain('40');
+    expect(line).toMatch(/\(\s*-\s*,\s*-\s*\)/);
+  });
+
+  it('always shows your own sector', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', xcoord: 5.4, ycoord: 3.9 });
+    const svc = new WhoHandlerService({ findAllShips: () => [me] } as unknown as ShipStateService);
+    const line = rows(svc.command.handler(me, [], ctx) as never)[0] ?? '';
+
+    expect(line).toContain('(  5,  3)');
+  });
+
+  it('keeps the columns aligned whether the sector is shown or hidden', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', xcoord: 5.4, ycoord: 3.9 });
+    const far = makeShip({ userid: 'u2', shipno: 1, shipname: 'Bravo', xcoord: -12.0, ycoord: -40.0 });
+    const svc = new WhoHandlerService({ findAllShips: () => [me, far] } as unknown as ShipStateService);
+    const out = rows(svc.command.handler(me, [], ctx) as never);
+
+    expect(new Set(out.map((t) => t.length)).size).toBe(1);
+  });
+});

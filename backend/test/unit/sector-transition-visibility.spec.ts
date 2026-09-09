@@ -12,8 +12,10 @@ import { GESTAT_USER, GESTAT_AUTO } from '../../src/game/constants';
  * sectors, so a pilot could route around them" (who.handler.ts). The scan
  * commands are the intended way to learn where an AI is.
  *
- * Player transitions stay galaxy-wide: `who` already publishes every player's
- * sector, so that is not a leak, and the client's player panel is driven by it.
+ * That rationale used to end "player transitions stay galaxy-wide, because
+ * `who` already publishes every player's sector". `who` no longer does, so the
+ * event is now sent to the MOVER alone and this predicate is the second lock
+ * rather than the only one. @see src/gateway/player-visibility.ts
  */
 describe('shouldBroadcastTransition', () => {
   it('publishes a player moving between sectors', () => {

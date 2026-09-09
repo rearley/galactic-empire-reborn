@@ -120,3 +120,57 @@ describe('usePlayerList', () => {
     expect(names).toEqual(['Albatross', 'Meridian', 'Zephyr']);
   });
 });
+
+/**
+ * Position is scoped to your own sector now, so the roster carries names for
+ * everyone and a sector only for those you could see anyway.
+ *
+ * `physics.sector-transition` used to drive this — it was `server.emit`-ed to
+ * every client carrying the mover's raw x/y, which is a finer position than a
+ * sector. It is now sent to the mover alone (their ScanMap clears on it), and
+ * the panel is driven by `player.sector`, whose audience the server scopes.
+ * @see backend/src/gateway/player-visibility.ts
+ */
+describe('usePlayerList — SECTOR updates', () => {
+  const here = { shipId: 'u1:1', name: 'Alpha', sector: { x: 5, y: 3 }, shipClass: 1 };
+
+  it('reveals a position when the server says the ship is now visible', () => {
+    const { result } = renderHook(() => usePlayerList());
+    act(() => result.current.dispatch({ type: 'SNAPSHOT', payload: { players: [{ ...here, sector: null }] } }));
+    act(() => result.current.dispatch({
+      type: 'SECTOR', payload: { updates: [{ shipId: 'u1:1', sector: { x: 5, y: 3 } }] },
+    }));
+
+    expect(result.current.players[0].sector).toEqual({ x: 5, y: 3 });
+  });
+
+  it('clears a stale position when the ship leaves your sector', () => {
+    const { result } = renderHook(() => usePlayerList());
+    act(() => result.current.dispatch({ type: 'SNAPSHOT', payload: { players: [here] } }));
+    act(() => result.current.dispatch({
+      type: 'SECTOR', payload: { updates: [{ shipId: 'u1:1', sector: null }] },
+    }));
+
+    expect(result.current.players[0].sector).toBeNull();
+  });
+
+  it('applies several updates at once and ignores unknown ships', () => {
+    const { result } = renderHook(() => usePlayerList());
+    act(() => result.current.dispatch({
+      type: 'SNAPSHOT',
+      payload: { players: [here, { shipId: 'u2:1', name: 'Bravo', sector: null, shipClass: 1 }] },
+    }));
+    act(() => result.current.dispatch({
+      type: 'SECTOR',
+      payload: { updates: [
+        { shipId: 'u1:1', sector: null },
+        { shipId: 'u2:1', sector: { x: 9, y: 9 } },
+        { shipId: 'ghost:1', sector: { x: 0, y: 0 } },
+      ] },
+    }));
+
+    expect(result.current.players.find((p) => p.shipId === 'u1:1')?.sector).toBeNull();
+    expect(result.current.players.find((p) => p.shipId === 'u2:1')?.sector).toEqual({ x: 9, y: 9 });
+    expect(result.current.players).toHaveLength(2);
+  });
+});

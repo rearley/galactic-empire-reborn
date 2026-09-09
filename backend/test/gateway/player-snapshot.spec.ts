@@ -33,7 +33,13 @@ describe('GameGateway player.snapshot', () => {
     disconnect: jest.fn(),
     join: jest.fn(),
     leave: jest.fn(),
-    broadcast: { emit: jest.fn() },
+    // The real BroadcastOperator: `player.joined` now carries a position only
+    // to the arriving sector, so the double has to offer to()/except() too.
+    broadcast: {
+      emit: jest.fn(),
+      to: jest.fn(() => ({ emit: jest.fn() })),
+      except: jest.fn(() => ({ emit: jest.fn() })),
+    },
   });
 
   beforeEach(() => {
@@ -151,6 +157,54 @@ describe('GameGateway player.snapshot', () => {
     expect(ids).toContain('user1:1');
   });
 
+  /**
+   * A snapshot must not hand out positions the viewer has not earned.
+   * @see src/game/ship/sector-visibility.ts
+   */
+  it('withholds the sector of a player in another part of the galaxy', async () => {
+    jest.spyOn(registry, 'list').mockReturnValue([
+      { shipId: 'user1:1', name: 'Defiant', sector: { x: 5, y: 3 }, shipClass: 3 },
+      { shipId: 'user9:1', name: 'Faraway', sector: { x: -12, y: 40 }, shipClass: 3 },
+    ]);
+    const socket = makeSocket('sock-1', 'user1');
+    await gateway.handleConnection(socket as never);
+
+    const call = (socket.emit.mock.calls as [string, unknown][]).find(([ev]) => ev === 'player.snapshot');
+    const payload = call![1] as { players: ConnectedPlayer[] };
+    expect(payload.players.find((p) => p.shipId === 'user9:1')?.sector).toBeNull();
+    expect(JSON.stringify(payload)).not.toContain('-12');
+  });
+
+  it('keeps the sector of a player sharing the viewer\u2019s own', async () => {
+    jest.spyOn(registry, 'list').mockReturnValue([
+      { shipId: 'user1:1', name: 'Defiant', sector: { x: 5, y: 3 }, shipClass: 3 },
+      { shipId: 'user9:1', name: 'Neighbour', sector: { x: 5, y: 3 }, shipClass: 3 },
+    ]);
+    const socket = makeSocket('sock-1', 'user1');
+    await gateway.handleConnection(socket as never);
+
+    const call = (socket.emit.mock.calls as [string, unknown][]).find(([ev]) => ev === 'player.snapshot');
+    const payload = call![1] as { players: ConnectedPlayer[] };
+    expect(payload.players.find((p) => p.shipId === 'user9:1')?.sector).toEqual({ x: 5, y: 3 });
+  });
+
+  it('announces an arrival to the galaxy by name, with a position only to its sector', async () => {
+    const socket = makeSocket('sock-1', 'user1');
+    await gateway.handleConnection(socket as never);
+
+    // (5.7, 3.2) -> sector 5,3
+    expect(socket.broadcast.to).toHaveBeenCalledWith('sector:5:3');
+    const scoped = (socket.broadcast.to as jest.Mock).mock.results
+      .flatMap((r) => (r.value.emit as jest.Mock).mock.calls)
+      .find(([ev]) => ev === 'player.joined');
+    expect(scoped?.[1]).toMatchObject({ shipId: 'user1:1', sector: { x: 5, y: 3 } });
+
+    const blind = (socket.broadcast.except as jest.Mock).mock.results
+      .flatMap((r) => (r.value.emit as jest.Mock).mock.calls)
+      .find(([ev]) => ev === 'player.joined');
+    expect(blind?.[1]).toMatchObject({ shipId: 'user1:1', sector: null });
+  });
+
   it('player.snapshot fires before player.joined for the same shipId', async () => {
     const socket = makeSocket('sock-1', 'user1');
     const emitOrder: string[] = [];
@@ -158,11 +212,12 @@ describe('GameGateway player.snapshot', () => {
     (socket.emit as jest.Mock).mockImplementation((ev: string) => {
       emitOrder.push(`socket:${ev}`);
     });
-    // player.joined is emitted via client.broadcast.emit, not server.emit —
-    // capture both paths into the same order tracker.
-    (socket.broadcast.emit as jest.Mock).mockImplementation((ev: string) => {
-      emitOrder.push(`server:${ev}`);
-    });
+    // player.joined goes out on client.broadcast.to(...) / .except(...), not
+    // server.emit — capture every path into the same order tracker.
+    const track = (ev: string) => { emitOrder.push(`server:${ev}`); };
+    (socket.broadcast.emit as jest.Mock).mockImplementation(track);
+    (socket.broadcast.to as jest.Mock).mockImplementation(() => ({ emit: track }));
+    (socket.broadcast.except as jest.Mock).mockImplementation(() => ({ emit: track }));
     serverEmitMock.mockImplementation((ev: string) => {
       emitOrder.push(`server:${ev}`);
     });

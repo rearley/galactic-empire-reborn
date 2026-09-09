@@ -87,6 +87,7 @@ function buildGateway(options: {
 
   const registryMock = {
     getSocketId: jest.fn().mockReturnValue(null),
+    list: jest.fn().mockReturnValue([]),
   };
 
   // Partial gateway — only the beacon-relevant fields

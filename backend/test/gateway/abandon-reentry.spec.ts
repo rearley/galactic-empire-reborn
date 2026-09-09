@@ -48,7 +48,7 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
     disconnect: jest.fn(),
     join: jest.fn(),
     leave: jest.fn(),
-    broadcast: { emit: jest.fn() },
+    broadcast: { emit: jest.fn(), to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }) },
   });
 
   const build = (rows: ReturnType<typeof makeRow>[]) => {

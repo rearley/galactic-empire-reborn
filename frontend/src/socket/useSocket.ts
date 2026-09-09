@@ -7,6 +7,7 @@ import type {
   PlayerJoinedPayload,
   PlayerLeftPayload,
   PhysicsSectorTransitionPayload,
+  PlayerSectorPayload,
   ShipRenamedPayload,
 } from '../types/contracts';
 import type { UsePlayerListReturn } from '../state/usePlayerList';
@@ -138,6 +139,12 @@ export function useSocket(
       playerDispatch({ type: 'TRANSITION', payload });
     };
 
+    // Positions are scoped server-side; this is how one becomes visible or
+    // goes dark. @see backend/src/gateway/player-visibility.ts
+    const handleSector = (payload: PlayerSectorPayload) => {
+      playerDispatch({ type: 'SECTOR', payload });
+    };
+
     const handleRenamed = (payload: ShipRenamedPayload) => {
       playerDispatch({ type: 'RENAMED', payload });
     };
@@ -146,6 +153,7 @@ export function useSocket(
     socket.on('player.joined', handleJoined);
     socket.on('player.left', handleLeft);
     socket.on('physics.sector-transition', handleTransition);
+    socket.on('player.sector', handleSector);
     socket.on('ship.renamed', handleRenamed);
 
     return () => {
@@ -153,6 +161,7 @@ export function useSocket(
       socket.off('player.joined', handleJoined);
       socket.off('player.left', handleLeft);
       socket.off('physics.sector-transition', handleTransition);
+      socket.off('player.sector', handleSector);
       socket.off('ship.renamed', handleRenamed);
     };
   }, [playerDispatch]);

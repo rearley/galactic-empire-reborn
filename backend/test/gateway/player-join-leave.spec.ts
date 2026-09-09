@@ -42,10 +42,19 @@ describe('GameGateway player.joined / player.left', () => {
     leave: jest.fn(),
     // gateway emits player.joined via client.broadcast.emit (not server.emit) —
     // route those calls into serverEmitMock so existing assertions match.
+    // `player.joined` now goes out twice — with a sector to the arriving
+    // sector's room, without one to everyone else — so the double needs the
+    // whole BroadcastOperator chain, all of it routed into serverEmitMock.
     broadcast: {
       emit: jest.fn().mockImplementation((...args: unknown[]) => {
         if (serverEmitMock) serverEmitMock(...args);
       }),
+      to: jest.fn(() => ({
+        emit: (...args: unknown[]) => { if (serverEmitMock) serverEmitMock(...args); },
+      })),
+      except: jest.fn(() => ({
+        emit: (...args: unknown[]) => { if (serverEmitMock) serverEmitMock(...args); },
+      })),
     },
   });
 
