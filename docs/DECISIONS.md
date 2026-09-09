@@ -4875,3 +4875,77 @@ the `--chown` fix. `npx` also went, since it wants a writable `$HOME` cache.
 **Reason for verifying by boot rather than by test:** CI has no Docker daemon,
 so the spec can only guard the directives. A Dockerfile that reads correctly and
 does not run is the failure this pair of checks exists to prevent.
+
+---
+
+## 2026-09-09 — Licensing: AGPL-3.0-or-later, and who is actually owed credit
+
+**Context:** the owner was told by a third party that this port sits under the
+AGPL and must credit Elwynor Technologies. Neither half turned out to describe
+the code we work from, but checking it surfaced a real gap: the repository had
+no LICENSE file at all, and no attribution anywhere, while running a public
+service built on someone else's copyleft source.
+
+**What the files actually say.** Every C file in the vendored distribution
+carries the same header: `Copyright (C) 1988, 89, 90, 91, 92 Michael B.
+Murdock`, released under "the GNU General Public License ... either version 2
+of the License, or (at your option) any later version". Not the AGPL. Elwynor
+appear nowhere in the distribution.
+
+The republished copy we vendored (`github.com/bsimser/ge`, retrieved
+2026-09-02) adds an MIT `LICENSE` at its root. **That file does not govern.** A
+republisher cannot relicense an upstream author's work by placing a file beside
+it; Murdock's per-file notices are the grant. Inbound terms are therefore
+GPL-2.0-or-later.
+
+**Where the AGPL claim comes from, and why it is not wrong exactly.** Elwynor
+Technologies maintain a genuinely separate port of Galactic Empire to 32-bit
+Worldgroup and The Major BBS V10, at `github.com/elwynor/elwge`, and it *is*
+AGPL-3.0. They state they arranged to take over the MBM products and released
+their port publicly in 2021. So the advice was accurate about a real project.
+It was about a different codebase. Nothing from `elwge` is used here.
+
+**Decision:** this port is licensed **AGPL-3.0-or-later**. `LICENSE` carries the
+canonical FSF text; `NOTICE` carries the attribution chain, the list of what is
+embedded verbatim, and the Elwynor correction. The seven generated files that
+embed Murdock's text and data carry a header naming his copyright, and the six
+generator scripts emit that header so regeneration keeps it.
+
+**Reason:**
+
+- The port embeds canon verbatim — 1,070 message strings, the 34-class ship
+  table, 61 help entries, the class pages, both AI taunt catalogues and the
+  neutral-zone fixture. This is not a clean-room reimplementation and it would
+  be dishonest to license it as though it were.
+- GPL-2.0-or-later permits moving to a later GPL, and the AGPL is the member of
+  that family whose §13 matches what we actually are: software people use over
+  a network without ever receiving a copy. Under the plain GPL, running this
+  site would owe nobody anything, which is a technically correct answer to a
+  question the original author's own note was not asking.
+- It matches what Elwynor chose for their port, so the community reads it as
+  good faith rather than as a loophole.
+
+**Alternatives rejected:**
+
+- **GPL-3.0-or-later** — the straightforward upgrade path, and defensible. It
+  simply does not reach the network case, which is our only distribution.
+- **GPL-2.0-or-later**, mirroring the inbound terms exactly — the most
+  conservative reading, and the easiest to argue. Rejected for the same reason:
+  no network clause.
+- **MIT, following the republisher's file** — rejected outright. The file is
+  wrong about its own contents.
+- **Attribution without a licence** — leaves the gap open while the service
+  runs.
+
+**Consequence, and the part that is not finished.** AGPL §13 entitles a player
+to the source of the service they are using. The repository is still private by
+the owner's decision, so that offer is not yet satisfiable. The `/provenance`
+page and its `SOURCE_URL` constant carry a comment saying the page must not be
+deployed while the link is dead. Going public, or arranging another route to
+the corresponding source, is the open item.
+
+**Not legal advice.** This entry records what the licence files say and what was
+decided on that basis. Whether a TypeScript reimplementation written from GPL C
+source is a derivative work is a judgement, not a fact that was checked; the
+verbatim data makes the question live rather than academic, which is why the
+conservative answer was taken.

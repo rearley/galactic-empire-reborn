@@ -98,6 +98,28 @@ sector types and planet placement. Ships use floating-point x/y (`COORD`).
 **WebSocket**: one `GameGateway`. Players join a Socket.io room per sector.
 Sector-scoped events go to rooms; kills and major announcements go to all.
 
+## Licensing — this matters before you copy anything from `/reference/`
+
+This port is **AGPL-3.0-or-later** (`LICENSE`), because it embeds Murdock's text
+and data verbatim and is played over a network. The original is
+**GPL-2.0-or-later**, © 1988-1992 Michael B. Murdock, per the header of every C
+file. `NOTICE` carries the full chain and the list of what is embedded.
+
+Three rules follow, and none of them are optional:
+
+- **Anything generated from canon carries a copyright header naming Murdock.**
+  Seven files do today, and the six `tools/extract-*.mjs` scripts emit it. If you
+  add a generator, emit it too.
+- **Elwynor Technologies' port is a different codebase.** They maintain an AGPL
+  port to 32-bit Worldgroup at `github.com/elwynor/elwge`. Nothing from it is
+  used here, and this project has already been asked about it once. Do not copy
+  a fix from it, and do not credit them for this. @see `NOTICE`
+- **The MIT file in the republished upstream does not govern.** A republisher
+  cannot relicense the author's work by adding a file beside it. Treat inbound
+  terms as GPL-2.0-or-later.
+
+@see docs/DECISIONS.md 2026-09-09 — Licensing
+
 ## Reference Source
 
 ### The classic game is the source of truth

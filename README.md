@@ -1,8 +1,12 @@
 # Galactic Empire Reborn
 
 A faithful web port of the classic MajorBBS game **Galactic Empire** (1988–1992) by Mike Murdock.
-Real-time multiplayer space combat and economy in a 30×15 sector universe — text commands,
+Real-time multiplayer space combat and economy across a 201×201 sector galaxy — text commands,
 ASCII scan maps, persistent Cybertron AI, planet colonization, and midnight scoring.
+
+(30×15 is the scan map's size in characters, not the galaxy's. This README said otherwise
+until 2026-09-09, which is the same misreading that has produced real defects in the code.
+The galaxy runs `-UNIVMAX..+UNIVMAX`, and we deploy at `UNIVMAX=100`.)
 
 **Stack**: NestJS · PostgreSQL 16 · Socket.io · React + Vite · Prisma ORM
 
@@ -242,3 +246,22 @@ galactic-empire-reborn/
 
 See `docs/ARCHITECTURE.md` for the full module map and `docs/GAME_MECHANICS.md` for
 implemented mechanics with C source references.
+
+---
+
+## License and credits
+
+Galactic Empire was written by **Michael B. Murdock** (© 1988–1992) and later released
+by him under the GNU General Public License, version 2 or later. This port continues that
+work and is licensed under the **GNU Affero General Public License, version 3 or later** —
+see [`LICENSE`](LICENSE), and [`NOTICE`](NOTICE) for the full attribution.
+
+The Affero variant is deliberate. The plain GPL asks nothing of someone who only runs a
+public network service, and that is exactly what this is, so anyone playing is entitled to
+the source of what they are playing.
+
+**This is not Elwynor Technologies' port.** Elwynor maintain a separate port of Galactic
+Empire to 32-bit Worldgroup and The Major BBS V10 at
+[elwynor/elwge](https://github.com/elwynor/elwge), also AGPL. No code, data or fix from it
+is used here; what this project reads is Murdock's original DOS-era C source. The `/provenance`
+page on the running site says the same thing to players.

@@ -12,7 +12,9 @@ describe('Landing', () => {
   it('names the game and its author', () => {
     renderLanding();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/galactic empire/i);
-    expect(screen.getByText(/Mike Murdock/i)).toBeInTheDocument();
+    // getAllByText, not getByText: the footer credits him a second time and
+    // links to /provenance. Two mentions is the point, not a duplicate.
+    expect(screen.getAllByText(/Mike Murdock/i).length).toBeGreaterThan(0);
   });
 
   it('states exactly which release was ported', () => {
