@@ -11,10 +11,28 @@ const CARGO_LABELS = [
 ] as const;
 
 /**
- * Handles `dat <fragment>` — shows full public stat block for a named ship.
- * Reinterpretation of cmd_data (GECMDS.C:5829) as a player-facing scouting verb.
+ * Handles `dat` — the full stat block for the ship YOU are flying.
+ *
+ * Canon's cmd_data is a machine-readable dump for a front-end terminal program:
+ * gated behind `dat qazwsx <report|scan|sector>`, anything else returning
+ * INVCMD, and every field printed from `warsptr`/`waruptr` — the CALLER's ship
+ * and user record. It has no target argument and touches no other ship.
+ *
+ * The port recast it as `dat <fragment>`, "a player-facing scouting verb"
+ * (spec 012 D1), which returned for ANY ship in the galaxy, at unlimited range,
+ * silently and with no notice to the target: exact sector, heading, speed,
+ * energy, damage, kills and the full cargo manifest including gold. Canon has
+ * no way to learn another ship's cargo at all — `spy` is planet-only,
+ * orbit-only and consumes an I_SPY item. It also matched on `!cloak` rather
+ * than `cloak < 10`, so a ship spinning up its cloak stayed exposed, and it did
+ * not exclude AI. Reported from play.
+ *
+ * The readable format stays — nothing in a browser parses canon's `UD1:`
+ * protocol lines — but the subject is the caller, as it always was. What a
+ * pilot may learn about someone else's ship is what `sca sh` shows.
+ *
  * @see GECMDS.C:5829 cmd_data
- * @see specs/012-social-commands/research.md D1
+ * @see docs/DECISIONS.md 2026-09-09
  */
 @Injectable()
 export class DatHandlerService {
@@ -27,22 +45,27 @@ export class DatHandlerService {
     return {
       keyword: 'dat',
       aliases: [],
-      minArgs: 1,
-      argMissingMessage: 'Usage: dat <ship-name-fragment>',
+      minArgs: 0,
+      argMissingMessage: '',
       handler: (ship: ShipState, args: string[], ctx: CommandContext): Promise<CommandResult> =>
         this.handle(ship, args, ctx),
     };
   }
 
-  private async handle(_ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
-    const fragment = args[0].toLowerCase();
-    const notFound: CommandResult = { lines: [{ text: 'Ship not found.', category: 'system' }] };
+  private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
+    // A pilot who types `dat <someone>` is asking a question the game answers
+    // with `sca sh`, so say so rather than failing silently — the argument form
+    // worked for a while and people will have it in their fingers.
+    if (args.some((a) => a.trim() !== '')) {
+      return {
+        lines: [{
+          text: 'dat reports your own ship. To look at another, use `sca sh <name>`.',
+          category: 'system',
+        }],
+      };
+    }
 
-    const target = this.shipService
-      .findAllShips()
-      .find((s) => !s.cloak && s.shipname.toLowerCase().includes(fragment));
-
-    if (!target) return notFound;
+    const target = ship;
 
     // Resolve team name and score via Prisma (single call covers both)
     let teamname = '—';

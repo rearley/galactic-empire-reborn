@@ -40,30 +40,30 @@ function buildRouter(ships: ShipState[]): CommandRouterService {
   return router;
 }
 
+/**
+ * Routed end-to-end, `dat` is about the caller and nobody else.
+ * @see src/game/commands/handlers/dat.handler.ts
+ */
 describe('dat dispatch integration', () => {
-  it('missing arg returns usage message', () => {
-    const router = buildRouter([]);
-    const result = router.dispatch('dat', makeShip(), ctx) as import('../../../src/game/commands/command.types').CommandResult;
-    expect(result.lines[0].text).toMatch(/Usage: dat/i);
-  });
-
-  it('match returns stat block with ship name in header', async () => {
-    const ship = makeShip({ shipname: 'StarBird', cloak: 0 });
-    const router = buildRouter([ship]);
-    const result = await router.dispatch('dat star', makeShip(), ctx);
+  it('bare `dat` reports the ship the caller is flying', async () => {
+    const me = makeShip({ shipname: 'StarBird' });
+    const result = await buildRouter([me]).dispatch('dat', me, ctx);
     expect(result.lines.some((l) => l.text.includes('StarBird'))).toBe(true);
   });
 
-  it('no match returns "Ship not found."', async () => {
-    const router = buildRouter([makeShip({ shipname: 'Nothing' })]);
-    const result = await router.dispatch('dat zzz', makeShip(), ctx);
-    expect(result.lines[0].text).toBe('Ship not found.');
+  it('`dat <name>` does not scout — it redirects to sca sh', async () => {
+    const me = makeShip({ userid: 'u1', shipname: 'Alpha' });
+    const them = makeShip({ userid: 'u2', shipname: 'StarBird' });
+    const result = await buildRouter([me, them]).dispatch('dat star', me, ctx);
+    const text = result.lines.map((l) => l.text).join('\n');
+    expect(text).not.toContain('StarBird');
+    expect(text).toMatch(/sca sh/);
   });
 
-  it('cloaked ship returns "Ship not found."', async () => {
-    const ship = makeShip({ shipname: 'Phantom', cloak: 1 });
-    const router = buildRouter([ship]);
-    const result = await router.dispatch('dat phan', makeShip(), ctx);
-    expect(result.lines[0].text).toBe('Ship not found.');
+  it('a cloaked stranger is no more visible than an uncloaked one', async () => {
+    const me = makeShip({ userid: 'u1', shipname: 'Alpha' });
+    const ghost = makeShip({ userid: 'u2', shipname: 'Phantom', cloak: 1 });
+    const result = await buildRouter([me, ghost]).dispatch('dat phan', me, ctx);
+    expect(result.lines.map((l) => l.text).join('\n')).not.toContain('Phantom');
   });
 });

@@ -3830,3 +3830,23 @@ including gold, at unlimited range, for AI as well as players. Canon's `dat` is
 terminal program (GECMDS.C:5829, `warsptr`/`waruptr` are the caller's), password
 -gated and never touching another ship. Canon has no way to see another ship's
 cargo at all; `spy` is planet-only. Raised in play, not yet fixed.
+
+## 2026-09-09 — `dat` no longer scouts, and the event log stops un-pinning itself
+**Completed:** Two playtest reports. (1) `dat <fragment>` returned any ship's
+position, speed, damage, kills and full cargo including gold, at unlimited
+range, AI included, with no notice to the target; canon's `dat` only ever dumped
+the caller's own ship. It now takes no argument and reports yours, redirecting a
+name argument to `sca sh`. (2) "jump to latest" appeared unbidden again on
+v0.7.0, which already carried the burst fix. Root cause was different: the log
+is FIFO-capped at 500, so once full every new line drops one off the TOP, and
+Chrome's scroll anchoring compensates by moving `scrollTop` itself — a scroll
+event carrying a value we never wrote, read as the reader scrolling away. Fixed
+with `overflow-anchor: none` and by requiring evidence a PERSON moved the log
+(wheel, touch, key, pointer) before auto-scroll disengages.
+**Tests:** `dat.handler.spec.ts` rewritten (10 — own ship, and five ways of
+failing to point it at someone else, including an AI hold); `dat.dispatch.spec.ts`
+rewritten (3). `eventlog-sticky.spec.tsx` +6, and the three older cases now fire
+a wheel event because a reader scroll is no longer just a scroll event.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09 (both entries).
+**Next:** —
+**Known issues:** none from this pair.

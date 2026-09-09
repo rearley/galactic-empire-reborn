@@ -4661,3 +4661,34 @@ and it devalues `sca` as a verb.
 
 **Known deviation both ways:** canon shows no positions at all. Noted on the
 `sca` guide page, the only slug a player reads before scanning.
+
+## 2026-09-09 — `dat` reports your own ship, as canon's always did
+**Context:** Raised in play — "not sure I like the command dat <fragment> as
+that gives full info on another players ship." It does, and it was the same
+leak as the sector column but larger.
+
+Canon's cmd_data (GECMDS.C:5829) is a machine-readable dump for a front-end
+terminal program: gated behind `dat qazwsx <report|scan|sector>`, anything else
+returning INVCMD, and every field printed from `warsptr`/`waruptr` — the
+CALLER's ship and user record. No target argument, no other ship.
+
+The port recast it as "a player-facing scouting verb" (spec 012 D1) taking a
+name fragment, returning for ANY ship in the galaxy, at unlimited range,
+silently, with no notice to the target: exact sector, heading, speed, energy,
+damage, kills and the full cargo manifest including gold. Canon has no way to
+learn another ship's cargo at all — `spy` is planet-only, orbit-only and burns
+an I_SPY item. It also matched on `!cloak` rather than `cloak < 10`, so a ship
+spinning up its cloak stayed exposed, and it excluded no AI, so every
+Cybertron's hold was public.
+
+**Decision:** `dat` takes no argument and reports the caller's own ship. Given
+one, it says so and points at `sca sh <name>`.
+
+**Reason:** What a pilot may learn about someone else's ship is what `sca sh`
+shows — range-gated, and it announces itself to the target. Cargo is not on that
+list in canon at any range, by any command.
+
+**Alternatives rejected:** Restoring canon's `dat qazwsx report` protocol dump —
+nothing in a browser parses `UD1:` lines, so the readable format stays and only
+the subject changes. Deleting the command — `rep` does not show the hold in one
+block, and the verb is still useful pointed at yourself.
