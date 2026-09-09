@@ -71,7 +71,9 @@ Images are built elsewhere, pushed to `ghcr.io/rearley/*`, and pulled here.
 pushing a new tag redeploys without touching the server — worth knowing before
 pushing a half-finished image.
 
-Secrets live in `/opt/<app>/.env`, never in the compose file.
+Secrets live in `/opt/<app>/.env`, never in the compose file — for the apps
+that follow this pattern. **GE ended up not following it**; see "Where that
+value actually lives" below.
 
 **3. The frontend probably does not need a container.** Plesk's nginx already
 serves `ge.makrholdings.com` from its docroot. Building `frontend/dist` and
@@ -150,11 +152,58 @@ CREATE ROLE makr_ge LOGIN PASSWORD '...';
 CREATE DATABASE makr_ge OWNER makr_ge;
 ```
 
-`/opt/ge/.env` therefore wants:
+The backend therefore wants:
 
 ```
-DATABASE_URL=postgresql://makr_ge:<password>@127.0.0.1:5432/makr_ge?schema=public
+DATABASE_URL=postgresql://makr_ge:<password>@localhost:5432/makr_ge?schema=public
 ```
+
+**Where that value actually lives — read this before an incident, not during
+one.** The section above says secrets belong in `/opt/<app>/.env`, which is the
+pattern the other apps on this host follow. **GE does not follow it.** This
+stack is managed by the Plesk Docker extension, so there is no `/opt/ge` at all
+and no `.env`; `DATABASE_URL` and `JWT_SECRET` are written inline in
+
+```
+/opt/psa/var/modules/docker/stacks/ge/compose.yaml   # mode 600, root
+```
+
+This file said `/opt/ge/.env` until 2026-09-09, and that path has never
+existed. Find the file from the container rather than trusting any documented
+path, including this one:
+
+```bash
+docker inspect --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' ge-backend
+```
+
+Note the compose **project** is `ge` and the **service** is `backend`, so
+recreating it is `docker compose -f <that file> up -d --force-recreate backend`
+— not `ge-backend`, which is only the container name.
+
+### Rotating the database password
+
+Done 2026-09-09; the procedure is recorded because the reason recurs. A role can
+change its own password, so this needs no Postgres superuser and no `su -
+postgres`: read the current URL out of `compose.yaml`, authenticate as
+`makr_ge`, `ALTER ROLE makr_ge WITH PASSWORD '<new>'`, rewrite the same line in
+`compose.yaml`, then force-recreate the `backend` service. Existing connections
+survive `ALTER ROLE`, so the running container keeps serving until it is
+recreated.
+
+Generate the value with `openssl rand -hex 24`. Hex avoids the second failure
+mode here: the password sits inside a URL, so `%`, `@`, `#`, `?` and `/` need
+encoding, and an un-encoded `%` is what broke a `psql` invocation during the
+2026-09-09 audit.
+
+**Verify by proving the OLD password fails**, not by watching the new one
+succeed. A container that never reconnected also looks healthy:
+
+```bash
+curl -s localhost:3100/health                    # {"status":"ok","database":"up"}
+PGPASSWORD=<old> psql -h localhost -U makr_ge -d makr_ge -c 'select 1'   # must FAIL
+```
+
+Then delete any backup copy of the compose file, since it holds the old secret.
 
 **A note on how this went wrong the first time.** A `makr_ge` database already
 existed — in **MySQL**, because that is what Plesk creates by default. This
@@ -259,7 +308,7 @@ Set for the backend process:
 
 | Variable | Purpose | Notes |
 |---|---|---|
-| `DATABASE_URL` | Postgres connection string | Read by `PrismaService`; production must NOT set `TEST_DATABASE_URL`, which is a separate variable that test runs bind to instead (`backend/src/prisma/database-url.ts`). |
+| `DATABASE_URL` | Postgres connection string | Set inline in the Plesk stack's `compose.yaml`, not an `.env` — see the database section. Read by `PrismaService`; production must NOT set `TEST_DATABASE_URL`, which is a separate variable that test runs bind to instead (`backend/src/prisma/database-url.ts`). |
 | `JWT_SECRET` | Signs and verifies auth tokens | Required — both `auth/jwt.strategy.ts` and `auth/auth.module.ts` throw at boot if it is unset. Generate a real secret; do not reuse anything from `.env.example`. |
 | `PORT` | Backend listen port | Defaults to `3000` if unset (`backend/src/main.ts:12`). |
 | `MIDNIGHT_MAILDAYS` | Mail purge age, days | Integer 1–7, default 3 (canon `MAILDAYS`, clamp ceiling 7 per `GEMAIN.C:497`). |
