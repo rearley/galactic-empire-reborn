@@ -1,5 +1,9 @@
 /**
  * GENERATED FILE — do not edit by hand.
+ *
+ * Contains material Copyright (C) 1988-1992 Michael B. Murdock, from Galactic
+ * Empire release 3.2e, released by its author under GPL-2.0-or-later. This
+ * port is AGPL-3.0-or-later; see NOTICE at the repository root.
  * Regenerate with:  node tools/extract-ai-taunts.mjs
  * Pinned by:        backend/test/balance/ai-taunt-canon.balance.spec.ts
  *

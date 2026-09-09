@@ -12,6 +12,7 @@ export function SiteHeader(): React.JSX.Element {
       <nav className="flex gap-4 text-gray-400">
         <Link to="/guide" className="hover:text-gray-200">Guide</Link>
         <Link to="/stats" className="hover:text-gray-200">Status</Link>
+        <Link to="/provenance" className="hover:text-gray-200">Credits</Link>
         {signedIn ? (
           <>
             <Link to="/play" className="hover:text-gray-200">Play</Link>

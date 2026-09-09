@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 67 entries.
+Append-only, **newest at the bottom**. 68 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 67 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
 - [2026-09-09 — the docs said work was outstanding that had been done for months](#2026-09-09--the-docs-said-work-was-outstanding-that-had-been-done-for-months)
 - [Backlog — before going public: account-enumeration hardening](#backlog--before-going-public-account-enumeration-hardening)
 - [2026-09-09 — DB password rotated, and the enumeration question worked through](#2026-09-09--db-password-rotated-and-the-enumeration-question-worked-through)
@@ -4059,3 +4060,56 @@ snapshot was updated for the deleted line. Full backend suite green.
 anywhere else is stale by definition. Also noticed, not fixed: several ship-tick
 specs still mock a `runAutoRepair` method that no longer exists on
 `MaintenanceService` — harmless, since the mocks are cast, but misleading.
+
+## 2026-09-09 — licensing, attribution, and a /provenance page
+
+**Completed:** the port now carries a licence. `LICENSE` is the canonical
+AGPL-3.0 text; `NOTICE` carries the attribution chain and the list of what is
+embedded verbatim from the original. The seven generated files that hold
+Murdock's text and data gained a copyright header, and the six generator scripts
+emit it, so regenerating cannot quietly strip it. README gained a licence and
+credits section. A new public page at `/provenance` says the same thing to
+players, linked from the site nav and the landing footer.
+
+**What prompted it:** a third party told the owner this port was AGPL and owed
+credit to Elwynor Technologies. Checking that against the files found neither
+half true of our code — every C file says GPL-2.0-or-later, © Michael B.
+Murdock, and Elwynor appear nowhere in the distribution. Elwynor do maintain a
+real and genuinely AGPL port, `elwynor/elwge`, to 32-bit Worldgroup. It is a
+different codebase and nothing from it is used here. The advice was right about
+a project we do not use.
+
+The check was still worth having: the repository had no LICENSE at all while a
+public service ran on someone else's copyleft source.
+
+**Decisions made:** `docs/DECISIONS.md` 2026-09-09 — AGPL-3.0-or-later, chosen
+over the plain GPL because §13 is the clause that matches a game played over a
+network, and over MIT because the republisher's MIT file does not govern
+Murdock's work.
+
+**Tests:** `frontend/test/routes/provenance.spec.tsx` (6), written failing
+first. One of them exists purely to keep the Elwynor correction unambiguous in
+both directions. `landing.spec.tsx` moved to `getAllByText` for the author's
+name, since the footer now credits him a second time. Frontend 255 across 36
+files; backend balance suite 899 across 26, re-run because every generated file
+changed. Regenerating from `tools/` produces no diff beyond the new headers.
+
+**Also fixed:** README described the game as a "30×15 sector universe". That is
+the scan map in characters, not the galaxy, and it is the third place this
+project has made that exact mistake. Corrected, with the correction left visible.
+
+The ship-class seed cited `GE/MSG/MBMGESHP.MSG` as its source. The generator was
+already reading `GE/REL/`, so regenerating fixed the comment; the two copies of
+that particular file are byte-identical, so no value ever drifted.
+
+**Next:** decide what goes in the public repository, and publish it.
+
+**Known issues:** **the source offer is not yet satisfiable.** AGPL §13
+entitles a player to the source of the service they are using, and the
+repository is private by the owner's decision. `SOURCE_URL` in
+`frontend/src/content/provenance-notes.ts` points at a repository that does not
+exist yet, and carries a comment saying the page must not deploy while that link
+is dead. Either the public repository lands before the next frontend deploy, or
+the `/provenance` route comes out of `main.tsx` until it does. Note also that
+the current private remote is spelled `galatic-empire-reborn`; the constant uses
+the corrected spelling on the assumption the public one will be a new repository.

@@ -1,10 +1,14 @@
 /**
  * Static ship class definitions -- GENERATED, DO NOT EDIT BY HAND.
  *
+ * Contains material Copyright (C) 1988-1992 Michael B. Murdock, from Galactic
+ * Empire release 3.2e, released by its author under GPL-2.0-or-later. This
+ * port is AGPL-3.0-or-later; see NOTICE at the repository root.
+ *
  * Regenerate with:  node tools/extract-ship-classes.mjs --ts
  *
  * Every value is read verbatim from the original distribution's ship
- * configuration table, reference/ge-upstream/mbmgemp/GE/MSG/MBMGESHP.MSG,
+ * configuration table, reference/ge-upstream/mbmgemp/GE/REL/MBMGESHP.MSG,
  * which is the file the original game itself loaded at boot. No value here is
  * normalized, rounded or editorially adjusted; where a field looks unused for a
  * given class it is still canon's value, because the fields the game ignores

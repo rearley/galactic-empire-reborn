@@ -117,6 +117,14 @@ export function Landing(): React.JSX.Element {
         <p className="mt-4 text-center text-xs text-gray-600">
           Free, no client to install. Pick a commander name and you are flying.
         </p>
+        <p className="mt-8 text-center text-xs text-gray-600">
+          Galactic Empire was written by Mike Murdock, who released its source publicly. This port
+          is free software and says{' '}
+          <Link to="/provenance" className="text-gray-500 hover:text-gray-300 hover:underline">
+            what it took from the original and what it did not
+          </Link>
+          .
+        </p>
       </main>
     </div>
   );
