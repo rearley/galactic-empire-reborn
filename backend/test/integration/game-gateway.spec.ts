@@ -17,7 +17,6 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
-import { UNIVMAX } from '../../src/game/constants';
 
 function makeShipState(
   overrides: { userid: string; shipno: number; shipname: string },
@@ -138,130 +137,38 @@ describe('GameGateway integration', () => {
     await app.close();
   }, 10000);
 
-  describe('sector:join', () => {
-    it('join valid (5,5) → receives sector:joined with correct payload', async () => {
+  /**
+   * `sector:join` / `sector:leave` were removed on 2026-09-09. They took the
+   * coordinates from the client and joined that room, gated only on "are you a
+   * bound player" — so any player could subscribe to all 201x201 rooms and read
+   * every `player.sector` update, which carries explicit coordinates. Nothing
+   * called them; the frontend never emitted either event and ships are placed
+   * in their room server-side. @see docs/audits/2026-09-09-security-review.md M4
+   */
+  describe('sector:join is gone', () => {
+    it('does not answer a client that asks to join a sector room', async () => {
       const socket = makeClient(port);
       await waitForEvent(socket, 'command:result'); // welcome message
 
       socket.emit('sector:join', { x: 5, y: 5 });
-      const data = await waitForEvent<{ x: number; y: number; room: string }>(socket, 'sector:joined');
+      const replied = await Promise.race([
+        waitForEvent(socket, 'sector:joined').then(() => true),
+        new Promise<false>((r) => setTimeout(() => r(false), 300)),
+      ]);
 
-      expect(data).toEqual({ x: 5, y: 5, room: 'sector:5:5' });
+      expect(replied).toBe(false);
       socket.disconnect();
     });
 
-    it('join idempotent — joining (5,5) twice yields only one membership', async () => {
+    it('does not put the socket in a room it asked for', async () => {
       const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
+      await waitForEvent(socket, 'command:result');
 
-      socket.emit('sector:join', { x: 5, y: 5 });
-      await waitForEvent(socket, 'sector:joined');
+      socket.emit('sector:join', { x: 42, y: 17 });
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      socket.emit('sector:join', { x: 5, y: 5 });
-      const data = await waitForEvent<{ x: number; y: number; room: string }>(socket, 'sector:joined');
-      expect(data.room).toBe('sector:5:5');
+      expect(ioServer.sockets.adapter.rooms.get('sector:42:17')).toBeUndefined();
       socket.disconnect();
     });
-
-    it('leave → receives sector:left and room no longer contains socket', async () => {
-      const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
-
-      socket.emit('sector:join', { x: 3, y: 7 });
-      await waitForEvent(socket, 'sector:joined');
-
-      socket.emit('sector:leave', { x: 3, y: 7 });
-      const data = await waitForEvent<{ x: number; y: number; room: string }>(socket, 'sector:left');
-      expect(data).toEqual({ x: 3, y: 7, room: 'sector:3:7' });
-      socket.disconnect();
-    });
-
-    it('leave never-joined → emits sector:left (no-op, no error)', async () => {
-      const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
-
-      socket.emit('sector:leave', { x: 10, y: 10 });
-      const data = await waitForEvent<{ room: string }>(socket, 'sector:left');
-      expect(data.room).toBe('sector:10:10');
-      socket.disconnect();
-    });
-
-    // The universe runs -UNIVMAX..+UNIVMAX on both axes with the origin at its
-    // centre, so 0 and negative sectors are perfectly valid — only coordinates
-    // beyond the square are out of bounds.
-    it.each([
-      [-(UNIVMAX + 1), 5],
-      [UNIVMAX + 1, 5],
-      [5, -(UNIVMAX + 1)],
-      [5, UNIVMAX + 1],
-    ])('out-of-bounds join (%i,%i) → OUT_OF_BOUNDS error, no room joined', async (x, y) => {
-      const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
-
-      socket.emit('sector:join', { x, y });
-      const err = await waitForEvent<{ event: string; code: string }>(socket, 'error');
-
-      expect(err.event).toBe('sector:join');
-      expect(err.code).toBe('OUT_OF_BOUNDS');
-      socket.disconnect();
-    });
-
-    it.each([
-      [{}],
-      [{ x: 'a', y: 5 }],
-      [{ x: 1.5, y: 5 }],
-    ])('invalid payload %j → INVALID_PAYLOAD error', async (payload) => {
-      const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
-
-      socket.emit('sector:join', payload);
-      const err = await waitForEvent<{ event: string; code: string }>(socket, 'error');
-
-      expect(err.event).toBe('sector:join');
-      expect(err.code).toBe('INVALID_PAYLOAD');
-      socket.disconnect();
-    });
-
-    it('disconnect cleanup — rooms released after disconnect (FR-008)', async () => {
-      const socket = makeClient(port);
-      await waitForEvent(socket, 'command:result'); // welcome message
-
-      socket.emit('sector:join', { x: 1, y: 1 });
-      await waitForEvent(socket, 'sector:joined');
-      socket.emit('sector:join', { x: 2, y: 2 });
-      await waitForEvent(socket, 'sector:joined');
-      socket.emit('sector:join', { x: 3, y: 3 });
-      await waitForEvent(socket, 'sector:joined');
-
-      const socketId = socket.id!;
-      socket.disconnect();
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      const rooms = ioServer.sockets.adapter.rooms;
-      expect(rooms.get('sector:1:1')?.has(socketId)).toBeFalsy();
-      expect(rooms.get('sector:2:2')?.has(socketId)).toBeFalsy();
-      expect(rooms.get('sector:3:3')?.has(socketId)).toBeFalsy();
-    });
-
-    it('100-cycle leak test — no growth in adapter room count (SC-004)', async () => {
-      const countRooms = (): number => ioServer.sockets.adapter.rooms.size;
-      const initialCount = countRooms();
-
-      for (let i = 0; i < 100; i++) {
-        const socket = makeClient(port);
-        await waitForEvent(socket, 'command:result'); // welcome message
-        socket.emit('sector:join', { x: 5, y: 5 });
-        await waitForEvent(socket, 'sector:joined');
-        socket.emit('sector:leave', { x: 5, y: 5 });
-        await waitForEvent(socket, 'sector:left');
-        socket.disconnect();
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      const finalCount = countRooms();
-      expect(finalCount).toBeLessThanOrEqual(initialCount + 1);
-    }, 30000);
   });
 });

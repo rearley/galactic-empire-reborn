@@ -116,11 +116,6 @@ import { isAiUserid } from '../game/commands/helpers/ai-userid';
 import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
 import { DOC_PLANET_LIMIT, MAIL_CLASS_DISTRESS, RNDDOC } from '../game/constants';
 
-interface SectorPayload {
-  x: unknown;
-  y: unknown;
-}
-
 interface CommandPayload {
   input: unknown;
 }
@@ -134,9 +129,6 @@ interface GatewayError {
   code: string;
   message: string;
 }
-
-type ValidCoord = { ok: true; x: number; y: number };
-type InvalidCoord = { ok: false; code: string; message: string };
 
 type OnboardingState = { step: 'AWAITING_NAME' };
 
@@ -371,6 +363,37 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * hand-rolled its own welcome sequence and omitted both, which left a
    * first-session pilot deaf to all of it until they reloaded.
    */
+  /**
+   * Rebroadcast the roster to everyone, each recipient seeing only what they
+   * are allowed to.
+   *
+   * `ren` and the five `tea` subcommands return a `__player_snapshot__`
+   * sentinel so the client picks up a changed name. That used to resolve to a
+   * bare `server.emit` of `registry.list()`, whose sectors are always real —
+   * so a player could type `ren A` / `ren B` in a loop and pull a live,
+   * unscoped position feed for the whole roster. The v0.8.0 scoping work
+   * covered the connect path and missed this one.
+   *
+   * The payload differs per recipient, so it has to be a fan-out rather than a
+   * broadcast: Socket.io cannot vary one emit. Sockets with no ship yet
+   * (onboarding, mid-selection) are skipped — they have no viewpoint to scope
+   * against, and inventing one would leak.
+   * @see gateway/player-visibility.ts, docs/audits/2026-09-09-security-review.md
+   */
+  private emitScopedSnapshotToAll(): void {
+    const roster = this.registry.list();
+    for (const socket of this.server.sockets.sockets.values()) {
+      const userid = socket.data?.userid as string | undefined;
+      const shipno = socket.data?.activeShipNo as number | undefined;
+      if (!userid || shipno === undefined) continue;
+      const ship = this.shipStateService.get(userid, shipno);
+      if (!ship) continue;
+      socket.emit('player.snapshot', {
+        players: scopePlayers(roster, { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) }),
+      });
+    }
+  }
+
   /**
    * Send one socket the roster as that viewer is allowed to see it — names for
    * everyone, positions only for their own sector.
@@ -1151,57 +1174,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  @SubscribeMessage('sector:join')
-  handleSectorJoin(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: SectorPayload,
-  ): void {
-    if (!client.data.userid || !this.registry.isBound(client.id)) {
-      client.emit('command:result', {
-        lines: [{ text: 'Not authenticated or not in play.', category: 'system' }],
-      });
-      return;
-    }
-    const result = this.validateCoord(payload, 'sector:join');
-    if (!result.ok) {
-      client.emit('error', {
-        event: 'sector:join',
-        code: result.code,
-        message: result.message,
-      } satisfies GatewayError);
-      return;
-    }
-    const { x, y } = result;
-    const room = `sector:${x}:${y}`;
-    void client.join(room);
-    client.emit('sector:joined', { x, y, room });
-  }
-
-  @SubscribeMessage('sector:leave')
-  handleSectorLeave(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: SectorPayload,
-  ): void {
-    if (!client.data.userid || !this.registry.isBound(client.id)) {
-      client.emit('command:result', {
-        lines: [{ text: 'Not authenticated or not in play.', category: 'system' }],
-      });
-      return;
-    }
-    const result = this.validateCoord(payload, 'sector:leave');
-    if (!result.ok) {
-      client.emit('error', {
-        event: 'sector:leave',
-        code: result.code,
-        message: result.message,
-      } satisfies GatewayError);
-      return;
-    }
-    const { x, y } = result;
-    const room = `sector:${x}:${y}`;
-    void client.leave(room);
-    client.emit('sector:left', { x, y, room });
-  }
+  /*
+   * `sector:join` / `sector:leave` were removed on 2026-09-09.
+   *
+   * They took x and y from the CLIENT and joined that room, gated only on "are
+   * you a bound player" — never "is this your sector". `validateCoord` checks
+   * integer type and +/-UNIVMAX and nothing else, so all 201x201 rooms were
+   * reachable, nothing but a disconnect ever removed a join, and there was no
+   * room cap. A player could subscribe to the whole galaxy and read every
+   * `player.sector` update, which carries explicit coordinates — a live
+   * position tracker, and an unbounded per-socket allocation besides.
+   *
+   * Nothing called them: the frontend never emitted either event, and ships are
+   * placed in their sector room server-side by `joinPlayerRooms` and moved by
+   * `handleSectorTransition`. Dead surface with a hole in it.
+   * @see docs/audits/2026-09-09-security-review.md M4
+   */
 
   /**
    * The ship name behind a `userid:shipno` key, or undefined if it has left.
@@ -2522,7 +2510,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const excludeId = broadcast.excludeSelf ? sender?.id : undefined;
 
       if (broadcast.event === 'player.snapshot') {
-        this.server.emit('player.snapshot', { players: this.registry.list() });
+        this.emitScopedSnapshotToAll();
       } else if (broadcast.freq !== undefined) {
         // Tuned transmission — only ships carrying this frequency on one of
         // their three channels hear it. @see GEMAIN.C:2583 outsect / outwar
@@ -2592,27 +2580,4 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private validateCoord(payload: SectorPayload, event: string): ValidCoord | InvalidCoord {
-    const { x, y } = payload;
-    if (
-      typeof x !== 'number' ||
-      typeof y !== 'number' ||
-      !Number.isInteger(x) ||
-      !Number.isInteger(y)
-    ) {
-      return {
-        ok: false,
-        code: 'INVALID_PAYLOAD',
-        message: 'x and y must be integers',
-      };
-    }
-    if (x < -UNIVMAX || x > UNIVMAX || y < -UNIVMAX || y > UNIVMAX) {
-      return {
-        ok: false,
-        code: 'OUT_OF_BOUNDS',
-        message: `Sector (${x},${y}) is outside galaxy bounds [${-UNIVMAX}..${UNIVMAX}]`,
-      };
-    }
-    return { ok: true, x, y };
-  }
 }
