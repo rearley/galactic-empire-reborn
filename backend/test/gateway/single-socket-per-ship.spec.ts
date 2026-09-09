@@ -50,11 +50,12 @@ describe('GameGateway single-socket-per-ship invariant', () => {
       join: jest.fn(),
       leave: jest.fn(),
       broadcast: {
-        emit: jest.fn().mockImplementation((ev: string) => {
-          // gateway emits player.joined via broadcast (not server.emit); record
-          // under the server: prefix so existing event-order assertions match.
-          emitOrder.push(`server:${ev}`);
-        }),
+        // gateway emits player.joined via broadcast (not server.emit), and
+        // splits it by sector room; record every path under the server: prefix
+        // so existing event-order assertions match.
+        emit: jest.fn().mockImplementation((ev: string) => { emitOrder.push(`server:${ev}`); }),
+        to: jest.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
+        except: jest.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
       },
     };
     return sock;

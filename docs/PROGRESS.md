@@ -3802,3 +3802,31 @@ by its hull.
 **Next:** —
 **Known issues:** SCAN02A still prints the raw numeric `teamcode` where canon
 prints `teamname(wuptr)`. Same report, one line down, not fixed here.
+
+## 2026-09-09 — position intelligence scoped to your own sector
+**Completed:** `who` and the player panel both published every player's live
+position, galaxy-wide and silently — the panel via `physics.sector-transition`,
+which carried raw x/y to every socket on every boundary crossing. Canon grants a
+player's position through `sca` alone (range-gated, and it tells the target).
+Positions are now scoped to the viewer's own sector on the server side:
+`sector-visibility.ts` holds the rule, `player-visibility.ts` applies it to
+snapshots and to the pairwise updates a mover generates, `physics.sector-
+transition` is sent to the mover alone, and a new `player.sector` event drives
+the panel. `ConnectedPlayer.sector` is now nullable on the wire.
+**Tests:** `who.handler.spec.ts` (4 — shown, withheld, self, column alignment);
+`player-position-scoping.spec.ts` (12 — the two pure helpers, plus the
+transition audience: no galaxy broadcast, mover still told, arrival revealed to
+the entered sector, stale position cleared in the sector left, mover's own row);
+`player-snapshot.spec.ts` (3 — snapshot withholding, snapshot keeping,
+`player.joined` split by room); frontend `usePlayerList.spec.ts` (3) and
+`PlayerListPanel.spec.tsx` (3).
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09. Noted on the `sca` guide
+page — there is no `who` page, canon has no help topic for it.
+**Next:** —
+**Known issues:** `dat <fragment>` is the same leak, larger: it returns any
+ship's sector, heading, speed, energy, damage, kills AND full cargo manifest
+including gold, at unlimited range, for AI as well as players. Canon's `dat` is
+`dat qazwsx report` — a machine-readable dump of YOUR OWN ship for a front-end
+terminal program (GECMDS.C:5829, `warsptr`/`waruptr` are the caller's), password
+-gated and never touching another ship. Canon has no way to see another ship's
+cargo at all; `spy` is planet-only. Raised in play, not yet fixed.

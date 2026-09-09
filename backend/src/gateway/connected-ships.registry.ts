@@ -10,7 +10,13 @@ export interface Sector {
 export interface ConnectedPlayer {
   shipId: string;
   name: string;
-  sector: Sector;
+  /**
+   * Where the ship is, or `null` when the recipient may not be told.
+   * `list()` always fills it in; `scopePlayers()` is what blanks it per
+   * viewer, immediately before the payload goes on the wire.
+   * @see gateway/player-visibility.ts
+   */
+  sector: Sector | null;
   shipClass: number;
 }
 

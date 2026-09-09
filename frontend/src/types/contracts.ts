@@ -85,8 +85,27 @@ export interface Sector {
 export interface ConnectedPlayer {
   shipId: string;
   name: string;
-  sector: Sector;
+  /**
+   * Where they are, or `null` when we are not allowed to know.
+   *
+   * Canon reveals a live player's position through `sca` alone — range-gated,
+   * and it announces itself to the target. The server scopes this to your own
+   * sector and sends `null` for everyone else, so the client is never HOLDING
+   * a position it must not show. @see backend/src/gateway/player-visibility.ts
+   */
+  sector: Sector | null;
   shipClass: number;
+}
+
+/** One player's position as far as this client is allowed to know it. */
+export interface PlayerSectorUpdate {
+  shipId: string;
+  sector: Sector | null;
+}
+
+/** Outbound: server → client `player.sector` — scoped position changes. */
+export interface PlayerSectorPayload {
+  updates: PlayerSectorUpdate[];
 }
 
 /** Outbound: server → client `player.snapshot` — full list on join. */
@@ -126,6 +145,7 @@ export const PLAYER_SNAPSHOT = 'player.snapshot' as const;
 export const PLAYER_JOINED = 'player.joined' as const;
 export const PLAYER_LEFT = 'player.left' as const;
 export const PHYSICS_SECTOR_TRANSITION = 'physics.sector-transition' as const;
+export const PLAYER_SECTOR = 'player.sector' as const;
 
 /** Outbound: server → client `ship.renamed` — a player renamed their ship. */
 export interface ShipRenamedPayload {

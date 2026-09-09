@@ -24,7 +24,12 @@ export function PlayerListPanel({ players, fkeys = [] }: PlayerListPanelProps) {
             data-testid={`player-sector-${p.shipId}`}
             className="text-gray-400 shrink-0"
           >
-            {p.sector.x},{p.sector.y}
+            {/*
+              * An em dash, not "null,null": a player outside your sector is a
+              * name on the roster and nothing more. Position comes from `sca`,
+              * which is range-gated and announces itself to the target.
+              */}
+            {p.sector ? `${p.sector.x},${p.sector.y}` : '—'}
           </span>
         </div>
       ))}

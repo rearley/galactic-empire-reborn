@@ -72,7 +72,12 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
   sca:
     'A port addition: `sca lo full` gives the full long-range view directly, ' +
     'without setting an option first. `set scanfull on` still works, on range scans, ' +
-    'exactly as the original does it.',
+    'exactly as the original does it. ' +
+    'Scanning is also the only way to find another pilot, as it was originally. ' +
+    'This port adds a `who` roster and a players panel the original had no ' +
+    'equivalent of; both name everyone in the galaxy, but show a position only ' +
+    'for pilots in your own sector — where a scan would have found them anyway. ' +
+    'Everyone else is a name on a list.',
 });
 
 /**

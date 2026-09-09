@@ -75,6 +75,7 @@ import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constan
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
 import { shouldBroadcastTransition } from './transition-visibility';
+import { scopePlayers, moverVisibilityUpdates } from './player-visibility';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
@@ -370,6 +371,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * hand-rolled its own welcome sequence and omitted both, which left a
    * first-session pilot deaf to all of it until they reloaded.
    */
+  /**
+   * Send one socket the roster as that viewer is allowed to see it — names for
+   * everyone, positions only for their own sector.
+   * @see gateway/player-visibility.ts
+   */
+  private emitScopedSnapshot(
+    client: { emit: (event: string, payload: unknown) => void },
+    viewer: { x: number; y: number },
+    selfShipId?: string,
+  ): void {
+    const players = scopePlayers(this.registry.list(), viewer);
+    client.emit('player.snapshot', selfShipId ? { players, selfShipId } : { players });
+  }
+
+  /**
+   * Announce an arrival: everyone learns the NAME, only the arriving sector
+   * learns the position. Two emits because Socket.io cannot vary a payload per
+   * recipient, and the client must never hold a position it may not show —
+   * filtering in the UI leaks straight back out through devtools.
+   */
+  private announceJoin(client: Socket, player: ConnectedPlayer, sector: { x: number; y: number }): void {
+    const room = `sector:${sector.x}:${sector.y}`;
+    client.broadcast.to(room).emit('player.joined', player);
+    client.broadcast.except(room).emit('player.joined', { ...player, sector: null });
+  }
+
   private joinPlayerRooms(client: Socket, userid: string, sector: { x: number; y: number }): void {
     void client.join(`user:${userid}`);
     void client.join(`sector:${sector.x}:${sector.y}`);
@@ -598,13 +625,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         category: 'system',
       }],
     });
-    client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
+    const sectorX = Math.floor(activeShip.xcoord);
+    const sectorY = Math.floor(activeShip.ycoord);
+    this.emitScopedSnapshot(client, { x: sectorX, y: sectorY }, shipId);
     // The F Key Map panel needs the captain's bindings at login, not just
     // after an `fset`. @see src/game/commands/fkeys.ts
     client.emit('fkeys.snapshot', { fkeys: this.shipStateService.get(userid, activeShip.shipno)?.fkeys ?? [] });
 
-    const sectorX = Math.floor(activeShip.xcoord);
-    const sectorY = Math.floor(activeShip.ycoord);
     this.joinPlayerRooms(client, userid, { x: sectorX, y: sectorY });
 
     const connectedPlayer: ConnectedPlayer = {
@@ -614,7 +641,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       shipClass: activeShip.shpclass,
     };
     // broadcast (not server.emit) — connecting client already has themselves via snapshot
-    client.broadcast.emit('player.joined', connectedPlayer);
+    this.announceJoin(client, connectedPlayer, { x: sectorX, y: sectorY });
 
     // Canon's tossingegame: ANNOUN to the galaxy, ENTWAR to the star system.
     // Must come AFTER joinPlayerRooms, or the sector room the arrival is
@@ -1009,7 +1036,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             },
           ],
         });
-        client.emit('player.snapshot', { players: this.registry.list(), selfShipId: shipId });
+        const sector = { x: Math.floor(state.xcoord), y: Math.floor(state.ycoord) };
+        this.emitScopedSnapshot(client, sector, shipId);
     // The F Key Map panel needs the captain's bindings at login, not just
     // after an `fset`. @see src/game/commands/fkeys.ts
         client.emit('fkeys.snapshot', { fkeys: state.fkeys ?? [] });
@@ -1017,11 +1045,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const connectedPlayer: ConnectedPlayer = {
           shipId,
           name: state.shipname,
-          sector: { x: Math.floor(state.xcoord), y: Math.floor(state.ycoord) },
+          sector,
           shipClass: state.shpclass,
         };
         // broadcast — connecting client already has themselves via snapshot
-        client.broadcast.emit('player.joined', connectedPlayer);
+        this.announceJoin(client, connectedPlayer, sector);
 
       } catch (err: unknown) {
         if (err instanceof SpawnSectorMissingError) {
@@ -2255,19 +2283,50 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
 
-    // Not every mover is public. This used to `server.emit` unconditionally,
-    // handing every client a live position feed for all 24 Cybertrons and
-    // every droid — while `who` deliberately hides AI so a pilot cannot route
-    // around them without scanning. @see transition-visibility.ts
-    if (shouldBroadcastTransition(movingShip?.status)) {
-      this.server.emit('physics.sector-transition', event);
+    // This event carries the mover's RAW x/y — finer than a sector — and used
+    // to go to every connected client on every boundary crossing. That was a
+    // live position feed for all 24 Cybertrons and every droid, and, once
+    // `who` stopped publishing player sectors, for every player too.
+    //
+    // Its one consumer is the mover's own ScanMap, which clears when the local
+    // ship changes sector (FR-013), so the mover is the whole audience. The
+    // status gate stays as a second lock: an AI has no socket to send to, but
+    // nothing should depend on that staying true.
+    // @see transition-visibility.ts, player-visibility.ts
+    const moverSocketId = this.registry.getSocketId(shipId);
+    if (shouldBroadcastTransition(movingShip?.status) && moverSocketId) {
+      this.server.sockets.sockets.get(moverSocketId)?.emit('physics.sector-transition', event);
     }
 
     if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
     if (!movingShip) return;
 
+    // Position is scoped to your own sector, so a crossing changes what three
+    // audiences may see: the sector entered gains the mover, the sector left
+    // loses them, and the mover's own view of everyone else flips both ways.
+    // Nobody else's view changed, so nobody else is told. @see player-visibility.ts
+    if (shouldBroadcastTransition(movingShip.status)) {
+      this.server
+        .to(`sector:${toSector.x}:${toSector.y}`)
+        .emit('player.sector', { updates: [{ shipId, sector: toSector }] });
+      this.server
+        .to(`sector:${fromSector.x}:${fromSector.y}`)
+        .emit('player.sector', { updates: [{ shipId, sector: null }] });
+
+      // The mover's own row is included explicitly: their socket does not join
+      // `sector:to` until further down this method, so the arrival broadcast
+      // above does not reach them and their own position would go stale.
+      const forMover = [
+        { shipId, sector: toSector },
+        ...moverVisibilityUpdates(this.registry.list(), shipId, fromSector, toSector),
+      ];
+      if (moverSocketId) {
+        this.server.sockets.sockets.get(moverSocketId)?.emit('player.sector', { updates: forMover });
+      }
+    }
+
     // Move the player's socket to the new sector room so they receive sector-scoped events.
-    const socketId = this.registry.getSocketId(shipId);
+    const socketId = moverSocketId;
     if (socketId) {
       const playerSocket = this.server.sockets.sockets.get(socketId);
       if (playerSocket) {

@@ -124,7 +124,7 @@ describe('player presence & sector-transition types', () => {
       shipClass: 5,
     };
     expect(joined.shipId).toBe('xyz');
-    expect(joined.sector.x).toBe(0);
+    expect(joined.sector?.x).toBe(0);
   });
 
   it('PlayerLeftPayload accepts a correctly-shaped value', () => {
@@ -149,7 +149,10 @@ describe('player presence & sector-transition types', () => {
 // These are no-op at runtime; the compile-time check is the gate.
 type _Sector = Sector extends { x: number; y: number } ? true : never;
 type _ConnectedPlayer = ConnectedPlayer extends {
-  shipId: string; name: string; sector: Sector; shipClass: number;
+  // `sector` is nullable on the wire: the server sends null rather than a
+  // position the viewer is not allowed to see.
+  // @see backend/src/gateway/player-visibility.ts
+  shipId: string; name: string; sector: Sector | null; shipClass: number;
 } ? true : never;
 type _PlayerSnapshotPayload = PlayerSnapshotPayload extends { players: ConnectedPlayer[] } ? true : never;
 type _PlayerJoinedPayloadFwd = PlayerJoinedPayload extends ConnectedPlayer ? true : never;

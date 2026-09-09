@@ -46,3 +46,32 @@ describe('PlayerListPanel', () => {
     expect(items[1].textContent).toContain('Beta');
   });
 });
+
+/**
+ * A player outside your sector is a name on a list, not a position. The panel
+ * must render that state legibly rather than printing "null,null".
+ * @see backend/src/game/ship/sector-visibility.ts
+ */
+describe('PlayerListPanel — hidden positions', () => {
+  it('shows the sector of a player you can see', () => {
+    render(<PlayerListPanel players={[
+      { shipId: 'u1:1', name: 'Alpha', sector: { x: 5, y: 3 }, shipClass: 1 },
+    ]} />);
+    expect(screen.getByTestId('player-sector-u1:1').textContent).toBe('5,3');
+  });
+
+  it('renders a dash, not coordinates, for a player elsewhere', () => {
+    render(<PlayerListPanel players={[
+      { shipId: 'u1:1', name: 'Alpha', sector: null, shipClass: 1 },
+    ]} />);
+    const cell = screen.getByTestId('player-sector-u1:1');
+    expect(cell.textContent).toBe('—');
+  });
+
+  it('still lists the player by name', () => {
+    render(<PlayerListPanel players={[
+      { shipId: 'u1:1', name: 'Alpha', sector: null, shipClass: 1 },
+    ]} />);
+    expect(screen.getByText('Alpha')).toBeTruthy();
+  });
+});
