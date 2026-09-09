@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 66 entries.
+Append-only, **newest at the bottom**. 67 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 66 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-09 — the docs said work was outstanding that had been done for months](#2026-09-09--the-docs-said-work-was-outstanding-that-had-been-done-for-months)
 - [Backlog — before going public: account-enumeration hardening](#backlog--before-going-public-account-enumeration-hardening)
 - [2026-09-09 — DB password rotated, and the enumeration question worked through](#2026-09-09--db-password-rotated-and-the-enumeration-question-worked-through)
 - [2026-09-05 — the systematic message sweep, and midnight moved to ET](#2026-09-05--the-systematic-message-sweep-and-midnight-moved-to-et)
@@ -1833,22 +1834,15 @@ See feature log entry 2026-05-06 — 012-social-commands above.
 
 `cloak`, `maint`, `transfer`, `jettison`, `set`, `destruct`, `abort`, `abandon` — full
 implementations with tick integration (cloak ramp, self-destruct countdown), energy drain,
-sysop-configurable `CLOAK_ENERGY_USE` DI token, `autoShield`/`autoRepair` DB columns.
+sysop-configurable `CLOAK_ENERGY_USE` DI token. The `autoShield`/`autoRepair`
+columns this feature added were dropped on 2026-09-09 as port inventions.
 
 See feature log entry 2026-05-07 — 013-ship-management above.
 
-### 014 — Planet attack & planet commands (planned)
+### 014 — Planet attack & planet commands ✓ DONE
 
-`att` — planetary assault: land troops and fighters to capture a planet; combat formula
-uses `PlanetState.men`, `.troops`, `.fighters`, `.ionc` from `GEPLANET.C`. Outcome
-depends on attacker vs defender population math — the primary endgame loop.
-`pln` — list all planets the player owns (name, sector, population, cash, defense).
-`pri` — display current buy/sell prices for every item at the orbited planet.
-
-Also closes: maint password gate (`FR-210`, `GECMDS.C:4463`) — `mai [password]` verifies
-`Planet.password` before charging; currently deferred from feature 013.
-
-No test coverage yet. No spec exists.
+`att`, `pln`, `pri`, plus the `mai` planet-password gate deferred out of 013.
+Spec: `specs/014-planet-attack/`. See the feature log entry 2026-05-07 above.
 
 ### 015 — Scan modes & display options ✓ DONE
 
@@ -1858,124 +1852,87 @@ All 7 D1-D7 deviations documented. ~200 new tests.
 
 See feature log entry 2026-05-07 — 015-scan-modes above.
 
-### 016 — Navigation autopilot & spy (planned)
+### 016 — Navigation & spy ✓ DONE
 
-`nav [x] [y]` — set an automatic course; `ship.holdcourse` is already a `ShipState`
-field (mapped but unused). Needs per-tick waypoint logic in `PhysicsTickService`:
-compute bearing to target sector, set `head2b`, clear on arrival or when player issues
-`rot`/`imp`/`war`. Source: `GECMDS.C:cmd_navigate`, `GEFUNCS.C:moveship`.
-`spy` — consume one spy item from cargo, attach to target planet (`Planet.spyowner`);
-returns intel (population, items, defenses) on the next scan. Source: `GECMDS.C:cmd_spy`.
-`hel` / `?` — in-game help text (topic-keyed lookup).
-`cls` — clear the client's event log (frontend-only; no backend handler needed).
+`nav`, `spy`, `hel`/`?`, `cls`. Spec: `specs/016-navigation-spy/`.
 
-No test coverage yet. No spec exists.
+Two things did NOT land the way this roadmap first described them, and both
+matter more than the feature number:
 
-### 017 — Mail inbox (planned)
+- **`nav` is not an autopilot.** Canon's `cmd_navigate` reports bearing and
+  distance and nothing else (GECMDS.C:5109). The port added course-holding,
+  then dropped it on 2026-09-05 along with the `navTargetX`/`navTargetY`
+  columns. `hel navigation` is now forbidden from using the word "autopilot"
+  by `test/unit/help-accuracy.spec.ts`.
+- **Spy intel is delivered two ways.** `sca pl` reveals inventory when you are
+  in the sector — a deliberate deviation — and the periodic SPYM2 report is
+  mailed by `PlanetEconomyService`, which is canon's own mechanism.
 
-`MailStat` rows are already written by the midnight job (production reports) and by PvP
-kill (distress signals) but players have no way to read them. `sen` (012) handles
-real-time broadcasts. This feature adds the persistent inbox:
-- list unread mail (count + sender)
-- read a message by index
-- delete a message
+### 017 — Mail inbox ✓ DONE
 
-No test coverage yet. No spec exists.
+`rea` / `del` over the `MailStat` rows the midnight job and PvP kills write.
+Spec: `specs/017-mail-inbox/`.
 
-### 018 — Team management (planned)
+### 018 — Team management ✓ DONE
 
-`tea join/leave` is implemented (012) but teams must be manually seeded in the DB --
-no player can create one. Needs:
-- `tea create <name>` — creates a `Team` row; creator becomes implicit leader
-- `tea list` — all teams with member counts and scores
-- Team score column on `ros` roster output
+`tea create <name> <password>`, join, leave, and team scores on the roster.
+Spec: `specs/018-team-management/`.
 
-No test coverage yet. No spec exists.
+### 019 — Physics & mechanics polish ✓ DONE, with one item still open
 
-### 019 — Physics & mechanics polish (planned)
+Spec: `specs/019-physics-polish/`. Landed: universe boundary wrap
+(`wrapUniverse` in `physics-math.ts`), overspeed engine damage
+(`ship-overspeed.ts`), wormhole gravity, AI kill scoring through
+`PlayerScoreService`, and the `droid.spawned` / `droid.killed` bridge to the
+client sector roster.
 
-Consolidates all deferred mechanical gaps from features 006a-013:
+**Two of this feature's deliverables were later REMOVED as port inventions**:
+`set auto-shield` and `set auto-repair`. See `docs/GAME_MECHANICS.md`
+"Auto-shield and auto-repair" for why, and do not re-add them.
 
-**Physics (GEFUNCS.C)**
-- **Universe boundary wrap** — ships crossing `MAXX=30` / `MAXY=15` should wrap;
-  `moveship()` does this in C but `PhysicsTickService` has no boundary enforcement.
-- **Overspeed engine damage** — ships exceeding 150% rated warp take hull damage
-  (`GEFUNCS.C:736`); `warncntr` field exists but damage logic is warn-only.
-- **Wormhole gravity** — `gravity()` (`GEFUNCS.C:836`) pulls ships within 250 parsecs
-  of a wormhole toward its mouth; currently wormholes are instant-teleport via `zip` only.
+**Still open from this feature:** `ACCENGAMT` (120) has no consumer. Canon
+gates acceleration on `useenergy(ACCENGAMT)` in `accel` (GEFUNCS.C:469-573);
+nothing in the port debits it. Not recorded as a deliberate deviation, so it is
+a gap rather than a choice.
 
-**Tick wiring**
-- **`set auto-repair` tick consumer** — `ship.autoRepair` persists (013) but the
-  SHIP_UPDATE tick doesn't act on it; needs wiring in the repair sub-tick.
-- **`set auto-shield` tick consumer** — same: `autoShield` persists but shields aren't
-  auto-raised on warp exit or after torpedo fire per `GEFUNCS.C:shieldstat`.
-- **AI kill scoring hookup** — Cybertron/Droid kills don't affect player `klscore`/rank;
-  `PlayerScoreService` (009) exists but the event path from AI kills was never wired.
+**This section used to say ships "crossing `MAXX=30` / `MAXY=15` should wrap".**
+That is wrong twice over and is left recorded here as a warning: those two
+constants are the character dimensions of the ASCII scan map, not the size of
+the galaxy. The galaxy runs `-UNIVMAX..+UNIVMAX`. Reading them as the universe
+has produced real defects in this codebase more than once — see CLAUDE.md.
 
-**Frontend events**
-- **`droid.spawned` / `droid.killed`** — emitted by `DroidTickService` (008) but never
-  bridged to the client player list (deferred from 008/010).
+### 020 — Source fidelity audit ✓ DONE, superseded twice
 
-No test coverage yet. No spec exists.
-
-### 020 — Source fidelity audit (planned)
-
-A systematic pass through every C source file comparing each function against the
-TypeScript implementation. Goal: close any remaining behavioral differences a player
-would notice. Reference: `GECMDS.C` (all cmd_* bodies), `GEFUNCS.C` (helpers),
-`GEPLANET.C` (planet combat/economy), `GEMAIN.C` (tick loop), `GEMAIN.H` (constants
-and struct fields).
-
-Known specific items to verify and close:
-- `randamage()` logic differences (`GEFUNCS.C` vs `combat-math.ts`)
-- Phaser reload preload bonus for Interceptor class (`GEFUNCS.C:checkdam`)
-- `GALWORM.visible` flag — wormhole visibility per-sector (not yet mapped in ShipState)
-- `scan lo full` side-panel ordering matches original C terminal output
-- Beacon display on movement (`GEFUNCS.C:808`) — not yet emitted as an event
-- `User.options[]` 30-byte array full mapping vs TS `set` command coverage
-- All `GEMAIN.H` balance constants have a pinning balance regression test
-- Live end-to-end validation on real DB: manual quickstart recipes T053, T043, T077
-
-No test coverage yet. No spec exists.
+Spec: `specs/020-source-fidelity-audit/`, then `specs/022-fidelity-audit-v2/`,
+then the 2026-09-05 canon-gap audit in `docs/audits/`. `randamage`, the phaser
+preload bonus, wormhole visibility, `User.options[]` mapping and the balance
+regression tests all landed. The audits are the current record of what is and
+is not faithful; this entry is not.
 
 ---
 
-### PLAYTEST MILESTONE — after 015
+### Work after 022 is not spec-numbered
 
-The game is ready for playtesting when feature 015 ships:
-- Create ship → navigate → fight ships → colonize planet → attack planets → midnight scoring
-- All 44 `gecmds[]` commands implemented; all scan modes working
-- Cybertrons and Murdonian Transport provide PvE targets
-- Real-time multiplayer via Socket.io with sector event log and tactical radar
-- ASCII scan map, range/sector radar, ship roster, frequency-based comms
-
-Features 016-020 add depth (mail, teams, autopilot, fidelity polish); they follow based
-on playtest feedback.
+Feature folders stop at `specs/022-fidelity-audit-v2`. Everything since —
+the canon-gap sweep, the message sweep, the security review, the public web
+presence — was run as ad-hoc work per CLAUDE.md's workflow rules, logged in
+this file and decided in `docs/DECISIONS.md`. Some code comments refer to a
+"feature 023"; there is no such folder, and the reference means the
+2026-08 neutral-zone and cloak-gate work.
 
 ---
 
-### Open deferred items — accounted for above
+### Where the open items actually live
 
-All items from feature "Known issues / deferred" sections map to a planned feature:
+This section used to hold a table routing every deferred item to a future
+feature number. All of those closed. Open work is now tracked in three places,
+and nowhere else:
 
-| Deferred item | Source feature | Closes in |
-|---|---|---|
-| `scan ra` / `scan se` placeholder | 003 | 015 ✓ |
-| `scan lo full` panel | 003 | 015 ✓ |
-| `set` display options (SCANNAMES/SCANHOME) | 003/013 | 015 ✓ |
-| Maint password gate (FR-210) | 013 | 014 |
-| `set auto-repair` / `auto-shield` tick wiring | 013 | 019 |
-| AI kill scoring hookup | 007/008 | 019 |
-| Universe boundary wrap | 006a | 019 |
-| Overspeed engine damage | 006a | 019 |
-| Wormhole gravity pull | 006a | 019 |
-| `droid.spawned`/`droid.killed` on client | 008/010 | 019 |
-| Nav autopilot (`holdcourse`) | 003 | 016 |
-| Spy deployment | -- | 016 |
-| Mail inbox | 009 | 017 |
-| Team creation | 012 | 018 |
-| Source fidelity gaps (randamage, preload, etc.) | multiple | 020 |
-| Manual quickstart validations (T053/T043/T077) | 007/008/013 | 020 |
+| Where | What it holds |
+|---|---|
+| The newest entries at the bottom of this file | `**Known issues:**` from each session, and the named backlog sections |
+| `docs/audits/2026-09-09-security-review.md` | Security findings and the one deliberate won't-fix |
+| `docs/DECISIONS.md` | Deviations from canon, each with its reason |
 
 ---
 
@@ -4043,3 +4000,62 @@ difference into an inbox the attacker cannot read.
 beta whose roster is a few people who know each other, that is friction bought
 with no safety. At public scale the roster becomes worth harvesting and the
 reset flow has to exist anyway, which is what makes the silent version bearable.
+
+## 2026-09-09 — the docs said work was outstanding that had been done for months
+
+**Completed:** an audit of every open-item marker in `docs/`, each claim checked
+against the code rather than against the surrounding prose. Most were stale.
+
+**One live bug, found by the sweep, not by a player.** The two invented `set`
+options were removed earlier the same day, but `hel maintenance` still told
+pilots to type `set auto-repair on`. Following the in-game help produced the
+usage line. The verb was right, so the existing router-level help guard never
+saw it; `test/unit/help-accuracy.spec.ts` now fails if the help names any `set`
+option outside canon's four. Written failing first, against the stale help.
+
+**Genuinely still open, confirmed:** the loopback bind on `:3100`;
+account-enumeration hardening; SCAN02A printing the raw numeric teamcode;
+retiring `/debug/*`, which needs **six** Playwright specs migrated, not the four
+this log claimed; **five** sysop options at `implemented: false`, not eight; no
+outbound email of any kind; the landing page not being crawlable;
+`PresenceService` being process-local; `QUADMAXPERTICK` having no consumer; and
+`ACCENGAMT` having no consumer, which is a gap rather than a recorded deviation.
+
+**Marked outstanding, actually finished long ago:** the `ITEM_NAMES` spelling
+divergence; the rotation energy gate; the mailed SPYM2 spy report; the mine
+neutral-zone and cloak gates; revolt; production-report mail; the rospos and
+chgloser score adjustments; `report cargo` and `report wpns`; the
+`droid.spawned`/`droid.killed` client bridge; and features 014 and 016 through
+020 in their entirety, which the roadmap still listed as planned with "No spec
+exists" against six full spec folders.
+
+**The roadmap was the worst of it.** It sat in the INDEX as if current, and it
+described `MAXX`/`MAXY` as the size of the galaxy — the exact misreading
+CLAUDE.md warns about three times and which has caused real defects here. That
+sentence is now quoted in place as a warning rather than deleted.
+
+**Decisions made:** nothing that was decided got deleted. Removed features keep
+a record of why they were removed (auto-shield contradicted canon's own help;
+auto-repair spent the pilot's cash unasked), rejected designs keep their
+refutations, and stale findings keep their canon citations under a banner
+saying they are a snapshot. Deleting a note because the work is done is how the
+reasoning gets rediscovered the expensive way.
+
+**CLAUDE.md was split.** The root file went from 531 lines to 371 by moving
+detail next to the code it governs: `backend/src/game/CLAUDE.md` (the two tick
+timers, `UNIVMAX` vs the scan viewport, the droid combat table),
+`backend/prisma/CLAUDE.md` (migrations, generated seeds, dropped columns),
+`backend/src/public/CLAUDE.md` (the generated guide, deviations, accepted
+limits) and `docs/CLAUDE.md` (what each living doc is for, and where open work
+is tracked). Every warning's conclusion stays in the root file; only the
+derivation moved, because a warning you meet after the mistake is not a warning.
+
+**Tests:** `test/unit/help-accuracy.spec.ts` gains a thirteenth case; the help
+snapshot was updated for the deleted line. Full backend suite green.
+
+**Next:** —
+**Known issues:** the docs are only as honest as the next session leaves them.
+`docs/CLAUDE.md` now names the three places open work may live, so a marker
+anywhere else is stale by definition. Also noticed, not fixed: several ship-tick
+specs still mock a `runAutoRepair` method that no longer exists on
+`MaintenanceService` — harmless, since the mocks are cast, but misleading.
