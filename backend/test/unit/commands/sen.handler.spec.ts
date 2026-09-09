@@ -23,7 +23,15 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   };
 }
 
-const handler = new SenHandlerService();
+/**
+ * A fresh handler per test. `sen` is rate limited now (CHAT_BURST inside
+ * CHAT_WINDOW_MS, port-original — canon throttles `send` not at all), and these
+ * cases fire far more than a person would inside one window. One instance per
+ * test is the realistic shape: a limit is per pilot per session, not per suite.
+ * @see src/game/commands/handlers/helpers/chat-throttle.ts
+ */
+let handler: SenHandlerService;
+beforeEach(() => { handler = new SenHandlerService(); });
 const ctx: CommandContext = {};
 
 describe('SenHandlerService', () => {

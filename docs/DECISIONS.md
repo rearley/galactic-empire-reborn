@@ -4842,3 +4842,36 @@ that one player's queue. Prisma rejects on timeout rather than hanging, and the
 rejection path is tested — a failed command moves the queue on rather than
 silencing the player. No arbitrary timeout was added: one firing while a command
 actually commits would report a failure that did not happen.
+
+## 2026-09-09 — The last three leads: chat throttle, socket cap, non-root container
+**Context:** The three remaining unconfirmed leads from the security review,
+taken on the condition that none of them changes play.
+
+**Decisions:**
+- **`sen` rate limit** — 5 sends per 5 seconds per pilot, rolling window.
+  PORT-ORIGINAL: canon throttles `send` not at all, because MajorBBS gave one
+  command per user per pass and a flood was unreachable from a terminal. A
+  refusal is deliberately NOT recorded, or a flood would extend its own ban and
+  the attacker would control the punishment's length. A person sending a
+  considered line manages one every few seconds, so a conversation never meets
+  it; a script meets it on its second breath.
+- **4 sockets per account, evicting the OLDEST.** Refusing the newcomer would
+  let a player's own stale tabs lock them out of their own account — a
+  hardening measure turned into a denial of service against the person it
+  protects. Eviction is also the rule already used for a boarded ship (latest
+  wins, SESSION_REPLACED), so this is one rule applied twice rather than two.
+- **`USER node` in the backend image**, with `--chown=node:node` on the runtime
+  COPYs.
+
+**What the container change cost, and why the build mattered:** the static test
+passed on the first attempt and the image did not. Prisma verifies it can WRITE
+to `/app/node_modules/@prisma/engines` before it will run, so a non-root
+container with root-owned modules fails `prisma migrate deploy` — and the
+entrypoint is `set -e`, so that is a container that exits rather than a game
+that starts. Watchtower would have pulled it and left the game down. Caught by
+building the image and booting it against Postgres; healthy in 9 seconds after
+the `--chown` fix. `npx` also went, since it wants a writable `$HOME` cache.
+
+**Reason for verifying by boot rather than by test:** CI has no Docker daemon,
+so the spec can only guard the directives. A Dockerfile that reads correctly and
+does not run is the failure this pair of checks exists to prevent.

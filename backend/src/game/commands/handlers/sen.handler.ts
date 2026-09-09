@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { FREQ_SECTOR_MAX, FREQ_GALAXY_MIN } from './_freq-thresholds';
 import { formatMessage, MessageId } from '../messages';
+import { shipKey } from '../../ship/ship-state.types';
+import { allowChat } from './helpers/chat-throttle';
 
 const CHANNEL_MAP: Record<string, number> = { a: 0, b: 1, c: 2 };
 const MAX_MSG_LEN = 200;
@@ -16,6 +18,22 @@ const MAX_MSG_LEN = 200;
  */
 @Injectable()
 export class SenHandlerService {
+  /**
+   * Send timestamps per ship, inside the throttle window only — `allowChat`
+   * returns the pruned list, so this cannot grow with time. Keyed by ship, so
+   * one pilot shouting never silences another. In-memory and process-local,
+   * consistent with the no-Redis rule: a restart forgives everyone, which for a
+   * chat limit is the right failure direction.
+   */
+  private readonly recentSends = new Map<string, number[]>();
+
+  /**
+   * Clock, so the throttle is testable without real time. `@Optional` because
+   * Nest cannot resolve a bare function type — it passes undefined and the
+   * default takes over, which is exactly the production behaviour.
+   */
+  constructor(@Optional() private readonly now: () => number = () => Date.now()) {}
+
   get command(): Command {
     return {
       keyword: 'sen',
@@ -38,6 +56,19 @@ export class SenHandlerService {
     const messageText = args.slice(1).join(' ');
     if (messageText.length > MAX_MSG_LEN) {
       return { lines: [{ text: formatMessage(MessageId.MSG_USAGE_SEN), category: 'system' }] };
+    }
+
+    // PORT-ORIGINAL rate limit. Canon throttles `send` not at all — MajorBBS
+    // gave one command per user per pass, so a flood was unreachable from a
+    // terminal. Over a socket `sen` makes no database call, completes instantly
+    // and the per-socket command queue does not slow it, so one client could
+    // fill every other player's log as fast as it could send packets.
+    // @see helpers/chat-throttle.ts, docs/DECISIONS.md 2026-09-09
+    const key = shipKey(ship.userid, ship.shipno);
+    const gate = allowChat(this.recentSends.get(key) ?? [], this.now());
+    this.recentSends.set(key, gate.history);
+    if (!gate.allowed) {
+      return { lines: [{ text: 'You are sending too fast — slow down, Sir.', category: 'system' }] };
     }
 
     const channelLabel = args[0].toUpperCase();

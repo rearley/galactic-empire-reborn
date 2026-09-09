@@ -3965,3 +3965,19 @@ its three cases asserted synchronously and the work is now a microtask later.
 **Known issues:** a promise that never settles would stall one player's queue;
 Prisma rejects on timeout and the rejection path is covered. The ticks are
 deliberately outside the queue.
+
+## 2026-09-09 — the last three security leads closed
+**Completed:** `sen` rate limited (5 per 5s per pilot, rolling window,
+port-original); concurrent sockets capped at 4 per account, evicting the oldest
+so a player can never be locked out by their own stale tabs; and the backend
+container drops to `USER node`.
+**Tests:** `chat-throttle.spec.ts` (6), `sen-throttle.spec.ts` (4),
+`socket-cap-per-account.spec.ts` (5), `dockerfile-nonroot.spec.ts` (3). The
+container change was additionally verified by building the image and booting it
+against Postgres — which is how the Prisma engines permission failure was found,
+after the static test had already passed.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09.
+**Next:** —
+**Known issues:** two host-level items remain and are the owner's: confirm the
+firewall on `:3100`, and rotate the database password. `/auth/register`
+enumeration stays as a deliberate won't-fix.

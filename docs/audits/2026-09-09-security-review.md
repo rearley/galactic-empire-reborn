@@ -4,7 +4,7 @@
      serialization plus conditional debits) and were deliberately not attempted
      as "easy fixes". See the status banner below and §5. -->
 
-## Status — updated 2026-09-09, v0.11.0
+## Status — updated 2026-09-09, v0.12.0
 
 | # | Finding | Status |
 |---|---|---|
@@ -16,18 +16,18 @@
 | lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
 | §5.1 | Command dispatch not serialized per socket | **FIXED (Part A)** — per-socket promise chain; `test/gateway/command-serialization.spec.ts` (5) |
 
-**Every CONFIRMED finding is closed.** What remains below are unconfirmed leads
-and two host-level items only the owner can do. None of the remainder is a path
-to another player's account or assets; they are availability and hardening.
+**Every finding and every actionable lead is closed.** What remains is two
+host-level items only the owner can do — confirm the firewall on `:3100`, and
+rotate the database password — plus one lead deliberately left alone.
 
 ### Leads reassessed after Part A
 
 | Lead | Now |
 |---|---|
 | One socket exhausting the DB pool by flooding commands | **Largely closed** by Part A — a socket can have one command in flight. Message-level flooding (CPU, memory) is untouched. |
-| `sen` as an unthrottled broadcast primitive | **OPEN.** `sen.handler` makes no DB call, so serialization does not slow it; a client can still spam sequentially. Payload is capped at 200 chars. |
-| Unlimited concurrent sockets per account | **OPEN.** The MAXPLRS seat cap (`game.gateway.ts:290`) bounds ships in flight, not sockets before boarding. |
-| Backend container runs as root | **OPEN.** No `USER` directive in `backend/Dockerfile`. Low, and partly a deployment choice. |
+| `sen` as an unthrottled broadcast primitive | **FIXED (v0.12.0)** — rolling window, 5 sends per 5s per pilot, refusals not counted against the sender; `chat-throttle.spec.ts` (6) + `sen-throttle.spec.ts` (4). Port-original: canon throttles `send` not at all. |
+| Unlimited concurrent sockets per account | **FIXED (v0.12.0)** — 4 per account, evicting the OLDEST so a player's own stale tabs can never lock them out; `socket-cap-per-account.spec.ts` (5). |
+| Backend container runs as root | **FIXED (v0.12.0)** — `USER node`, with `--chown=node:node` on the runtime COPYs. Verified by building and booting the image, not by reading it: Prisma refuses to run unless it can write to `@prisma/engines`, so the first attempt would have failed `migrate deploy` and taken the game down. `dockerfile-nonroot.spec.ts` (3) guards the directives. |
 | Cargo tonnage from a stale snapshot | **Closed in practice** — the same-socket race is gone with Part A, and ship item counts can no longer go negative, which was what manufactured phantom capacity. |
 | `/auth/register` email enumeration | **Won't fix, deliberately.** A signup form that will not say "already registered" is a worse product, and the address is the login identifier. Recorded so it is not re-raised. |
 

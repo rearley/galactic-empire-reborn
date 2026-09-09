@@ -8,7 +8,9 @@ done
 echo "[Entrypoint] PostgreSQL is ready."
 
 echo "[Entrypoint] Running migrations..."
-npx prisma migrate deploy
+# Not `npx`: it wants a writable cache under $HOME, and this runs as `node`
+# now. The binary is already in the image.
+./node_modules/.bin/prisma migrate deploy
 
 echo "[Entrypoint] Running seed (idempotent — errors tolerated on re-run)..."
 node dist/prisma/seed.js || echo "[Entrypoint] Seed skipped or already applied."

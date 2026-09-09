@@ -76,6 +76,7 @@ import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
 import { shouldBroadcastTransition } from './transition-visibility';
 import { scopePlayers, moverVisibilityUpdates } from './player-visibility';
+import { capSocketsForUser, MAX_SOCKETS_PER_USER } from './socket-cap';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
@@ -220,6 +221,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(GameGateway.name);
 
   /**
+   * Authenticated socket ids per account, oldest first. Bounded by
+   * MAX_SOCKETS_PER_USER on insert and pruned on disconnect, so it cannot grow
+   * with connection churn. @see gateway/socket-cap.ts
+   */
+  private readonly socketsByUser = new Map<string, string[]>();
+
+  /**
    * Disconnect reasons produced by the CLIENT (browser drop, timeout).
    * Server-side reasons ('server namespace disconnect', 'server shutting down')
    * are NOT in this set and must never trigger the combat-kill.
@@ -278,6 +286,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.userid = userid;
     client.data.username = payload.username;
     this.presence.arrive(userid);
+
+    // Cap simultaneous sockets per ACCOUNT. The MAXPLRS gate below counts ships
+    // in flight, not sockets, so an account that never finishes selecting a
+    // ship could hold connections open without bound — two Prisma queries and a
+    // socket-map slot each. Oldest go first and the arrival is never evicted,
+    // so a player's own stale tabs can never lock them out.
+    // @see gateway/socket-cap.ts
+    const forUser = this.socketsByUser.get(userid) ?? [];
+    for (const staleId of capSocketsForUser(forUser, client.id)) {
+      this.logger.log(`socket cap: closing ${staleId} for ${userid}`);
+      this.server.sockets.sockets.get(staleId)?.disconnect(true);
+    }
+    this.socketsByUser.set(
+      userid,
+      [...forUser.filter((id) => id !== client.id), client.id].slice(-MAX_SOCKETS_PER_USER),
+    );
 
     // Step 2: Look up ALL ships for this user, ordered by shipno (deterministic).
     // Replaces the previous non-deterministic findFirst — selection is now explicit.
@@ -752,6 +776,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // and a player who cannot be un-counted is a player the stats page reports
     // as online forever.
     if (userid !== undefined) this.presence.depart(userid);
+
+    // Drop this socket from the per-account list, and the account's entry with
+    // it once the last one goes — otherwise the map keeps a key per user who
+    // has ever connected. @see gateway/socket-cap.ts
+    if (userid !== undefined) {
+      const remaining = (this.socketsByUser.get(userid) ?? []).filter((id) => id !== client.id);
+      if (remaining.length > 0) this.socketsByUser.set(userid, remaining);
+      else this.socketsByUser.delete(userid);
+    }
+
     const activeShipNo = client.data.activeShipNo as number | undefined;
 
     if (userid !== undefined && activeShipNo !== undefined) {
