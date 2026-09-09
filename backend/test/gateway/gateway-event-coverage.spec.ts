@@ -78,8 +78,6 @@ function gatewayEmits(): string[] {
  * failure.
  */
 const DELIBERATELY_UNHANDLED: Record<string, string> = {
-  'sector:joined': 'room bookkeeping; the player sees the arrival text instead',
-  'sector:left': 'room bookkeeping, as above',
   'cybertron.broke-off': 'internal telemetry; canon prints nothing when a cyb disengages',
   'combat.miss':
     'canon tells only the firer, and it already arrives on command:result as '

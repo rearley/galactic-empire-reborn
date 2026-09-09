@@ -133,23 +133,6 @@ describe('GameGateway handler auth posture (T020b)', () => {
     client.disconnect();
   });
 
-  it('sector:join from unbound socket → rejection, no room join', async () => {
-    // Wait for ship-name prompt (confirms handleConnection completed, socket is in onboarding mode)
-    await onboardingReady;
-
-    client.emit('sector:join', { x: 1, y: 1 });
-    const result = await waitForEvent<{ lines: Array<{ text: string }> }>(client, 'command:result');
-    expect(result.lines[0].text).toMatch(/not authenticated|not in play/i);
-  });
-
-  it('sector:leave from unbound socket → rejection', async () => {
-    // Wait for ship-name prompt (confirms handleConnection completed, socket is in onboarding mode)
-    await onboardingReady;
-
-    client.emit('sector:leave', { x: 1, y: 1 });
-    const result = await waitForEvent<{ lines: Array<{ text: string }> }>(client, 'command:result');
-    expect(result.lines[0].text).toMatch(/not authenticated|not in play/i);
-  });
 
   it('command from unbound socket (no activeShipNo) → rejection, dispatch NOT called', async () => {
     dispatchMock.mockClear();

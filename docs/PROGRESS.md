@@ -3887,3 +3887,31 @@ existing specs updated and three deleted; help snapshots regenerated.
 medium findings, none critical or high. Its own recommended order is in §5; the
 single highest-value item is serializing command dispatch per socket, which
 closes the economy race findings together.
+
+## 2026-09-09 — three security findings closed (M3, M4, M5)
+**Completed:** The easy half of the security review. (1) The
+`__player_snapshot__` rebroadcast behind `ren` and the five `tea` subcommands
+was a bare `server.emit` of `registry.list()`, whose sectors are always real —
+so `ren A` / `ren B` in a loop was a live unscoped position feed for the whole
+roster. Now a per-socket fan-out through `scopePlayers`, the hole the v0.8.0
+scoping work left. (2) `sector:join` / `sector:leave` took coordinates from the
+client and joined that room, gated only on "are you a bound player", so any
+player could subscribe to all 201x201 rooms and read every `player.sector`
+update. Nothing called them — the frontend never emitted either — so both
+handlers are deleted, with `validateCoord` and `SectorPayload`. (3) `trust proxy`
+was unset behind Plesk's nginx, so the auth throttler saw 127.0.0.1 for every
+caller and the whole internet shared one 10-per-minute bucket; a single host
+could hold it saturated and block all logins and registrations.
+**Tests:** `snapshot-broadcast-scoping.spec.ts` (5), `trust-proxy.spec.ts` (2),
+two replacement cases in `game-gateway.spec.ts` pinning that `sector:join` is
+unanswered and joins no room. Removed the ~13 integration tests that exercised
+the deleted surface and two now-stale entries from the event-coverage excuse
+list.
+**Decisions made:** `trust proxy` is `'loopback'`, never `true` — blanket trust
+makes `X-Forwarded-For` attacker-controlled, which is no better than one shared
+bucket.
+**Next:** M1/M2 — serialize command dispatch per socket, then make the cash
+debit conditional. One considered change, not a quick win.
+**Known issues:** M1 and M2 remain open by choice; status table at the top of
+`docs/audits/2026-09-09-security-review.md`. The host firewall check on :3100
+and the DB password rotation are still yours.
