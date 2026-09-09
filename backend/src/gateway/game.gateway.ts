@@ -898,6 +898,34 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: CommandPayload,
   ): void {
+    // One command at a time, per socket.
+    //
+    // This used to run `runCommand` straight away. A handler that awaits the
+    // database releases control, so the next command from the same socket
+    // started immediately and two were half-done at once, both working from
+    // state read before either had written. Part B made the money and cargo
+    // invariants hold whatever the timing, so this is no longer what stands
+    // between a player and free credits; what it buys now is that commands
+    // COMPLETE IN THE ORDER TYPED — which canon got for free by running one
+    // command per player — that the ship is looked up after the previous
+    // command finished rather than before it, and that the next async handler
+    // anyone writes is safe by default instead of only if they remembered.
+    //
+    // The chain lives on `client.data`, so it is collected with the socket and
+    // there is nothing to clean up on disconnect. `.catch` before storing it:
+    // a rejected link must move the queue on, or one failed command would
+    // silence that player for the rest of their session.
+    //
+    // NOT covered, deliberately: the 1s and 6s ticks, which mutate ship state
+    // on timers and were never in this queue. Only invariants at the data layer
+    // hold against those. @see docs/DECISIONS.md 2026-09-09
+    const prior = (client.data.commandChain as Promise<void> | undefined) ?? Promise.resolve();
+    const next = prior.then(() => this.runCommand(client, body));
+    client.data.commandChain = next.catch(() => undefined);
+  }
+
+  /** One command, start to finish. Queued by {@link handleCommand}. */
+  private async runCommand(client: Socket, body: CommandPayload): Promise<void> {
     const userid = client.data.userid as string | undefined;
     const activeShipNo = client.data.activeShipNo as number | undefined;
 
@@ -937,27 +965,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const resultOrPromise = this.commandRouter.dispatch(input, ship, { client });
-      if (resultOrPromise instanceof Promise) {
-        resultOrPromise
-          .then((result) => {
-            this.emitCommandResult(client, result);
-            this.processBroadcasts(result, client);
-            void this.maybeReenterShipEntry(client, result);
-            void this.maybeExitGame(client, result);
-          })
-          .catch((err: unknown) => {
-            this.logger.error('Async command handler threw:', err);
-            client.emit('command:result', {
-              lines: [{ text: 'Internal error processing command.', category: 'system' }],
-            });
-          });
-      } else {
-        this.emitCommandResult(client, resultOrPromise);
-        this.processBroadcasts(resultOrPromise, client);
-        void this.maybeReenterShipEntry(client, resultOrPromise);
-        void this.maybeExitGame(client, resultOrPromise);
-      }
+      // AWAITED, not fire-and-forget. The caller chains the next command onto
+      // this promise, so returning early would leave the queue ordering only
+      // the synchronous half of each command and serialize nothing.
+      const result = await this.commandRouter.dispatch(input, ship, { client });
+      this.emitCommandResult(client, result);
+      this.processBroadcasts(result, client);
+      await this.maybeReenterShipEntry(client, result);
+      await this.maybeExitGame(client, result);
     } catch (err: unknown) {
       this.logger.error('Command handler threw:', err);
       client.emit('command:result', {

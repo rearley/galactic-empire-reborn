@@ -23,6 +23,13 @@ import { PresenceService } from '../../src/public/presence.service';
  * @see specs/005-planet-system/contracts/commands.md §land — "the gateway
  *      re-dispatches with the supplied input as the next `land <name>`"
  */
+/**
+ * Commands are queued per socket now, so `handleCommand` returns before the
+ * work runs — one command must finish before the next begins. Let the chain
+ * drain between sends. @see test/gateway/command-serialization.spec.ts
+ */
+const drain = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+
 describe('GameGateway — expectFollowup redispatch', () => {
   let gateway: GameGateway;
   let dispatch: jest.Mock;
@@ -70,35 +77,42 @@ describe('GameGateway — expectFollowup redispatch', () => {
     };
   });
 
-  it('feeds the next input back to the handler that asked', () => {
+  it('feeds the next input back to the handler that asked', async () => {
     const socket = makeSocket();
 
     dispatch.mockReturnValueOnce({ lines: [{ text: 'Name?', category: 'system' }], expectFollowup: 'land' });
     gateway.handleCommand(socket as never, { input: 'lan' });
+    await drain();
 
     gateway.handleCommand(socket as never, { input: 'New Terra' });
+    await drain();
     expect(dispatch).toHaveBeenLastCalledWith('land New Terra', expect.anything(), expect.anything());
   });
 
-  it('is one-shot — the input after the answer routes normally again', () => {
+  it('is one-shot — the input after the answer routes normally again', async () => {
     const socket = makeSocket();
 
     dispatch.mockReturnValueOnce({ lines: [], expectFollowup: 'land' });
     gateway.handleCommand(socket as never, { input: 'lan' });
+    await drain();
     gateway.handleCommand(socket as never, { input: 'New Terra' });
+    await drain();
     gateway.handleCommand(socket as never, { input: 'new ship 4' });
+    await drain();
 
     expect(dispatch).toHaveBeenLastCalledWith('new ship 4', expect.anything(), expect.anything());
   });
 
-  it('an empty answer cancels the prompt instead of redispatching', () => {
+  it('an empty answer cancels the prompt instead of redispatching', async () => {
     const socket = makeSocket();
 
     dispatch.mockReturnValueOnce({ lines: [], expectFollowup: 'land' });
     gateway.handleCommand(socket as never, { input: 'lan' });
+    await drain();
     dispatch.mockClear();
 
     gateway.handleCommand(socket as never, { input: '   ' });
+    await drain();
     expect(dispatch).not.toHaveBeenCalled();
     expect(socket.emit).toHaveBeenCalledWith(
       'command:result',

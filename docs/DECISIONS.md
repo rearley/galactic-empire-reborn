@@ -4806,3 +4806,39 @@ separate change.
 **Note on the clamp:** `buy.handler`'s negative-balance reset to zero is canon
 (GECMDS.C:4205-4207) and stays. Canon was safe because MajorBBS ran one command
 per user; the clamp is not the defect and should now be unreachable.
+
+## 2026-09-09 — Part A: one command at a time, per socket
+**Context:** `handleCommand` fired `dispatch` and only `.then()`-ed it, so a
+handler that awaits the database released control and the same socket's next
+command started immediately. Part B already made the money and cargo invariants
+hold whatever the timing, so this is no longer what stands between a player and
+free credits.
+
+**Decision:** Chain each command onto a per-socket promise held on
+`client.data`, and `await` the dispatch inside it.
+
+**Reason:** Three things B does not give us. Commands complete in the order
+typed, which canon got for free by running one command per player. The ship is
+looked up AFTER the previous command finished, so `x` followed by anything
+cannot act on a hull just left. And the next async handler anyone writes is safe
+by default rather than only if they remembered to make its read-and-write
+atomic.
+
+**Cost, measured:** every combat and navigation command — `pha`, `tor`, `mis`,
+`shi`, `clo`, `dec`, `loc`, `rot`, `war`, `imp` — makes ZERO database calls, so
+each runs to completion synchronously and the queue adds one microtask. A pilot
+can only be delayed behind a command that touches the database, and those are
+the trade and admin verbs, which need orbit and are not available mid-fight.
+`att` is the one battle-adjacent exception: it awaits, so a `pha` typed straight
+after one waits a single round trip.
+
+**Not covered, deliberately:** the 1s and 6s ticks. They mutate ship state on
+timers and were never in this queue, so the world does not pause for it —
+movement, shield charge and torpedo flight continue while a command is queued.
+Only data-layer invariants hold against those, which is why B came first.
+
+**Known new failure mode:** a handler whose promise never settles would stall
+that one player's queue. Prisma rejects on timeout rather than hanging, and the
+rejection path is tested — a failed command moves the queue on rather than
+silencing the player. No arbitrary timeout was added: one firing while a command
+actually commits would report a failure that did not happen.

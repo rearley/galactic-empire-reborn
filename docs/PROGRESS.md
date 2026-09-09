@@ -3950,3 +3950,18 @@ suggest the duplication was already hit.
 **Known issues:** Part A open by choice. `planet-trade-concurrent.spec.ts` still
 uses a mocked Prisma and tests the lock's logic, not database concurrency — it
 is not a regression guard for any of this.
+
+## 2026-09-09 — Part A: per-socket command serialization
+**Completed:** Commands from one socket now run one at a time, chained on
+`client.data.commandChain`, with the dispatch awaited inside `runCommand`.
+Closes the last item from the security review; every confirmed finding is now
+fixed.
+**Tests:** `command-serialization.spec.ts` (5 — no overlap, order preserved, a
+rejection does not wedge the queue, two players do not block each other, and the
+ship is re-read after the previous command). `command-followup.spec.ts` updated:
+its three cases asserted synchronously and the work is now a microtask later.
+**Decisions made:** see `docs/DECISIONS.md` 2026-09-09.
+**Next:** —
+**Known issues:** a promise that never settles would stall one player's queue;
+Prisma rejects on timeout and the rejection path is covered. The ticks are
+deliberately outside the queue.
