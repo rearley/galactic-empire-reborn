@@ -3788,3 +3788,17 @@ the assertions are about the resulting map, not about the mock.
 110.62. It is now inert — nothing loads it — and the spawn tick will recycle the
 slot via createSpawn, which resets damage.
 **Known issues:** none outstanding.
+
+## 2026-09-09 — `sca sh` printed the account key instead of the pilot
+**Completed:** `sca sh <name>` rendered SCAN02 with `target.userid`, our synthetic
+primary key, where canon prints `username(wptr)`. A player scanning a friend saw
+`Commanded by: usr_11aaf162ae9b2af979259bbd`. The `displayName()` helper already
+existed for this and its own doc names `sca sh` as a caller — the call site was
+never wired. Now routed through it, so a player is named by their handle and AI
+by its hull.
+**Tests:** two cases in `test/unit/scan-sh-canon-report.spec.ts` — a player target
+(handle, and the userid must not appear anywhere in the report) and an AI target
+(hull name, not the `Cybrg-NNN` account).
+**Next:** —
+**Known issues:** SCAN02A still prints the raw numeric `teamcode` where canon
+prints `teamname(wuptr)`. Same report, one line down, not fixed here.

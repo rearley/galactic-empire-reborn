@@ -155,3 +155,42 @@ describe('`sca sh` reports what canon reports', () => {
     expect(out).toContain('Registered Kills: 3');
   });
 });
+
+/**
+ * "Commanded by:" must name the PILOT, not our primary key.
+ *
+ * Canon prints `username(wptr)` here (GECMDS.C:2229), which returns the hull
+ * name for AI and the BBS login for a player. The port printed `target.userid`
+ * literally — and OUR userid is a synthetic key, so scanning a friend showed:
+ *
+ *   Commanded by: usr_11aaf162ae9b2af979259bbd
+ *
+ * Reported from play. `displayName()` already exists for exactly this and its
+ * own doc names `sca sh` as a caller; the call site was simply never wired.
+ * @see src/game/ship/display-name.ts
+ */
+describe('`sca sh` — Commanded by', () => {
+  it('names the pilot by their handle, never by the account key', async () => {
+    const me = makeShip();
+    const friend = makeShip({
+      userid: 'usr_11aaf162ae9b2af979259bbd', shipno: 3, shipname: 'The AngryGoatBoy',
+      username: 'AngryGoatBoy', status: 1, xcoord: 6.7, ycoord: 5.0, channel: 3,
+    });
+    const out = await scan(await makeService([me, friend]), me, 'The AngryGoatBoy');
+
+    expect(out).toContain('Commanded by: AngryGoatBoy');
+    expect(out).not.toContain('usr_11aaf162ae9b2af979259bbd');
+  });
+
+  it('names AI by its hull, as canon username() does', async () => {
+    const me = makeShip();
+    const cyb = makeShip({
+      userid: 'Cybrg-222', shipno: 2, shipname: 'Cyberquad 44135', shpclass: 24,
+      status: 2, xcoord: 6.7, ycoord: 5.0, channel: 2,
+    });
+    const out = await scan(await makeService([me, cyb]), me, 'Cyberquad 44135');
+
+    expect(out).toContain('Commanded by: Cyberquad 44135');
+    expect(out).not.toContain('Cybrg-222');
+  });
+});
