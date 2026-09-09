@@ -21,11 +21,14 @@ export type GateResult =
 
 /**
  * Domain service encapsulating the gate logic, cash debit, and repair-queue
- * mutation for ship maintenance. Single source of truth shared by:
- *  - `MaintHandlerService` (manual `maint` command)
- *  - `ShipTickService` (auto-repair tick consumer, US3/FR-005)
+ * mutation for ship maintenance. Its only caller is `MaintHandlerService`, the
+ * manual `maint` command.
  *
- * The tick layer MUST NOT import command handlers. This service is the shared seam.
+ * It was built as a shared seam for a second, tick-layer caller: spec 019's
+ * `set auto-repair`, which would have hired a crew for you. That option was a
+ * port invention and was removed on 2026-09-09 — canon has no auto-repair — so
+ * the seam now has one side. It is kept because the tick layer MUST NOT import
+ * command handlers, and anything that ever repairs on a tick belongs here.
  *
  * @see GECMDS.C:cmd_maint — gate logic and cost
  * @see specs/019-physics-polish/research.md R3
@@ -51,8 +54,9 @@ export class MaintenanceService {
    *  6. Must have damage (damage > 0)                FR-204
    *  7. Sufficient cash                              FR-205
    *
-   * @param passwordArg Optional planet password provided by user input (command layer only).
-   *   Auto-repair callers pass undefined — password gate skipped for tick-layer consumers.
+   * @param passwordArg Optional planet password provided by user input.
+   *   Undefined skips the password gate entirely, which is why it is optional:
+   *   the removed auto-repair tick caller had no password to offer.
    * @see GECMDS.C:4452 cmd_maint
    */
   async evaluateGates(ship: ShipState, passwordArg?: string): Promise<GateResult> {
@@ -68,9 +72,8 @@ export class MaintenanceService {
     // so a visiting captain learned whether a stranger's colony was big enough
     // to service them before being asked for the password.
     //
-    // The password gate is command-layer only; tick callers (auto-repair) pass
-    // undefined and skip it, which has no canon counterpart because canon has
-    // no auto-repair.
+    // The password gate is command-layer only. Passing undefined skips it,
+    // which has no canon counterpart — canon always has a pilot to ask.
     // @see GECMDS.C:4471 MAINT2, :4479 MAINT3
     if (passwordArg !== undefined && planet?.password && planet.password.toLowerCase() !== 'none') {
       if (!passwordArg) return { ok: false, reason: 'password-required' };

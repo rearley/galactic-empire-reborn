@@ -200,4 +200,28 @@ describe('help text matches the commands it documents', () => {
     // Must not claim a scan bearing is a compass heading.
     expect(nav).not.toMatch(/compass heading.*as scans report/);
   });
+  /**
+   * `set` has exactly four options — canon's NUMOPTS 4 (GECMDS.C cmd_set).
+   * `auto-shield` and `auto-repair` were port inventions, removed on
+   * 2026-09-09, but `hel maintenance` kept telling pilots to type
+   * `set auto-repair on`. Following the help literally answers with the usage
+   * line, which is the same failure the checks above exist to prevent — the
+   * verb was right, so the router-level guard never saw it.
+   *
+   * @see backend/src/game/commands/handlers/set.handler.ts
+   */
+  it('the help names no `set` option the command does not accept', () => {
+    const CANON_OPTIONS = new Set(['scannames', 'scanhome', 'scanfull', 'filter']);
+    const named: string[] = [];
+    for (const topic of Object.keys(HELP_TOPICS) as Array<keyof typeof HELP_TOPICS>) {
+      for (const line of HELP_TOPICS[topic].body) {
+        // Command lines only — indented, and `set` is the verb. Prose like
+        // "set a tax rate" or "set production" is a different English verb and
+        // is not making a promise about the command.
+        const m = /^ {2,}set ([a-z][a-z-]*)/.exec(line);
+        if (m && !CANON_OPTIONS.has(m[1])) named.push(`${topic}: set ${m[1]}`);
+      }
+    }
+    expect(named).toEqual([]);
+  });
 });

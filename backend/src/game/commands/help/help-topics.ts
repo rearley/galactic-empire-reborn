@@ -470,8 +470,6 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
     body: [
       'Maintenance & Repair',
       '  mai [password]     — hire a repair crew at the planet you are orbiting',
-      '  set auto-repair on — hire one automatically when you are damaged AND',
-      '                       orbiting a planet that will take the job',
       '  rep sys            — current hull damage and repair progress',
       '',
       'A damaged hull mends very slowly on its own - 0.6 damage a minute, so a',

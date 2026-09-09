@@ -14,8 +14,10 @@ import { SHIELDDM, SHMINPWR } from '../../constants';
  * a pilot whose shields had just been blown could re-raise them immediately,
  * so there was no cost to losing them and sustained fire bought nothing.
  *
- * The tick engine still never auto-raises shields (outside the `autoShield`
- * convenience) — the pilot asks for them.
+ * The tick engine never auto-raises shields — the pilot asks for them. Canon
+ * states this in its own help (HLPSHI: "They WILL NOT be automatically raised
+ * after the firing"), which is why the port's `set auto-shield` option was
+ * removed on 2026-09-09.
  *
  * @see GECMDS.C:3114 cmd_shields
  * @see GEFUNCS.C:2409 shieldup — flips shieldstat only, grants no charge
