@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 69 entries.
+Append-only, **newest at the bottom**. 70 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 69 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
 - [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
 - [2026-09-09 — licensing, attribution, and a /provenance page](#2026-09-09--licensing-attribution-and-a-provenance-page)
@@ -4234,3 +4235,46 @@ copy edit. Written failing first. Frontend 255 across 36 files.
 **Known issues:** unchanged. The going-public decision is still open, and
 `/provenance` still ships a link to a repository that does not exist. See the
 "Backlog — going public" section above.
+
+## 2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise
+
+**Completed:** rewrote the `SysHandlerService` doc comment, which still claimed
+the handler supported only `sys unjam`. The other twelve landed in `8809d7e`,
+the commit before this session started.
+
+**What the check turned up.** Canon's `sys` is often described from the header
+comment at `GECMDS.C:4728-4738`, which lists eighteen subcommands. That comment
+is stale in canon's own source, and five of the eighteen are unreachable:
+
+- `cyborg`, `cyborgoff` and `cybmine` are dispatched at `GECMDS.C:4852-4877`,
+  but the block sits inside `#ifdef NOTHING`, and `NOTHING` is never defined.
+  Dead in the shipped build, the same shape as DEADSTOP.
+- `cybhalt` and `cybstart` appear in that comment and nowhere else in the
+  source. `cybpause` is what actually shipped.
+
+The reachable set is the thirteen printed by canon's own `sys help`, and the
+port implements all thirteen. Verified by listing every
+`sameas("…",margv[1])` between the start of `cmd_sysop` and its end, not by
+reading the comment. `SYS_HELP_LINES` is canon's help text verbatim from the
+`prf` calls, so `sys help` prints what the original printed.
+
+**Asked and answered while there: could a sysop message everyone?** No, and
+there is no such command in canon. The only galaxy-wide send is an ordinary open
+hail — `sen` on a channel whose frequency is 0, which `outwar(FILTER,usrnum,0)`
+(`GEMAIN.C:1517`) delivers to every ship in the game except the sender. It is
+not sysop-gated, and `outprfge` drops it for anyone with `set filter on`, so it
+can be silenced.
+
+Canon does have an unfilterable path — a frequency at or above 20000 sends via
+`outwar(ALWAYS,…)` — but that reaches only ships tuned to that exact frequency,
+so it is a private channel that cannot be muted rather than a broadcast. **There
+is no canon path that reaches everyone and cannot be filtered.**
+
+**Tests:** none added; a doc comment. `sys-commands`, `sys-authorization` and
+`sys-unjam` re-run, 26 passing.
+
+**Next:** —
+**Known issues:** a `sys announce` that reached every ship unfilterably would be
+port-original, so it needs a `docs/DECISIONS.md` entry and a `GUIDE_DEVIATIONS`
+note before it is built. Not started. It is the same feature as the parked
+deploy-notice half of deploy scheduling.

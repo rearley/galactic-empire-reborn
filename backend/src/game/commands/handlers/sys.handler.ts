@@ -12,10 +12,49 @@ import {
 } from './sys-commands';
 
 /**
- * Handles `sys <subcommand>`. Currently supports:
- *   - `sys unjam` — clears the firer's jammer counter immediately.
+ * Handles `sys <subcommand>` — canon's sysop toolkit, behind the gate below.
  *
- * @see GECMDS.C — sys command dispatch
+ * All THIRTEEN reachable canon subcommands are implemented:
+ *
+ *   help        list the toolkit                          GECMDS.C:4762
+ *   get         create items on this ship                          :4782
+ *   kill        destroy the ship commanded by a username           :4801
+ *   cash        create credits                                     :4823
+ *   goto        teleport to a sector                               :4830
+ *   class       change this ship's class                           :4880
+ *   shieldtype  change this ship's shields                         :4892
+ *   phasertype  change this ship's phasers                         :4903
+ *   maint       start fast maintenance                             :4913
+ *   unjam       clear the jammer counter                           :4922
+ *   list        list 50 ships from an offset                       :4929
+ *   classlist   index of ship classes                              :4956
+ *   cybpause    pause the Cybertrons for n seconds                 :4973
+ *
+ * `SYS_HELP_LINES` is canon's own help text, verbatim from the `prf` calls at
+ * GECMDS.C:4762-4776, so `sys help` prints what the original printed.
+ *
+ * **Canon's own header comment (GECMDS.C:4728-4738) is stale — do not work
+ * from it.** It advertises five subcommands that a player could never reach:
+ *
+ *   - `cyborg`, `cyborgoff`, `cybmine` are dispatched at :4852-:4877, but the
+ *     whole block sits inside `#ifdef NOTHING` and `NOTHING` is never defined.
+ *     Dead in the shipped build, like DEADSTOP. @see docs/audits/2026-09-05-canon-gaps.md
+ *   - `cybhalt` and `cybstart` appear in that comment and nowhere else in the
+ *     source. `cybpause` is what actually shipped.
+ *
+ * So this port is complete against canon, not thirteen-of-eighteen. Verified by
+ * listing every `sameas("…",margv[1])` between :4742 and the end of cmd_sysop.
+ *
+ * **There is no sysop broadcast, in canon or here.** Nothing in this toolkit
+ * sends a message. The only galaxy-wide send is an ordinary open hail — `sen`
+ * on a channel whose frequency is 0, which reaches every ship via
+ * `outwar(FILTER,usrnum,0)` (GEMAIN.C:1517) and which any player can silence
+ * with `set filter on`. Adding an unfilterable announcement would be
+ * port-original and needs a DECISIONS.md entry first.
+ *
+ * @see GECMDS.C:4742 cmd_sysop
+ * @see test/game/commands/sys-commands.spec.ts
+ * @see test/game/commands/handlers/sys-authorization.spec.ts
  */
 @Injectable()
 export class SysHandlerService {
