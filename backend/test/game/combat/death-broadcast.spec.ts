@@ -68,7 +68,13 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     gateway.handleCombatShipDestroyed(event);
     // `attackerName` is added by the gateway: it names the planet when a kill
     // has no attacking ship (an ion-cannon kill), and is null otherwise.
-    expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, { ...event, attackerName: null });
+    // Four fields, not the whole internal event. The spread used to publish
+    // the kill's sector, both account keys, the hull's cargo and the victim's
+    // socket disconnect reason to every client.
+    // @see test/gateway/destroyed-payload-scoping.spec.ts
+    expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, {
+      victimId: 'b:2', attackerId: 'a:7', weapon: null, attackerName: null,
+    });
     // The DESTRUCTION notice stays galaxy-wide and unfiltered. The only
     // targeted emit is YOURDEAD to the victim, which C sends with
     // outprfge(ALWAYS,usrn) — it tells them they escaped and are back at
@@ -78,7 +84,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     expect(toMock).toHaveBeenCalledWith('user:b');
   });
 
-  it('payload is forwarded intact, plus the planet-kill attribution field', () => {
+  it('carries the four rendered fields and nothing internal', () => {
     const tickAt = new Date('2026-01-01T00:00:00Z');
     const event: CombatShipDestroyedEvent = {
       victimId: 'x:1',
@@ -96,7 +102,9 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     };
     gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledTimes(1);
-    expect(serverEmitMock.mock.calls[0][1]).toStrictEqual({ ...event, attackerName: null });
+    expect(serverEmitMock.mock.calls[0][1]).toStrictEqual({
+      victimId: 'x:1', attackerId: null, weapon: null, attackerName: null,
+    });
   });
 
   /**

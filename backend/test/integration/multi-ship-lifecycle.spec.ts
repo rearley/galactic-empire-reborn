@@ -685,7 +685,10 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
     expect(serverEmitMock).toHaveBeenCalledWith(
       COMBAT_SHIP_DESTROYED,
-      expect.objectContaining({ victimUserid: TEST_USERID }),
+      // The payload is scoped to what the client renders — `victimUserid` and
+      // the rest of the internal event no longer travel.
+      // @see test/gateway/destroyed-payload-scoping.spec.ts
+      expect.objectContaining({ victimId: `${TEST_USERID}:2` }),
     );
   });
 });

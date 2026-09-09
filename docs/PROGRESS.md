@@ -3915,3 +3915,21 @@ debit conditional. One considered change, not a quick win.
 **Known issues:** M1 and M2 remain open by choice; status table at the top of
 `docs/audits/2026-09-09-security-review.md`. The host firewall check on :3100
 and the DB password rotation are still yours.
+
+## 2026-09-09 — the death announcement stops publishing the internal event
+**Completed:** Chasing "is all the easy stuff done", the review's
+`COMBAT_SHIP_DESTROYED` lead was verified and was real.
+`handleCombatShipDestroyed` built its galaxy-wide payload with `{ ...event }`,
+and `CombatShipDestroyedEvent` is internal — it drives score transfer, loot, the
+ship-loss mail and the forensics log. So every client received the kill's exact
+sector (a live position feed on anyone who fights), `victimUserid` /
+`attackerUserid` / both ship keys (the account keys `displayName()` exists to
+hide), the destroyed hull's cargo, and `victimDisconnectReason` — which was
+added so a sysop could tell a closed tab from a dropped connection. The client
+reads four fields; it now receives four.
+**Tests:** `destroyed-payload-scoping.spec.ts` (5 — the four kept fields, and
+one case per disclosure). Four existing assertions updated, one of which was
+named "payload is forwarded intact" and pinned the leak.
+**Next:** M1/M2, the economy races. Still one considered change.
+**Known issues:** unchanged; see the status table in
+`docs/audits/2026-09-09-security-review.md`.

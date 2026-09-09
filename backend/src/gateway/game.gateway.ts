@@ -1598,9 +1598,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       now: Date.now(),
     });
 
-    // Serialize loot amounts as strings — BigInt is not JSON-serializable.
+    // Built field by field, NOT spread from the event.
+    //
+    // `CombatShipDestroyedEvent` is internal: it drives score transfer, loot,
+    // the ship-loss mail and the forensics log. Spreading it into a galaxy-wide
+    // emit published the kill's exact SECTOR (a live position feed on anyone
+    // who fights), the internal account keys `displayName()` exists to hide —
+    // `usr_...` and `Cybrg-NNN`, GEFUNCS.C:2596 username — the destroyed hull's
+    // CARGO, and `victimDisconnectReason`, which was added so a SYSOP could
+    // tell a closed tab from a dropped connection and is nobody else's
+    // business. The client renders four fields; it now receives four.
+    // @see docs/audits/2026-09-09-security-review.md
+    // @see test/gateway/destroyed-payload-scoping.spec.ts
     const payload = {
-      ...event,
+      victimId: event.victimId,
+      attackerId: event.attackerId,
       weapon: killedByPlanet ? ('ion' as const) : event.weapon,
       // Name the killer. A planet kill takes the planet's name; a ship kill
       // resolves the attacking ship's, because the client's own player list
@@ -1610,7 +1622,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       attackerName: killedByPlanet
         ? (ionHit?.name ?? null)
         : (event.attackerName ?? (event.attackerId ? this.shipNameOf(event.attackerId) ?? null : null)),
-      loot: event.loot.map(l => ({ itemIndex: l.itemIndex, amount: l.amount.toString() })),
     };
     this.server.emit(COMBAT_SHIP_DESTROYED, payload);
 
