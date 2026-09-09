@@ -16,9 +16,29 @@
 | lead | `COMBAT_SHIP_DESTROYED` payload over-broad | **CONFIRMED, then FIXED** — built field by field instead of spread; `test/gateway/destroyed-payload-scoping.spec.ts` (5) |
 | §5.1 | Command dispatch not serialized per socket | **FIXED (Part A)** — per-socket promise chain; `test/gateway/command-serialization.spec.ts` (5) |
 
-**Every finding and every actionable lead is closed.** What remains is two
-host-level items only the owner can do — confirm the firewall on `:3100`, and
-rotate the database password — plus one lead deliberately left alone.
+**Every finding and every actionable lead is closed.** One host-level item
+remains: rotate the database password. One lead is deliberately left alone.
+
+### `:3100` exposure — CHECKED 2026-09-09, not exposed
+
+The review could not probe this and correctly refused to guess. Answered from
+both sides:
+
+- **On the host:** `iptables -P INPUT DROP`, 24 ACCEPT rules, none covering 3100
+  (nearest is `49152:65535`). firewalld not running, ufw inactive.
+- **From outside:** unreachable from two independent machines on two networks,
+  each with `:443` as a control so a false negative from a broken path would
+  show up. nginx reaches the app at `proxy_pass http://127.0.0.1:3100`.
+
+**Still worth hardening, and not done.** The container runs `network_mode: host`
+and the app listens on `*:3100` — every interface — where `ge-frontend` binds
+`127.0.0.1:8081`. It is safe today by ONE mechanism: the iptables default
+policy. One broad ACCEPT rule, or a Plesk firewall regeneration, and the game's
+API is on the public internet with no TLS and no nginx in front of it.
+`app.listen(port, '127.0.0.1')` would cost nothing — nginx already reaches it on
+loopback — and would make it two independent mechanisms instead of one. Deploy
+risk is real (bind it wrong and the site 502s), so it wants building and booting
+locally first, the way the non-root image change was.
 
 ### Leads reassessed after Part A
 
