@@ -1,6 +1,9 @@
 {
   "name": "galactic-empire-reborn-frontend",
   "version": "0.0.1",
+  "engines": {
+    "node": ">=24"
+  },
   "private": true,
   "type": "module",
   "scripts": {
