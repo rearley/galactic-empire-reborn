@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 80 entries.
+Append-only, **newest at the bottom**. 81 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — coverage round two: 80 more cases, combat tick clears the bar](#2026-09-10--coverage-round-two-80-more-cases-combat-tick-clears-the-bar)
 - [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
@@ -4838,4 +4839,63 @@ said so in the file instead of dressing it as a citation.
 90% bar for pre-refactor confidence, the Cybertron tick 75.6%. `physics-tick`
 was untouched — its agent chose planet-state instead, which was the better use
 of one agent but leaves 11 sites open.
+**Known issues:** frontend still has no coverage tooling.
+
+## 2026-09-10 — coverage round two: 80 more cases, combat tick clears the bar
+
+Second five-agent workflow against the remaining Tier 1 gaps plus the first
+Tier 2 handlers. Same constraints: no agent runs Jest, verification serial.
+
+**Two changes to the brief, both from what round one taught:**
+
+1. Each agent had to READ the round-one spec nearest its target first. The line
+   numbers handed out are only what REMAINS, and five agents rediscovering
+   covered ground is waste.
+2. Each had to **name the production change that would break every case before
+   writing it**, and drop any case it could not name one for. That is the
+   mutation test moved to the front instead of applied afterwards.
+
+The second change showed in the output: every agent returned a per-case
+mutation table, and the reports read as arguments rather than inventories.
+
+**80 new cases, 5 files, no source touched.** All typecheck, all pass.
+
+| module | round 1 | round 2 |
+|---|---|---|
+| `handlers/new-ship.handler.ts` | 66.7 | **89.2** |
+| `combat/combat-tick.service.ts` | 81.8 | **90.5** |
+| `handlers/sys.handler.ts` | 72.6 | 85.5 |
+| `handlers/admin.handler.ts` | 76.5 | 85.2 |
+| `physics/physics-tick.service.ts` | 79.8 | 85.7 |
+| `cybertron/cybertron-tick.service.ts` | 75.6 | 80.6 |
+| `droid/droid-tick.service.ts` | 69.5 | 74.3 |
+| `handlers/transfer.handler.ts` | 57.6 | 71.2 |
+
+Suite: **branches 78.4% → 80.4%**, lines 93.6% → 94.5%, 5,883 → 5,963 tests.
+`combat-tick` is the first Tier 1 module past the 90% pre-refactor bar.
+
+**Mutation-checked, one per spec, against what each actually claims:**
+
+| mutation | result |
+|---|---|
+| Cybertron idle-wander countdown threshold moved | 1 failed |
+| New hull's Mark-1 phasers changed to Mark-9 | 1 failed |
+| Gold's half-ton rounded up in the transfer path | 1 failed |
+| Decoy burn-out neutered | 1 failed |
+| `tra up` ownership gate disabled | round-2 spec unaffected — round-1 spec catches it |
+
+That last row is the instruction working. Round two was told not to duplicate
+round one, so the ownership gate stays pinned where it already was and the new
+spec covers the tonnage arithmetic beside it instead.
+
+**A mutation that found nothing, and what it taught.** Rounding gold up in
+`planet-trade.ts` did not break the transfer spec, because the transfer path
+computes tonnage from `ITEM_TONS` directly and never calls `unitsThatFit` —
+`buy` and `pri` are the callers of that helper. Two paths, same arithmetic,
+different code. Worth knowing before anyone refactors one into the other.
+
+**Next:** `droid-tick` (74.3) and `cybertron-tick` (80.6) remain below the bar,
+and both have large skip lists that are legitimately excluded, so their real
+ceiling is lower than 100. Recount what is genuinely coverable in each before
+spending a third round on them.
 **Known issues:** frontend still has no coverage tooling.
