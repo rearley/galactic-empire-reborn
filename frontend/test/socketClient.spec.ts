@@ -25,7 +25,7 @@ describe('socketClient', () => {
   beforeEach(async () => {
     vi.resetModules();
     const { io } = await import('socket.io-client');
-    const ms = (io as ReturnType<typeof vi.fn>)();
+    const ms = vi.mocked(io)();
     ms.emit = vi.fn();
     ms.on = vi.fn();
     ms.off = vi.fn();

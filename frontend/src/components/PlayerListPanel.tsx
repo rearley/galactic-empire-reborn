@@ -9,7 +9,7 @@ interface PlayerListPanelProps {
 export function PlayerListPanel({ players, fkeys = [] }: PlayerListPanelProps) {
   return (
     <div data-testid="player-list-panel" className="font-mono text-sm flex flex-col h-full">
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Players</span>
       </div>
       <div className="overflow-y-auto flex-1">
@@ -44,7 +44,7 @@ export function PlayerListPanel({ players, fkeys = [] }: PlayerListPanelProps) {
         * a pilot wants visible while typing — the job a terminal's
         * function-key legend did. @see src/game/commands/fkeys.ts
         */}
-      <div className="border-t border-gray-800 flex-shrink-0">
+      <div className="border-t border-gray-800 shrink-0">
         <div className="px-3 py-1">
           <span className="text-xs text-gray-500 uppercase tracking-widest">F Key Map</span>
         </div>
