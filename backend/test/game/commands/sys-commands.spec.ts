@@ -30,20 +30,50 @@ describe('SYS_HELP_LINES', () => {
   });
 });
 
+/**
+ * Canon bounds `sys class` by `tot_classes` — the SLOT COUNT of the class table
+ * — and treats the argument as a one-based index into it:
+ *
+ *   if (atoi(margv[2]) <= tot_classes && atoi(margv[2]) > 0)
+ *       warsptr->shpclass = atoi(margv[2]) - 1;     GECMDS.C:4882
+ *
+ * The shipped table has 34 slots, S01..S33 plus S41, so `sys class 34` made a
+ * sysop a Sysopian Death Star. Twenty-five of those slots are `<NONE>` and
+ * canon lets you become one of those too.
+ *
+ * This port stores the class NUMBER rather than a slot index, and the numbers
+ * are SPARSE: 1-9, 21-25, 31-33, 41. Comparing a number against a count is
+ * therefore a category error, and it was the bug — with 18 classes defined the
+ * bound accepted 1..18, which silently refused every class above 9. A sysop
+ * could not become a Scout, a Cyberquad, a Base Star, a Droid or the Death
+ * Star, and got "Huh?" with no hint why.
+ *
+ * The right test is membership: is this a class the table actually defines.
+ */
 describe('sysClassIsValid', () => {
-  it('accepts a class in range', () => {
-    // GECMDS.C:4882 — `atoi(margv[2]) <= tot_classes && atoi(margv[2]) > 0`
-    expect(sysClassIsValid(1, 34)).toBe(true);
-    expect(sysClassIsValid(34, 34)).toBe(true);
+  const TABLE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 31, 32, 33, 41];
+
+  it('accepts a player hull', () => {
+    expect(sysClassIsValid(1, TABLE)).toBe(true);
+    expect(sysClassIsValid(8, TABLE)).toBe(true);
+  });
+
+  it('accepts the sparse high numbers a count-based bound refused', () => {
+    expect(sysClassIsValid(21, TABLE)).toBe(true); // Cybertron Scout
+    expect(sysClassIsValid(25, TABLE)).toBe(true); // Sarten Obliterator
+    expect(sysClassIsValid(33, TABLE)).toBe(true); // Vakory Survey Drone
+    expect(sysClassIsValid(41, TABLE)).toBe(true); // Sysopian Death Star
   });
 
   it('rejects zero and negatives, as canon does', () => {
-    expect(sysClassIsValid(0, 34)).toBe(false);
-    expect(sysClassIsValid(-1, 34)).toBe(false);
+    expect(sysClassIsValid(0, TABLE)).toBe(false);
+    expect(sysClassIsValid(-1, TABLE)).toBe(false);
   });
 
-  it('rejects above the class count', () => {
-    expect(sysClassIsValid(35, 34)).toBe(false);
+  it('rejects a number the table does not define', () => {
+    expect(sysClassIsValid(10, TABLE)).toBe(false);
+    expect(sysClassIsValid(34, TABLE)).toBe(false);
+    expect(sysClassIsValid(99, TABLE)).toBe(false);
   });
 });
 

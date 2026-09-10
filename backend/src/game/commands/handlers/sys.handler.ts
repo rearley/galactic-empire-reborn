@@ -252,7 +252,9 @@ export class SysHandlerService {
     if (n === null) return SysHandlerService.huh();
     const classes = await this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true } });
     const target = classes.find((c) => c.classNumber === n);
-    if (!target || !sysClassIsValid(n, classes.length)) return SysHandlerService.huh();
+    if (!target || !sysClassIsValid(n, classes.map((c) => c.classNumber))) {
+      return SysHandlerService.huh();
+    }
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.shpclass = n;

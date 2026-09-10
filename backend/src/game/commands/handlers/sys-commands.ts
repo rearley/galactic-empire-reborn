@@ -55,11 +55,27 @@ export function parseSysArgs(args: readonly string[]): ParsedSysArgs {
 /**
  * `atoi(margv[2]) <= tot_classes && atoi(margv[2]) > 0` — GECMDS.C:4882.
  *
- * Canon stores `shpclass` zero-based and subtracts one from the input; this
- * port stores the class NUMBER directly, so no adjustment is needed here.
+ * Canon bounds this by `tot_classes`, the SLOT COUNT of the class table, and
+ * treats the argument as a one-based index into it (`shpclass = arg - 1`). The
+ * shipped table has 34 slots — S01..S33 plus S41 — so `sys class 34` is how a
+ * sysop became a Sysopian Death Star. Twenty-five of those slots are `<NONE>`,
+ * and canon cheerfully lets you become one of those as well.
+ *
+ * This port stores the class NUMBER, not a slot index, and the numbers are
+ * SPARSE: 1-9, 21-25, 31-33, 41. Comparing a number against a count was
+ * therefore a category error and it was a bug: with 18 classes defined the old
+ * bound accepted 1..18, silently refusing every class above 9. A sysop could
+ * not become a Scout, a Cyberquad, a Base Star, a Droid or the Death Star, and
+ * got "Huh?" with nothing to say why.
+ *
+ * Membership in the table is the honest equivalent of canon's range test: it
+ * admits exactly the classes that exist, and unlike canon it cannot hand you an
+ * undefined slot.
  */
-export function sysClassIsValid(classNumber: number, totalClasses: number): boolean {
-  return Number.isInteger(classNumber) && classNumber > 0 && classNumber <= totalClasses;
+export function sysClassIsValid(classNumber: number, definedClasses: readonly number[]): boolean {
+  return Number.isInteger(classNumber)
+    && classNumber > 0
+    && definedClasses.includes(classNumber);
 }
 
 /**

@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 77 entries.
+Append-only, **newest at the bottom**. 78 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
 - [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
 - [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
@@ -4681,3 +4682,59 @@ retreat rather than for lurking is describing this, not being poetic.
 against re-deriving the band from the constants alone — the tick ORDER is what
 decides it, and reading CLENGUSE and ENGYMIN side by side gives the wrong
 answer, which is the mistake made here.
+
+## 2026-09-10 — `sys class` refused every hull above class 9
+
+**Started as a question about the Sysopian Death Star** — "how would a sysop
+back in the day get this ship?" — and turned up a bug affecting nine classes.
+
+**How canon does it.** `sys class` is bounded by `tot_classes`, the SLOT COUNT
+of the class table, and the argument is a one-based INDEX into it:
+
+```
+if (atoi(margv[2]) <= tot_classes && atoi(margv[2]) > 0)
+    warsptr->shpclass = atoi(margv[2])-1;          GECMDS.C:4882
+```
+
+`MBMGESHP.MSG` has **34 slots** — S01 through S33, then S41 — so a 1992 sysop
+typed `sys class 34` and became a Death Star. Twenty-five of those slots are
+`<NONE>`, and canon lets you become one of those too.
+
+**The bug.** This port stores the class NUMBER, not a slot index, and the
+numbers are SPARSE: 1-9, 21-25, 31-33, 41. The bound compared a class number
+against a count. With 18 classes defined it accepted 1..18, so **everything
+above 9 was silently refused**: Cybertron Scout, Cyberquad, Base Star, all
+three Droids, both Sartens and the Death Star. A sysop got "Huh?" with no hint
+why.
+
+The line above it already checked the class exists, so the bound contributed
+nothing except the defect. Replaced with a membership test, which is the honest
+equivalent of canon's range check and — unlike canon — cannot hand a sysop an
+undefined slot.
+
+**Why the unit test missed it.** `sys-commands.spec.ts` called
+`sysClassIsValid(34, 34)`, passing canon's slot count. The real caller passes
+`classes.length`, which is 18. The function was tested with arithmetic no caller
+uses, so it passed while the command failed. Handler-level cases added
+alongside, exercising the caller's own path.
+
+**Correction to something said in conversation:** the Death Star's phaser was
+described as type 20, "the tell". Wrong — its maximum phaser is Mark-5 and
+shields Mark-6. The instant-kill phaser is a separate sysop setting
+(`sys phasertype 20`), which returns 101 damage regardless of range, focus or
+tonnage (GECMDS.C:971, :1065 "sysop phaser"). The cheat is the phaser, not the
+hull. What the hull gives is 100,000,000 tons — dividing incoming phaser damage
+by about 6,668 — warp 255, a 1,000,000 scan range, and every system in the game.
+Its damage factor is normal, so projectiles still hurt it.
+
+**Purchase is unaffected.** The shipyard bounds listing and buying at the first
+CPU class independently, so widening `sys class` does not put the Death Star on
+sale at Zygor.
+
+**Tests:** the validator spec rewritten to membership semantics (4 cases), plus
+5 handler-level cases in `sys-kill.spec.ts` covering 21, 25, 33, 41 and a
+number the table does not define. Backend 5,808 across 578 files.
+
+**Next:** —
+**Known issues:** none. Canon would also let a sysop become an undefined slot;
+that is deliberately NOT restored, since the only outcome is a corrupt hull.
