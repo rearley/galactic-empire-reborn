@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 78 entries.
+Append-only, **newest at the bottom**. 79 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
 - [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
 - [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
@@ -4738,3 +4739,43 @@ number the table does not define. Backend 5,808 across 578 files.
 **Next:** —
 **Known issues:** none. Canon would also let a sysop become an undefined slot;
 that is deliberately NOT restored, since the only outcome is a corrupt hull.
+
+## 2026-09-10 — test strategy written, and the first gap it found was one of ours
+
+**Context for this and the work that follows:** the goal is to reach a suite
+that supports OPTIMISATION — restructuring code for speed and clarity without
+changing what the game does. A suite that proves lines execute does not support
+that; one that pins observable behaviour does. `docs/TEST_STRATEGY.md` is the
+plan, the deliberate exclusions and the risk-ordered queue.
+
+**Measured first.** Backend 578 suites, 5,808 tests: lines 92.5%, statements
+91.4%, functions 89.9%, **branches 76.5%**. Branches sitting fifteen points
+below lines is the signature of tests that walk the happy path. Every one of the
+six defects found by play on 2026-09-09 was a conditional no test entered.
+
+**The filter, in place of a coverage target:** would a wrong answer on this
+branch cost a player a ship, a planet or credits? A target pushes effort toward
+whatever is cheapest to cover, which is exactly the code where being wrong costs
+nothing — `rep wpns` alone has fourteen display fallbacks.
+
+**The audit's first find was a gap we created the day before.** The torpedo lock
+guard was added to BOTH AI brains on 2026-09-09; only the Cybertron half was
+tested, and the Droid's copy was sitting on an uncovered branch. Same defect
+class that killed a Dreadnought, in the half nobody exercised.
+
+`droid-torpedo-lock-gate.spec.ts` (4) closes it, going through `actClass12` —
+the real Vakory brain — rather than poking the launch helper, because a test
+that pokes the helper proves the helper works and says nothing about whether the
+brain reaches it. Verified by reverting the guard: three of the four fail.
+
+Droid tick branch coverage 45.7% → 57.1%. Total 76.5% → 76.8%.
+
+**CI also stops rebuilding for test-only commits.** Neither Dockerfile copies a
+test directory, so a test commit produced a byte-identical image and restarted
+the live game for nothing. `backend/test/`, `frontend/test/` and `frontend/e2e/`
+joined docs in `paths-ignore`. Coverage work makes many such commits.
+
+**Next:** Tier 1 continues — the rest of the Droid tick, then the Cybertron tick
+(70.7%, 71 missed) and combat tick (73.0%, 40 missed).
+**Known issues:** frontend has no coverage tooling installed, so its number is
+unknown. 256 tests across 36 files is a count, not coverage.

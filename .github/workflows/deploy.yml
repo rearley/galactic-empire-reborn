@@ -42,12 +42,20 @@ on:
     # reference/ is deliberately NOT here either. It never reaches an image, but
     # a change to it is rare enough that an unnecessary build costs less than
     # reasoning about whether that one was the exception.
+    #
+    # Test directories are here for the same reason as docs: neither Dockerfile
+    # copies them (backend takes package*.json, prisma, tsconfig, nest-cli.json,
+    # src, config), so a test-only commit rebuilds a byte-identical image and
+    # restarts the game for nothing. Coverage work makes many such commits.
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - 'specs/**'
       - 'LICENSE'
       - 'NOTICE'
+      - 'backend/test/**'
+      - 'frontend/test/**'
+      - 'frontend/e2e/**'
   workflow_dispatch:
 
 env:
