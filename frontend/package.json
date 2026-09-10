@@ -19,7 +19,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^6.30.6",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "@ge/wire": "file:../packages/wire"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

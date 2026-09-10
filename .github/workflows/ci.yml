@@ -118,7 +118,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          # Points at the root lockfile, not backend/'s: `npm ci` run from
+          # backend/ discovers the ancestor npm workspace declared at the repo
+          # root and installs against ITS lockfile, not a per-app one — a
+          # side effect of adding packages/wire in Phase 1. The two per-app
+          # package-lock.json files were removed for the same reason; keeping
+          # them around would have been actively misleading, since npm no
+          # longer reads them.
+          cache-dependency-path: package-lock.json
 
       # global-setup.ts shells out to `psql` for three LOWER() unique indexes
       # that Prisma cannot express in schema.prisma. An assumption that fails
@@ -129,6 +136,14 @@ jobs:
       - name: Install
         working-directory: backend
         run: npm ci
+
+      # @ge/wire ships as a dual CJS/ESM build under packages/wire/dist. `npm
+      # ci` only symlinks the workspace package into node_modules — it does
+      # not build it — so nothing importing `@ge/wire` resolves at runtime
+      # until this runs.
+      - name: Build @ge/wire
+        working-directory: backend
+        run: npm run build --workspace @ge/wire
 
       - name: Generate Prisma client
         working-directory: backend
@@ -161,11 +176,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          # See the backend job's identical comment: `npm ci` from frontend/
+          # resolves against the root lockfile once packages/wire exists.
+          cache-dependency-path: package-lock.json
 
       - name: Install
         working-directory: frontend
         run: npm ci
+
+      - name: Build @ge/wire
+        working-directory: frontend
+        run: npm run build --workspace @ge/wire
 
       - name: Lint
         working-directory: frontend
