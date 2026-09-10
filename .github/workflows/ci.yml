@@ -96,9 +96,16 @@ jobs:
       # every auth and gateway suite. Value is irrelevant; it signs nothing that
       # outlives the job.
       JWT_SECRET: ci-not-a-real-secret
-      # test/game/physics/bench.spec.ts asserts 100 ships advance in under 50ms.
-      # It measures 3ms locally, but a wall-clock budget on a shared runner
-      # tests the runner's neighbours. The escape hatch is the test author's own.
+      # Skips the two wall-clock performance budgets: 100 ships advancing in
+      # under 50ms (test/game/physics/bench.spec.ts) and the midnight pass over
+      # 1,000 users and 2,000 planets in under 5,000ms
+      # (test/game/midnight/perf-budget.spec.ts).
+      #
+      # Both measure the machine they run on. A hosted runner is shared, and the
+      # midnight budget sat close enough to its ceiling here that it would
+      # eventually go red for a reason that says nothing about the code — which
+      # teaches people to re-run a build until it passes. They still run
+      # locally, where the number is comparable with the last time it was taken.
       CI_LOW_PERF: '1'
 
     steps:
@@ -161,10 +168,17 @@ jobs:
         run: npm test
 
       # `npm run build` is `tsc && vite build`, so this is the frontend's
-      # type-check as well as proof the bundle still assembles. The Playwright
-      # specs under e2e/ are excluded from Vitest and are not run here: they
-      # need a live backend and a real browser, which is a separate job worth
-      # adding on its own terms.
+      # type-check as well as proof the bundle still assembles.
+      #
+      # THE PLAYWRIGHT SPECS UNDER e2e/ ARE DELIBERATELY NOT RUN HERE, decided
+      # 2026-09-10. They are excluded from Vitest already. Running them would
+      # mean a migrated and seeded `ge` database, a backend started in the
+      # background with GE_DEBUG_ENDPOINTS=1 for the fixtures they drive, and a
+      # Chromium download — to exercise a real-time game on a 6-second tick,
+      # single-worker, with 60-second per-test timeouts, against a freshly
+      # generated 40,401-sector galaxy. That is a lot of moving parts for a
+      # layer that runs perfectly well against the dev stack, which is where it
+      # stays. Run it there with `npm run test:e2e`.
       - name: Build
         working-directory: frontend
         run: npm run build
