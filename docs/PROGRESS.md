@@ -4388,9 +4388,34 @@ that divides phaser damage by seventeen and cuts every projectile to a fifth, so
 nobody will ever choose the fight. Without a working `sys kill` the surplus was
 permanent.
 
-Live counts at the time were 24 hulls against a configured 9 — canon's unscaled
-figures in a galaxy an eighth of canon's area. Galaxy size is NOT the lever
-here; there are live players and a planted colony, so UNIVMAX cannot move.
+**CORRECTED, same evening.** The first read of this said live counts were 24
+against a configured 9, canon's unscaled figures in a galaxy an eighth of the
+area. That query counted every `status=2` row, and twelve of them were corpses:
+a killed automaton leaves its row behind at `damage > 100` until a later spawn
+recycles the slot, and `spawnOne` counts the IN-MEMORY map, not the table.
+
+Actual live population, filtered on `damage <= 100`:
+
+| class | alive | dead rows | target |
+|---|---|---|---|
+| Cybertron Scout | 4 | 6 | 3 |
+| Cyberquad | 5 | 0 | 2 |
+| Base Star | 1 | 0 | 1 |
+| Sarten Attack Drone | 2 | 4 | 2 |
+| Sarten Obliterator | 0 | 2 | 1 |
+
+So the surplus was 3, not 15, and it is almost all Cyberquads. Attrition has
+been working the whole time — the twelve corpses ARE the evidence of it.
+
+There was also never a surplus Obliterator. `Cybrg-222` has been dead at damage
+110.6 since a previous session (it is the orphaned row already noted in the
+2026-09-08 entry), so the live count was 1, exactly on target, and killing
+`Cybrg-223` took the class to zero. A replacement spawns at a random point
+within a few minutes, which is the desired outcome: the same population, placed
+by the galaxy rather than parked beside the trade hub.
+
+Galaxy size is NOT the lever here regardless; there are live players and a
+planted colony, so UNIVMAX cannot move.
 
 **Next:** —
 **Known issues:** the surplus stands at seven Scouts, three Cyberquads and four
