@@ -1,5 +1,12 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TickContext, TickHandler, TickKind, Unsubscribe } from './tick.types';
+import { TickOrder } from './tick-order';
+
+/** A registered handler and its position in canon's warrtia sequence. */
+interface OrderedHandler {
+  handler: TickHandler;
+  order: number;
+}
 import { InvariantRegistry } from '../invariants/harness';
 import { WorldSnapshot } from '../invariants/invariants.types';
 
@@ -23,10 +30,10 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
   private planetUpdateTimer: NodeJS.Timeout | null = null;
   private planetUpdateIntervalMs: number | null = null;
 
-  private readonly handlers: Map<TickKind, Set<TickHandler>> = new Map([
-    [TickKind.SHIP_UPDATE, new Set()],
-    [TickKind.PHYSICS, new Set()],
-    [TickKind.PLANET_UPDATE, new Set()],
+  private readonly handlers: Map<TickKind, OrderedHandler[]> = new Map([
+    [TickKind.SHIP_UPDATE, []],
+    [TickKind.PHYSICS, []],
+    [TickKind.PLANET_UPDATE, []],
   ]);
 
   /**
@@ -86,12 +93,34 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Register a handler for a tick kind. Returns an idempotent unsubscribe function.
-   * Registering the same handler reference twice for the same kind is a no-op (Set semantics).
+   * Registering the same handler reference twice for the same kind is a no-op.
+   *
+   * `order` places the handler in canon's `warrtia` sequence — LOWER RUNS
+   * EARLIER. It is not decoration: `fluxstat` runs before `cloakstat` in
+   * GEMAIN.C:2256-2259 so a starving ship reloads before its cloak is tested,
+   * and this port had that pair backwards because handlers fired in whatever
+   * order Nest constructed them. Use the named values in `TickOrder` rather
+   * than a literal, so the reason for a position is written down next to it.
+   *
+   * Omitting `order` puts the handler at the BACK. A handler with no stated
+   * ordering requirement must never be able to displace one that has.
+   *
+   * @see ./tick-order.ts
    */
-  subscribe(kind: TickKind, handler: TickHandler): Unsubscribe {
-    this.handlers.get(kind)!.add(handler);
+  subscribe(kind: TickKind, handler: TickHandler, order: number = TickOrder.DEFAULT): Unsubscribe {
+    const list = this.handlers.get(kind)!;
+    if (!list.some((e) => e.handler === handler)) {
+      // Stable insert: ahead of the first entry with a HIGHER order, so
+      // handlers sharing an order keep registration order between them.
+      const at = list.findIndex((e) => e.order > order);
+      const entry = { handler, order };
+      if (at === -1) list.push(entry);
+      else list.splice(at, 0, entry);
+    }
     return () => {
-      this.handlers.get(kind)!.delete(handler);
+      const l = this.handlers.get(kind)!;
+      const i = l.findIndex((e) => e.handler === handler);
+      if (i !== -1) l.splice(i, 1);
     };
   }
 
@@ -153,7 +182,8 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
   /** @see GEMAIN.C main loop — one bad subscriber must not stop siblings or the next tick. */
   private dispatch(kind: TickKind, ctx: TickContext): void {
-    for (const handler of this.handlers.get(kind)!) {
+    // Snapshot: a handler may unsubscribe during dispatch (destruct does).
+    for (const { handler } of [...this.handlers.get(kind)!]) {
       try {
         const result = handler(ctx);
         if (result instanceof Promise) {
