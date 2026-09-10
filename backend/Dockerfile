@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY config ./config
 RUN npm run build
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:24-alpine
 
 RUN apk add --no-cache postgresql-client openssl
 
