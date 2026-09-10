@@ -255,7 +255,11 @@ describe('the Murdonian fights back in hyperspace', () => {
     // Battle lock on both sides: this is what blocks `repair` and `x`.
     expect(target.lastfired).toBe(droid.channel);
     expect(target.cantexit).toBe(FIRETICKS);
-    expect(droid.phasr).toBe(0);
+    // The hyper-phaser costs FLUX, not the phaser bank. `firehp` debits
+    // `ptr->energy` and arms `hypha`; it never touches `ptr->phasr`.
+    // @see GECMDS.C:1039 `ptr->energy -= HPFIRAMT;`
+    expect(droid.phasr).toBe(100);
+    expect(droid.hypha).toBe(1);
     expect(droid.cantexit).toBe(FIRETICKS);
   });
 });

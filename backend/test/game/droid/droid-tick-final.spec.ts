@@ -428,14 +428,16 @@ describe('a shot that computes to less than one point of damage', () => {
    * this path until 2026-09-10, which made a droid harmless in hyperspace while
    * a Cybertron in the same position was not.
    *
-   * The firer's own tail is unconditional in both: canon spends the bank and
-   * locks the firer at GECMDS.C:1041, before it looks for a victim at all.
+   * The firer's own charge is unconditional in both, but it is FLUX and not the
+   * phaser bank: GECMDS.C:1039-1041 debits `ptr->energy` by HPFIRAMT, arms
+   * `hypha` and locks the firer, all before the victim search. `ptr->phasr` is
+   * never touched by `firehp` at all.
    *
    * 2.2 sectors is inside both the flat 30000 fight-back gate and the Vakory's
    * own 25000 scanner, so nothing upstream refuses the shot.
    *
    * Breaks if: a `damage >= 1` gate is reintroduced here to match the normal
-   * phaser, or the `phasr`/`cantexit` tail is moved inside the arc test.
+   * phaser, or the flux charge is moved inside the arc test.
    */
   it('battle-locks a victim it grazes for nothing, unlike the normal phaser', () => {
     const target = makeShip({
@@ -455,8 +457,11 @@ describe('a shot that computes to less than one point of damage', () => {
     expect(target.damage).toBe(0);
     expect(target.lastfired).toBe(droid.channel);
     expect(target.cantexit).toBe(FIRETICKS);
-    // The firer's tail runs regardless, as canon's does before the victim loop.
-    expect(droid.phasr).toBe(0);
+    // The FLUX is what a hyper-phaser costs, not the phaser bank. `firehp`
+    // debits `ptr->energy` and arms `hypha` before it looks for a victim, and
+    // never touches `ptr->phasr`. @see GECMDS.C:1039 `ptr->energy -= HPFIRAMT;`
+    expect(droid.phasr).toBe(100);
+    expect(droid.hypha).toBe(1);
     expect(droid.cantexit).toBe(FIRETICKS);
   });
 });

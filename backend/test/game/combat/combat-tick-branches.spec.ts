@@ -340,9 +340,12 @@ describe('what a hit does to a raised shield', () => {
     expect(victim.shieldstat).toBe(SHIELDDM);
     expect(victim.shield).toBeLessThan(0); // the extra knock*3 on collapse
     expect(victim.lastfired).toBe(5);
-    expect(victim.cantexit).toBe(FIRETICKS);
-    // The firer is battle-locked by their own shot as well.
-    expect(firer.cantexit).toBe(FIRETICKS);
+    // Canon does NOT battle-lock on impact. `checktm` only counts `cantexit`
+    // down (GEFUNCS.C:1541 `--(ptr->cantexit);`); every `= FIRETICKS` sits in
+    // GECMDS.C at fire or lock time, so the lock this hit inherits was armed by
+    // `lockon` several ticks earlier and is already expiring.
+    expect(victim.cantexit).toBe(0);
+    expect(firer.cantexit).toBe(0);
   });
 
   it('leaves a healthy shield UP, merely drained', async () => {

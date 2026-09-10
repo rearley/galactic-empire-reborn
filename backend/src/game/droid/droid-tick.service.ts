@@ -37,6 +37,8 @@ import {
   GESTAT_AUTO,
   PMINFIRE,
   FIRETICKS,
+  HPMINFIR,
+  HPFIRAMT,
   HPBEAMW,
   JAMTIME,
   MAXTORPS,
@@ -555,6 +557,22 @@ export class DroidTickService implements OnModuleInit {
     const { fightbackHyperspaceMaxDist } = this.config.global;
     if (ddist >= fightbackHyperspaceMaxDist) return;
 
+    // The hyper-phaser runs on FLUX, not on the phaser bank. The entire body of
+    // `firehp` sits inside GECMDS.C:1029 `if (ptr->energy >= HPMINFIR)`, and
+    // its cost is charged to the firer before it looks for a victim at all:
+    //
+    //   ptr->energy -= HPFIRAMT;
+    //   ptr->hypha = 1;
+    //   ptr->cantexit = FIRETICKS;
+    //
+    // `ptr->phasr` is never touched anywhere in the function — `phasrtype` is
+    // read for damage scaling and that is all. This copy had no gate, debited
+    // nothing, never armed `hypha`, and instead emptied the normal phaser bank,
+    // so a droid that fired into hyperspace could not then fire a phaser in
+    // normal space. The Cybertron path was corrected earlier; this one was not.
+    // @see GECMDS.C:1039 `ptr->energy -= HPFIRAMT;`
+    if (droid.energy < HPMINFIR) return;
+
     // A-002: defense-in-depth range gate. C-source `firehp` has explicit
     // `ddistance < shipclass.scanrange` (GECMDS.C:1054). Even though
     // `fightbackHyperspaceMaxDist` caps at 30000, also enforce per-class
@@ -577,6 +595,11 @@ export class DroidTickService implements OnModuleInit {
       sector,
       tickAt: new Date(),
     } satisfies CombatPhaserFiredEvent);
+
+    // Charged before the victim search, exactly as canon does at GECMDS.C:1039-1041.
+    droid.energy = droid.energy - HPFIRAMT;
+    droid.hypha = 1;
+    droid.cantexit = FIRETICKS;
 
     const dist = cdistance(droid, target);
     // Runtime invariants — record at fire time.
@@ -631,8 +654,6 @@ export class DroidTickService implements OnModuleInit {
       // @see GEFUNCS.C:randamage — called after every droid hyper-phaser hit (GEDROIDS.C → GECMDS.C:1082)
       applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidHypTickAt);
     }
-    droid.phasr = 0;
-    droid.cantexit = FIRETICKS;
   }
 
   /** Launch a torpedo at target. @see GEDROIDS.C:472-480 torp */

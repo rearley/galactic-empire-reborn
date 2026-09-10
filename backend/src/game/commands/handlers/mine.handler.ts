@@ -22,7 +22,7 @@ const MINE_INITIAL_TIMER = 30;
  *   2. not in neutral zone → else MIN_NEUTRAL  (C order: GECMDS.C:1727-1746)
  *   3. firer.cloak === 0 → else MIN_CLOAK (plain refusal, no self-zap)
  *   4. firer.items[I_MINE] > 0n → else MIN_NOAMMO
- *   5. timer arg optional; if given must be in [MINE_TIMER_MIN, MINE_TIMER_MAX] → else NUMOOR
+ *   5. timer arg REQUIRED, and in [MINE_TIMER_MIN, MINE_TIMER_MAX]; else MINFMT
  *   6. live-mine count by deployer < USERMINES → else MIN_FULL
  *
  * Side effects on success:
@@ -71,13 +71,25 @@ export class MineHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MIN_NOAMMO), category: 'system' }] };
     }
 
-    let timer = MINE_INITIAL_TIMER;
-    if (args[0] !== undefined) {
-      const parsed = parseInt(args[0], 10);
-      if (isNaN(parsed) || parsed < MINE_TIMER_MIN || parsed > MINE_TIMER_MAX) {
-        return { lines: [{ text: formatMessage(MessageId.NUMOOR, MINE_TIMER_MIN, MINE_TIMER_MAX), category: 'system' }] };
-      }
-      timer = parsed;
+    // The fuse is REQUIRED and both refusals are the command's own usage line.
+    //
+    //   if (margc != 2 ) { prfmsg(MINFMT); ... return; }
+    //   i = atoi(margv[1]);
+    //   if (i < 1 || i > 50) { prfmsg(MINFMT); ... return; }
+    //
+    // @see GECMDS.C:1757 `if (margc != 2 )`
+    // @see GECMDS.C:1767 `prfmsg(MINFMT);`
+    //
+    // This port had invented a default of 30 and answered a bad number with the
+    // generic NUMOOR. A bare `min` therefore laid a live mine — a minefield by
+    // typo, costing ammunition, a combat lock, and a ship if a friend drifts
+    // over it. Canon lays nothing.
+    if (args[0] === undefined) {
+      return { lines: [{ text: formatMessage(MessageId.MIN_FMT), category: 'system' }] };
+    }
+    const timer = parseInt(args[0], 10);
+    if (isNaN(timer) || timer < MINE_TIMER_MIN || timer > MINE_TIMER_MAX) {
+      return { lines: [{ text: formatMessage(MessageId.MIN_FMT), category: 'system' }] };
     }
 
     if (this.mineRegistry.countByDeployer(ship.userid) >= USERMINES) {

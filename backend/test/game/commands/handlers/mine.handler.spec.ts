@@ -117,28 +117,43 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     expect(h.repo.create).toHaveBeenCalledWith(expect.objectContaining({ timer: 45 }));
   });
 
-  it('4b. rejects timer arg 0 (NUMOOR 1-50)', async () => {
+  // Canon answers an out-of-range timer with the command's OWN usage line, not
+  // with the generic NUMOOR. `cmd_mine` prints MINFMT for both the missing
+  // argument and the bad one, and never calls NUMOOR at all.
+  // @see GECMDS.C:1767 `prfmsg(MINFMT);`
+  it('4b. rejects timer arg 0 with the usage line', async () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, ['0'], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toContain('range from');
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_FMT));
     expect(h.repo.create).not.toHaveBeenCalled();
   });
 
-  it('4c. rejects timer arg 51 (NUMOOR 1-50)', async () => {
+  it('4c. rejects timer arg 51 with the usage line', async () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, ['51'], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toContain('range from');
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_FMT));
     expect(h.repo.create).not.toHaveBeenCalled();
   });
 
-  it('5. default timer 30 when no arg given', async () => {
+  /**
+   * `min` on its own lays nothing. The timer is REQUIRED.
+   *
+   * Canon opens with GECMDS.C:1757 `if (margc != 2 )` and prints MINFMT, so
+   * there is no default fuse anywhere in the command. This port invented one of
+   * 30 and deployed a live mine on a bare `min`, which is a mine laid by a
+   * typo — and it costs ammunition, a combat lock and, if a friend wanders
+   * over it, a ship.
+   */
+  it('5. lays nothing at all when no timer is given', async () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 12, ycoord: 34 });
     const h = makeHarness([alice]);
     const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
-    expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
-    expect(h.repo.create).toHaveBeenCalledWith(expect.objectContaining({ timer: 30 }));
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_FMT));
+    expect(h.repo.create).not.toHaveBeenCalled();
+    expect(alice.items[I_MINE]).toBe(5n);
+    expect(alice.cantexit).toBe(0);
   });
 
   it('6. rejects when per-player live-mine cap reached (MIN_FULL)', async () => {
@@ -148,7 +163,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     for (let i = 0; i < USERMINES; i++) {
       h.registry.add({ id: i, channel: 99, timer: 30, xcoord: 5, ycoord: 5, deployedBy: 'alice' });
     }
-    const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
+    const result = await (h.handler.command.handler(alice, ['30'], ctx) as Promise<CommandResult>);
     expect(result.lines[0].text).toBe(formatMessage(MessageId.MIN_FULL));
     expect(h.repo.create).not.toHaveBeenCalled();
   });
@@ -157,7 +172,7 @@ describe('MineHandlerService — `min` (Plan 3 T1, C-004)', () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 12, ycoord: 34 });
     const h = makeHarness([alice]);
 
-    const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
+    const result = await (h.handler.command.handler(alice, ['30'], ctx) as Promise<CommandResult>);
     expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
 
     expect(h.repo.create).toHaveBeenCalledWith({

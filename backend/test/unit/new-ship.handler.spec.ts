@@ -5,8 +5,11 @@
  */
 import { NewShipHandlerService, quoteUpgrade } from '../../src/game/commands/handlers/new-ship.handler';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import type { Random } from '../../src/game/combat/random.port';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { MAXSHIPS, GESTAT_AVAIL } from '../../src/game/constants';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
@@ -145,6 +148,8 @@ function makeService(
   const service = new NewShipHandlerService(
     prismaMock as unknown as PrismaService,
     shipStateMock as unknown as ShipStateService,
+    { bySector: () => [] } as unknown as PlanetStateService,
+    { next: () => 0.5 } as Random,
   );
 
   return { service, prismaMock, shipStateMock };
@@ -255,13 +260,42 @@ describe('NewShipHandlerService', () => {
   });
 
   describe('new ship <N> — rejection: not orbiting', () => {
-    it('returns orbit requirement message', async () => {
+    /**
+     * Canon has two answers here and tests `where` FIRST.
+     *
+     *   if (warsptr->where < 10) { prfmsg(NEW1); ... return; }
+     *   plnum = warsptr->where - 10;
+     *   if (neutral(&warsptr->coord) && plnum == 1) { ...buy... }
+     *   else prfmsg(NEW5);
+     *
+     * NEW1 is "Sorry Sir, we must go to Zygor to get a new ship." NEW5, the
+     * one that mentions orbit, is the LATER branch for a pilot already in
+     * orbit around the wrong body. The port printed the orbit message to
+     * everyone, telling someone in open space to leave an orbit they were not
+     * in.
+     *
+     * @see GECMDS.C:4547 `if (warsptr->where < 10)`
+     */
+    it('tells a pilot in open space to go to Zygor, not to leave orbit', async () => {
       const { service } = makeService();
       const result = await service.command.handler(
         makeShip({ xcoord: 0.5, ycoord: 0.5, where: 0 }), // where < 10 = not orbiting
         ['ship', '4'],
         {},
       );
+      expect(result.lines[0].text).toBe(formatMessage(MessageId.NEW_NOT_ORBITING));
+      expect(result.lines[0].text).not.toMatch(/orbit/i);
+    });
+
+    it('still tells a pilot orbiting the WRONG body about orbit', async () => {
+      const { service } = makeService();
+      const result = await service.command.handler(
+        // In orbit (where >= 10) but around planet 2, not Zygor.
+        makeShip({ xcoord: 0, ycoord: 0, where: 12 }),
+        ['ship', '4'],
+        {},
+      );
+      expect(result.lines[0].text).toBe(formatMessage(MessageId.NEW_WRONG_PLACE));
       expect(result.lines[0].text).toMatch(/orbit/i);
     });
   });
@@ -297,6 +331,8 @@ describe('NewShipHandlerService', () => {
       const service = new NewShipHandlerService(
         prismaMock as unknown as PrismaService,
         { loadShip: jest.fn() } as unknown as ShipStateService,
+        { bySector: () => [] } as unknown as PlanetStateService,
+        { next: () => 0.5 } as Random,
       );
       const result = await service.command.handler(makeShip(), ['ship', '4'], {});
       // Canon's NEW4 names the class and does not quote the shortfall.
@@ -414,16 +450,28 @@ describe('NewShipHandlerService — name collisions between captains', () => {
   });
 
   /**
-   * "New Heavy Freighter purchased and docked at Zygor" — and then the hull
-   * materialised at the sector's (0,0) corner, up to 7,071 units from the
-   * station the buyer was orbiting. The position was floored to the sector
-   * index, throwing away the intra-sector coordinates entirely.
+   * A purchased hull is placed the way `initshp` places one, not handed to you.
    *
-   * That was survivable when `orb` worked from anywhere in the sector. Now
-   * that orbit requires closing to within 250 units, it is a seven-minute
-   * impulse crawl back to the station you were already docked at.
+   *   tmpshp.coord.xcoord = NEUTRAL_X + rndm(.9999);
+   *   tmpshp.coord.ycoord = NEUTRAL_Y + rndm(.9999);
+   *   while (any planet in the sector is closer than 1000) re-roll
+   *                                                    -- GEFUNCS.C:196-215
+   *
+   * `cmd_new` calls the same `initshp` that places a first-time pilot
+   * (GECMDS.C:4572), so a new ship sits at a random point inside the neutral
+   * sector and never inside a station's approach. It is a short flight away.
+   *
+   * The port had used the buyer's exact coordinates. That was written to fix a
+   * different bug — the position had been floored to the sector index, putting
+   * the hull at the corner — and overshot canon in the other direction: buy at
+   * Zygor and the ship was already docked beside you.
+   *
+   * The harness draw is a constant 0.5, so the roll lands at the sector centre
+   * and the buyer's own 0.4812/0.5533 cannot be mistaken for it.
+   *
+   * @see GEFUNCS.C:204 `tmpshp.coord.xcoord     = NEUTRAL_X + rndm(.9999);`
    */
-  it('leaves the new hull where the buyer is, not at the sector corner', async () => {
+  it('places the new hull by initshp, not at the buyer', async () => {
     const { service, prismaMock } = makeService();
     const buyer = makeShip();
     buyer.xcoord = 0.4812;
@@ -434,8 +482,9 @@ describe('NewShipHandlerService — name collisions between captains', () => {
     const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
       data: Record<string, unknown>;
     };
-    expect(created.data['xcoord']).toBeCloseTo(0.4812, 6);
-    expect(created.data['ycoord']).toBeCloseTo(0.5533, 6);
+    expect(created.data['xcoord']).toBeCloseTo(0.5 * 0.9999, 6);
+    expect(created.data['ycoord']).toBeCloseTo(0.5 * 0.9999, 6);
+    expect(created.data['xcoord']).not.toBeCloseTo(0.4812, 6);
   });
 });
 
@@ -477,6 +526,8 @@ describe('NewShipHandlerService — shipyard narration for new phaser/shield', (
     const service = new NewShipHandlerService(
       prismaMock as unknown as PrismaService,
       { mutate, loadShip: jest.fn() } as unknown as ShipStateService,
+      { bySector: () => [] } as unknown as PlanetStateService,
+      { next: () => 0.5 } as Random,
     );
     return { service, user, mutate };
   }

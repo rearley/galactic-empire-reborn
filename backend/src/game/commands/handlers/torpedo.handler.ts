@@ -139,15 +139,6 @@ export class TorpedoHandlerService {
       return { lines: [{ text: formatMessage(MessageId.JAMMER4), category: 'system' }] };
     }
 
-    // 5c. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
-    if (isInNeutralZone(ship)) {
-      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-        s.damage = s.damage + SE100DAM;
-        s.cantexit = FIRETICKS;
-      });
-      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
-    }
-
     // 6. Target lookup
     const allShips = this.shipState.findAllShips();
     const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
@@ -157,6 +148,20 @@ export class TorpedoHandlerService {
       return { lines: [{ text: found.message, category: 'system' }] };
     }
     const target = found.ship;
+
+    // The self-zap needs a RESOLVED target: canon's `zaphim` sits inside the
+    // `shpnum >= 0` arm, after `findshp` has produced a real ship. Testing the
+    // zone before the lookup meant naming a ship that does not exist while
+    // sitting at the origin cost a hundred points of hull, where canon just
+    // says the scanners cannot locate it.
+    // @see GECMDS.C:1159 `if (neutral(&warsptr->coord))`
+    if (isInNeutralZone(ship)) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+        s.damage = s.damage + SE100DAM;
+        s.cantexit = FIRETICKS;
+      });
+      return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
+    }
 
     // Target in neutral zone ⇒ fire control refuses (GECMDS.C:1363).
     if (isInNeutralZone(target)) {

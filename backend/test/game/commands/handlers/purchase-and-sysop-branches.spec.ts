@@ -22,6 +22,8 @@ import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.ha
 import { CommandContext, CommandResult } from '../../../../src/game/commands/command.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
+import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
+import type { Random } from '../../../../src/game/combat/random.port';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
@@ -157,7 +159,7 @@ const textOf = (r: CommandResult): string => r.lines.map((l) => l.text).join('\n
 
 describe('NewShipHandlerService — purchase refusals that protect the wallet', () => {
   function harness(db: FakeDb, ship: ShipState, classes?: FakeClass[]) {
-    const service = new NewShipHandlerService(makePrisma(db, classes), makeShipState([ship]));
+    const service = new NewShipHandlerService(makePrisma(db, classes), makeShipState([ship]), { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
     return (args: string[]) => service.command.handler(ship, args, ctx) as Promise<CommandResult>;
   }
 
@@ -295,7 +297,7 @@ describe('NewShipHandlerService — purchase refusals that protect the wallet', 
 
 describe('NewShipHandlerService — upgrade gates and the arithmetic behind them', () => {
   function harness(db: FakeDb, ship: ShipState) {
-    const service = new NewShipHandlerService(makePrisma(db), makeShipState([ship]));
+    const service = new NewShipHandlerService(makePrisma(db), makeShipState([ship]), { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
     return (args: string[]) => service.command.handler(ship, args, ctx) as Promise<CommandResult>;
   }
 

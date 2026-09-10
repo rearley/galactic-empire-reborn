@@ -62,7 +62,7 @@ describe('mine — galaxy table full', () => {
 
   it('answers MINE2 rather than leaking an internal error', async () => {
     const ship = makeShip();
-    const res = await build(ship).command.handler(ship, [], {} as never);
+    const res = await build(ship).command.handler(ship, ['30'], {} as never);
     expect(res.lines.map((l) => l.text)).toEqual([formatMessage(MessageId.MIN_JAMMED)]);
   });
 
@@ -70,7 +70,7 @@ describe('mine — galaxy table full', () => {
     // C reaches `--ptr->items[I_MINE]` and `cantexit = FIRETICKS` only inside
     // the free-slot branch (GECMDS.C:1809-1814).
     const ship = makeShip();
-    await build(ship).command.handler(ship, [], {} as never);
+    await build(ship).command.handler(ship, ['30'], {} as never);
     expect(ship.items[I_MINE_IDX]).toBe(5n);
     expect(ship.cantexit).toBe(0);
   });

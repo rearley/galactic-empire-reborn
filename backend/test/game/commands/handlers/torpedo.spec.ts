@@ -202,18 +202,50 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 
-  it('firing from inside the neutral zone self-zaps and does not lock (Plan 1 T8)', () => {
+  /**
+   * The self-zap is inside canon's `shpnum >= 0` arm, so it needs a REAL target.
+   *
+   *   shpnum = findshp(margv[1],1);
+   *   if (shpnum == usrnum) { prfmsg(FOOLISH); }
+   *   else if ( shpnum >= 0)
+   *     {
+   *     if (neutral(&warsptr->coord)) { zaphim(warsptr,usrnum); return; }
+   *     ...
+   *     }
+   *   else { prfmsg(NOSHIP); }
+   *
+   * The port ran the neutral-zone test BEFORE looking the target up, so naming
+   * a ship that does not exist while sitting at the origin cost a hundred
+   * points of hull. Canon answers "the tactical scanners cannot locate" and
+   * leaves the ship alone. The zone is only lethal once you have actually
+   * picked someone to shoot at.
+   *
+   * @see GECMDS.C:1159 `if (neutral(&warsptr->coord))`
+   */
+  it('firing from inside the neutral zone self-zaps once a real target is named', () => {
     const firer = makeShip({
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
       items: itemsWith({ [I_TORP]: 1n }),
     });
-    const h = makeHarness([firer]);
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0.2, ycoord: 0 });
+    const h = makeHarness([firer, bob]);
     const res = h.handler.command.handler(firer, ['Bob'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/Enforcer Planet/i);
     expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
     expect(firer.cantexit).toBe(FIRETICKS);
     // No target lock allocated — firer returned early
-    expect(firer.ltorpsChannel.length).toBe(0);
+    expect(bob.ltorpsChannel.filter((c) => c !== undefined && c !== 255).length).toBe(0);
+  });
+
+  it('does NOT self-zap for a name nothing in the galaxy carries', () => {
+    const firer = makeShip({
+      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
+      items: itemsWith({ [I_TORP]: 1n }),
+    });
+    const h = makeHarness([firer]);
+    const res = h.handler.command.handler(firer, ['Nobody'], ctx) as CommandResult;
+    expect(res.lines[0].text).not.toMatch(/Enforcer Planet/i);
+    expect(firer.damage).toBe(0);
   });
 
   it('happy path — allocates into first free slot when others occupied', () => {

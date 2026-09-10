@@ -4,11 +4,21 @@ import { hyperPhaserDamage } from '../../../src/game/combat/combat-math';
  * Hyper-phaser damage — C `pdamage` warp branch (GEFUNCS.C:2069-2077) folded
  * into `firehp`'s outer scaling (GECMDS.C:1056-1067):
  *   dd     = max(0, 1 - distRaw/40000)
- *   dp     = dd ^ HPFIRDST            (HPFIRDST = 1 → linear)
- *   dam    = HPDAMMAX * dp            (HPDAMMAX = 200)
+ *   dp     = dd ^ HPFIRDST            (HPFIRDST = 5)
+ *   dam    = HPDAMMAX * dp            (HPDAMMAX = 50)
  *   factor = dam * phasrtype / (1 + victimMaxTons/TONFACT)
  *   phasrtype === 20 (sysop) → 101
  *   floor(factor)
+ *
+ * Both numbers in this header used to be the CLAMP BOUNDS rather than the
+ * shipped values — `numopt(HPFIRDST,1,20)` and `numopt(HPDAMMAX,1,200)`, so the
+ * header claimed a linear falloff capped at 200 while the cases below were
+ * already written against a fifth-power falloff capped at 50. A header that
+ * contradicts its own tests is worse than no header, because it is the thing
+ * the next reader trusts.
+ *
+ * @see MBMGEMSG.MSG:403 `HPFIRDST {Hyperphaser distance factor: 5} N 1 20`
+ * @see MBMGEMSG.MSG:411 `HPDAMMAX {Hyperphaser maximum damage: 50} N 1 200`
  */
 describe('hyperPhaserDamage — C firehp/pdamage warp branch', () => {
   it('point-blank (dist 0): floor(HPDAMMAX * phasrtype / 1)', () => {
@@ -26,7 +36,7 @@ describe('hyperPhaserDamage — C firehp/pdamage warp branch', () => {
   it('heavier victim (maxTons 15000 → tonfact 2) takes half', () => {
     const light = hyperPhaserDamage({ phasrtype: 1, distRaw: 0, victimMaxTons: 0 });
     const heavy = hyperPhaserDamage({ phasrtype: 1, distRaw: 0, victimMaxTons: 15000 });
-    expect(heavy).toBe(Math.floor(light / 2)); // 100
+    expect(heavy).toBe(Math.floor(light / 2)); // 25, from a shipped HPDAMMAX of 50
   });
 
   it('sysop phaser (type 20) is fixed at 101 regardless of distance/tonnage', () => {

@@ -38,10 +38,15 @@
  *
  *   @see GEPLANET.C:149-186
  *
- * Canon clears `spyowner` on exactly two outcomes — the master taking the
- * planet (:113) and the counter-spies catching the infiltrator (:144) — and
+ * Canon clears `spyowner` on exactly two live outcomes — the planet's owner
+ * turning out to BE the spy's master, GEPLANET.C:94
+ * `plptr->spyowner[0] = 0;`, and the counter-spies catching the infiltrator at
+ * GEPLANET.C:142 — and
  * pointedly not on a report, because filing reports is the whole reason the
- * item costs what it does. The service's own comment records that this used to
+ * item costs what it does. There is a third assignment at :101, but it sits
+ * inside a commented-out `uidxst` block and never runs; the header used to
+ * cite :113, which is the opening of a `/*DEBUG` comment and is not code at
+ * all. The service's own comment records that this used to
  * be `if (outcome !== 'none') spyowner = ''`, which deleted a spy every time
  * one reported. The pure roll is covered by `spy-counter-espionage.spec.ts`;
  * what was NOT covered is the service branch that decides whether the spy

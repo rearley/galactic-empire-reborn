@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 85 entries.
+Append-only, **newest at the bottom**. 86 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 85 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — the re-audit that asked whether the tests were RIGHT](#2026-09-10--the-re-audit-that-asked-whether-the-tests-were-right)
 - [2026-09-10 — a citation now has to prove itself, and a divergence has to be a decision](#2026-09-10--a-citation-now-has-to-prove-itself-and-a-divergence-has-to-be-a-decision)
 - [2026-09-10 — three droid defects found by reading the brains side by side](#2026-09-10--three-droid-defects-found-by-reading-the-brains-side-by-side)
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
@@ -5179,4 +5180,109 @@ forces it up except the habit of quoting when you touch a citation. That is an
 honest limit, not an oversight: requiring a quote on all 3,304 would mean
 backfilling by hand, which is the same error-prone transcription the guard
 exists to catch.
+
+## 2026-09-10 — the re-audit that asked whether the tests were RIGHT
+
+**Completed:** twenty-two canon defects found and fixed. Thirteen were
+behaviour, nine were comments, test names or citations.
+
+The 2026-09-05 test-suite audit read all 501 spec files and asked whether each
+test could fail. It never asked whether the expected value was correct. That is
+the more important question in a port whose source of truth is a pile of C from
+1992: a wrong number with a wrong citation passes forever and then defends the
+invention against anyone who tries to correct it.
+
+Five agents took the 25 spec files where a wrong value costs a ship, a planet or
+credits, each finding then put to an adversarial verifier told to refute it and
+to default to refuting when uncertain. 32 raw, 10 refuted, 22 kept.
+
+| batch | raw | refuted | kept |
+|---|---|---|---|
+| combat math | 5 | 1 | 4 |
+| projectiles | 11 | 1 | 10 |
+| planet economy | 5 | 4 | 1 |
+| planet combat | 4 | 3 | 1 |
+| AI and ships | 7 | 1 | 6 |
+
+**The behaviour fixes.**
+
+*Projectile impact re-armed the battle lock.* `checktm` touches `cantexit`
+exactly once, at GEFUNCS.C:1541, and only to count it down. Every
+`= FIRETICKS` in the original is in GECMDS.C at fire or lock time. This port
+re-armed both ships on every hit, so a volley held a pilot in place far longer
+than canon does, and `repair` is blocked while that counter is up.
+
+*A mine was laid by a typo.* `min` with no argument deployed a live mine on an
+invented 30-tick fuse. Canon requires the fuse and answers a bare `min` with the
+usage line (GECMDS.C:1757). Out-of-range fuses answered with the generic NUMOOR
+where canon prints the usage line again. The same wrong-message defect was in
+`mis` for the charge.
+
+*The neutral-zone self-zap fired at a name nothing carried.* Canon's `zaphim`
+sits inside the `shpnum >= 0` arm, after the target resolves. Sitting at the
+origin and naming a ship that does not exist cost a hundred points of hull.
+Fixed on both `tor` and `mis`.
+
+*The droid hyper-phaser spent the wrong resource.* `firehp` runs on flux: it
+gates on HPMINFIR, debits HPFIRAMT, arms `hypha`, and never touches `ptr->phasr`
+(GECMDS.C:1039). The droid path had no gate, debited nothing, and emptied the
+normal phaser bank instead, so a droid that fired into hyperspace could not then
+fire in normal space. The Cybertron copy had been corrected earlier and this one
+had not.
+
+*A missile arrived a tick early.* Canon's missile test is a strict less-than
+(GEFUNCS.C:1615) where the torpedo's is `<=` (GEFUNCS.C:1550). The asymmetry
+reads like a typo in the original and is canon all the same.
+
+*The missile lock envelope was stated as 4.93 sectors in four places.* It is
+3.53. 4.93 comes from using 1 as the lock divisor, and 1 is the numopt floor,
+not the shipped 21. The code always used the right value; only the file's
+arithmetic was wrong, so a case at six sectors passed while describing a
+boundary a sector and a half out. The real boundary is now pinned either side.
+
+*`new ship` told a pilot in open space to leave an orbit they were not in.*
+Canon tests `where < 10` first and answers NEW1, "we must go to Zygor to get a
+new ship". NEW5, the one that mentions orbit, is the later branch for someone
+orbiting the wrong body.
+
+*A purchased hull was handed to the buyer where they stood.* Canon runs the same
+`initshp` that places a first-time pilot: a random point in the neutral sector,
+re-rolled until it clears every planet there by 1000 units (GEFUNCS.C:196-215).
+The port's version was written to fix a different bug, where the position had
+been floored to the sector corner, and overshot in the other direction.
+
+*A dead shadow of the troop-attack math had the ratio wrong.* Canon's ratio is a
+percentage, `(left1*100UL)/left2`, so the `> 2` gate means the attacking force
+is more than 2% of the garrison. The helper divided without the hundred and was
+called by nothing. Deleted rather than corrected: an unused, wrong model of
+canon in a test file is worse than none, because the next person to need one
+copies it.
+
+**The nine documentation fixes** were a header quoting clamp bounds as if they
+were shipped values and contradicting its own tests, a test name attributing the
+seed's old broken scan range to the Interceptor, a citation pointing into a
+commented-out debug block, another quoting a guard that appears nowhere in the
+original, and four line numbers landing on blank lines and closing braces.
+
+**One of the 22 was mine, from this morning.** When I rewrote the droid
+hyper-phaser docblock I claimed canon spends the phaser bank at GECMDS.C:1041,
+where canon spends flux at :1039, and I wrote an assertion pinning it. The
+citation guard built earlier the same day checks that a cited line exists and
+that a quoted line matches; it cannot check a claim ABOUT what a line means.
+That is a fair result for the process and an unflattering one for the author.
+
+**Tests:** 603 suites, 6,116 tests, all passing. Every behaviour fix has its
+test written to canon before the code changed.
+
+**Decisions made:** none new. All 22 are canon corrections, so nothing goes in
+`DECISIONS.md`.
+
+**Next:** the restructuring work, now with the highest-stakes half of the suite
+checked against the original rather than assumed.
+
+**Known issues:** canon's missile impact never sets `lastfired` — the torpedo
+branch does and the missile branch does not. Following it would mean a missile
+kill credits nobody. Left alone deliberately and written up at the foot of
+`docs/audits/2026-09-10-canon-value-reaudit.md`; it wants its own look rather
+than a same-day change to kill attribution on a live galaxy.
 

@@ -185,9 +185,12 @@ const knockFor = (drain: number): number => Math.floor(MK2_DMAX * (drain / 100))
 
 describe('the mine sweep only touches ships that are still flying', () => {
   /**
-   * `minesweep` walks the ship table and skips anything not ingame — canon's
-   * loop is `if (shipdata[i].status == GESTAT_USER || ... GESTAT_AUTO)`
-   * (GEFUNCS.C:1420-1426). Our map keeps a hull for a tick or two after it
+   * `checkmines` walks the ship table and skips anything not ingame. The guard
+   * is a call, not a status comparison: GEFUNCS.C:1426 `if (ingegame(zothusn))`,
+   * and `ingegame` tests the USER's session state for a player and only falls
+   * back to `status == GESTAT_AUTO` for an automaton (GEMAIN.C:2651-2665).
+   * This docblock used to quote a status test that appears nowhere in the
+   * original. Our map keeps a hull for a tick or two after it
    * stops being a ship (kill resolution runs last, shutdown drains later), so
    * without the guard a mine writes damage and `lastfired` onto a corpse — and
    * `lastfired` is exactly what kill attribution reads, so the mine's layer can
@@ -315,7 +318,9 @@ describe('a missile arriving on a raised shield', () => {
       userid: 'b', shipno: 2, channel: 6,
       shieldstat: 1, shieldtype: 2, shield: 100,
       lmisslChannel: [5, 255, 255],
-      lmisslDistance: [MISLSPED, 0, 0], // arrives exactly this tick
+      // A STRICT less-than in canon: below MISLSPED arrives, exactly MISLSPED
+      // does not. @see GEFUNCS.C:1615 `if (mptr->distance < mislsped)`
+      lmisslDistance: [MISLSPED - 1, 0, 0],
       lmisslEnergy: [49_950, 0, 0],
     });
     const h = await makeHarness([firer, victim], fixedRandom(0.5));
@@ -334,9 +339,12 @@ describe('a missile arriving on a raised shield', () => {
     const hit = found(h, COMBAT_HIT) as CombatHitEvent | undefined;
     expect(hit?.weapon).toBe('missile');
     expect(hit?.damageShield).toBe(expectedKnock);
-    // Both ends of a fight are battle-locked by it — GEFUNCS.C:1570.
-    expect(victim.cantexit).toBe(FIRETICKS);
-    expect(firer.cantexit).toBe(FIRETICKS);
+    // Canon does NOT battle-lock on impact. `checktm` only counts `cantexit`
+    // down (GEFUNCS.C:1541 `--(ptr->cantexit);`); every `= FIRETICKS` sits in
+    // GECMDS.C at fire or lock time, so the lock this hit inherits was armed by
+    // `lockon` several ticks earlier and is already expiring.
+    expect(victim.cantexit).toBe(0);
+    expect(firer.cantexit).toBe(0);
   });
 
   /**
@@ -357,7 +365,7 @@ describe('a missile arriving on a raised shield', () => {
     const victim = makeShip({
       userid: 'b', shipno: 2, channel: 6,
       lmisslChannel: [5, 255, 255],
-      lmisslDistance: [MISLSPED, 0, 0],
+      lmisslDistance: [MISLSPED - 1, 0, 0],
       lmisslEnergy: [], // no charge recorded for this slot at all
     });
     const h = await makeHarness([firer, victim], fixedRandom(0.5));
@@ -401,7 +409,8 @@ describe('a hit whose firer cannot be resolved to a ship', () => {
     const hit = found(h, COMBAT_HIT) as CombatHitEvent | undefined;
     expect(hit?.attackerId).toBe('?:9');
     expect(hit?.victimId).toBe(shipKey('b', 2));
-    expect(victim.cantexit).toBe(FIRETICKS);
+    // No battle lock on impact — GEFUNCS.C:1541 only decrements it.
+    expect(victim.cantexit).toBe(0);
   });
 
   /**
