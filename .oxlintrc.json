@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "reference/**",
+    "**/*.generated.ts",
+    "backend/prisma/seed/**"
+  ],
+  "rules": {
+    "eslint/no-unused-vars": "off",
+    "unicorn/no-new-array": "off",
+    "eslint/no-control-regex": "off",
+    "unicorn/prefer-string-starts-ends-with": "off",
+    "unicorn/no-useless-spread": "off",
+    "oxc/erasing-op": "off",
+    "unicorn/no-empty-file": "off"
+  }
+}

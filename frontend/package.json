@@ -11,6 +11,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "lint": "oxlint -c ../.oxlintrc.json .",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
@@ -31,6 +32,8 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.0",
     "jsdom": "^30.0.1",
+    "oxlint": "^1.82.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
