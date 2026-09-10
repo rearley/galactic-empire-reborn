@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 81 entries.
+Append-only, **newest at the bottom**. 82 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — coverage round three: the gateway, and two agent errors caught by verifying](#2026-09-10--coverage-round-three-the-gateway-and-two-agent-errors-caught-by-verifying)
 - [2026-09-10 — coverage round two: 80 more cases, combat tick clears the bar](#2026-09-10--coverage-round-two-80-more-cases-combat-tick-clears-the-bar)
 - [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
@@ -4899,3 +4900,52 @@ and both have large skip lists that are legitimately excluded, so their real
 ceiling is lower than 100. Recount what is genuinely coverable in each before
 spending a third round on them.
 **Known issues:** frontend still has no coverage tooling.
+
+## 2026-09-10 — coverage round three: the gateway, and two agent errors caught by verifying
+
+Third five-agent workflow: three slices of `game.gateway.ts`, the remaining real
+decisions in both AI ticks, and the report handler.
+
+**86 new cases. Two failed on first run — and that is the headline.**
+
+Both were errors in the TESTS, not defects in the code, and both are the kind an
+agent makes and a human would too:
+
+1. `gateway-command-branches` asserted that a non-string prompt reply does not
+   reach `finalize`. It does, because the harness mocks `validateNameReply` to
+   accept everything. The real validator rejects `''` — `isValidShipName`
+   requires 1-19 characters — so production behaves as the agent expected but
+   its own harness did not. Fixed by making the mock reflect the real validator
+   for that case.
+2. `gateway-broadcast-branches` put a ship at x = −11.8 and expected room
+   `sector:-11:42`. `Math.floor(-11.8)` is −12. Canon's `coord1` is floor
+   (GECMDS.C:3102) and the code is right. This is the same off-by-one that once
+   let the neutral zone protect x in (−0.5, 0), which floors to sector −1 — a
+   bug this project has already had.
+
+Neither would have been caught by an agent running its own Jest, because the
+first passes with an unrealistic mock and the second was a wrong expectation.
+Serial verification by a different reader is what found them.
+
+| module | before | after |
+|---|---|---|
+| `gateway/game.gateway.ts` | 74.7 | **85.8** |
+| `handlers/report.handler.ts` | 47.6 | 76.8 |
+| `cybertron/cybertron-tick.service.ts` | 80.6 | 83.5 |
+| `droid/droid-tick.service.ts` | 74.3 | 76.2 |
+
+Suite: **branches 80.4% → 82.2%**, lines 94.5% → 95.4%, 6,049 tests.
+
+**Mutation-checked**, one per spec: the non-string name coercion, the MAXPLRS
+seat gate, and the `rep` sub-report routing (which failed three cases, so the
+routing is pinned from several directions). Each produced failures; none passed
+silently.
+
+**The report handler's real ceiling.** It went 47.6 → 76.8 and that is close to
+done, not half done: seventeen of its remaining branches are the display
+fallbacks the strategy excludes by name.
+
+**Next:** the frontend socket layer — `useSocket.ts` at 6.7% functions,
+`socketClient.ts` at 42.9%. That is where connection state, reconnection and
+event dispatch live, and a wrong branch means a client silently stops receiving
+events while looking fine. It connects to the known disconnect-detection window.
