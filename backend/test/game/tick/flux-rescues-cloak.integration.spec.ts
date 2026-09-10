@@ -90,7 +90,13 @@ function runTicks(tick: TickService, n: number): void {
 }
 
 describe('flux reloads before the cloak is tested (warrtia order)', () => {
-  it('keeps a cloak alive on a reloaded pod instead of shutting it down', () => {
+  // NOTE: this is the NARROW case — a tick that STARTS below ENGYMIN with the
+  // cloak already on, reachable by engaging the cloak on a nearly empty tank
+  // (`clo on` debits CLENGUSE immediately). It is NOT the steady-state drain
+  // path: a cloaked ship draining normally dies in the 5,000-8,199 band long
+  // before it reaches the reload threshold, because shieldstat runs before
+  // cloakstat and takes its cut first. @see docs/PROGRESS.md 2026-09-10
+  it('reloads before the cloak test when a tick starts under the threshold', () => {
     const ship = makeShip({ energy: 1000 });
     ship.items[I_FLUX] = 15n;
     const { tick } = harness(ship);
