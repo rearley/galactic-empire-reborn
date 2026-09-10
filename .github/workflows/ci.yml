@@ -1,23 +1,35 @@
-name: CI
+name: CI and deploy
 
-# Runs the test suites. Nothing here builds or publishes an image — that is
-# deploy.yml's job, and the two are deliberately separate.
+# Tests, then images. One workflow, because the gate has to be real: the build
+# job declares `needs` on both suites, so GitHub itself refuses to start it when
+# a test fails. Nothing unproven can reach ghcr, and nothing unproven can reach
+# the <panel> host that pulls from it.
 #
-# WHAT THIS DOES NOT DO YET: it does not gate the deploy. deploy.yml triggers on
-# its own `push` to master, so a red run here does not stop an image reaching
-# production. Wiring that up is a deliberate second step, because a broken gate
-# blocks every deploy including the fix.
+# This used to be two workflows and the split was the problem. deploy.yml
+# triggered on its own `push`, so a red test run did not stop an image shipping.
+# A `workflow_run` trigger would have gated it while losing the path rules
+# below, because workflow_run cannot filter on paths.
 #
-# TRIGGERS. `push` to master is the one that matters. Work on this repository is
-# committed straight to master rather than through feature branches, so a
-# pull_request-only workflow would almost never run. pull_request is here for
-# the occasions when a branch is used.
+# Images go to ghcr, where a watchtower container on the <panel> host follows
+# :latest — so a merge to master redeploys without anyone touching the server,
+# usually within five minutes.
 #
-# Documentation must not spend a CI run, for the same reason it must not restart
-# a live game. The ignore list is deliberately SHORTER than deploy.yml's: that
-# workflow also ignores backend/test, frontend/test and tools, because they are
-# not build inputs. They are exactly what this workflow exists to run, so a
-# change to any of them must trigger it.
+# TRIGGERS. `push` to master is the one that matters. Work here is committed
+# straight to master rather than through feature branches, so a
+# pull_request-only workflow would almost never run. On a pull request the
+# suites run and the build does not.
+#
+# Documentation must not spend a CI run OR restart a live game. A docs-only
+# push is filtered out here and never starts anything.
+#
+# TRAP: if a .md ever becomes a build input — a guide page sourced from
+# markdown, say — remove the pattern rather than adding an exception. A deploy
+# that does not happen looks exactly like one that did.
+#
+# VERSION is deliberately NOT ignored: it is read below and baked into both
+# images, so a bump must build. reference/ is not ignored either — it never
+# reaches an image, but a change to it is rare enough that an unnecessary build
+# costs less than reasoning about whether this one was the exception.
 on:
   push:
     branches: [master]
@@ -30,33 +42,32 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A newer commit supersedes an in-flight run on the same ref. Without this, a
-# quick succession of pushes queues runs that are already answering a stale
-# question.
+# A newer commit supersedes an in-flight run on the same ref. Cancelling is
+# limited to pull requests on purpose: on master an in-flight run may be pushing
+# images, and interrupting that is a worse outcome than one redundant run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Nothing here needs to write anything. deploy.yml holds packages:write because
-# it pushes images; this workflow only reads the tree, so it says so explicitly
-# rather than inheriting whatever the repository default happens to be.
+# Read-only by default. The build job raises its own permissions to push images,
+# so the two test jobs cannot write anything even if a dependency tried.
 permissions:
   contents: read
 
-# Third-party actions are pinned to commit SHAs rather than tags, matching
-# deploy.yml. A tag like @v4 is mutable. This workflow holds no secrets, so the
-# stakes are lower here than there, but a consistent rule is easier to keep than
-# a conditional one.
+# Third-party actions are pinned to commit SHAs, not tags. The build job holds
+# packages:write against a registry the production host pulls from, and a tag
+# like @v4 is mutable — whoever controls that action could repoint it, and the
+# next build would push whatever they wanted into ghcr, where watchtower would
+# deploy it within five minutes. The trailing comment keeps the human-readable
+# version visible.
 
 jobs:
   backend:
     name: Backend — Jest
     runs-on: ubuntu-latest
-    # Measured at 100s wall clock for 605 suites / 6,141 tests on a developer
-    # machine, plus install and schema push. A hosted runner is slower and its
-    # Postgres is a container, so this is generous headroom rather than a
-    # prediction. It exists so a hang costs minutes instead of the six-hour
-    # default.
+    # 605 suites / 6,141 tests measured at 100s on a developer machine and 240s
+    # on a hosted runner. This is headroom, not a prediction; it exists so a
+    # hang costs minutes instead of the six-hour default.
     timeout-minutes: 20
 
     # The suite is not hermetic: it runs against a real PostgreSQL, because the
@@ -70,8 +81,7 @@ jobs:
           POSTGRES_DB: ge_test
         ports:
           - 5432:5432
-        # Without a health check the first connection races container startup
-        # and fails on a cold runner roughly one run in five.
+        # Without a health check the first connection races container startup.
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -87,9 +97,8 @@ jobs:
       # outlives the job.
       JWT_SECRET: ci-not-a-real-secret
       # test/game/physics/bench.spec.ts asserts 100 ships advance in under 50ms.
-      # It measured 3ms locally, but a wall-clock budget on a shared runner
-      # tests the runner's neighbours, not this code. The escape hatch is the
-      # test author's own.
+      # It measures 3ms locally, but a wall-clock budget on a shared runner
+      # tests the runner's neighbours. The escape hatch is the test author's own.
       CI_LOW_PERF: '1'
 
     steps:
@@ -105,9 +114,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       # global-setup.ts shells out to `psql` for three LOWER() unique indexes
-      # that Prisma cannot express in schema.prisma. The runner image ships a
-      # client, but an assumption that fails silently three steps later is worse
-      # than one that fails here.
+      # that Prisma cannot express in schema.prisma. An assumption that fails
+      # silently three steps later is worse than one that fails here.
       - name: Verify psql is present
         run: psql --version
 
@@ -125,8 +133,6 @@ jobs:
         working-directory: backend
         run: npx tsc --noEmit
 
-      # globalSetup pushes the schema to the test database and creates the three
-      # raw indexes before the first suite runs.
       - name: Test
         working-directory: backend
         run: npm test
@@ -134,7 +140,7 @@ jobs:
   frontend:
     name: Frontend — Vitest and build
     runs-on: ubuntu-latest
-    # Measured at 15s for 39 files / 310 tests, plus install and the Vite build.
+    # 39 files / 310 tests measured at 15s locally, plus install and the build.
     timeout-minutes: 10
 
     steps:
@@ -162,3 +168,139 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+  # Does anything in this push actually change what goes INTO an image?
+  #
+  # GIT_SHA is a build arg baked into both images, so every build produces a new
+  # digest even when no code changed, watchtower sees a new :latest, and the
+  # stack restarts. A test-only commit therefore interrupts whoever is playing,
+  # and coverage work makes many such commits.
+  #
+  # Neither Dockerfile copies these paths — backend takes package*.json, prisma,
+  # tsconfig, nest-cli.json, src and config; frontend takes package*.json, the
+  # config files, index.html, src and nginx.conf. The two tools/ directories
+  # hold the canon extractors and the coverage classifier, which run on a
+  # developer's machine. Excluding them is safe BECAUSE the extractors write
+  # their output into backend/src and backend/prisma/seed, which are not
+  # excluded, so regenerating canon still deploys while editing the generator
+  # that produced it does not.
+  #
+  # This file is NOT excluded. A change to the build recipe should rebuild:
+  # that is the only way to learn whether the recipe still works.
+  #
+  # It FAILS OPEN. Whenever the range cannot be determined the answer is build,
+  # because a redundant restart is recoverable and a deploy that silently did
+  # not happen is not.
+  changes:
+    name: Build needed?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'push'
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The push range starts at `before`, which is not in a shallow clone.
+          fetch-depth: 0
+
+      - id: decide
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # Deliberately a SUPERSET of the paths-ignore on the trigger above.
+          # The trigger only skips a push where EVERY file is ignored, so a
+          # commit pairing a README with a test file would otherwise arrive here
+          # and build. This list is the authority; the trigger is the shortcut.
+          NOT_A_BUILD_INPUT='^(backend/test/|frontend/test/|frontend/e2e/|tools/|backend/tools/|docs/|specs/|LICENSE$|NOTICE$)|\.md$'
+
+          if [ -z "$BEFORE" ] \
+            || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "Cannot resolve the push range from '$BEFORE' — building."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! CHANGED=$(git diff --name-only "$BEFORE" "$AFTER"); then
+            echo "git diff failed across the range — building."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed in this push:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          RELEVANT=$(echo "$CHANGED" | grep -Ev "$NOT_A_BUILD_INPUT" || true)
+          if [ -n "$RELEVANT" ]; then
+            echo "Build inputs changed:"
+            echo "$RELEVANT" | sed 's/^/  /'
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing here reaches an image. Skipping the build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build and publish images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # THE GATE. Both suites must pass before a single image is built. A pull
+    # request never gets here, and neither does a push that changes nothing an
+    # image contains.
+    needs: [backend, frontend, changes]
+    if: github.event_name == 'push' && needs.changes.outputs.build == 'true'
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      # Build both even if one fails, so a broken frontend does not hide a
+      # broken backend and cost a second round trip to find out.
+      fail-fast: false
+      matrix:
+        include:
+          - name: ge-backend
+            context: ./backend
+          - name: ge-frontend
+            context: ./frontend
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # The release number lives in one place, at the repo root, so both images
+      # cannot disagree about what release they are.
+      - name: Read VERSION
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ghcr
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.name }}
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          # Baked into the image so the running app can say which commit it is.
+          # Same value as the :sha tag below, so a version on screen names a
+          # pullable image, which is what makes it useful for rolling back.
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=${{ steps.version.outputs.value }}
+          # :latest is what watchtower follows; the sha tag is what makes a bad
+          # deploy recoverable — pin the compose file to a sha to roll back.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
