@@ -60,6 +60,11 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
   planets:
     'Colonists eat here. The original fed only troops, which let a colony grow ' +
     'forever on nothing — feed a planet or watch it starve.',
+  rep:
+    '`rep sys` calls the phaser inoperable until the bank holds enough charge ' +
+    'to actually fire. The original called it operative the moment the bank was ' +
+    'above zero, and then refused the shot anyway. Here the line answers the ' +
+    'question you are really asking before a fight.',
   set:
     'Function keys are typed rather than pressed — `fset f1 pha 0 0`, then `f1` — ' +
     'because a browser will not give up F11 or F12.',

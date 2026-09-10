@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 84 entries.
+Append-only, **newest at the bottom**. 85 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 84 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — a citation now has to prove itself, and a divergence has to be a decision](#2026-09-10--a-citation-now-has-to-prove-itself-and-a-divergence-has-to-be-a-decision)
 - [2026-09-10 — three droid defects found by reading the brains side by side](#2026-09-10--three-droid-defects-found-by-reading-the-brains-side-by-side)
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
@@ -5115,3 +5116,67 @@ another sweep.
 
 **Known issues:** none opened by this work. The going-public decision and the
 loopback bind on `:3100` are still where they were.
+
+## 2026-09-10 — a citation now has to prove itself, and a divergence has to be a decision
+
+**Completed:** `backend/test/balance/canon-citations.balance.spec.ts`, closing
+the two things the suite could not prove about itself.
+
+The question that started it: if a test hardcodes its expected value, what
+tethers that value to canon? Only the citation beside it. And the existing guard
+checks a citation points at a line that EXISTS, not that the line says what the
+comment claims. So a wrong number with a wrong citation passes forever, and then
+defends the invention against anyone who tries to correct it.
+
+**Guard one — quoted citations are verified.** Where a comment already quotes
+the line it cites, the fragment must appear within five lines of the cited line,
+whitespace ignored. No new syntax: 51 citations were already written that way by
+habit. It found a real error on its first run — `planet-tick.service.ts` cited
+`GEMAIN.C:963` for `#define MAXTIC 20`, which lives at 1977. Right value,
+pointer a thousand lines out, and the bounds check passed because GEMAIN.C is
+long.
+
+Three weaker designs were measured and rejected before this one. Requiring the
+cited line be "substantive" fails on 446 of 3,304 citations, most of them
+legitimately pointing at a function's opening brace. Inferring the quote from
+surrounding prose verifies 79%, and the misses are artifacts of associating
+every fragment in a docblock with every citation in it. Exact text matching
+produces six false failures out of forty-seven, because canon spaces its
+semicolons oddly. A noisy guard gets disabled, and a disabled guard is worse
+than none.
+
+**Guard two — divergences are decisions.** `@divergence <slug>` must appear in
+both the code and `DECISIONS.md`, checked in both directions so a divergence
+quietly returned to canon also fails and forces the entry closed. Paired with a
+trap on the language people use when parking one: five phrases, validated
+against the whole corpus at three hits before shipping.
+
+It found one open divergence. `rep sys` calls the phaser inoperable below
+`PMINFIRE` where canon prints operative whenever the bank is above zero
+(GECMDS.C:2019). Canon's own `cmd_phas` then refuses to fire below 60, so the
+original reports a working weapon and declines the shot. Kept and recorded
+rather than reverted, because the port's line answers the question a pilot is
+actually asking before a fight. Now in `DECISIONS.md` and on the guide's `rep`
+page.
+
+**Tests:** 7 cases in the new guard, all three checks mutation-verified — a
+citation moved 1,000 lines fails, the code-side marker removed fails, the
+DECISIONS-side marker removed fails. A citation moved by one line does NOT fail,
+which is the five-line window working as intended rather than a gap.
+
+**Decisions made:** `rep sys` phaser readiness recorded as a deliberate
+deviation, `@divergence rep-sys-phaser-readiness`. It is a one-word revert if
+that call is wrong.
+
+**Next:** the restructuring work. `docs/TEST_STRATEGY.md` now carries the
+playtest loop — read canon and quote it, failing test first through the caller,
+watch it fail for the right reason, mutation-check, and if canon cannot answer
+then it is a decision and not a comment.
+
+**Known issues:** the quoted-citation check only covers citations that carry a
+quote, currently 48 of 3,304. The ratchet stops that number falling but nothing
+forces it up except the habit of quoting when you touch a citation. That is an
+honest limit, not an oversight: requiring a quote on all 3,304 would mean
+backfilling by hand, which is the same error-prone transcription the guard
+exists to catch.
+

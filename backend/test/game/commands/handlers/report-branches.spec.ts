@@ -230,10 +230,12 @@ describe('rep wpns — yes/no mirrors the hull fit, per flag', () => {
 // ---------------------------------------------------------------------------
 
 describe('rep sys — phaser bank readiness (report.handler.ts:222)', () => {
-  // CHARACTERIZATION. Canon prints REP23 whenever `warsptr->phasr > 0`
-  // (GECMDS.C:2018-2022); this port gates on PMINFIRE, the charge a shot
-  // actually costs, so a partly-charged bank reads <inoperable> here and
-  // <operative> in the original. Pinned as it stands, not as canon.
+  // A recorded deviation, not an accident. Canon prints REP23 whenever
+  // GECMDS.C:2019 `if (warsptr->phasr > 0)` holds, while `cmd_phas` refuses to
+  // fire below PMINFIRE — so the original calls the bank operative through the
+  // 0-59 band and then declines the shot. This port gates the report on the
+  // charge a shot actually costs, so the line answers the question the pilot is
+  // asking. @divergence rep-sys-phaser-readiness
   it('a bank at or above PMINFIRE reads operative', async () => {
     const h = await makeHarness();
     const lines = await report(h, ['sys'], makeShip({ phasrtype: 3, phasr: PMINFIRE }));
