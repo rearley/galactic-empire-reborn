@@ -27,7 +27,11 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
   };
 }
 
-function makeHarness(ships: ShipState[], scanRange = 100_000_000) {
+function makeHarness(
+  ships: ShipState[],
+  scanRange = 100_000_000,
+  letters: ReadonlyArray<{ shipKey: string; letter: string }> = [],
+) {
   const shipMap = new Map<string, ShipState>();
   for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
   const shipState = {
@@ -46,7 +50,7 @@ function makeHarness(ships: ShipState[], scanRange = 100_000_000) {
     scanRange, maxTons: 5000,
   } as never);
   return new LockHandlerService(shipState, cache,
-      { lettersFor: () => [] } as unknown as ScanHandlerService,
+      { lettersFor: () => letters } as unknown as ScanHandlerService,
     );
 }
 
@@ -62,6 +66,36 @@ describe('LockHandlerService — `loc <target>`', () => {
     // LOCK02 names the ship AND its commander — canon passes username() as the
     // second arg (GECMDS.C:5093). The old assertion pinned an invented string.
     expect(result.lines[0].text).toMatch(/Fire control locked on Bob commanded by/);
+  });
+
+  /**
+   * Canon compares the RESOLVED target to the caller — `if (shpnum == usrnum)
+   * prfmsg(FOOLISH)` (GECMDS.C:1150) — AFTER findshp has turned the argument
+   * into a ship. It never matches on a name, and since findshp resolves by
+   * scan letter and your own hull is not in your own scan table, the check is
+   * all but unreachable.
+   *
+   * The port put a name-prefix self-test BEFORE resolution, so any letter that
+   * happened to begin the caller's own ship name became permanently unusable
+   * as a target. A pilot flying "BigCat" could never `loc B`, whatever B was
+   * on their scan, and got "That would be foolish Sir!" for a Cyberquad
+   * eighteen thousand units away. `sca sh B` worked the whole time, which is
+   * what made it look like nonsense. Reported from play 2026-09-09.
+   */
+  it('locks the letter, not the caller, when the letter starts their own ship name', () => {
+    const me = makeShip({ userid: 'me', shipno: 1, shipname: 'BigCat' });
+    const quad = makeShip({ userid: 'Cybrg-9', shipno: 9, shipname: 'Cyberquad 44135', status: 2 });
+    const h = makeHarness([me, quad], 100_000_000, [{ shipKey: shipKey(quad.userid, quad.shipno), letter: 'B' }]);
+    const result = h.command.handler(me, ['B'], ctx) as CommandResult;
+    expect(result.lines[0].text).not.toBe(formatMessage(MessageId.LOC_SELF));
+    expect(result.lines[0].text).toMatch(/locked on/i);
+  });
+
+  it('still refuses a name that really is the caller, with no letter in play', () => {
+    const me = makeShip({ userid: 'me', shipno: 1, shipname: 'BigCat' });
+    const h = makeHarness([me]);
+    const result = h.command.handler(me, ['BigCat'], ctx) as CommandResult;
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.LOC_SELF));
   });
 
   it('rejects locking onto self (LOC_SELF)', () => {

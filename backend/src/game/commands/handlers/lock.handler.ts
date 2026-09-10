@@ -70,17 +70,6 @@ export class LockHandlerService {
 
     const query = args[0] ?? '';
 
-    // 2a. Self-name reject — if the query (case-insensitive prefix) matches
-    // our own shipname, surface LOC_SELF rather than findShip's
-    // generic "no such ship" (findShip silently excludes self).
-    const trimmed = query.trim();
-    if (
-      trimmed.length > 0 && trimmed !== '@' &&
-      ship.shipname.toLowerCase().startsWith(trimmed.toLowerCase())
-    ) {
-      return { lines: [{ text: formatMessage(MessageId.LOC_SELF), category: 'system' }] };
-    }
-
     let scanRange = 0;
     try {
       scanRange = this.shipClassCache.getScanRange(ship.shpclass);
@@ -91,6 +80,25 @@ export class LockHandlerService {
     const allShips = this.shipState.findAllShips();
     const result = findShip(query, ship, allShips, scanRange, this.scanHandler.lettersFor(ship.userid, ship.shipno));
     if (!result.ok) {
+      // Self-name reject, and it must come AFTER resolution. Canon compares the
+      // RESOLVED ship to the caller — `if (shpnum == usrnum) prfmsg(FOOLISH)`
+      // (GECMDS.C:1150) — and never matches on a name.
+      //
+      // This used to run BEFORE findShip as a name-prefix test, which made any
+      // letter that began the caller's own ship name permanently unusable as a
+      // target: a pilot flying "BigCat" could not `loc B` at all, and was told
+      // "That would be foolish Sir!" about a Cyberquad two sectors away while
+      // `sca sh B` kept working. Running it here keeps the friendlier message
+      // for someone who really did type their own name, without the collision,
+      // because findShip has already had its chance to resolve the letter.
+      const trimmed = query.trim();
+      if (
+        trimmed.length > 0 && trimmed !== '@'
+        && ship.shipname.toLowerCase().startsWith(trimmed.toLowerCase())
+      ) {
+        return { lines: [{ text: formatMessage(MessageId.LOC_SELF), category: 'system' }] };
+      }
+
       // Lazy clear semantics — if findShip flagged the lock as stale, persist clear.
       if (result.clearedLock) {
         this.shipState.mutate(ship.userid, ship.shipno, (s) => {
