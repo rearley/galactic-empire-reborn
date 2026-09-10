@@ -5435,6 +5435,7 @@ of it.
 (up from the 605/6,141 pre-phase baseline: +1 suite/+6 tests from the runtime
 pin, +1 suite/+7 tests from the lint gate), ~117s local. Frontend unchanged at
 39 files / 310 tests, ~15s. Both `npm run lint` exit 0 in both apps.
+(Amended after initial entry: figure revised from 6,153 to 6,154 during phase 0 before branch push when one assertion was added to `node-runtime-version.spec.ts` to tie `@types/node` to the runtime major version.)
 
 **Decisions made:** the three recorded in `docs/DECISIONS.md` 2026-09-10 —
 TypeScript pinned at 6.0.3 until Vitest replaces Jest in phase 5, oxlint over
