@@ -210,6 +210,7 @@ export enum MessageId {
 
   // mine / zipper / decoy / jammer / sys (feature 006b Phase 5)
   MIN_NOMINE = 'MIN_NOMINE',
+  MIN_FMT = 'MIN_FMT',
   MIN_CLOAK = 'MIN_CLOAK',
   MIN_NEUTRAL = 'MIN_NEUTRAL',
   MIN_NOAMMO = 'MIN_NOAMMO',
@@ -252,6 +253,7 @@ export enum MessageId {
   DESTRUCT_BLAST_HIT = 'DESTRUCT_BLAST_HIT',
   /** NEW5 — `new` attempted anywhere but in orbit around Zygor. */
   NEW_WRONG_PLACE = 'NEW_WRONG_PLACE',
+  NEW_NOT_ORBITING = 'NEW_NOT_ORBITING',
   /** TRANSFR4 — `tra down` refused because the planet is not ours. */
   TRAN_DOWN_NOT_OWNER = 'TRAN_DOWN_NOT_OWNER',
   /** TRANSUP4 — `tra up` refused because the planet is not ours. */
@@ -857,6 +859,7 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   // The sector scan is always 1x and carries no range at all.
   [MessageId.SCAN25]: CANON_MESSAGES.SCAN25,
   [MessageId.MIN_NOMINE]: CANON_MESSAGES.MINE0,
+  [MessageId.MIN_FMT]: CANON_MESSAGES.MINFMT,
   [MessageId.MIN_CLOAK]: CANON_MESSAGES.PCLOKUP,
   [MessageId.MIN_NEUTRAL]: CANON_MESSAGES.MINE7,
   [MessageId.MIN_NOAMMO]: CANON_MESSAGES.MINE1,
@@ -919,6 +922,7 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
    * Tahanian Station.
    */
   [MessageId.NEW_WRONG_PLACE]: CANON_MESSAGES.NEW5,
+  [MessageId.NEW_NOT_ORBITING]: CANON_MESSAGES.NEW1,
   /**
    * Canon's ownership refusals for `tra`. The port answered TRANSFR3 — "We are
    * not in orbit" — for both, which is false of a ship standing in orbit over

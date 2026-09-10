@@ -191,9 +191,13 @@ describe('PhysicsTickService', () => {
 
     it('ship in orbit (where>=10) skips accel/move/maintenance but STILL ROTATES', () => {
       // `warrti2a` calls rotateship/accel/moveship/destruct with no orbit test
-      // (GEMAIN.C:2476-2483), and rotateship contains no reference to `where`
-      // at all (GEFUNCS.C:433-461) — the gate lives only in moveship (:641,
-      // :652). Gating rotation too meant an orbiting pilot was told "Now
+      // (GEMAIN.C:2479-2482), and none of those three functions tests `where`
+      // either. Canon needs no orbit gate: an orbiting ship is stopped, and
+      // `moveship` opens with GEFUNCS.C:641 `if (ptr->speed > 0)`, so the body
+      // never runs. Its one `where` test, GEFUNCS.C:651 `if (ptr->where <= 1)`,
+      // guards the universe-boundary wrap and has nothing to do with orbit.
+      // This note used to claim an orbit gate at :641 and :652 that does not
+      // exist. Gating rotation too meant an orbiting pilot was told "Now
       // turning to N degrees" and simply did not turn, with no way to see it:
       // `rep nav` correctly omits heading while orbiting (GECMDS.C:1984-1988),
       // so every `sca pl` bearing taken in orbit used a stale heading.

@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { buildPurchasedShipName } from './purchased-ship-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Random, RANDOM } from '../../combat/random.port';
+import { PlanetStateService } from '../../planet/planet-state.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
@@ -113,6 +115,17 @@ function isShipnameCollision(err: unknown): boolean {
  * orbit.handler.ts stores `where = 10 + plnum`. @see GECMDS.C:4557
  */
 const ZYGOR_PLNUM = 1;
+/** `NEUTRAL_X` and `NEUTRAL_Y` are both 0 — the origin sector. */
+const NEUTRAL_SECTOR = 0;
+/** `rndm(.9999)` — a point inside the sector, never its next neighbour. */
+const INTRA_SECTOR_MAX = 0.9999;
+/** One sector in the raw units `cdistance` is scaled into. */
+const SECTOR_UNITS = 10_000;
+/** `if (ddistance < 1000) flag = 1;` — GEFUNCS.C:212 */
+const HULL_PLANET_CLEARANCE = 1000;
+const HULL_PLACEMENT_ATTEMPTS = 50;
+/** `plnum = warsptr->where - 10`, so anything under 10 is not in orbit at all. */
+const ORBIT_WHERE_BASE = 10;
 
 /**
  * The buyer could not afford the hull, or was at the fleet cap, at the moment
@@ -132,7 +145,46 @@ export class NewShipHandlerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipStateService: ShipStateService,
+    private readonly planetState: PlanetStateService,
+    @Inject(RANDOM) private readonly random: Random,
   ) {}
+
+  /**
+   * Where a purchased hull actually appears.
+   *
+   *   tmpshp.coord.xcoord = NEUTRAL_X + rndm(.9999);
+   *   tmpshp.coord.ycoord = NEUTRAL_Y + rndm(.9999);
+   *   ... re-rolled while any planet in the sector is closer than 1000
+   *                                                   -- GEFUNCS.C:196-215
+   *
+   * Canon does NOT hand you the hull where you stand. `cmd_new` calls `initshp`
+   * (GECMDS.C:4572), the same routine that places a first-time pilot, and that
+   * drops the ship at a random point inside the neutral sector, re-rolling
+   * until it clears every planet there by 1000 units. So a new ship is a short
+   * flight away, and never inside a station's approach.
+   *
+   * This port used the buyer's exact position, which is a different and easier
+   * game: buy at Zygor and the hull is already docked beside you.
+   */
+  private placeNewHull(): { x: number; y: number } {
+    const planets = this.planetState.bySector(NEUTRAL_SECTOR, NEUTRAL_SECTOR);
+    for (let attempt = 0; attempt < HULL_PLACEMENT_ATTEMPTS; attempt++) {
+      const x = NEUTRAL_SECTOR + this.random.next() * INTRA_SECTOR_MAX;
+      const y = NEUTRAL_SECTOR + this.random.next() * INTRA_SECTOR_MAX;
+      const tooClose = planets.some(
+        (p) => Math.hypot(x - p.xcoord, y - p.ycoord) * SECTOR_UNITS < HULL_PLANET_CLEARANCE,
+      );
+      if (!tooClose) return { x, y };
+    }
+    // Canon's loop is unbounded and cannot fail with the shipped three-planet
+    // neutral zone. A bound is kept here so a mis-seeded galaxy cannot hang the
+    // command, and the last roll is used rather than falling back to the
+    // buyer's position, which is the behaviour being corrected.
+    return {
+      x: NEUTRAL_SECTOR + this.random.next() * INTRA_SECTOR_MAX,
+      y: NEUTRAL_SECTOR + this.random.next() * INTRA_SECTOR_MAX,
+    };
+  }
 
   get command(): Command {
     return {
@@ -215,6 +267,23 @@ export class NewShipHandlerService {
     // (GECMDS.C:4500): you can be serviced at Tahanian Station, but you can
     // only BUY at Zygor. The port gated on "sector (0,0), orbiting anything",
     // so every neutral-zone body sold hulls and upgrades.
+    // Canon answers with TWO different messages and tests `where` first:
+    //
+    //   if (warsptr->where < 10) { prfmsg(NEW1); ... return; }
+    //   plnum = warsptr->where - 10;
+    //   if (neutral(&warsptr->coord) && plnum == 1) { ...buy... }
+    //   else prfmsg(NEW5);
+    //
+    // NEW1 is "Sorry Sir, we must go to Zygor to get a new ship." and is what a
+    // pilot flying free space hears. NEW5, "we must be in orbit around Zygor in
+    // Sector 0 0 to get new equipment", is the LATER answer for someone already
+    // in orbit around the wrong body. This port printed the orbit message to
+    // everyone, which told a pilot sitting in open space to leave an orbit they
+    // were not in.
+    // @see GECMDS.C:4547 `if (warsptr->where < 10)`
+    if (ship.where < ORBIT_WHERE_BASE) {
+      return { lines: [{ text: formatMessage(MessageId.NEW_NOT_ORBITING), category: 'system' }] };
+    }
     if (!this.atZygor(ship)) {
       return { lines: [{ text: formatMessage(MessageId.NEW_WRONG_PLACE), category: 'system' }] };
     }
@@ -287,12 +356,7 @@ export class NewShipHandlerService {
       try {
         await this.createShipTransaction(
           ship.userid, newShipno, shipName, classNumber, shipClass, items,
-          // The buyer's exact position, not the sector index. Flooring put a
-          // hull "docked at Zygor" at the sector's corner instead — up to
-          // 7,071 units from the station, which since orbit began requiring a
-          // 250-unit approach is a long impulse crawl back to where you
-          // already were.
-          { x: ship.xcoord, y: ship.ycoord },
+          this.placeNewHull(),
         );
         created = true;
       } catch (err: unknown) {

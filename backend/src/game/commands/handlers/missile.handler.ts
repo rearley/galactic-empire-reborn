@@ -39,7 +39,7 @@ const MISSHRT = 'Sorry Sir! There is not that much energy in our neutron flux pi
  *
  * Validations (mirror GECMDS.C:cmd_missl, GEFUNCS.C:firemiss):
  *   1. ShipClass.hasMissile === true   → else MIS_NOMIS
- *   2. charge ∈ [1, 50000]              → else NUMOOR(1, 50000)
+ *   2. charge in [1, 50000], else MISFMT — canon's own usage line, GECMDS.C:1272
  *   3. firer.jammer === 0               → else JAMMER4 (FR-017)
  *   4. firer.items[I_MISSL] > 0n        → else MIS_NOAMMO
  *   5. target found in scan range
@@ -122,20 +122,23 @@ export class MissileHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MIS_CLOAK), category: 'system' }] };
     }
 
-    // Parse charge
+    // Both refusals are the command's OWN usage line. Canon tests the argument
+    // twice and prints MISFMT each time, and `cmd_missl` never calls NUMOOR:
+    //
+    //   if (margv[2] == NULL || margc < 3) { prfmsg(MISFMT); ... return; }
+    //   eng_long = atol(margv[2]);
+    //   if (eng_long == 0 || eng_long > 50000L) { prfmsg(MISFMT); ... return; }
+    //
+    // @see GECMDS.C:1262 `prfmsg(MISFMT);`
+    // @see GECMDS.C:1271 `prfmsg(MISFMT);`
     const chargeArg = args[1] ?? '';
     if (!/^-?\d+$/.test(chargeArg.trim())) {
-      return {
-        lines: [{ text: formatMessage(MessageId.NUMOOR, MISSILE_CHARGE_MIN, MISSILE_CHARGE_MAX), category: 'system' }],
-      };
+      return { lines: [{ text: formatMessage(MessageId.MIS_FMT), category: 'system' }] };
     }
     const charge = parseInt(chargeArg, 10);
 
-    // 2. Charge range
     if (charge < MISSILE_CHARGE_MIN || charge > MISSILE_CHARGE_MAX) {
-      return {
-        lines: [{ text: formatMessage(MessageId.NUMOOR, MISSILE_CHARGE_MIN, MISSILE_CHARGE_MAX), category: 'system' }],
-      };
+      return { lines: [{ text: formatMessage(MessageId.MIS_FMT), category: 'system' }] };
     }
 
     // 3. Fire control damaged — GECMDS.C:1346-1351 lockon first check (C-010, Fix 1)
@@ -188,7 +191,22 @@ export class MissileHandlerService {
       };
     }
 
-    // 4b. Neutral-zone self-zap (GECMDS.C:937 zaphim) — firer takes SE100DAM, no outgoing lock.
+    // 5. Target lookup
+    const allShips = this.shipState.findAllShips();
+    const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
+    const letters = this.scanHandler.lettersFor(ship.userid, ship.shipno);
+    const found = findShip(args[0] ?? '', ship, allShips, scanRange, letters);
+    if (!found.ok) {
+      return { lines: [{ text: found.message, category: 'system' }] };
+    }
+    const target = found.ship;
+
+    // The self-zap needs a RESOLVED target: canon's `zaphim` sits inside the
+    // `shpnum >= 0` arm, after `findshp` has produced a real ship. Testing the
+    // zone before the lookup meant naming a ship that does not exist while
+    // sitting at the origin cost a hundred points of hull, where canon just
+    // says the scanners cannot locate it.
+    // @see GECMDS.C:1297 `if (neutral(&warsptr->coord))`
     if (isInNeutralZone(ship)) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;
@@ -201,16 +219,6 @@ export class MissileHandlerService {
         ],
       };
     }
-
-    // 5. Target lookup
-    const allShips = this.shipState.findAllShips();
-    const scanRange = this.shipClassCache.getScanRange(ship.shpclass);
-    const letters = this.scanHandler.lettersFor(ship.userid, ship.shipno);
-    const found = findShip(args[0] ?? '', ship, allShips, scanRange, letters);
-    if (!found.ok) {
-      return { lines: [{ text: found.message, category: 'system' }] };
-    }
-    const target = found.ship;
 
     // Target in neutral zone ⇒ fire control refuses (GECMDS.C:1363).
     if (isInNeutralZone(target)) {

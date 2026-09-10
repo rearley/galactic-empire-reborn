@@ -75,7 +75,12 @@ describe('combat-math', () => {
 
   describe('inScanRange — bridges sector-unit cdistance to raw-unit scanRange', () => {
     const a = { xcoord: 5, ycoord: 5 };
-    it('true at 1 sector with scanRange=15_000 (Interceptor)', () => {
+    // 15_000 is a bare scanRange for the arithmetic, NOT the Interceptor's.
+    // The Interceptor carries 100_000 — `S01SRNG {  Scan Range: 100000}` at
+    // MBMGESHP.MSG:141 — and 15_000 is the value the seed drifted to before the
+    // scanRange bug was fixed. Naming it after a real hull here made a stale
+    // number look like canon.
+    it('true at 1 sector with a 15_000 scanner', () => {
       expect(inScanRange(a, { xcoord: 6, ycoord: 5 }, 15_000)).toBe(true);
     });
     it('false at 2 sectors with scanRange=15_000', () => {

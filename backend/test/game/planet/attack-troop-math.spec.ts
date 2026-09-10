@@ -99,43 +99,13 @@ function makeService(seed: number) {
   return { service, mockShipState, mockPrisma, mutated };
 }
 
-// ---------------------------------------------------------------------------
-// Helpers to compute expected values deterministically
-// ---------------------------------------------------------------------------
-
-function simulateTroopAttack(seed: number, attackNum: number, defTroops: number, defFighters = 0) {
-  const r = new Mulberry32Adapter(seed);
-  const { gernd, rndm } = require('../../../src/game/combat/random.port');
-
-  let left1 = attackNum;
-  let left2 = defTroops;
-  let kill1 = 0;
-  let kill2 = 0;
-
-  // Step 1: defender fighters fire
-  if (defFighters > 1) {
-    const fk = (gernd(r) % 35 + 9) * defFighters;
-    kill1 = Math.min(fk, left1);
-  }
-
-  // Step 2: ground troops fire
-  const groundKills = Math.floor(left2 * (rndm(r, PLATTRT1_DEFAULT) + 0.25));
-  kill1 += groundKills;
-
-  // Step 3: ratio counter-kill
-  const ratio = left2 > 0 ? Math.floor(left1 / left2) : 0;
-  if (ratio > 2) {
-    kill2 = Math.floor(left1 * (rndm(r, PLATTRT2_DEFAULT) + 0.1));
-  }
-
-  // Step 4: cap
-  if (kill1 > left1) kill1 = left1;
-  if (kill2 > left2) kill2 = left2;
-  left1 -= kill1;
-  left2 -= kill2;
-
-  return { left1, left2, kill1, kill2, ratio };
-}
+// A hand-written shadow of canon's troop-attack arithmetic used to sit here and
+// was called by nothing. It also had the math wrong: canon's `ratio` is a
+// PERCENTAGE, `ratio = (left1*100UL)/left2` (GECMDS.C:3655), and the shadow
+// divided without the x100 — so it demanded a hundred times the men before the
+// defenders lost anyone. An unused, wrong model of canon in a test file is
+// worse than none, because the next person to need one copies it. The gates it
+// described are asserted through the real service below.
 
 // ---------------------------------------------------------------------------
 // Tests

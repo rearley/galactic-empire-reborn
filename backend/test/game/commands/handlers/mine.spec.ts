@@ -78,7 +78,9 @@ describe('MineHandlerService — `min`', () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 12, ycoord: 34 });
     const h = makeHarness([alice]);
 
-    const result = await (h.handler.command.handler(alice, [], ctx) as Promise<CommandResult>);
+    // The fuse is an argument, not a default — canon refuses a bare `min`.
+    // @see GECMDS.C:1757 `if (margc != 2 )`
+    const result = await (h.handler.command.handler(alice, ['30'], ctx) as Promise<CommandResult>);
     expect(result.lines[0].text).toMatch(/^Neutron Mine launched\. Detonation in \d+ centocks!$/);
 
     expect(h.repo.create).toHaveBeenCalledWith({

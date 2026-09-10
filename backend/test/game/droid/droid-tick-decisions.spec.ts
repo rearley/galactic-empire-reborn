@@ -107,9 +107,15 @@ interface Harness {
 
 /**
  * A Droid that has been shot at. Fight-back needs BOTH `cantexit > 0` and
- * `lastfired` pointing at the attacker's CHANNEL (GEDROIDS.C:443 for the
- * Vakory, :338 for the Murdonian); the tests set them explicitly rather than
- * relying on a prior hit, so each case starts from a stated state.
+ * `lastfired` pointing at the attacker's CHANNEL. The two brains spell the
+ * second half slightly differently, and both lines are real:
+ *
+ *   GEDROIDS.C:447 `if (ptr->cantexit > 0 && ptr->lastfired > 0)`   Vakory
+ *   GEDROIDS.C:340 `if (ptr->cantexit > 0 && ptr->lastfired >= 0)`  Murdonian
+ *
+ * This note used to cite :443 and :338, which are a blank line and a closing
+ * brace. The tests set both fields explicitly rather than relying on a prior
+ * hit, so each case starts from a stated state.
  */
 function buildHarness(droidOver: Partial<ShipState>, target: ShipState): Harness {
   const rand = { next: () => 0.99 } as unknown as Random;
@@ -270,8 +276,11 @@ describe('hyperspace fire — firehp, and the range that stops it', () => {
     // The victim is battle-locked by the hit — this is what blocks `repair`.
     expect(target.lastfired).toBe(droid.channel);
     expect(target.cantexit).toBe(FIRETICKS);
-    // The bank is spent whether or not the beam connected.
-    expect(droid.phasr).toBe(0);
+    // The hyper-phaser runs on FLUX, not the phaser bank. `firehp` charges
+    // HPFIRAMT to `ptr->energy`, arms `hypha`, and never touches `ptr->phasr`
+    // at all. @see GECMDS.C:1039 `ptr->energy -= HPFIRAMT;`
+    expect(droid.phasr).toBe(100);
+    expect(droid.hypha).toBe(1);
     expect(droid.cantexit).toBe(FIRETICKS);
   });
 
@@ -310,7 +319,7 @@ describe('hyperspace fire — firehp, and the range that stops it', () => {
 
 describe('normal-space fire — firep, and what shields do to it', () => {
   /**
-   * `firep` branches solely on `wptr->shieldstat != SHIELDUP` (GECMDS.C:986);
+   * `firep` branches solely on GECMDS.C:982 `if (wptr->shieldstat != SHIELDUP)`;
    * the SHIELDUP arm never touches `wptr->damage`. Shields absorb the hit
    * WHOLE — the charge falls, the hull does not.
    *

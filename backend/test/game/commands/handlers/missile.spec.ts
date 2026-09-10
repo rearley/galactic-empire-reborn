@@ -102,14 +102,14 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '0'], ctx) as CommandResult;
-    expect(result.lines[0].text).toContain('range from');
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIS_FMT));
   });
 
   it('rejects charge > 50000 (NUMOOR)', () => {
     const alice = makeShip();
     const h = makeHarness([alice]);
     const result = h.handler.command.handler(alice, ['Bob', '50001'], ctx) as CommandResult;
-    expect(result.lines[0].text).toContain('range from');
+    expect(result.lines[0].text).toBe(formatMessage(MessageId.MIS_FMT));
   });
 
   it('rejects with JAMMER4 when firer.jammer > 0', () => {
@@ -128,7 +128,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
 
   it('rejects when target has all MAXMISSL slots occupied (MIS_FULL)', () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 1, ycoord: 0 });
-    // bob must be within lock range (~4.93 sectors) so the lock-quality gate passes
+    // bob must be within lock range (3.53 sectors) so the lock-quality gate passes
     // and we actually reach the slot-full check. Moved from ycoord:100 → ycoord:1.
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
@@ -147,7 +147,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
       userid: 'a', shipno: 9, xcoord: 1, ycoord: 0,
       energy: 50000, items: itemsWith({ [I_MISSL]: 4n }),
     });
-    // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
+    // bob must be within lock range (3.53 sectors). Moved from ycoord:50 → ycoord:1.
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
     });
@@ -171,18 +171,49 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 
-  it('firing from inside the neutral zone self-zaps and does not lock (Plan 1 T8)', () => {
+  /**
+   * The self-zap is inside canon's `shpnum >= 0` arm, so it needs a REAL target.
+   *
+   *   shpnum = findshp(margv[1],1);
+   *   if (shpnum == usrnum) { prfmsg(FOOLISH); }
+   *   else if ( shpnum >= 0)
+   *     {
+   *     if (neutral(&warsptr->coord)) { zaphim(warsptr,usrnum); return; }
+   *     ...
+   *     }
+   *   else { prfmsg(NOSHIP); }
+   *
+   * The port ran the neutral-zone test BEFORE looking the target up, so naming
+   * a ship that does not exist while sitting at the origin cost a hundred
+   * points of hull. Canon answers "the tactical scanners cannot locate" and
+   * leaves the ship alone. The zone is only lethal once you have actually
+   * picked someone to shoot at.
+   *
+   * @see GECMDS.C:1297 `if (neutral(&warsptr->coord))`
+   */
+  it('firing from inside the neutral zone self-zaps once a real target is named', () => {
+    const firer = makeShip({
+      userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
+      items: itemsWith({ [I_MISSL]: 1n }),
+    });
+    const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 0.2, ycoord: 0 });
+    const h = makeHarness([firer, bob]);
+    const res = h.handler.command.handler(firer, ['Bob', '1000'], ctx) as CommandResult;
+    expect(res.lines.some((l) => /Enforcer Planet/i.test(l.text))).toBe(true);
+    expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
+    expect(firer.cantexit).toBe(FIRETICKS);
+    expect(bob.lmisslChannel.filter((c) => c !== undefined && c !== 255).length).toBe(0);
+  });
+
+  it('does NOT self-zap for a name nothing in the galaxy carries', () => {
     const firer = makeShip({
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
       items: itemsWith({ [I_MISSL]: 1n }),
     });
     const h = makeHarness([firer]);
-    const res = h.handler.command.handler(firer, ['Bob', '1000'], ctx) as CommandResult;
-    expect(res.lines.some((l) => /Enforcer Planet/i.test(l.text))).toBe(true);
-    expect(firer.damage).toBeGreaterThanOrEqual(SE100DAM);
-    expect(firer.cantexit).toBe(FIRETICKS);
-    // No target lock allocated — firer returned early
-    expect(firer.lmisslChannel.length).toBe(0);
+    const res = h.handler.command.handler(firer, ['Nobody', '1000'], ctx) as CommandResult;
+    expect(res.lines.some((l) => /Enforcer Planet/i.test(l.text))).toBe(false);
+    expect(firer.damage).toBe(0);
   });
 
   it('missiles allowed at warp speed (no warp gate)', () => {
@@ -190,7 +221,7 @@ describe('MissileHandlerService — `mis <target> <charge>`', () => {
       userid: 'a', shipno: 1, xcoord: 1, ycoord: 0,
       speed: WARP_THRESHOLD,
     });
-    // bob must be within lock range (~4.93 sectors). Moved from ycoord:50 → ycoord:1.
+    // bob must be within lock range (3.53 sectors). Moved from ycoord:50 → ycoord:1.
     const bob = makeShip({ userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
     const h = makeHarness([alice, bob]);
     const result = h.handler.command.handler(alice, ['Bob', '500'], ctx) as CommandResult;
@@ -282,7 +313,39 @@ describe('missile lock + cloak gates (Plan 1 T7)', () => {
     expect(res.lines[0].text).toMatch(/cloak/i);
   });
 
-  it('fails to lock a target beyond ~4.9 sectors', () => {
+  /**
+   * The missile envelope is 3.53 sectors, not the 4.93 this file used to claim.
+   *
+   * Canon's missile branch has no speed term at all — GECMDS.C:1392
+   * `fact = ((5.0-dist)/mis_fact);` — and the lock needs `fact > .7`, so the
+   * boundary is `dist < 5 - 0.7 * mis_fact`. `mis_fact` is
+   * `numopt(MISFACT,1,50)/10` and the shipped MISFACT is 21, giving 2.1 and a
+   * limit of 3.53 sectors.
+   *
+   * 4.93 is what you get by using 1 as the divisor, and 1 is the numopt FLOOR,
+   * not the shipped value. That is the same clamp-bound-for-default mistake
+   * that has now been made here three times. The CODE always used 2.1; only
+   * this file's arithmetic was wrong, so the old case at six sectors passed
+   * while describing a boundary a sector and a half out.
+   *
+   * @see MBMGEMSG.MSG:324 `MISFACT {Missile Lock-on divisor: 21} N 1 50`
+   */
+  // `spawnTarget` places the target on the x axis while the firer sits at
+  // (0, 1), so the real separation is `sqrt(x^2 + 1)`. x = 3.35 is 3.496
+  // sectors and x = 3.46 is 3.601 — either side of the 3.53 limit.
+  it('locks at 3.50 sectors, just inside the envelope', () => {
+    const target = spawnTarget({ sectorsAway: 3.35 });
+    const res = handler.command.handler(firer, [target.shipname, '5000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toMatch(/Missile fired sir!/);
+  });
+
+  it('fails to lock at 3.60 sectors, just outside it', () => {
+    const target = spawnTarget({ sectorsAway: 3.46 });
+    const res = handler.command.handler(firer, [target.shipname, '5000'], ctx) as CommandResult;
+    expect(res.lines[0].text).toBe(formatMessage(MessageId.LOCK_FAIL, '?'));
+  });
+
+  it('fails to lock a target well beyond the envelope', () => {
     const farTarget = spawnTarget({ sectorsAway: 6 });
     const res = handler.command.handler(firer, [farTarget.shipname, '5000'], ctx) as CommandResult;
     // LOCK3 names the target by its scan LETTER (%c). This target was never

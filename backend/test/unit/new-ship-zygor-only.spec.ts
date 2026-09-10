@@ -19,6 +19,8 @@
 import { NewShipHandlerService } from '../../src/game/commands/handlers/new-ship.handler';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { PlanetStateService } from '../../src/game/planet/planet-state.service';
+import type { Random } from '../../src/game/combat/random.port';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { CommandContext, CommandResult } from '../../src/game/commands/command.types';
@@ -59,7 +61,7 @@ function service() {
     $transaction: jest.fn(),
   } as unknown as PrismaService;
   const ships = { mutate: jest.fn(), findAllShips: () => [] } as unknown as ShipStateService;
-  return new NewShipHandlerService(prisma, ships);
+  return new NewShipHandlerService(prisma, ships, { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
 }
 
 const ctx: CommandContext = {};

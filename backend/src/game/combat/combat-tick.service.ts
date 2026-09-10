@@ -780,11 +780,21 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         }
       }
 
-      if (newDist > 0) {
+      // Canon's missile test is STRICT, unlike the torpedo's:
+      //
+      //   if (mptr->distance < mislsped)      GEFUNCS.C:1615   missile
+      //   if (tptr->distance <= torpsped)     GEFUNCS.C:1550   torpedo
+      //
+      // So a missile sitting at exactly MISLSPED does NOT detonate this tick.
+      // It falls to the else, is walked down to zero, and the `distance > 0`
+      // guard skips it forever after. The asymmetry looks like a typo in the
+      // original and is canon all the same; this port had the torpedo rule on
+      // both, so a missile at exactly one tick's travel hit a tick early.
+      if (newDist >= 0) {
         this.shipState.mutate(carrier.userid, carrier.shipno, (s) => {
           s.lmisslDistance[i] = newDist;
         });
-        stillTracking = true;
+        if (newDist > 0) stillTracking = true;
         continue;
       }
 
@@ -897,7 +907,6 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
         v.lastfired = attackerChannel;
         v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
-        v.cantexit = FIRETICKS;
       });
       shieldConsumed = r.shieldConsumed;
     } else {
@@ -905,17 +914,21 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         v.damage = v.damage + hullDamage;
         v.lastfired = attackerChannel;
         v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
-        v.cantexit = FIRETICKS;
       });
     }
 
-    // Find the attacker ship (by shipno = channel) and set their cantexit too.
+      // NO battle lock here. `checktm` touches `cantexit` exactly once, at the
+      // top of the function, and only to count it DOWN:
+      //
+      //   if (ptr->cantexit > 0)
+      //     --(ptr->cantexit);
+      //
+      // Every `= FIRETICKS` in the original is in GECMDS.C, at FIRE or LOCK
+      // time — `lockon` arms both ships when the tube is locked, several ticks
+      // before the torpedo arrives. Re-arming on IMPACT extended the window in
+      // which neither ship could leave, on every hit, for the whole flight of
+      // a volley. @see GEFUNCS.C:1541 `--(ptr->cantexit);`
     const attacker = this.findShipByChannel(attackerChannel, carrier);
-    if (attacker) {
-      this.shipState.mutate(attacker.userid, attacker.shipno, (a) => {
-        a.cantexit = FIRETICKS;
-      });
-    }
 
     const hitEvent: CombatHitEvent = {
       attackerId: attacker ? shipKey(attacker.userid, attacker.shipno) : `?:${attackerChannel}`,

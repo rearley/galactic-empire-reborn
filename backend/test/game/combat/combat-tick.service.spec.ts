@@ -307,7 +307,7 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
     expect(bob.lmisslEnergy[0]).toBe(1500);
   });
 
-  it('torpedo hit at distance ≤ 0 emits COMBAT_HIT { weapon: torpedo }, applies damage, sets cantexit on victim', async () => {
+  it('torpedo hit at distance ≤ 0 emits COMBAT_HIT { weapon: torpedo } and applies damage, WITHOUT re-arming the battle lock', async () => {
     const alice = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 0, ycoord: 0,
@@ -333,10 +333,12 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
 
     // Slot cleared
     expect(bob.ltorpsChannel[0]).toBe(255);
-    // cantexit set on victim
-    expect(bob.cantexit).toBe(FIRETICKS);
-    // cantexit set on attacker
-    expect(alice.cantexit).toBe(FIRETICKS);
+    // Canon does NOT battle-lock on impact. `checktm` only counts `cantexit`
+    // down (GEFUNCS.C:1541 `--(ptr->cantexit);`); every `= FIRETICKS` sits in
+    // GECMDS.C at fire or lock time, so the lock this hit inherits was armed by
+    // `lockon` several ticks earlier and is already expiring.
+    expect(bob.cantexit).toBe(0);
+    expect(alice.cantexit).toBe(0);
   });
 
   it('missile hit at distance ≤ 0 emits COMBAT_HIT { weapon: missile } using stored energy as dmgMax', async () => {
