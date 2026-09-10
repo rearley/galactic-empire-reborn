@@ -108,7 +108,20 @@ through the caller.
 
 Optimisation must not change behaviour, so before restructuring a module:
 
-1. Its branch coverage should be at or above 90%, by the filter above.
+1. Its branch coverage should be at or above 90% **of its COVERABLE branches**,
+   not of its raw total.
+
+   This distinction was got wrong first time and is worth stating precisely. A
+   module's excluded branches — the `??` fallbacks, the optional-dependency
+   guards, the catch-block log ternaries — still count in the denominator
+   Istanbul reports. `droid-tick.service.ts` has 105 branches of which 12 are
+   excludable, so its raw ceiling is 88.6% even with every real decision
+   covered. Chasing a raw 90% there means testing display fallbacks to buy
+   percentage points, which is the exact behaviour the filter exists to stop.
+
+   Measure it as `(total - excludable - uncovered_real) / (total - excludable)`.
+   To find the split, run coverage with the `json` reporter and classify each
+   uncovered branch line by reading its source line.
 2. The behaviour should be pinned by CHARACTERIZATION tests — given this input
    state, assert the exact output state — not merely by "it does not throw".
 3. The canon citations in that module's tests must still point at real C source
