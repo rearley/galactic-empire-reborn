@@ -286,6 +286,23 @@ First run on a new machine needs the browser binary:
 cd frontend && npx playwright install chromium
 ```
 
+### What runs in CI
+
+`.github/workflows/ci.yml` runs on every push to master and on pull requests. The backend suite
+runs against a real PostgreSQL 16 service container, the frontend suite and build run beside it,
+and both must pass before any image is built or published. A push that changes only tests, docs
+or tooling runs the suites but builds nothing, because those paths never reach an image and a
+rebuild would restart the live game for no reason.
+
+Two things run locally and not in CI, both deliberately:
+
+- **The Playwright specs**, because they need a seeded database, a backend with the debug
+  endpoints enabled and a real browser, to drive a real-time game on a 6-second tick. Run them
+  against the dev stack.
+- **The two wall-clock performance budgets**, in `physics/bench.spec.ts` and
+  `midnight/perf-budget.spec.ts`. Both measure the machine they run on, and a shared runner is
+  not a machine worth measuring. `CI_LOW_PERF=1` skips them; CI sets it.
+
 ---
 
 ## Repository layout

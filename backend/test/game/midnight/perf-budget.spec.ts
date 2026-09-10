@@ -103,8 +103,24 @@ afterAll(async () => {
   await app.close();
 });
 
+/**
+ * Skipped where CI_LOW_PERF=1, which CI sets, matching
+ * test/game/physics/bench.spec.ts.
+ *
+ * A wall-clock budget measures the machine it runs on. This one takes about
+ * 1,600ms of its 5,000ms ceiling on a developer box, and a hosted runner
+ * measured 2.4x slower across the suite as a whole — close enough to the
+ * ceiling that it would eventually fail for a reason that says nothing about
+ * this code. A perf assertion that goes red on a noisy neighbour teaches people
+ * to re-run the build until it passes, which is worse than not asserting.
+ *
+ * It still runs locally, where the number means something because the machine
+ * is the same one it meant something on last time.
+ */
 describe('performance budget (SC-005)', () => {
-  it(`completes in < ${BUDGET_MS}ms for ${USER_COUNT} users / ${PLANET_COUNT} planets`, async () => {
+  const it_ = process.env.CI_LOW_PERF === '1' ? it.skip : it;
+
+  it_(`completes in < ${BUDGET_MS}ms for ${USER_COUNT} users / ${PLANET_COUNT} planets`, async () => {
     const start = Date.now();
     const counters = await service.run();
     const elapsed = Date.now() - start;
