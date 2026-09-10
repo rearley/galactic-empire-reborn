@@ -11,7 +11,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "oxlint -c ../.oxlintrc.json .",
+    "lint": "oxlint --type-aware -c ../.oxlintrc.json .",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
