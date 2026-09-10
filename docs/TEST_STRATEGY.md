@@ -176,8 +176,24 @@ Two guards close the difference, both in
   the line it cites — `@see GEMAIN.C:1977 \`#define MAXTIC\t20\`` — the guard
   finds that text within five lines of the cited line, whitespace ignored. It
   caught a citation reading `GEMAIN.C:963` for a define that lives at 1977 on
-  its first run. Quoting is optional but the count of quoted citations may never
-  fall, so verification cannot be quietly removed.
+  its first run.
+- **A NEW citation has to carry its quote.** Two ratchets working as a pincer:
+  the count of quoted citations may not fall, and the count of bare ones may not
+  rise. Adding `GECMDS.C:1234` alone fails; adding it with the line quoted
+  passes. The 3,268 bare citations already in the tree are grandfathered and get
+  quoted when someone touches them for another reason, because backfilling them
+  by hand is the same error-prone transcription the guard exists to catch.
+
+  This was added after the guard missed three wrong line numbers in a single
+  commit — two pointing at a commented-out statement and a damage assignment,
+  one at the print above the line it named. All three sat in prose with no
+  quote, so nothing looked at them, and a person asking "are you sure?" found
+  them instead.
+
+  The honest limit stays: five lines of tolerance means a quoted citation proves
+  the right NEIGHBOURHOOD, not the right line. Exact matching was measured and
+  produced six false failures in forty-seven, because canon spaces its
+  semicolons oddly and citations legitimately point at the head of a block.
 - **A divergence must be a decision.** `@divergence <slug>` has to appear in
   both the code and `docs/DECISIONS.md`, checked both ways, and the prose people
   reach for when parking one instead of ruling on it is trapped. It found the

@@ -74,6 +74,14 @@ const SOURCE_FILES = [
 
 const rel = (f: string) => f.replace(`${REPO}/`, '');
 
+/**
+ * This file quotes citations as EXAMPLES — real ones to show the shape, and
+ * invented ones to show what a failure looks like. Scanning itself would make
+ * the examples fail and would move both counts below, so it sits outside every
+ * check it performs.
+ */
+const SCANNED = SOURCE_FILES.filter((f) => !f.endsWith('canon-citations.balance.spec.ts'));
+
 describe('a quoted citation says what the original says', () => {
   const canon = loadCanon();
 
@@ -92,6 +100,10 @@ describe('a quoted citation says what the original says', () => {
    * exact text produced six false failures out of forty-seven and would have
    * made this file the kind of test people delete.
    */
+  // Matched per LINE, not across the file: the quote has to sit on the same
+  // line as the citation. A wrapped quote is simply not counted, which costs a
+  // handful of legitimate ones and is worth it — a whole-file match would pair
+  // a citation with any backtick that happened to follow it anywhere below.
   const QUOTED = /\b(GE[A-Z]+\.[CH]):(\d+)\s*`([^`]+)`/g;
 
   /**
@@ -113,7 +125,7 @@ describe('a quoted citation says what the original says', () => {
 
   function collect() {
     const pairs: Array<{ where: string; file: string; line: number; frag: string }> = [];
-    for (const f of SOURCE_FILES) {
+    for (const f of SCANNED) {
       readFileSync(f, 'utf8').split('\n').forEach((text, idx) => {
         for (const m of text.matchAll(QUOTED)) {
           const frag = m[3];
@@ -168,15 +180,47 @@ describe('a quoted citation says what the original says', () => {
    * time to raise it is when you touch a citation for any other reason.
    */
   it('never loses ground on the number of citations that prove themselves', () => {
-    const BASELINE = 41;
+    const BASELINE = 78;
     expect(pairs.length).toBeGreaterThanOrEqual(BASELINE);
+  });
+
+  /**
+   * The mirror ratchet, and the one that actually changes behaviour: a NEW
+   * citation has to carry its quote.
+   *
+   * The pair works like a pincer. The count above may not fall and the count
+   * below may not rise, so adding `GECMDS.C:1234` on its own fails while adding
+   * ``GECMDS.C:1234 `if (x > 0)` `` passes. Nobody has to backfill the 3,268
+   * bare citations already here; they are grandfathered and get quoted when
+   * someone touches them for another reason.
+   *
+   * This exists because of a specific miss. On 2026-09-10 three line numbers
+   * were written wrong in one commit — two pointing at a commented-out
+   * statement and a damage assignment, one at the print above the line it
+   * claimed. All three sat in prose with no quote, so the check above never
+   * looked at them, and they were found by a human asking "are you sure?"
+   * rather than by this file.
+   *
+   * The honest limit stays: a quoted citation proves the right NEIGHBOURHOOD,
+   * because the window is five lines either side. Matching the exact line was
+   * measured and produced six false failures in forty-seven.
+   */
+  it('never adds a citation that cannot prove itself', () => {
+    let total = 0;
+    for (const f of SCANNED) {
+      total += [...readFileSync(f, 'utf8').matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)].length;
+    }
+    const unquoted = total - pairs.length;
+    // To fix a failure here: put the cited line in backticks after the
+    // citation. Do not raise this number to get past it — that is the one move
+    // that makes the guard stop working.
+    const BASELINE = 3268;
+    expect(unquoted).toBeLessThanOrEqual(BASELINE);
   });
 });
 
 describe('a divergence from canon is a decision, not a comment', () => {
   const DECISIONS = readFileSync(join(REPO, 'docs/DECISIONS.md'), 'utf8');
-  /** This file's own prose quotes the marker and the phrases it hunts for. */
-  const SCANNED = SOURCE_FILES.filter((f) => !f.endsWith('canon-citations.balance.spec.ts'));
   const MARKER = /@divergence\s+([a-z0-9][a-z0-9-]*)/g;
 
   function markersIn(text: string): string[] {

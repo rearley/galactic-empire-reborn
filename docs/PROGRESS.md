@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 87 entries.
+Append-only, **newest at the bottom**. 88 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 87 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — a new citation now has to carry its quote](#2026-09-10--a-new-citation-now-has-to-carry-its-quote)
 - [2026-09-10 — a torpedo volley now tells you it hit](#2026-09-10--a-torpedo-volley-now-tells-you-it-hit)
 - [2026-09-10 — the re-audit that asked whether the tests were RIGHT](#2026-09-10--the-re-audit-that-asked-whether-the-tests-were-right)
 - [2026-09-10 — a citation now has to prove itself, and a divergence has to be a decision](#2026-09-10--a-citation-now-has-to-prove-itself-and-a-divergence-has-to-be-a-decision)
@@ -5332,4 +5333,41 @@ document:
 
 Comments are 35% of every non-blank line, which is deliberate: this codebase
 argues with canon in the margins, and the last two days are the case for it.
+
+## 2026-09-10 — a new citation now has to carry its quote
+
+**Completed:** the mirror ratchet on `canon-citations.balance.spec.ts`, closing
+the gap that let three wrong line numbers through earlier the same day.
+
+The guard as built only inspected citations that quoted the line they cited, and
+83 of 3,348 did. The three bad pointers were bare line numbers in prose, so
+nothing looked at them. They were found by the user asking whether the findings
+were canon, which is not a control.
+
+**The fix is a pincer, not a backfill.** The count of quoted citations may not
+fall and the count of bare ones may not rise. Adding `GECMDS.C:1234` on its own
+fails; adding it with the line quoted passes. Nothing forces anyone to touch the
+3,268 bare citations already here — they are grandfathered and get quoted when
+someone edits them for another reason. Backfilling by hand would be the same
+error-prone transcription the guard exists to catch.
+
+Two counting details worth knowing before anyone changes it. The quote must sit
+on the SAME LINE as the citation; a whole-file match would pair a citation with
+any backtick anywhere below it, and the line rule costs four legitimate wrapped
+quotes to avoid that. And this file no longer scans itself, because it quotes
+both real citations as examples and invented ones to show what a failure looks
+like.
+
+**Tests:** three mutations, all caught. A bare citation added anywhere fails.
+The same citation with its line quoted passes. The same quote against a line a
+thousand out fails.
+
+**Decisions made:** the five-line tolerance stays. A quoted citation proves the
+right neighbourhood, not the right line. Exact matching was measured at six
+false failures in forty-seven, and a guard that cries wolf gets switched off.
+
+**Next:** open. The restructuring work is unblocked and nothing is queued ahead
+of it.
+
+**Known issues:** none.
 
