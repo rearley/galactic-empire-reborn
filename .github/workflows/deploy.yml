@@ -54,8 +54,19 @@ on:
     # BECAUSE the extractors write their output into backend/src and
     # backend/prisma/seed, which are not ignored — so regenerating canon still
     # deploys, while editing the generator that produced it does not.
+    #
+    # CI and Dependabot config are not build inputs either -- no Dockerfile
+    # copies .github/. Three consecutive commits touching only these files each
+    # rebuilt both images and restarted the live game, which is the same defect
+    # the docs exclusion above exists to prevent.
+    #
+    # deploy.yml is deliberately NOT in this list. A change to the build recipe
+    # SHOULD rebuild: that is the only way to find out whether the recipe still
+    # works, and skipping it would mean a broken workflow lands green.
     paths-ignore:
       - '**/*.md'
+      - '.github/workflows/ci.yml'
+      - '.github/dependabot.yml'
       - 'docs/**'
       - 'specs/**'
       - 'LICENSE'
