@@ -74,7 +74,7 @@ docker compose down -v       # stops containers AND deletes all data
 
 ### 1. Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - PostgreSQL 16+ running on `localhost:5432`
 
 ### 2. Clone and install

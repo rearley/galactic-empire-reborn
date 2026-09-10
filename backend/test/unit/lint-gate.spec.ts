@@ -65,10 +65,14 @@ describe('lint gate', () => {
       const script = pkg.scripts?.lint ?? '';
 
       // `oxlint --version` or `oxlint --help` would satisfy `/oxlint/` above
-      // while checking nothing. The script must run against a real target.
+      // while checking nothing. The script must run against a real target:
+      // its last argument must be a path/target, not a flag (`--version`,
+      // `--help`, or any other `-`/`--` option).
       expect(script).not.toMatch(/--version\b/);
       expect(script).not.toMatch(/--help\b/);
-      expect(script).toMatch(/\.\s*$/);
+      const tokens = script.trim().split(/\s+/);
+      const lastToken = tokens.at(-1) ?? '';
+      expect(lastToken.startsWith('-')).toBe(false);
     },
   );
 

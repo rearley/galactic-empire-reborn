@@ -63,7 +63,7 @@ Backend suite: 605 suites / 6,141 tests, ~100s local, ~240s on a hosted runner.
 Frontend: 39 files / 310 tests, ~15s.
 
 **Post-phase-0 (2026-09-10), measured, not overwriting the baseline above:**
-backend 607 suites / 6,153 tests, ~117s local; frontend unchanged at 39 files /
+backend 607 suites / 6,154 tests, ~117s local; frontend unchanged at 39 files /
 310 tests, ~15s. The backend suite grew by 2 suites / 12 tests across phase 0:
 `node-runtime-version.spec.ts` (Task 1, 5 tests) and `lint-gate.spec.ts`
 (Task 4, grew from 4 to 7 tests during its fix round).
