@@ -77,6 +77,41 @@ file and line they came from. Those citations are load-bearing, not decoration:
 they are how a reader tells canon from our own work.
 
 
+HOW THIS PORT WAS WRITTEN
+=========================
+
+This port was written by Rick Earley in collaboration with Claude, Anthropic's
+AI coding assistant, using Claude Code. The commit history records it directly:
+hundreds of the commits in this repository carry a `Co-Authored-By: Claude`
+trailer.
+
+It is stated here because the method is load-bearing rather than incidental. A
+faithful port is an exercise in reading sixteen thousand lines of 1990s C and
+not getting a number wrong, and this project is built around not trusting any
+single reading of that source -- human or otherwise:
+
+  - Every gameplay constant carries an @see citation to the C file and line it
+    was taken from. A test re-reads the original and fails if a citation quotes
+    a line that is not there.
+
+  - Canon data is generated from the shipped .MSG files, never hand-typed. That
+    rule exists because hand-transcription put wrong numbers into this codebase
+    twice before it did.
+
+  - Where the port knowingly differs from the original, it is a numbered entry
+    in docs/DECISIONS.md, tagged in the code, and checked in both directions by
+    the test suite. A deviation that is not written down is a bug.
+
+  - Behaviour is pinned by over six thousand automated backend tests, and the
+    balance layer among them re-reads the original distribution rather than
+    asserting a remembered value.
+
+None of that makes the port correct. It makes an error findable, which is the
+most any reimplementation of a game this old can honestly promise. Where you
+find one, the original is right and this is wrong. See docs/DECISIONS.md for
+how such a finding gets recorded.
+
+
 ATTRIBUTION AND CORRECTIONS
 ===========================
 

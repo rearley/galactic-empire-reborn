@@ -4,11 +4,30 @@ A faithful web port of the classic MajorBBS game **Galactic Empire** (1988–199
 Real-time multiplayer space combat and economy across a 201×201 sector galaxy — text commands,
 ASCII scan maps, persistent Cybertron AI, planet colonization, and midnight scoring.
 
-(30×15 is the scan map's size in characters, not the galaxy's. This README said otherwise
-until 2026-09-09, which is the same misreading that has produced real defects in the code.
-The galaxy runs `-UNIVMAX..+UNIVMAX`, and we deploy at `UNIVMAX=100`.)
-
 **Stack**: NestJS · PostgreSQL 16 · Socket.io · React + Vite · Prisma ORM
+
+---
+
+## What "faithful" means here
+
+The original 1988–1992 distribution is authoritative for every value and behaviour. Where this
+port and the classic game disagree, the classic game is right and this port is wrong — including
+when our version is better balanced or pinned by a passing test.
+
+That rule is enforced rather than aspired to:
+
+- Gameplay constants carry `@see` citations to the C file and line they came from, and a test
+  re-reads the original to check the quoted line is really there.
+- Canon data — messages, the ship table, the help pages, the taunt catalogues — is **generated**
+  from the shipped `.MSG` files by the scripts in `tools/`, never hand-typed.
+- Deliberate differences are numbered entries in [`docs/DECISIONS.md`](docs/DECISIONS.md), tagged
+  in the code, and checked in both directions. A deviation that is not written down is a bug.
+
+The full original distribution is vendored read-only at `reference/`. See
+[`NOTICE`](NOTICE) for what is embedded and under which licence, and
+[`reference/CLAUDE.md`](reference/CLAUDE.md) for which copy of each data file is the real one —
+that last point matters, because the distribution ships several generations of the same
+configuration and picking the wrong one has put wrong numbers into this codebase twice.
 
 ---
 
@@ -23,9 +42,9 @@ docker compose up -d
 - Frontend: [http://localhost:8080](http://localhost:8080)
 - Backend API: [http://localhost:3000](http://localhost:3000)
 
-On first boot the backend automatically runs Prisma migrations, seeds the 18 ship classes,
-and generates the 30×15 galaxy. Subsequent boots detect no pending migrations and skip seeding
-(seed uses `upsert`, so it is safe to re-run).
+On first boot the backend runs Prisma migrations, seeds the 18 ship classes, and generates the
+galaxy. Subsequent boots detect no pending migrations and skip seeding (the seed uses `upsert`,
+so it is safe to re-run).
 
 ### Overriding JWT_SECRET for production
 
@@ -106,6 +125,10 @@ npx prisma db seed
 Migrations create the schema. The seed populates the 18 ship classes. The galaxy generates
 automatically on first server boot.
 
+> **Never `prisma db push`, never `prisma migrate reset`.** Schema changes go through
+> `prisma migrate dev --name <name>`, and migrations are committed rather than edited.
+> See [`backend/prisma/CLAUDE.md`](backend/prisma/CLAUDE.md).
+
 ### 6. Start the backend
 
 ```bash
@@ -113,8 +136,8 @@ cd backend
 npm run start:dev
 ```
 
-The NestJS server starts on **port 3000**. On first boot it generates the 30×15 galaxy
-(planets, wormholes, neutral zone) inside a single transaction — takes a few seconds.
+The NestJS server starts on **port 3000**. On first boot it generates the galaxy — planets,
+wormholes and the neutral zone — inside a single transaction, which takes a few seconds.
 
 ### 7. Start the frontend
 
@@ -130,10 +153,9 @@ Vite starts on **port 5173**. Open [http://localhost:5173](http://localhost:5173
 ## Playing the game
 
 1. **Register** a new account via the auth screen
-2. **Start in a class 1 Interceptor** — new pilots always receive one, along with 5,000 credits and
-   3 flux pods (feature 021 restored the original `initshp` behaviour; there is no class picker).
-   Upgrades are bought in-game with `new ship <N>` at Zygor-3 in sector 0,0. There are **nine**
-   player classes (1-9); class 34 is the admin-only Sysopian Death Star.
+2. **Start in a class 1 Interceptor** — new pilots always receive one, along with 100,000
+   credits and 3 flux pods. There is no class picker; this restores the original's `initshp`
+   behaviour. Upgrades are bought in-game with `new ship <N>` at Zygor-3 in sector 0,0.
 3. **Name your ship**
 4. **Type commands** in the terminal input
 
@@ -155,47 +177,77 @@ Vite starts on **port 5173**. Open [http://localhost:5173](http://localhost:5173
 | `pla` | List your owned planets |
 | `ros` | Player roster (top scores) |
 | `who` | Show all active ships |
-| `hel` | In-game help |
+| `hel` | In-game help — 61 pages, the original's own text |
 | `set ?` | Show your option flags |
 
 ### Ship classes
 
-Class 1 (Scout) cannot attack planets. Classes 2–10 can. Higher class numbers = heavier ships
-with more firepower and cargo but lower warp speed.
+Eighteen of the original's slots are real classes and are seeded; the rest are empty or stale
+leftovers in the shipped table and are omitted.
+
+| Range | Category | Notes |
+|---|---|---|
+| 1–9 | Player | Interceptor, Stealth Fighter, Heavy Freighter, Destroyer, Star Cruiser, Battle Cruiser, Frigate, Dreadnought, Freight Barge |
+| 21–25 | Cybertron and Sarten | Persistent hunters; escalate with your kill count |
+| 31–33 | Droids | Ephemeral. The Vakory Survey Drone (33) is the starter PvE target |
+| 41 | Sysopian Death Star | Admin only |
+
+The class 1 Interceptor cannot attack planets; every other player class can. Higher class numbers
+are not uniformly heavier — the Freight Barge (9) is a hauler, not the top of a ladder. Type
+`hel class` in game for the summary table, or `hel class <n>` for the original's own
+specification page for a buyable hull.
+
+---
+
+## Galaxy size — the thing this README used to get wrong
+
+`MAXX=30` and `MAXY=15` are the dimensions of the ASCII scan map **in characters**. They are not
+the size of the galaxy. The galaxy runs `-UNIVMAX..+UNIVMAX`; canon defaults to 300 and we deploy
+at 100, giving 201×201 sectors. This is a declared deviation, and the smaller map is why the
+Cybertron population is scaled down to match — see the `the-galaxy` entry in
+`backend/src/public/guide.ts`.
+
+The 30×15 misreading has produced real defects in the code more than once, so it is called out
+here rather than left to be rediscovered.
 
 ---
 
 ## Game tuning (`backend/config/game.config.json`)
 
-The original exposed 51 options to the sysop via `numopt(NAME, min, max)`, read at boot from a
-`.cnf` file (`GEMAIN.C:459-524`). This port mirrors that in `backend/config/game.config.json`,
-grouped by domain:
+The original exposed its options to the sysop via `numopt(NAME, min, max)`, read at boot from a
+`.cnf` file (`GEMAIN.C:459-524`). Two things follow, and keeping them apart is the whole design:
+
+- **The bounds are canon.** A value outside them is one the original could never produce, which
+  makes it a fidelity defect rather than a preference.
+- **The shipped default is also canon.** `MBMGEMSG.MSG` carries it inside the braces of every
+  block, so it is recovered by `tools/extract-sysop-options.mjs` rather than guessed.
+
+Both live in `backend/src/game/config/game-config.ts`, which declares 54 options, 48 of them
+backing a live gameplay constant. The rest are declared so their bounds are recorded and the gap
+is visible.
+
+`backend/config/game.config.json` is therefore **deviations only**. Today it contains one entry:
 
 ```json
-{
-  "weapons": { "PDAMMAX": 25, "TDAMMAX": 100 },
-  "world":   { "UNIVMAX": 15, "PLODDS": 4 },
-  "limits":  { "MAXPLRS": 256, "MAXSHIPS": 10 }
-}
+{ "world": { "UNIVMAX": 100 } }
 ```
 
-Any option can be overridden by an environment variable of the same name, which takes precedence —
-handy for Docker and CI:
+List an option there only to run it away from canon on purpose, and record the reason in
+`docs/DECISIONS.md`. The file previously restated all the options, 44 of them at values that were
+never canon — mostly a clamp bound picked because the shipped defaults were believed
+unrecoverable. Restating a value you did not choose is how that drift hid.
+
+Any option can also be overridden by an environment variable of the same name, which takes
+precedence — handy for Docker and CI:
 
 ```bash
 PDAMMAX=40 docker compose up
 ```
 
-**Every value is clamped to the range the original enforced.** That distinction matters: the *value*
-was never canon (it was each sysop's taste, and the `.cnf` files are not part of the reference
-source), but the *bounds* are — a value outside them is one the original could never produce. Three
-such defects were found by hand before this existed (torpedoes at twice the permitted maximum,
-missiles at three times, jammers at twice), so the loader now clamps and warns rather than letting
-one through silently. An unknown option name or a non-numeric value is a hard error, so a typo fails
-loudly instead of looking like a setting that had no effect.
-
-21 of the 51 currently back a live gameplay constant; the rest are declared in
-`backend/src/game/config/game-config.ts` so their bounds are recorded and the gap is visible.
+Every value is clamped to the range the original enforced, and an unknown option name or a
+non-numeric value is a hard error, so a typo fails loudly instead of looking like a setting that
+had no effect. Three defects were found by hand before this existed: torpedoes at twice the
+permitted maximum, missiles at three times, jammers at twice.
 
 ---
 
@@ -203,7 +255,7 @@ loudly instead of looking like a setting that had no effect.
 
 ```bash
 cd backend
-npm test               # full Jest suite (~2450 tests)
+npm test               # full Jest suite (600+ suites, 6,000+ tests)
 npm run test:manual    # manual smoke tests (requires live DB)
 ```
 
@@ -213,15 +265,22 @@ npm test               # Vitest suite
 npm run test:e2e       # Playwright browser E2E (requires a live stack)
 ```
 
-`npm run test:e2e` drives a real Chromium against the running app: register a pilot, complete
-onboarding, round-trip commands, and assert the terminal UI renders correctly. **Postgres and the
-backend must already be running** (`npm run start:dev` in `backend/`); Vite is started automatically
-and an existing dev server is reused.
+Testing is a first-class requirement here, not a coverage number. What the suite exists to do is
+make change safe, and [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) sets out what is
+deliberately left untested and why.
 
-This layer exists for defects nothing else can see. The event log once collapsed the column padding
-that `who`/`ros`/`pla` emit — destroying every ASCII table — and it was invisible to the backend
-suite, the Vitest suite and the no-mock integration layer alike, because it was a CSS rule. That
-specific regression is pinned in `frontend/e2e/gameplay.spec.ts`.
+Two layers are worth knowing about:
+
+**Balance specs** (`backend/test/balance/`) re-read the original distribution at test time rather
+than asserting a remembered value. They fail if a constant drifts, if a citation quotes a line
+that is not there, or if data is read from the wrong copy of a `.MSG` file.
+
+**Playwright E2E** drives a real Chromium against the running app: register a pilot, complete
+onboarding, round-trip commands, assert the terminal UI renders. **Postgres and the backend must
+already be running** (`npm run start:dev` in `backend/`); Vite is started automatically and an
+existing dev server is reused. This layer exists for defects nothing else can see — the event log
+once collapsed the column padding that `who`/`ros`/`pla` emit, destroying every ASCII table, and
+it was invisible to every other suite because it was a CSS rule.
 
 First run on a new machine needs the browser binary:
 
@@ -238,14 +297,44 @@ galactic-empire-reborn/
   backend/             NestJS application (port 3000)
   frontend/            React + Vite terminal UI (port 5173)
   docs/                Architecture, decisions, progress, game mechanics
-  specs/               spec-kit feature specs (001–020)
+  specs/               spec-kit feature specs (001–022, all shipped)
+  tools/               Extractors that generate canon data from the .MSG files
   reference/
     ge-source/         Original C source — READ ONLY
-    wiki/              Game wiki reference
+    ge-upstream/       The full vendored 3.2e distribution
+    wiki/              Community transcription — orientation only
 ```
 
-See `docs/ARCHITECTURE.md` for the full module map and `docs/GAME_MECHANICS.md` for
-implemented mechanics with C source references.
+`docs/` is living documentation, updated in the same commit as the change it describes:
+
+| File | What it is for |
+|---|---|
+| [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map and how the pieces fit |
+| [`DECISIONS.md`](docs/DECISIONS.md) | Every deliberate deviation and why, numbered |
+| [`GAME_MECHANICS.md`](docs/GAME_MECHANICS.md) | Implemented mechanics with C source references |
+| [`TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) | What is tested, what is not, and the filter |
+| [`PROGRESS.md`](docs/PROGRESS.md) | Where the work is |
+| [`DATA_MODEL.md`](docs/DATA_MODEL.md) | Schema and the columns that were dropped |
+| [`DEPLOYMENT.md`](docs/DEPLOYMENT.md) | How it runs in production |
+
+---
+
+## How this port was written
+
+This port was written by Rick Earley in collaboration with **Claude**, Anthropic's AI coding
+assistant, using Claude Code. Hundreds of the commits in this repository carry a
+`Co-Authored-By: Claude` trailer, and the method is stated plainly rather than left to be
+inferred from the history.
+
+It is worth stating because the method is load-bearing. A faithful port is an exercise in reading
+sixteen thousand lines of 1990s C and not getting a number wrong, and everything in the
+"What faithful means" section above — generated canon data, quoted citations checked by a test,
+numbered deviations, six thousand tests — exists because no single reading of that source is
+trusted, human or otherwise.
+
+None of it makes the port correct. It makes an error findable, which is the most any
+reimplementation of a game this old can honestly promise. Where you find one, the original is
+right and this is wrong. [`NOTICE`](NOTICE) says the same at more length.
 
 ---
 
