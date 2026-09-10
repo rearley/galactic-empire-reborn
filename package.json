@@ -1,0 +1,12 @@
+{
+  "name": "galactic-empire-reborn",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=24"
+  }
+}

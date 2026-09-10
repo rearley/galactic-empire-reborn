@@ -34,7 +34,8 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "@ge/wire": "file:../packages/wire"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
