@@ -21,6 +21,13 @@ export interface Class10Action {
   shieldCommand: 1 | 0;
   /** Annoy targets: each entry carries the player to annoy */
   annoys: Array<{ target: ShipState; message: string }>;
+  /**
+   * A player was inside scan range this tick. Canon sets the short countdown
+   * right there, BEFORE rolling the 1-in-4 annoy — so spotting someone
+   * sharpens the Scow's reaction even on the ticks it says nothing.
+   * @see GEDROIDS.C:278
+   */
+  detected?: boolean;
 }
 
 /**
@@ -43,14 +50,19 @@ export function droidActClass10(
       jammedHoldcourse: pickHoldCourseDuration('jammed', rng),
       shieldCommand,
       annoys: [],
+      detected: false,
     };
   }
 
   const annoys: Array<{ target: ShipState; message: string }> = [];
+  let detected = false;
 
   for (const player of players) {
     if (player.status !== 1) continue; // GESTAT_USER
     if (inScanRange(droid, player, scanRange)) {
+      // `ptr->tick = CYBTICKTIME + gernd()%CYBTICKTIME` sits here in canon,
+      // outside the annoy roll. @see GEDROIDS.C:278
+      detected = true;
       // @see GEDROIDS.C:278-283 — rollAnnoy(4, DRDMSG6, DRDMSG6)
       if (rollAnnoy(DROID_ANNOY_DENOM, rng)) {
         annoys.push({ target: player, message: pickMessage(droid.shipname, rng) });
@@ -58,5 +70,5 @@ export function droidActClass10(
     }
   }
 
-  return { shieldCommand, annoys };
+  return { shieldCommand, annoys, detected };
 }

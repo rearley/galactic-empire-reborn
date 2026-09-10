@@ -61,18 +61,59 @@ describe('docs cite a real original', () => {
   const C_SOURCE = join(REPO, 'reference/ge-source');
 
   /** Line counts of every vendored C/H file, for citation bounds. */
-  const lineCounts = new Map<string, number>(
-    readdirSync(C_SOURCE).map((f) => [
-      f.toUpperCase(),
-      readFileSync(join(C_SOURCE, f), 'latin1').split('\n').length,
-    ]),
-  );
+  //
+  // BOTH vendored trees. `ge-source/` holds nine files; the full upstream
+  // distribution adds GELIB.C, SECURE.C, MBMGEGRF.C and GESAMPLE.C, and the
+  // source legitimately cites GELIB.C. Checking only ge-source/ reported eight
+  // real citations as pointing at a file we do not vendor. @see PROVENANCE.md
+  const UPSTREAM = join(REPO, 'reference/ge-upstream/mbmgemp');
+  const lineCounts = new Map<string, number>();
+  for (const dir of [UPSTREAM, C_SOURCE]) {
+    for (const f of readdirSync(dir)) {
+      if (!/\.[CH]$/i.test(f)) continue;
+      lineCounts.set(f.toUpperCase(), readFileSync(join(dir, f), 'latin1').split('\n').length);
+    }
+  }
 
   it('has a vendored C source to check against at all', () => {
     // Guard the guard: if the tree moved, every assertion below would pass
     // vacuously.
     expect(lineCounts.size).toBeGreaterThan(5);
     expect(lineCounts.get('GECMDS.C')).toBeGreaterThan(1000);
+  });
+
+  /**
+   * The SOURCE carries far more citations than the docs — roughly 1,900 across
+   * src/ and test/ — and CLAUDE.md calls them load-bearing rather than
+   * decoration: they are how a reader tells canon from our own work.
+   *
+   * They were unchecked until 2026-09-10. That matters most for the
+   * restructuring this suite is being built to support: a refactor that moves
+   * or deletes code can leave a citation pointing at a line that has nothing to
+   * do with the claim beside it, and nothing would say so. A citation nobody
+   * verifies is a comment that looks like evidence.
+   *
+   * This checks the BOUND only — that the file exists and is long enough. It
+   * cannot know whether line 1039 still says what the comment claims. That is
+   * the honest limit of a cheap check, and it still catches the whole class of
+   * "cited a file we do not vendor" and "cited past the end".
+   */
+  it('points every citation in the SOURCE at a line that exists', () => {
+    const files = [...walk(join(REPO, 'backend/src')), ...walk(join(REPO, 'backend/test'))];
+    const bad: string[] = [];
+    for (const f of files) {
+      readFileSync(f, 'utf8').split('\n').forEach((line, idx) => {
+        for (const m of line.matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)) {
+          const file = m[1].toUpperCase();
+          const n = Number(m[2]);
+          const len = lineCounts.get(file);
+          const where = `${f.replace(REPO + '/', '')}:${idx + 1}`;
+          if (len === undefined) bad.push(`${where} → ${m[0]} (no such vendored file)`);
+          else if (n > len) bad.push(`${where} → ${m[0]} (file has ${len} lines)`);
+        }
+      });
+    }
+    expect(bad).toEqual([]);
   });
 
   it('points every FILE.C:line citation at a line that exists', () => {

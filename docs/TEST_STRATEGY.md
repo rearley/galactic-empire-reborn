@@ -9,77 +9,84 @@ not support that. A suite that pins observable behaviour does.
 
 ## Where we are
 
-Recounted 2026-09-10 after four rounds of work, backend, 596 suites and 6,073
-tests. Both numbers matter and only the second is the bar:
+Recounted 2026-09-10 (second recount, same day) after the pre-refactor cleanup,
+backend, 602 suites and 6,104 tests. Both numbers matter and only the second is
+the bar:
 
 | | |
 |---|---|
-| Raw branches | 82.6% |
-| **Branches of COVERABLE** | **90.0%** |
-| Lines | 95.6% |
-| Functions | 91.9% |
+| Raw branches | 83.9% |
+| **Branches of COVERABLE** | **92.9%** |
 
-Frontend, measured for the first time on the same day: branches 90.8%, functions
-94.2%, lines 87.5%, 310 tests.
+Frontend, measured 2026-09-10: branches 90.8%, functions 94.2%, lines 87.5%,
+310 tests.
 
-### The recount, and how to repeat it
+### The recount is now a script, because doing it by hand kept moving
 
-702 backend branches are uncovered. Classified against this document's own
-exclusions:
+`backend/tools/classify-coverage.mjs`:
+
+```
+cd backend
+npx jest --coverage --coverageReporters=json
+node tools/classify-coverage.mjs
+```
+
+It reads each uncovered branch's source line and sorts it into this document's
+own buckets. 626 backend branches are uncovered:
 
 | | |
 |---|---|
-| Display and format fallbacks | 297 |
-| Defensive early returns | 31 |
+| Display and format fallbacks | 302 |
+| Defensive early returns | 73 |
 | Optional-dependency guards | 3 |
-| **Real decisions** | **269** |
+| **Real decisions** | **248** |
 
-So the coverable ceiling is 91.8% and we sit at 90.0% of it. **The pre-refactor
-bar is met in aggregate.**
+So the raw figure would read 93.6% with every real decision covered, and we sit
+at 92.9% of what can be covered. **The pre-refactor bar is met in aggregate.**
 
-Reproduce with `jest --coverage --coverageReporters=json`, then walk
-`coverage-final.json`, take each uncovered branch's `branchMap[id].loc.start.line`,
-read that source line, and classify it. A crude classifier that only looks for
-`??` and `catch` will overstate the real count by roughly a third — it misses
-`if (!x) return` and `if (this.optionalDep)`, which this document also excludes.
+The hand count was done twice and disagreed with itself both times. The first
+version looked only for `??` and `catch` and overstated the real count by about
+a third. The second still scored `const stack = err instanceof Error ? …` and
+`if (owner === null) return` as real decisions, which put `planet-economy` at a
+false 68.8% when every one of its twelve open branches is an error-logging
+ternary or a null guard. Change the rules in the script rather than re-deriving
+them, or the next recount will not be comparable with this one.
 
 ### Per module, against the bar
 
 | module | raw | coverable | real left |
 |---|---|---|---|
+| `planet/planet-economy.service.ts` | 64.7 | **100** | 0 |
 | `combat/firehp.ts` | 100 | **100** | 0 |
 | `handlers/report.handler.ts` | 76.8 | **98.4** | 1 |
+| `handlers/transfer.handler.ts` | 71.2 | **97.9** | 1 |
+| `physics/physics-tick.service.ts` | 96.4 | **97.6** | 2 |
+| `cybertron/cybertron-tick.service.ts` | 83.5 | **97.1** | 6 |
+| `combat/combat-tick.service.ts` | 90.5 | **97.1** | 4 |
 | `planet/planet-state.service.ts` | 87.6 | **96.8** | 3 |
-| `handlers/scan.handler.ts` | 89.6 | **96.1** | 7 |
-| `cybertron/cybertron-tick.service.ts` | 83.5 | **95.8** | 6 |
-| `combat/combat-tick.service.ts` | 90.5 | **95.7** | 4 |
-| `handlers/transfer.handler.ts` | 71.2 | **94.0** | 3 |
-| `handlers/new-ship.handler.ts` | 89.2 | **93.3** | 5 |
-| `gateway/game.gateway.ts` | 85.8 | **92.9** | 18 |
-| `droid/droid-tick.service.ts` | 76.2 | 89.9 | 8 |
-| `physics/physics-tick.service.ts` | 85.7 | 86.7 | 8 |
-| `planet/planet-economy.service.ts` | 64.7 | 81.5 | 2 |
+| `handlers/scan.handler.ts` | 89.6 | **96.6** | 6 |
+| `gateway/game.gateway.ts` | 85.6 | **95.4** | 15 |
+| `droid/droid-tick.service.ts` | 76.9 | **95.2** | 4 |
+| `handlers/new-ship.handler.ts` | 89.2 | **94.3** | 5 |
 
-Note how far the raw column misleads. `transfer.handler.ts` reads 71.2% and is
-actually at 94% of what can be covered; `report.handler.ts` reads 76.8% and has
-exactly one real decision left. Judging either by the raw figure would send
-someone to write tests for display fallbacks.
+Every module previously named as under the bar now clears it. Note how far the
+raw column misleads: `planet-economy` reads 64.7% and has nothing real left at
+all, and `transfer.handler.ts` reads 71.2% at 97.9% of what is coverable.
+Judging either by the raw figure would send someone to write tests for display
+fallbacks.
 
 ### What is left is a long tail, not a hot spot
 
-No file has more than 18 real decisions open, and the median is under five. The
-concentrations that justified five-agent rounds are gone. Further work is
-~7 branches each across ~30 files, with falling returns — worth doing
-opportunistically when touching a module, not as another sweep.
+No file has more than 15 real decisions open, and the median is under five. The
+concentrations that justified five-agent rounds are gone. The largest remaining
+counts are `game.gateway.ts` (15, mostly transport plumbing rather than game
+rules), `commands/messages.ts` (11) and `handlers/tea.handler.ts` (11). Further
+work is worth doing opportunistically when touching a module, not as another
+sweep.
 
-The three modules still under the bar are `droid-tick` (89.9), `physics-tick`
-(86.7) and `planet-economy` (81.5). Those are the ones to finish before
-restructuring anything in them.
-
-Branches being fifteen points below lines is the signature of tests that walk
-the happy path and confirm the code runs. Six defects were found by an evening
-of PLAY on 2026-09-09, not by 5,800 tests, and every one was a conditional no
-test entered:
+Branches being well below lines is the signature of tests that walk the happy
+path and confirm the code runs. Six defects were found by an evening of PLAY on
+2026-09-09, not by 5,800 tests, and every one was a conditional no test entered:
 
 - AI torpedoes had no lock check to branch on at all
 - The torpedo gate tested speed where canon tests hyperspace
@@ -87,6 +94,13 @@ test entered:
 - `ren` dropped every argument after the first
 - `loc B` self-matched on the caller's ship name
 - `sys class` compared a class number against a count
+
+A further three were found on 2026-09-10 by READING the three droid brains side
+by side, which is the other thing coverage work is good for:
+
+- a Garbage Scow that spotted a player never got the short reaction countdown
+- a droid phaser shot that rounded to zero damage never spent the bank
+- the droid hyper-phaser carried a minimum-damage gate `firehp` does not have
 
 That list is the argument for this document.
 
@@ -115,38 +129,32 @@ Recorded so the gap is a decision rather than an oversight, and so nobody
   original `.MSG` files.
 - **Defensive early returns** guarding states the type system already prevents.
 
-## The queue, in risk order
+## The queue, as it stood before the four rounds
 
-### Tier 1 — combat decisions, where a wrong branch costs a ship
+Kept as a record of where the effort went, not as work to do — every file below
+is now at or above the bar. The tiering is the part worth reusing: combat
+decisions first, because a wrong branch there costs a ship; then economy, where
+credits and planets move; then physics and surfaces.
 
-| file | branch % | missed |
-|---|---|---|
-| `droid/droid-tick.service.ts` | 45.7 | 57 |
-| `cybertron/cybertron-tick.service.ts` | 70.7 | 71 |
-| `combat/combat-tick.service.ts` | 73.0 | 40 |
-| `combat/firehp.ts` | 50.0 | 5 |
+| tier | file | branch % then | missed then |
+|---|---|---|---|
+| 1 | `droid/droid-tick.service.ts` | 45.7 | 57 |
+| 1 | `cybertron/cybertron-tick.service.ts` | 70.7 | 71 |
+| 1 | `combat/combat-tick.service.ts` | 73.0 | 40 |
+| 1 | `combat/firehp.ts` | 50.0 | 5 |
+| 2 | `planet/planet-economy.service.ts` | 55.9 | 15 |
+| 2 | `commands/handlers/transfer.handler.ts` | 57.6 | 28 |
+| 2 | `commands/handlers/buy.handler.ts` | 66.7 | 12 |
+| 2 | `commands/handlers/new-ship.handler.ts` | 66.7 | 31 |
+| 2 | `commands/handlers/admin.handler.ts` | 76.5 | 19 |
+| 2 | `planet/planet-state.service.ts` | 78.1 | 23 |
+| 3 | `physics/physics-tick.service.ts` | 79.8 | — |
+| 3 | `gateway/game.gateway.ts` | 74.7 | 93 |
 
-The Droid tick is the worst gameplay file in the codebase and drives real
+The Droid tick was the worst gameplay file in the codebase and drives real
 fights. The Cybertron half got attention on 2026-09-09; the Droid half did not,
 which is how the torpedo lock guard added that day shipped with its Droid copy
-untested.
-
-### Tier 2 — economy, where credits and planets move
-
-| file | branch % | missed |
-|---|---|---|
-| `planet/planet-economy.service.ts` | 55.9 | 15 |
-| `commands/handlers/transfer.handler.ts` | 57.6 | 28 |
-| `commands/handlers/buy.handler.ts` | 66.7 | 12 |
-| `commands/handlers/new-ship.handler.ts` | 66.7 | 31 |
-| `commands/handlers/admin.handler.ts` | 76.5 | 19 |
-| `planet/planet-state.service.ts` | 78.1 | 23 |
-
-### Tier 3 — physics and surfaces
-
-`physics/physics-tick.service.ts` (79.8), `gateway/game.gateway.ts` (74.7, and
-the largest absolute gap at 93 branches, though much of it is transport
-plumbing rather than game rules).
+untested — and how the three defects above survived until someone read it.
 
 ## The rule that would have caught most of 2026-09-09
 
@@ -178,8 +186,9 @@ Optimisation must not change behaviour, so before restructuring a module:
    percentage points, which is the exact behaviour the filter exists to stop.
 
    Measure it as `(total - excludable - uncovered_real) / (total - excludable)`.
-   To find the split, run coverage with the `json` reporter and classify each
-   uncovered branch line by reading its source line.
+   Do not do that split by hand — `backend/tools/classify-coverage.mjs` prints
+   it per module, and the hand version came out different every time it was
+   tried.
 2. The behaviour should be pinned by CHARACTERIZATION tests — given this input
    state, assert the exact output state — not merely by "it does not throw".
 3. The canon citations in that module's tests must still point at real C source

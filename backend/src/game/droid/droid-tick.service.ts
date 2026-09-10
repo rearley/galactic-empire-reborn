@@ -210,7 +210,7 @@ export class DroidTickService implements OnModuleInit {
 
     let detected = false;
     if (classNumber === DROID_CLASS_SCOW) {
-      this.actClass10(droid, players, scanRange, tickAt);
+      detected = this.actClass10(droid, players, scanRange, tickAt);
     } else if (classNumber === DROID_CLASS_TRANSPORT) {
       detected = this.actClass11(droid, players, scanRange, tickAt);
     } else if (classNumber === DROID_CLASS_VAKORY) {
@@ -251,7 +251,7 @@ export class DroidTickService implements OnModuleInit {
 
   // ── Class 10: Lydorian Garbage Scow ───────────────────────────────────────
 
-  private actClass10(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): void {
+  private actClass10(droid: ShipState, players: ShipState[], scanRange: number, tickAt: number): boolean {
     const action = droidActClass10(
       droid,
       players,
@@ -270,6 +270,8 @@ export class DroidTickService implements OnModuleInit {
     for (const { target, message } of action.annoys) {
       this.emitAnnoy(droid, target, message, DROID_CLASS_SCOW, 'passive', tickAt);
     }
+
+    return action.detected === true;
   }
 
   // ── Class 11: Murdonian Transport ─────────────────────────────────────────
@@ -491,7 +493,16 @@ export class DroidTickService implements OnModuleInit {
       // `cantexit > 0`, so a damaged pilot within scanner range of any droid
       // could never finish a repair. The gate is already present in the
       // hyper-phaser path in this same file and in the player path.
-      if (damage < 1) return;
+      // ...but `ptr->phasr = 0` is OUTSIDE the loop (GECMDS.C:1006), so the
+      // trigger costs the bank whatever the shot achieves. Returning without
+      // spending it left a droid firing beyond effective range with a
+      // permanently hot bank, able to open at full charge the moment its
+      // target closed. `cantexit` stays unset — canon's copy of THAT line is
+      // inside the gate (GECMDS.C:977).
+      if (damage < 1) {
+        droid.phasr = 0;
+        return;
+      }
       // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
     // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
     // raised on an empty capacitor still absorbs the next hit in full —
@@ -594,27 +605,31 @@ export class DroidTickService implements OnModuleInit {
         distRaw: dist * 10000,
         victimMaxTons: this.classCache.getMaxTons(target.shpclass),
       });
-      if (damage >= 1) {
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
-          v.damage = v.damage + damage;
-          v.lastfired = droid.channel ?? NO_CHANNEL;
-          v.cantexit = FIRETICKS;
-        });
+      // No minimum-damage gate. `firep` has one (GECMDS.C:975) and `firehp`
+      // does not: inside the arc and inside scan range it applies damage,
+      // battle-locks both ships and rolls `randamage` with no test on the
+      // figure at all (GECMDS.C:1078-1082). This copy had picked up `firep`'s
+      // gate, so a droid grazing a ship in transit did nothing where a
+      // Cybertron in the same position knocked a system out.
+      this.shipState.mutate(target.userid, target.shipno, (v) => {
+        v.damage = v.damage + damage;
+        v.lastfired = droid.channel ?? NO_CHANNEL;
+        v.cantexit = FIRETICKS;
+      });
 
-        const droidHypTickAt = new Date();
-        this.events.emit(COMBAT_HIT, {
-          attackerId: shipKey(droid.userid, droid.shipno),
-          victimId: shipKey(target.userid, target.shipno),
-          weapon: 'phaser',
-          damageHull: damage,
-          damageShield: 0,
-          sector,
-          tickAt: droidHypTickAt,
-        } satisfies CombatHitEvent);
+      const droidHypTickAt = new Date();
+      this.events.emit(COMBAT_HIT, {
+        attackerId: shipKey(droid.userid, droid.shipno),
+        victimId: shipKey(target.userid, target.shipno),
+        weapon: 'phaser',
+        damageHull: damage,
+        damageShield: 0,
+        sector,
+        tickAt: droidHypTickAt,
+      } satisfies CombatHitEvent);
 
-        // @see GEFUNCS.C:randamage — called after every droid hyper-phaser hit (GEDROIDS.C → GECMDS.C:1082)
-        applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidHypTickAt);
-      }
+      // @see GEFUNCS.C:randamage — called after every droid hyper-phaser hit (GEDROIDS.C → GECMDS.C:1082)
+      applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidHypTickAt);
     }
     droid.phasr = 0;
     droid.cantexit = FIRETICKS;

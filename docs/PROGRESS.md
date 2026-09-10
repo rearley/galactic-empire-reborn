@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 83 entries.
+Append-only, **newest at the bottom**. 84 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 83 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — three droid defects found by reading the brains side by side](#2026-09-10--three-droid-defects-found-by-reading-the-brains-side-by-side)
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
 - [2026-09-10 — round four: the frontend, and a bug found by a test written wrong](#2026-09-10--round-four-the-frontend-and-a-bug-found-by-a-test-written-wrong)
@@ -5023,3 +5024,94 @@ looking connected.
 more pass at `transfer.handler.ts` (3 real decisions), `planet-economy` (2), and
 an honest re-count of the AI tick tails, several of which look unreachable from
 any caller and should be recorded as excluded rather than re-attempted.
+
+
+## 2026-09-10 — three droid defects found by reading the brains side by side
+
+**Completed:** the pre-refactor cleanup. Three canon divergences in the droid
+tick, a canon-citation guard extended over the whole codebase, and the coverage
+recount turned into a script.
+
+The three defects all came from the same place: `droid-tick.service.ts` has one
+method per droid class, they were written at different times, and nothing had
+ever compared them against each other or against `GEDROIDS.C` line by line.
+
+**A Garbage Scow that spotted a player never sped up.** Canon sets the reaction
+countdown inside each class brain, in the scan-range branch — `ptr->tick =
+CYBTICKTIME + gernd()%CYBTICKTIME` at GEDROIDS.C:278, :340 and :442 — and
+`droid_lives` re-arms only what the brain left alone, `if (ptr->tick == 255)` at
+:215. That fallback is the one that multiplies by three. The port hoisted the
+decision out of the brains into the caller, where it reads a `detected` flag off
+the returned action. `actClass11` and `actClass12` returned one. `actClass10`
+returned `void`, so the Scow's flag was permanently false and a Scow with a
+player inside its scanner still waited 27 ticks instead of 9.
+
+**A droid phaser shot that rounded to zero never spent the bank.** Canon's
+`firep` wraps its consequences in `if (damage >= 1)` (GECMDS.C:975) but puts
+`ptr->phasr = 0` outside the victim loop entirely (:1006), so pulling the
+trigger costs the bank whatever the shot achieved. The port's gate was an early
+`return` that skipped the tail, leaving a droid firing beyond effective range
+with a permanently hot bank — able to open at full charge the instant its target
+closed. The firer's `cantexit` correctly stays unset, because canon's copy of
+THAT line is inside the gate (:977).
+
+**The droid hyper-phaser carried a gate `firehp` does not have.** GECMDS.C:1078
+applies damage, sets `lastfired`/`cantexit` and rolls `randamage` with no test
+on the figure at all. The shared `firehp.ts` helper follows canon and so does
+the Cybertron caller; only the droid copy had picked up `firep`'s `damage >= 1`.
+So a droid grazing a ship in transit did nothing where a Cybertron in the same
+position knocked a system out. One weapon, two behaviours, depending on which
+hull fired it.
+
+**Tests:** three new specs, each written failing first and each failing for the
+right reason before the fix. `scow-detect-cadence.spec.ts` (3 cases, asserts the
+9-vs-27 countdown through `actOnDroid`, not through the pure function),
+`droid-phaser-bank-spend.spec.ts` (4), `droid-hyper-phaser-no-gate.spec.ts` (4,
+opening with a case that proves the chosen geometry really does round to zero,
+so a retune of PDAMMAX or PFIRDST fails loudly rather than making the rest
+vacuous).
+
+Two characterization cases in `droid-tick-final.spec.ts` had PINNED the second
+and third divergences as-is, with canon named and a note saying a later fidelity
+fix should not be mistaken for a regression. That note is what made these safe
+to change, and both cases are now rewritten to assert canon.
+
+**The citation guard now covers source, not just docs.** `docs-truth.balance.spec.ts`
+checks every `@see FILE.C:LINE` against the real file's line count. Extending it
+from `docs/` to `backend/src` and `backend/test` put 1,870 citations under it and
+turned up ten failures: nine were the guard's, because `GELIB.C` and friends live
+in `reference/ge-upstream/mbmgemp` rather than `reference/ge-source`, and one was
+real — `cyb-decisions.ts:181` cited `GECYBS.C:2354` in an 839-line file. It meant
+`GEMAIN.C:2354`.
+
+**The recount is a script now.** `backend/tools/classify-coverage.mjs`. The hand
+classification was done twice and disagreed with itself both times: the first
+version looked only for `??` and `catch` and overstated the real count by about a
+third, and the second still scored `err instanceof Error ? …` and
+`if (owner === null) return` as real decisions — which put `planet-economy` at a
+false 68.8% when all twelve of its open branches are error-logging ternaries or
+null guards. It is actually at 100% of coverable.
+
+| | round four | now |
+|---|---|---|
+| Backend raw branches | 82.6% | 83.9% |
+| **Backend branches of coverable** | **90.0%** | **92.9%** |
+| Backend tests | 6,073 | 6,104 |
+
+Every module previously named as under the bar now clears it: `droid-tick` 95.2,
+`physics-tick` 97.6, `planet-economy` 100.
+
+**Decisions made:** the three fixes are canon corrections, not deviations, so
+nothing goes in `DECISIONS.md` or `GUIDE_DEVIATIONS`. A player would not have
+been able to name any of them from the outside — the Scow one is a cadence
+change nobody could time, and the other two only show at ranges where the shot
+does nothing anyway.
+
+**Next:** the restructuring work this was all building toward. The remaining
+coverage tail is 248 real decisions spread thin, largest being
+`game.gateway.ts` (15, mostly transport plumbing), `commands/messages.ts` (11)
+and `tea.handler.ts` (11). Worth picking up when touching those files, not as
+another sweep.
+
+**Known issues:** none opened by this work. The going-public decision and the
+loopback bind on `:3100` are still where they were.

@@ -178,7 +178,9 @@ export function pickPursuitBand(
  * Pick a spawn class for a new Cybertron slot.
  * 1% chance of a random CPU_COMBATIVE class regardless of population; otherwise picks
  * among classes that still have room up to tot_to_create.
- * @see GECYBS.C:2354 main loop spawn slot — picks class by population gap
+ * @see GEMAIN.C:2354 main loop spawn slot — picks class by population gap
+ *      (cited as GECYBS.C until 2026-09-10; the line number was always right,
+ *      the filename was not — GECYBS.C is 839 lines long)
  */
 export function pickSpawnClass(
   classCounts: Map<number, number>,
