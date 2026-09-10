@@ -1,4 +1,8 @@
 {
+  // Comments in this file must be on their own line (`//` starting a fresh
+  // line, nothing else on it before or after). `backend/test/unit/lint-gate.spec.ts`
+  // parses this file with a helper that only strips whole-line `//` comments;
+  // a trailing comment survives that strip and breaks `JSON.parse`.
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {

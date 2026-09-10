@@ -470,7 +470,7 @@ cd backend && npm run lint && npm test 2>&1 | tail -5
 cd ../frontend && npm run lint && npm test 2>&1 | tail -5
 ```
 
-Expected: both linters exit 0. Backend `607 passed` suites / `6150 total` tests. Frontend 39 files / 310 tests.
+Expected: both linters exit 0. Backend `607 passed` suites / `6154 total` tests. Frontend 39 files / 310 tests.
 
 - [ ] **Step 8: Commit**
 
@@ -526,7 +526,7 @@ cd backend && npm test 2>&1 | tail -5
 cd ../frontend && npm test 2>&1 | tail -5
 ```
 
-Expected: backend `607 passed` / `6150 total`, frontend 39 / 310.
+Expected: backend `607 passed` / `6154 total`, frontend 39 / 310.
 
 - [ ] **Step 5: Commit and push**
 
@@ -553,7 +553,7 @@ This gives full CI on every push to the branch. The `build` job requires `github
 - Both images build on Node 24 and the backend image boots.
 - `npx tsc --noEmit` is clean on TypeScript 6.
 - `npm run lint` exits 0 in both apps and CI runs it in both jobs.
-- Backend suite: 607 suites, 6,150 tests, all passing.
+- Backend suite: 607 suites, 6,154 tests, all passing.
 - Frontend suite: 39 files, 310 tests, all passing.
 - No file under `backend/src/`, `frontend/src/`, `backend/prisma/` or `reference/` changed, except React 19 API migrations in `frontend/src/` if Task 3 required them.
 - The draft PR is open and its CI run is green.

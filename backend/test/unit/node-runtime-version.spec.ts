@@ -54,4 +54,15 @@ describe('Node runtime version', () => {
       expect(pkg.engines?.node).toBe(`>=${EXPECTED_MAJOR}`);
     },
   );
+
+  it('backend/package.json pins @types/node to the runtime major', () => {
+    // Frontend has no @types/node dependency, so this check is backend-only.
+    const pkg = JSON.parse(read('backend/package.json')) as {
+      devDependencies?: Record<string, string>;
+    };
+    const range = pkg.devDependencies?.['@types/node'];
+
+    expect(range).toBeDefined();
+    expect(range).toMatch(new RegExp(`^\\^${EXPECTED_MAJOR}\\.`));
+  });
 });

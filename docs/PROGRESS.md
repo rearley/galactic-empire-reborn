@@ -4206,9 +4206,20 @@ Remaining sub-choice, to be made after reviewing the tree:
    requests, and uses only the auto-provisioned token. But on a public
    repository the *run logs* become world-readable, and existing history
    carries over. Secrets are masked; hostnames and deploy output are not.
-6. **Note the remote spelling.** The private remote is
-   `rearley/galatic-empire-reborn`; `SOURCE_URL` assumes a corrected
-   `galactic-empire-reborn`. One of the two has to move.
+6. **Remote spelling — resolved 2026-09-10.** The private remote was
+   `rearley/galatic-empire-reborn`; `SOURCE_URL` in
+   `frontend/src/content/provenance-notes.ts` already used the corrected
+   `galactic-empire-reborn`. The GitHub repository was renamed to
+   `rearley/galactic-empire-reborn` rather than changing the constant, because
+   the misspelling would otherwise become permanent in a public URL and in an
+   AGPL source offer — a constant is easy to fix later, a URL people have
+   linked to is not. GitHub redirects the old spelling, so nothing that
+   already points at it breaks. The deploy path was checked and is unaffected:
+   the container images are named `ghcr.io/<owner>/<app>` from the repository
+   owner and a matrix build name, never from the repository name itself.
+   **This does not close item 1** — the repository is still private, so
+   `/provenance` still links to a repo that does not exist and that page must
+   not ship until it does. The spelling was the smaller of the two problems.
 
 ### Not reasons to delay
 
@@ -5420,8 +5431,8 @@ of it.
   discovered" section for why that one tsconfig setting blocks both TS7 and
   backend type-aware linting. (`1050298`, fix round `30f9975`)
 
-**Tests:** measured at the end of phase 0 — backend 607 suites / 6,153 tests
-(up from the 605/6,141 pre-phase baseline: +1 suite/+5 tests from the runtime
+**Tests:** measured at the end of phase 0 — backend 607 suites / 6,154 tests
+(up from the 605/6,141 pre-phase baseline: +1 suite/+6 tests from the runtime
 pin, +1 suite/+7 tests from the lint gate), ~117s local. Frontend unchanged at
 39 files / 310 tests, ~15s. Both `npm run lint` exit 0 in both apps.
 
