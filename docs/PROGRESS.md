@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 74 entries.
+Append-only, **newest at the bottom**. 75 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
 - [2026-09-09 — `sys kill` could not name an AI hull](#2026-09-09--sys-kill-could-not-name-an-ai-hull)
@@ -4507,3 +4508,52 @@ frontend 256 across 36.
 **Known issues:** existing ships that were silently truncated keep their
 truncated names — nothing migrates them, and a pilot can simply rename again
 now that it works.
+
+## 2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away
+
+**Found in play**, and the workaround the owner reached for says everything
+about how it presented: he renamed his ship to get the lock.
+
+`LockHandlerService` ran a self-check BEFORE resolving the target:
+
+```ts
+if (ship.shipname.toLowerCase().startsWith(trimmed.toLowerCase()))
+    return LOC_SELF;
+```
+
+So a pilot flying `BigCat` could never `loc B`. Whatever B was on their scan,
+the letter prefix-matched their own hull name and they were told locking it
+would be foolish. One letter of the twenty-six was silently unusable, chosen by
+whatever they had named their ship, and `sca sh B` kept working the whole time —
+which is what made it read as nonsense rather than as a rule.
+
+**Canon compares the RESOLVED ship to the caller**, after `findshp` has turned
+the argument into a target:
+
+```
+if (shpnum == usrnum) { prfmsg(FOOLISH); }        GECMDS.C:1150
+```
+
+It never matches on a name. And since `findshp` resolves by scan letter
+(GECMDS.C:1473-1487) and your own hull is not in your own scan table, FOOLISH is
+all but unreachable — which is why canon can afford to leave the check there.
+
+Moved the self-test to run only after `findShip` has failed to resolve. That
+keeps the friendlier message for someone who really did type their own ship's
+name, and removes the collision entirely, because the letter gets its chance
+first.
+
+**Tests:** two cases added to `lock.spec.ts`, the first written failing. The
+harness gained a settable scan table, which it did not have — every existing
+case ran with `lettersFor: () => []`, so no test in the file had ever exercised
+a letter through the handler. That is why a helper with a correct letter branch
+and a handler that could not reach it coexisted.
+
+Backend 5,791 across 575 files.
+
+**Next:** —
+**Known issues:** none from this. Worth noting the two lookalike reports it
+arrived with, both checked and both correct behaviour: a torpedo refused at
+warp 1 was the lock arithmetic (combined speed puts reach at 1.51 sectors
+against a target 1.82 away), and a torpedo refused in hyperspace was this
+morning's restored TORP2 gate doing its job.
