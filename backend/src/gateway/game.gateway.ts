@@ -1387,12 +1387,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     //     }
     //
     // `checktm` calls `acctm` on both weapons and both shield branches
-    // (GEFUNCS.C:1562 torpedo, :1640 and :1659 missile). `shpltr(usrn,ship)`
+    // (GEFUNCS.C:1562 and :1575 torpedo, :1646 and :1660 missile).
+    // `shpltr(usrn,ship)`
     // reads the FIRST argument's scan table, so the letter is the shooter's own
     // for the target. Both strings were extracted into CANON_MESSAGES and
     // neither was ever sent: a phaser told you what it did, a torpedo volley
     // told you nothing, and you learned the result from the target's next scan.
-    // @see GEFUNCS.C:1741 `ptr->lastfired = channel;`
+    // @see GEFUNCS.C:1742 `ptr->lastfired = channel;`
     if (event.weapon === 'torpedo' || event.weapon === 'missile') {
       const attackerUser = useridOf(event.attackerId);
       // `?:<channel>` is this port's marker for a firer no ship holds any more,
