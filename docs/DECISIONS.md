@@ -5012,3 +5012,64 @@ departure than tightening a threshold.
 
 **Player-visible:** yes, and recorded in `GUIDE_DEVIATIONS` on the `report` page.
 
+
+## 2026-09-10 — the comment layer stays, and it is an asset for going public
+
+**Context:** the runtime port is 46,349 lines of which 15,017 are comments, 35%
+of every non-blank line. That number stood out while counting the codebase ahead
+of publication, and the question was whether it is documentation or narration.
+
+**Decision:** keep it. No comment-stripping sweep, now or before the repository
+goes public.
+
+**Reason:** it was sampled rather than guessed, and the split is not what the
+headline number suggests.
+
+| backend `src` comment lines | | |
+|---|---|---|
+| carry a canon citation, `@see`, or a `.MSG` reference | 11,031 | 80% |
+| prose with no canon reference | 2,840 | 20% |
+
+Of the prose, 350 are standalone single-line comments and a restatement
+heuristic — most of the comment's words already appear on the line below, and it
+adds no clause of its own — flags 23. Reading the flagged set, several are
+useful anyway: the numbered gate markers in the weapon handlers mirror canon's
+own ordering, and one is the production formula written out above the
+expression that implements it.
+
+So the removable narration is on the order of a hundred lines in 41,782. Call it
+0.2%. Recovering it would mean a sweep across 270 files with 11,031 lines of
+canon reasoning sitting next to it, and the failure mode of that sweep is
+deleting the reasoning.
+
+The 80% is the argument-with-canon layer, and it is the reason this port can be
+audited at all. When a constant is 21 rather than 1, the paragraph explaining
+that 1 is the numopt FLOOR is the only thing standing between the next reader
+and a mistake this codebase has now made three times. When behaviour deviates,
+the note saying so is what makes a later fidelity fix safe rather than a
+suspected regression — two droid defects were corrected on 2026-09-10 precisely
+because their characterization tests said "canon differs, do not read a change
+here as a regression".
+
+**For a public repository specifically, that layer reads as evidence, not
+clutter.** The claim on the landing page is a faithful port of someone else's
+1988 game. A reader with the original source open can check that claim line by
+line only because the citations are there. Stripping them would leave the claim
+unfalsifiable, which is worse than verbose.
+
+**Alternatives rejected:** removing the ~23 flagged restatements. The churn
+across a dozen files is not worth ten lines, and the diff would be noise in the
+history for anyone later trying to see when behaviour changed. They can go when
+someone edits those files for a real reason.
+
+**One real cleanup item does follow, and it is NOT about volume.** 55 source
+files cite internal paths — `specs/022-fidelity-audit-v2/findings.md`,
+`docs/audits/2026-09-09-security-review.md` and similar. If `specs/` and
+`docs/audits/` do not ship with the public repository, those become references
+to nothing. Either publish them, or rewrite those references to state the
+finding inline. That is part of the going-public decision recorded in the
+"Backlog — going public" section of `docs/PROGRESS.md`, not a separate one.
+
+**Not re-litigated without new measurement.** If the question comes back, count
+first: the sampling above is reproducible and took minutes.
+

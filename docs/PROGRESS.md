@@ -4219,6 +4219,22 @@ source of the version being run, not how it was written. And the enumeration
 finding in the security review stops being a secret the moment the source is
 public, since it is four lines of `auth.service.ts`.
 
+### Added 2026-09-10 — dangling internal references in source comments
+
+55 files under `backend/src` cite internal paths in comments: eight point at
+`specs/022-fidelity-audit-v2/findings.md`, twelve at
+`docs/audits/2026-09-09-security-review.md`, and the rest at spec folders for
+features 003, 004, 007, 009, 011-015 and 030.
+
+Whichever way the repository question goes, these have to be resolved before
+publication. Either `specs/` and `docs/audits/` ship too, or those references
+are rewritten to state the finding inline. A comment pointing at a file the
+reader cannot open is worse than no comment: it says evidence exists and then
+withholds it.
+
+Checked at the same time and clean: no comment in `backend/src` references a
+session, an assistant, or any tooling used to write it.
+
 ## 2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning
 
 **Completed:** `NOTICE`, `README.md`, `CLAUDE.md` and the `/provenance` page now
