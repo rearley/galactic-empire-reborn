@@ -30,8 +30,16 @@ Second goal, stated 2026-09-10: the repository goes public. It must not read as
   service does not break traceability. Never drop a citation while moving a file.
 - **Feature-first, not layer-first.** See "Target structure" below.
 - Standing project rules still apply: `/reference/` is read-only, never
-  `prisma db push`, never `prisma migrate reset`, bump `VERSION` with anything
-  that deploys (at merge, not per-commit on this branch).
+  `prisma db push`, never `prisma migrate reset`.
+- **`VERSION` is NOT bumped during the restructure phases.** Rick's explicit
+  call, 2026-09-10: no version bumps for restructure work until we are ready to
+  merge. The root `CLAUDE.md` rule is "bump `VERSION` in the same commit as any
+  change that will be deployed" — and it still holds, because **nothing on this
+  branch deploys**. The push trigger is master-only, so no phase-0..5 commit can
+  reach ghcr or the watchtower on the Plesk host. The bump belongs in the merge
+  commit, once, and it must actually land there: that merge is a real production
+  deploy carrying a runtime major and a CSS-engine major together. Do not
+  "correct" this against the root rule — the two agree.
 
 ## Production safety on this branch
 
