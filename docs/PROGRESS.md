@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 88 entries.
+Append-only, **newest at the bottom**. 89 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 88 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change](#2026-09-10--restructure-phase-0-toolchain-and-runtime-zero-gameplay-change)
 - [2026-09-10 — a new citation now has to carry its quote](#2026-09-10--a-new-citation-now-has-to-carry-its-quote)
 - [2026-09-10 — a torpedo volley now tells you it hit](#2026-09-10--a-torpedo-volley-now-tells-you-it-hit)
 - [2026-09-10 — the re-audit that asked whether the tests were RIGHT](#2026-09-10--the-re-audit-that-asked-whether-the-tests-were-right)
@@ -22,7 +23,6 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
 - [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
-- [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
@@ -5386,4 +5386,62 @@ false failures in forty-seven, and a guard that cries wolf gets switched off.
 of it.
 
 **Known issues:** none.
+
+## 2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change
+
+**Completed:** all four phase-0 tasks of the restructure
+(`docs/superpowers/specs/2026-09-10-restructure-design.md`), on the
+`restructure` branch, master untouched:
+
+- **Node 20 → 24** in both Dockerfiles and both CI jobs, `engines.node`
+  (`>=24`) added to both `package.json` files, pinned by a new repo-invariant
+  test, `backend/test/unit/node-runtime-version.spec.ts`. Both images verified
+  to build; the backend image boots and runs `node v24.21.0`. (`66e53b1`)
+- **Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (29.4.12).** Two
+  `backend/tsconfig.json` additions were required —
+  `"ignoreDeprecations": "6.0"` and `"types": ["jest", "node"]` — both
+  compile-time-only, no `src/**` behaviour change. See
+  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`84ccc49`)
+- **Frontend: React 19, Vite 8, Vitest 5, Tailwind 4, TypeScript 6.0.3, in one
+  batch.** Tailwind's config moved from `tailwind.config.ts` (deleted) into
+  `src/styles.css`'s `@theme` block. Two Vitest-5-driven test-infrastructure
+  fixes (`@testing-library/jest-dom/vitest` import path, `vi.mocked()` in
+  place of a cast-and-call) and six mechanical Tailwind-4 utility-class
+  renames (`flex-shrink-0`→`shrink-0`, `outline-none`→`outline-hidden`) across
+  frontend `src/`, all behaviour-identical. No React-19-specific migration was
+  needed — the codebase already used `createRoot` and current
+  `@testing-library/react` idioms. (`0e3d4d0`)
+- **oxlint, both apps, wired into CI**, backed by
+  `backend/test/unit/lint-gate.spec.ts` (7 tests after a fix round). Frontend
+  runs `--type-aware`; backend runs syntax-only because `oxlint-tsgolint`
+  rejects `backend/tsconfig.json`'s deprecated `moduleResolution: "node"`. See
+  `docs/DECISIONS.md` 2026-09-10 ("oxlint, not ESLint") for the full rule
+  table and rationale, and the restructure spec's "Blockers and constraints
+  discovered" section for why that one tsconfig setting blocks both TS7 and
+  backend type-aware linting. (`1050298`, fix round `30f9975`)
+
+**Tests:** measured at the end of phase 0 — backend 607 suites / 6,153 tests
+(up from the 605/6,141 pre-phase baseline: +1 suite/+5 tests from the runtime
+pin, +1 suite/+7 tests from the lint gate), ~117s local. Frontend unchanged at
+39 files / 310 tests, ~15s. Both `npm run lint` exit 0 in both apps.
+
+**Decisions made:** the three recorded in `docs/DECISIONS.md` 2026-09-10 —
+TypeScript pinned at 6.0.3 until Vitest replaces Jest in phase 5, oxlint over
+ESLint, Node 24 over 22 — plus the `moduleResolution` finding folded into the
+oxlint decision and into the restructure spec's blockers section.
+
+**Next:** phase 1 — one typed wire contract (root npm workspace, a shared
+types-and-event-names package, retiring the duplicated `contracts.ts`). See
+the restructure spec for the full phase list.
+
+**Known issues:** `eslint/no-unused-vars` is set to `warn` repo-wide rather
+than `error`, because it currently reports 111 genuine dead-import findings
+(41 in `backend/src/**`, 70 across 46 backend test files, 6 in frontend
+`e2e/**`) that phase 0 was not permitted to fix by editing source. Phases 2
+and 3 already plan to open every `backend/src/**` file with a finding
+(`cybertron-tick.service.ts`, `phaser.handler.ts`, `physics-tick.service.ts`,
+`droid-tick.service.ts`, the combat and galaxy modules, and others) — clear
+the dead imports there and in the 46 test files as part of that work, then
+promote the rule to `error` repo-wide. Tracked here and in the oxlint
+decision in `docs/DECISIONS.md`.
 
