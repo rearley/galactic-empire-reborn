@@ -18,18 +18,20 @@ export function ShipNamePrompt({ onSubmit, error }: Props): React.JSX.Element {
   return (
     <div className="p-4 font-mono text-gray-100">
       <p className="mb-2 text-yellow-400">
-        Enter a name for your ship (1–19 characters, no spaces):
+        Enter a name for your ship (1–19 characters):
       </p>
       {error && (
         <p role="alert" className="mb-2 text-red-400">
           {/*
             The gateway distinguishes these two; showing "already taken" for
             both sent pilots off to invent a new name when the real problem was
-            a space in the one they had chosen.
+            the shape of the one they had chosen. Spaces ARE allowed — canon
+            reads the rest of the line (GECMDS.C:5004) — so this copy no longer
+            claims otherwise.
           */}
           {error === 'name-taken'
             ? 'That name is already taken. Choose another.'
-            : 'Use 1–19 characters, no spaces.'}
+            : 'Use 1–19 characters.'}
         </p>
       )}
       <input

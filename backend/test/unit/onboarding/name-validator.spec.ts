@@ -21,8 +21,27 @@ describe('isValidShipName', () => {
     expect(isValidShipName('12345678901234567890')).toBe(false);
   });
 
-  it('rejects a name containing a space (0x20)', () => {
-    expect(isValidShipName('hello world')).toBe(false);
+  /**
+   * Canon renames with `rstrin(); strncpy(shipname, margv[1], 19)`
+   * (GECMDS.C:5002-5010). `rstrin()` restores the input line the tokeniser
+   * split, so `margv[1]` runs to the end of it — that is the MajorBBS idiom
+   * for "the rest of the line", and `cmd_send` uses the same trick to send a
+   * message rather than a single word.
+   *
+   * So an interior space is legal and always was. The port rejected it, and
+   * `ren BigCat II` silently produced "BigCat".
+   */
+  it('accepts an interior space — canon takes the rest of the line', () => {
+    expect(isValidShipName('BigCat II')).toBe(true);
+    expect(isValidShipName('The Black Pearl')).toBe(true);
+  });
+
+  it('rejects leading or trailing space, which canon never produces', () => {
+    // The handler trims before validating, so a name arriving here padded is a
+    // caller bug rather than a user one.
+    expect(isValidShipName(' BigCat')).toBe(false);
+    expect(isValidShipName('BigCat ')).toBe(false);
+    expect(isValidShipName('   ')).toBe(false);
   });
 
   it('rejects a name containing a control character (0x00)', () => {

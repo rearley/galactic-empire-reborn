@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 73 entries.
+Append-only, **newest at the bottom**. 74 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
 - [2026-09-09 — `sys kill` could not name an AI hull](#2026-09-09--sys-kill-could-not-name-an-ai-hull)
 - [2026-09-09 — AI torpedoes never passed a lock check, and the player's gate was the wrong rule](#2026-09-09--ai-torpedoes-never-passed-a-lock-check-and-the-players-gate-was-the-wrong-rule)
@@ -4462,3 +4463,47 @@ parsing the workflow and by reading both Dockerfiles for every COPY.
 **Next:** —
 **Known issues:** this change is itself a workflow edit, so landing it costs one
 final restart. After that, documentation is free.
+
+## 2026-09-09 — `ren BigCat II` produced a ship called BigCat
+
+**Found in play**, and it is the SECOND pilot to hit it. The first was
+"Ravenspur II" during a playtest, and that fix explained the restriction
+instead of checking whether it was real.
+
+**It was not real.** Canon renames with
+
+```
+rstrin();
+strncpy(warsptr->shipname,margv[1],19);      GECMDS.C:5004-5006
+```
+
+`rstrin()` restores the input line the argument tokeniser split apart, so
+`margv[1]` reads to the END OF THE LINE. That is the standard MajorBBS idiom
+for "the rest of the line", and `cmd_send` uses it identically so that
+`sen A hello there` sends both words. Canon does no character validation at
+all — it truncates at 19 and stops.
+
+Interior spaces have always been legal. Three places disagreed:
+
+1. `rename.handler.ts` read `args[0]`, dropping everything after the first
+   token, then **reported success** with the truncated name. The pilot was told
+   the rename worked and shown a name they had not asked for, which is worse
+   than a refusal.
+2. `isValidShipName` rejected `0x20` outright. Now accepts `0x20-0x7E` and
+   refuses only a padded name, which no caller should produce since the handler
+   trims.
+3. `ShipNamePrompt.tsx` told new pilots "no spaces" in two places. Its actual
+   validation never enforced it, so the copy was the only thing stopping them.
+
+`sen` and `adm rename` already joined their arguments. Ship rename was the one
+that did not.
+
+**Tests:** the validator spec had a case asserting the bug ("rejects a name
+containing a space") and the frontend spec asserted the wrong copy; both
+rewritten to canon, with accepting cases added. Backend 5,789 across 575 files;
+frontend 256 across 36.
+
+**Next:** —
+**Known issues:** existing ships that were silently truncated keep their
+truncated names — nothing migrates them, and a pilot can simply rename again
+now that it works.

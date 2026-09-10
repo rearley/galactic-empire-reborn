@@ -63,12 +63,26 @@ describe('RenameService (T053)', () => {
       expect(prisma.ship.update).not.toHaveBeenCalled();
     });
 
-    it('rejects name with space', async () => {
+    it('rejects a name padded with spaces, which no caller should send', async () => {
       const prisma = makePrisma();
       const svc = new RenameService(prisma as never, makeShipStateService(makeShip()) as never);
 
-      const result = await svc.rename('u1', 1, 'Star Falcon');
+      const result = await svc.rename('u1', 1, ' Star Falcon ');
       expect(result).toEqual({ ok: false, reason: 'INVALID_FORMAT' });
+    });
+
+    /**
+     * Canon runs `rstrin()` before `strncpy(shipname, margv[1], 19)`, which
+     * restores the split input line, so the name is everything to the end of
+     * it (GECMDS.C:5004-5006). Interior spaces were always legal; the port
+     * invented the restriction and `ren BigCat II` produced "BigCat".
+     */
+    it('accepts an interior space', async () => {
+      const prisma = makePrisma();
+      const svc = new RenameService(prisma as never, makeShipStateService(makeShip()) as never);
+
+      const result = await svc.rename('u1', 1, 'BigCat II');
+      expect(result.ok).toBe(true);
     });
 
     it('rejects name longer than 19 characters', async () => {
