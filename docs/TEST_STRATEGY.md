@@ -9,14 +9,72 @@ not support that. A suite that pins observable behaviour does.
 
 ## Where we are
 
-Measured 2026-09-10, backend, 578 suites and 5,808 tests:
+Recounted 2026-09-10 after four rounds of work, backend, 596 suites and 6,073
+tests. Both numbers matter and only the second is the bar:
 
 | | |
 |---|---|
-| Lines | 92.5% |
-| Statements | 91.4% |
-| Functions | 89.9% |
-| Branches | **76.5%** |
+| Raw branches | 82.6% |
+| **Branches of COVERABLE** | **90.0%** |
+| Lines | 95.6% |
+| Functions | 91.9% |
+
+Frontend, measured for the first time on the same day: branches 90.8%, functions
+94.2%, lines 87.5%, 310 tests.
+
+### The recount, and how to repeat it
+
+702 backend branches are uncovered. Classified against this document's own
+exclusions:
+
+| | |
+|---|---|
+| Display and format fallbacks | 297 |
+| Defensive early returns | 31 |
+| Optional-dependency guards | 3 |
+| **Real decisions** | **269** |
+
+So the coverable ceiling is 91.8% and we sit at 90.0% of it. **The pre-refactor
+bar is met in aggregate.**
+
+Reproduce with `jest --coverage --coverageReporters=json`, then walk
+`coverage-final.json`, take each uncovered branch's `branchMap[id].loc.start.line`,
+read that source line, and classify it. A crude classifier that only looks for
+`??` and `catch` will overstate the real count by roughly a third — it misses
+`if (!x) return` and `if (this.optionalDep)`, which this document also excludes.
+
+### Per module, against the bar
+
+| module | raw | coverable | real left |
+|---|---|---|---|
+| `combat/firehp.ts` | 100 | **100** | 0 |
+| `handlers/report.handler.ts` | 76.8 | **98.4** | 1 |
+| `planet/planet-state.service.ts` | 87.6 | **96.8** | 3 |
+| `handlers/scan.handler.ts` | 89.6 | **96.1** | 7 |
+| `cybertron/cybertron-tick.service.ts` | 83.5 | **95.8** | 6 |
+| `combat/combat-tick.service.ts` | 90.5 | **95.7** | 4 |
+| `handlers/transfer.handler.ts` | 71.2 | **94.0** | 3 |
+| `handlers/new-ship.handler.ts` | 89.2 | **93.3** | 5 |
+| `gateway/game.gateway.ts` | 85.8 | **92.9** | 18 |
+| `droid/droid-tick.service.ts` | 76.2 | 89.9 | 8 |
+| `physics/physics-tick.service.ts` | 85.7 | 86.7 | 8 |
+| `planet/planet-economy.service.ts` | 64.7 | 81.5 | 2 |
+
+Note how far the raw column misleads. `transfer.handler.ts` reads 71.2% and is
+actually at 94% of what can be covered; `report.handler.ts` reads 76.8% and has
+exactly one real decision left. Judging either by the raw figure would send
+someone to write tests for display fallbacks.
+
+### What is left is a long tail, not a hot spot
+
+No file has more than 18 real decisions open, and the median is under five. The
+concentrations that justified five-agent rounds are gone. Further work is
+~7 branches each across ~30 files, with falling returns — worth doing
+opportunistically when touching a module, not as another sweep.
+
+The three modules still under the bar are `droid-tick` (89.9), `physics-tick`
+(86.7) and `planet-economy` (81.5). Those are the ones to finish before
+restructuring anything in them.
 
 Branches being fifteen points below lines is the signature of tests that walk
 the happy path and confirm the code runs. Six defects were found by an evening
