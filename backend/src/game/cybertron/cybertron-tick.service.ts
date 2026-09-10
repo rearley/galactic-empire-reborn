@@ -26,6 +26,8 @@ import {
   DECOYTIME,
   WARP_THRESHOLD,
   MAXTORPS,
+  HPFIRAMT,
+  HPMINFIR,
   TORFACT,
   CYB_BE_NICE,
   CYB_BE_EASY,
@@ -494,6 +496,36 @@ export class CybertronTickService implements OnModuleInit {
     const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.degrees = Math.round((absAngle - ship.heading + 360) % 360);
+    });
+
+    // The ENTIRE body of `firehp` sits inside `if (ptr->energy >= HPMINFIR)`
+    // (GECMDS.C:1029). Below 6,000 flux nothing happens at all — no shot, no
+    // debit, no cooldown — and the gate is `>=`, so exactly 6,000 fires. The
+    // player path has honoured this all along; this one had no gate.
+    if (ship.energy < HPMINFIR) return;
+
+    // `firehp` then charges the FIRER, before it looks for a victim:
+    //
+    //   ptr->energy -= HPFIRAMT;
+    //   ptr->hypha = 1;
+    //   ptr->cantexit = FIRETICKS;      -- GECMDS.C:1039-1041
+    //
+    // This path set only the battle lock, so a Cybertron's hyper-phaser cost it
+    // nothing and had no cooldown while a player paid 5,000 flux and waited for
+    // hypha to clear. Same shape as the torpedo lock the AI skipped on
+    // 2026-09-09: an AI path missing a constraint the player path honours.
+    //
+    // Canon does NOT gate the AI on `hypha` the way `cmd_phas` gates a player
+    // (GECYBS.C:279 calls firehp unconditionally, GECMDS.C:849 does not) — that
+    // asymmetry is canon and is deliberately left alone.
+    //
+    // firehp's neutral-zone self-zap (GECMDS.C:1031) is unreachable from here:
+    // `runEngagementScan` returns before firing when the Cybertron is inside
+    // the zone, so an AI never calls this from within it.
+    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
+      s.energy = s.energy - HPFIRAMT;
+      s.hypha = 1;
+      s.cantexit = FIRETICKS;
     });
 
     const scanRange = this.shipClassCache.get(ship.shpclass)?.scanRange ?? 100_000;
