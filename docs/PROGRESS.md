@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 79 entries.
+Append-only, **newest at the bottom**. 80 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
 - [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
@@ -4779,3 +4780,62 @@ joined docs in `paths-ignore`. Coverage work makes many such commits.
 (70.7%, 71 missed) and combat tick (73.0%, 40 missed).
 **Known issues:** frontend has no coverage tooling installed, so its number is
 unknown. 256 tests across 36 files is a count, not coverage.
+
+## 2026-09-10 — Tier 1 branch coverage, five agents in parallel
+
+Ran the `docs/TEST_STRATEGY.md` queue as a five-agent workflow, one module each.
+
+**The constraint that shaped it.** Every Jest suite shares one `ge_test`
+database and `jest.config.ts` already sets `maxWorkers: 1` because
+`truncateAll()` in one worker wipes another's data. Five agents running Jest
+would have corrupted each other, which is exactly what produced a flaky
+five-suite failure earlier in the session. So the agents were forbidden from
+running Jest at all: they wrote specs, and verification was done serially
+afterwards.
+
+**Result: 71 new cases across five files, 2,327 lines, no source touched.**
+All typecheck, all pass.
+
+| module | branches before | after |
+|---|---|---|
+| `combat/firehp.ts` | 50.0 | **100** |
+| `planet/planet-state.service.ts` | 78.1 | 87.6 |
+| `combat/combat-tick.service.ts` | 73.0 | 81.8 |
+| `cybertron/cybertron-tick.service.ts` | 70.7 | 75.6 |
+| `droid/droid-tick.service.ts` | 57.1 | 69.5 |
+| `planet/planet-economy.service.ts` | 55.9 | 64.7 |
+
+Suite total: **branches 76.5% → 78.4%**, lines 92.5% → 93.6%, 5,808 → 5,883
+tests.
+
+**Passing on the first run is not evidence.** A test written after the code
+always passes; the question is whether it FAILS when the code is wrong. Every
+spec was mutation-checked by breaking the branch it claims to cover:
+
+| mutation | result |
+|---|---|
+| Droid shield-by-speed forced to 0 | 1 failed |
+| Cybertron neutral-zone guard disabled | 1 failed |
+| Combat shield collapse into SHIELDDM removed | 1 failed |
+| `firehp` neutral-zone immunity removed | 1 failed |
+| `tra up` ownership gate disabled | 1 failed |
+
+Two of the first mutations passed, and that was informative rather than a
+failure: those agents had ranged beyond their assigned module into the trade and
+admin handlers, so the mutation targeted code they never claimed. Retargeting at
+what they DO assert caught both.
+
+**What the agents refused to test, which is the part worth keeping.** Each
+reported its skips with reasons: display fallbacks (`?? '?'`), optional-
+dependency guards, log-format ternaries in catch blocks, `channel ?? NO_CHANNEL`
+attribution fallbacks, and branches unreachable from any caller because the
+decision function upstream already excludes the state. One agent flagged a
+single assertion as characterization rather than canon — the ordering where
+`damageFlee.speed2b` overwrites a missile-evade speed set moments earlier — and
+said so in the file instead of dressing it as a citation.
+
+**Next:** Tier 1 is not finished. The Droid tick is 69.5% against the strategy's
+90% bar for pre-refactor confidence, the Cybertron tick 75.6%. `physics-tick`
+was untouched — its agent chose planet-state instead, which was the better use
+of one agent but leaves 11 sites open.
+**Known issues:** frontend still has no coverage tooling.
