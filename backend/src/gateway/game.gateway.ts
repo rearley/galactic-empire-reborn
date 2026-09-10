@@ -1376,6 +1376,43 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       text: hitText(event, deflected, attackerLabel, attackerLetter),
     });
 
+    // The FIRER is told too, and canon says it in its own words rather than
+    // leaving the shooter to infer it from the victim's line:
+    //
+    //   if (channel != 255)
+    //     {
+    //     prfmsg(MTACC1+mt,shpltr(channel,usrn),ptr->shipname);
+    //     outprfge(ALWAYS,channel);
+    //     ptr->lastfired = channel;
+    //     }
+    //
+    // `checktm` calls `acctm` on both weapons and both shield branches
+    // (GEFUNCS.C:1562 torpedo, :1640 and :1659 missile). `shpltr(usrn,ship)`
+    // reads the FIRST argument's scan table, so the letter is the shooter's own
+    // for the target. Both strings were extracted into CANON_MESSAGES and
+    // neither was ever sent: a phaser told you what it did, a torpedo volley
+    // told you nothing, and you learned the result from the target's next scan.
+    // @see GEFUNCS.C:1741 `ptr->lastfired = channel;`
+    if (event.weapon === 'torpedo' || event.weapon === 'missile') {
+      const attackerUser = useridOf(event.attackerId);
+      // `?:<channel>` is this port's marker for a firer no ship holds any more,
+      // which is canon's `channel == 255` — confirmed to nobody.
+      if (attackerUser !== '?') {
+        const victimLetter = shipLetter(
+          this.scanHandler.lettersFor(attackerUser, shipnoOf(event.attackerId)),
+          event.victimId,
+        );
+        this.server.to(`user:${attackerUser}`).emit('event.log', {
+          category: 'combat',
+          text: formatMessage(
+            event.weapon === 'torpedo' ? MessageId.MTACC1 : MessageId.MTACC2,
+            victimLetter,
+            enriched.victimName ?? '?',
+          ),
+        });
+      }
+    }
+
     // Victim may be in a DIFFERENT sector room (cross-sector phaser range), so
     // deliver directly — but only if the sector broadcast did not already
     // reach them. C prints PHITYOU exactly once per hit

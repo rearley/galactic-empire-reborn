@@ -334,16 +334,48 @@ if (warsptr->where < 10)
 **Verifier:** UPHELD (medium-high confidence). I read `moveship` in full (GEFUNCS.C:632 onward). Line 641 is `if (ptr->speed > 0)` — a speed gate, not an orbit gate — and the sole `where` test in the function is GEFUNCS.C:651 `	if (ptr->where <= 1)`, whose opening brace is :652 and which guards only the univmax boundary/telezip block (:653-700+). There is no orbit gate anywhere in `moveship`, so "the gate lives only in moveship (:641, :652)" points at lines that are not that gate. Canon reaches the same no-movement outcome by a different route: `cmd_orb` zeroes speed on entry — GECMDS.C:801-803 `warsptr->where = 10 + plnum; warsptr->speed = 0; warsptr->speed2b = 0;` — so an orbiting canon ship has speed 0 and `moveship`'s :641 gate is what stops it. The rotateship half of the comment is correct and exactly cited: GEFUNCS.C:433-462 contains no reference to `where`.
 
 
-## Found while fixing, NOT acted on
+## Found while fixing, then chased down
 
-**Canon's missile impact never sets `lastfired`.** `checktm`'s torpedo branch
-does — GEFUNCS.C:1559 `ptr->lastfired = tptr->channel;` — and the missile
-branch at GEFUNCS.C:1625-1665 sets damage, drains the shield and rolls
-`randamage` without ever recording who fired. Since `lastfired` is what kill
-attribution reads, following canon here would mean a missile kill credits
-nobody.
+**The claim that canon's missile impact never sets `lastfired` was WRONG, and
+something real was underneath it.**
 
-Left alone deliberately. It was outside the audit's findings, nobody has
-verified it is not compensated somewhere else in the original, and changing
-kill attribution on a live galaxy on the strength of one reading is a bigger
-step than any fix in this list. Worth its own look before the next round.
+The reading was made by searching `checktm` for `lastfired`. The torpedo branch
+has it inline at GEFUNCS.C:1559 and the missile branch appears not to. But both
+branches call `acctm`, which is defined at GEFUNCS.C:1730, below the window that
+was searched, and `acctm` sets it:
+
+```c
+if (channel != 255)
+	{
+	prfmsg(MTACC1+mt,shpltr(channel,usrn),ptr->shipname);
+	outprfge(ALWAYS,channel);
+	ptr->lastfired = channel;
+	}
+else
+	{
+	ptr->lastfired = -1;
+	}
+```
+
+So canon attributes a missile hit exactly as it attributes a torpedo hit, and
+this port was right all along. Kill attribution needed no change. The torpedo
+branch is merely redundant: it sets `lastfired` inline and then `acctm` sets it
+again.
+
+**What the search DID uncover is that `acctm`'s other job was never done here.**
+It confirms every projectile impact to the FIRER — MTACC1 for a torpedo, MTACC2
+for a hyper-missile — naming the target by the letter the SHOOTER scans it as
+(`shpltr` reads its first argument's scan table) and by the target's ship name.
+`checktm` calls it on both weapons and on both shield branches, at :1562, :1640
+and :1659.
+
+Both strings had been extracted into `CANON_MESSAGES` and neither was ever sent.
+A phaser firer got PHITHIM or PDEFLECT, so a beam reported what it did, while a
+torpedo volley reported nothing at all: three tubes emptied and the result
+arrived only with the target's next scan. Fixed 2026-09-10, with the confirmation
+suppressed when the firer cannot be resolved, which is canon's `channel != 255`.
+
+The lesson is the one this whole audit is about. A grep over a line range is not
+a reading of a function, and the wrong conclusion was recorded here as an open
+item on the strength of one. Following it would have meant changing kill
+attribution on a live galaxy to fix a bug that did not exist.

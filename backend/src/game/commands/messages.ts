@@ -477,6 +477,10 @@ export enum MessageId {
   PFIRED = 'PFIRED',
   /** @see MBMGEMSG.MSG PHITHIM — to the firer, damage dealt to an unshielded victim */
   PHITHIM = 'PHITHIM',
+  /** @see MBMGEMSG.MSG MTACC1 — to the FIRER, their torpedo connected */
+  MTACC1 = 'MTACC1',
+  /** @see MBMGEMSG.MSG MTACC2 — to the FIRER, their hyper-missile connected */
+  MTACC2 = 'MTACC2',
   /** @see MBMGEMSG.MSG PHITYOU — to the victim, damage taken */
   /**
    * Canon prints a DIFFERENT message per weapon when you are hit. PHITYOU is
@@ -1144,6 +1148,8 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
   // separate playtesters conclude phasers were broken.
   [MessageId.PFIRED]: CANON_MESSAGES.PFIRED,
   [MessageId.PHITHIM]: CANON_MESSAGES.PHITHIM,
+  [MessageId.MTACC1]: CANON_MESSAGES.MTACC1,
+  [MessageId.MTACC2]: CANON_MESSAGES.MTACC2,
   [MessageId.PHITYOU]: CANON_MESSAGES.PHITYOU,
   [MessageId.PDEFLECT]: CANON_MESSAGES.PDEFLECT,
   [MessageId.PHITDEF]: CANON_MESSAGES.PHITDEF,
