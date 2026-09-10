@@ -1,6 +1,6 @@
 # Restructure spec
 
-**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 0 in progress.
+**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 1 next.
 
 This is the SPEC for the restructure and the recovery document for a lost session.
 Executable per-phase plans live beside it in `docs/superpowers/plans/2026-09-10-restructure-phase-N-*.md`. If a session is lost or
@@ -61,6 +61,12 @@ Baseline. Re-measure at the end; these are the before numbers.
 
 Backend suite: 605 suites / 6,141 tests, ~100s local, ~240s on a hosted runner.
 Frontend: 39 files / 310 tests, ~15s.
+
+**Post-phase-0 (2026-09-10), measured, not overwriting the baseline above:**
+backend 607 suites / 6,153 tests, ~117s local; frontend unchanged at 39 files /
+310 tests, ~15s. The backend suite grew by 2 suites / 12 tests across phase 0:
+`node-runtime-version.spec.ts` (Task 1, 5 tests) and `lint-gate.spec.ts`
+(Task 4, grew from 4 to 7 tests during its fix round).
 
 ### What the analysis found
 
@@ -177,6 +183,19 @@ focus is the restructure.**
   `src/auth/dto/`. Not worth sequencing around.
 - Node 24 chosen over 22: Active LTS to 2028-04-30, and it is what Nest 12
   targets. Node 22 is Maintenance only, ending 2027-04-30.
+- **The deprecated `moduleResolution: "node"` in `backend/tsconfig.json` is a
+  phase 5 blocker, not just a TypeScript 6 deprecation warning.** TypeScript 6
+  requires `"ignoreDeprecations": "6.0"` to keep using it (phase 0, Task 2), and
+  it is the *same* setting that stopped backend type-aware oxlint from running
+  at all in phase 0, Task 4: `oxlint-tsgolint` is built on typescript-go
+  tracking TypeScript 7, and TS7 removed the option outright (it was the legacy
+  `node10` algorithm under an alias), so tsgolint refuses the tsconfig before
+  it can analyse anything. The frontend has no such problem — it already uses
+  `moduleResolution: "bundler"` and runs `--type-aware` oxlint cleanly. Phase 5
+  (ESM + Prisma 7 + NestJS 12 + TypeScript 7) is what finally forces backend
+  off `"node"`, and that same move is what will let backend oxlint go
+  type-aware. One underlying fact, two separate phase-0 findings — worth
+  knowing as one thing, not two coincidences.
 
 ## The phases
 
@@ -187,11 +206,14 @@ Split by **whether an upgrade can change runtime behaviour**, not by calendar.
 - [x] Node 20 → 24 in `backend/Dockerfile`, `frontend/Dockerfile`,
       `.github/workflows/ci.yml` (both jobs). **Verified: both images build; the
       backend image runs `node v24.21.0` and `dist/src/main.js` loads.**
-- [ ] Add `engines.node` to both `package.json` files.
-- [ ] Backend: TypeScript 6.0.3, Jest 30, ts-jest latest.
-- [ ] Frontend: React 19, Vite 8, Vitest 5, Tailwind 4 (config rewrite),
-      TypeScript 6.0.3. One batch — it is only 3,521 isolated lines.
-- [ ] oxlint with type-aware rules, both apps, wired into CI.
+- [x] Add `engines.node` to both `package.json` files. Pinned by
+      `backend/test/unit/node-runtime-version.spec.ts` (`66e53b1`).
+- [x] Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (`84ccc49`).
+- [x] Frontend: React 19, Vite 8, Vitest 5, Tailwind 4 (config rewrite),
+      TypeScript 6.0.3. One batch — it is only 3,521 isolated lines (`0e3d4d0`).
+- [x] oxlint with type-aware rules, both apps, wired into CI. Frontend runs
+      `--type-aware`; backend runs syntax-only (see the `moduleResolution`
+      blocker above). (`1050298`, fix round `30f9975`.)
 
 ### Phase 1 — one typed wire contract
 

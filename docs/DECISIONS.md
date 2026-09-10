@@ -5073,3 +5073,148 @@ finding inline. That is part of the going-public decision recorded in the
 **Not re-litigated without new measurement.** If the question comes back, count
 first: the sampling above is reproducible and took minutes.
 
+## 2026-09-10 — TypeScript pinned at 6.0.3, not 7, until Vitest replaces Jest
+
+**Context:** phase 0 of the restructure (`restructure` branch,
+`docs/superpowers/specs/2026-09-10-restructure-design.md`) bumped the backend
+compiler from TypeScript 5.7 to the newest release that still works, ahead of
+NestJS 12/Vitest work in phase 5. TypeScript 7 was on the table — its
+typescript-go rewrite is 8-12x faster on this codebase's 137k lines — but it
+was rejected for now.
+
+**Decision:** pin TypeScript at exactly `6.0.3` in both `backend/package.json`
+and `frontend/package.json`. Do not bump to 7 until `ts-jest` is gone.
+
+**Reason:** `ts-jest` (the backend's Jest-to-TypeScript bridge) declares a peer
+range of `typescript: ">=4.3 <7"`. Installing TypeScript 7 today would either
+fail the install outright or run with an unsupported compiler underneath
+every backend test. NestJS 12's own toolchain replaces Jest with Vitest,
+which has no such ceiling — that swap is scheduled for phase 5, and TypeScript
+7 moves with it, not before.
+
+Two compile-time-only `backend/tsconfig.json` additions were required to reach
+a clean `tsc --noEmit` under 6.0.3, both config, no runtime effect:
+- `"ignoreDeprecations": "6.0"` — TypeScript 6 deprecates the
+  `moduleResolution: "node"` alias ahead of TypeScript 7 removing it outright
+  (see the "Blockers and constraints discovered" section of
+  `docs/superpowers/specs/2026-09-10-restructure-design.md` for the full
+  chain to phase 5); this is the exact silencing flag TypeScript's own error
+  message prescribes, and it changes zero resolution
+  behaviour.
+- `"types": ["jest", "node"]` — TypeScript 6 stopped automatically including
+  every installed `@types/*` package's ambient globals when no `types` array
+  is set; without this, `describe`/`it`/`expect`/`jest` stopped resolving.
+  Verified safe: every other `@types/*` package in the backend (~35 of them —
+  `express`, `bcrypt`, `cors`, `passport`, `validator`, etc.) is consumed via
+  an explicit `import`, never as an ambient global, so narrowing `types` to
+  just the two that are actually used as globals dropped nothing. Confirmed
+  by a clean `tsc --noEmit` across `src/**` too, not just `test/**`.
+
+**Alternatives rejected:** staying on TypeScript 5.7 (loses nothing this
+phase needed, but phase 0's brief was to modernise the toolchain wherever
+behaviour-neutral, and 5.7 to 6.0.3 was a straightforward, low-risk step
+worth taking now rather than stacking two major bumps into phase 5).
+
+**Record this so nobody "helpfully" bumps `typescript` to `^7` in a routine
+dependency update** — it will break the backend test runner, not just emit a
+warning.
+
+## 2026-09-10 — oxlint, not ESLint, and its current rule shape
+
+**Context:** the backend had no linter at all before phase 0 (strict TS was
+carrying that weight; only 4 `any`s existed). The restructure's toolchain pass
+needed to pick one, wired into CI for both apps.
+
+**Decision:** oxlint, over ESLint + typescript-eslint.
+
+**Reason:** oxlint's type-aware linting went stable in July 2026, covers 59 of
+typescript-eslint's 61 type-aware rules, and runs 20-40x faster (measured on
+this repo: ~0.26s backend, 41,826 src + 95,041 test lines; ~0.19s frontend).
+NestJS 12's own toolchain is moving to oxlint, so this is also the direction
+upstream is heading, not a contrarian choice.
+
+**What actually shipped is narrower than the pitch, and that gap is real, not
+hidden.** Type-aware linting (`oxlint-tsgolint`) is built on typescript-go
+tracking TypeScript 7, and TypeScript 7 removed the `moduleResolution: "node"`
+alias that `backend/tsconfig.json` still uses (see the TypeScript-6-pin
+entry above, and the restructure spec's "Blockers and constraints discovered"
+section for the full chain to phase 5) — so tsgolint refuses the
+backend's tsconfig outright before analysing anything. **Backend oxlint
+currently runs syntax-only.** Frontend already uses
+`moduleResolution: "bundler"`, so it runs `--type-aware` cleanly. Both apps
+share one `.oxlintrc.json` at the repo root; only the invocation differs.
+`oxlint-tsgolint` stays installed as a devDependency in both apps for phase 5,
+when the `moduleResolution` move unblocks backend type-aware linting too — it
+costs nothing at rest.
+
+**The lint gate's rule exceptions, and why each exists** (`.oxlintrc.json`,
+enforced by `backend/test/unit/lint-gate.spec.ts`, 7 tests):
+
+- `unicorn/no-new-array` is **off, repo-wide**. `new Array(n).fill(x)` is a
+  deliberate fixed-length idiom used at 27 sites in `backend/src/**`
+  (`galaxy.service.ts` x18, `midnight.repository.ts` x5, `planet-seed.ts` x2,
+  `droid-decisions.ts` x2). The unicorn rule's preferred alternative
+  (`Array.from({length:n})`) is not more correct, only a style preference —
+  it only reached the correctness category by default classification, not by
+  merit here.
+- `eslint/no-unused-vars` is set to **`warn`**, everywhere, not `off` and not
+  `error`. It reports 111 real dead-import/declaration findings: 41 in
+  `backend/src/**`, 70 across 46 backend test files, 6 in frontend `e2e/**`
+  (0 in `backend/tools/**`). It is not `off` because hiding 41 dead imports in
+  production source ahead of a public release is the wrong instinct. It is
+  not `error` because clearing them means editing source and test files,
+  which phase 0's "toolchain only, zero behaviour change" premise forbids.
+  **Open item, tracked in `docs/PROGRESS.md`'s Known issues for this date:**
+  phases 2 and 3 already plan to open every one of the 14 backend `src/**`
+  files with a finding (`cybertron-tick.service.ts`, `phaser.handler.ts`,
+  `physics-tick.service.ts`, `droid-tick.service.ts`, the combat and galaxy
+  modules, and others) — remove the dead imports there and in the 46 test
+  files as part of that work, then promote this rule to `error` repo-wide.
+- `eslint/no-control-regex`, `unicorn/prefer-string-starts-ends-with`,
+  `oxc/erasing-op`, `typescript/unbound-method` are scoped off for
+  `test/**`/`tools/**`/`e2e/**` paths only, via `overrides` (not a global
+  disable) — each has zero `src/**` findings, confirmed by count, and each
+  fires on deliberate test-only patterns (e.g. the balance suite matching
+  literal MajorBBS control characters in canon text, which is the thing under
+  test).
+- `unicorn/no-useless-spread` and `unicorn/no-empty-file` are scoped off for
+  the exact files with a genuine hit (`backend/src/game/tick/tick.service.ts`;
+  `frontend/src/onboarding/index.ts` and `frontend/src/auth/index.ts`, both
+  intentional empty barrel placeholders) rather than disabled repo-wide, so
+  the rule stays live everywhere else in `src/`.
+
+**Two smaller deferrals, recorded rather than acted on:** `oxlint-tsgolint` is
+installed in both apps but wired into neither backend lint script (see above —
+kept for phase 5 rather than churning an uninstall/reinstall commit).
+`frontend/src/styles.css` has no explicit `@source` directive after the
+Tailwind 4 migration landed in the same phase (frontend dependency batch,
+`0e3d4d0`); it relies on automatic content detection, which works today but
+would be more resilient made explicit — not urgent, just unfinished.
+
+**Alternatives rejected:** ESLint + typescript-eslint (slower, and the whole
+point of moving was to get ahead of where NestJS 12 itself is going);
+generating a parallel TypeScript-7-flavoured tsconfig just for backend linting
+so `--type-aware` could run today (rejected as scope creep for a phase-0 task
+scoped to "install a linter," and risked drifting from the real build
+tsconfig's semantics — left as a design option for phase 5 to consider,
+not a decision made unilaterally here).
+
+## 2026-09-10 — Node 24, not 22, as the pinned runtime
+
+**Context:** phase 0 bumped the runtime from Node 20, which reached end of
+life 2026-04-30 — this repository shipped on it for four months past that
+date before this bump landed.
+
+**Decision:** Node 24, pinned by `backend/test/unit/node-runtime-version.spec.ts`
+across both Dockerfiles, both CI jobs, and `engines.node` in both
+`package.json` files (`>=24`).
+
+**Reason:** Node 24 is Active LTS to 2028-04-30. Node 22 was the more
+conservative-looking choice but is Maintenance-only already, ending
+2027-04-30 — a shorter support window for a project that is not deploying
+this bump immediately. Node 24 is also what NestJS 12 targets, and phase 5
+moves this backend onto NestJS 12.
+
+**Alternatives rejected:** Node 22 (shorter support runway, no offsetting
+benefit — it does not unblock anything Node 24 doesn't also unblock).
+
