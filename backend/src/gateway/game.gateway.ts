@@ -2698,6 +2698,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       case 'player.snapshot':
         return;
+      default: {
+        // Exhaustiveness check, not dead code: if `CommandBroadcast` ever
+        // grows a sixth `event` variant, every case above still compiles —
+        // `broadcast.event` would just be a value the switch does not
+        // recognise, and the broadcast would silently vanish at runtime
+        // exactly like the pre-fix probe test this switch replaced. Assigning
+        // the unhandled remainder to `never` makes that a compile error
+        // instead: TypeScript can only narrow `broadcast` to `never` here if
+        // every union member was already matched above.
+        const _exhaustive: never = broadcast;
+        return _exhaustive;
+      }
     }
   }
 

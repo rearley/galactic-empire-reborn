@@ -1,8 +1,11 @@
 import type { GameGateway } from '../../src/gateway/game.gateway';
+import type { CommandBroadcast } from '../../src/game/commands/command.types';
 
 /**
  * Type-level proof that `GameGateway.server` (and `.emit()` calls against
- * sockets of the same type) reject a wrong payload at compile time.
+ * sockets of the same type) reject a wrong payload at compile time, and that
+ * `CommandBroadcast`'s discriminated union and `dispatchBroadcast`'s
+ * exhaustiveness assertion do the same for the dynamic broadcast path.
  *
  * This file is never executed — `jest`'s `testMatch` is `**\/*.spec.ts` and
  * this is a `.type-check.ts` file, so it is invisible to the test runner. It
@@ -46,5 +49,57 @@ server.emit('event.lgo', { text: 'hello', category: 'system' });
 // A payload missing a required field must be rejected.
 // @ts-expect-error — 'reason' is required on auth:logout.
 server.emit('auth:logout', {});
+
+// A wrong field TYPE on an otherwise-correct field name must be rejected.
+// @ts-expect-error — 'text' must be a string, not a number.
+server.emit('event.log', { text: 42, category: 'system' });
+
+// An excess property on an otherwise-complete payload must be rejected.
+// Excess-property checking only fires on an object literal passed directly
+// as the argument, which is exactly how every real emit call site does it.
+// @ts-expect-error — 'extra' is not a field of AuthLogoutPayload.
+server.emit('auth:logout', { reason: 'bumped', extra: true });
+
+// ─── The mistake a discriminated union exists to catch ────────────────────
+//
+// One event's payload sent under a DIFFERENT event's name. This is the
+// failure mode `CommandBroadcast` (backend/src/game/commands/command.types.ts)
+// was built to prevent for the dynamic broadcast path: `event` and `payload`
+// are correlated by a discriminated union, not independently typed as
+// `event: string; payload: unknown`, so pairing the wrong two must fail.
+// @ts-expect-error — a ShipRenamedPayload does not belong under 'command.notice'.
+const wrongPairing: CommandBroadcast = { room: 'ship:usr_x:1', event: 'command.notice', payload: { shipId: 'usr_x:1', oldName: 'Old', newName: 'New' } };
+void wrongPairing;
+
+// ─── The dispatchBroadcast exhaustiveness assertion ────────────────────────
+//
+// `GameGateway.dispatchBroadcast` closes its switch on `CommandBroadcast.event`
+// with `const _exhaustive: never = broadcast;` in `default`, so a SIXTH
+// variant that isn't matched by an explicit `case` fails to compile there —
+// `broadcast` is not narrowed to `never` unless every member was handled.
+// `dispatchBroadcast` is private, so the idiom is reproduced structurally
+// here against a hypothetical extra variant, proving the assertion actually
+// catches what it claims to.
+type CommandBroadcastPlusHypothetical =
+  | CommandBroadcast
+  | { room: string; event: 'sixth.event'; payload: { x: number } };
+
+declare const hypothetical: CommandBroadcastPlusHypothetical;
+switch (hypothetical.event) {
+  case 'command.notice':
+  case 'event.log':
+  case 'message.send':
+  case 'player.snapshot':
+  case 'ship.renamed':
+    break;
+  default: {
+    // @ts-expect-error — 'sixth.event' is not narrowed away here, so
+    // `hypothetical` is not `never`. This is exactly the compile error a real
+    // sixth `CommandBroadcast` variant would raise in `dispatchBroadcast`
+    // until a matching `case` is added for it.
+    const _exhaustive: never = hypothetical;
+    break;
+  }
+}
 
 export {};
