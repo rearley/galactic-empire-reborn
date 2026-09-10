@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipStateService } from '../ship/ship-state.service';
 import { TickService } from '../tick/tick.service';
 import { TickKind } from '../tick/tick.types';
+import { TickOrder } from '../tick/tick-order';
 import { ShipState, shipKey } from '../ship/ship-state.types';
 import { CLOAK_ENERGY_USE } from './cloak.config';
 import { SHMINPWR } from '../constants';
@@ -52,7 +53,14 @@ export class ShipManagementTickService implements OnModuleInit {
   private clicker = 0;
 
   onModuleInit(): void {
-    this.tickService.subscribe(TickKind.PHYSICS, () => this.onPhysicsTick());
+    this.tickService.subscribe(
+      TickKind.PHYSICS,
+      () => this.onPhysicsTick(),
+      // `cloakstat` is FOURTH in warrtia (GEMAIN.C:2259), after fluxstat.
+      // That order is the difference between a cloak surviving on a
+      // reloaded pod and dying at zero with a full hold. @see tick-order.ts
+      TickOrder.CLOAK,
+    );
 
     // The self-destruct countdown belongs to the MOVEMENT clock. Canon calls
     // `destruct(wptr,zothusn)` from warrti2a, in the same strided loop as

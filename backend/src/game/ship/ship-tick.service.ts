@@ -6,6 +6,7 @@ import { I_ION } from '../constants/items';
 import { I_FLUX } from '../constants/items';
 import { Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
+import { TickOrder } from '../tick/tick-order';
 import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
 import { ShipStateService } from './ship-state.service';
 import { ShipState, shipKey } from './ship-state.types';
@@ -100,8 +101,13 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     this.unsubscribe = this.tickService.subscribe(TickKind.SHIP_UPDATE, (ctx) =>
       this.forEachShip(ctx, (ship) => this.processMovementTick(ship)),
     );
-    this.unsubscribeRestore = this.tickService.subscribe(TickKind.PHYSICS, (ctx) =>
-      this.forEachShip(ctx, (ship) => this.processRestorativeTick(ship)),
+    this.unsubscribeRestore = this.tickService.subscribe(
+      TickKind.PHYSICS,
+      (ctx) => this.forEachShip(ctx, (ship) => this.processRestorativeTick(ship)),
+      // `fluxstat` is the FIRST thing warrtia does (GEMAIN.C:2256), so a ship
+      // about to starve reloads before anything downstream tests its energy.
+      // The cloak upkeep sits at TickOrder.CLOAK and must not run first.
+      TickOrder.FLUX,
     );
     this.logger.log('Subscribed to SHIP_UPDATE and PHYSICS ticks');
   }

@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 75 entries.
+Append-only, **newest at the bottom**. 76 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
@@ -4557,3 +4558,73 @@ arrived with, both checked and both correct behaviour: a torpedo refused at
 warp 1 was the lock arithmetic (combined speed puts reach at 1.51 sectors
 against a target 1.82 away), and a torpedo refused in hyperspace was this
 morning's restored TORP2 gate doing its job.
+
+## 2026-09-09 — the cloak died at zero power with fifteen pods aboard
+
+**Found by the owner testing a prediction I got wrong**, and the proof is
+arithmetic rather than argument.
+
+Canon's `warrtia` is ONE function with a fixed sequence (GEMAIN.C:2256-2267):
+`fluxstat, repairship, shieldstat, cloakstat, checktm, fireion, recharge,
+checkdam`. `fluxstat` runs FIRST so a ship about to starve reloads a pod before
+anything downstream tests its energy — `cloakstat`, four calls later, then sees
+a full tank rather than an empty one.
+
+This port split that function across services and registered every handler
+through a `Set`, so the running order was an emergent property of the Nest DI
+graph rather than a decision. It came out backwards for exactly that pair.
+
+**The proof.** Cloak 7,500/tick plus Mark-7 shields 700/tick, from a full
+65,000, reaches zero after eight ticks. Then:
+
+| | |
+|---|---|
+| Cloak tested first, no power | shuts down |
+| Flux fires, refills | 65,000 |
+| Shields that tick | −700 |
+| Passive recharge | +1 |
+| **Predicted** | **64,301** |
+| **Live ship read** | **64,301** |
+
+Exact to the unit, with fifteen pods still in the hold.
+
+**Fix.** `TickService.subscribe` now takes an explicit `order`, and
+`tick-order.ts` names the positions with canon's line numbers. Handlers are
+kept sorted, ties keep registration order, and an omitted order goes to the
+BACK so a handler with no stated requirement can never displace one that has.
+The restorative pass registers at `TickOrder.FLUX`, the cloak upkeep at
+`TickOrder.CLOAK`.
+
+Encoding the sequence once is closer to canon than repairing the one pair,
+which is what was asked for: canon has a list, so now so do we.
+
+**Tests:** three files, and the third exists because the first two left a gap
+of exactly the shape that hid the original defect.
+
+- `tick-order.spec.ts` (5) — the dispatcher: ordering, tie stability, the
+  default-to-back rule, unsubscribe.
+- `flux-rescues-cloak.integration.spec.ts` (3) — the real cloak service driven
+  through a real `TickService`, so the ORDER is under test rather than the
+  sequence a test happens to call things in.
+- `warrtia-order-wiring.spec.ts` (3) — that the REAL services register at those
+  positions. The integration test registers a STUB at the flux position, so it
+  proves "whatever sits there runs first" and cannot prove `ShipTickService` is
+  what sits there. Verified by reverting the wiring: exactly one test failed,
+  the new one, while the integration test stayed green with the bug present.
+  A correct helper and a handler that cannot reach it, each fine alone, is how
+  this class of defect survives.
+
+**The dead band is pinned as canon, not fixed.** ENGYMAX 65,000 over CLENGUSE
+7,500 leaves exactly 5,000, ENGYMIN is 5,000, and `fluxstat` tests strictly
+less than. So a ship cloaking from full with NOTHING else drawing power lands
+one unit above the reload threshold and the cloak dies with a full hold. Any
+other drain pushes it under and the reload catches it — which is why cloaking
+while moving sustains itself and cloaking while parked does not. Both constants
+are canon and so is the gap.
+
+Backend 5,799 across 577 files.
+
+**Next:** —
+**Known issues:** the dispatcher change touches every tick subscriber. Only the
+two that need an order declare one; everything else defaults to the back, which
+preserves today's behaviour for them.
