@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 72 entries.
+Append-only, **newest at the bottom**. 73 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
 - [2026-09-09 — `sys kill` could not name an AI hull](#2026-09-09--sys-kill-could-not-name-an-ai-hull)
 - [2026-09-09 — AI torpedoes never passed a lock check, and the player's gate was the wrong rule](#2026-09-09--ai-torpedoes-never-passed-a-lock-check-and-the-players-gate-was-the-wrong-rule)
 - [Backlog — going public: the decision, and what has to be true first](#backlog--going-public-the-decision-and-what-has-to-be-true-first)
@@ -4421,3 +4422,43 @@ planted colony, so UNIVMAX cannot move.
 **Known issues:** the surplus stands at seven Scouts, three Cyberquads and four
 Drones over target, which is the population players are meant to be working
 through and is deliberately left to attrition.
+
+## 2026-09-09 — a docs-only push restarted the game mid-battle
+
+**Caught by the owner**, who was in a fight when a documentation commit landed.
+
+`deploy.yml` triggered on any push to master with no path filter. `GIT_SHA` is a
+build arg baked into both images, so every push produced a new digest even when
+no code had changed, watchtower saw a new `:latest`, and the stack restarted.
+Correcting a paragraph in this file cost a live player an interruption.
+
+Added `paths-ignore` for `**/*.md`, `docs/**`, `specs/**`, `LICENSE` and
+`NOTICE`. Neither Dockerfile copies any of them — backend takes `package*.json`,
+`prisma`, `tsconfig`, `nest-cli.json`, `src` and `config`; frontend takes
+`package*.json`, its config files, `index.html`, `src` and `nginx.conf` — so
+nothing in that list can change what gets built.
+
+Two paths were deliberately left OUT of the filter:
+
+- **`VERSION`**, because the workflow reads it and bakes it in as
+  `APP_VERSION`. A bump must build or the site would report the old release.
+- **`reference/`**, because a change there is rare enough that an unnecessary
+  build costs less than having to reason about whether that particular change
+  was the exception.
+
+**The trade, stated so it is not rediscovered:** the SHA on `/public/stats` will
+now lag master whenever the newest commits are documentation. That field exists
+to identify the running code, and documentation is not running code, so the lag
+is honest. The alternative was interrupting players to keep a hash current.
+
+**The trap, recorded at the workflow:** if a `.md` ever becomes a build input —
+a guide page sourced from markdown, say — this filter will silently skip a real
+deploy. The fix then is to remove the pattern, not to add an exception, because
+a deploy that does not happen looks exactly like one that did.
+
+**Tests:** none; a CI trigger cannot be exercised from the suite. Verified by
+parsing the workflow and by reading both Dockerfiles for every COPY.
+
+**Next:** —
+**Known issues:** this change is itself a workflow edit, so landing it costs one
+final restart. After that, documentation is free.

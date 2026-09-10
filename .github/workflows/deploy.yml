@@ -19,6 +19,35 @@ name: Build and publish images
 on:
   push:
     branches: [master]
+    # Documentation must not restart a live game.
+    #
+    # GIT_SHA is a build arg baked into both images, so EVERY push produced a
+    # new digest even when no code changed, watchtower saw a new :latest, and
+    # the stack restarted. A docs-only commit therefore interrupted whoever was
+    # playing — caught doing exactly that to a player mid-battle on 2026-09-09.
+    #
+    # Neither Dockerfile copies docs/, specs/ or any .md (backend takes
+    # package*.json, prisma, tsconfig, nest-cli.json, src, config; frontend
+    # takes package*.json, the config files, index.html, src, nginx.conf), so
+    # nothing here can change what gets built.
+    #
+    # TRAP: if a .md ever becomes a build input — a guide page sourced from
+    # markdown, say — this filter will silently skip a real deploy. Remove the
+    # pattern rather than adding an exception, because a deploy that does not
+    # happen looks exactly like one that did.
+    #
+    # VERSION is deliberately NOT here: it is read by this workflow and baked
+    # in as APP_VERSION, so a bump must build.
+    #
+    # reference/ is deliberately NOT here either. It never reaches an image, but
+    # a change to it is rare enough that an unnecessary build costs less than
+    # reasoning about whether that one was the exception.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'specs/**'
+      - 'LICENSE'
+      - 'NOTICE'
   workflow_dispatch:
 
 env:
