@@ -12,7 +12,7 @@ import { planetKey } from './planet-state.types';
  */
 /**
  * Planet records processed per sweep, as C's `plarti` does.
- * @see GEMAIN.C:963 `#define MAXTIC 20`
+ * @see GEMAIN.C:1977 `#define MAXTIC	20`
  */
 export const MAXTIC = 20;
 

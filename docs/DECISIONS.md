@@ -4979,3 +4979,36 @@ decided on that basis. Whether a TypeScript reimplementation written from GPL C
 source is a derivative work is a judgement, not a fact that was checked; the
 verbatim data makes the question live rather than academic, which is why the
 conservative answer was taken.
+
+
+## 2026-09-10 — `rep sys` reports whether the phaser will FIRE, not whether it has charge
+
+**Divergence marker:** `@divergence rep-sys-phaser-readiness`
+
+**Context:** a citation-and-divergence guard added on 2026-09-10 traps the prose
+people write when they notice a divergence and park it instead of ruling on it.
+Its first run found this one, sitting in a test docblock since the report
+handler was written, in words good enough to read like a decision had been
+taken. Nobody had taken one.
+
+**Decision:** keep the port's behaviour. `rep sys` prints REP23 (operative) when
+the bank holds at least `PMINFIRE`, and REP24 (inoperable) below it.
+
+**Reason:** canon prints REP23 whenever `warsptr->phasr > 0`
+(GECMDS.C:2018-2022 `if (warsptr->phasr > 0)`) while `cmd_phas` refuses to fire
+below `PMINFIRE`, which is 60. So in the original, a bank recharging through the
+0-59 band reports itself operative and then declines to shoot. The port's
+version answers the question the pilot is actually asking. A report that says
+your weapon works when it does not is the kind of thing that loses a ship, and
+this is the one place a player checks before committing to a fight.
+
+**Alternatives rejected:** matching canon exactly, which is normally this
+project's default and is a one-word change (`ship.phasr > 0`). Rejected because
+the divergence makes the report MORE truthful about the code beneath it rather
+than less, and because canon's own help does not promise the looser reading.
+Also rejected: printing the percentage, which is what this port did before —
+canon has two lines here and no number, and inventing a third is a bigger
+departure than tightening a threshold.
+
+**Player-visible:** yes, and recorded in `GUIDE_DEVIATIONS` on the `report` page.
+

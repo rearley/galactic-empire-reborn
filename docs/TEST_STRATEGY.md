@@ -156,6 +156,50 @@ fights. The Cybertron half got attention on 2026-09-09; the Droid half did not,
 which is how the torpedo lock guard added that day shipped with its Droid copy
 untested — and how the three defects above survived until someone read it.
 
+## What the suite cannot prove about itself, and what now guards it
+
+A passing test proves the code matches the test. It does not prove the test is
+right. Almost every spec here hardcodes its expected value — correctly, because
+running one must not depend on reading C — which makes the citation beside that
+number the only tether between it and canon. A wrong number with a wrong
+citation goes green forever and then defends the invention against anyone who
+tries to correct it.
+
+Thirty-two specs are deliberately the other way and re-read the original at test
+time. That category exists because hand-transcription has put wrong numbers into
+this codebase twice, and it stays small on purpose.
+
+Two guards close the difference, both in
+`test/balance/canon-citations.balance.spec.ts`:
+
+- **A quoted citation is checked against the original.** Where a comment quotes
+  the line it cites — `@see GEMAIN.C:1977 \`#define MAXTIC\t20\`` — the guard
+  finds that text within five lines of the cited line, whitespace ignored. It
+  caught a citation reading `GEMAIN.C:963` for a define that lives at 1977 on
+  its first run. Quoting is optional but the count of quoted citations may never
+  fall, so verification cannot be quietly removed.
+- **A divergence must be a decision.** `@divergence <slug>` has to appear in
+  both the code and `docs/DECISIONS.md`, checked both ways, and the prose people
+  reach for when parking one instead of ruling on it is trapped. It found the
+  `rep sys` phaser-readiness deviation, which had been sitting in a test
+  docblock in words good enough to read like a decision had been taken.
+
+## When play turns up a bug
+
+The loop that found nine defects in two days, in order:
+
+1. **Read canon first and quote the line.** Not the wiki, not memory, not the
+   in-game help — the help states intent and the shipped configuration often
+   does not implement it.
+2. **Write the failing test before the fix,** through the caller rather than the
+   helper, with the citation bound to a quote.
+3. **Watch it fail for the right reason.** A test that passes on first run is
+   testing something else.
+4. **Mutation-check the fix** by breaking it deliberately and confirming the new
+   test is what fails.
+5. **If canon genuinely cannot answer, it is a decision** — record it in
+   `DECISIONS.md` and tag both sides `@divergence`. It is not a comment.
+
 ## The rule that would have caught most of 2026-09-09
 
 **Test the caller's arithmetic, not the function's.** Three of the six defects
