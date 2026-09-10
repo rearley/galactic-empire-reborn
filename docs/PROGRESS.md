@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 76 entries.
+Append-only, **newest at the bottom**. 77 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
 - [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
@@ -4628,3 +4629,55 @@ Backend 5,799 across 577 files.
 **Known issues:** the dispatcher change touches every tick subscriber. Only the
 two that need an order declare one; everything else defaults to the back, which
 preserves today's behaviour for them.
+
+## 2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated
+
+**Correcting the entry above.** It claims the warrtia ordering fix "keeps a
+cloak alive on a reloaded pod". It does not, in any situation a pilot reaches by
+flying. The ordering change is still canon-correct and stays; the effect claimed
+for it was wrong.
+
+**The owner said this first** — "by design the game will not let you sit on clo
+unless you are manually hitting flu" — and I argued him out of it with bad
+arithmetic. He then tested it and was right.
+
+**The error.** I modelled the cloak draining before the shields. Canon's order
+is `fluxstat, repairship, shieldstat, cloakstat` (GEMAIN.C:2256-2259), so the
+shield draw comes off FIRST and the cloak is tested against what remains. That
+moves the failure point up by the whole shield cost.
+
+Measured against a live Dreadnought, Mark-7 shields, cloak up:
+
+```
+57500 -> 56801 -> ... -> 32204 -> 24005 -> 15806 -> 7607 -> drop, 6908 left
+```
+
+Every step is −8,199 (7,500 cloak + 699 shields), and the model reproduces all
+of them to the credit.
+
+**The real dead band, with Mark-7 shields, is 5,000 to 8,199** — 3,199 wide,
+not the 2,500 stated earlier. The cloak dies the moment energy enters it, and
+`fluxstat` only fires below 5,000. **A cloaked ship can never cross that gap**,
+because entering it stops the cloak and therefore stops the drain. That is why
+the observed ship sat at 6,908 with fifteen pods untouched.
+
+So: **shields make it worse, not better.** The earlier claim that raising them
+would let the auto-loader rescue you is exactly backwards — a bigger shield
+widens the band by its own upkeep.
+
+**What the ordering fix actually buys.** Only the case where a tick STARTS
+below 5,000 with the cloak already on, which is reachable by engaging the cloak
+on a nearly empty tank (`clo on` debits CLENGUSE immediately). Real, but narrow,
+and not the steady-state drain path. `flux-rescues-cloak.integration.spec.ts`
+starts its ship at 1,000 energy, so it tests that reachable case honestly; the
+NAME of its first case oversells it.
+
+**Sustained cloak requires a manual `flu`, once per eight ticks (48 seconds),
+one pod each time.** Canon's help calling the cloak useful for covering a
+retreat rather than for lurking is describing this, not being poetic.
+
+**Next:** —
+**Known issues:** none new. This is a documentation correction plus a warning
+against re-deriving the band from the constants alone — the tick ORDER is what
+decides it, and reading CLENGUSE and ENGYMIN side by side gives the wrong
+answer, which is the mistake made here.
