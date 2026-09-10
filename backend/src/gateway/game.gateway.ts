@@ -21,6 +21,7 @@ import {
 import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents } from '@ge/wire';
 import { UNIVMAX, GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
@@ -116,6 +117,7 @@ import { attackerNameFromLastFired, resolveKillSpoils } from '../game/combat/kil
 import { isAiUserid } from '../game/commands/helpers/ai-userid';
 import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
 import { DOC_PLANET_LIMIT, MAIL_CLASS_DISTRESS, RNDDOC } from '../game/constants';
+import type { CommandBroadcast } from '../game/commands/command.types';
 
 interface CommandPayload {
   input: unknown;
@@ -213,10 +215,27 @@ function hitText(
   }
 }
 
+/**
+ * The Socket.io server and per-connection socket, typed with the wire
+ * contract from `@ge/wire` so a wrong event name or payload shape is a
+ * build error rather than a runtime surprise.
+ *
+ * @see docs/superpowers/plans/2026-09-10-restructure-phase-1-wire-contract.md
+ */
+type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
+type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
+/**
+ * Every shape `processBroadcasts`/`emitToSockets` actually call `.emit()` on:
+ * the whole server (galaxy-wide), a room operator (`server.to(room)`), or one
+ * connected socket. All three carry the same `ServerToClientEvents` map.
+ */
+type BroadcastTarget = GameServer | GameSocket | ReturnType<GameServer['to']>;
+
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server!: Server;
+  server!: GameServer;
 
   private readonly logger = new Logger(GameGateway.name);
 
@@ -268,7 +287,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/011-onboarding/contracts/websocket-events.md §Connection
    * @see specs/030-multi-ship/task-7-brief.md T7
    */
-  async handleConnection(client: Socket): Promise<void> {
+  async handleConnection(client: GameSocket): Promise<void> {
     this.logger.log(`connection ${client.id}`);
 
     // Capture disconnect reason so handleDisconnect can distinguish client-side
@@ -342,7 +361,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * runs on a permitted exit.
    */
   private async maybeExitGame(
-    client: Socket,
+    client: GameSocket,
     result: import('../game/commands/command.types').CommandResult,
   ): Promise<void> {
     if (!result.exitGame) return;
@@ -361,7 +380,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private async maybeReenterShipEntry(
-    client: Socket,
+    client: GameSocket,
     result: import('../game/commands/command.types').CommandResult,
   ): Promise<void> {
     if (!result.reenterShipEntry) return;
@@ -424,7 +443,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see gateway/player-visibility.ts
    */
   private emitScopedSnapshot(
-    client: { emit: (event: string, payload: unknown) => void },
+    client: Pick<GameSocket, 'emit'>,
     viewer: { x: number; y: number },
     selfShipId?: string,
   ): void {
@@ -438,13 +457,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * recipient, and the client must never hold a position it may not show —
    * filtering in the UI leaks straight back out through devtools.
    */
-  private announceJoin(client: Socket, player: ConnectedPlayer, sector: { x: number; y: number }): void {
+  private announceJoin(client: GameSocket, player: ConnectedPlayer, sector: { x: number; y: number }): void {
     const room = `sector:${sector.x}:${sector.y}`;
     client.broadcast.to(room).emit('player.joined', player);
     client.broadcast.except(room).emit('player.joined', { ...player, sector: null });
   }
 
-  private joinPlayerRooms(client: Socket, userid: string, sector: { x: number; y: number }): void {
+  private joinPlayerRooms(client: GameSocket, userid: string, sector: { x: number; y: number }): void {
     void client.join(`user:${userid}`);
     void client.join(`sector:${sector.x}:${sector.y}`);
   }
@@ -479,7 +498,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Fire-and-forget in spirit: any failure here is swallowed, because a
    * mailbox hiccup must never keep a captain out of the game.
    */
-  private async noticeShipLossOnEntry(client: Socket, userid: string): Promise<void> {
+  private async noticeShipLossOnEntry(client: GameSocket, userid: string): Promise<void> {
     try {
       const mail = await this.prisma.mailStat.findFirst({
         where: { userid, class: MAIL_CLASS_DISTRESS, type: MESG_SHIPLOSS },
@@ -499,7 +518,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private async presentShipEntry(
-    client: Socket,
+    client: GameSocket,
     userid: string,
     opts: { noticeShipLoss?: boolean; autoBoard?: boolean } = {},
   ): Promise<void> {
@@ -589,7 +608,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/030-multi-ship/task-7-brief.md §boardShipAndWelcome
    */
   private async boardShipAndWelcome(
-    client: Socket,
+    client: GameSocket,
     userid: string,
     ship: { shipno: number; shipname: string; shpclass: number; xcoord: number; ycoord: number; damage: number; energy: number; heading: number; speed: number; where: number; [key: string]: unknown },
   ): Promise<void> {
@@ -769,7 +788,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
   }
 
-  async handleDisconnect(client: Socket): Promise<void> {
+  async handleDisconnect(client: GameSocket): Promise<void> {
     this.logger.log(`disconnect ${client.id}`);
     const userid = client.data.userid as string | undefined;
     // Before the cantexit branch below: that path can throw or return early,
@@ -929,7 +948,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @SubscribeMessage('command')
   handleCommand(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: GameSocket,
     @MessageBody() body: CommandPayload,
   ): void {
     // One command at a time, per socket.
@@ -959,7 +978,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /** One command, start to finish. Queued by {@link handleCommand}. */
-  private async runCommand(client: Socket, body: CommandPayload): Promise<void> {
+  private async runCommand(client: GameSocket, body: CommandPayload): Promise<void> {
     const userid = client.data.userid as string | undefined;
     const activeShipNo = client.data.activeShipNo as number | undefined;
 
@@ -1028,7 +1047,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @SubscribeMessage('prompt:reply')
   async handlePromptReply(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: GameSocket,
     @MessageBody() body: PromptReplyPayload,
   ): Promise<void> {
     const userid = client.data.userid as string | undefined;
@@ -1183,7 +1202,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see specs/030-multi-ship/task-7-brief.md T7
    */
   private async handleShipSelectReply(
-    client: Socket,
+    client: GameSocket,
     userid: string,
     pending: PendingShipSelectEntry[],
     rawValue: unknown,
@@ -2561,7 +2580,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    *
    * @see specs/015-scan-modes/contracts/scan-render.md §1 ("Event routing canonical")
    */
-  emitCommandResult(client: Socket, result: import('../game/commands/command.types').CommandResult): void {
+  emitCommandResult(client: GameSocket, result: import('../game/commands/command.types').CommandResult): void {
     if (result.expectFollowup !== undefined) {
       client.data.pendingFollowup = result.expectFollowup;
     }
@@ -2601,7 +2620,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   private processBroadcasts(
     result: import('../game/commands/command.types').CommandResult,
-    sender?: Socket,
+    sender?: GameSocket,
   ): void {
     if (!result.broadcasts) return;
     for (const broadcast of result.broadcasts) {
@@ -2614,12 +2633,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // their three channels hear it. @see GEMAIN.C:2583 outsect / outwar
         const members =
           broadcast.room === 'galaxy' ? undefined : this.roomMembers(broadcast.room);
-        this.emitToSockets(broadcast.event, broadcast.payload, members, excludeId, (ship) =>
+        this.emitToSockets(broadcast, members, excludeId, (ship) =>
           ship.freq.includes(broadcast.freq as number),
         );
       } else if (broadcast.room === 'galaxy') {
         // Galaxy-wide: all connected sockets, no filtering
-        this.server.emit(broadcast.event, broadcast.payload);
+        this.dispatchBroadcast(this.server, broadcast);
       } else if (broadcast.room.startsWith('ship:')) {
         // A message addressed to ONE pilot, the way C writes to a single
         // terminal with `outprfge(FILTER, shpnum)`. Used by `sca sh` to tell
@@ -2627,8 +2646,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const [, uid, shipnoRaw] = broadcast.room.split(':');
         const shipno = Number(shipnoRaw);
         this.emitToSockets(
-          broadcast.event,
-          broadcast.payload,
+          broadcast,
           undefined,
           excludeId,
           (ship) => ship.userid === uid && ship.shipno === shipno,
@@ -2638,9 +2656,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // delivers to every `ingegame` ship and never examines cloak —
         // running silent hides you from scanners, not from your own radio.
         // @see GECMDS.C:1845
-        this.emitToSockets(broadcast.event, broadcast.payload, undefined, excludeId, () => true);
+        this.emitToSockets(broadcast, undefined, excludeId, () => true);
       } else {
-        this.server.to(broadcast.room).emit(broadcast.event, broadcast.payload);
+        this.dispatchBroadcast(this.server.to(broadcast.room), broadcast);
       }
     }
   }
@@ -2651,15 +2669,47 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Emits to every socket whose active ship satisfies `accept`.
+   * Emits `broadcast` on `target`, narrowing `broadcast.event` so
+   * `broadcast.payload` is checked against the ONE wire payload type that
+   * event actually carries, rather than passing a union `event` and an
+   * unrelated `payload` to a single `.emit()` call (which the typed
+   * `Server`/`Socket` generics correctly refuse — `event` and `payload` are
+   * a discriminated union on `CommandBroadcast`, and Socket.io's overloaded
+   * `emit` cannot verify that correlation across a union without this
+   * per-branch narrowing).
+   *
+   * `'player.snapshot'` never reaches here — `processBroadcasts` resolves it
+   * to `emitScopedSnapshotToAll()` before any target-based dispatch. The case
+   * exists only so this switch is exhaustive over `CommandBroadcast['event']`.
+   */
+  private dispatchBroadcast(target: BroadcastTarget, broadcast: CommandBroadcast): void {
+    switch (broadcast.event) {
+      case 'command.notice':
+        target.emit('command.notice', broadcast.payload);
+        return;
+      case 'event.log':
+        target.emit('event.log', broadcast.payload);
+        return;
+      case 'message.send':
+        target.emit('message.send', broadcast.payload);
+        return;
+      case 'ship.renamed':
+        target.emit('ship.renamed', broadcast.payload);
+        return;
+      case 'player.snapshot':
+        return;
+    }
+  }
+
+  /**
+   * Emits `broadcast` to every socket whose active ship satisfies `accept`.
    *
    * `members` limits the sweep to one room's socket ids; omit it to consider
    * every connected socket. `excludeId` drops the sender, which C does by
    * passing `usrnum` to outsect/outwar.
    */
   private emitToSockets(
-    event: string,
-    payload: unknown,
+    broadcast: CommandBroadcast,
     members: Set<string> | undefined,
     excludeId: string | undefined,
     accept: (ship: ShipState) => boolean,
@@ -2674,7 +2724,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (uid == null || shipno == null) continue;
       const ship = this.shipStateService.get(uid, shipno);
       if (!ship || !accept(ship)) continue;
-      sock.emit(event, payload);
+      this.dispatchBroadcast(sock, broadcast);
     }
   }
 

@@ -18,7 +18,7 @@ import type {
   CombatMissEvent,
   CombatDecoyInterceptEvent,
   CombatMineDetonationEvent,
-  CombatShipDestroyedEvent,
+  CombatShipDestroyedPayload,
   CybertronTauntPayload,
   CybertronBrokeOffPayload,
   DroidAnnoyEvent,
@@ -61,7 +61,7 @@ export interface ServerToClientEvents {
   'combat.miss': (payload: CombatMissEvent) => void;
   'combat.decoy-intercept': (payload: CombatDecoyInterceptEvent) => void;
   'combat.mine-detonation': (payload: CombatMineDetonationEvent) => void;
-  'combat.ship-destroyed': (payload: CombatShipDestroyedEvent) => void;
+  'combat.ship-destroyed': (payload: CombatShipDestroyedPayload) => void;
   'cybertron.taunt': (payload: CybertronTauntPayload) => void;
   'cybertron.broke-off': (payload: CybertronBrokeOffPayload) => void;
   'droid.annoy': (payload: DroidAnnoyEvent) => void;
