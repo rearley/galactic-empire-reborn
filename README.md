@@ -25,9 +25,9 @@ That rule is enforced rather than aspired to:
 
 The full original distribution is vendored read-only at `reference/`. See
 [`NOTICE`](NOTICE) for what is embedded and under which licence, and
-[`reference/CLAUDE.md`](reference/CLAUDE.md) for which copy of each data file is the real one —
-that last point matters, because the distribution ships several generations of the same
-configuration and picking the wrong one has put wrong numbers into this codebase twice.
+[`reference/CLAUDE.md`](reference/CLAUDE.md) for which copy of each data file is the real one.
+That last point matters: the distribution ships several generations of the same configuration,
+they look identical, and only one of them is what the shipped game actually loaded.
 
 ---
 
@@ -199,16 +199,16 @@ specification page for a buyable hull.
 
 ---
 
-## Galaxy size — the thing this README used to get wrong
+## Galaxy size
 
-`MAXX=30` and `MAXY=15` are the dimensions of the ASCII scan map **in characters**. They are not
-the size of the galaxy. The galaxy runs `-UNIVMAX..+UNIVMAX`; canon defaults to 300 and we deploy
-at 100, giving 201×201 sectors. This is a declared deviation, and the smaller map is why the
-Cybertron population is scaled down to match — see the `the-galaxy` entry in
-`backend/src/public/guide.ts`.
+The galaxy runs `-UNIVMAX..+UNIVMAX` on both axes. Canon defaults to 300; this port deploys at
+100, giving 201×201 sectors. That is a declared deviation, and the Cybertron population is scaled
+down with it so an encounter stays about as frequent as the original intended.
 
-The 30×15 misreading has produced real defects in the code more than once, so it is called out
-here rather than left to be rediscovered.
+`MAXX=30` and `MAXY=15` are the ASCII scan map's dimensions **in characters**. They are the
+viewport, not the galaxy, and anything measured in sectors is coupled to `UNIVMAX` instead.
+
+Scan ranges are absolute, so map size and scan range have to be chosen together.
 
 ---
 
@@ -233,9 +233,8 @@ is visible.
 ```
 
 List an option there only to run it away from canon on purpose, and record the reason in
-`docs/DECISIONS.md`. The file previously restated all the options, 44 of them at values that were
-never canon — mostly a clamp bound picked because the shipped defaults were believed
-unrecoverable. Restating a value you did not choose is how that drift hid.
+`docs/DECISIONS.md`. Restating a value you did not choose defeats the point, because the file
+then looks authoritative while silently overriding a corrected default.
 
 Any option can also be overridden by an environment variable of the same name, which takes
 precedence — handy for Docker and CI:
@@ -246,8 +245,7 @@ PDAMMAX=40 docker compose up
 
 Every value is clamped to the range the original enforced, and an unknown option name or a
 non-numeric value is a hard error, so a typo fails loudly instead of looking like a setting that
-had no effect. Three defects were found by hand before this existed: torpedoes at twice the
-permitted maximum, missiles at three times, jammers at twice.
+had no effect.
 
 ---
 
@@ -278,9 +276,9 @@ that is not there, or if data is read from the wrong copy of a `.MSG` file.
 **Playwright E2E** drives a real Chromium against the running app: register a pilot, complete
 onboarding, round-trip commands, assert the terminal UI renders. **Postgres and the backend must
 already be running** (`npm run start:dev` in `backend/`); Vite is started automatically and an
-existing dev server is reused. This layer exists for defects nothing else can see — the event log
-once collapsed the column padding that `who`/`ros`/`pla` emit, destroying every ASCII table, and
-it was invisible to every other suite because it was a CSS rule.
+existing dev server is reused. This layer exists for defects no unit test can see, chiefly the
+rendering of the ASCII tables that `who`, `ros` and `pla` emit, where a CSS rule can destroy a
+correct payload.
 
 First run on a new machine needs the browser binary:
 
