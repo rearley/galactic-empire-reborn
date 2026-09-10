@@ -368,7 +368,7 @@ function Terminal(): React.JSX.Element {
           * `sca se` painted the identical picture twice and the history filled
           * with near-duplicates.
           */}
-        <div className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
+        <div className="w-80 shrink-0 border-r border-gray-800 flex flex-col overflow-hidden">
           <ScanMap cells={scanCells} shipId={localShipId} kind={scanKind} />
           <div className="flex-1 overflow-auto border-t border-gray-800">
             <ScanPanel shipId={localShipId} />
@@ -376,7 +376,7 @@ function Terminal(): React.JSX.Element {
         </div>
 
         {/* Side: player-list panel (FR-002, FR-016..FR-018) */}
-        <div className="w-48 flex-shrink-0">
+        <div className="w-48 shrink-0">
           <PlayerListPanel players={players} fkeys={fkeys} />
         </div>
       </div>

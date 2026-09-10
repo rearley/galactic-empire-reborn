@@ -126,7 +126,7 @@ export function ScanMap({ cells, shipId = null, kind = null }: ScanMapProps): Re
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Sector Map</span>
       </div>
       <div

@@ -140,7 +140,7 @@ export function ScanPanel({ shipId = null }: ScanPanelProps): React.JSX.Element 
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Scan Data</span>
       </div>
       {cards.length === 0 ? (

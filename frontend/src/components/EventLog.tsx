@@ -123,7 +123,7 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0 flex items-center justify-between">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0 flex items-center justify-between">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Event Log</span>
         {/*
           * Auto-scroll is a MODE, and it used to be invisible: once it

@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig*.json vite.config.ts postcss.config.cjs tailwind.config.ts ./
+COPY tsconfig*.json vite.config.ts postcss.config.cjs ./
 COPY index.html ./
 COPY src ./src
 
