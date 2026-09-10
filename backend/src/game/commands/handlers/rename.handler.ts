@@ -37,8 +37,16 @@ export class RenameHandlerService {
     args: string[],
     _ctx: CommandContext,
   ): Promise<CommandResult> {
-    // args casing is preserved since CommandRouterService only lower-cases the keyword
-    const newName = args[0];
+    // args casing is preserved since CommandRouterService only lower-cases the
+    // keyword.
+    //
+    // JOINED, not args[0]. Canon runs `rstrin()` before reading `margv[1]`,
+    // which restores the input line the tokeniser split, so the name is
+    // everything to the end of the line (GECMDS.C:5004-5006). Taking the first
+    // token alone renamed "BigCat II" to "BigCat" and reported success, so the
+    // pilot was told the rename worked and shown a name they had not asked
+    // for. `sen` and `adm rename` already join; this was the one that did not.
+    const newName = args.join(' ').trim();
 
     const result = await this.renameService.rename(ship.userid, ship.shipno, newName);
 
@@ -46,7 +54,7 @@ export class RenameHandlerService {
       const text =
         result.reason === 'NAME_TAKEN'
           ? `Name "${newName}" is already taken.`
-          : `Invalid ship name. Use 1-19 printable characters (no spaces).`;
+          : `Invalid ship name. Use 1-19 printable characters.`;
       return { lines: [{ text, category: 'system' }] };
     }
 

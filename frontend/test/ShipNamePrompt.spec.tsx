@@ -6,11 +6,19 @@ import { ShipNamePrompt } from '../src/onboarding/ShipNamePrompt';
  * The gateway distinguishes `invalid-format` from `name-taken`, but the prompt
  * rendered one hard-coded sentence for both: "That name is already taken."
  *
- * Ship names are a single token of printable ASCII with no spaces
- * (GECMDS.C:5002 strncpy of margv[1]), so a pilot naming their ship
- * "Ravenspur II" was told the name was taken — sending them off to invent a
- * different name when the real problem was the space. It cost me two attempts
- * during a playtest.
+ * The original note here said ship names were "a single token of printable
+ * ASCII with no spaces (GECMDS.C:5002 strncpy of margv[1])", after a pilot
+ * naming their ship "Ravenspur II" was told the name was taken.
+ *
+ * That reading was WRONG, and the same problem came back on 2026-09-09 with
+ * "BigCat II". Canon runs `rstrin()` BEFORE the strncpy, which restores the
+ * input line the tokeniser split, so `margv[1]` runs to the end of it — the
+ * MajorBBS idiom for "the rest of the line", used identically by `cmd_send`
+ * so that `sen A hello there` sends both words.
+ *
+ * Spaces were always legal. The restriction was invented here, and the first
+ * fix explained the invented rule instead of checking it, which is why it took
+ * a second pilot hitting the same wall to find.
  */
 describe('ShipNamePrompt error messages', () => {
   it('says the name is taken when it is taken', () => {
@@ -32,6 +40,11 @@ describe('ShipNamePrompt error messages', () => {
 
   it('states the rule up front so the first attempt succeeds', () => {
     render(<ShipNamePrompt onSubmit={vi.fn()} error={null} />);
-    expect(document.body.textContent).toMatch(/no spaces/i);
+    expect(document.body.textContent).toMatch(/19/);
+  });
+
+  it('does not claim spaces are forbidden, because they are not', () => {
+    render(<ShipNamePrompt onSubmit={vi.fn()} error="invalid-format" />);
+    expect(document.body.textContent ?? '').not.toMatch(/no spaces/i);
   });
 });
