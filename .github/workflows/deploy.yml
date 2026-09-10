@@ -47,6 +47,13 @@ on:
     # copies them (backend takes package*.json, prisma, tsconfig, nest-cli.json,
     # src, config), so a test-only commit rebuilds a byte-identical image and
     # restarts the game for nothing. Coverage work makes many such commits.
+    #
+    # The two tools/ directories are not build inputs either. `tools/` holds the
+    # canon extractors and `backend/tools/` the coverage classifier and one-off
+    # backfills; all of them run on a developer's machine. Excluding them is safe
+    # BECAUSE the extractors write their output into backend/src and
+    # backend/prisma/seed, which are not ignored — so regenerating canon still
+    # deploys, while editing the generator that produced it does not.
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -56,6 +63,8 @@ on:
       - 'backend/test/**'
       - 'frontend/test/**'
       - 'frontend/e2e/**'
+      - 'tools/**'
+      - 'backend/tools/**'
   workflow_dispatch:
 
 env:
