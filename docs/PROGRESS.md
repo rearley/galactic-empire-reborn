@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 82 entries.
+Append-only, **newest at the bottom**. 83 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 
 - [2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise](#2026-09-09--the-sysop-toolkit-is-complete-against-canon-and-the-doc-said-otherwise)
 - [2026-09-09 — Elwynor credited as stewards, and a correction to yesterday's reasoning](#2026-09-09--elwynor-credited-as-stewards-and-a-correction-to-yesterdays-reasoning)
+- [2026-09-10 — round four: the frontend, and a bug found by a test written wrong](#2026-09-10--round-four-the-frontend-and-a-bug-found-by-a-test-written-wrong)
 - [2026-09-10 — coverage round three: the gateway, and two agent errors caught by verifying](#2026-09-10--coverage-round-three-the-gateway-and-two-agent-errors-caught-by-verifying)
 - [2026-09-10 — coverage round two: 80 more cases, combat tick clears the bar](#2026-09-10--coverage-round-two-80-more-cases-combat-tick-clears-the-bar)
 - [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
@@ -4949,3 +4950,76 @@ fallbacks the strategy excludes by name.
 `socketClient.ts` at 42.9%. That is where connection state, reconnection and
 event dispatch live, and a wrong branch means a client silently stops receiving
 events while looking fine. It connects to the known disconnect-detection window.
+
+## 2026-09-10 — round four: the frontend, and a bug found by a test written wrong
+
+Fourth five-agent workflow: three frontend slices, the scan handler, and the
+tail of both AI ticks.
+
+**A wrong test predicate exposed a real bug in the Cybertron.**
+
+Four cases in `ai-tick-tail.spec.ts` failed. The agent's `fired()` predicate was
+`cyb.phasr === 0`, which tests the wrong weapon — canon's `firehp` never touches
+`phasr`. Correcting the predicate to `hypha === 1` did not make them pass, and
+that is the finding.
+
+`firehp` charges the FIRER three things before it looks for a victim
+(GECMDS.C:1039-1041):
+
+```
+ptr->energy -= HPFIRAMT;      /* 5,000 flux */
+ptr->hypha   = 1;             /* arms the cooldown */
+ptr->cantexit = FIRETICKS;    /* battle lock */
+```
+
+The player path implements all three. **`cybFireHyperPhaser` set only the battle
+lock**, and it had no energy gate at all — canon's ENTIRE `firehp` body sits
+inside `if (ptr->energy >= HPMINFIR)` (GECMDS.C:1029), so below 6,000 flux
+nothing happens: no shot, no debit, no cooldown.
+
+**Two corrections to the first reading of this, both found by re-checking before
+pushing:**
+
+1. The first fix debited energy *unconditionally*, ahead of the gate it had just
+   been shown to be missing. That would have driven a low Cybertron's flux
+   negative and armed a cooldown for a shot it never took. The gate goes first.
+2. The claim that "a Cybertron fired for free while a player paid" **overstates
+   it**. `cyb_lives` restores AI energy to a flat 50,000 on every activation
+   (GECYBS.C:325, and our line 314), so the debit is refunded a moment later.
+   Canon hands the AI free flux by design.
+
+So what does the fix actually change? The engagement scan runs BEFORE that
+restore and loops EVERY ship in range, firing at each. Previously a Cybertron
+could fire an unlimited number of hyper-phaser shots in one activation. Now it
+gets eight or nine before its flux drops under HPMINFIR and the rest are
+refused — which is what canon does. Narrow, real, and much smaller than first
+claimed.
+
+Canon does NOT gate the AI on `hypha` the way `cmd_phas` gates the player
+(GECYBS.C:279 calls `firehp` unconditionally, GECMDS.C:849 does not). That
+asymmetry is canon and is deliberately left alone.
+
+The test that found it asserted final energy, which can never hold because of
+the restore. It now asserts `hypha` and the victim's hull — the signals that
+survive the tick. Mutation-checked both ways: removing the gate fails one case,
+failing to arm `hypha` fails five.
+
+**Coverage after four rounds:**
+
+| | start | now |
+|---|---|---|
+| Backend branches | 76.5% | **82.6%** |
+| Backend lines | 92.5% | 95.6% |
+| Frontend branches | 88.3% | **90.8%** |
+| Frontend functions | 71.7% | **94.2%** |
+| Frontend lines | 82.2% | 87.5% |
+
+Backend 6,071 tests, frontend 310. The frontend's function coverage moving 71.7
+→ 94.2 is the socket layer: `useSocket.ts` had fourteen event handlers and none
+were covered, which is where a client silently stops updating while still
+looking connected.
+
+**Next:** the remaining backend gaps are small and mostly excluded. Worth one
+more pass at `transfer.handler.ts` (3 real decisions), `planet-economy` (2), and
+an honest re-count of the AI tick tails, several of which look unreachable from
+any caller and should be recorded as excluded rather than re-attempted.
