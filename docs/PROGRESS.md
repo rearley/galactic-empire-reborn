@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 86 entries.
+Append-only, **newest at the bottom**. 87 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 86 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-10 — a torpedo volley now tells you it hit](#2026-09-10--a-torpedo-volley-now-tells-you-it-hit)
 - [2026-09-10 — the re-audit that asked whether the tests were RIGHT](#2026-09-10--the-re-audit-that-asked-whether-the-tests-were-right)
 - [2026-09-10 — a citation now has to prove itself, and a divergence has to be a decision](#2026-09-10--a-citation-now-has-to-prove-itself-and-a-divergence-has-to-be-a-decision)
 - [2026-09-10 — three droid defects found by reading the brains side by side](#2026-09-10--three-droid-defects-found-by-reading-the-brains-side-by-side)
@@ -5285,4 +5286,50 @@ branch does and the missile branch does not. Following it would mean a missile
 kill credits nobody. Left alone deliberately and written up at the foot of
 `docs/audits/2026-09-10-canon-value-reaudit.md`; it wants its own look rather
 than a same-day change to kill attribution on a live galaxy.
+
+## 2026-09-10 — a torpedo volley now tells you it hit
+
+**Completed:** chased the one item left open by the canon re-audit. It was
+wrong, and something real was underneath it.
+
+The open item claimed canon's missile impact never records who fired, which
+would have meant a missile kill credits nobody. It came from searching
+`checktm` for `lastfired`: the torpedo branch has it inline and the missile
+branch appears not to. Both branches call `acctm`, which is defined below the
+range that was searched, and `acctm` sets it. Canon attributes a missile hit
+exactly as it attributes a torpedo hit. This port was right and needed no
+change to kill attribution.
+
+**What the search did uncover is `acctm`'s other job, which was never done
+here.** It confirms every projectile impact to the FIRER — MTACC1 for a
+torpedo, MTACC2 for a hyper-missile — naming the target by the letter the
+SHOOTER scans it as and by the target's ship name, on both weapons and both
+shield branches. Both strings had been extracted into `CANON_MESSAGES` and
+neither was ever sent. A phaser firer got PHITHIM or PDEFLECT, so a beam
+reported what it did, while a torpedo volley reported nothing: three tubes
+emptied and you learned the result from the target's next scan.
+
+**Tests:** `test/gateway/projectile-hit-confirmation.spec.ts`, four cases
+written failing first — the torpedo line, the missile line, silence for a
+phaser because its handler already sends PHITHIM, and silence when the firer
+cannot be resolved, which is canon's `channel != 255`. 604 suites, 6,124 tests.
+
+**Decisions made:** none. A canon behaviour that was missing.
+
+**Next:** the restructuring work.
+
+**Known issues:** none open from the re-audit. Its findings file is closed.
+
+For the record, the runtime port as it stands, excluding every test, spec and
+document:
+
+| | files | lines | code | comment |
+|---|---|---|---|---|
+| backend `src` | 270 | 41,782 | 24,762 | 13,850 |
+| frontend `src` | 41 | 3,403 | 2,261 | 847 |
+| schema and seed | 3 | 1,164 | 797 | 320 |
+| **total** | **314** | **46,349** | **27,820** | **15,017** |
+
+Comments are 35% of every non-blank line, which is deliberate: this codebase
+argues with canon in the margins, and the last two days are the case for it.
 
