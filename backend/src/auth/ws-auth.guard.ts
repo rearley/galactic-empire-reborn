@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents } from '@ge/wire';
 import { AuthService } from './auth.service';
+
+type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 export interface WsJwtPayload {
   sub: string;
@@ -26,7 +29,7 @@ export class WsAuthGuard {
    * Returns the decoded payload on success.
    * On failure: emits error and disconnects the socket, then returns null.
    */
-  async validate(client: Socket): Promise<WsJwtPayload | null> {
+  async validate(client: GameSocket): Promise<WsJwtPayload | null> {
     const token = client.handshake.auth['token'] as string | undefined;
     if (!token) {
       client.emit('error', { code: 'AUTH_REQUIRED', message: 'No token provided.' });

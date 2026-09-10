@@ -11,9 +11,26 @@
 // ─── event.log ────────────────────────────────────────────────────────────
 
 /**
- * Moved from `frontend/src/types/contracts.ts`.
+ * Moved from `frontend/src/types/contracts.ts`, WIDENED to add `'alert'`.
+ *
+ * `game.gateway.ts`'s `handleEngineShutdown` (the `SHIP_ENGINE_SHUTDOWN`
+ * handler) emits `category: 'alert'` for canon's unfilterable engine-shutdown
+ * notice (GEFUNCS.C:528 `outprfge(ALWAYS,usrn);`) — deliberately distinct
+ * from `'system'` per that handler's own comment. The frontend's
+ * `CATEGORY_CLASS` lookup in `EventLog.tsx` falls back to a default style for
+ * any key it does not recognise, so an un-widened declaration would not have
+ * crashed the client — it would just have silently discarded canon's
+ * distinction between an unfilterable alert and an ordinary system line. That
+ * is real gameplay information the type should not be hiding.
  */
-export type EventLogCategory = 'system' | 'info' | 'success' | 'combat' | 'nav' | 'chat';
+export type EventLogCategory =
+  | 'system'
+  | 'info'
+  | 'success'
+  | 'combat'
+  | 'nav'
+  | 'chat'
+  | 'alert';
 
 /**
  * Moved from `frontend/src/types/contracts.ts`. Payload of `event.log`.
@@ -365,6 +382,27 @@ export interface CombatShipDestroyedEvent {
   victimClass?: number;
   /** Points awarded on this kill — shipClass.points for victim's class. 0 if class unknown. @see GEFUNCS.C:killem (1145) */
   scoreAwarded: number;
+}
+
+/**
+ * Payload actually put on the wire for `combat.ship-destroyed` by
+ * `backend/src/gateway/game.gateway.ts` (search "Built field by field, NOT
+ * spread from the event"). Deliberately narrower than the internal
+ * `CombatShipDestroyedEvent` above, which drives score transfer, loot, the
+ * ship-loss mail and the forensics log server-side: spreading it onto a
+ * galaxy-wide emit would publish the kill's exact sector, the internal
+ * account keys `displayName()` exists to hide, the destroyed hull's cargo,
+ * and `victimDisconnectReason`. The client renders four fields; this is the
+ * four it receives.
+ *
+ * @see docs/audits/2026-09-09-security-review.md
+ * @see backend/test/gateway/destroyed-payload-scoping.spec.ts
+ */
+export interface CombatShipDestroyedPayload {
+  victimId: string;
+  attackerId: string | null;
+  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity' | null;
+  attackerName: string | null;
 }
 
 // ─── cybertron.* ──────────────────────────────────────────────────────────

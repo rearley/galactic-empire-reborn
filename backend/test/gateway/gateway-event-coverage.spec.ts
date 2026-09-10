@@ -87,6 +87,16 @@ const DELIBERATELY_UNHANDLED: Record<string, string> = {
     'canon MINE5 is "Sensors indicate a large neutron explosion bearing %d, Sir!" '
     + 'and the payload carries no bearing, so it cannot be rendered faithfully '
     + 'yet. Fixing it means adding bearing server-side, not inventing a line here.',
+  'command.notice':
+    'emitted via the dynamic broadcast path (scan.handler.ts, `sca sh`) to tell '
+    + 'one hull it has been scanned; the frontend has no listener today. Recorded '
+    + 'as a finding, not fixed, by the 2026-09-10 typed-wire-contract phase — a '
+    + 'later phase decides whether this is dead code or an unfinished feature. '
+    + 'This scanner could not see it before that phase typed '
+    + '`GameGateway.processBroadcasts`\' dispatch: the event name used to reach '
+    + '`.emit()` only as a variable (`broadcast.event`), invisible to this '
+    + "file's source-text regex, and became a literal only once the typed emit "
+    + 'map required narrowing on it.',
 };
 
 describe('gateway → client event coverage', () => {

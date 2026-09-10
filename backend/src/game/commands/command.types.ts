@@ -1,3 +1,9 @@
+import type {
+  CommandNoticePayload,
+  EventLogLine,
+  MessageSendPayload,
+  ShipRenamedPayload,
+} from '@ge/wire';
 import { ShipState } from '../ship/ship-state.types';
 
 /**
@@ -8,6 +14,34 @@ export interface CommandContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client?: any;
 }
+
+/**
+ * One dynamic broadcast a command handler can ask the gateway to deliver,
+ * discriminated on `event` so `payload` is the wire type that event actually
+ * carries.
+ *
+ * @see CommandResult.broadcasts
+ * @see docs/superpowers/plans/2026-09-10-restructure-phase-1-wire-contract.md
+ */
+export type CommandBroadcast = {
+  room: string;
+  /**
+   * Radio frequency this transmission is on. When set, the gateway delivers
+   * only to ships carrying it on one of their three channels — C's
+   * `outsect`/`outwar` take the same argument and filter the same way
+   * (GEMAIN.C:2583-2600). Omit for an open hail everyone can hear.
+   */
+  freq?: number;
+  /** Skip the socket that issued the command — C excludes `usrnum`. */
+  excludeSelf?: boolean;
+} & (
+  | { event: 'command.notice'; payload: CommandNoticePayload }
+  | { event: 'event.log'; payload: EventLogLine }
+  | { event: 'message.send'; payload: MessageSendPayload }
+  /** Sentinel only — see the field doc on `CommandResult.broadcasts`. */
+  | { event: 'player.snapshot'; payload: Record<string, never> }
+  | { event: 'ship.renamed'; payload: ShipRenamedPayload }
+);
 
 /**
  * Wire result returned by a command handler to the gateway.
@@ -35,21 +69,27 @@ export interface CommandResult {
    * without a round trip. @see src/game/commands/fkeys.ts
    */
   fkeys?: string[];
-  /** Scaffolded for feature 006 sector-room broadcasts; no in-scope command emits any. */
-  broadcasts?: Array<{
-    room: string;
-    event: string;
-    payload: unknown;
-    /**
-     * Radio frequency this transmission is on. When set, the gateway delivers
-     * only to ships carrying it on one of their three channels — C's
-     * `outsect`/`outwar` take the same argument and filter the same way
-     * (GEMAIN.C:2583-2600). Omit for an open hail everyone can hear.
-     */
-    freq?: number;
-    /** Skip the socket that issued the command — C excludes `usrnum`. */
-    excludeSelf?: boolean;
-  }>;
+  /**
+   * Scaffolded for feature 006 sector-room broadcasts.
+   *
+   * `event`/`payload` is a discriminated union over the five names actually
+   * used across all 55 command handlers — `command.notice`, `event.log`,
+   * `message.send`, `player.snapshot`, `ship.renamed` — rather than `event:
+   * string; payload: unknown`. That correlation, not just a narrowed `event`,
+   * is what lets `GameGateway`'s typed emit calls on this dynamic path
+   * type-check without a cast: switching on `broadcast.event` narrows
+   * `broadcast.payload` to the matching wire payload type in the same branch.
+   *
+   * `player.snapshot`'s payload is `Record<string, never>` — a sentinel, not
+   * the real `PlayerSnapshotPayload`. `GameGateway.processBroadcasts` resolves
+   * this variant to a global re-broadcast (`emitScopedSnapshotToAll`) BEFORE
+   * the generic emit path, so the placeholder `{}` never reaches a socket.
+   * That is routing, not a payload defect — do not "fix" it to carry a real
+   * `PlayerSnapshotPayload`.
+   *
+   * @see docs/superpowers/plans/2026-09-10-restructure-phase-1-wire-contract.md
+   */
+  broadcasts?: Array<CommandBroadcast>;
   /** When true, the frontend should clear the event log AFTER appending lines.
    *  Used exclusively by the `cls` command. @see specs/016-navigation-spy/research.md D4 */
   clearLog?: boolean;

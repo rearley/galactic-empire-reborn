@@ -555,11 +555,16 @@ describe('processBroadcasts — the room prefixes that are not Socket.io rooms',
     const sameCaptainOtherHull = h.addSocket('sock-other-hull', 'usr_scanned', 1);
     const bystander = h.addSocket('sock-bystander', 'usr_other', 1);
 
-    send(h, { room: 'ship:usr_scanned:2', event: 'scan.notice', payload: { by: 'Rick' } });
+    // 'command.notice' is the real event this address type carries in
+    // production — scan.handler.ts's `sca sh` uses exactly this room shape
+    // (`ship:<userid>:<shipno>`) with this event to tell one hull it has been
+    // scanned, per the `sca sh` citation in this describe block's own doc
+    // comment above.
+    send(h, { room: 'ship:usr_scanned:2', event: 'command.notice', payload: { lines: [] } });
 
-    expect(received(wanted, 'scan.notice')).toEqual([{ by: 'Rick' }]);
-    expect(received(sameCaptainOtherHull, 'scan.notice')).toEqual([]);
-    expect(received(bystander, 'scan.notice')).toEqual([]);
+    expect(received(wanted, 'command.notice')).toEqual([{ lines: [] }]);
+    expect(received(sameCaptainOtherHull, 'command.notice')).toEqual([]);
+    expect(received(bystander, 'command.notice')).toEqual([]);
   });
 
   /**
