@@ -588,7 +588,7 @@ const PORT_HELP_ADDENDA: Readonly<Record<string, ReadonlyArray<string>>> = Objec
     '',
     '  The original game moved cargo only between a ship and the planet it',
     '  orbits; the line above is not part of it. Name the receiving ship, and',
-    '  both ships must be in the same sector. See docs/DECISIONS.md (D1).',
+    '  both ships must be in the same sector.',
   ]),
 });
 
