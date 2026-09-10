@@ -81,6 +81,62 @@ function cybertron(userid: string, shipno: number, shipname: string): ShipState 
   return s;
 }
 
+/**
+ * `sys class` must reach every class the table defines.
+ *
+ * The unit test for the validator passed 34 as the class COUNT, which is
+ * canon's slot count. The real caller passes the number of DEFINED classes,
+ * which is 18, and the bound compared a class NUMBER against it — so with
+ * sparse numbering (1-9, 21-25, 31-33, 41) everything above 9 was refused and
+ * a sysop could not become any AI hull or the Death Star. The unit test could
+ * not see it because it never used the caller's arithmetic.
+ *
+ * @see GECMDS.C:4882
+ */
+describe('SysHandlerService — `sys class` reaches the sparse high numbers', () => {
+  const saved = process.env.GE_SYSOP_USERNAME;
+  beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'Sysop'; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.GE_SYSOP_USERNAME;
+    else process.env.GE_SYSOP_USERNAME = saved;
+  });
+
+  const TABLE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 31, 32, 33, 41]
+    .map((classNumber) => ({ classNumber, maxWarp: 10 }));
+
+  function harnessWithClasses(ships: ShipState[]) {
+    const shipMap = new Map<string, ShipState>();
+    for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
+    const shipState = {
+      findAllShips: () => Array.from(shipMap.values()),
+      mutate: (userid: string, shipno: number, fn: (s: ShipState) => void) => {
+        const s = shipMap.get(shipKey(userid, shipno));
+        if (!s) return undefined;
+        fn(s); return s;
+      },
+    } as unknown as ShipStateService;
+    return new SysHandlerService(
+      shipState,
+      { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue(TABLE) } } as unknown as PrismaService,
+      new CybertronControlService(),
+    );
+  }
+
+  it.each([21, 25, 33, 41])('accepts class %i', async (n) => {
+    const sysop = makeShip();
+    const h = harnessWithClasses([sysop]);
+    await h.command.handler(sysop, ['class', String(n)], ctx);
+    expect(sysop.shpclass).toBe(n);
+  });
+
+  it('still refuses a number the table does not define', async () => {
+    const sysop = makeShip({ shpclass: 1 });
+    const h = harnessWithClasses([sysop]);
+    await h.command.handler(sysop, ['class', '34'], ctx);
+    expect(sysop.shpclass).toBe(1);
+  });
+});
+
 describe('SysHandlerService — `sys kill`', () => {
   const saved = process.env.GE_SYSOP_USERNAME;
   beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'Sysop'; });
