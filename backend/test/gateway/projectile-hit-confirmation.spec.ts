@@ -11,7 +11,7 @@
  *     }
  *
  * `checktm` calls it on both weapons and on both shield branches —
- * GEFUNCS.C:1562 for a torpedo (mt 0) and GEFUNCS.C:1640 and :1659 for a
+ * GEFUNCS.C:1562 and :1575 for a torpedo (mt 0), :1646 and :1660 for a
  * missile (mt 1) — so MTACC1 is "our torpedo has hit ship %c, The %s" and
  * MTACC2 the hyper-missile equivalent. `shpltr(usrn,ship)` reads the FIRST
  * argument's scan table, so the letter is the one the shooter uses for the
@@ -27,7 +27,7 @@
  * missed because the function is defined below the window that was searched.
  * The claim was wrong and this was underneath it.
  *
- * @see GEFUNCS.C:1741 `ptr->lastfired = channel;`
+ * @see GEFUNCS.C:1742 `ptr->lastfired = channel;`
  */
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';

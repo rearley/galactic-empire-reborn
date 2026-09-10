@@ -366,8 +366,8 @@ again.
 It confirms every projectile impact to the FIRER — MTACC1 for a torpedo, MTACC2
 for a hyper-missile — naming the target by the letter the SHOOTER scans it as
 (`shpltr` reads its first argument's scan table) and by the target's ship name.
-`checktm` calls it on both weapons and on both shield branches, at :1562, :1640
-and :1659.
+`checktm` calls it on both weapons and on both shield branches, at :1562 and
+:1575 for a torpedo and :1646 and :1660 for a missile.
 
 Both strings had been extracted into `CANON_MESSAGES` and neither was ever sent.
 A phaser firer got PHITHIM or PDEFLECT, so a beam reported what it did, while a
