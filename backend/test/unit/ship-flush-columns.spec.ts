@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { stateToPrismaUpdate, IN_MEMORY_ONLY_SHIP_FIELDS } from '../../src/game/ship/ship-state.mappers';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 /**
  * Every key `stateToPrismaUpdate` returns must be a real Ship column.
@@ -24,24 +25,14 @@ import { NUMITEMS } from '../../src/game/constants/items';
  * silent runtime failure into a failing unit test.
  */
 function fullState(): ShipState {
-  return {
-    userid: 'usr_a', shipno: 1, shipname: 'Probe', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 1.5, ycoord: 2.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'usr_a',
+    shipname: 'Probe',
+    xcoord: 1.5,
+    ycoord: 2.5,
+    phasrtype: 1,
+    shieldtype: 1,
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     // In-memory only — every one of these must be stripped.
     lockKey: 'usr_b:1',
     maxTons: 1000,
@@ -52,7 +43,7 @@ function fullState(): ShipState {
     lastfiredBy: { channel: 9, name: 'Killer' },
     deathCause: { kind: 'gravity', what: 'Zygor' },
     userKills: 4,
-  } as ShipState;
+  });
 }
 
 describe('stateToPrismaUpdate returns only real Ship columns', () => {

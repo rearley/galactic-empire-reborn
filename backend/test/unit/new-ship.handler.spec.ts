@@ -12,34 +12,26 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { MAXSHIPS, GESTAT_AVAIL } from '../../src/game/constants';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u-test', shipno: 1, shipname: 'USS Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0.5, ycoord: 0.5, // neutral zone (0,0) by floor
-    damage: 0, energy: 65000,
-    phasr: 100, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    userid: 'u-test',
+    shipname: 'USS Test',
+    xcoord: 0.5,
+    ycoord: 0.5, // neutral zone (0,0) by floor
+    energy: 65000,
+    phasr: 100,
     // In orbit around ZYGOR. Canon's shipyard gate is
     // `neutral(&coord) && plnum == 1` (GECMDS.C:4557), and `where = 10 + plnum`
     // — so orbiting Zygor is 11. This fixture said 10, i.e. plnum 0, which is
     // not a planet at all; it passed only because the port checked "orbiting
     // anything in sector (0,0)".
     where: 11,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: [0n, 0n, 0n, 0n, 3n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    topspeed: 10,
     ...overrides,
-  };
+  });
 }
 
 const PLAYER_CLASS_4 = {
