@@ -236,6 +236,118 @@ export function renderLoFullScan(
 }
 
 /**
+ * Range-radar scan — projects all in-range ships onto a 30×15 grid at the
+ * requested zoom level. Level is coerced to 1 when out-of-range or non-numeric.
+ *
+ * Formula (GECMDS.C:2510):
+ *   effective_range = scanrange / pow(10.0 - level, 2.0)
+ *
+ * Grid projection (GECMDS.C:2515-2540):
+ *   range_doubled = 2 * effective_range
+ *   xfactor = range_doubled / (MAXX - 1)
+ *   yfactor = range_doubled / (MAXY - 1)
+ *   xf = (other.xcoord - self.xcoord) / xfactor + MAXX / 2.0
+ *   yf = (other.ycoord - self.ycoord) / yfactor + MAXY / 2.0
+ *
+ * @see GECMDS.C:2484 scan_ra
+ * @see GECMDS.C:2510 range = scanrange / pow(10.0 - scan_level, 2.0)
+ */
+export function renderRangeScan(
+  ship: ShipState,
+  level: number,
+  scanRange: number,
+  allShips: ShipState[],
+  scantab: Scantab,
+  mines: MineState[],
+): CommandResult {
+  // GECMDS.C:2510 — effective range in raw units (e.g. scanrange=100000, level=1 → 1234)
+  const effectiveRangeRaw = scanRange / Math.pow(10 - level, 2);
+
+  // S-003: GECMDS.C:2517 — convert raw → sector units before projection.
+  // Without this divide-by-10000, xfactor is in raw-units-per-cell while
+  // target coords are in sector-units → every target collapses to the centre.
+  const effectiveRangeSectors = effectiveRangeRaw / 10000.0;
+
+  const cells: ScanCell[] = [];
+
+  // Project each scantab entry onto the grid
+  const rangeDbl = 2 * effectiveRangeSectors;
+  const xfactor = rangeDbl / (SCAN_GRID_WIDTH - 1);
+  const yfactor = rangeDbl / (SCAN_GRID_HEIGHT - 1);
+
+  // Live mines. Canon's mine loop belongs to scan_ra — this is the zoomable
+  // tactical scan, the only mode with an adjustable range, and therefore the
+  // one a pilot uses to pick a way through a minefield.
+  //
+  //   for (i=0,mptr = mines; i<nummines;++mptr,++i)
+  //       if (mptr->channel != 255) { xf = ...; yf = ...; }
+  //
+  // @see GECMDS.C:2529-2545. Drawn before ships so a contact in the same cell
+  // takes it, matching canon's write order.
+  for (const mine of mines) {
+    if (mine.channel === MINE_SLOT_FREE) continue;
+    const mxf = (mine.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
+    const myf = (mine.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
+    if (mxf >= 0 && mxf < SCAN_GRID_WIDTH && myf >= 0 && myf < SCAN_GRID_HEIGHT) {
+      cells.push({ x: Math.floor(mxf), y: Math.floor(myf), type: 'mine', char: '.' });
+    }
+  }
+
+  for (const entry of scantab) {
+    // Find the ship state for this scantab entry
+    const other = allShips.find(
+      s => `${s.userid}#${s.shipno}` === entry.shipKey,
+    );
+    if (!other) continue;
+
+    const xf = (other.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
+    const yf = (other.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
+
+    if (xf >= 0 && xf < SCAN_GRID_WIDTH && yf >= 0 && yf < SCAN_GRID_HEIGHT) {
+      const colour: ScanCell['colour'] = scanShipColour(other.status);
+      cells.push({
+        x: Math.floor(xf),
+        y: Math.floor(yf),
+        type: 'ship',
+        char: entry.letter,
+        colour,
+      });
+    }
+  }
+
+  // Self-cell at grid centre — GECMDS.C:2550 map[MAXY/2][MAXX/2] = '*'
+  cells.push({
+    x: Math.floor(SCAN_GRID_WIDTH / 2),
+    y: Math.floor(SCAN_GRID_HEIGHT / 2),
+    type: 'self',
+    char: '*',
+    colour: 'self',
+  });
+
+  const xsect = Math.floor(ship.xcoord);
+  const ysect = Math.floor(ship.ycoord);
+  const header = formatMessage(MessageId.SCAN24, Math.round(effectiveRangeRaw), xsect, ysect);
+
+  const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
+
+  return {
+    lines: [{ text: header, category: 'info' }],
+    // GECMDS.C:2571 — `if (waruptr->options[SCANFULL]) printmapfull(); else
+    // printmap();`. SCANFULL is read in scan_ra and NOWHERE else: scan_se
+    // (:2635) and scan_lo (:2723) call printmap() unconditionally. Omitting
+    // the panel entirely, rather than sending an empty one, is what keeps
+    // the option's two states distinguishable to the client.
+    scanRender: {
+      kind: 'ra',
+      mode,
+      cells,
+      header,
+      ...(ship.scanFull ? { sidePanel: buildSidePanel(ship, scantab, allShips) } : {}),
+    },
+  };
+}
+
+/**
  * Sector scan — projects all objects in the player's current 1×1 sector onto a
  * 30×15 grid at high resolution. The grid covers only the current sector
  * (sector-relative coords 0.0..1.0 mapped to 0..29 × 0..14).

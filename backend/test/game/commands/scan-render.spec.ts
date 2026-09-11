@@ -132,4 +132,70 @@ describe('renderSectorScan', () => {
     const mineCells = result.scanRender?.cells.filter((c) => c.type === 'mine');
     expect(mineCells).toHaveLength(1);
   });
+
+  /**
+   * Canon's write order — mines '.' -> wormholes 'W' (ours) -> ships (letter)
+   * -> self '*' -> map_planets() LAST (GECMDS.C:2598-2634, plus the wormhole
+   * insertion this port adds ahead of the self-cell). Each test below
+   * colocates exactly the ADJACENT pair in that order on one grid cell — the
+   * self ship is parked on a DIFFERENT cell (0.5,0.5 -> grid (15,7)) so it
+   * never contaminates a pair that doesn't involve it.
+   *
+   * A reordered `put()` call is exactly the risk this pins: swapping the
+   * ship and wormhole loops, or moving the self-cell write before the ship
+   * loop, changes which glyph a player sees when two objects share a cell,
+   * and no other test in this file (or `scan-se-gateway.spec.ts`) would catch
+   * it, because none of them colocate two draw types on the same cell.
+   */
+  describe('draw-order precedence chain: mine -> wormhole -> ship -> self -> planet', () => {
+    // A colocation cell distinct from the self ship's own (15,7) cell below.
+    const CO_X = 0.02;
+    const CO_Y = 0.02;
+
+    it('a wormhole overwrites a mine on the same cell', () => {
+      const self = makeShip({ xcoord: 0.5, ycoord: 0.5 });
+      const mines: MineState[] = [{ channel: 1, xcoord: CO_X, ycoord: CO_Y } as unknown as MineState];
+      const wormholes = [{ xcoord: CO_X, ycoord: CO_Y, visible: true }];
+      const result = renderSectorScan(self, [self], [], mines, wormholes, []);
+      const cellsAt00 = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
+      expect(cellsAt00).toHaveLength(1);
+      expect(cellsAt00?.[0]).toMatchObject({ type: 'wormhole', char: 'W' });
+    });
+
+    it('a ship overwrites a wormhole on the same cell', () => {
+      const self = makeShip({ userid: 'u1', shipno: 1, xcoord: 0.5, ycoord: 0.5 });
+      const other = makeShip({ userid: 'u2', shipno: 1, xcoord: CO_X, ycoord: CO_Y, status: GESTAT_AUTO });
+      const scantab: Scantab = [
+        { shipKey: 'u2#1', dist: 100, letter: 'A', bearing: 0, heading: 0, speed: 0, flag: 1 },
+      ];
+      const wormholes = [{ xcoord: CO_X, ycoord: CO_Y, visible: true }];
+      const result = renderSectorScan(self, [self, other], scantab, [], wormholes, []);
+      const cellsAt00 = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
+      expect(cellsAt00).toHaveLength(1);
+      expect(cellsAt00?.[0]).toMatchObject({ type: 'ship', char: 'A' });
+    });
+
+    it('the self cell overwrites a ship on the same cell', () => {
+      // The self ship itself sits on the colocation cell here (rather than at
+      // its own separate (15,7) spot), so self and another ship share (0,0).
+      const self = makeShip({ userid: 'u1', shipno: 1, xcoord: CO_X, ycoord: CO_Y });
+      const other = makeShip({ userid: 'u2', shipno: 1, xcoord: CO_X, ycoord: CO_Y, status: GESTAT_AUTO });
+      const scantab: Scantab = [
+        { shipKey: 'u2#1', dist: 100, letter: 'A', bearing: 0, heading: 0, speed: 0, flag: 1 },
+      ];
+      const result = renderSectorScan(self, [self, other], scantab, [], [], []);
+      const cellsAt00 = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
+      expect(cellsAt00).toHaveLength(1);
+      expect(cellsAt00?.[0]).toMatchObject({ type: 'self', char: '*' });
+    });
+
+    it('a planet overwrites the self cell on the same cell', () => {
+      const self = makeShip({ xcoord: CO_X, ycoord: CO_Y });
+      const planet = { xcoord: CO_X, ycoord: CO_Y, plnum: 3 } as unknown as import('@prisma/client').Planet;
+      const result = renderSectorScan(self, [self], [], [], [], [planet]);
+      const cellsAt00 = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
+      expect(cellsAt00).toHaveLength(1);
+      expect(cellsAt00?.[0]).toMatchObject({ type: 'planet', char: '3' });
+    });
+  });
 });
