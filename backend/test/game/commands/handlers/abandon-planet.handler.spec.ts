@@ -4,6 +4,7 @@ import { PlanetStateService } from '../../../../src/game/planet/planet-state.ser
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-management-constants';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 /**
  * `aba` is C's colony-abandonment command (GECMDS.C:3420): in orbit over a
@@ -16,26 +17,16 @@ import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-manag
  * behind the explicit `aba ship`.
  */
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'owner1', shipno: 1, shipname: 'Ranger', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 4.5, ycoord: 2.5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    userid: 'owner1',
+    shipname: 'Ranger',
+    xcoord: 4.5,
+    ycoord: 2.5,
+    energy: 10000,
     where: 11, // orbiting planet 1 in sector (4,2)
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeHandler(
