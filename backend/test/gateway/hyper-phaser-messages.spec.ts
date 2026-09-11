@@ -19,29 +19,21 @@
  * Damage is a damstr WORD in both directions, as canon reports damage
  * everywhere else.
  */
-import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { damstr } from '../../src/game/combat/combat-math';
 import { CombatHitEvent } from '../../src/game/combat/combat-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { makeGateway } from '../helpers/make-gateway';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
 function build() {
   const emits: Emit[] = [];
-  const gateway = new GameGateway(
-    {} as never,                                   // shipStateService
-    {} as never,                                   // commandRouter
-    { getSocketId: () => undefined } as never,     // registry
-    {} as never,                                   // wsAuthGuard
-    {} as never,                                   // prisma
-    {} as never,                                   // onboardingService
-    { lettersFor: () => [] } as never,             // scanHandler — hitText needs it
-    {} as never,                                   // shipClassCache
-    {} as never,                                   // random
-    { emit: jest.fn(), on: jest.fn() } as never,   // events
-    new PresenceService(),
-  );
+  const gateway = makeGateway({
+    registry: { getSocketId: () => undefined } as unknown as ConnectedShipsRegistry,
+    scanHandler: { lettersFor: () => [] } as unknown as ScanHandlerService, // hitText needs it
+  });
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),
     emit: (event: string, payload: unknown) => { emits.push({ rooms, event, payload }); },

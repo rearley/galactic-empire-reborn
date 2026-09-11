@@ -17,16 +17,13 @@
  */
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 describe('GameGateway — KILLEDBY galaxy broadcast', () => {
   const build = () => {
@@ -48,18 +45,13 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
       shipClass: { findFirst: jest.fn() },
     } as unknown as PrismaService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
       prisma,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     // Canon's outwar excludes the victim's own channel (GEMAIN.C:1522), so the
     // double records WHICH room was excluded rather than flattening except()
     // into a plain broadcast — otherwise the test cannot see the exclusion.
@@ -177,18 +169,13 @@ describe('GameGateway — DIED, the killer-less death', () => {
       },
     } as unknown as ShipStateService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      prisma: { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     const excluded: string[] = [];
     (gateway as unknown as { server: unknown }).server = {
       emit: (event: string, payload: unknown) => { globalEmits.push({ event, payload }); },

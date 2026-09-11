@@ -36,6 +36,7 @@ import { PresenceService } from '../../src/public/presence.service';
 import { MAXPLRS, GESTAT_USER, GESTAT_AUTO } from '../../src/game/constants';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Doubles
@@ -209,22 +210,21 @@ function build(opts: HarnessOpts = {}) {
   const registry = new ConnectedShipsRegistry(shipStateService);
   const presence = new PresenceService();
 
-  const gateway = new GameGateway(
+  const gateway = makeGateway({
     shipStateService,
-    { dispatch } as unknown as CommandRouterService,
+    commandRouter: { dispatch } as unknown as CommandRouterService,
     registry,
-    { validate } as unknown as WsAuthGuard,
+    wsAuthGuard: { validate } as unknown as WsAuthGuard,
     prisma,
-    onboarding,
-    { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-    {
+    onboardingService: onboarding,
+    scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+    shipClassCache: {
       getTypeName: (): string => 'Interceptor',
       getMaxTons: (): number => 5000,
     } as unknown as ShipClassCacheService,
-    mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never,
+    random: mockRandom,
     presence,
-  );
+  });
 
   const liveSockets = new Map<string, FakeSocket>();
   (gateway as unknown as { server: unknown }).server = {

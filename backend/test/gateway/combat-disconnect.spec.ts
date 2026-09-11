@@ -18,14 +18,14 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let gateway: GameGateway;
@@ -121,18 +121,17 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockEvents = { emit: eventsEmitMock, on: jest.fn() };
 
-    gateway = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
+    gateway = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
       registry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn(), getMaxTons: jest.fn().mockReturnValue(5000) } as never,
-      mockRandom,
-      mockEvents as never, new PresenceService(),
-    );
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      shipClassCache: { getTypeName: jest.fn(), getMaxTons: jest.fn().mockReturnValue(5000) } as unknown as ShipClassCacheService,
+      random: mockRandom,
+      events: mockEvents as never,
+    });
     (gateway as unknown as { server: unknown }).server = { to: () => ({ emit: () => undefined, except: () => ({ emit: () => undefined }) }), except: () => ({ emit: () => undefined, to: () => ({ emit: () => undefined }) }), emit: serverEmitMock,
       sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
     };

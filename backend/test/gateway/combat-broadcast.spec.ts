@@ -1,13 +1,12 @@
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
-import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -43,18 +42,14 @@ describe('GameGateway combat broadcasts', () => {
     const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService;
-    gateway = new GameGateway(
-      {} as ShipStateService,
-      {} as CommandRouterService,
-      { getSocketId: jest.fn().mockReturnValue(undefined) } as unknown as ConnectedShipsRegistry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    gateway = makeGateway({
+      registry: { getSocketId: jest.fn().mockReturnValue(undefined) } as unknown as ConnectedShipsRegistry,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
     // Inject the mock io Server.
     (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
   });
@@ -164,18 +159,14 @@ describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
       ),
     } as unknown as ConnectedShipsRegistry;
 
-    const gw = new GameGateway(
-      {} as ShipStateService,
-      {} as CommandRouterService,
-      mockRegistry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    const gw = makeGateway({
+      registry: mockRegistry,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
 
     const emitMock2 = jest.fn();
     const toMock2 = jest.fn().mockReturnValue({ emit: emitMock2 });
