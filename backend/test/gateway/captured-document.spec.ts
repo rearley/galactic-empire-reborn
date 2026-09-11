@@ -30,86 +30,93 @@
  * The 20-row cap is canon's, and it is a cap on the LISTING, not a sample: the
  * loop takes planets in table order and stops.
  */
-import { GameGateway } from '../../src/gateway/game.gateway';
+import { DestroyedEmitter, ShipDestroyedService } from '../../src/gateway/ship-destroyed.service';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { Random } from '../../src/game/combat/random.port';
-import { makeGateway } from '../helpers/make-gateway';
 
-interface Emit { rooms: string[]; event: string; payload: unknown }
+interface Emit { room: string; text: string }
 
 function build(planets: Array<{ name: string; xsect: number; ysect: number; plnum: number }>, roll: number) {
   const emits: Emit[] = [];
   const findMany = jest.fn().mockResolvedValue(planets);
-  const chain = (rooms: string[]) => ({
-    to: (r: string) => chain([...rooms, r]),
-    emit: (event: string, payload: unknown) => { emits.push({ rooms, event, payload }); },
-  });
-  const gateway = makeGateway({
-    prisma: { planet: { findMany } } as unknown as PrismaService,
-    random: { next: () => roll } as unknown as Random,
-  });
-  (gateway as unknown as { server: unknown }).server = { to: (r: string) => chain([r]) };
-  return { gateway, emits, findMany };
+  const emit: DestroyedEmitter = {
+    toRoom: (room, _category, text) => { emits.push({ room, text }); },
+    toAllExcept: () => {},
+    announceDestroyed: () => {},
+    recoverVictim: () => Promise.resolve(),
+  };
+  const service = new ShipDestroyedService(
+    { planet: { findMany } } as unknown as PrismaService,
+    {} as unknown as ShipStateService,
+    {} as unknown as ScanHandlerService,
+    {} as unknown as ShipClassCacheService,
+    { next: () => roll } as unknown as Random,
+  );
+  return { service, emit, emits, findMany };
 }
 
-const reveal = (g: GameGateway, victimUserid: string, killerUserid: string) =>
-  (g as unknown as {
-    revealCapturedDocument: (v: string, k: string) => Promise<void>;
-  }).revealCapturedDocument(victimUserid, killerUserid);
+const reveal = (
+  h: { service: ShipDestroyedService; emit: DestroyedEmitter },
+  victimUserid: string,
+  killerUserid: string,
+) => h.service.revealCapturedDocument(victimUserid, killerUserid, h.emit);
 
 const colony = (n: number) => ({ name: `Colony ${n}`, xsect: n, ysect: -n, plnum: 1 });
 
 describe('captured documents (GEFUNCS.C:1227)', () => {
   it('lists the VICTIM\'s planets to the killer, one in six', async () => {
-    const { gateway, emits } = build([colony(1), colony(2)], 0);
+    const h = build([colony(1), colony(2)], 0);
 
-    await reveal(gateway, 'usr_victim', 'usr_killer');
+    await reveal(h, 'usr_victim', 'usr_killer');
 
-    expect(emits[0].rooms).toEqual(['user:usr_killer']);
-    expect((emits[0].payload as { text: string }).text)
+    expect(h.emits[0].room).toBe('user:usr_killer');
+    expect(h.emits[0].text)
       .toBe(formatMessage(MessageId.CAPTURED_DOC));
-    expect(emits.map((e) => (e.payload as { text: string }).text).join('\n'))
+    expect(h.emits.map((e) => e.text).join('\n'))
       .toContain('Colony 2');
   });
 
   it('says nothing on the other five kills in six', async () => {
-    const { gateway, emits, findMany } = build([colony(1)], 0.5);
+    const h = build([colony(1)], 0.5);
 
-    await reveal(gateway, 'usr_victim', 'usr_killer');
+    await reveal(h, 'usr_victim', 'usr_killer');
 
-    expect(emits).toHaveLength(0);
+    expect(h.emits).toHaveLength(0);
     // and does not even ask the database
-    expect(findMany).not.toHaveBeenCalled();
+    expect(h.findMany).not.toHaveBeenCalled();
   });
 
   it('says nothing when the victim owns no planets', async () => {
-    const { gateway, emits } = build([], 0);
+    const h = build([], 0);
 
-    await reveal(gateway, 'usr_victim', 'usr_killer');
+    await reveal(h, 'usr_victim', 'usr_killer');
 
-    expect(emits).toHaveLength(0);
+    expect(h.emits).toHaveLength(0);
   });
 
   it('caps the listing at canon 20 rows', async () => {
     const many = Array.from({ length: 40 }, (_, i) => colony(i + 1));
-    const { gateway, emits, findMany } = build(many.slice(0, 20), 0);
+    const h = build(many.slice(0, 20), 0);
 
-    await reveal(gateway, 'usr_victim', 'usr_killer');
+    await reveal(h, 'usr_victim', 'usr_killer');
 
-    expect(findMany.mock.calls[0][0]).toMatchObject({ take: 20 });
+    expect(h.findMany.mock.calls[0][0]).toMatchObject({ take: 20 });
     // one CAPTDOC header plus at most 20 rows
-    expect(emits.length).toBeLessThanOrEqual(21);
+    expect(h.emits.length).toBeLessThanOrEqual(21);
   });
 
   it('does nothing at all when there is no killer to hand it to', async () => {
     // An AI or environmental kill: canon's `who` is the firing channel, and a
     // gravity crash sets none. @see GEFUNCS.C:1105
-    const { gateway, emits, findMany } = build([colony(1)], 0);
+    const h = build([colony(1)], 0);
 
-    await reveal(gateway, 'usr_victim', '');
+    await reveal(h, 'usr_victim', '');
 
-    expect(emits).toHaveLength(0);
-    expect(findMany).not.toHaveBeenCalled();
+    expect(h.emits).toHaveLength(0);
+    expect(h.findMany).not.toHaveBeenCalled();
   });
 });

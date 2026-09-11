@@ -33,14 +33,16 @@ import { ShipOverspeedEvent } from '../../src/game/ship/overspeed-events';
  * onboarding joins by `onboarding-room-join.spec.ts` — none of that is repeated.
  *
  * Deliberately NOT covered here, with reasons (see docs/TEST_STRATEGY.md):
- *   - `shipLossManifest`'s `Number.isFinite(shipno)` guard (game.gateway.ts:1276)
- *     and `shipNameOf`'s copy (:1317), and `handleOf`'s `idx < 0` guard (:1494).
+ *   - `shipLossManifest`'s `Number.isFinite(shipno)` guard
+ *     (ship-destroyed.service.ts) and `shipNameOf`'s copy of it, and
+ *     `handleOf`'s `idx < 0` guard (both ship-identity.ts).
  *     Both arms of each converge on the same observable output — with the guard
  *     removed the lookup is simply a miss and returns undefined/null anyway — so
  *     no assertion can distinguish them. A test that cannot fail is not a test.
- *   - `handleCombatHit`'s `if (victimSocketId)` (:1387) for the same reason:
- *     with the guard gone the socket lookup misses and nothing is emitted. The
- *     INNER guard (:1389) is the one that changes behaviour, and it is covered.
+ *   - `handleCombatHit`'s outer `if (victimSocketId)` (game.gateway.ts) for the
+ *     same reason: with the guard gone the socket lookup misses and nothing is
+ *     emitted. The INNER guard is the one that changes behaviour, and it is
+ *     covered.
  */
 
 type ShipRow = {
@@ -695,8 +697,9 @@ describe('GameGateway — routing a per-captain notice', () => {
 
 describe('GameGateway — KILLEDBY names the killer by their handle', () => {
   /**
-   * `handleOf` — game.gateway.ts:1491-1497, called at :1697 for the KILLEDBY
-   * label. Canon's `username()` names a player by their HANDLE (GEFUNCS.C:2596);
+   * `handleOf` — ship-identity.ts, called by `ShipDestroyedService.handle` for
+   * the KILLEDBY label. Canon's `username()` names a player by their HANDLE
+   * (GEFUNCS.C:2596);
    * ours caches it on ShipState. Without the lookup the galaxy-wide kill notice
    * reads "destroyed by usr_27523ed6401c4e990dd98be2" — the internal account key
    * `username()` exists to hide, and the name nobody can act on.
