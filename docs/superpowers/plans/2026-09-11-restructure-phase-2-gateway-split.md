@@ -885,6 +885,32 @@ the disconnect combat-kill. It also holds the bug class that produced the
 - Produces: `class ConnectionLifecycleService` with `onConnect(client: GameSocket): Promise<void>`
   and `onDisconnect(client: GameSocket): Promise<void>`.
 
+**Debt this task inherits and must collapse (added 2026-09-11 from Task 4's review):**
+
+Task 4 left `DestroyedEmitter` with 7 members where the plan specified 3. Five are
+correct and stay. The other items below exist only because the connection-lifecycle
+region was still on the gateway when Task 4 ran — this task is what makes them
+removable, and removing them is in scope here:
+
+- **`recoverVictim` and `takeIonAttacker`** reach gateway-resident state
+  (`presentShipEntry`, `lastIonAttacker`). Once that state lives in this service,
+  both seams collapse.
+- **`warn` and `error`** exist solely because `combat-death-delete.spec.ts:174` spies
+  and `ship-loss-forensics.spec.ts:52,:126` assign on the GATEWAY's logger. Replace
+  them with a service-owned `private readonly logger = new Logger(ShipDestroyedService.name)`
+  and update those two specs **in the same commit** — editing them is in scope here,
+  where it was forbidden in Task 4.
+- **The `revealCapturedDocument` delegate** at `game.gateway.ts` has zero production
+  callers and is kept alive only by `captured-document.spec.ts` calling the 2-arg entry
+  point. Delete it when that spec is migrated to drive the service directly.
+- **Stale line-number citations** in `gateway-command-branches.spec.ts:36-37,:698` point
+  at `shipLossManifest`, `shipNameOf` and `handleOf`, all of which now live in other
+  files. Sweep them.
+- **`backend/src/gateway/broadcast-dispatch.ts`** imports `BroadcastTarget` and
+  `GameServer` back from `game.gateway.ts`. Type-only, so it erases and there is no
+  runtime cycle — but this task is the second consumer of those types, which is the
+  point at which a shared `backend/src/gateway/types.ts` pays for itself. Move them.
+
 - [ ] **Step 1: Read the region and name every side effect**
 
 ```bash
