@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Wormhole } from '@prisma/client';
+import type { Wormhole } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**

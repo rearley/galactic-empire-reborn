@@ -1,8 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../src/prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { makePrismaClient } from '../helpers/make-prisma-client';
 
-const prisma = new PrismaClient({ datasources: { db: { url: process.env.TEST_DATABASE_URL } } });
+const prisma = makePrismaClient(process.env.TEST_DATABASE_URL);
 
 /** Sentinel used to force a transaction rollback after assertions. */
 class Rollback extends Error {}

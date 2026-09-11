@@ -8,7 +8,7 @@
  * @see specs/009-midnight-job/research.md D5 (date keying)
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../prisma/client';
 
 export interface MidnightCounters {
   usersUpdated: number;

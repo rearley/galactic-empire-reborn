@@ -22,9 +22,21 @@ RUN npm run build --workspace=@ge/wire
 
 WORKDIR /app/backend
 
-# Generate Prisma client
+# Generate Prisma client.
+#
+# prisma.config.ts comes too: Prisma 7 reads the schema path and the migration
+# connection from it, not from package.json, and it sits beside prisma/ rather
+# than inside it.
+#
+# DATABASE_URL is a placeholder scoped to this one RUN line. `prisma generate`
+# never opens a connection — it reads the schema and writes TypeScript — but the
+# config resolves the variable eagerly and fails loudly when it is unset, which
+# is the behaviour wanted everywhere else. The real URL arrives in the
+# environment at container start; nothing here is baked into the image.
 COPY backend/prisma ./prisma
-RUN npx prisma generate
+COPY backend/prisma.config.ts ./prisma.config.ts
+RUN DATABASE_URL="postgresql://generate-only:generate-only@127.0.0.1:1/generate-only" \
+    npx prisma generate
 
 # Build the NestJS application
 COPY backend/tsconfig*.json backend/nest-cli.json ./
@@ -40,11 +52,17 @@ RUN apk add --no-cache postgresql-client openssl
 WORKDIR /app/backend
 
 # Copy compiled output, all node_modules (ts-node needed for prisma db seed), prisma artifacts
-# --chown=node:node, not a later `chown -R`: Prisma checks that it can WRITE to
-# node_modules/@prisma/engines before it will run, so a non-root container
-# with root-owned node_modules fails `migrate deploy` outright — the entrypoint
-# is `set -e`, so that is a container that exits instead of a game that starts.
-# Caught by booting the image, not by reading it.
+# --chown=node:node, not a later `chown -R`. This began as a Prisma 5 constraint:
+# the engine checked that it could WRITE to node_modules/@prisma/engines before
+# it would run, so a non-root container with root-owned node_modules failed
+# `migrate deploy` outright — and the entrypoint is `set -e`, so that was a
+# container that exits instead of a game that starts. Caught by booting the
+# image, not by reading it.
+#
+# Prisma 7 is Rust-free and ships no engine binaries, so THAT specific check is
+# gone. The ownership stays: `node` still has to read node_modules, and the CLI
+# still writes under it. Kept deliberately rather than dropped on the grounds
+# that the original reason expired.
 #
 # node_modules is hoisted to the workspace root by `npm ci`, and node's module
 # resolution walks up from /app/backend looking for node_modules, so it is
@@ -60,6 +78,10 @@ COPY --from=builder --chown=node:node /app/packages/wire /app/packages/wire
 RUN ln -s /app/node_modules /app/backend/node_modules
 COPY --from=builder --chown=node:node /app/backend/dist ./dist
 COPY --from=builder --chown=node:node /app/backend/prisma ./prisma
+# The entrypoint runs `prisma migrate deploy`, and Prisma 7 finds the schema and
+# the migration connection through this file. Without it the CLI reports no
+# schema and the container exits before the game starts.
+COPY --from=builder --chown=node:node /app/backend/prisma.config.ts ./prisma.config.ts
 # The sysop tuning file. The entrypoint runs dist/src/main from /app/backend,
 # so the resolver looks for /app/backend/config/game.config.json. Omitting this
 # does not fail: a missing file legitimately falls back to canon defaults,

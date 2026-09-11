@@ -11,7 +11,7 @@
  * @see backend/src/game/ship/ship-state.mappers.ts prismaShipToState
  */
 import { prismaShipToState } from '../../src/game/ship/ship-state.mappers';
-import type { Ship } from '@prisma/client';
+import type { Ship } from '../../src/prisma/client';
 
 function makeRow(): Ship {
   // Minimal row — only fields exercised by the mapper.

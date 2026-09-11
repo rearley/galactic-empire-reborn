@@ -1,6 +1,7 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../../src/prisma/client';
 import { stateToPrismaUpdate } from '../../../src/game/ship/ship-state.mappers';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { schemaModel } from '../../helpers/schema-model';
 
 /**
  * `stateToPrismaUpdate` destructures the in-memory-only fields off ShipState and
@@ -13,7 +14,7 @@ import type { ShipState } from '../../../src/game/ship/ship-state.types';
  * position had never reached the database.
  */
 describe('stateToPrismaUpdate — every key must be a real Ship column', () => {
-  const shipModel = Prisma.dmmf.datamodel.models.find((m) => m.name === 'Ship');
+  const shipModel = schemaModel('Ship');
 
   it('finds the Ship model in the Prisma schema', () => {
     expect(shipModel).toBeDefined();

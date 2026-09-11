@@ -29,7 +29,7 @@ import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { MAX_SOCKETS_PER_USER } from '../../src/gateway/socket-cap';
 import { MAXPLRS, GESTAT_USER } from '../../src/game/constants';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
-import type { Ship } from '@prisma/client';
+import type { Ship } from '../../src/prisma/client';
 import type { GameSocket } from '../../src/gateway/types';
 import type { Mock } from 'vitest';
 

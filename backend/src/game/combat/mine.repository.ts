@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { Mine } from '@prisma/client';
+import { Mine } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MineRegistry } from './mine.registry';
 import { USERMINES } from '../constants';

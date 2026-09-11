@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Planet, Prisma, Wormhole, GalaxyMeta } from '@prisma/client';
+import { Planet, Prisma, Wormhole, GalaxyMeta } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WormholeRepository } from './wormhole.repository';
 import { UNIVMAX, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constants';

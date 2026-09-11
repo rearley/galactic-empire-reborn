@@ -10,7 +10,7 @@
  * @see GE/REL/MBMGEMSG.MSG:4079-4176
  */
 
-import { MailStat } from '@prisma/client';
+import { MailStat } from '../../src/prisma/client';
 import { MailInboxService } from '../../src/game/mail/mail-inbox.service';
 import { MailInboxRepository } from '../../src/game/mail/mail-inbox.repository';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';

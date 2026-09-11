@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { WormholeRepository } from '../../src/game/galaxy/wormhole.repository';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { Planet } from '@prisma/client';
+import { Planet } from '../../src/prisma/client';
 import { S00, S00_PLNUM } from '../../src/game/galaxy/s00';
 
 // ── Minimal Planet factory ────────────────────────────────────────────────────

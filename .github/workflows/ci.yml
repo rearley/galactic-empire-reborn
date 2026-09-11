@@ -145,12 +145,20 @@ jobs:
         working-directory: backend
         run: npm run build --workspace @ge/wire
 
+      # DATABASE_URL is scoped to this step and is a placeholder. `prisma
+      # generate` never opens a connection — it reads the schema and writes
+      # TypeScript — but prisma.config.ts resolves the variable eagerly and
+      # fails loudly when it is unset, which is the behaviour wanted everywhere
+      # else. The suite connects through TEST_DATABASE_URL in the job env above.
       - name: Generate Prisma client
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql://generate-only:generate-only@127.0.0.1:1/generate-only
         run: npx prisma generate
 
-      # Jest transpiles per file and does not type-check the project as a whole,
-      # so a type error in code no test imports would otherwise reach master.
+      # Vitest transpiles per file and does not type-check the project as a
+      # whole, so a type error in code no test imports would otherwise reach
+      # master.
       - name: Type-check
         working-directory: backend
         run: npx tsc --noEmit

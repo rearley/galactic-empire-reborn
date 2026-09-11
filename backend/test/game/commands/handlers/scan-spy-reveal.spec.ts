@@ -63,7 +63,7 @@ function makePrismaPlanet(xsect = 10, ysect = 7) {
     userid: 'bob', name: 'Recon Base',
     enviorn: 0, resource: 2,
     visible: 1,
-  } as unknown as import('@prisma/client').Planet;
+  } as unknown as import('../../../../src/prisma/client').Planet;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import type { Ship } from '@prisma/client';
+import type { Ship } from '../prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';

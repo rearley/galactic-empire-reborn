@@ -29,7 +29,7 @@ import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
-import { Planet, Wormhole } from '@prisma/client';
+import { Planet, Wormhole } from '../../src/prisma/client';
 import { makeShip as buildShip } from '../helpers/make-ship';
 
 // ── helpers ───────────────────────────────────────────────────────────────────

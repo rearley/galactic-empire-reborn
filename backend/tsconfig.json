@@ -7,6 +7,7 @@
     "target": "ES2022",
     "module": "commonjs",
     "moduleResolution": "bundler",
+    "rewriteRelativeImportExtensions": true,
     "types": [
       "vitest/globals",
       "node"
