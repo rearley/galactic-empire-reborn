@@ -13,7 +13,8 @@ export interface OnboardingGrant {
 }
 
 /**
- * Every read and write of the `User` row that gameplay performs.
+ * The `User` row as gameplay reads and writes it — commands, ticks, the socket
+ * layer and the public board.
  *
  * The `User` table is canon's `WARUSR` (GEMAIN.H) — the per-captain record that
  * outlives any one hull: cash, score, kills, planet count, team membership and
@@ -21,10 +22,37 @@ export interface OnboardingGrant {
  * and written directly, so every statement that touches it is here rather than
  * scattered across twenty-odd call sites.
  *
+ * It is NOT the only place the table is touched, and a reader should grep
+ * rather than trust this sentence. Four other files hold `prisma.user.*`
+ * legitimately, and `test/invariants/user-repository-boundary.spec.ts` is the
+ * list that must stay true:
+ *
+ *  - `cybertron/cybertron.repository.ts` — Cybertron hydration with
+ *    `include: { ships: true }` and the `CYB_MAXCASH` clamp. Its
+ *    `flushUsersImmediate` writes REAL players' cash too, not only AI rows.
+ *  - `team/team.repository.ts` — the `groupBy` that counts live members.
+ *  - `player/player-score.repository.ts` — `rospos`, for the midnight job.
+ *  - `auth/auth.service.ts` — account lifecycle: register, login, username.
+ *
  * Each method issues exactly the statement the call site it replaced issued —
  * same `where`, same `select`, same verb. Two methods differ only in `update`
  * vs `updateMany` (`incrementPlanets` / `incrementPlanetsIfPresent`) and that is
  * deliberate: the callers differ in whether a missing row is an error.
+ *
+ * ## This class must stay stateless and constructible from `(prisma)` alone
+ *
+ * Eleven classes that still hold `PrismaService` for other models take this
+ * repository as an `@Optional()` constructor parameter defaulting to
+ * `new UserRepository(prisma)`. That is only safe while a second instance is
+ * indistinguishable from the shared one: no fields beyond `prisma`, no cache,
+ * no counters, no second constructor parameter.
+ *
+ * Add a memoised roster or a `Logger` parameter and it breaks silently — Nest's
+ * singleton gets the new behaviour, the eleven inline defaults construct their
+ * own object and do not. Nothing fails to boot and no test goes red; `ros`
+ * simply serves a stale board from some call sites and a fresh one from others.
+ * If this class ever needs state, the eleven defaults must become required
+ * injected parameters in the same commit.
  */
 @Injectable()
 export class UserRepository {

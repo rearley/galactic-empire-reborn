@@ -337,5 +337,22 @@ describe('UserRepository', () => {
         data: { cash: 1000n, noships: 1, topshipno: 1 },
       });
     });
+
+    it('writes no cash key at all on the empty-fleet rebuild', async () => {
+      // The branch that matters: a captain who has owned a hull before gets a
+      // free replacement without the bank being touched. If `cash` leaked into
+      // the write as a default, a returning bankrupt captain would be topped
+      // back up to the stipend — and a banked balance wiped down to it.
+      // @see onboarding-cash.ts
+      const update = jest.fn().mockResolvedValue({});
+      const repo = makeRepo({ update });
+
+      await repo.applyOnboardingGrant('usr_a', { noships: 1, topshipno: 6 });
+      expect(update).toHaveBeenCalledWith({
+        where: { userid: 'usr_a' },
+        data: { noships: 1, topshipno: 6 },
+      });
+      expect(update.mock.calls[0][0].data).not.toHaveProperty('cash');
+    });
   });
 });

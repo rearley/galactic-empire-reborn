@@ -71,7 +71,9 @@ export class SysHandlerService {
      * `new SysHandlerService(...)` sites keep compiling — and keep asserting
      * on the very same `prisma.user.*` calls, which is what proves the queries
      * did not change when they moved behind it. Nest injects the shared
-     * provider in production. Same pattern as `ShipStateService.channels`.
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
