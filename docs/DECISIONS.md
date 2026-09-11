@@ -5540,6 +5540,16 @@ now-retired pattern. Task 5's ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`)
 removed every live call. Grepping for `forwardRef(` — the call, not the word —
 is the correct check and gives 3 → 0.
 
+**CORRECTION 2026-09-11 (final branch review).** "3 actual `forwardRef(`
+calls" is itself a miscount of lines, not calls — the same wrong-unit error
+this entry flags in the `raw string forwardRef` row just above. At `8af4ed2`,
+`planet.module.ts:29` carries **two** calls on one line —
+`forwardRef(() => ShipModule), forwardRef(() => TickModule)` — plus one each
+in `ship.module.ts:25` and `tick.module.ts:9`. That is **4 calls on 3 lines**,
+not 3 calls. The corrected row is `forwardRef(` actual calls | 4 | 0. There
+were two distinct cycles retired, both by Task 5's ports: `ship ↔ planet`,
+and `planet → tick → ship`.
+
 **Repository map** (files under `backend/src/`, by when they were introduced):
 
 Pre-existing (before `8af4ed2`): `combat/mine.repository.ts`,
@@ -5578,6 +5588,28 @@ this phase's design, not noise — Task 3 alone (the ship-class cache) added
 32 in one commit. **Phase 5 leans on the same "narrow the seam, casts go
 away" reasoning for its Prisma/ESM migration risk assessment; that
 assessment should account for this finding, not assume it away.**
+
+**CORRECTION 2026-09-11 (final branch review).** The mechanism claimed above
+is wrong; line-level attribution of every added cast says the opposite of
+"narrowing a dependency to a port... harder to satisfy structurally." Task 3
+added 32 casts, 30 of them literally `new ShipClassCacheService({} as
+never)` — the cast is on the test's fake `PrismaService` **constructor
+argument**, a concrete class the spec instantiates for real; the narrowed
+seam itself is satisfied exactly, with no cast. Task 4 added 8: `new
+WormholeRepository(... as never)`, `new ShipRepository(... as never)`, and
+`{ existsInSector: async () => false } as never` — that last one needs its
+cast **precisely because** the parameter is typed as a concrete class
+(`WormholeRepository`) rather than a port; a narrow interface there would
+have accepted the object literal with no cast at all. Task 5 is the only
+task that introduced real ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`) and
+it added **zero** (551 → 551, verified at `602e725` and `6fa0c30`). So casts
+track **concrete-class dependencies**, and ports were **cast-neutral**. The
+honest statement: `as never` rose because Tasks 3 and 4 made specs
+instantiate concrete services and repositories and stub their own Prisma
+dependency; the one task that introduced real ports added none. Phase 5's
+risk assessment should read this finding as *support* for narrowing seams to
+ports, not evidence against it. The per-commit table above is unaffected and
+stands as measured.
 
 **Caveat — `ShipRepository` is a beachhead, not a boundary.** Of 15 live
 `this.prisma.ship.*` call sites in `backend/src/`, `ShipRepository` covers 2

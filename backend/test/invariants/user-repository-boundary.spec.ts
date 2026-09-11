@@ -64,6 +64,10 @@ function walk(dir: string, out: string[] = []): string[] {
 function callsUserDelegate(text: string): boolean {
   return text
     .split('\n')
+    // Whole-line comments only: a trailing `// comment` on a code line (e.g.
+    // `someCall(); // see this.prisma.user.update(...)`) is NOT stripped and
+    // would false-positive this guard. Fails loud and in the safe direction,
+    // which is the right trade for a grep guard — left as-is, documented here.
     .map((line) => line.replace(/^\s*(\*|\/\/).*$/, '')) // drop comment lines
     .some((line) => /\bprisma\.user\.[a-zA-Z]/.test(line));
 }
