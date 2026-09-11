@@ -74,6 +74,33 @@ export class TeamRepository {
   }
 
   /**
+   * A teamcode rendered as a name — `tea` (show-current-team) and `dat` both
+   * issued this exact `findFirst`, one duplicated statement at two call
+   * sites. Scaffolded here from that duplication; the two handlers were left
+   * calling Prisma directly, since repointing them was outside this task's
+   * file list. @see GECMDS.C cmd_team, GECMDS.C cmd_data
+   */
+  async findNameByCode(teamcode: bigint): Promise<{ teamname: string } | null> {
+    return this.prisma.team.findFirst({
+      where: { teamcode },
+      select: { teamname: true },
+    });
+  }
+
+  /**
+   * The same lookup as `findNameByCode`, but on the primary key: `rep acc`
+   * looked a captain's team up with `findUnique` rather than `findFirst`, a
+   * different verb kept distinct rather than merged into one method.
+   * @see GECMDS.C cmd_report REP31A
+   */
+  async getName(teamcode: bigint): Promise<{ teamname: string } | null> {
+    return this.prisma.team.findUnique({
+      where: { teamcode },
+      select: { teamname: true },
+    });
+  }
+
+  /**
    * How many teams exist, for canon's MAXTEAMS gate.
    *
    * Canon walks `teamtab` and stops at the first zero teamcode, so it counts

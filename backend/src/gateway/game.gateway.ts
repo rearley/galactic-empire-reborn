@@ -83,7 +83,7 @@ import { planTransition, MoverEmit, RoomEmit } from './sector-transition';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT } from './events/beacon.event';
-import { PrismaService } from '../prisma/prisma.service';
+import { ShipRepository } from '../game/ship/ship.repository';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
 import {
   CloakCollapsedPayload,
@@ -230,7 +230,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly shipStateService: ShipStateService,
     private readonly commandRouter: CommandRouterService,
     private readonly registry: ConnectedShipsRegistry,
-    private readonly prisma: PrismaService,
+    private readonly shipRepository: ShipRepository,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
     private readonly shipClassCache: ShipClassCacheService,
@@ -562,7 +562,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const target = Array.isArray(meta?.target) ? meta.target.join(',') : String(meta?.target ?? '');
           if (target.includes('userid') || target.includes('Ship_userid_key')) {
             // Race: this user won another concurrent finalize → treat as returning player
-            const ship = await this.prisma.ship.findFirst({ where: { userid } });
+            const ship = await this.shipRepository.findFirstForUser(userid);
             if (ship) {
               const shipId = shipKey(userid, ship.shipno);
               this.registry.upsert(shipId, client.id);
@@ -626,7 +626,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (isValidIndex) {
       const chosen = pending[indexNum - 1];
       // Reload from DB to ensure the hull row still exists (could have been destroyed mid-select).
-      const shipRow = await this.prisma.ship.findFirst({ where: { userid, shipno: chosen.shipno } });
+      const shipRow = await this.shipRepository.findHull(userid, chosen.shipno);
       if (shipRow) {
         await this.boardShipAndWelcome(client, userid, shipRow);
         client.data.pendingShipSelect = undefined;

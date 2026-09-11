@@ -4,6 +4,7 @@ import { ShipStateService } from './ship-state.service';
 import { ShipChannelRegistry } from './ship-channel.registry';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
+import { ShipRepository } from './ship.repository';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PlayerModule } from '../player/player.module';
 import { PlanetModule } from '../planet/planet.module';
@@ -26,7 +27,7 @@ const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
     forwardRef(() => PlanetModule),
   ],
   controllers: [...devOnlyControllers],
-  providers: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
-  exports: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
+  providers: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService, ShipRepository],
+  exports: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService, ShipRepository],
 })
 export class ShipModule {}
