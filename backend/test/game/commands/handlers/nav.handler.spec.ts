@@ -45,10 +45,37 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
 // Status form — nav with no args
 // ---------------------------------------------------------------------------
 
-// EMPTY SUITE. It named a behaviour and asserted nothing, which under Jest
-// reported as a passing suite. `describe.todo` keeps the name in the report as
-// a declared gap instead of as coverage that does not exist. @see issue #32
-describe.todo('NavHandlerService — status form (no args)');
+/**
+ * There is no status form, and that is the point worth pinning.
+ *
+ * `nav` declares `minArgs: 0`, which reads like a bare form exists; canon's
+ * `cmd_navigate` validates the argument count and returns NAVFMT, because there
+ * is no autopilot in the original to report the status of (GECMDS.C:5109-5157).
+ * The suite that used to stand here named this behaviour and asserted nothing,
+ * which Jest reported as a passing suite. @see issue #32
+ */
+describe('NavHandlerService — status form (no args)', () => {
+  it('answers NAVFMT rather than a status line', () => {
+    const { handler, state, ctx } = makeService();
+    const result = handler.command.handler(state, [], ctx);
+    expect(result.lines).toEqual([
+      { text: formatMessage(MessageId.NAVFMT), category: 'system' },
+    ]);
+  });
+
+  it('carries NAVFMT as its own argMissingMessage, so the router says the same thing', () => {
+    const { handler } = makeService();
+    expect(handler.command.argMissingMessage).toBe(formatMessage(MessageId.NAVFMT));
+  });
+
+  it('changes nothing about the ship — a rejected nav is not a manoeuvre', () => {
+    const { handler, state, ctx, mockShipState } = makeService({ heading: 90, where: 3 });
+    handler.command.handler(state, [], ctx);
+    expect(mockShipState.mutate).not.toHaveBeenCalled();
+    expect(state.heading).toBe(90);
+    expect(state.where).toBe(3);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // NAVFMT rejection cases
@@ -254,10 +281,53 @@ describe('NavHandlerService — nav never breaks orbit', () => {
  * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
  * arithmetic was right both times; nothing told the pilot why.
  *
- * EMPTY SUITE — the explanation above was written and the assertions never
- * were. Kept as `describe.todo` so the report names the gap. @see issue #32
+ * The assertions were never written; they are below now. @see issue #32
+ *
+ * What they pin is that the number is heading-relative, which is canon and is
+ * the whole explanation: the bearing shrinks to 0 as the hull comes onto
+ * course, from the same position, with no rotate issued. NAV01's text is
+ * canon verbatim ("Sector %d %d is bearing %d, distance %s.") and does not get
+ * a sentence added to it; the port's own help carries the explanation instead.
  */
-describe.todo('NavHandlerService — explains the shrinking bearing');
+describe('NavHandlerService — explains the shrinking bearing', () => {
+  /** The bearing NAV01 printed, parsed back out of the canon sentence. */
+  function bearingOf(ship: ShipState, handler: NavHandlerService, ctx: CommandContext): number {
+    const text = handler.command.handler(ship, ['0', '0'], ctx).lines[0].text;
+    const m = /bearing (-?\d+)/.exec(text);
+    expect(m).not.toBeNull();
+    return Number(m![1]);
+  }
+
+  it('reports a different bearing from the same spot once the hull turns', () => {
+    const { handler, ctx } = makeService();
+    const standingStart = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
+    const onCourse = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
+
+    const before = bearingOf(standingStart, handler, ctx);
+    expect(before).not.toBe(0);
+
+    // The physics tick steers head2b onto course; nothing else moved.
+    onCourse.heading = (onCourse.heading + before + 360) % 360;
+    expect(bearingOf(onCourse, handler, ctx)).toBe(0);
+  });
+
+  it('is zero exactly when the hull already points at the target', () => {
+    const { handler, ctx } = makeService();
+    // (0.5, 0.5) from (5.5, 5.5) is astern-left; heading 0 is y-decreasing.
+    const ship = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
+    const bearing = bearingOf(ship, handler, ctx);
+    const aimed = makeShip({ xcoord: 5, ycoord: 5, heading: bearing });
+    expect(bearingOf(aimed, handler, ctx)).toBe(0);
+  });
+
+  it('the distance does NOT move when only the heading does', () => {
+    const { handler, ctx } = makeService();
+    const a = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 0 }), ['0', '0'], ctx);
+    const b = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 137 }), ['0', '0'], ctx);
+    const dist = (r: typeof a) => /distance (\S+)\./.exec(r.lines[0].text)![1];
+    expect(dist(a)).toBe(dist(b));
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Keyword and aliases
