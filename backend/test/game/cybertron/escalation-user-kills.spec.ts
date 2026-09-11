@@ -63,7 +63,7 @@ describe('userKills is hydrated everywhere teamcode is', () => {
 
   it.each([
     ['src/game/ship/ship-state.service.ts', 'boot hydration'],
-    ['src/gateway/game.gateway.ts', 'boarding a ship'],
+    ['src/gateway/connection-lifecycle.service.ts', 'boarding a ship'],
   ])('%s populates it (%s)', (path) => {
     const text = src(path);
     // Wherever the User row is read for teamcode, kills must come with it.

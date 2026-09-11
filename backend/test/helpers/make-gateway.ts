@@ -27,6 +27,7 @@ import { Random } from '../../src/game/combat/random.port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PresenceService } from '../../src/public/presence.service';
 import { ShipDestroyedService } from '../../src/gateway/ship-destroyed.service';
+import { ConnectionLifecycleService } from '../../src/gateway/connection-lifecycle.service';
 
 export interface GatewayDeps {
   shipStateService: ShipStateService;
@@ -41,6 +42,7 @@ export interface GatewayDeps {
   events: EventEmitter2;
   presence: PresenceService;
   shipDestroyed: ShipDestroyedService;
+  connectionLifecycle: ConnectionLifecycleService;
 }
 
 export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
@@ -56,7 +58,7 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
       size: jest.fn(() => 0),
     } as unknown as ShipStateService);
 
-  const flat: Omit<GatewayDeps, 'shipDestroyed'> = {
+  const flat: Omit<GatewayDeps, 'shipDestroyed' | 'connectionLifecycle'> = {
     shipStateService,
     commandRouter: { dispatch: jest.fn() } as unknown as CommandRouterService,
     registry: new ConnectedShipsRegistry(shipStateService),
@@ -90,6 +92,24 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
         flat.shipClassCache,
         flat.random,
       ),
+    // Inert for the same reason `shipDestroyed` is not: the connect and
+    // disconnect specs drive the gateway's OnGatewayConnection hooks and assert
+    // on what happens behind them — the seat cap, the boarding, the rage-quit
+    // kill. A double that did nothing would turn every one of them green
+    // without exercising a line of it.
+    connectionLifecycle:
+      overrides.connectionLifecycle ??
+      new ConnectionLifecycleService(
+        flat.shipStateService,
+        flat.registry,
+        flat.wsAuthGuard,
+        flat.prisma,
+        flat.scanHandler,
+        flat.shipClassCache,
+        flat.random,
+        flat.events,
+        flat.presence,
+      ),
   };
 
   return new GameGateway(
@@ -105,5 +125,6 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     deps.events,
     deps.presence,
     deps.shipDestroyed,
+    deps.connectionLifecycle,
   );
 }
