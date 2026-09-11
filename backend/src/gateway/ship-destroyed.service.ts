@@ -45,7 +45,9 @@ export interface DestroyedEmitter {
 }
 
 /**
- * Everything that happens when a ship dies, off the transport layer.
+ * Ship destruction is broadcast galaxy-wide.
+ * Also clears the victim's scantab so stale assignments don't persist on respawn.
+ * @see specs/006b-combat/contracts/combat-events.md
  *
  * This was `GameGateway.handleCombatShipDestroyed` — 256 lines holding a
  * `prisma.$transaction`, the clearest breach of the rule that the gateway
