@@ -217,6 +217,43 @@ describe('a quoted citation says what the original says', () => {
     const BASELINE = 3268;
     expect(unquoted).toBeLessThanOrEqual(BASELINE);
   });
+
+  /**
+   * GAP THREE — the two checks above bound `pairs.length` from below and
+   * `unquoted` (`total - pairs.length`) from above, but nothing bounds `total`
+   * itself. That leaves a citation deletable without either ratchet noticing:
+   *
+   *  - Delete an UNQUOTED citation and `total` and `unquoted` fall together,
+   *    so `unquoted <= BASELINE` still holds. Invisible immediately.
+   *  - Delete a QUOTED citation and only `pairs.length` falls; the floor above
+   *    catches it only once six have gone missing (84 today, floor 78).
+   *
+   * This is not hypothetical: a refactor moved a comment and silently dropped
+   * two bare citations (`GECMDS.C:2529`, `GECMDS.C:2598`) from a mine-loop
+   * explanation, leaving "This method used to carry it" with no antecedent,
+   * and both ratchets above stayed green.
+   *
+   * `total` never falling is the floor that actually watches every citation,
+   * quoted or not. Legitimate deletions do happen — dead code gets removed,
+   * and a citation goes with it. When that is genuinely what happened, lower
+   * `TOTAL_FLOOR` in this same commit to the new measured total, with a
+   * one-line reason in a comment above it (e.g. "removed with the dead
+   * scan_ra mine-loop branch, PR #NNN"). What is not acceptable is lowering
+   * it to make an ACCIDENTAL loss go away — that is the one move that makes
+   * this guard stop working, same as the rule above it.
+   */
+  it('never loses ground on the total number of citations, quoted or not', () => {
+    let total = 0;
+    for (const f of SCANNED) {
+      total += [...readFileSync(f, 'utf8').matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)].length;
+    }
+    // Measured 2026-09-11 by running this file's own scan (see GAP THREE
+    // above). If this fails because citations were deliberately removed,
+    // lower TOTAL_FLOOR to the new total and say why in a comment here — do
+    // NOT lower it just to clear a failure caused by an accidental loss.
+    const TOTAL_FLOOR = 3355;
+    expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
+  });
 });
 
 describe('a divergence from canon is a decision, not a comment', () => {
