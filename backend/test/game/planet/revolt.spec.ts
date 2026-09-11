@@ -64,7 +64,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 1000n;
 
-    const mailCreate = jest.fn().mockResolvedValue({});
+    const mailCreate = vi.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
     const events = new EventEmitter2();
     const emitted: string[] = [];
@@ -114,7 +114,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 1000n;
 
-    const mailCreate = jest.fn().mockResolvedValue({});
+    const mailCreate = vi.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
     // 0.07 → randVal = 7 → 7 % 10 != 0 → no revolt.
     const random = new FixedRandom([0.07]);
@@ -132,7 +132,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 1000n;
 
-    const mailCreate = jest.fn().mockResolvedValue({});
+    const mailCreate = vi.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
     const random = new FixedRandom([0, 0]);
     const svc = new PlanetEconomyService(random, prisma);
@@ -172,7 +172,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 1000n;
 
-    const mailCreate = jest.fn().mockResolvedValue({});
+    const mailCreate = vi.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
     // Draws that WOULD revolt an owned planet: 1-in-10 gate hits, divisor roll.
     const random = new FixedRandom([0, 0]);
@@ -193,7 +193,7 @@ describe('PlanetEconomyService — revolt branch (T056, FR-028)', () => {
     planet.items[I_MEN].qty = 100n;
     planet.items[I_TROOPS].qty = 1000n;
 
-    const mailCreate = jest.fn().mockResolvedValue({});
+    const mailCreate = vi.fn().mockResolvedValue({});
     const prisma = { mailStat: { create: mailCreate } } as never;
     const random = new FixedRandom([0, 0]);
     const svc = new PlanetEconomyService(random, prisma);
@@ -224,7 +224,7 @@ describe('revolt severity is an independent roll (GEPLANET.C:359-361)', () => {
     const planet = makePlanet({ userid: 'owner1', taxrate: 60 });
     planet.items[I_MEN].qty = 10000n;
     planet.items[I_TROOPS].qty = 720n; // divisible by 2..9, so no flooring noise
-    const prisma = { mailStat: { create: jest.fn().mockResolvedValue({}) } } as never;
+    const prisma = { mailStat: { create: vi.fn().mockResolvedValue({}) } } as never;
     const svc = new PlanetEconomyService(new FixedRandom(draws), prisma);
     const { state } = await svc.applyTick(planet);
     return state.items[I_TROOPS].qty;

@@ -57,27 +57,27 @@ function makePlanetState(qty: Partial<Record<number, bigint>> = {}, overrides: P
 
 function makeService(planet: PlanetState, wormholes: unknown[] = []) {
   const mockShipService = {
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByName: jest.fn().mockReturnValue(undefined),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByName: vi.fn().mockReturnValue(undefined),
   } as unknown as ShipStateService;
 
   const mockGalaxyService = {
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
   } as unknown as GalaxyService;
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
-    bySector: jest.fn().mockReturnValue([planet]),
-    byName: jest.fn().mockReturnValue(undefined),
+    get: vi.fn().mockReturnValue(planet),
+    bySector: vi.fn().mockReturnValue([planet]),
+    byName: vi.fn().mockReturnValue(undefined),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
-    user: { findUnique: jest.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
     wormhole: {
-      findMany: jest.fn().mockImplementation(() => Promise.resolve(wormholes)),
-      findFirst: jest.fn().mockImplementation((q: { where: { plnum: number } }) => Promise.resolve((wormholes as { plnum: number }[]).find((w) => w.plnum === q.where.plnum) ?? null)),
+      findMany: vi.fn().mockImplementation(() => Promise.resolve(wormholes)),
+      findFirst: vi.fn().mockImplementation((q: { where: { plnum: number } }) => Promise.resolve((wormholes as { plnum: number }[]).find((w) => w.plnum === q.where.plnum) ?? null)),
     },
   } as unknown as PrismaService;
 

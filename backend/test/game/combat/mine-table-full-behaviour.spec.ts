@@ -45,11 +45,11 @@ describe('mine — galaxy table full', () => {
       get: () => ship,
     } as never;
     const mineRepo = {
-      create: jest.fn().mockRejectedValue(new MineTableFullError(12)),
+      create: vi.fn().mockRejectedValue(new MineTableFullError(12)),
     } as never;
     const mineRegistry = {
       countByDeployer: () => 0,
-      add: jest.fn(),
+      add: vi.fn(),
       isFull: () => true,
       capacity: 12,
     } as never;

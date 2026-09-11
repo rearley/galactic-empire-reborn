@@ -28,6 +28,7 @@ import {
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -72,8 +73,8 @@ interface Harness {
   svc: DroidTickService;
   events: EventEmitter2;
   shipMap: Map<string, ShipState>;
-  prismaShipDeleteMock: jest.Mock;
-  removeFromGameSpy: jest.Mock;
+  prismaShipDeleteMock: Mock;
+  removeFromGameSpy: Mock;
 }
 
 function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harness {
@@ -87,9 +88,9 @@ function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harn
     shipMap.set(`${d.userid}:1`, s);
   }
 
-  const prismaShipDeleteMock = jest.fn();
+  const prismaShipDeleteMock = vi.fn();
 
-  const removeFromGameSpy = jest.fn((s: { userid: string; shipno: number }) => {
+  const removeFromGameSpy = vi.fn((s: { userid: string; shipno: number }) => {
     shipMap.delete(`${s.userid}:${s.shipno}`);
   });
 
@@ -114,13 +115,13 @@ function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harn
     getMaxShields: (_n: number) => 2,
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const tickService = {
-    subscribe: jest.fn(),
+    subscribe: vi.fn(),
   } as unknown as TickService;
 
   const spawner = new DroidSpawner(shipState, classCache, rand);
@@ -142,8 +143,8 @@ describe('T035 — ephemerality invariants', () => {
       // We verify indirectly: creating a mock ShipStateService with a flush subscriber,
       // populating it with an ephemeral state, and confirming prisma.ship.update is never called.
 
-      const prismaUpdateMock = jest.fn();
-      const prismaShipMock = { update: prismaUpdateMock } as unknown as { update: jest.Mock };
+      const prismaUpdateMock = vi.fn();
+      const prismaShipMock = { update: prismaUpdateMock } as unknown as { update: Mock };
 
       // Simulate the flush logic from ShipStateService as described in ship-state.service.ts:128-145
       const map = new Map<string, ShipState>();
@@ -170,7 +171,7 @@ describe('T035 — ephemerality invariants', () => {
     });
 
     it('a non-ephemeral dirty state IS flushed (control: flush runs for normal ships)', async () => {
-      const prismaUpdateMock = jest.fn().mockResolvedValue({});
+      const prismaUpdateMock = vi.fn().mockResolvedValue({});
       const map = new Map<string, ShipState>();
       const normalShip = makeShip({
         userid: 'player1',
@@ -248,9 +249,9 @@ describe('T035 — ephemerality invariants', () => {
         getMaxShields: () => 2,
       } as unknown as ShipClassCacheService;
 
-      const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
-      const mineRepo = { create: jest.fn() } as unknown as MineRepository;
-      const tickService = { subscribe: jest.fn() } as unknown as TickService;
+      const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
+      const mineRepo = { create: vi.fn() } as unknown as MineRepository;
+      const tickService = { subscribe: vi.fn() } as unknown as TickService;
       const spawner = new DroidSpawner(shipState, classCache, rand);
       const svc = new DroidTickService(
         tickService, shipState, classCache, spawner, mineRegistry, mineRepo, events, rand,

@@ -5,6 +5,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { TickService } from '../../src/game/tick/tick.service';
 import { TickKind } from '../../src/game/tick/tick.types';
 import { shipKey } from '../../src/game/ship/ship-state.types';
+import type { Mock } from 'vitest';
 
 function makeShipRow(overrides: Partial<{
   userid: string;
@@ -38,29 +39,29 @@ function makeShipRow(overrides: Partial<{
 describe('ShipStateService', () => {
   let service: ShipStateService;
   let prismaMock: {
-    ship: { findMany: jest.Mock; update: jest.Mock };
-    shipClass: { findMany: jest.Mock };
+    ship: { findMany: Mock; update: Mock };
+    shipClass: { findMany: Mock };
   };
-  let tickSubscribeMock: jest.Mock;
-  let registerSnapshotProviderMock: jest.Mock;
+  let tickSubscribeMock: Mock;
+  let registerSnapshotProviderMock: Mock;
   let flushTick: (() => Promise<void>) | undefined;
 
   beforeEach(async () => {
     prismaMock = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({}),
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue({}),
       },
       // onModuleInit now awaits Promise.all([ship.findMany, shipClass.findMany]).
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    tickSubscribeMock = jest.fn().mockImplementation(
+    tickSubscribeMock = vi.fn().mockImplementation(
       (_kind: TickKind, handler: () => Promise<void>) => {
         flushTick = handler;
         return () => {};
       },
     );
-    registerSnapshotProviderMock = jest.fn();
+    registerSnapshotProviderMock = vi.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

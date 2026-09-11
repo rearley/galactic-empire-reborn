@@ -5,6 +5,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { TEAM_LIST_DISPLAY_CAP, MAXTEAMS, MAX_TEAMNAME_LENGTH, MAX_TEAM_PASSWORD_LENGTH } from '../../src/game/team/team.types';
 import { TEAMMAX } from '../../src/game/constants';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 
 /**
@@ -14,15 +15,15 @@ import { makeShip as baseMakeShip } from '../helpers/make-ship';
  * slot. The mock runs the callback against the same doubles so the sequence is
  * exercised rather than stubbed away.
  */
-function makePrisma(opts: { memberCount: number; update?: jest.Mock }): PrismaService {
-  const update = opts.update ?? jest.fn().mockResolvedValue({});
+function makePrisma(opts: { memberCount: number; update?: Mock }): PrismaService {
+  const update = opts.update ?? vi.fn().mockResolvedValue({});
   const tx = {
-    $queryRaw: jest.fn().mockResolvedValue([]),
-    user: { count: jest.fn().mockResolvedValue(opts.memberCount), update },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    user: { count: vi.fn().mockResolvedValue(opts.memberCount), update },
   };
   return {
-    user: { update, count: jest.fn().mockResolvedValue(opts.memberCount) },
-    $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+    user: { update, count: vi.fn().mockResolvedValue(opts.memberCount) },
+    $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   } as unknown as PrismaService;
 }
 
@@ -37,26 +38,26 @@ function makeService(
   prismaOverrides: Partial<PrismaService> = {},
 ): TeamService {
   const repo = {
-    getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-    countTeams: jest.fn().mockResolvedValue(0),
-    insertTeam: jest.fn().mockResolvedValue(undefined),
-    findByNameLower: jest.fn().mockResolvedValue(null),
-    liveCountsGroupBy: jest.fn().mockResolvedValue([]),
-    findTeamsByCodes: jest.fn().mockResolvedValue([]),
+    getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+    countTeams: vi.fn().mockResolvedValue(0),
+    insertTeam: vi.fn().mockResolvedValue(undefined),
+    findByNameLower: vi.fn().mockResolvedValue(null),
+    liveCountsGroupBy: vi.fn().mockResolvedValue([]),
+    findTeamsByCodes: vi.fn().mockResolvedValue([]),
     ...repoOverrides,
   } as unknown as TeamRepository;
 
   const prisma = {
-    $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+    $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
     user: {
-      update: jest.fn().mockResolvedValue({}),
-      groupBy: jest.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+      groupBy: vi.fn().mockResolvedValue([]),
       // joinByPassword counts live members to enforce TEAMMAX (GECMDS.C:5357).
-      count: jest.fn().mockResolvedValue(0),
+      count: vi.fn().mockResolvedValue(0),
     },
     team: {
-      aggregate: jest.fn().mockResolvedValue({ _max: { teamcode: null } }),
-      findMany: jest.fn().mockResolvedValue([]),
+      aggregate: vi.fn().mockResolvedValue({ _max: { teamcode: null } }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     ...prismaOverrides,
   } as unknown as PrismaService;
@@ -69,16 +70,16 @@ function makeService(
 describe('TeamService.create', () => {
   it('allocates teamcode as MAX(teamcode)+1', async () => {
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(5n),
-      countTeams: jest.fn().mockResolvedValue(0),
-      insertTeam: jest.fn().mockResolvedValue(undefined),
-      findByNameLower: jest.fn(),
-      liveCountsGroupBy: jest.fn(),
-      findTeamsByCodes: jest.fn(),
+      getMaxTeamcode: vi.fn().mockResolvedValue(5n),
+      countTeams: vi.fn().mockResolvedValue(0),
+      insertTeam: vi.fn().mockResolvedValue(undefined),
+      findByNameLower: vi.fn(),
+      liveCountsGroupBy: vi.fn(),
+      findTeamsByCodes: vi.fn(),
     } as unknown as TeamRepository;
-    const userUpdate = jest.fn().mockResolvedValue({});
+    const userUpdate = vi.fn().mockResolvedValue({});
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: userUpdate },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
@@ -89,13 +90,13 @@ describe('TeamService.create', () => {
 
   it('sets User.teamcode in the transaction', async () => {
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-      countTeams: jest.fn().mockResolvedValue(0),
-      insertTeam: jest.fn().mockResolvedValue(undefined),
+      getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+      countTeams: vi.fn().mockResolvedValue(0),
+      insertTeam: vi.fn().mockResolvedValue(undefined),
     } as unknown as TeamRepository;
-    const userUpdate = jest.fn().mockResolvedValue({});
+    const userUpdate = vi.fn().mockResolvedValue({});
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: userUpdate },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
@@ -106,13 +107,13 @@ describe('TeamService.create', () => {
 
   it('mirrors ShipState.teamcode after create', async () => {
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-      countTeams: jest.fn().mockResolvedValue(0),
-      insertTeam: jest.fn().mockResolvedValue(undefined),
+      getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+      countTeams: vi.fn().mockResolvedValue(0),
+      insertTeam: vi.fn().mockResolvedValue(undefined),
     } as unknown as TeamRepository;
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
-      user: { update: jest.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
@@ -122,15 +123,15 @@ describe('TeamService.create', () => {
   });
 
   it('preserves original casing of team name (FR-006)', async () => {
-    const insertTeam = jest.fn().mockResolvedValue(undefined);
+    const insertTeam = vi.fn().mockResolvedValue(undefined);
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-      countTeams: jest.fn().mockResolvedValue(0),
+      getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+      countTeams: vi.fn().mockResolvedValue(0),
       insertTeam,
     } as unknown as TeamRepository;
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
-      user: { update: jest.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
@@ -149,13 +150,13 @@ describe('TeamService.create', () => {
   it('returns name_taken on P2002 after 3 retries', async () => {
     const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-      countTeams: jest.fn().mockResolvedValue(0),
-      insertTeam: jest.fn().mockRejectedValue(p2002),
+      getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+      countTeams: vi.fn().mockResolvedValue(0),
+      insertTeam: vi.fn().mockRejectedValue(p2002),
     } as unknown as TeamRepository;
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
-      user: { update: jest.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
@@ -168,17 +169,17 @@ describe('TeamService.create', () => {
     const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
     let callCount = 0;
     const repo = {
-      getMaxTeamcode: jest.fn().mockResolvedValue(0n),
-      countTeams: jest.fn().mockResolvedValue(0),
-      insertTeam: jest.fn().mockImplementation(() => {
+      getMaxTeamcode: vi.fn().mockResolvedValue(0n),
+      countTeams: vi.fn().mockResolvedValue(0),
+      insertTeam: vi.fn().mockImplementation(() => {
         callCount++;
         if (callCount === 1) throw p2002;
         return Promise.resolve(undefined);
       }),
     } as unknown as TeamRepository;
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
-      user: { update: jest.fn().mockResolvedValue({}) },
+      $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
+      user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
@@ -192,7 +193,7 @@ describe('TeamService.create', () => {
 
 describe('TeamService.joinByPassword', () => {
   it('returns no_such_team when name has no case-insensitive match', async () => {
-    const repo = { findByNameLower: jest.fn().mockResolvedValue(null) } as unknown as TeamRepository;
+    const repo = { findByNameLower: vi.fn().mockResolvedValue(null) } as unknown as TeamRepository;
     const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
     const result = await svc.joinByPassword({ ship: makeShip(), name: 'Unknown', password: 'pw' });
@@ -201,7 +202,7 @@ describe('TeamService.joinByPassword', () => {
 
   it('returns wrong_password when team exists but password mismatch', async () => {
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'correct' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'correct' }),
     } as unknown as TeamRepository;
     const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
@@ -211,7 +212,7 @@ describe('TeamService.joinByPassword', () => {
 
   it('password comparison is case-sensitive', async () => {
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'Secret' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 1n, teamname: 'Raiders', password: 'Secret' }),
     } as unknown as TeamRepository;
     const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
@@ -228,7 +229,7 @@ describe('TeamService.joinByPassword', () => {
 
   it('returns ok and mirrors ShipState on success', async () => {
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
     const prisma = makePrisma({ memberCount: 0 });
     const svc = new TeamService(prisma, repo);
@@ -245,9 +246,9 @@ describe('TeamService.joinByPassword', () => {
     // only recomputes daily -- reading that column would let a team overfill
     // freely within a single day.
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
-    const update = jest.fn().mockResolvedValue({});
+    const update = vi.fn().mockResolvedValue({});
     const prisma = makePrisma({ memberCount: TEAMMAX, update });
     const svc = new TeamService(prisma, repo);
     const ship = makeShip({ teamcode: undefined });
@@ -263,14 +264,14 @@ describe('TeamService.joinByPassword', () => {
     // TEAMMAX-1 and both succeed. The original could not hit this -- a BBS ran
     // one session at a time -- but a websocket server can.
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
     const tx = {
-      $queryRaw: jest.fn().mockResolvedValue([]),
-      user: { count: jest.fn().mockResolvedValue(0), update: jest.fn().mockResolvedValue({}) },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      user: { count: vi.fn().mockResolvedValue(0), update: vi.fn().mockResolvedValue({}) },
     };
     const prisma = {
-      $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+      $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
     } as unknown as PrismaService;
     const svc = new TeamService(prisma, repo);
 
@@ -287,7 +288,7 @@ describe('TeamService.joinByPassword', () => {
 
   it('admits the member who exactly fills the last slot', async () => {
     const repo = {
-      findByNameLower: jest.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
+      findByNameLower: vi.fn().mockResolvedValue({ teamcode: 7n, teamname: 'Raiders', password: 'pw' }),
     } as unknown as TeamRepository;
     const prisma = makePrisma({ memberCount: TEAMMAX - 1 });
     const svc = new TeamService(prisma, repo);
@@ -300,17 +301,17 @@ describe('TeamService.joinByPassword', () => {
 
 describe('TeamService.list', () => {
   it('returns empty array when no teams', async () => {
-    const svc = makeService({ liveCountsGroupBy: jest.fn().mockResolvedValue([]) });
+    const svc = makeService({ liveCountsGroupBy: vi.fn().mockResolvedValue([]) });
     expect(await svc.list()).toEqual([]);
   });
 
   it('returns teams ordered by score desc', async () => {
     const repo = {
-      liveCountsGroupBy: jest.fn().mockResolvedValue([
+      liveCountsGroupBy: vi.fn().mockResolvedValue([
         { teamcode: 1n, count: 2 },
         { teamcode: 2n, count: 3 },
       ]),
-      findTeamsByCodes: jest.fn().mockResolvedValue([
+      findTeamsByCodes: vi.fn().mockResolvedValue([
         { teamcode: 1n, teamname: 'Alpha', teamscore: 100n },
         { teamcode: 2n, teamname: 'Beta', teamscore: 200n },
       ]),
@@ -323,11 +324,11 @@ describe('TeamService.list', () => {
 
   it('tie-breaks equal scores by teamcode asc', async () => {
     const repo = {
-      liveCountsGroupBy: jest.fn().mockResolvedValue([
+      liveCountsGroupBy: vi.fn().mockResolvedValue([
         { teamcode: 3n, count: 1 },
         { teamcode: 1n, count: 1 },
       ]),
-      findTeamsByCodes: jest.fn().mockResolvedValue([
+      findTeamsByCodes: vi.fn().mockResolvedValue([
         { teamcode: 3n, teamname: 'Third', teamscore: 500n },
         { teamcode: 1n, teamname: 'First', teamscore: 500n },
       ]),
@@ -340,11 +341,11 @@ describe('TeamService.list', () => {
 
   it('excludes teams with 0 live members', async () => {
     const repo = {
-      liveCountsGroupBy: jest.fn().mockResolvedValue([
+      liveCountsGroupBy: vi.fn().mockResolvedValue([
         { teamcode: 1n, count: 2 },
         { teamcode: 2n, count: 0 },
       ]),
-      findTeamsByCodes: jest.fn().mockResolvedValue([
+      findTeamsByCodes: vi.fn().mockResolvedValue([
         { teamcode: 1n, teamname: 'Alpha', teamscore: 100n },
       ]),
     } as unknown as TeamRepository;
@@ -358,8 +359,8 @@ describe('TeamService.list', () => {
     const counts = Array.from({ length: 25 }, (_, i) => ({ teamcode: BigInt(i + 1), count: 1 }));
     const teams = counts.map((c) => ({ teamcode: c.teamcode, teamname: `Team${c.teamcode}`, teamscore: 0n }));
     const repo = {
-      liveCountsGroupBy: jest.fn().mockResolvedValue(counts),
-      findTeamsByCodes: jest.fn().mockResolvedValue(teams),
+      liveCountsGroupBy: vi.fn().mockResolvedValue(counts),
+      findTeamsByCodes: vi.fn().mockResolvedValue(teams),
     } as unknown as TeamRepository;
     const svc = makeService(repo);
     const entries = await svc.list();
@@ -368,8 +369,8 @@ describe('TeamService.list', () => {
 
   it('does not include password in returned TeamListEntry', async () => {
     const repo = {
-      liveCountsGroupBy: jest.fn().mockResolvedValue([{ teamcode: 1n, count: 2 }]),
-      findTeamsByCodes: jest.fn().mockResolvedValue([
+      liveCountsGroupBy: vi.fn().mockResolvedValue([{ teamcode: 1n, count: 2 }]),
+      findTeamsByCodes: vi.fn().mockResolvedValue([
         { teamcode: 1n, teamname: 'Alpha', teamscore: 100n },
       ]),
     } as unknown as TeamRepository;
@@ -426,7 +427,7 @@ describe('Balance regression constants', () => {
  */
 describe('TeamService.create enforces MAXTEAMS (GECMDS.C:5484)', () => {
   it('refuses when the table is already full', async () => {
-    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS) });
+    const svc = makeService({ countTeams: vi.fn().mockResolvedValue(MAXTEAMS) });
 
     const res = await svc.create({ ship: makeShip(), name: 'Latecomers', password: 'pw' });
 
@@ -434,7 +435,7 @@ describe('TeamService.create enforces MAXTEAMS (GECMDS.C:5484)', () => {
   });
 
   it('allows the last free slot — the gate is >=, not >', async () => {
-    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS - 1) });
+    const svc = makeService({ countTeams: vi.fn().mockResolvedValue(MAXTEAMS - 1) });
 
     const res = await svc.create({ ship: makeShip(), name: 'JustInTime', password: 'pw' });
 
@@ -442,8 +443,8 @@ describe('TeamService.create enforces MAXTEAMS (GECMDS.C:5484)', () => {
   });
 
   it('does not write a team row when it refuses', async () => {
-    const insertTeam = jest.fn().mockResolvedValue(undefined);
-    const svc = makeService({ countTeams: jest.fn().mockResolvedValue(MAXTEAMS), insertTeam });
+    const insertTeam = vi.fn().mockResolvedValue(undefined);
+    const svc = makeService({ countTeams: vi.fn().mockResolvedValue(MAXTEAMS), insertTeam });
 
     await svc.create({ ship: makeShip(), name: 'Latecomers', password: 'pw' });
 

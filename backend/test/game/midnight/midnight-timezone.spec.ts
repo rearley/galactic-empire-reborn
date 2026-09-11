@@ -14,6 +14,8 @@
  * or doubled midnight is invisible until scores are wrong.
  */
 import { runDateFor, GAME_TIMEZONE } from '../../../src/game/midnight/midnight-time';
+import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants';
+import { MidnightService } from '../../../src/game/midnight/midnight.service';
 
 describe('the game clock', () => {
   it('defaults to US Eastern', () => {
@@ -49,8 +51,6 @@ describe('the game clock', () => {
 describe('the midnight cron', () => {
   it('is scheduled in the game timezone, not the host timezone', () => {
     // The host runs UTC. Without this option the pass fires at 8pm ET.
-    const { SCHEDULE_CRON_OPTIONS } = require('@nestjs/schedule/dist/schedule.constants');
-    const { MidnightService } = require('../../../src/game/midnight/midnight.service');
     const opts = Reflect.getMetadata(
       SCHEDULE_CRON_OPTIONS,
       MidnightService.prototype.scheduledRun,

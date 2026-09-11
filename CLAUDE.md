@@ -18,7 +18,8 @@ running as a modern 24/7 persistent web game.
 - **Scheduling**: raw `setInterval` in `TickService` lifecycle hooks for the two
   game heartbeats; @nestjs/schedule (`@Cron`) for midnight only. See
   `docs/DECISIONS.md` 2026-05-01.
-- **Testing**: Jest (backend), Vitest (frontend)
+- **Testing**: Vitest (backend and frontend). The backend ran Jest until Phase 5
+  of the restructure; see `docs/DECISIONS.md` 2026-09-11
 - **Deployment**: Docker + Docker Compose (Hetzner CPX32)
 - **Dev methodology**: Spec-Driven Development via spec-kit (github/spec-kit)
 

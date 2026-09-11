@@ -40,7 +40,7 @@ function makeService(count: number, nowMs = 0) {
   let clock = nowMs;
   const svc = new PlanetTickService(
     fake as never,
-    { subscribe: jest.fn(), startPlanetUpdateTimer: jest.fn() } as never,
+    { subscribe: vi.fn(), startPlanetUpdateTimer: vi.fn() } as never,
     () => clock,
   );
   return { svc, fake, advanceClock: (secs: number) => { clock += secs * 1000; } };

@@ -28,7 +28,7 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
   const state = makeShip(shipOverrides);
 
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         return state;
@@ -45,9 +45,10 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
 // Status form — nav with no args
 // ---------------------------------------------------------------------------
 
-describe('NavHandlerService — status form (no args)', () => {
-
-});
+// EMPTY SUITE. It named a behaviour and asserted nothing, which under Jest
+// reported as a passing suite. `describe.todo` keeps the name in the report as
+// a declared gap instead of as coverage that does not exist. @see issue #32
+describe.todo('NavHandlerService — status form (no args)');
 
 // ---------------------------------------------------------------------------
 // NAVFMT rejection cases
@@ -246,17 +247,17 @@ describe('NavHandlerService — nav never breaks orbit', () => {
 // The bearing is heading-relative — say so, or it looks like a random number
 // ---------------------------------------------------------------------------
 
-describe('NavHandlerService — explains the shrinking bearing', () => {
-  /**
-   * NAV01 prints cbearing(from, to, heading) — a bearing RELATIVE to the hull's
-   * present heading (GECMDS.C:5142-5155). Our physics tick steers head2b onto
-   * course every tick, so an identical `nav 0 0` from a standing start reported
-   * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
-   * arithmetic was right both times; nothing told the pilot why.
-   */
-
-
-});
+/**
+ * NAV01 prints cbearing(from, to, heading) — a bearing RELATIVE to the hull's
+ * present heading (GECMDS.C:5142-5155). Our physics tick steers head2b onto
+ * course every tick, so an identical `nav 0 0` from a standing start reported
+ * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
+ * arithmetic was right both times; nothing told the pilot why.
+ *
+ * EMPTY SUITE — the explanation above was written and the assertions never
+ * were. Kept as `describe.todo` so the report names the gap. @see issue #32
+ */
+describe.todo('NavHandlerService — explains the shrinking bearing');
 
 // ---------------------------------------------------------------------------
 // Keyword and aliases

@@ -53,12 +53,12 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 }
 
 function svcWith(planet: unknown) {
-  const mockShipState = { mutate: jest.fn() } as unknown as ShipStateService;
-  const mockPlanetService = { get: jest.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
+  const mockShipState = { mutate: vi.fn() } as unknown as ShipStateService;
+  const mockPlanetService = { get: vi.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n }),
+      update: vi.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
   return new MaintenanceService(mockShipState, mockPlanetService, new UserRepository(mockPrisma));

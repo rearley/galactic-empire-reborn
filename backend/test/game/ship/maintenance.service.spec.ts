@@ -44,7 +44,7 @@ function makeService(opts: {
 
   const mutated: Record<string, unknown> = {};
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         const s = makeShip();
         fn(s);
@@ -54,17 +54,17 @@ function makeService(opts: {
   } as unknown as ShipStateService;
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
+    get: vi.fn().mockReturnValue(planet),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ cash }),
+      update: vi.fn().mockResolvedValue({}),
       // The debit is conditional now — the balance is re-checked in the same
       // statement that spends it. `count` is how the caller learns whether the
       // money actually moved. @see docs/audits/2026-09-09-security-review.md M1
-      updateMany: jest.fn().mockResolvedValue({ count: cash >= 0n ? 1 : 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: cash >= 0n ? 1 : 0 }),
     },
   } as unknown as PrismaService;
 

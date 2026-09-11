@@ -55,7 +55,7 @@ function build(ships: ShipState[]) {
       getMaxTons: () => 1000,
       getScanRange: () => 100_000,
     } as never,
-    { emit: jest.fn() } as never,
+    { emit: vi.fn() } as never,
     { next: () => 0.5 } as never,
   );
   return svc;

@@ -30,16 +30,16 @@ function buildHarness() {
   const mockShipState = {
     // abandon() persists status as well as setting it — the tick flush strips
     // `status`, so the handler cannot go through mutate().
-    abandon: jest.fn().mockImplementation((_uid: string, _no: number) => {
+    abandon: vi.fn().mockImplementation((_uid: string, _no: number) => {
       ship.status = SHIP_STATUS_ABANDONED;
       ship.destruct = 0;
       return Promise.resolve();
     }),
-    findShip: jest.fn().mockReturnValue(ship),
+    findShip: vi.fn().mockReturnValue(ship),
   } as unknown as ShipStateService;
 
   const router = new CommandRouterService();
-  const abandonHandler = new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService);
+  const abandonHandler = new AbandonHandlerService(mockShipState, { abandonPlanet: vi.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService);
 
   // Register only the abandon command + a test command to exercise the FR-803 gate
   router.register(abandonHandler.command);

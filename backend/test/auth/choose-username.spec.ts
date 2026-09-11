@@ -2,10 +2,11 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AuthService } from '../../src/auth/auth.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import type { Mock } from 'vitest';
 
-function makeService(userTable: Partial<Record<string, jest.Mock>>) {
+function makeService(userTable: Partial<Record<string, Mock>>) {
   const prisma = { user: userTable } as unknown as PrismaService;
-  const jwt = { sign: jest.fn().mockReturnValue('fresh.jwt.token') } as unknown as JwtService;
+  const jwt = { sign: vi.fn().mockReturnValue('fresh.jwt.token') } as unknown as JwtService;
   return new AuthService(prisma, jwt);
 }
 
@@ -14,8 +15,8 @@ describe('chooseUsername', () => {
     // The token issued at step 1 says username: null, and WsAuthGuard refuses
     // those. Without a fresh token here the player finishes signup and still
     // cannot open a socket.
-    const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
-    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const findUnique = vi.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const svc = makeService({ findUnique, updateMany });
 
     const result = await svc.chooseUsername('usr_abc', { username: 'rick' });
@@ -29,8 +30,8 @@ describe('chooseUsername', () => {
   });
 
   it('refuses a handle someone already holds', async () => {
-    const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
-    const updateMany = jest.fn().mockRejectedValue(
+    const findUnique = vi.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
+    const updateMany = vi.fn().mockRejectedValue(
       Object.assign(new Error('unique violation'), {
         code: 'P2002',
         meta: { target: 'User_username_lower_idx' },
@@ -45,8 +46,8 @@ describe('chooseUsername', () => {
   it('refuses to rename an account that already has a handle', async () => {
     // This endpoint completes signup. It is not a rename feature, and letting
     // it act as one would let a player shed a reputation mid-war.
-    const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: 'rick' });
-    const updateMany = jest.fn();
+    const findUnique = vi.fn().mockResolvedValue({ userid: 'usr_abc', username: 'rick' });
+    const updateMany = vi.fn();
     const svc = makeService({ findUnique, updateMany });
 
     await expect(svc.chooseUsername('usr_abc', { username: 'someoneelse' }))
@@ -55,8 +56,8 @@ describe('chooseUsername', () => {
   });
 
   it('rejects an unknown userid rather than creating a row', async () => {
-    const findUnique = jest.fn().mockResolvedValue(null);
-    const svc = makeService({ findUnique, updateMany: jest.fn() });
+    const findUnique = vi.fn().mockResolvedValue(null);
+    const svc = makeService({ findUnique, updateMany: vi.fn() });
 
     await expect(svc.chooseUsername('usr_ghost', { username: 'rick' }))
       .rejects.toBeInstanceOf(NotFoundException);
@@ -69,8 +70,8 @@ describe('chooseUsername', () => {
     // username: null), not in the earlier read: updateMany matching zero rows
     // is the only signal that distinguishes "I won" from "someone beat me",
     // and the service must report USERNAME_ALREADY_SET rather than success.
-    const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
-    const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+    const findUnique = vi.fn().mockResolvedValue({ userid: 'usr_abc', username: null });
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
     const svc = makeService({ findUnique, updateMany });
 
     await expect(svc.chooseUsername('usr_abc', { username: 'rick' }))

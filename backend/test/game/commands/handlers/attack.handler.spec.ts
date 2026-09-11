@@ -15,6 +15,7 @@ import { PLTYPE_WORM } from '../../../../src/game/constants';
 import { FIRETICKS_DEFAULT } from '../../../../src/game/commands/attack.config';
 import { I_TROOPS, I_FIGHTER, NUMITEMS } from '../../../../src/game/constants/items';
 import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -70,7 +71,7 @@ function makeHandler(opts: {
 
   const mutated: Record<string, unknown> = {};
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         const s = makeShip();
         fn(s);
@@ -81,20 +82,20 @@ function makeHandler(opts: {
   } as unknown as ShipStateService;
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
-    withPlanetLock: jest.fn().mockImplementation(
+    get: vi.fn().mockReturnValue(planet),
+    withPlanetLock: vi.fn().mockImplementation(
       async (_x: number, _y: number, _p: number, fn: () => Promise<unknown>) => fn(),
     ),
-    flushPlanet: jest.fn().mockResolvedValue(undefined),
+    flushPlanet: vi.fn().mockResolvedValue(undefined),
   } as unknown as PlanetStateService;
 
   const mockAttackService = {
-    attackTroop: jest.fn().mockResolvedValue(attackOutcome),
-    attackFighter: jest.fn().mockResolvedValue(attackOutcome),
+    attackTroop: vi.fn().mockResolvedValue(attackOutcome),
+    attackFighter: vi.fn().mockResolvedValue(attackOutcome),
   } as unknown as PlanetAttackService;
 
   const mockShipClassCache = {
-    get: jest.fn().mockReturnValue({ canAttackPlanet }),
+    get: vi.fn().mockReturnValue({ canAttackPlanet }),
   } as unknown as ShipClassCacheService;
 
   const handler = new AttackHandlerService(
@@ -144,7 +145,7 @@ describe('AttackHandlerService — FR-014-002: no planet attack capability', () 
 
   it('returns ATT_NO_CAPABILITY when ship class not found in cache', async () => {
     const { mockShipClassCache, handler } = makeHandler();
-    (mockShipClassCache.get as jest.Mock).mockReturnValue(null);
+    (mockShipClassCache.get as Mock).mockReturnValue(null);
     const ship = makeShip({ where: 10 });
     const result = await handler.command.handler(ship, ['100', 'tro'], {}) as Lines;
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ATT_NO_CAPABILITY));
@@ -279,7 +280,7 @@ describe('AttackHandlerService — happy path (troops)', () => {
     const ship = makeShip({ where: 10 });
     await handler.command.handler(ship, ['100', 'tro'], {});
     expect(mockShipState.mutate).toHaveBeenCalled();
-    const mutateCall = (mockShipState.mutate as jest.Mock).mock.calls[0];
+    const mutateCall = (mockShipState.mutate as Mock).mock.calls[0];
     const stateCopy = makeShip({ where: 10 });
     mutateCall[2](stateCopy);
     expect(stateCopy.hostile).toBe(10);
@@ -292,7 +293,7 @@ describe('AttackHandlerService — happy path (troops)', () => {
     items[I_TROOPS] = 500n;
     const ship = makeShip({ where: 10, items });
     await handler.command.handler(ship, ['100', 'tro'], {});
-    const mutateCalls = (mockShipState.mutate as jest.Mock).mock.calls;
+    const mutateCalls = (mockShipState.mutate as Mock).mock.calls;
     const stateCopy = makeShip({ items: [...items] });
     mutateCalls[0][2](stateCopy);
     expect(stateCopy.items[I_TROOPS]).toBe(400n);

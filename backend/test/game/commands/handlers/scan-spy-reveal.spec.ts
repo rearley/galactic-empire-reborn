@@ -79,30 +79,30 @@ function makeService(opts: {
   const prismaPlane = makePrismaPlanet();
 
   const mockShipService = {
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByName: jest.fn().mockReturnValue(undefined),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByName: vi.fn().mockReturnValue(undefined),
   } as unknown as ShipStateService;
 
   const mockGalaxyService = {
-    findPlanetByName: jest.fn().mockReturnValue(prismaPlane),
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(prismaPlane),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
   } as unknown as GalaxyService;
 
   const planetState = makePlanetState({ spyowner });
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planetState),
+    get: vi.fn().mockReturnValue(planetState),
     // scanPl resolves the planet from the LIVE state now — GalaxyService's
     // read-model hydrates once at boot and goes stale on the first claim.
-    bySector: jest.fn().mockReturnValue([]),
-    byName: jest.fn().mockReturnValue(prismaPlane),
+    bySector: vi.fn().mockReturnValue([]),
+    byName: vi.fn().mockReturnValue(prismaPlane),
   } as unknown as PlanetStateService;
 
   // PrismaService — user.findUnique for scanPl owner resolution. Ship-class
   // fields come from the boot-time ShipClassCacheService now, not a query.
   const mockPrisma = {
-    user: { findUnique: jest.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
 
   const service = new ScanHandlerService(

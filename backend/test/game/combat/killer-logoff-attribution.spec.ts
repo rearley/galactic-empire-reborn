@@ -86,14 +86,14 @@ async function makeCombatHarness(ships: ShipState[]) {
   const subscribers: Array<(c: TickContext) => void> = [];
   const tickService = {
     subscribe: (_k: TickKind, h: (c: TickContext) => void) => { subscribers.push(h); return () => {}; },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]), create: jest.fn(), delete: jest.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]), create: vi.fn(), delete: vi.fn(),
   } as unknown as MineRepository;
   const events = new EventEmitter2();
   const logger = new Logger('KillerLogoffSpec');
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const service = new CombatTickService(
     tickService, svc, mineRepo, new MineRegistry(),

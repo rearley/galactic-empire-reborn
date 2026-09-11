@@ -1,5 +1,6 @@
 import { UserRepository } from '../../../src/game/player/user.repository';
 import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../../../src/game/player/roster-query';
+import type { Mock } from 'vitest';
 
 /**
  * These cases assert the QUERY, not the answer.
@@ -10,12 +11,12 @@ import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../../../src/game/player/roster-q
  * each call is pinned here against the call site it replaced.
  */
 describe('UserRepository', () => {
-  const makeRepo = (delegate: Record<string, jest.Mock>) =>
+  const makeRepo = (delegate: Record<string, Mock>) =>
     new UserRepository({ user: delegate } as never);
 
   describe('cash reads', () => {
     it('reads cash with a narrow select, not the whole row', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ cash: 500n });
+      const findUnique = vi.fn().mockResolvedValue({ cash: 500n });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getCash('usr_a')).resolves.toBe(500n);
@@ -26,13 +27,13 @@ describe('UserRepository', () => {
     });
 
     it('returns null when the account is gone, rather than throwing', async () => {
-      const findUnique = jest.fn().mockResolvedValue(null);
+      const findUnique = vi.fn().mockResolvedValue(null);
       const repo = makeRepo({ findUnique });
       await expect(repo.getCash('usr_missing')).resolves.toBeNull();
     });
 
     it('reads cash alongside the fleet counters in one row', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ cash: 1n, noships: 2, topshipno: 7 });
+      const findUnique = vi.fn().mockResolvedValue({ cash: 1n, noships: 2, topshipno: 7 });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getCashAndFleet('usr_a')).resolves.toEqual({ cash: 1n, noships: 2, topshipno: 7 });
@@ -43,7 +44,7 @@ describe('UserRepository', () => {
     });
 
     it('reads topshipno on its own for the onboarding allocator', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ topshipno: 5 });
+      const findUnique = vi.fn().mockResolvedValue({ topshipno: 5 });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getTopshipno('usr_a')).resolves.toBe(5);
@@ -57,7 +58,7 @@ describe('UserRepository', () => {
   describe('profile reads', () => {
     it('reads the five columns `rep acc` renders', async () => {
       const row = { cash: 1n, score: 2n, kills: 3, planets: 4, teamcode: 5n };
-      const findUnique = jest.fn().mockResolvedValue(row);
+      const findUnique = vi.fn().mockResolvedValue(row);
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getAccountSummary('usr_a')).resolves.toEqual(row);
@@ -68,7 +69,7 @@ describe('UserRepository', () => {
     });
 
     it('reads a display name only', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ username: 'Zaphod' });
+      const findUnique = vi.fn().mockResolvedValue({ username: 'Zaphod' });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getUsername('usr_a')).resolves.toBe('Zaphod');
@@ -79,7 +80,7 @@ describe('UserRepository', () => {
     });
 
     it('reports a missing account without loading a row', async () => {
-      const findUnique = jest.fn().mockResolvedValue(null);
+      const findUnique = vi.fn().mockResolvedValue(null);
       const repo = makeRepo({ findUnique });
 
       await expect(repo.exists('usr_missing')).resolves.toBe(false);
@@ -91,7 +92,7 @@ describe('UserRepository', () => {
 
     it('reads the five columns a reconnecting session rehydrates', async () => {
       const row = { teamcode: 1n, options: [1, 0, 0, 0], kills: 2, username: 'Ford', fkeys: ['sca'] };
-      const findUnique = jest.fn().mockResolvedValue(row);
+      const findUnique = vi.fn().mockResolvedValue(row);
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getSessionProfile('usr_a')).resolves.toEqual(row);
@@ -102,7 +103,7 @@ describe('UserRepository', () => {
     });
 
     it('reads the option flag array', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ options: [0, 1] });
+      const findUnique = vi.fn().mockResolvedValue({ options: [0, 1] });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.getOptions('usr_a')).resolves.toEqual([0, 1]);
@@ -115,7 +116,7 @@ describe('UserRepository', () => {
 
   describe('team reads', () => {
     it('reads a kick target as userid plus teamcode', async () => {
-      const findUnique = jest.fn().mockResolvedValue({ userid: 'usr_b', teamcode: 3n });
+      const findUnique = vi.fn().mockResolvedValue({ userid: 'usr_b', teamcode: 3n });
       const repo = makeRepo({ findUnique });
 
       await expect(repo.findTeamMembership('usr_b')).resolves.toEqual({ userid: 'usr_b', teamcode: 3n });
@@ -126,7 +127,7 @@ describe('UserRepository', () => {
     });
 
     it('batches teamcodes for the live ship map', async () => {
-      const findMany = jest.fn().mockResolvedValue([]);
+      const findMany = vi.fn().mockResolvedValue([]);
       const repo = makeRepo({ findMany });
 
       await repo.findTeamcodesFor(['a', 'b']);
@@ -137,7 +138,7 @@ describe('UserRepository', () => {
     });
 
     it('lists team members in userid order, capped', async () => {
-      const findMany = jest.fn().mockResolvedValue([{ userid: 'a' }, { userid: 'b' }]);
+      const findMany = vi.fn().mockResolvedValue([{ userid: 'a' }, { userid: 'b' }]);
       const repo = makeRepo({ findMany });
 
       await expect(repo.listTeamMemberIds(9n, 20)).resolves.toEqual(['a', 'b']);
@@ -152,7 +153,7 @@ describe('UserRepository', () => {
 
   describe('roster reads', () => {
     it('runs canon’s board query, population included', async () => {
-      const findMany = jest.fn().mockResolvedValue([]);
+      const findMany = vi.fn().mockResolvedValue([]);
       const repo = makeRepo({ findMany });
 
       await repo.findRoster(10);
@@ -165,7 +166,7 @@ describe('UserRepository', () => {
     });
 
     it('runs the public board query, which does not read population', async () => {
-      const findMany = jest.fn().mockResolvedValue([]);
+      const findMany = vi.fn().mockResolvedValue([]);
       const repo = makeRepo({ findMany });
 
       await repo.findPublicRoster(20);
@@ -178,7 +179,7 @@ describe('UserRepository', () => {
     });
 
     it('counts only accounts that can actually log in', async () => {
-      const count = jest.fn().mockResolvedValue(3);
+      const count = vi.fn().mockResolvedValue(3);
       const repo = makeRepo({ count });
 
       await expect(repo.countRegistered()).resolves.toBe(3);
@@ -188,7 +189,7 @@ describe('UserRepository', () => {
 
   describe('cash writes', () => {
     it('credits cash with an atomic increment', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.addCash('usr_a', 250n);
@@ -199,7 +200,7 @@ describe('UserRepository', () => {
     });
 
     it('debits only when the balance still covers it, and reports whether it moved', async () => {
-      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
       const repo = makeRepo({ updateMany });
 
       await expect(repo.debitIfAffordable('usr_a', 100n)).resolves.toBe(true);
@@ -210,13 +211,13 @@ describe('UserRepository', () => {
     });
 
     it('reports a refused debit rather than throwing', async () => {
-      const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+      const updateMany = vi.fn().mockResolvedValue({ count: 0 });
       const repo = makeRepo({ updateMany });
       await expect(repo.debitIfAffordable('usr_a', 100n)).resolves.toBe(false);
     });
 
     it('sets an absolute balance', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.setCash('usr_a', 0n);
@@ -227,7 +228,7 @@ describe('UserRepository', () => {
     });
 
     it('charges a shipyard upgrade as a decrement', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.applyUpgradeCharge('usr_a', 1000n, 0n);
@@ -238,7 +239,7 @@ describe('UserRepository', () => {
     });
 
     it('pays a downgrade back as an increment', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.applyUpgradeCharge('usr_a', 0n, 500n);
@@ -251,7 +252,7 @@ describe('UserRepository', () => {
 
   describe('other writes', () => {
     it('joins a team by writing the teamcode', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.setTeamcode('usr_a', 4n);
@@ -262,7 +263,7 @@ describe('UserRepository', () => {
     });
 
     it('leaves a team by nulling the teamcode', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.setTeamcode('usr_a', null);
@@ -273,7 +274,7 @@ describe('UserRepository', () => {
     });
 
     it('writes the whole option array back', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.setOptions('usr_a', [1, 0, 0, 0]);
@@ -284,7 +285,7 @@ describe('UserRepository', () => {
     });
 
     it('writes the whole fkey array back', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.setFkeys('usr_a', ['sca', '']);
@@ -295,7 +296,7 @@ describe('UserRepository', () => {
     });
 
     it('increments the planet counter on a row that must exist', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.incrementPlanets('usr_a');
@@ -306,7 +307,7 @@ describe('UserRepository', () => {
     });
 
     it('increments the planet counter tolerantly on claim', async () => {
-      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
       const repo = makeRepo({ updateMany });
 
       await repo.incrementPlanetsIfPresent('usr_a');
@@ -317,7 +318,7 @@ describe('UserRepository', () => {
     });
 
     it('decrements the planet counter only while it is above zero', async () => {
-      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
       const repo = makeRepo({ updateMany });
 
       await repo.decrementPlanetsIfPositive('usr_a');
@@ -328,7 +329,7 @@ describe('UserRepository', () => {
     });
 
     it('applies the onboarding grant exactly as composed by the caller', async () => {
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.applyOnboardingGrant('usr_a', { cash: 1000n, noships: 1, topshipno: 1 });
@@ -344,7 +345,7 @@ describe('UserRepository', () => {
       // the write as a default, a returning bankrupt captain would be topped
       // back up to the stipend — and a banked balance wiped down to it.
       // @see onboarding-cash.ts
-      const update = jest.fn().mockResolvedValue({});
+      const update = vi.fn().mockResolvedValue({});
       const repo = makeRepo({ update });
 
       await repo.applyOnboardingGrant('usr_a', { noships: 1, topshipno: 6 });

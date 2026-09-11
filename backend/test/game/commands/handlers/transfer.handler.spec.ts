@@ -40,8 +40,8 @@ function makeService(sourceShip: ShipState, targetShip?: ShipState) {
   for (const s of ships) shipMap.set(`${s.userid}:${s.shipno}`, s);
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue(ships),
+    mutate: vi.fn().mockImplementation(
       (uid: string, no: number, fn: (s: ShipState) => void) => {
         const s = shipMap.get(`${uid}:${no}`);
         if (s) fn(s);

@@ -8,6 +8,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * Verifies the single-socket-per-ship invariant (FR-025a).
@@ -20,7 +21,7 @@ import { makeGateway } from '../helpers/make-gateway';
 describe('GameGateway single-socket-per-ship invariant', () => {
   let gateway: GameGateway;
   let registry: ConnectedShipsRegistry;
-  let serverEmitMock: jest.Mock;
+  let serverEmitMock: Mock;
   let emitOrder: string[];
 
   const shipState = {
@@ -38,23 +39,23 @@ describe('GameGateway single-socket-per-ship invariant', () => {
       connected: true,
       handshake: { query: { userid } },
       data: {} as Record<string, unknown>,
-      emit: jest.fn().mockImplementation((ev: string) => {
+      emit: vi.fn().mockImplementation((ev: string) => {
         emitOrder.push(`socket[${id}]:${ev}`);
       }),
-      disconnect: jest.fn().mockImplementation(() => {
+      disconnect: vi.fn().mockImplementation(() => {
         // Simulate socket.io calling handleDisconnect when disconnect(true) is called
         gateway.handleDisconnect(sock as never);
       }),
-      on: jest.fn(),
-      join: jest.fn(),
-      leave: jest.fn(),
+      on: vi.fn(),
+      join: vi.fn(),
+      leave: vi.fn(),
       broadcast: {
         // gateway emits player.joined via broadcast (not server.emit), and
         // splits it by sector room; record every path under the server: prefix
         // so existing event-order assertions match.
-        emit: jest.fn().mockImplementation((ev: string) => { emitOrder.push(`server:${ev}`); }),
-        to: jest.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
-        except: jest.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
+        emit: vi.fn().mockImplementation((ev: string) => { emitOrder.push(`server:${ev}`); }),
+        to: vi.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
+        except: vi.fn(() => ({ emit: (ev: string) => { emitOrder.push(`server:${ev}`); } })),
       },
     };
     return sock;
@@ -62,17 +63,17 @@ describe('GameGateway single-socket-per-ship invariant', () => {
 
   const mockShipStateService = (): Partial<ShipStateService> => ({
     // Seat cap (MAXPLRS) counts live player ships on connect.
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByUserid: jest.fn().mockReturnValue([shipState]),
-    get: jest.fn().mockReturnValue(shipState),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    unboard: jest.fn().mockResolvedValue(undefined),
-    board: jest.fn(),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([shipState]),
+    get: vi.fn().mockReturnValue(shipState),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    unboard: vi.fn().mockResolvedValue(undefined),
+    board: vi.fn(),
   });
 
   beforeEach(() => {
     emitOrder = [];
-    serverEmitMock = jest.fn().mockImplementation((ev: string) => {
+    serverEmitMock = vi.fn().mockImplementation((ev: string) => {
       emitOrder.push(`server:${ev}`);
     });
 
@@ -80,7 +81,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     registry = new ConnectedShipsRegistry(svc as ShipStateService);
 
     const mockWsGuard = {
-      validate: jest.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
+      validate: vi.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
         const userid = socket.handshake.query?.userid ?? 'test-user';
         socket.data.userid = userid;
         return { sub: userid, username: userid };
@@ -88,7 +89,7 @@ describe('GameGateway single-socket-per-ship invariant', () => {
     } as unknown as WsAuthGuard;
     const mockPrisma = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([{
+        findMany: vi.fn().mockResolvedValue([{
           userid: 'user1',
           shipno: 1,
           shipname: 'Defiant',
@@ -97,12 +98,12 @@ describe('GameGateway single-socket-per-ship invariant', () => {
           ycoord: 3.2,
           items: Array(16).fill(0n),
         }]),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
     gateway = makeGateway({
       shipStateService: svc as ShipStateService,
       registry,
@@ -116,13 +117,13 @@ describe('GameGateway single-socket-per-ship invariant', () => {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
       // .except() is part of the real Socket.io chain — WARHUP uses it.
-      to: jest.fn(() => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) })),
+      to: vi.fn(() => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) })),
       // ANNOUN is a top-level server.except(...) broadcast.
-      except: jest.fn(() => ({ emit: jest.fn(), to: () => ({ emit: jest.fn() }) })),
+      except: vi.fn(() => ({ emit: vi.fn(), to: () => ({ emit: vi.fn() }) })),
       emit: serverEmitMock,
       sockets: {
         sockets: {
-          get: jest.fn().mockImplementation((id: string) =>
+          get: vi.fn().mockImplementation((id: string) =>
             id === 'sock-1' ? sock1 : undefined,
           ),
         },

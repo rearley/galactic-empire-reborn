@@ -34,24 +34,24 @@ function makeCtx(tickNumber = 1): TickContext {
  */
 function makeHarness(ship: ShipState) {
   let capturedHandler: ((ctx: TickContext) => void) | null = null;
-  const unsub = jest.fn();
+  const unsub = vi.fn();
 
   const mockTickService = {
-    subscribe: jest.fn().mockImplementation((_kind: TickKind, handler: (ctx: TickContext) => void) => {
+    subscribe: vi.fn().mockImplementation((_kind: TickKind, handler: (ctx: TickContext) => void) => {
       capturedHandler = handler;
       return unsub;
     }),
   } as unknown as TickService;
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([ship]),
-    mutate: jest.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
+    findAllShips: vi.fn().mockReturnValue([ship]),
+    mutate: vi.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
       fn(ship);
     }),
   } as unknown as ShipStateService;
 
   const mockMaintService = {
-    runAutoRepair: jest.fn().mockResolvedValue(undefined),
+    runAutoRepair: vi.fn().mockResolvedValue(undefined),
   } as unknown as MaintenanceService;
 
   const svc = new ShipTickService(mockTickService, mockShipState, mockMaintService);

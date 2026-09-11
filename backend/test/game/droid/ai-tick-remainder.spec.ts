@@ -175,7 +175,7 @@ function shipStateStub(ships: ShipState[]): ShipStateService {
       return s;
     },
     loadShip: (s: ShipState) => { ships.push(s); },
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     size: () => ships.length,
   } as unknown as ShipStateService;
 }
@@ -230,11 +230,11 @@ function droidHarness(rand: Random, droidOver: Partial<ShipState>, target: ShipS
   } as unknown as ShipClassCacheService;
 
   const svc = new DroidTickService(
-    { subscribe: jest.fn() } as unknown as TickService,
+    { subscribe: vi.fn() } as unknown as TickService,
     shipState, classCache,
     new DroidSpawner(shipState, classCache, rand),
-    { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry,
-    { create: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
+    { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry,
+    { create: vi.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
     new EventEmitter2(), rand,
   );
   return { svc, droid };
@@ -421,10 +421,10 @@ function cybHarness(
     shipState,
     classCache,
     {
-      hydrateAll: jest.fn().mockResolvedValue(undefined),
+      hydrateAll: vi.fn().mockResolvedValue(undefined),
       clampCybertronCash: (n: bigint) => n,
-      flushShipsImmediate: jest.fn(),
-      incrementKills: jest.fn(),
+      flushShipsImmediate: vi.fn(),
+      incrementKills: vi.fn(),
     } as unknown as CybertronRepository,
     new EventEmitter2(),
     rand,

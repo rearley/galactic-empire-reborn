@@ -19,6 +19,7 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -30,9 +31,9 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
   });
 }
 
-function build(update: jest.Mock) {
-  const prisma = { ship: { update }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-  const tick = { subscribe: jest.fn(() => jest.fn()) } as unknown as TickService;
+function build(update: Mock) {
+  const prisma = { ship: { update }, shipClass: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+  const tick = { subscribe: vi.fn(() => vi.fn()) } as unknown as TickService;
   const svc = new ShipStateService(prisma, tick);
   const errors: string[] = [];
   (svc as unknown as { logger: { error: (m: string) => void; warn: (m: string) => void } }).logger = {
@@ -50,7 +51,7 @@ const runFlush = async (svc: ShipStateService, times: number) => {
 
 describe('ShipStateService flush failure escalation', () => {
   it('does not cry wolf over a single transient failure', async () => {
-    const update = jest.fn()
+    const update = vi.fn()
       .mockRejectedValueOnce(new Error('deadlock'))
       .mockResolvedValue({});
     const { svc, errors } = build(update);
@@ -62,7 +63,7 @@ describe('ShipStateService flush failure escalation', () => {
   });
 
   it('raises the alarm once a run of flushes has all failed', async () => {
-    const update = jest.fn().mockRejectedValue(new Error('Unknown arg `channel`'));
+    const update = vi.fn().mockRejectedValue(new Error('Unknown arg `channel`'));
     const { svc, errors } = build(update);
     svc.loadShip(makeShip());
 
@@ -72,7 +73,7 @@ describe('ShipStateService flush failure escalation', () => {
   });
 
   it('names the persistence risk, not just the error', async () => {
-    const update = jest.fn().mockRejectedValue(new Error('Unknown arg `channel`'));
+    const update = vi.fn().mockRejectedValue(new Error('Unknown arg `channel`'));
     const { svc, errors } = build(update);
     svc.loadShip(makeShip());
     await runFlush(svc, 12);
@@ -95,12 +96,12 @@ describe('ShipStateService flush failure escalation', () => {
    * distinction never showed up.
    */
   it('alarms when a fault hits only SOME ships, sweep after sweep', async () => {
-    const update = jest.fn(({ where }: { where: { userid_shipno: { userid: string } } }) =>
+    const update = vi.fn(({ where }: { where: { userid_shipno: { userid: string } } }) =>
       where.userid_shipno.userid === 'doomed'
         ? Promise.reject(new Error('Unknown argument `userKills`'))
         : Promise.resolve({}),
     );
-    const { svc, errors } = build(update as unknown as jest.Mock);
+    const { svc, errors } = build(update as unknown as Mock);
     const doomed = makeShip({ userid: 'doomed', shipno: 1 });
     const healthy = makeShip({ userid: 'healthy', shipno: 1 });
     svc.loadShip(doomed);
@@ -116,7 +117,7 @@ describe('ShipStateService flush failure escalation', () => {
   });
 
   it('resets once flushes succeed again, so a later fault re-alarms', async () => {
-    const update = jest.fn().mockRejectedValue(new Error('boom'));
+    const update = vi.fn().mockRejectedValue(new Error('boom'));
     const { svc, errors } = build(update);
     const ship = makeShip();
     svc.loadShip(ship);

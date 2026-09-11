@@ -327,7 +327,7 @@ const g = (k: number): number => k / 65536;
 
 function buildEconomy(draws: number[], failInserts = false) {
   const created: MailRow[] = [];
-  const create = jest.fn(async (arg: { data: MailRow }) => {
+  const create = vi.fn(async (arg: { data: MailRow }) => {
     created.push(arg.data);
     if (failInserts) throw new Error('mailStat insert rejected');
     return {};

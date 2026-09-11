@@ -30,7 +30,7 @@ async function truncateAll(prisma: PrismaService) {
 async function makeApp() {
   const app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
   }).compile();
   const prisma = app.get(PrismaService);
   const service = app.get(MidnightService);
@@ -42,7 +42,7 @@ describe('self-heal on startup (FR-001b)', () => {
     const { app, prisma, service } = await makeApp();
     await truncateAll(prisma);
 
-    const runSpy = jest.spyOn(service, 'run').mockResolvedValue({
+    const runSpy = vi.spyOn(service, 'run').mockResolvedValue({
       usersUpdated: 0, planetsProcessed: 0, mailReportsCreated: 0,
       mailDeleted: 0, teamsReconciled: 0, teamsRemoved: 0,
       abandonedSignupsDeleted: 0,
@@ -86,7 +86,7 @@ describe('self-heal on startup (FR-001b)', () => {
       },
     });
 
-    const runSpy = jest.spyOn(service, 'run');
+    const runSpy = vi.spyOn(service, 'run');
 
     await app.init();
     await new Promise((r) => setTimeout(r, 100));

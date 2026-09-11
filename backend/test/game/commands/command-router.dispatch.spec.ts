@@ -51,30 +51,30 @@ function buildRouter() {
 
   // Common mocks
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([ship]),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue([ship]),
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(ship);
         return ship;
       },
     ),
-    removeFromGame: jest.fn(),
-    abandon: jest.fn().mockResolvedValue(undefined),
+    removeFromGame: vi.fn(),
+    abandon: vi.fn().mockResolvedValue(undefined),
   } as unknown as ShipStateService;
 
   const mockPlanet = {
-    get: jest.fn().mockReturnValue({ items: [{ qty: 50_000n }] }),
+    get: vi.fn().mockReturnValue({ items: [{ qty: 50_000n }] }),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash: 100_000n }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ cash: 100_000n }),
+      update: vi.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
 
   const mockMaintService = {
-    runMaintenance: jest.fn().mockResolvedValue({
+    runMaintenance: vi.fn().mockResolvedValue({
       ok: true,
       price: BigInt(MAINT_COST_NORMAL),
       repairAmt: 4,
@@ -90,7 +90,7 @@ function buildRouter() {
   router.register(new SetHandlerService(mockShipState, new UserRepository(mockPrisma)).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
-  router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);
+  router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: vi.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);
 
   return { router, ship };
 }

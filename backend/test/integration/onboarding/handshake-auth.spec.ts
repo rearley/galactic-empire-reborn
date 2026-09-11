@@ -61,7 +61,7 @@ function waitForDisconnect(socket: Socket, timeoutMs = 3000): Promise<void> {
  * - token === 'valid-token'          → returns a minimal JWT payload
  */
 const mockWsAuthGuard = {
-  validate: jest.fn().mockImplementation(async (socket: Socket) => {
+  validate: vi.fn().mockImplementation(async (socket: Socket) => {
     const token = (socket as any).handshake?.auth?.token as string | undefined;
     if (!token || token === 'invalid') {
       socket.emit('error', { code: 'AUTH_REQUIRED', message: 'No token provided.' });
@@ -81,28 +81,28 @@ describe('GameGateway — handshake auth (T025)', () => {
       imports: [GatewayModule],
     })
       .overrideProvider(ShipStateService)
-      .useValue({ findByUserid: jest.fn().mockReturnValue([]), get: jest.fn() })
+      .useValue({ findByUserid: vi.fn().mockReturnValue([]), get: vi.fn() })
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn() })
+      .useValue({ register: vi.fn(), dispatch: vi.fn() })
       .overrideProvider(PrismaService)
       .useValue({
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-        mine: { findMany: jest.fn().mockResolvedValue([]) },
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+        mine: { findMany: vi.fn().mockResolvedValue([]) },
       })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       // Replace the real WsAuthGuard with our controlled mock so the test
       // exercises the gateway's wiring without needing a real JWT secret.

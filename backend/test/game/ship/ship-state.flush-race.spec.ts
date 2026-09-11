@@ -19,6 +19,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeState(overrides: Partial<ShipState>): ShipState {
   return baseMakeShip({
@@ -42,18 +43,18 @@ function makeState(overrides: Partial<ShipState>): ShipState {
   });
 }
 
-function harness(update: jest.Mock) {
+function harness(update: Mock) {
   let capturedFlush: (() => void | Promise<void>) | null = null;
   const prisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-    ship: { findMany: jest.fn().mockResolvedValue([]), update },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+    ship: { findMany: vi.fn().mockResolvedValue([]), update },
   } as unknown as PrismaService;
   const ticks = {
     subscribe: (kind: TickKind, fn: () => void | Promise<void>) => {
       if (kind === TickKind.SHIP_UPDATE) capturedFlush = fn;
       return () => {};
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
   const svc = new ShipStateService(prisma, ticks);
   return { svc, ticks, flush: () => capturedFlush!() };
@@ -66,7 +67,7 @@ describe('ShipStateService.flush — mutations landing mid-flush', () => {
     // The write resolves only after we have moved the ship — i.e. the physics
     // tick fired between the Prisma call and its completion.
     let moved = false;
-    const update = jest.fn().mockImplementation(async () => {
+    const update = vi.fn().mockImplementation(async () => {
       if (!moved) {
         moved = true;
         ship.xcoord = 6;
@@ -94,7 +95,7 @@ describe('ShipStateService.flush — mutations landing mid-flush', () => {
 
   it('re-queues a ship whose write failed', async () => {
     const ship = makeState({ dirty: true });
-    const update = jest.fn().mockRejectedValue(new Error('connection reset'));
+    const update = vi.fn().mockRejectedValue(new Error('connection reset'));
     const h = harness(update);
     await h.svc.onModuleInit();
     h.svc.loadShip(ship);

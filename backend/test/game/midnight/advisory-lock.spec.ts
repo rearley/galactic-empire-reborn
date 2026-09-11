@@ -31,7 +31,7 @@ async function truncateAll() {
 beforeAll(async () => {
   app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
   }).compile();
   prisma = app.get(PrismaService);
   service = app.get(MidnightService);
@@ -57,7 +57,7 @@ describe('advisory lock concurrency (FR-004a)', () => {
     // Simulate the advisory lock being held by another session by mocking
     // pg_try_advisory_lock to return false. Using a real second DB connection
     // is unreliable because Prisma may reuse the same session from its pool.
-    const queryRawSpy = jest.spyOn(prisma, '$queryRaw').mockResolvedValueOnce(
+    const queryRawSpy = vi.spyOn(prisma, '$queryRaw').mockResolvedValueOnce(
       [{ pg_try_advisory_lock: false }],
     );
 
@@ -69,7 +69,7 @@ describe('advisory lock concurrency (FR-004a)', () => {
   });
 
   it('scheduledRun() catches MidnightLockHeldError and does not rethrow', async () => {
-    const queryRawSpy = jest.spyOn(prisma, '$queryRaw').mockResolvedValueOnce(
+    const queryRawSpy = vi.spyOn(prisma, '$queryRaw').mockResolvedValueOnce(
       [{ pg_try_advisory_lock: false }],
     );
 

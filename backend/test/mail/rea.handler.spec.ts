@@ -79,9 +79,9 @@ function makeService(
   listing: MailListing = { userid: 'alice', entries: [], empty: true },
 ) {
   const mockInbox = {
-    resolveIndex: jest.fn().mockResolvedValue(resolveResult),
-    list: jest.fn().mockResolvedValue(listing),
-    deleteByIndex: jest.fn(),
+    resolveIndex: vi.fn().mockResolvedValue(resolveResult),
+    list: vi.fn().mockResolvedValue(listing),
+    deleteByIndex: vi.fn(),
   } as unknown as MailInboxService;
 
   const handler = new ReaHandlerService(mockInbox);

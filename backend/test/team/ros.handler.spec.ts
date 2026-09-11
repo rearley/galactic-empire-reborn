@@ -13,7 +13,7 @@ import { RosHandlerService } from '../../src/game/commands/handlers/ros.handler'
 import { UserRepository } from '../../src/game/player/user.repository';
 
 function makeHandler(rows: unknown[]): RosHandlerService {
-  const prisma = { user: { findMany: jest.fn().mockResolvedValue(rows) } };
+  const prisma = { user: { findMany: vi.fn().mockResolvedValue(rows) } };
   return new RosHandlerService(new UserRepository(prisma as never));
 }
 

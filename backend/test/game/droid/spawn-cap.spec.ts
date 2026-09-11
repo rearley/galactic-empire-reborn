@@ -124,8 +124,8 @@ function buildHarness(seed = 42) {
     },
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
-  const mineRepo = { create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }) } as unknown as MineRepository;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
+  const mineRepo = { create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }) } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];
   const tickService = {
@@ -234,13 +234,13 @@ describe('MAXDROID — total droid population cap', () => {
   it('stops spawning once the total population reaches the cap', async () => {
     // The guard cannot be exercised via the environment: constants.ts captures
     // MAXDROID at import, and DroidTickService closes over that module, so
-    // jest.resetModules() cannot reach the already-constructed service. Nor can
+    // vi.resetModules() cannot reach the already-constructed service. Nor can
     // the population map be pre-seeded — the tick reconciles it against real
     // ships each pass and drops placeholder ids.
     //
     // Forcing the counter is what actually exercises the branch.
     const { svc, fireTick } = buildHarness(11);
-    jest
+    vi
       .spyOn(svc as unknown as { totalDroidPopulation: () => number }, 'totalDroidPopulation')
       .mockReturnValue(MAXDROID);
 

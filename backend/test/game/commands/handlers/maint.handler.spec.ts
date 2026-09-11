@@ -31,7 +31,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(gateResult: GateResult = { ok: true, price: BigInt(MAINT_COST_NORMAL), repairAmt: 11 }) {
   const mockMaintenanceService = {
-    runMaintenance: jest.fn().mockResolvedValue(gateResult),
+    runMaintenance: vi.fn().mockResolvedValue(gateResult),
   } as unknown as MaintenanceService;
 
   const handler = new MaintHandlerService(mockMaintenanceService);

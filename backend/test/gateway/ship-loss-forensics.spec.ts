@@ -51,17 +51,17 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
         get: (userid: string, shipno: number) =>
           userid === VICTIM.userid && shipno === VICTIM.shipno ? VICTIM : undefined,
         findAllShips: () => [VICTIM],
-        removeFromGame: jest.fn(),
+        removeFromGame: vi.fn(),
       } as unknown as ShipStateService,
-      prisma: { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
     });
     captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, logs };
@@ -124,16 +124,16 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
     // Races and AI victims: never throw, and never lose the identity.
     const logs: string[] = [];
     const gateway = makeGateway({
-      shipStateService: { get: () => undefined, findAllShips: () => [], removeFromGame: jest.fn() } as unknown as ShipStateService,
-      prisma: { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipStateService: { get: () => undefined, findAllShips: () => [], removeFromGame: vi.fn() } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => undefined } as unknown as ShipClassCacheService,
     });
     captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     destroy(gateway);
@@ -161,25 +161,25 @@ describe('handleCombatShipDestroyed — awaitable by the shutdown drain', () => 
     let finished = false;
 
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async () => {
+      $transaction: vi.fn().mockImplementation(async () => {
         await txDone;
         finished = true;
       }),
-      shipClass: { findFirst: jest.fn() },
+      shipClass: { findFirst: vi.fn() },
     };
 
     const gateway = makeGateway({
       shipStateService: {
         get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
         findAllShips: () => [],
-        removeFromGame: jest.fn(),
+        removeFromGame: vi.fn(),
       } as unknown as ShipStateService,
       prisma: prisma as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
     });
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     const returned = (gateway as unknown as {

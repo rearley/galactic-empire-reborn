@@ -27,7 +27,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(ship: ShipState) {
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(ship);
         return ship;

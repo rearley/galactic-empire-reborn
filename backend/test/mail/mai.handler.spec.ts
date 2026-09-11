@@ -30,7 +30,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeServices(maintResult: CommandResult = { lines: [] }) {
-  const mockMaintCommandHandler = jest.fn().mockResolvedValue(maintResult);
+  const mockMaintCommandHandler = vi.fn().mockResolvedValue(maintResult);
   const mockMaint = {
     command: { handler: mockMaintCommandHandler },
   } as unknown as MaintHandlerService;

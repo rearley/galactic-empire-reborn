@@ -2,8 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { AuthValidationFilter } from '../../../src/auth/auth-validation.filter';
 
 function makeHost() {
-  const json = jest.fn();
-  const status = jest.fn().mockReturnValue({ json });
+  const json = vi.fn();
+  const status = vi.fn().mockReturnValue({ json });
   const host = {
     switchToHttp: () => ({
       getResponse: () => ({ status }),

@@ -31,8 +31,8 @@ function makeRow(overrides: Partial<MailStat> = {}): MailStat {
 }
 
 function makeService(rows: MailStat[]) {
-  const repo = { findByUserid: jest.fn().mockResolvedValue(rows) } as unknown as MailInboxRepository;
-  const ships = { findByUserid: jest.fn().mockReturnValue([]) } as unknown as ShipStateService;
+  const repo = { findByUserid: vi.fn().mockResolvedValue(rows) } as unknown as MailInboxRepository;
+  const ships = { findByUserid: vi.fn().mockReturnValue([]) } as unknown as ShipStateService;
   return new MailInboxService(repo, ships, {} as unknown as PrismaService);
 }
 

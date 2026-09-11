@@ -89,15 +89,15 @@ describe('Session replaced (T048)', () => {
     // ConnectedShipsRegistry is NOT overridden; the real instance is used
     // so upsert() correctly tracks and returns the prior socket ID.
     const shipStateServiceMock = {
-      findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
-      findAllShips: jest.fn().mockReturnValue([TEST_SHIP]),
-      get: jest.fn().mockReturnValue(TEST_SHIP),
-      loadShip: jest.fn(),
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(1),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      findByUserid: vi.fn().mockReturnValue([TEST_SHIP]),
+      findAllShips: vi.fn().mockReturnValue([TEST_SHIP]),
+      get: vi.fn().mockReturnValue(TEST_SHIP),
+      loadShip: vi.fn(),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(1),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -106,45 +106,45 @@ describe('Session replaced (T048)', () => {
       .overrideProvider(ShipStateService)
       .useValue(shipStateServiceMock)
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue({
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-        mine: { findMany: jest.fn().mockResolvedValue([]) },
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+        mine: { findMany: vi.fn().mockResolvedValue([]) },
         ship: {
-          findMany: jest.fn().mockResolvedValue([{
+          findMany: vi.fn().mockResolvedValue([{
             userid: TEST_USERID,
             shipno: TEST_SHIPNO,
             shipname: 'StarFalcon',
           }]),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
         // Both sockets present as the SAME user — identical shipId in registry
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = TEST_USERID;
           client.data.username = 'TestPilot';
           return { sub: TEST_USERID, username: 'TestPilot' };
         }),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .compile();
 

@@ -7,13 +7,23 @@
     "target": "ES2022",
     "module": "commonjs",
     "moduleResolution": "bundler",
-    "types": ["jest", "node"],
+    "types": [
+      "vitest/globals",
+      "node"
+    ],
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src/**/*", "test/**/*", "prisma/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "prisma/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

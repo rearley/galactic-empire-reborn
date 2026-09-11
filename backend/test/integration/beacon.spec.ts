@@ -72,13 +72,13 @@ function buildGateway(options: {
   const randomMock = { next: randomNext };
 
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue([options.mover, ...options.observers]),
-    get: jest.fn().mockReturnValue(options.mover),
+    findAllShips: vi.fn().mockReturnValue([options.mover, ...options.observers]),
+    get: vi.fn().mockReturnValue(options.mover),
   };
 
   const registryMock = {
-    getSocketId: jest.fn().mockReturnValue(null),
-    list: jest.fn().mockReturnValue([]),
+    getSocketId: vi.fn().mockReturnValue(null),
+    list: vi.fn().mockReturnValue([]),
   };
 
   // Partial gateway — only the beacon-relevant fields

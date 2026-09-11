@@ -32,11 +32,11 @@ function makeService(
   planetState: { userid: string } | null = { userid: 'owner' },
   withdrawResult: WithdrawResult = { ok: true, amount: 500n },
 ) {
-  const withdrawTaxMock = jest.fn().mockResolvedValue(withdrawResult);
-  const prismaUpdateMock = jest.fn().mockResolvedValue({});
+  const withdrawTaxMock = vi.fn().mockResolvedValue(withdrawResult);
+  const prismaUpdateMock = vi.fn().mockResolvedValue({});
 
   const planetMock = {
-    get: jest.fn().mockReturnValue(planetState),
+    get: vi.fn().mockReturnValue(planetState),
     withdrawTax: withdrawTaxMock,
   };
   const prismaMock = { user: { update: prismaUpdateMock } };

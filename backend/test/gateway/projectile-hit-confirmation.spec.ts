@@ -52,17 +52,17 @@ function build() {
 
   const gateway = makeGateway({
     shipStateService,
-    wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+    wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
     scanHandler: {
-      clearScantab: jest.fn(),
+      clearScantab: vi.fn(),
       // The shooter has the victim on scan as 'C'; nobody else has anyone.
-      lettersFor: jest.fn((userid: string) =>
+      lettersFor: vi.fn((userid: string) =>
         (userid === 'usr_shooter' ? [{ shipKey: 'usr_victim:2', letter: 'C' }] : [])),
     } as unknown as ScanHandlerService,
     random: mockRandom,
   });
   (gateway as unknown as { server: unknown }).server = {
-    emit: jest.fn(),
+    emit: vi.fn(),
     to: (room: string) => ({
       emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },
     }),

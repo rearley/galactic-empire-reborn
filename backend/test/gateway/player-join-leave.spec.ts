@@ -7,6 +7,7 @@ import { OnboardingService } from '../../src/game/onboarding/onboarding.service'
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * Verifies player.joined broadcasts after snapshot and player.left fires on disconnect.
@@ -16,7 +17,7 @@ import { makeGateway } from '../helpers/make-gateway';
  */
 describe('GameGateway player.joined / player.left', () => {
   let gateway: GameGateway;
-  let serverEmitMock: jest.Mock;
+  let serverEmitMock: Mock;
 
   const shipState = {
     userid: 'user1',
@@ -32,24 +33,24 @@ describe('GameGateway player.joined / player.left', () => {
     connected: true,
     handshake: { query: { userid } },
     data: {} as Record<string, unknown>,
-    emit: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
+    emit: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     // gateway emits player.joined via client.broadcast.emit (not server.emit) —
     // route those calls into serverEmitMock so existing assertions match.
     // `player.joined` now goes out twice — with a sector to the arriving
     // sector's room, without one to everyone else — so the double needs the
     // whole BroadcastOperator chain, all of it routed into serverEmitMock.
     broadcast: {
-      emit: jest.fn().mockImplementation((...args: unknown[]) => {
+      emit: vi.fn().mockImplementation((...args: unknown[]) => {
         if (serverEmitMock) serverEmitMock(...args);
       }),
-      to: jest.fn(() => ({
+      to: vi.fn(() => ({
         emit: (...args: unknown[]) => { if (serverEmitMock) serverEmitMock(...args); },
       })),
-      except: jest.fn(() => ({
+      except: vi.fn(() => ({
         emit: (...args: unknown[]) => { if (serverEmitMock) serverEmitMock(...args); },
       })),
     },
@@ -57,20 +58,20 @@ describe('GameGateway player.joined / player.left', () => {
 
   const mockShipStateService = (): Partial<ShipStateService> => ({
     // Seat cap (MAXPLRS) counts live player ships on connect.
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByUserid: jest.fn().mockReturnValue([shipState]),
-    get: jest.fn().mockReturnValue(shipState),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    unboard: jest.fn().mockResolvedValue(undefined),
-    board: jest.fn(),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([shipState]),
+    get: vi.fn().mockReturnValue(shipState),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    unboard: vi.fn().mockResolvedValue(undefined),
+    board: vi.fn(),
   });
 
   beforeEach(() => {
-    serverEmitMock = jest.fn();
+    serverEmitMock = vi.fn();
     const svc = mockShipStateService();
 
     const mockWsGuard = {
-      validate: jest.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
+      validate: vi.fn().mockImplementation(async (socket: { handshake: { query?: { userid?: string } }; data: Record<string, unknown> }) => {
         const userid = socket.handshake.query?.userid ?? 'test-user';
         socket.data.userid = userid;
         return { sub: userid, username: userid };
@@ -78,7 +79,7 @@ describe('GameGateway player.joined / player.left', () => {
     } as unknown as WsAuthGuard;
     const mockPrisma = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([{
+        findMany: vi.fn().mockResolvedValue([{
           userid: 'user1',
           shipno: 1,
           shipname: 'Defiant',
@@ -87,12 +88,12 @@ describe('GameGateway player.joined / player.left', () => {
           ycoord: 3.2,
           items: Array(16).fill(0n),
         }]),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
     gateway = makeGateway({
       shipStateService: svc as ShipStateService,
       wsAuthGuard: mockWsGuard,
@@ -105,11 +106,11 @@ describe('GameGateway player.joined / player.left', () => {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
       // .except() is part of the real Socket.io chain — WARHUP uses it.
-      to: jest.fn(() => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) })),
+      to: vi.fn(() => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) })),
       // ANNOUN is a top-level server.except(...) broadcast.
-      except: jest.fn(() => ({ emit: jest.fn(), to: () => ({ emit: jest.fn() }) })),
+      except: vi.fn(() => ({ emit: vi.fn(), to: () => ({ emit: vi.fn() }) })),
       emit: serverEmitMock,
-      sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
+      sockets: { sockets: { get: vi.fn().mockReturnValue(undefined) } },
     };
   });
 

@@ -16,6 +16,7 @@ import {
 import { PlayerScoreService } from '../../../src/game/player/player-score.service';
 import { PlayerScoreRepository } from '../../../src/game/player/player-score.repository';
 import { CHGLOSER_DEFAULT } from '../../../src/game/midnight/midnight.constants';
+import type { Mock } from 'vitest';
 
 function makeEvent(overrides: Partial<CombatShipDestroyedEvent> = {}): CombatShipDestroyedEvent {
   return {
@@ -44,15 +45,15 @@ const DROID_CLASS_POINTS: Record<number, number> = {
 
 describe('US6 — Droid kill scoring (FR-025/026)', () => {
   let events: EventEmitter2;
-  let transferKillScore: jest.Mock;
-  let applyCashPenalty: jest.Mock;
+  let transferKillScore: Mock;
+  let applyCashPenalty: Mock;
   let service: PlayerScoreService;
 
   beforeEach(() => {
     events = new EventEmitter2();
-    transferKillScore = jest.fn().mockResolvedValue(undefined);
-    applyCashPenalty = jest.fn().mockResolvedValue(0n);
-    const repo = { transferKillScore, applyCashPenalty, getRospos: jest.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
+    transferKillScore = vi.fn().mockResolvedValue(undefined);
+    applyCashPenalty = vi.fn().mockResolvedValue(0n);
+    const repo = { transferKillScore, applyCashPenalty, getRospos: vi.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
     service = new PlayerScoreService(events, repo, CHGLOSER_DEFAULT);
     service.onModuleInit();
   });

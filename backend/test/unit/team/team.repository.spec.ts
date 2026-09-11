@@ -1,10 +1,11 @@
 import { TeamRepository } from '../../../src/game/team/team.repository';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import type { Mock } from 'vitest';
 
 function makePrisma(findFirstResult: unknown = null) {
   return {
     team: {
-      findFirst: jest.fn().mockResolvedValue(findFirstResult),
+      findFirst: vi.fn().mockResolvedValue(findFirstResult),
     },
   } as unknown as PrismaService;
 }
@@ -12,7 +13,7 @@ function makePrisma(findFirstResult: unknown = null) {
 function makePrismaWithUnique(findUniqueResult: unknown = null) {
   return {
     team: {
-      findUnique: jest.fn().mockResolvedValue(findUniqueResult),
+      findUnique: vi.fn().mockResolvedValue(findUniqueResult),
     },
   } as unknown as PrismaService;
 }
@@ -28,7 +29,7 @@ describe('TeamRepository.findByNameLower', () => {
 
     await repo.findByNameLower('%');
 
-    const where = (prisma.team.findFirst as jest.Mock).mock.calls[0][0].where;
+    const where = (prisma.team.findFirst as Mock).mock.calls[0][0].where;
     expect(where.teamname.equals).toBe('\\%');
   });
 
@@ -38,7 +39,7 @@ describe('TeamRepository.findByNameLower', () => {
 
     await repo.findByNameLower('rebels');
 
-    const where = (prisma.team.findFirst as jest.Mock).mock.calls[0][0].where;
+    const where = (prisma.team.findFirst as Mock).mock.calls[0][0].where;
     expect(where.teamname.equals).toBe('rebels');
     expect(where.teamname.mode).toBe('insensitive');
   });

@@ -1,17 +1,18 @@
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { AuthService } from '../../src/auth/auth.service';
 import { Socket } from 'socket.io';
+import type { Mock } from 'vitest';
 
 function makeSocket(token: string | undefined) {
   return {
     handshake: { auth: token === undefined ? {} : { token } },
-    emit: jest.fn(),
-    disconnect: jest.fn(),
-  } as unknown as Socket & { emit: jest.Mock; disconnect: jest.Mock };
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+  } as unknown as Socket & { emit: Mock; disconnect: Mock };
 }
 
 function makeGuard(payload: unknown) {
-  const authService = { verifyJwt: jest.fn().mockResolvedValue(payload) } as unknown as AuthService;
+  const authService = { verifyJwt: vi.fn().mockResolvedValue(payload) } as unknown as AuthService;
   return new WsAuthGuard(authService);
 }
 

@@ -26,13 +26,13 @@ describe('GameGateway — a Cybertron taunt reaches the pilot it is aimed at', (
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn(),
+      get: vi.fn(),
     } as unknown as ShipStateService;
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     // The taunt goes out as ONE emit chained over two rooms (`.to(a).to(b)`),
@@ -40,7 +40,7 @@ describe('GameGateway — a Cybertron taunt reaches the pilot it is aimed at', (
     // taunter's sector. The double must therefore model the chain, and record
     // one entry PER ROOM so these assertions keep their meaning.
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: function chain(room: string) {
         const rooms = [room];
         const node = {

@@ -59,7 +59,7 @@ function build(ships: ShipState[]) {
     {} as never,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
-      findPlanetByName: () => null, getMeta: jest.fn(),
+      findPlanetByName: () => null, getMeta: vi.fn(),
     } as never,
     { get: () => undefined } as never,
     { all: () => [] } as never,

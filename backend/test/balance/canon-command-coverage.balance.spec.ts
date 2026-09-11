@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { readdirSync } from 'node:fs';
 
 /**
  * Every keyword in canon's command table must be typeable here.
@@ -26,7 +27,6 @@ function canonKeywords(): string[] {
 }
 
 function ourKeywords(): Set<string> {
-  const { readdirSync } = require('fs') as typeof import('fs');
   const words = new Set<string>();
   for (const f of readdirSync(HANDLERS).filter((n: string) => n.endsWith('.ts'))) {
     const src = readFileSync(join(HANDLERS, f), 'utf8');

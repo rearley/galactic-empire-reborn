@@ -41,10 +41,10 @@ function makePlanet(overrides: Partial<Planet> & Pick<Planet, 'xsect' | 'ysect' 
 // ── Mock PrismaService ────────────────────────────────────────────────────────
 
 const prismaMock = {
-  planet: { findMany: jest.fn().mockResolvedValue([]) },
-  wormhole: { findMany: jest.fn().mockResolvedValue([]) },
-  galaxyMeta: { findFirst: jest.fn().mockResolvedValue(null) },
-  $transaction: jest.fn(),
+  planet: { findMany: vi.fn().mockResolvedValue([]) },
+  wormhole: { findMany: vi.fn().mockResolvedValue([]) },
+  galaxyMeta: { findFirst: vi.fn().mockResolvedValue(null) },
+  $transaction: vi.fn(),
 };
 
 // ── Shared test state ─────────────────────────────────────────────────────────

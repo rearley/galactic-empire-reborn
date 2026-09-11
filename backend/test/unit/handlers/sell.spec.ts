@@ -24,8 +24,8 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(sellResult: Awaited<ReturnType<PlanetStateService['sell']>> = { ok: true, transferred: 10, proceeds: 19n, fee: 1n }) {
-  const sellMock = jest.fn().mockResolvedValue(sellResult);
-  const prismaUpdateMock = jest.fn().mockResolvedValue({});
+  const sellMock = vi.fn().mockResolvedValue(sellResult);
+  const prismaUpdateMock = vi.fn().mockResolvedValue({});
 
   const planetMock = { sell: sellMock };
   const prismaMock = { user: { update: prismaUpdateMock } };

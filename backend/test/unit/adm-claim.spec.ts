@@ -36,9 +36,9 @@ function makeService(
   planetUserid: string | null,
   claimResult: unknown = { ok: true },
 ) {
-  const claim = jest.fn().mockResolvedValue(claimResult);
+  const claim = vi.fn().mockResolvedValue(claimResult);
   const planetService = {
-    get: jest.fn().mockReturnValue({
+    get: vi.fn().mockReturnValue({
       xsect: 3, ysect: 4, plnum: 1, userid: planetUserid, name: planetUserid ? 'Held' : '',
       cash: 0n, tax: 0n, taxrate: 0, password: '', teamcode: 0n,
       items: Array.from({ length: NUMITEMS }, () => ({
@@ -46,7 +46,7 @@ function makeService(
       })),
     }),
     claim,
-    applyAdminChange: jest.fn().mockResolvedValue({ ok: true }),
+    applyAdminChange: vi.fn().mockResolvedValue({ ok: true }),
   } as unknown as PlanetStateService;
   return { svc: new AdminHandlerService(planetService), claim };
 }

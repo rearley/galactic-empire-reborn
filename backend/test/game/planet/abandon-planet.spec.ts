@@ -1,6 +1,7 @@
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { NUMITEMS, I_MEN, I_FOOD } from '../../../src/game/constants/items';
+import type { Mock } from 'vitest';
 
 /**
  * GECMDS.C:3420 cmd_abandon — the canonical `aba`. In orbit over a planet you
@@ -26,13 +27,13 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 
 function makeService(planet: PlanetState | null): {
   svc: PlanetStateService;
-  update: jest.Mock;
-  userUpdate: jest.Mock;
+  update: Mock;
+  userUpdate: Mock;
 } {
-  const update = jest.fn().mockResolvedValue({});
-  const userUpdate = jest.fn().mockResolvedValue({});
+  const update = vi.fn().mockResolvedValue({});
+  const userUpdate = vi.fn().mockResolvedValue({});
   const prisma = {
-    planet: { update, findMany: jest.fn().mockResolvedValue([]) },
+    planet: { update, findMany: vi.fn().mockResolvedValue([]) },
     user: { updateMany: userUpdate },
   } as never;
   const svc = new PlanetStateService(prisma, { get: () => undefined } as never);

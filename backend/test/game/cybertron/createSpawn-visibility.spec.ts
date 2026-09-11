@@ -15,19 +15,20 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import type { SpawnSlotInit } from '../../../src/game/cybertron/cybertron.repository';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import type { Mock } from 'vitest';
 
 // ─── Fake Prisma that records calls ──────────────────────────────────────────
 
 function buildFakePrisma(returnedShip: Record<string, unknown>) {
-  const upsertMock = jest.fn().mockResolvedValue({});
-  const createMock = jest.fn().mockResolvedValue({});
-  const findUniqueMock = jest.fn().mockResolvedValue(returnedShip);
-  const txFn = jest.fn();
+  const upsertMock = vi.fn().mockResolvedValue({});
+  const createMock = vi.fn().mockResolvedValue({});
+  const findUniqueMock = vi.fn().mockResolvedValue(returnedShip);
+  const txFn = vi.fn();
 
   const fakePrisma = {
-    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<void>) => {
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
-        user: { upsert: upsertMock, findUnique: jest.fn().mockResolvedValue({ userid: 'Cybrg-test', cash: 1000n }) },
+        user: { upsert: upsertMock, findUnique: vi.fn().mockResolvedValue({ userid: 'Cybrg-test', cash: 1000n }) },
         ship: { upsert: createMock },
       };
       await fn(tx);
@@ -46,20 +47,20 @@ function buildFakePrisma(returnedShip: Record<string, unknown>) {
 function buildFakeShipState() {
   const map = new Map<string, ShipState>();
 
-  const loadShipSpy = jest.fn((state: ShipState) => {
+  const loadShipSpy = vi.fn((state: ShipState) => {
     map.set(`${state.userid}:${state.shipno}`, state);
   });
 
-  const getSpy = jest.fn((userid: string, shipno: number): ShipState | undefined => {
+  const getSpy = vi.fn((userid: string, shipno: number): ShipState | undefined => {
     return map.get(`${userid}:${shipno}`);
   });
 
   const fakeShipState = {
     loadShip: loadShipSpy,
     get: getSpy,
-    findByUserid: jest.fn().mockReturnValue([]),
-    findAllShips: jest.fn().mockReturnValue([]),
-    removeFromGame: jest.fn(),
+    findByUserid: vi.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue([]),
+    removeFromGame: vi.fn(),
   } as unknown as ShipStateService;
 
   return { fakeShipState, loadShipSpy, getSpy, map };
@@ -246,6 +247,6 @@ describe('T038 — Cybertron spawn-visibility: ship immediately in ShipStateServ
     const repo = new CybertronRepository(fakePrisma, fakeShipState);
     await repo.createSpawn(makeSpawnSlot(userid, shipno));
 
-    expect((fakePrisma.$transaction as jest.Mock)).toHaveBeenCalledTimes(1);
+    expect((fakePrisma.$transaction as Mock)).toHaveBeenCalledTimes(1);
   });
 });

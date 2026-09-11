@@ -26,6 +26,7 @@ import {
 import { I_GOLD, I_MINE } from '../../../src/game/constants/items';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function buildHarness() {
   const shipMap = new Map<string, ShipState>();
   shipMap.set(`${droidUserid}:1`, murdonian);
 
-  const removeFromGameSpy = jest.fn((s: { userid: string; shipno: number }) => {
+  const removeFromGameSpy = vi.fn((s: { userid: string; shipno: number }) => {
     shipMap.delete(`${s.userid}:${s.shipno}`);
   });
 
@@ -111,13 +112,13 @@ function buildHarness() {
     getMaxShields: (_n: number) => 2,
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const tickService = {
-    subscribe: jest.fn(),
+    subscribe: vi.fn(),
   } as unknown as TickService;
 
   const spawner = new DroidSpawner(shipState, classCache, rand);
@@ -214,7 +215,7 @@ describe('T016 — Murdonian cargo transfer on kill', () => {
 
     // Only mine.create is a DB operation in DroidTickService — ship.delete is never called
     // The mineRepo.create mock was never triggered (no mine lay happened here)
-    expect((mineRepo.create as jest.Mock).mock.calls).toHaveLength(0);
+    expect((mineRepo.create as Mock).mock.calls).toHaveLength(0);
   });
 
   it('frees the slot from livePopulation', async () => {

@@ -19,24 +19,25 @@ import {
   CombatShipDestroyedEvent,
 } from '../../../src/game/combat/combat-events';
 import { makeGateway } from '../../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
   let gateway: GameGateway;
-  let toMock: jest.Mock;
-  let serverEmitMock: jest.Mock;
+  let toMock: Mock;
+  let serverEmitMock: Mock;
 
   beforeEach(() => {
-    toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
-    serverEmitMock = jest.fn();
+    toMock = vi.fn().mockReturnValue({ emit: vi.fn() });
+    serverEmitMock = vi.fn();
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
     const mockPrisma = {
-      ship: { findFirst: jest.fn(), updateMany: jest.fn() },
-      $transaction: jest.fn().mockResolvedValue(undefined),
+      ship: { findFirst: vi.fn(), updateMany: vi.fn() },
+      $transaction: vi.fn().mockResolvedValue(undefined),
     } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    const mockShipState = { removeFromGame: jest.fn(), get: jest.fn().mockReturnValue(undefined), findAllShips: () => [] } as unknown as ShipStateService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
+    const mockShipState = { removeFromGame: vi.fn(), get: vi.fn().mockReturnValue(undefined), findAllShips: () => [] } as unknown as ShipStateService;
     gateway = makeGateway({
       shipStateService: mockShipState,
       wsAuthGuard: mockWsGuard,
@@ -51,7 +52,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       // KILLEDBY goes out via except(victim) — canon's outwar skips the dying
       // pilot's own channel (GEFUNCS.C:1117, GEMAIN.C:1522). This suite is
       // about the STRUCTURED payload, so the text line is routed to a sink.
-      except: jest.fn().mockReturnValue({ emit: jest.fn() }),
+      except: vi.fn().mockReturnValue({ emit: vi.fn() }),
     };
   });
 
@@ -219,9 +220,9 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
    */
   it('names the ship that made a kill, including an AI one', () => {
     const gw = gateway as unknown as {
-      shipStateService: { get: jest.Mock };
+      shipStateService: { get: Mock };
     };
-    gw.shipStateService.get = jest.fn().mockReturnValue({ shipname: 'Cybrg-49326' });
+    gw.shipStateService.get = vi.fn().mockReturnValue({ shipname: 'Cybrg-49326' });
 
     const event: CombatShipDestroyedEvent = {
       victimId: 'usr_tarq:1',

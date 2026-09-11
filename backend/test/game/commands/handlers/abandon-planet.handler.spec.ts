@@ -5,6 +5,7 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-management-constants';
 import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 /**
  * `aba` is C's colony-abandonment command (GECMDS.C:3420): in orbit over a
@@ -31,13 +32,13 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeHandler(
   abandonPlanetResult: unknown = { ok: true, name: 'Aurora' },
-): { handler: AbandonHandlerService; abandonPlanet: jest.Mock; abandonShip: jest.Mock; ship: ShipState } {
+): { handler: AbandonHandlerService; abandonPlanet: Mock; abandonShip: Mock; ship: ShipState } {
   const ship = makeShip();
-  const abandonShip = jest.fn().mockImplementation(() => {
+  const abandonShip = vi.fn().mockImplementation(() => {
     ship.status = SHIP_STATUS_ABANDONED;
     return Promise.resolve();
   });
-  const abandonPlanet = jest.fn().mockResolvedValue(abandonPlanetResult);
+  const abandonPlanet = vi.fn().mockResolvedValue(abandonPlanetResult);
   const handler = new AbandonHandlerService(
     { abandon: abandonShip } as unknown as ShipStateService,
     { abandonPlanet } as unknown as PlanetStateService,
@@ -127,12 +128,12 @@ describe('AbandonHandlerService — `aba ship` keeps the port\'s scuttle path', 
 describe('AbandonHandlerService — confirmation', () => {
   function withPlanet(name = 'Aurelia-Landing', owner = 'owner1') {
     const ship = makeShip();
-    const abandonPlanet = jest.fn().mockResolvedValue({ ok: true, name });
+    const abandonPlanet = vi.fn().mockResolvedValue({ ok: true, name });
     const handler = new AbandonHandlerService(
-      { abandon: jest.fn() } as unknown as ShipStateService,
+      { abandon: vi.fn() } as unknown as ShipStateService,
       {
         abandonPlanet,
-        get: jest.fn().mockReturnValue({ name, userid: owner }),
+        get: vi.fn().mockReturnValue({ name, userid: owner }),
       } as unknown as PlanetStateService,
     );
     return { handler, abandonPlanet, ship };
@@ -194,10 +195,10 @@ describe('AbandonHandlerService — confirmation', () => {
    */
   it('ends the scuttle prompt when the answer is not yes', async () => {
     const { handler, ship } = withPlanet();
-    const abandonShip = jest.fn();
+    const abandonShip = vi.fn();
     const h = new AbandonHandlerService(
       { abandon: abandonShip } as unknown as ShipStateService,
-      { abandonPlanet: jest.fn(), get: jest.fn() } as unknown as PlanetStateService,
+      { abandonPlanet: vi.fn(), get: vi.fn() } as unknown as PlanetStateService,
     );
     void handler;
 

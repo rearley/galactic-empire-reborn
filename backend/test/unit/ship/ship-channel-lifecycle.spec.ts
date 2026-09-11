@@ -28,10 +28,10 @@ describe('ShipStateService — channel lifecycle', () => {
 
   beforeEach(() => {
     const prisma = {
-      ship: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({}) },
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+      ship: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({}) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
-    const tick = { subscribe: jest.fn().mockReturnValue(() => {}) } as unknown as TickService;
+    const tick = { subscribe: vi.fn().mockReturnValue(() => {}) } as unknown as TickService;
     service = new ShipStateService(prisma, tick, new ShipChannelRegistry());
   });
 

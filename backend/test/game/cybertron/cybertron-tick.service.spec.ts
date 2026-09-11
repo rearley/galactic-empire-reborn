@@ -19,6 +19,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CYBERTRON_EVENT, CybertronTargetAcquiredPayload } from '../../../src/game/cybertron/cybertron-events';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
+import { cybwhoops as cw } from '../../../src/game/cybertron/cyb-decisions';
+import { Mulberry32Adapter as M32 } from '../../../src/game/combat/random.port';
+import { CYB_BREAKOFF } from '../../../src/game/constants';
 
 // Build a minimal ShipState for tests, on the shared factory. `userid`,
 // `shipno` and `shpclass` stay required here (rather than falling back to the
@@ -85,14 +89,14 @@ async function buildHarness(seed = 42) {
 
   const createdSpawns: unknown[] = [];
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(async (slot) => {
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockImplementation(async (slot) => {
       createdSpawns.push(slot);
       const s = makeShip({ userid: slot.userid, shipno: slot.shipno, shpclass: slot.classNumber, status: 2, tick: slot.tick });
       shipMap.set(`${slot.userid}:${slot.shipno}`, s);
     }),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 
@@ -359,8 +363,6 @@ describe('T037 — cybwhoops: skill error rate verifiable from unit test', () =>
     // cybwhoops = floor(rand * cybskill) === 1
     // With cybskill=1: floor(rand * 1) = floor(rand) = 0 for rand∈[0,1), so 0===1 = false always
     // This verifies the edge case; integration via gebemean/rollTorpedoCount tests in T033-T034
-    const { cybwhoops: cw } = require('../../../src/game/cybertron/cyb-decisions');
-    const { Mulberry32Adapter: M32 } = require('../../../src/game/combat/random.port');
     for (let seed = 0; seed < 200; seed++) {
       const rand = new M32(seed);
       expect(cw(1, rand)).toBe(false);
@@ -372,7 +374,6 @@ describe('T037 — cybwhoops: skill error rate verifiable from unit test', () =>
 
 describe('T038 — breakoff roll: non-quad fires cybertron.broke-off at 1/CYB_BREAKOFF', () => {
   it('CYB_BREAKOFF constant is 500', () => {
-    const { CYB_BREAKOFF } = require('../../../src/game/constants');
     expect(CYB_BREAKOFF).toBe(500);
   });
 
@@ -604,7 +605,7 @@ describe('T064 — Sartern class 24: spawns via same code path with Cybrg- prefi
     });
 
     // Override configs to only allow class 24
-    const svcAny = repository as unknown as { createSpawn: jest.Mock };
+    const svcAny = repository as unknown as { createSpawn: Mock };
     fireTick(30);
     await new Promise((r) => setImmediate(r));
 

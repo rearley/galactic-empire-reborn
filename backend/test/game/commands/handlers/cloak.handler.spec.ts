@@ -27,7 +27,7 @@ function makeService(shipState?: Partial<ShipState>) {
   const state = makeShip(shipState);
   const mutated: Partial<ShipState> = {};
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         Object.assign(mutated, state);

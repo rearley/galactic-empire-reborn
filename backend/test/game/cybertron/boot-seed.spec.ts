@@ -110,8 +110,8 @@ function buildHarness(
 
   const createdSpawns: Array<{ classNumber: number; userid: string; shipno: number }> = [];
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockImplementation(
       async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
         createdSpawns.push({ classNumber: slot.classNumber, userid: slot.userid, shipno: slot.shipno });
         const ship = makeAiShip({
@@ -120,8 +120,8 @@ function buildHarness(
         shipMap.set(`${slot.userid}:${slot.shipno}`, ship);
       },
     ),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 

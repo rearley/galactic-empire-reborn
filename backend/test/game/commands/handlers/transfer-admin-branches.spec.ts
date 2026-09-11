@@ -131,8 +131,8 @@ interface Harness {
  */
 function makeHarness(planet: PlanetState, ships: ShipState[]): Harness {
   const prisma = {
-    planet: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
-    user: { updateMany: jest.fn().mockResolvedValue({}) },
+    planet: { update: vi.fn().mockResolvedValue({}), findMany: vi.fn().mockResolvedValue([]) },
+    user: { updateMany: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
 
   const find = (userid: string, shipno: number): ShipState | undefined =>

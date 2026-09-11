@@ -50,6 +50,7 @@ import type { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { PMINFIRE } from '../../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 interface ClassRow {
   classNumber: number;
@@ -113,8 +114,8 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 
 interface Harness {
   service: ReportHandlerService;
-  userFind: jest.Mock;
-  teamFind: jest.Mock;
+  userFind: Mock;
+  teamFind: Mock;
 }
 
 async function makeHarness(
@@ -122,8 +123,8 @@ async function makeHarness(
   user: UserRow | null = makeUser(),
   team: { teamname: string } | null = null,
 ): Promise<Harness> {
-  const userFind = jest.fn().mockResolvedValue(user);
-  const teamFind = jest.fn().mockResolvedValue(team);
+  const userFind = vi.fn().mockResolvedValue(user);
+  const teamFind = vi.fn().mockResolvedValue(team);
   const prisma = {
     user: { findUnique: userFind },
     team: { findUnique: teamFind },

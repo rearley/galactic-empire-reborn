@@ -61,18 +61,18 @@ function makeService(ships: ShipState[], scanRange = INTERCEPTOR_SCAN_RANGE) {
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const service = new ScanHandlerService(
     {
-      findAllShips: jest.fn().mockReturnValue(ships),
-      findByName: jest.fn().mockReturnValue(undefined),
-      findByUserid: jest.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue(ships),
+      findByName: vi.fn().mockReturnValue(undefined),
+      findByUserid: vi.fn().mockReturnValue([]),
     } as unknown as ShipStateService,
     {} as unknown as PrismaService,
     {
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
     } as unknown as GalaxyService,
-    { get: jest.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
+    { get: vi.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
     new MineRegistry(),
     undefined,
     shipClassCache,

@@ -47,12 +47,12 @@ function makeHarness(ships: ShipState[]) {
   const registry = new MineRegistry();
   let nextId = 100;
   const repo = {
-    create: jest.fn().mockImplementation(async (input: { channel: number; timer: number; xcoord: number; ycoord: number; deployedBy: string }) => ({
+    create: vi.fn().mockImplementation(async (input: { channel: number; timer: number; xcoord: number; ycoord: number; deployedBy: string }) => ({
       id: nextId++,
       ...input,
     })),
-    delete: jest.fn().mockResolvedValue(undefined),
-    findAllActive: jest.fn().mockResolvedValue([]),
+    delete: vi.fn().mockResolvedValue(undefined),
+    findAllActive: vi.fn().mockResolvedValue([]),
   } as unknown as MineRepository;
 
   const cache = new ShipClassCacheService({} as never);

@@ -18,7 +18,7 @@ const ctx: CommandContext = {};
 function buildRouter(ships: ShipState[]): CommandRouterService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
   const teamsMock = {
-    findNameByCode: jest.fn().mockResolvedValue(null),
+    findNameByCode: vi.fn().mockResolvedValue(null),
   } as unknown as TeamRepository;
   const handler = new DatHandlerService(shipSvc, teamsMock);
   const router = new CommandRouterService();

@@ -47,9 +47,9 @@ function makeHarness(ship: ShipState, ionQty: bigint, planetAt = { x: 4.5, y: -6
   const emitted: unknown[] = [];
 
   const tick = {
-    subscribe: jest.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
+    subscribe: vi.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
       byKind.set(kind, handler);
-      return jest.fn();
+      return vi.fn();
     }),
   } as unknown as TickService;
 
@@ -73,7 +73,7 @@ function makeHarness(ship: ShipState, ionQty: bigint, planetAt = { x: 4.5, y: -6
       plnum === 2 ? ({ xsect, ysect, plnum, xcoord: planetAt.x, ycoord: planetAt.y, items } as never) : undefined,
   } as unknown as PlanetStateService;
 
-  const maint = { runAutoRepair: jest.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
+  const maint = { runAutoRepair: vi.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
   const events = { emit: (e: string, p: unknown) => { emitted.push({ e, p }); } } as never;
 
   const svc = new ShipTickService(tick, state, maint, planets, events);

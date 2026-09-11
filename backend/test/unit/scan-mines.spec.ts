@@ -56,21 +56,21 @@ function makeMine(over: Partial<MineState> = {}): MineState {
 
 async function makeService(ships: ShipState[], mines: MineState[], scanRange = 100_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([{ classNumber: 1, scanRange }]) },
   };
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
   const registry = new MineRegistry();
   registry.hydrate(mines);
 

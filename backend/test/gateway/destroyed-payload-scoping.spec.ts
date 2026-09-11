@@ -41,18 +41,18 @@ describe('combat.ship-destroyed carries only what the client renders', () => {
       shipStateService: {
         get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
         findAllShips: () => [],
-        removeFromGame: jest.fn(),
+        removeFromGame: vi.fn(),
       } as unknown as ShipStateService,
-      prisma: { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
     });
     (gateway as unknown as { server: unknown }).server = {
       emit: (event: string, payload: Record<string, unknown>) => { emitted.push({ event, payload }); },
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
-      except: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, emitted };

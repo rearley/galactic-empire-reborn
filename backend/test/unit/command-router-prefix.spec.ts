@@ -38,7 +38,7 @@ function makeShip(): ShipState {
 const ctx = {} as CommandContext;
 const UNKNOWN = formatMessage(MessageId.UNKNOWN_CMD);
 
-function makeRouter(keyword: string, handler = jest.fn().mockReturnValue({ lines: [] })) {
+function makeRouter(keyword: string, handler = vi.fn().mockReturnValue({ lines: [] })) {
   const router = new CommandRouterService();
   const cmd: Command = { keyword, aliases: [], minArgs: 0, argMissingMessage: 'missing', handler };
   router.register(cmd);
@@ -76,8 +76,8 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   describe('a differing 3rd character is a different command', () => {
     it('sel and sen do not collide', () => {
       const router = new CommandRouterService();
-      const sell = jest.fn().mockReturnValue({ lines: [] });
-      const send = jest.fn().mockReturnValue({ lines: [] });
+      const sell = vi.fn().mockReturnValue({ lines: [] });
+      const send = vi.fn().mockReturnValue({ lines: [] });
       router.register({ keyword: 'sel', aliases: [], minArgs: 0, argMissingMessage: '', handler: sell });
       router.register({ keyword: 'sen', aliases: [], minArgs: 0, argMissingMessage: '', handler: send });
 
@@ -113,15 +113,15 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   describe('registration guards against silently shadowing a command', () => {
     it('throws when two different commands share a 3-char prefix', () => {
       const router = new CommandRouterService();
-      router.register({ keyword: 'mai', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() });
+      router.register({ keyword: 'mai', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() });
       expect(() =>
-        router.register({ keyword: 'maint', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() }),
+        router.register({ keyword: 'maint', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() }),
       ).toThrow(/prefix/i);
     });
 
     it('re-registering the same command object is not a collision', () => {
       const router = new CommandRouterService();
-      const cmd: Command = { keyword: 'sca', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() };
+      const cmd: Command = { keyword: 'sca', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() };
       router.register(cmd);
       expect(() => router.register(cmd)).not.toThrow();
     });

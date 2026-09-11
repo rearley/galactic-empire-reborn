@@ -6,6 +6,7 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PHYSICS_SECTOR_TRANSITION_EVENT } from '../../../src/game/tick/sector-transition.subscriber';
 import type { PhysicsSectorTransitionPayload } from '../../../src/game/tick/sector-transition.subscriber';
+import type { Mock, Mocked } from 'vitest';
 
 /**
  * Verifies the SectorTransitionSubscriber emits a batched physics.sector-transition
@@ -16,7 +17,7 @@ import type { PhysicsSectorTransitionPayload } from '../../../src/game/tick/sect
  */
 describe('SectorTransitionSubscriber', () => {
   let subscriber: SectorTransitionSubscriber;
-  let events: jest.Mocked<EventEmitter2>;
+  let events: Mocked<EventEmitter2>;
   let shipStateService: Partial<ShipStateService>;
 
   const makeShip = (userid: string, shipno: number, x: number, y: number, shipname = 'Test', shpclass = 3) => ({
@@ -29,13 +30,13 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   beforeEach(() => {
-    events = { emit: jest.fn() } as unknown as jest.Mocked<EventEmitter2>;
-    shipStateService = { findAllShips: jest.fn().mockReturnValue([]) };
+    events = { emit: vi.fn() } as unknown as Mocked<EventEmitter2>;
+    shipStateService = { findAllShips: vi.fn().mockReturnValue([]) };
     subscriber = new SectorTransitionSubscriber(shipStateService as ShipStateService, events);
   });
 
   it('does NOT emit on a quiet tick (no ship has moved to a new integer cell)', () => {
-    (shipStateService.findAllShips as jest.Mock).mockReturnValue([
+    (shipStateService.findAllShips as Mock).mockReturnValue([
       makeShip('user1', 1, 5.1, 3.2),
     ]);
     subscriber.onPhysicsTick(); // first tick — establishes snapshot, no diff
@@ -44,7 +45,7 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   it('emits physics.sector-transition when a ship crosses an integer cell boundary', () => {
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([makeShip('user1', 1, 5.1, 3.2)]) // tick 1
       .mockReturnValueOnce([makeShip('user1', 1, 6.4, 3.2)]); // tick 2 — x crossed 5→6
 
@@ -66,7 +67,7 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   it('batches multiple transitions in a single event per tick', () => {
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([
         makeShip('user1', 1, 5.1, 3.2),
         makeShip('user2', 1, 10.9, 7.8),
@@ -86,7 +87,7 @@ describe('SectorTransitionSubscriber', () => {
 
   it('includes AI ships (no userid filtering)', () => {
     // Droids / Cybertrons have userid values that look like 'DROID:...' or 'CYB:...'
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([makeShip('DROID:spawn:1', 1, 5.1, 3.2)])
       .mockReturnValueOnce([makeShip('DROID:spawn:1', 1, 6.4, 3.2)]);
 
@@ -104,7 +105,7 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   it('sub-cell movement (no integer boundary cross) does not emit', () => {
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([makeShip('user1', 1, 5.1, 3.2)])
       .mockReturnValueOnce([makeShip('user1', 1, 5.9, 3.8)]); // still floor=5,3
 
@@ -115,7 +116,7 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   it('newly-spawned ship (not in prior snapshot) does NOT produce a transition entry', () => {
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([]) // tick 1 — no ships
       .mockReturnValueOnce([makeShip('user1', 1, 5.1, 3.2)]); // tick 2 — ship appears
 
@@ -126,7 +127,7 @@ describe('SectorTransitionSubscriber', () => {
   });
 
   it('despawned ship (in prior snapshot, gone this tick) does NOT produce a transition entry', () => {
-    (shipStateService.findAllShips as jest.Mock)
+    (shipStateService.findAllShips as Mock)
       .mockReturnValueOnce([makeShip('user1', 1, 5.1, 3.2)]) // tick 1
       .mockReturnValueOnce([]); // tick 2 — ship gone
 

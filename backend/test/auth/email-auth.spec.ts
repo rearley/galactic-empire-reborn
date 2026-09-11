@@ -2,16 +2,32 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from '../../src/auth/auth.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-// `import bcrypt = require(...)` (not `import * as bcrypt`) so this binds the
-// same concrete module object `bcrypt` in auth.service.ts forwards to.
-// TypeScript's namespace-import helper (__importStar) copies CJS exports
-// onto a fresh, non-configurable wrapper object per import site, which makes
-// `jest.spyOn(bcrypt, 'compare')` throw "Cannot redefine property" below.
-import bcrypt = require('bcrypt');
+import type { Mock } from 'vitest';
+import * as bcrypt from 'bcrypt';
 
-function makeService(userTable: Partial<Record<string, jest.Mock>>) {
+// The constant-time assertion below needs to see that `bcrypt.compare` ran
+// inside `AuthService.login`, and spying on a local import cannot show that:
+// each importer gets its own module-namespace object, so a spy installed here
+// never reaches the binding `auth.service.ts` calls. Under Jest this file used
+// `import bcrypt = require(...)` to land on the one shared CJS object; that
+// trick does not survive the move to Vitest, whose module runner gives every
+// importer a namespace of its own.
+//
+// So the module itself is replaced, once, with the real implementation behind
+// a spy. Behaviour is unchanged — `compare` still does real bcrypt work, which
+// is what makes the timing claim meaningful — and the call is observable.
+// `vi.hoisted` is required because `vi.mock` is hoisted above the imports, so
+// the spy has to exist before this line is reached.
+const bcryptSpy = vi.hoisted(() => ({ compare: vi.fn() }));
+vi.mock('bcrypt', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('bcrypt')>();
+  bcryptSpy.compare.mockImplementation(actual.compare);
+  return { ...actual, compare: bcryptSpy.compare };
+});
+
+function makeService(userTable: Partial<Record<string, Mock>>) {
   const prisma = { user: userTable } as unknown as PrismaService;
-  const jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') } as unknown as JwtService;
+  const jwt = { sign: vi.fn().mockReturnValue('signed.jwt.token') } as unknown as JwtService;
   return new AuthService(prisma, jwt);
 }
 
@@ -24,7 +40,7 @@ function p2002(indexName: string) {
 
 describe('register', () => {
   it('creates the account with a null username — the handle comes in step 2', async () => {
-    const create = jest.fn().mockResolvedValue({});
+    const create = vi.fn().mockResolvedValue({});
     const svc = makeService({ create });
 
     const result = await svc.register({ email: 'Pilot@Example.COM', password: 'hunter2hunter2' });
@@ -41,7 +57,7 @@ describe('register', () => {
   it('reports EMAIL_TAKEN, not a generic conflict', async () => {
     // A single "already taken" would leave the player guessing which field was
     // the problem, on the one screen where guessing is most expensive.
-    const create = jest.fn().mockRejectedValue(p2002('user_email_lower_key'));
+    const create = vi.fn().mockRejectedValue(p2002('user_email_lower_key'));
     const svc = makeService({ create });
 
     await expect(svc.register({ email: 'taken@example.com', password: 'hunter2hunter2' }))
@@ -55,7 +71,7 @@ describe('login', () => {
   const hash = bcrypt.hashSync('hunter2hunter2', 4);
 
   it('finds the account regardless of the case the player typed', async () => {
-    const findFirst = jest.fn().mockResolvedValue({
+    const findFirst = vi.fn().mockResolvedValue({
       userid: 'usr_abc', username: 'rick', passwordHash: hash,
     });
     const svc = makeService({ findFirst });
@@ -77,7 +93,7 @@ describe('login', () => {
     // must be inert here. This only pins the query shape (mocked prisma can't
     // exercise real ILIKE semantics) — the plain-equality where-clause above
     // is what makes wildcards inert against a real Postgres `=`.
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const svc = makeService({ findFirst });
 
     await expect(svc.login({ email: '%@gmail.com', password: 'hunter2hunter2' }))
@@ -89,20 +105,19 @@ describe('login', () => {
   });
 
   it('still runs bcrypt when the email is unknown, so timing does not leak membership', async () => {
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const svc = makeService({ findFirst });
-    const compare = jest.spyOn(bcrypt, 'compare');
+    bcryptSpy.compare.mockClear();
 
     await expect(svc.login({ email: 'nobody@example.com', password: 'hunter2hunter2' }))
       .rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(compare).toHaveBeenCalled();
-    compare.mockRestore();
+    expect(bcryptSpy.compare).toHaveBeenCalled();
   });
 
   it('issues a token for an account that has not chosen a username yet', async () => {
     // Otherwise abandoning signup after step 1 locks the player out of step 2.
-    const findFirst = jest.fn().mockResolvedValue({
+    const findFirst = vi.fn().mockResolvedValue({
       userid: 'usr_def', username: null, passwordHash: hash,
     });
     const svc = makeService({ findFirst });

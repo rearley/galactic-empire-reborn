@@ -93,7 +93,7 @@ function makePlanet(over: Partial<PlanetState> = {}): PlanetState {
 
 function buildEconomy(draws: number[] = []) {
   const created: MailRow[] = [];
-  const create = jest.fn(async (arg: { data: MailRow }) => {
+  const create = vi.fn(async (arg: { data: MailRow }) => {
     created.push(arg.data);
     return {};
   });
@@ -200,11 +200,11 @@ describe('two notices in one tick take distinct msgnos', () => {
   const FROZEN = 1_700_000_000_000;
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('gives the second letter lastMsgno + 1 when the clock has not moved', async () => {
-    jest.spyOn(Date, 'now').mockReturnValue(FROZEN);
+    vi.spyOn(Date, 'now').mockReturnValue(FROZEN);
 
     // 1,000 troops against 5 food: floor(1000/100) = 10 > 5, so 125 starve and
     // 875 remain. The survivors then eat the store to nothing, and the 10,000

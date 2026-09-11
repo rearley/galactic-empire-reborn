@@ -66,19 +66,19 @@ async function makeHarness(ships: ShipState[], seed = 42) {
       subscribers.push(h);
       return () => {};
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    delete: jest.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    delete: vi.fn(),
   } as unknown as MineRepository;
 
   const mineRegistry = new MineRegistry();
   const events = new EventEmitter2();
   const logger = new Logger('MutualKillSpec');
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const classCache = new ShipClassCacheService({} as never);
   classCache.setForTest(1, {

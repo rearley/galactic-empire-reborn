@@ -11,6 +11,7 @@ import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 
 // ---------------------------------------------------------------------------
@@ -34,18 +35,18 @@ function makeCtx(tickNumber = 1): TickContext {
 
 function makeHarness(ships: ShipState[] = []) {
   let capturedHandler: ((ctx: TickContext) => void) | null = null;
-  const unsub = jest.fn();
+  const unsub = vi.fn();
 
   const mockTickService = {
-    subscribe: jest.fn().mockImplementation((kind: TickKind, handler: (ctx: TickContext) => void) => {
+    subscribe: vi.fn().mockImplementation((kind: TickKind, handler: (ctx: TickContext) => void) => {
       capturedHandler = handler;
       return unsub;
     }),
   } as unknown as TickService;
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    mutate: jest.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
+    findAllShips: vi.fn().mockReturnValue(ships),
+    mutate: vi.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
       const s = ships[0] ? { ...ships[0] } : makeShip();
       fn(s);
       return s;
@@ -53,7 +54,7 @@ function makeHarness(ships: ShipState[] = []) {
   } as unknown as ShipStateService;
 
   const mockMaintService = {
-    runAutoRepair: jest.fn().mockResolvedValue(undefined),
+    runAutoRepair: vi.fn().mockResolvedValue(undefined),
   } as unknown as MaintenanceService;
 
   const svc = new ShipTickService(mockTickService, mockShipState, mockMaintService);
@@ -124,12 +125,12 @@ describe('ShipTickService — fault isolation', () => {
     const { svc, mockShipState, mockMaintService, fireTick } = makeHarness(ships);
 
     let callCount = 0;
-    (mockShipState.findAllShips as jest.Mock).mockReturnValue(ships);
+    (mockShipState.findAllShips as Mock).mockReturnValue(ships);
     // Fault isolation used to be provoked through the auto-repair hook. That
     // was a port invention and is gone, so the throw now comes from the state
     // mutation every ship makes — same contract: one bad ship must not abort
     // the batch.
-    (mockShipState.mutate as jest.Mock).mockImplementation((uid: string) => {
+    (mockShipState.mutate as Mock).mockImplementation((uid: string) => {
       callCount++;
       if (uid === 'boom') throw new Error('boom!');
       return undefined;

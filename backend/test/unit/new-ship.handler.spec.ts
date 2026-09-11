@@ -13,6 +13,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { MAXSHIPS, GESTAT_AVAIL } from '../../src/game/constants';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -84,8 +85,8 @@ function makeService(
   const self: { value: unknown } = { value: undefined };
   const prismaMock = {
     shipClass: {
-      findMany: jest.fn().mockResolvedValue([PLAYER_CLASS_4]),
-      findFirst: jest.fn().mockImplementation(
+      findMany: vi.fn().mockResolvedValue([PLAYER_CLASS_4]),
+      findFirst: vi.fn().mockImplementation(
         async (args: { where: { classNumber: number } }) => {
           if (args.where.classNumber === 4) return PLAYER_CLASS_4;
           if (args.where.classNumber === 31) return DROID_CLASS;
@@ -94,7 +95,7 @@ function makeService(
       ),
     },
     ship: {
-      create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => ({
+      create: vi.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => ({
         userid: 'u-test',
         shipno: args.data['shipno'] as number,
         shipname: args.data['shipname'],
@@ -121,18 +122,18 @@ function makeService(
       })),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({ userid: 'u-test', cash, noships, topshipno }),
-      update: jest.fn().mockResolvedValue({ userid: 'u-test', cash: cash - 600_000n, noships: noships + 1, topshipno: topshipno + 1 }),
+      findUnique: vi.fn().mockResolvedValue({ userid: 'u-test', cash, noships, topshipno }),
+      update: vi.fn().mockResolvedValue({ userid: 'u-test', cash: cash - 600_000n, noships: noships + 1, topshipno: topshipno + 1 }),
       // The purchase debit is conditional now: the balance and the MAXSHIPS cap
       // are re-checked in the same statement that spends and increments them,
       // and `count` is how the caller learns whether it won the race.
       // @see docs/audits/2026-09-09-security-review.md M1
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     // Interactive form: the transaction body needs to branch on that count, so
     // it is a callback rather than an array of operations. `self` is the same
     // mock, handed in as the transaction client.
-    $transaction: jest.fn().mockImplementation(
+    $transaction: vi.fn().mockImplementation(
       async (arg: unknown) =>
         typeof arg === 'function'
           ? (arg as (tx: unknown) => Promise<unknown>)(self.value)
@@ -144,7 +145,7 @@ function makeService(
   self.value = prismaMock;
 
   const shipStateMock: Pick<ShipStateService, 'loadShip'> = {
-    loadShip: jest.fn(),
+    loadShip: vi.fn(),
   };
 
   const shipClassCache = makeShipClassCache([PLAYER_CLASS_4, DROID_CLASS]);
@@ -164,7 +165,7 @@ function makeService(
 describe('new ship / new phaser / new shield read the class table from the boot-time cache, not the database', () => {
   it('new ship (listing) enumerates classes through ShipClassCacheService.getClassNumbers', async () => {
     const { service, shipClassCache } = makeService();
-    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+    const listSpy = vi.spyOn(shipClassCache, 'getClassNumbers');
 
     await service.command.handler(makeShip(), ['ship'], {});
 
@@ -173,7 +174,7 @@ describe('new ship / new phaser / new shield read the class table from the boot-
 
   it('new ship <N> (purchase) resolves the class through ShipClassCacheService.get', async () => {
     const { service, shipClassCache } = makeService();
-    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const getSpy = vi.spyOn(shipClassCache, 'get');
 
     await service.command.handler(makeShip(), ['ship', '4'], {});
 
@@ -182,7 +183,7 @@ describe('new ship / new phaser / new shield read the class table from the boot-
 
   it('new phaser resolves the class through ShipClassCacheService.get', async () => {
     const { service, shipClassCache } = makeService();
-    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const getSpy = vi.spyOn(shipClassCache, 'get');
     const ship = makeShip();
 
     await service.command.handler(ship, ['phaser'], {});
@@ -237,7 +238,7 @@ describe('NewShipHandlerService', () => {
       // topshipno=2 → newShipno=3 → name "Destroyer #3"
       const { service, prismaMock } = makeService({}, 1, 2);
       await service.command.handler(makeShip(), ['ship', '4'], {});
-      const createCall = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+      const createCall = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
       expect(String(createCall.data['shipname'])).toMatch(/Destroyer #3/);
     });
   });
@@ -259,7 +260,7 @@ describe('NewShipHandlerService', () => {
       // user has 1 ship, topshipno=3 → new ship gets shipno 4; user updated topshipno→4, noships→2
       const { service, prismaMock } = makeService({}, 1, 3);
       await service.command.handler(makeShip(), ['ship', '4'], {});
-      const createCall = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+      const createCall = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
       expect(createCall.data['shipno']).toBe(4);
       expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -276,10 +277,10 @@ describe('NewShipHandlerService', () => {
     it('creates the new ship with status GESTAT_AVAIL (0) — dormant, not in memory map', async () => {
       const { service, prismaMock, shipStateMock } = makeService();
       await service.command.handler(makeShip(), ['ship', '4'], {});
-      const createCall = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+      const createCall = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
       expect(createCall.data['status']).toBe(GESTAT_AVAIL);
       // Dormant ship is NOT loaded into in-memory ShipStateService
-      expect((shipStateMock.loadShip as jest.Mock)).not.toHaveBeenCalled();
+      expect((shipStateMock.loadShip as Mock)).not.toHaveBeenCalled();
     });
   });
 
@@ -357,16 +358,16 @@ describe('NewShipHandlerService', () => {
     it('returns insufficient credits message', async () => {
       const prismaMock = {
         shipClass: {
-          findMany: jest.fn().mockResolvedValue([PLAYER_CLASS_4]),
-          findFirst: jest.fn().mockResolvedValue(PLAYER_CLASS_4),
+          findMany: vi.fn().mockResolvedValue([PLAYER_CLASS_4]),
+          findFirst: vi.fn().mockResolvedValue(PLAYER_CLASS_4),
         },
-        ship: { create: jest.fn() },
-        user: { findUnique: jest.fn().mockResolvedValue({ userid: 'u-test', cash: 100n, noships: 1, topshipno: 1 }) },
-        $transaction: jest.fn(),
+        ship: { create: vi.fn() },
+        user: { findUnique: vi.fn().mockResolvedValue({ userid: 'u-test', cash: 100n, noships: 1, topshipno: 1 }) },
+        $transaction: vi.fn(),
       };
       const service = new NewShipHandlerService(
         prismaMock as unknown as PrismaService,
-        { loadShip: jest.fn() } as unknown as ShipStateService,
+        { loadShip: vi.fn() } as unknown as ShipStateService,
         { bySector: () => [] } as unknown as PlanetStateService,
         { next: () => 0.5 } as Random,
         undefined,
@@ -403,7 +404,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
   it('retries under a different name instead of failing the purchase', async () => {
     let calls = 0;
     let inner: unknown;
-    const $transaction = jest.fn().mockImplementation(async (arg: unknown) => {
+    const $transaction = vi.fn().mockImplementation(async (arg: unknown) => {
       calls += 1;
       if (calls === 1) throw p2002;
       return typeof arg === 'function'
@@ -420,7 +421,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
   });
 
   it('gives up with a readable message rather than an internal error', async () => {
-    const $transaction = jest.fn().mockRejectedValue(p2002);
+    const $transaction = vi.fn().mockRejectedValue(p2002);
     const { service } = makeService({ $transaction });
 
     const result = await service.command.handler(makeShip(), ['ship', '4'], {});
@@ -431,7 +432,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
   });
 
   it('lets an unrelated failure surface instead of swallowing it', async () => {
-    const $transaction = jest.fn().mockRejectedValue(new Error('db is on fire'));
+    const $transaction = vi.fn().mockRejectedValue(new Error('db is on fire'));
     const { service } = makeService({ $transaction });
 
     await expect(service.command.handler(makeShip(), ['ship', '4'], {})).rejects.toThrow(/on fire/);
@@ -454,7 +455,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 
     await service.command.handler(makeShip(), ['ship', '4'], {});
 
-    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+    const created = (prismaMock.ship.create as Mock).mock.calls[0][0] as {
       data: Record<string, unknown>;
     };
     expect(created.data['topspeed']).toBe(PLAYER_CLASS_4.maxWarp);
@@ -477,7 +478,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 
     await service.command.handler(makeShip(), ['ship', '4'], {});
 
-    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+    const created = (prismaMock.ship.create as Mock).mock.calls[0][0] as {
       data: Record<string, unknown>;
     };
     expect(created.data['phasrtype']).toBe(1);
@@ -517,7 +518,7 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 
     await service.command.handler(buyer, ['ship', '4'], {});
 
-    const created = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as {
+    const created = (prismaMock.ship.create as Mock).mock.calls[0][0] as {
       data: Record<string, unknown>;
     };
     expect(created.data['xcoord']).toBeCloseTo(0.5 * 0.9999, 6);
@@ -548,22 +549,22 @@ describe('NewShipHandlerService — name collisions between captains', () => {
 describe('NewShipHandlerService — shipyard narration for new phaser/shield', () => {
   function makeUpgradeService(cash: bigint) {
     const user = {
-      findUnique: jest.fn().mockResolvedValue({ cash }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ cash }),
+      update: vi.fn().mockResolvedValue({}),
     };
     const prismaMock = {
       shipClass: {
-        findFirst: jest.fn().mockResolvedValue({ ...PLAYER_CLASS_4, maxPhaser: 10, maxShields: 10 }),
-        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue({ ...PLAYER_CLASS_4, maxPhaser: 10, maxShields: 10 }),
+        findMany: vi.fn().mockResolvedValue([]),
       },
       user,
-      ship: { create: jest.fn() },
-      $transaction: jest.fn(),
+      ship: { create: vi.fn() },
+      $transaction: vi.fn(),
     };
-    const mutate = jest.fn();
+    const mutate = vi.fn();
     const service = new NewShipHandlerService(
       prismaMock as unknown as PrismaService,
-      { mutate, loadShip: jest.fn() } as unknown as ShipStateService,
+      { mutate, loadShip: vi.fn() } as unknown as ShipStateService,
       { bySector: () => [] } as unknown as PlanetStateService,
       { next: () => 0.5 } as Random,
       undefined,

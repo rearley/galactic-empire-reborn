@@ -31,7 +31,7 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: (userid: string, shipno: number) => {
         if (userid === 'Cybrg-222' && shipno === 1) return { userid, shipno, shipname: 'Cybrg-49340', status: 2 } as never;
         if (userid === 'usr_abc' && shipno === 2) return { userid, shipno, shipname: 'Defiant', status: 1 } as never;
@@ -41,15 +41,15 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     } as unknown as ShipStateService;
 
     const prisma = {
-      $transaction: jest.fn().mockResolvedValue(undefined),
-      shipClass: { findFirst: jest.fn() },
+      $transaction: vi.fn().mockResolvedValue(undefined),
+      shipClass: { findFirst: vi.fn() },
     } as unknown as PrismaService;
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       prisma,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     // Canon's outwar excludes the victim's own channel (GEMAIN.C:1522), so the
@@ -161,7 +161,7 @@ describe('GameGateway — DIED, the killer-less death', () => {
     const shipStateService = {
       findAllShips: () => [{ userid: 'usr_muted', shipno: 1, msgFilter: true }],
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: (userid: string, shipno: number) => {
         if (userid === 'Cybrg-222' && shipno === 1) return { userid, shipno, shipname: 'Cyberquad 44135', status: 2 } as never;
         if (userid === 'usr_abc' && shipno === 2) return { userid, shipno, shipname: 'Defiant', status: 1 } as never;
@@ -171,9 +171,9 @@ describe('GameGateway — DIED, the killer-less death', () => {
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      prisma: { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: { $transaction: vi.fn().mockResolvedValue(undefined), shipClass: { findFirst: vi.fn() } } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     const excluded: string[] = [];

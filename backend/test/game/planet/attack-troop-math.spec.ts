@@ -65,7 +65,7 @@ function makeService(seed: number) {
 
   const mutated: Record<string, bigint[]> = {};
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         const s = makeShip(500);
         fn(s);
@@ -73,12 +73,12 @@ function makeService(seed: number) {
       },
     ),
     // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
-    findByUserid: jest.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([]),
   } as unknown as ShipStateService;
 
   const mockPrisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
-    mailStat: { create: jest.fn().mockResolvedValue({}) },
+    user: { update: vi.fn().mockResolvedValue({}) },
+    mailStat: { create: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
 
   const service = new PlanetAttackService(

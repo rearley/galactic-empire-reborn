@@ -104,8 +104,8 @@ function buildHarness(seed = 42) {
     getMaxShields: () => 2,
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
-  const mineRepo = { create: jest.fn().mockResolvedValue({}) } as unknown as MineRepository;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
+  const mineRepo = { create: vi.fn().mockResolvedValue({}) } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];
   const tickService = {

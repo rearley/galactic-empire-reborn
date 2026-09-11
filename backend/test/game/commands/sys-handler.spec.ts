@@ -22,16 +22,16 @@ function makeShip(o: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(opts: { ships?: ShipState[] } = {}) {
-  const mutate = jest.fn((_u: string, _s: number, fn: (s: ShipState) => void) => {
+  const mutate = vi.fn((_u: string, _s: number, fn: (s: ShipState) => void) => {
     fn(state);
   });
   const state = opts.ships?.[0] ?? makeShip();
   const shipState = {
     mutate,
-    findAllShips: jest.fn().mockReturnValue(opts.ships ?? [state]),
+    findAllShips: vi.fn().mockReturnValue(opts.ships ?? [state]),
   } as unknown as ShipStateService;
   const prisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
+    user: { update: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 5, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 });
@@ -165,7 +165,7 @@ describe('audit trail', () => {
     // actions available, and "who gave themselves a million credits" is not a
     // question anyone should have to answer from memory.
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['cash', '1000000']);
     expect(spy).toHaveBeenCalled();
     // Inspect the arguments directly: ShipState carries BigInt item counts, so
@@ -178,7 +178,7 @@ describe('audit trail', () => {
 
   it('does NOT log read-only commands, which would be noise', async () => {
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['help']);
     await run(svc, makeShip(), ['classlist']);
     expect(spy).not.toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('audit trail', () => {
   it('does not log a REFUSED attempt as though it succeeded', async () => {
     delete process.env.GE_SYSOP_USERNAME;
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['cash', '999']);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
@@ -201,8 +201,8 @@ describe('`sys class` / `sys classlist` read the boot-time cache, not the table'
 
   it('sys class resolves the target class through ShipClassCacheService.get/getClassNumbers', async () => {
     const { svc, state, shipClassCache } = makeService();
-    const getSpy = jest.spyOn(shipClassCache, 'get');
-    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+    const getSpy = vi.spyOn(shipClassCache, 'get');
+    const listSpy = vi.spyOn(shipClassCache, 'getClassNumbers');
 
     await run(svc, state, ['class', '2']);
 
@@ -212,7 +212,7 @@ describe('`sys class` / `sys classlist` read the boot-time cache, not the table'
 
   it('sys classlist enumerates classes through ShipClassCacheService.getClassNumbers', async () => {
     const { svc, shipClassCache } = makeService();
-    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+    const listSpy = vi.spyOn(shipClassCache, 'getClassNumbers');
 
     await run(svc, makeShip(), ['classlist']);
 

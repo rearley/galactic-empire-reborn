@@ -10,6 +10,7 @@
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { NUMITEMS, I_FOOD, BASEPRICE } from '../../src/game/constants/items';
 import { planetKey } from '../../src/game/planet/planet-state.types';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,7 +103,7 @@ function makeNeutralZoneRow() {
 }
 
 function makeShipsMock() {
-  return { get: jest.fn(), mutate: jest.fn() };
+  return { get: vi.fn(), mutate: vi.fn() };
 }
 
 // ---------------------------------------------------------------------------
@@ -114,8 +115,8 @@ describe('T035 — PlanetStateService.buy(, 10_000_000n) persistence and re-hydr
     let storedRow: ReturnType<typeof makeNonNeutralRow>;
     let prismaMock: {
       planet: {
-        findMany: jest.Mock;
-        update: jest.Mock;
+        findMany: Mock;
+        update: Mock;
       };
     };
 
@@ -124,8 +125,8 @@ describe('T035 — PlanetStateService.buy(, 10_000_000n) persistence and re-hydr
 
       prismaMock = {
         planet: {
-          findMany: jest.fn().mockImplementation(() => Promise.resolve([storedRow])),
-          update: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+          findMany: vi.fn().mockImplementation(() => Promise.resolve([storedRow])),
+          update: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
             storedRow = { ...storedRow, ...data };
             return Promise.resolve({});
           }),
@@ -266,8 +267,8 @@ describe('T035 — PlanetStateService.buy(, 10_000_000n) persistence and re-hydr
     let storedRow: ReturnType<typeof makeNeutralZoneRow>;
     let prismaMock: {
       planet: {
-        findMany: jest.Mock;
-        update: jest.Mock;
+        findMany: Mock;
+        update: Mock;
       };
     };
 
@@ -276,8 +277,8 @@ describe('T035 — PlanetStateService.buy(, 10_000_000n) persistence and re-hydr
 
       prismaMock = {
         planet: {
-          findMany: jest.fn().mockImplementation(() => Promise.resolve([storedRow])),
-          update: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+          findMany: vi.fn().mockImplementation(() => Promise.resolve([storedRow])),
+          update: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
             storedRow = { ...storedRow, ...data };
             return Promise.resolve({});
           }),

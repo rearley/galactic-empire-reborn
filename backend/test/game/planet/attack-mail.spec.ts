@@ -47,7 +47,7 @@ function makeService(seed = 42, onlineOwnerShips: ShipState[] = []) {
   const events = new EventEmitter2();
 
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         const s = makeShip();
         fn(s);
@@ -55,14 +55,14 @@ function makeService(seed = 42, onlineOwnerShips: ShipState[] = []) {
     ),
     // Canon suppresses the owner's distress mail when the owner is in-game
     // (GEFUNCS.C:2231). Default: nobody is flying, so mail is always written.
-    findByUserid: jest.fn().mockReturnValue(onlineOwnerShips),
+    findByUserid: vi.fn().mockReturnValue(onlineOwnerShips),
   } as unknown as ShipStateService;
 
   const mailCreates: unknown[] = [];
   const mockPrisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
+    user: { update: vi.fn().mockResolvedValue({}) },
     mailStat: {
-      create: jest.fn().mockImplementation((args: unknown) => {
+      create: vi.fn().mockImplementation((args: unknown) => {
         mailCreates.push(args);
         return Promise.resolve({});
       }),

@@ -39,7 +39,7 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 function makePrisma(planets: PlanetState[]) {
   return {
     planet: {
-      findMany: jest.fn().mockResolvedValue(
+      findMany: vi.fn().mockResolvedValue(
         planets.map((p) => ({
           ...p,
           userid: p.userid,
@@ -51,11 +51,11 @@ function makePrisma(planets: PlanetState[]) {
           itemsSold2a: p.items.map((it) => it.sold2a),
         })),
       ),
-      update: jest.fn().mockResolvedValue({}),
-      findFirst: jest.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue({}),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
     // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
-    user: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
 }
 
@@ -67,8 +67,8 @@ function makeShips(items?: bigint[]) {
     dirty: false,
   };
   return {
-    get: jest.fn().mockReturnValue(ship),
-    mutate: jest.fn().mockImplementation((_uid: string, _shipno: number, fn: (s: typeof ship) => void) => {
+    get: vi.fn().mockReturnValue(ship),
+    mutate: vi.fn().mockImplementation((_uid: string, _shipno: number, fn: (s: typeof ship) => void) => {
       fn(ship);
       ship.dirty = true;
       return ship;
@@ -565,7 +565,7 @@ describe('PlanetStateService — reloadPlanet', () => {
     expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1000n);
 
     // Midnight restocks the row behind the service's back.
-    prisma.planet.findFirst = jest.fn().mockResolvedValue({
+    prisma.planet.findFirst = vi.fn().mockResolvedValue({
       ...planets[0],
       name: 'Zygor-3',
       itemsQty: planets[0].items.map(() => 1_032_000n),
@@ -588,7 +588,7 @@ describe('PlanetStateService — reloadPlanet', () => {
     const svc = new PlanetStateService(prisma as never, makeShips() as never);
     await svc.onModuleInit();
 
-    prisma.planet.findFirst = jest.fn().mockResolvedValue(null);
+    prisma.planet.findFirst = vi.fn().mockResolvedValue(null);
     await svc.reloadPlanet(0, 0, 1);
 
     expect(svc.get(0, 0, 1)?.items[I_FOOD].qty).toBe(1000n);

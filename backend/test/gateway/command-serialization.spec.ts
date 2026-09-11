@@ -4,6 +4,7 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * One command at a time, per player.
@@ -30,15 +31,15 @@ import { makeGateway } from '../helpers/make-gateway';
  */
 describe('GameGateway — commands from one socket run one at a time', () => {
   type Sock = {
-    id: string; data: Record<string, unknown>; emit: jest.Mock;
-    broadcast: { emit: jest.Mock; to: () => { emit: jest.Mock }; except: () => { emit: jest.Mock } };
+    id: string; data: Record<string, unknown>; emit: Mock;
+    broadcast: { emit: Mock; to: () => { emit: Mock }; except: () => { emit: Mock } };
   };
 
   const makeSocket = (id: string, userid: string): Sock => ({
     id,
     data: { userid, activeShipNo: 1 },
-    emit: jest.fn(),
-    broadcast: { emit: jest.fn(), to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }) },
+    emit: vi.fn(),
+    broadcast: { emit: vi.fn(), to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }) },
   });
 
   /** A router whose handlers resolve only when the test says so. */
@@ -47,7 +48,7 @@ describe('GameGateway — commands from one socket run one at a time', () => {
     const finished: string[] = [];
     const gates = new Map<string, () => void>();
 
-    const dispatch = jest.fn((input: string) => {
+    const dispatch = vi.fn((input: string) => {
       started.push(input);
       return new Promise<{ lines: { text: string; category: string }[] }>((resolve) => {
         gates.set(input, () => {
@@ -67,13 +68,13 @@ describe('GameGateway — commands from one socket run one at a time', () => {
     const gateway = makeGateway({
       shipStateService,
       commandRouter: { dispatch } as unknown as CommandRouterService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       random: mockRandom,
     });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
-      except: () => ({ emit: jest.fn() }),
+      emit: vi.fn(),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
 
@@ -119,7 +120,7 @@ describe('GameGateway — commands from one socket run one at a time', () => {
     // type again. A rejection must move the queue on, not stop it.
     const { gateway, started } = build();
     const sock = makeSocket('s1', 'u1');
-    const boom = jest.fn().mockRejectedValue(new Error('handler exploded'));
+    const boom = vi.fn().mockRejectedValue(new Error('handler exploded'));
     (gateway as unknown as { commandRouter: { dispatch: unknown } }).commandRouter.dispatch = boom;
 
     gateway.handleCommand(sock as never, { input: 'bad' });
@@ -127,7 +128,7 @@ describe('GameGateway — commands from one socket run one at a time', () => {
 
     // Restore a working router; the next command must still be served.
     (gateway as unknown as { commandRouter: { dispatch: unknown } }).commandRouter.dispatch =
-      jest.fn((input: string) => { started.push(input); return Promise.resolve({ lines: [] }); });
+      vi.fn((input: string) => { started.push(input); return Promise.resolve({ lines: [] }); });
     gateway.handleCommand(sock as never, { input: 'after' });
     await settle();
 

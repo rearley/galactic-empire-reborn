@@ -10,6 +10,7 @@ import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../../src/game/constants';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // Local defaults layered on the shared factory: this suite's ships are named
 // 'Test', not yet boarded (status 0), stationary (topspeed 0).
@@ -23,27 +24,27 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 const defaultGalaxyMock = {
-  getSectorPlanets: jest.fn().mockReturnValue([]),
-  getSectorWormholes: jest.fn().mockReturnValue([]),
-  findPlanetByName: jest.fn().mockReturnValue(null),
-  getMeta: jest.fn(),
-  onModuleInit: jest.fn(),
+  getSectorPlanets: vi.fn().mockReturnValue([]),
+  getSectorWormholes: vi.fn().mockReturnValue([]),
+  findPlanetByName: vi.fn().mockReturnValue(null),
+  getMeta: vi.fn(),
+  onModuleInit: vi.fn(),
 };
 
 function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultGalaxyMock) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {};
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   // scanPl reads the LIVE planet state now, not GalaxyService's boot-time
   // read-model, so mirror whatever this galaxy mock is serving.
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined),
-    bySector: jest.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
-    byName: jest.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined),
+    bySector: vi.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
+    byName: vi.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
@@ -59,7 +60,7 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
 describe('scan reads scanRange/typeName/maxTons from the boot-time cache, not the database', () => {
   it('sca lo resolves the ship class through ShipClassCacheService.get, not a query', async () => {
     const { service, shipClassCache } = makeService([], 42_000);
-    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const getSpy = vi.spyOn(shipClassCache, 'get');
     const ship = makeShip();
 
     await service.command.handler(ship, ['lo'], {});
@@ -226,29 +227,29 @@ describe('ScanHandlerService', () => {
 function makeServiceWithGalaxy(
   ships: ShipState[],
   galaxyMock: Partial<{
-    getSectorPlanets: jest.Mock;
-    getSectorWormholes: jest.Mock;
-    findPlanetByName: jest.Mock;
+    getSectorPlanets: Mock;
+    getSectorWormholes: Mock;
+    findPlanetByName: Mock;
   }>,
   scanRange = 5000,
 ) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {};
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const fullGalaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
     ...galaxyMock,
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined),
-    bySector: jest.fn((x: number, y: number) => fullGalaxyMock.getSectorPlanets(x, y)),
-    byName: jest.fn((n: string) => fullGalaxyMock.findPlanetByName(n) ?? undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined),
+    bySector: vi.fn((x: number, y: number) => fullGalaxyMock.getSectorPlanets(x, y)),
+    byName: vi.fn((n: string) => fullGalaxyMock.findPlanetByName(n) ?? undefined) };
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,
@@ -310,7 +311,7 @@ describe('T022 — sca lo projects ships only, never planets', () => {
     const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
     const { service } = makeServiceWithGalaxy(
       [],
-      { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
+      { getSectorPlanets: vi.fn().mockReturnValue([planet]), getSectorWormholes: vi.fn().mockReturnValue([]) },
     );
     const ship = makeShip({ xcoord: 0, ycoord: 0 });
     const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
@@ -321,7 +322,7 @@ describe('T022 — sca lo projects ships only, never planets', () => {
     const wormhole = makeWormhole({ xcoord: 0.2, ycoord: 0.2, visible: 1 });
     const { service } = makeServiceWithGalaxy(
       [],
-      { getSectorPlanets: jest.fn().mockReturnValue([]), getSectorWormholes: jest.fn().mockReturnValue([wormhole]) },
+      { getSectorPlanets: vi.fn().mockReturnValue([]), getSectorWormholes: vi.fn().mockReturnValue([wormhole]) },
     );
     const ship = makeShip({ xcoord: 0, ycoord: 0 });
     const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
@@ -333,7 +334,7 @@ describe('T022 — sca lo projects ships only, never planets', () => {
     const planet = makePlanet({ xcoord: 0.1, ycoord: 0.1 });
     const { service } = makeServiceWithGalaxy(
       [],
-      { getSectorPlanets: jest.fn().mockReturnValue([planet]), getSectorWormholes: jest.fn().mockReturnValue([]) },
+      { getSectorPlanets: vi.fn().mockReturnValue([planet]), getSectorWormholes: vi.fn().mockReturnValue([]) },
     );
     const ship = makeShip({ xcoord: 0, ycoord: 0 });
     const result = await (service.command.handler(ship, ['lo'], {}) as Promise<CommandResult>);
@@ -346,17 +347,17 @@ describe('T049 — scan pl: beacon line', () => {
   function makeServiceWithBeacon(beaconState: { beacon: string } | null) {
     const planet = makePlanet({ xsect: 0, ysect: 0, plnum: 1, name: 'BeaconWorld' });
     const shipServiceMock = {
-      findAllShips: jest.fn().mockReturnValue([]),
-      findByName: jest.fn().mockReturnValue(undefined),
-      findByUserid: jest.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue([]),
+      findByName: vi.fn().mockReturnValue(undefined),
+      findByUserid: vi.fn().mockReturnValue([]),
     };
     const prismaMock = {};
     const shipClassCache = new ShipClassCacheService({} as never);
     shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 5000 });
     const galaxyMock = {
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(planet),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(planet),
     };
     // The live-state stub needs the fields scanPl actually reads now: the
     // non-owner reconnaissance block (GECMDS.C:2377-2448) reads `items`, so a
@@ -368,9 +369,9 @@ describe('T049 — scan pl: beacon line', () => {
         qty: 0n, rate: 0, sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
       })),
     };
-    const planetServiceMock = { get: jest.fn().mockReturnValue(liveState),
-      bySector: jest.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
-      byName: jest.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
+    const planetServiceMock = { get: vi.fn().mockReturnValue(liveState),
+      bySector: vi.fn((x: number, y: number) => galaxyMock.getSectorPlanets(x, y)),
+      byName: vi.fn((n: string) => galaxyMock.findPlanetByName(n) ?? undefined) };
     const service = new ScanHandlerService(
       shipServiceMock as unknown as ShipStateService,
       prismaMock as unknown as PrismaService,
@@ -409,7 +410,7 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
     const planet = makePlanet({ xsect: 5, ysect: 3, plnum: 1, name: 'Zygor-3', xcoord: 5.1, ycoord: 3.1 });
     const { service } = makeServiceWithGalaxy(
       [],
-      { findPlanetByName: jest.fn().mockReturnValue(planet) },
+      { findPlanetByName: vi.fn().mockReturnValue(planet) },
     );
     const result = await (service.command.handler(makeShip(), ['pl', 'Zygor-3'], {}) as Promise<CommandResult>);
     const texts = result.lines.map(l => l.text);
@@ -426,7 +427,7 @@ describe('T023 — scan pl: planet name lookup (RED until T027+T029)', () => {
   it('scan pl NOTAPLANET returns NO_SUCH_PLANET message', async () => {
     const { service } = makeServiceWithGalaxy(
       [],
-      { findPlanetByName: jest.fn().mockReturnValue(null) },
+      { findPlanetByName: vi.fn().mockReturnValue(null) },
     );
     const result = await (service.command.handler(makeShip(), ['pl', 'NOTAPLANET'], {}) as Promise<CommandResult>);
     expect(result.lines[0].text).toBe('No planet by that name.');

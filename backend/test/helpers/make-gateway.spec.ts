@@ -9,7 +9,7 @@ describe('makeGateway', () => {
   });
 
   it('lets one dependency be overridden by name, leaving the rest defaulted', () => {
-    const shipStateService = { get: jest.fn().mockReturnValue(undefined) } as unknown as ShipStateService;
+    const shipStateService = { get: vi.fn().mockReturnValue(undefined) } as unknown as ShipStateService;
     const gateway = makeGateway({ shipStateService });
     expect((gateway as unknown as { shipStateService: ShipStateService }).shipStateService)
       .toBe(shipStateService);

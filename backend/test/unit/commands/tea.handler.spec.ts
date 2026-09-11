@@ -14,11 +14,11 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeHandler(
   foundTeam: { teamcode: bigint; teamname: string } | null,
-  userUpdateMock = jest.fn().mockResolvedValue({}),
+  userUpdateMock = vi.fn().mockResolvedValue({}),
 ): TeaHandlerService {
   const prismaMock = {
     team: {
-      findFirst: jest.fn().mockResolvedValue(foundTeam),
+      findFirst: vi.fn().mockResolvedValue(foundTeam),
     },
     user: {
       update: userUpdateMock,
@@ -26,9 +26,9 @@ function makeHandler(
   } as unknown as PrismaService;
   const shipStateSvcMock = {} as unknown as ShipStateService;
   const teamSvcMock = {
-    create: jest.fn(),
-    joinByPassword: jest.fn(),
-    list: jest.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    joinByPassword: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
   } as unknown as import('../../../src/game/team/team.service').TeamService;
   return new TeaHandlerService(prismaMock, shipStateSvcMock, teamSvcMock);
 }

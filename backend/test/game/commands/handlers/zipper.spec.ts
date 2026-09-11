@@ -43,9 +43,9 @@ function makeHarness(ships: ShipState[], mines: MineState[] = [], scanRange = 50
   const registry = new MineRegistry();
   registry.hydrate(mines);
   const repo = {
-    delete: jest.fn().mockResolvedValue(undefined),
-    create: jest.fn(),
-    findAllActive: jest.fn().mockResolvedValue([]),
+    delete: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]),
   } as unknown as MineRepository;
 
   const cache = new ShipClassCacheService({} as never);

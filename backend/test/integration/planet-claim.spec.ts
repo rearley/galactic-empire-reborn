@@ -9,6 +9,7 @@
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { NUMITEMS } from '../../src/game/constants/items';
 import { planetKey } from '../../src/game/planet/planet-state.types';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,7 +49,7 @@ function makeBaseRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeShipsMock() {
-  return { get: jest.fn(), mutate: jest.fn() };
+  return { get: vi.fn(), mutate: vi.fn() };
 }
 
 // ---------------------------------------------------------------------------
@@ -63,10 +64,10 @@ describe('T023 — PlanetStateService.claim()', () => {
   let storedRow: ReturnType<typeof makeBaseRow>;
   let prismaMock: {
     planet: {
-      findMany: jest.Mock;
-      update: jest.Mock;
+      findMany: Mock;
+      update: Mock;
     };
-    user: { updateMany: jest.Mock };
+    user: { updateMany: Mock };
   };
 
   beforeEach(() => {
@@ -74,14 +75,14 @@ describe('T023 — PlanetStateService.claim()', () => {
 
     prismaMock = {
       planet: {
-        findMany: jest.fn().mockImplementation(() => Promise.resolve([storedRow])),
-        update: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+        findMany: vi.fn().mockImplementation(() => Promise.resolve([storedRow])),
+        update: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
           storedRow = { ...storedRow, ...data };
           return Promise.resolve({});
         }),
       },
       // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
-      user: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
   });
 

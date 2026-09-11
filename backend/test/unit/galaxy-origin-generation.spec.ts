@@ -27,9 +27,9 @@ function makeTx() {
   return {
     rows: { sectors, planets, wormholes },
     tx: {
-      sector: { create: jest.fn(async ({ data }: { data: Row }) => { sectors.push(data); }) },
-      planet: { create: jest.fn(async ({ data }: { data: Row }) => { planets.push(data); }) },
-      wormhole: { create: jest.fn(async ({ data }: { data: Row }) => { wormholes.push(data); }) },
+      sector: { create: vi.fn(async ({ data }: { data: Row }) => { sectors.push(data); }) },
+      planet: { create: vi.fn(async ({ data }: { data: Row }) => { planets.push(data); }) },
+      wormhole: { create: vi.fn(async ({ data }: { data: Row }) => { wormholes.push(data); }) },
     },
   };
 }

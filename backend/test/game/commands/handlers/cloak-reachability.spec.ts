@@ -57,15 +57,15 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 describe('cloak reachability — torpedo.handler.ts:82 (firer cloaked)', () => {
   function makeTorpedoService() {
     const mockShipState = {
-      findAllShips: jest.fn().mockReturnValue([]),
-      mutate: jest.fn(),
+      findAllShips: vi.fn().mockReturnValue([]),
+      mutate: vi.fn(),
     } as unknown as ShipStateService;
     const mockShipClassCache = {
-      getScanRange: jest.fn().mockReturnValue(50000),
-      getHasTorpedo: jest.fn().mockReturnValue(true),
+      getScanRange: vi.fn().mockReturnValue(50000),
+      getHasTorpedo: vi.fn().mockReturnValue(true),
     } as unknown as ShipClassCacheService;
     const mockEvents = new EventEmitter2();
-    const mockRandom = { next: jest.fn().mockReturnValue(0.5) } as unknown as Random;
+    const mockRandom = { next: vi.fn().mockReturnValue(0.5) } as unknown as Random;
     return new TorpedoHandlerService(mockShipState, mockShipClassCache, mockEvents, mockRandom,
       { lettersFor: () => [] } as unknown as ScanHandlerService,
     );
@@ -169,10 +169,10 @@ function buildCybertronHarness() {
   });
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn(),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn(),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n,
   } as unknown as CybertronRepository;
 

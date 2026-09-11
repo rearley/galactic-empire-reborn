@@ -1,13 +1,13 @@
 /**
- * Does this Jest invocation actually touch the database?
+ * Does this test-runner invocation actually touch the database?
  *
  * Global setup ran `prisma db push --force-reset` against the shared `ge_test`
  * database for EVERY invocation, including a single read-only spec.
- * `npx jest canon-citations.balance.spec.ts` reads files off disk and counts
+ * `npx vitest run canon-citations.balance.spec.ts` reads files off disk and counts
  * strings; running it alone still wiped state another process was relying on,
  * with no warning and no reason for the person running it to expect one.
  *
- * This project already has one incident in that family — two concurrent Jest
+ * This project already has one incident in that family — two concurrent test
  * processes racing `ge_test` produced two interleaved, disagreeing summaries in
  * one output file, which was initially misread as a flake. This is the same
  * hazard from the other direction: one run with a side effect far wider than
@@ -143,9 +143,10 @@ function allSpecs(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * The spec files a Jest invocation selected.
+ * The spec files an invocation selected.
  *
- * `patterns` is `globalConfig.testPathPatterns.patterns` — Jest treats each as
+ * `patterns` is the runner's positional file filter — Vitest's
+ * `filenamePattern`, Jest's `testPathPatterns.patterns`. Both treat each as
  * a regex against the absolute path and takes their union. An empty list means
  * a full run. A pattern that will not compile is DROPPED rather than thrown,
  * and dropping every pattern leaves the full list, which is the fail-closed

@@ -36,12 +36,12 @@ describe('GameGateway — combat notices name the attacking SHIP', () => {
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: vi.fn(() => []) } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },
       }),

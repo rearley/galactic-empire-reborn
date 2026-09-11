@@ -179,31 +179,31 @@ function build(opts: HarnessOpts = {}) {
     },
     findAllShips: (): ShipState[] => seated,
     findByUserid: (): ShipState[] => [],
-    unboard: jest.fn().mockResolvedValue(undefined),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    removeFromGame: jest.fn(),
-    mutate: jest.fn(),
+    unboard: vi.fn().mockResolvedValue(undefined),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    removeFromGame: vi.fn(),
+    mutate: vi.fn(),
   } as unknown as ShipStateService;
 
-  const shipFindMany = jest.fn().mockResolvedValue(ships);
-  const userFindUnique = jest.fn().mockResolvedValue(userRow);
+  const shipFindMany = vi.fn().mockResolvedValue(ships);
+  const userFindUnique = vi.fn().mockResolvedValue(userRow);
   const prisma = {
-    ship: { findMany: shipFindMany, findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
+    ship: { findMany: shipFindMany, findFirst: vi.fn().mockResolvedValue(null), updateMany: vi.fn() },
     user: { findUnique: userFindUnique },
-    shipClass: { findFirst: jest.fn().mockResolvedValue({ maxTons: 5000, points: 100 }) },
-    mailStat: { findFirst: jest.fn().mockResolvedValue(null) },
+    shipClass: { findFirst: vi.fn().mockResolvedValue({ maxTons: 5000, points: 100 }) },
+    mailStat: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
 
-  const validate = jest.fn().mockResolvedValue(authPayload);
-  const finalize = jest.fn();
+  const validate = vi.fn().mockResolvedValue(authPayload);
+  const finalize = vi.fn();
   const onboarding = {
     finalize,
-    validateNameReply: jest.fn().mockReturnValue(true),
-    buildClassListPayload: jest.fn().mockResolvedValue([]),
+    validateNameReply: vi.fn().mockReturnValue(true),
+    buildClassListPayload: vi.fn().mockResolvedValue([]),
   } as unknown as OnboardingService;
 
   const dispatched: unknown[] = [];
-  const dispatch = jest.fn().mockImplementation((input: unknown) => {
+  const dispatch = vi.fn().mockImplementation((input: unknown) => {
     dispatched.push(input);
     return Promise.resolve({ lines: [] });
   });
@@ -217,7 +217,7 @@ function build(opts: HarnessOpts = {}) {
     wsAuthGuard: { validate } as unknown as WsAuthGuard,
     prisma,
     onboardingService: onboarding,
-    scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+    scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
     shipClassCache: {
       getTypeName: (): string => 'Interceptor',
       getMaxTons: (): number => 5000,
@@ -228,7 +228,7 @@ function build(opts: HarnessOpts = {}) {
 
   const liveSockets = new Map<string, FakeSocket>();
   (gateway as unknown as { server: unknown }).server = {
-    emit: jest.fn(),
+    emit: vi.fn(),
     to: () => ({ emit: (): void => undefined, except: () => noopEmitter }),
     except: () => ({ emit: (): void => undefined, to: () => noopEmitter }),
     sockets: { sockets: liveSockets, adapter: { rooms: new Map<string, Set<string>>() } },

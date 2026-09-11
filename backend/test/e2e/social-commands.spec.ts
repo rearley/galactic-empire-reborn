@@ -14,6 +14,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandContext, CommandResult } from '../../src/game/commands/command.types';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock, Mocked } from 'vitest';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -86,18 +87,18 @@ describe('sen E2E round-trip', () => {
 
 describe('tea E2E round-trip', () => {
   let router: CommandRouterService;
-  let prismaMock: jest.Mocked<Pick<PrismaService, 'team' | 'user'>>;
+  let prismaMock: Mocked<Pick<PrismaService, 'team' | 'user'>>;
 
   beforeEach(() => {
     prismaMock = {
-      team: { findFirst: jest.fn() } as never,
-      user: { update: jest.fn().mockResolvedValue({}) } as never,
+      team: { findFirst: vi.fn() } as never,
+      user: { update: vi.fn().mockResolvedValue({}) } as never,
     };
     const shipSvcMock = {} as unknown as ShipStateService;
     const teamSvcMock = {
-      create: jest.fn(),
-      joinByPassword: jest.fn(),
-      list: jest.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      joinByPassword: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
     } as unknown as import('../../src/game/team/team.service').TeamService;
     const handler = new TeaHandlerService(prismaMock as unknown as PrismaService, shipSvcMock, teamSvcMock);
     router = new CommandRouterService();
@@ -112,7 +113,7 @@ describe('tea E2E round-trip', () => {
     });
 
     it('shows team name when teamcode set and team found', async () => {
-      (prismaMock.team.findFirst as jest.Mock).mockResolvedValue({ teamcode: 1n, teamname: 'Raiders' });
+      (prismaMock.team.findFirst as Mock).mockResolvedValue({ teamcode: 1n, teamname: 'Raiders' });
       const ship = makeShip({ teamcode: 1n });
       const result = await router.dispatch('tea', ship, ctx);
       expect(result.lines[0].text).toMatch(/Raiders/);
@@ -131,7 +132,7 @@ describe('tea E2E round-trip', () => {
   // Single-token form now routes to show-current-team (FR-016a change in feature 018)
   describe('tea <name> single-token (FR-016a)', () => {
     it('single-token shows team info, does not join', async () => {
-      (prismaMock.team.findFirst as jest.Mock).mockResolvedValue({ teamcode: 99n, teamname: 'Pirates' });
+      (prismaMock.team.findFirst as Mock).mockResolvedValue({ teamcode: 99n, teamname: 'Pirates' });
       const ship = makeShip({ teamcode: 99n });
       const result = await router.dispatch('tea Pirates', ship, ctx);
       expect(result.lines[0].category).toBe('info');
@@ -139,7 +140,7 @@ describe('tea E2E round-trip', () => {
     });
 
     it('single unknown token returns not-on-team info when not affiliated', async () => {
-      (prismaMock.team.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaMock.team.findFirst as Mock).mockResolvedValue(null);
       const ship = makeShip({ teamcode: undefined });
       const result = await router.dispatch('tea Unknown', ship, ctx);
       expect(result.lines[0].category).toBe('info');

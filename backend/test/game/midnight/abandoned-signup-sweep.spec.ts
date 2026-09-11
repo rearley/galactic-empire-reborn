@@ -3,7 +3,7 @@ import { ABANDONED_SIGNUP_DAYS } from '../../../src/game/midnight/midnight.const
 import { PrismaService } from '../../../src/prisma/prisma.service';
 
 function makeRepo() {
-  const deleteMany = jest.fn().mockResolvedValue({ count: 0 });
+  const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
   const tx = { user: { deleteMany } } as never;
   return { repo: new MidnightRepository({} as PrismaService), tx, deleteMany };
 }
@@ -30,13 +30,13 @@ describe('purgeAbandonedSignups', () => {
   });
 
   it('returns how many it deleted', async () => {
-    const deleteMany = jest.fn().mockResolvedValue({ count: 4 });
+    const deleteMany = vi.fn().mockResolvedValue({ count: 4 });
     const tx = { user: { deleteMany } } as never;
     expect(await new MidnightRepository({} as PrismaService).purgeAbandonedSignups(tx, 10, NOW)).toBe(4);
   });
 
   it('is idempotent — a second run finds nothing left', async () => {
-    const deleteMany = jest.fn()
+    const deleteMany = vi.fn()
       .mockResolvedValueOnce({ count: 4 })
       .mockResolvedValueOnce({ count: 0 });
     const tx = { user: { deleteMany } } as never;

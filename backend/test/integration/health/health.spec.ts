@@ -9,13 +9,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const request = require('supertest') as (app: unknown) => import('supertest').SuperTest<import('supertest').Test>;
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { HealthController } from '../../../src/health/health.controller';
+import request from 'supertest';
 
 describe('GET /health', () => {
   let app: INestApplication;
-  const prismaStub = { $queryRaw: jest.fn() };
+  const prismaStub = { $queryRaw: vi.fn() };
 
   async function build(): Promise<void> {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,7 +29,7 @@ describe('GET /health', () => {
 
   afterEach(async () => {
     if (app) await app.close();
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
 
   it('returns 200 with status ok when Postgres is reachable', async () => {

@@ -18,6 +18,7 @@ import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { GESTAT_AVAIL, GESTAT_USER, GESTAT_AUTO } from '../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,13 +68,13 @@ function makeShipRow(overrides: { userid: string; shipno: number; status: number
 
 /** Build a ShipStateService with the given Prisma ship rows. */
 async function buildSvc(rows: ReturnType<typeof makeShipRow>[]) {
-  const updateMock = jest.fn().mockResolvedValue({});
-  const updateManyMock = jest.fn().mockResolvedValue({ count: 1 });
+  const updateMock = vi.fn().mockResolvedValue({});
+  const updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
 
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     ship: {
-      findMany: jest.fn().mockResolvedValue(rows),
+      findMany: vi.fn().mockResolvedValue(rows),
       update: updateMock,
       updateMany: updateManyMock,
     },
@@ -81,7 +82,7 @@ async function buildSvc(rows: ReturnType<typeof makeShipRow>[]) {
 
   const mockTickService = {
     subscribe: (_kind: TickKind, _fn: () => void) => () => {},
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const svc = new ShipStateService(mockPrisma, mockTickService);
@@ -125,7 +126,7 @@ describe('Dormancy — onModuleInit loads only AI (GESTAT_AUTO) ships', () => {
   it('findMany where clause includes { status: GESTAT_AUTO }', async () => {
     const { mockPrisma } = await buildSvc([]);
 
-    const call = (mockPrisma.ship.findMany as jest.Mock).mock.calls[0][0] as {
+    const call = (mockPrisma.ship.findMany as Mock).mock.calls[0][0] as {
       where?: { status?: number };
     };
     expect(call.where?.status).toBe(GESTAT_AUTO);

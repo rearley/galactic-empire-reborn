@@ -49,8 +49,8 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 function build() {
   const channels = new ShipChannelRegistry();
   const svc = new ShipStateService(
-    { ship: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }), delete: jest.fn().mockResolvedValue({}) }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
-    { subscribe: jest.fn(() => jest.fn()) } as unknown as TickService,
+    { ship: { update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }), delete: vi.fn().mockResolvedValue({}) }, shipClass: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    { subscribe: vi.fn(() => vi.fn()) } as unknown as TickService,
     channels,
   );
   return { svc, channels };
