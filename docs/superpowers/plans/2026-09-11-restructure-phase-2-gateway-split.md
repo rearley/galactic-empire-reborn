@@ -44,7 +44,7 @@ Recorded 2026-09-11 on `restructure` at `41101ea`:
 | | value |
 |---|---|
 | `backend/src/gateway/game.gateway.ts` | 2,743 lines |
-| `@OnEvent` handlers in it | 38, totalling 798 lines |
+| `@OnEvent` handlers in it | 37, totalling 798 lines (a 38th `@OnEvent` grep hit is prose inside a comment at line 1291, not a decorator — CORRECTED 2026-09-11 during Task 3 review) |
 | `@SubscribeMessage` handlers | 2 |
 | `this.prisma` call sites in it | 10 |
 | constructor parameters | 11 |
