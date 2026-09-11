@@ -41,27 +41,25 @@ import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { CombatTickService } from '../../src/game/combat/combat-tick.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { MINERANGE, NUMITEMS } from '../../src/game/constants';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState>): ShipState {
-  return {
-    userid: 'e2e', shipno: 1, shipname: 'E2E', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: -1,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'e2e',
+    shipname: 'E2E',
+    energy: 50_000,
+    phasrtype: 1,
+    lastfired: -1,
+    shieldtype: 1,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 1, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    topspeed: 1,
     ...over,
-  } as ShipState;
+  });
 }
 
 describe('combat spatial integration (real services, no mocks)', () => {
