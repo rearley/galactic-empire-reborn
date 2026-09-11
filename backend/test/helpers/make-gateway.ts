@@ -26,6 +26,7 @@ import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.s
 import { Random } from '../../src/game/combat/random.port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PresenceService } from '../../src/public/presence.service';
+import { ShipDestroyedService } from '../../src/gateway/ship-destroyed.service';
 
 export interface GatewayDeps {
   shipStateService: ShipStateService;
@@ -39,6 +40,7 @@ export interface GatewayDeps {
   random: Random;
   events: EventEmitter2;
   presence: PresenceService;
+  shipDestroyed: ShipDestroyedService;
 }
 
 export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
@@ -54,7 +56,7 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
       size: jest.fn(() => 0),
     } as unknown as ShipStateService);
 
-  const deps: GatewayDeps = {
+  const flat: Omit<GatewayDeps, 'shipDestroyed'> = {
     shipStateService,
     commandRouter: { dispatch: jest.fn() } as unknown as CommandRouterService,
     registry: new ConnectedShipsRegistry(shipStateService),
@@ -72,6 +74,24 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     ...overrides,
   };
 
+  // Deliberately NOT inert. Every death spec drives the gateway's @OnEvent
+  // handler and asserts on what the service does behind it — the transaction,
+  // the manifest line, the KILLEDBY broadcast. An inert double would turn all
+  // of them green for the wrong reason. Built from the resolved deps above,
+  // the same way `registry` is built from the resolved ShipStateService.
+  const deps: GatewayDeps = {
+    ...flat,
+    shipDestroyed:
+      overrides.shipDestroyed ??
+      new ShipDestroyedService(
+        flat.prisma,
+        flat.shipStateService,
+        flat.scanHandler,
+        flat.shipClassCache,
+        flat.random,
+      ),
+  };
+
   return new GameGateway(
     deps.shipStateService,
     deps.commandRouter,
@@ -84,5 +104,6 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     deps.random,
     deps.events,
     deps.presence,
+    deps.shipDestroyed,
   );
 }

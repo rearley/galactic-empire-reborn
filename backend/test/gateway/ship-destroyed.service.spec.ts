@@ -1,0 +1,286 @@
+import 'reflect-metadata';
+import { ShipDestroyedService, DestroyedEmitter } from '../../src/gateway/ship-destroyed.service';
+import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { Random } from '../../src/game/combat/random.port';
+import { GESTAT_AUTO } from '../../src/game/constants';
+import { formatMessage, MessageId } from '../../src/game/commands/messages';
+
+/**
+ * The death path, tested without Socket.io.
+ *
+ * `handleCombatShipDestroyed` was 256 lines on the gateway holding a
+ * `prisma.$transaction`. It now lives here, behind a narrow emitter, and this
+ * file pins every side effect a ship dying has — enumerated once, one case
+ * each, so a future move can be checked against a list rather than a memory.
+ *
+ * The five specs that already guard death (combat-death-delete,
+ * ship-loss-forensics, kill-salvage-report, captured-document and
+ * destroyed-payload-scoping) still drive it through the GATEWAY and are
+ * untouched. This file is the unit-level complement, not their replacement.
+ */
+
+interface EmitterSpy extends DestroyedEmitter {
+  roomLines: Array<{ room: string; text: string }>;
+  exceptLines: Array<{ rooms: string | string[]; text: string }>;
+  announced: unknown[];
+  recovered: string[];
+  warnings: string[];
+  errors: Array<{ message: string; err?: Error }>;
+  order: string[];
+}
+
+function emitterSpy(ionHit: { name: string; at: number } | null = null): EmitterSpy {
+  const spy: EmitterSpy = {
+    roomLines: [],
+    exceptLines: [],
+    announced: [],
+    recovered: [],
+    warnings: [],
+    errors: [],
+    order: [],
+    toRoom: (room, _category, text) => { spy.order.push('toRoom'); spy.roomLines.push({ room, text }); },
+    toAllExcept: (rooms, _category, text) => { spy.order.push('toAllExcept'); spy.exceptLines.push({ rooms, text }); },
+    announceDestroyed: (payload) => { spy.order.push('announce'); spy.announced.push(payload); },
+    takeIonAttacker: () => ionHit,
+    recoverVictim: (userid) => { spy.order.push('recoverVictim'); spy.recovered.push(userid); return Promise.resolve(); },
+    warn: (message) => { spy.order.push('warn'); spy.warnings.push(message); },
+    error: (message, err) => { spy.order.push('error'); spy.errors.push({ message, err }); },
+  };
+  return spy;
+}
+
+function destroyedEvent(over: Partial<CombatShipDestroyedEvent> = {}): CombatShipDestroyedEvent {
+  return {
+    victimId: 'usr_victim:2',
+    attackerId: 'usr_killer:1',
+    victimShipKey: 'usr_victim:2',
+    attackerShipKey: 'usr_killer:1',
+    victimUserid: 'usr_victim',
+    attackerUserid: 'usr_killer',
+    attackerName: null,
+    attackerChannel: 7,
+    weapon: 'phaser',
+    sector: { x: -12, y: 40 },
+    tickAt: new Date(),
+    loot: [{ itemIndex: 12, amount: 471n }],
+    scoreAwarded: 1000,
+    ...over,
+  } as CombatShipDestroyedEvent;
+}
+
+const VICTIM = {
+  userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1,
+  phasrtype: 6, shieldtype: 4, username: 'jo',
+  items: [0n, 3n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 814n, 0n],
+};
+const KILLER = { userid: 'usr_killer', shipno: 1, shipname: 'Marauder', status: 1, username: 'rick', items: [] };
+
+interface Doubles {
+  ships?: Partial<ShipStateService>;
+  prisma?: Record<string, unknown>;
+  roll?: number;
+}
+
+function build(over: Doubles = {}) {
+  const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+  const userFindUnique = jest.fn().mockResolvedValue({ noships: 2 });
+  const userUpdate = jest.fn().mockResolvedValue(undefined);
+  const shipFindFirst = jest.fn().mockResolvedValue(undefined);
+  const planetFindMany = jest.fn().mockResolvedValue([]);
+  const tx = {
+    ship: { deleteMany, findFirst: shipFindFirst },
+    user: { findUnique: userFindUnique, update: userUpdate },
+  };
+  const $transaction = jest.fn(async (fn: (t: typeof tx) => Promise<void>) => fn(tx));
+  const removeFromGame = jest.fn();
+  const clearScantab = jest.fn();
+
+  const ships = {
+    get: (userid: string, shipno: number) => {
+      if (userid === VICTIM.userid && shipno === VICTIM.shipno) return VICTIM;
+      if (userid === KILLER.userid && shipno === KILLER.shipno) return KILLER;
+      return undefined;
+    },
+    findAllShips: () => [],
+    removeFromGame,
+    ...over.ships,
+  } as unknown as ShipStateService;
+
+  const prisma = {
+    $transaction,
+    planet: { findMany: planetFindMany },
+    ...over.prisma,
+  } as unknown as PrismaService;
+
+  const service = new ShipDestroyedService(
+    prisma,
+    ships,
+    { clearScantab } as unknown as ScanHandlerService,
+    { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    { next: () => over.roll ?? 0 } as unknown as Random,
+  );
+
+  return { service, $transaction, deleteMany, userUpdate, userFindUnique, shipFindFirst, planetFindMany, removeFromGame, clearScantab };
+}
+
+describe('ShipDestroyedService — every side effect of a ship dying', () => {
+  // 1. scan table
+  it('clears the victim’s scan table', async () => {
+    const h = build();
+    await h.service.handle(destroyedEvent(), emitterSpy());
+    expect(h.clearScantab).toHaveBeenCalledWith('usr_victim', 2);
+  });
+
+  // 2. forensics manifest
+  it('warns the loss manifest, with the hull, its fittings and its cargo', async () => {
+    const h = build();
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent({ victimDisconnectReason: 'ping timeout' }), emit);
+    const line = emit.warnings.join('\n');
+    expect(line).toContain('ship destroyed:');
+    expect(line).toContain('WildCat');
+    expect(line).toContain('class=8');
+    expect(line).toContain('phaser=6');
+    expect(line).toContain('shield=4');
+    expect(line).toMatch(/gold[=:]\s*814/i);
+    expect(line).toContain('ping timeout');
+  });
+
+  // 3. the hull write
+  it('deletes the hull and decrements noships inside ONE transaction', async () => {
+    const h = build();
+    await h.service.handle(destroyedEvent(), emitterSpy());
+    expect(h.$transaction).toHaveBeenCalledTimes(1);
+    expect(h.deleteMany).toHaveBeenCalledWith({ where: { userid: 'usr_victim', shipno: 2 } });
+    expect(h.userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userid: 'usr_victim' }, data: { noships: { decrement: 1 } } }),
+    );
+  });
+
+  // 3b. AI hulls are the AI layer's business
+  it('never deletes an AI hull', async () => {
+    const h = build({ ships: { get: () => ({ ...VICTIM, status: GESTAT_AUTO }) } as unknown as Partial<ShipStateService> });
+    await h.service.handle(destroyedEvent(), emitterSpy());
+    expect(h.deleteMany).not.toHaveBeenCalled();
+    expect(h.userUpdate).not.toHaveBeenCalled();
+  });
+
+  // 3c. a failed write is logged, never thrown
+  it('logs a failed hull write instead of taking the kill down with it', async () => {
+    const h = build({ prisma: { $transaction: jest.fn().mockRejectedValue(new Error('deadlock')) } });
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    expect(emit.errors.map((e) => e.message).join('\n')).toContain('death delete/decrement failed');
+  });
+
+  // 4. memory eviction
+  it('evicts the hull from the in-memory map', async () => {
+    const h = build();
+    await h.service.handle(destroyedEvent(), emitterSpy());
+    expect(h.removeFromGame).toHaveBeenCalledWith({ userid: 'usr_victim', shipno: 2 });
+  });
+
+  // 5 + 6. the structured announcement, and planet attribution
+  it('announces the kill with the four fields the client renders, and nothing else', async () => {
+    const h = build();
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    expect(emit.announced).toHaveLength(1);
+    const payload = emit.announced[0] as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual(['attackerId', 'attackerName', 'victimId', 'weapon']);
+    expect(payload.weapon).toBe('phaser');
+    expect(payload.attackerName).toBe('Marauder');
+  });
+
+  it('names a colony’s ion cannons as the killer when nothing else fired', async () => {
+    const h = build();
+    const emit = emitterSpy({ name: 'Ceti Alpha', at: Date.now() });
+    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, weapon: null }), emit);
+    const payload = emit.announced[0] as Record<string, unknown>;
+    expect(payload.weapon).toBe('ion');
+    expect(payload.attackerName).toBe('Ceti Alpha');
+  });
+
+  // 7. KILLEDBY / DIED
+  it('announces KILLEDBY to the galaxy, excluding the victim and anyone filtering', async () => {
+    const h = build({ ships: {
+      findAllShips: () => ([{ userid: 'usr_quiet', msgFilter: true }]),
+    } as unknown as Partial<ShipStateService> });
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    expect(emit.exceptLines).toHaveLength(1);
+    expect(emit.exceptLines[0].text).toBe(formatMessage(MessageId.KILLEDBY, 'jo', 'rick'));
+    expect(emit.exceptLines[0].rooms).toEqual(['user:usr_victim', 'user:usr_quiet']);
+  });
+
+  it('announces DIED, excluding only the victim, when no ship killed them', async () => {
+    const h = build();
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, weapon: 'gravity' }), emit);
+    expect(emit.exceptLines).toHaveLength(1);
+    expect(emit.exceptLines[0].text).toBe(formatMessage(MessageId.DIED, 'WildCat', 'jo'));
+    expect(emit.exceptLines[0].rooms).toBe('user:usr_victim');
+  });
+
+  // 8. the captured document
+  it('hands the victor the victim’s colony list, one kill in six', async () => {
+    const h = build({ prisma: { planet: { findMany: jest.fn().mockResolvedValue([
+      { name: 'Colony 1', xsect: 1, ysect: -1, plnum: 1 },
+    ]) } } });
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    await new Promise((r) => setImmediate(r));
+    const toKiller = emit.roomLines.filter((l) => l.room === 'user:usr_killer');
+    expect(toKiller[0].text).toBe(formatMessage(MessageId.CAPTURED_DOC));
+    expect(toKiller.map((l) => l.text).join('\n')).toContain('Colony 1');
+  });
+
+  it('says nothing about colonies on the other five kills in six', async () => {
+    const h = build({ roll: 0.5 });
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    await new Promise((r) => setImmediate(r));
+    expect(h.planetFindMany).not.toHaveBeenCalled();
+    expect(emit.roomLines.filter((l) => l.room === 'user:usr_killer')).toHaveLength(0);
+  });
+
+  // 9. YOURDEAD
+  it('tells the pilot who died that they survived', async () => {
+    const h = build();
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    const toVictim = emit.roomLines.filter((l) => l.room === 'user:usr_victim');
+    expect(toVictim.map((l) => l.text)).toContain(formatMessage(MessageId.YOURDEAD));
+  });
+
+  // 10. recovery
+  it('asks for the victim to be re-seated, after the hull write has begun', async () => {
+    const h = build();
+    const emit = emitterSpy();
+    await h.service.handle(destroyedEvent(), emit);
+    expect(emit.recovered).toEqual(['usr_victim']);
+    // The recovery is the LAST thing said: it must not re-board a hull that
+    // the transaction above is still in the middle of deleting.
+    expect(emit.order[emit.order.length - 1]).toBe('recoverVictim');
+    expect(h.$transaction).toHaveBeenCalled();
+  });
+
+  // 11. the awaitable
+  it('returns a promise that settles only once the hull write is done', async () => {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((r) => { release = r; });
+    let finished = false;
+    const h = build({ prisma: { $transaction: jest.fn(async () => { await gate; finished = true; }) } });
+
+    const returned = h.service.handle(destroyedEvent(), emitterSpy());
+    expect(returned).toBeInstanceOf(Promise);
+    expect(finished).toBe(false);
+    release?.();
+    await returned;
+    expect(finished).toBe(true);
+  });
+});
