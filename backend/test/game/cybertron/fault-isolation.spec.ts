@@ -12,6 +12,7 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
 import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', () => {
   it('5 healthy Cybertrons still tick after 1 throwing ship', async () => {
@@ -22,7 +23,7 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
 
     // Build 5 healthy Cybertrons and 1 "bad" ship that throws
     for (let i = 0; i < 5; i++) {
-      ships.push({
+      ships.push(baseMakeShip({
         userid: `Cybrg-${200 + i}`,
         shipno: 200 + i,
         shpclass: 21,
@@ -30,55 +31,23 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
         tick: 1,
         cybmine: 255,
         cybupdate: 100,
-        holdcourse: 0,
-        where: 0,
         phasr: 100,
         phasrtype: 2,
         shield: 2,
         shieldtype: 2,
         shieldstat: 1,
-        speed: 0,
-        speed2b: 0,
-        heading: 0,
-        head2b: 0,
         xcoord: 5,
         ycoord: 5,
-        damage: 0,
         energy: 50000,
-        kills: 0,
         lastfired: 255,
-        cloak: 0,
-        degrees: 0,
-        percent: 0,
-        tactical: 0,
         helm: 1,
-        train: 0,
-        ltorpsChannel: [],
-        ltorpsDistance: [],
-        lmisslChannel: [],
-        lmisslDistance: [],
-        lmisslEnergy: [],
         decout: [0, 0, 0, 0, 0],
-        jammer: 0,
         freq: [],
         items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-        titem: 0,
-        hostile: 0,
-        cantexit: 0,
-        repair: 0,
-        hypha: 0,
-        firecntl: 0,
-        destruct: 0,
         cybskill: 10,
-        emulate: 0,
-        minesnear: 0,
-        lock: 0,
         topspeed: 8,
-        warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
         shipname: `Healthy-${i}`,
-        dirty: false,
-      });
+      }));
     }
 
     // Ship that throws inside its tick (bad state: shpclass not in cache)

@@ -13,6 +13,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CYBERTRON_CLASS_DEFAULTS } from '../../../src/game/cybertron/cybertron.config';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 async function buildHarness(seed = 1) {
   const rand = new Mulberry32Adapter(seed);
@@ -51,22 +52,31 @@ async function buildHarness(seed = 1) {
       createdSpawns.push({
         classNumber: slot.classNumber, userid: slot.userid, shipno: slot.shipno, topspeed: slot.topspeed,
       });
-      const ship: ShipState = {
-        userid: slot.userid, shipno: slot.shipno, shipname: `Cybrg-${slot.shipno}`,
-        shpclass: slot.classNumber, status: 2, tick: slot.tick,
-        heading: 0, head2b: 0, speed: 0, speed2b: 0, xcoord: 5, ycoord: 5,
-        damage: 0, energy: 50000, phasr: 100, phasrtype: 1, kills: 0, lastfired: 255,
-        shieldtype: 1, shieldstat: 1, shield: 1, cloak: 0, degrees: 0, percent: 0,
-        tactical: 0, helm: 1, train: 0, where: 0,
-        ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-        decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
-        items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n],
-        titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
-        cybmine: 255, cybskill: 10, cybupdate: 50,
-        emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-      };
+      const ship: ShipState = baseMakeShip({
+    userid: slot.userid,
+    shipno: slot.shipno,
+    shipname: `Cybrg-${slot.shipno}`,
+    shpclass: slot.classNumber,
+    status: 2,
+    tick: slot.tick,
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    lastfired: 255,
+    shieldtype: 1,
+    shieldstat: 1,
+    shield: 1,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
+    items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n],
+    cybmine: 255,
+    cybskill: 10,
+    cybupdate: 50,
+    topspeed: 8,
+  });
       shipMap.set(`${slot.userid}:${slot.shipno}`, ship);
     }),
     flushShipsImmediate: jest.fn().mockResolvedValue(undefined),

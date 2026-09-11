@@ -15,6 +15,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CYBERTRON_CLASS_DEFAULTS } from '../../../src/game/cybertron/cybertron.config';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /** Total AI hulls the config asks for, whatever the galaxy size scales it to. */
 function expectedTotal(): number {
@@ -27,26 +28,29 @@ function expectedTotal(): number {
 function makeAiShip(
   overrides: Partial<ShipState> & { userid: string; shipno: number; shpclass: number },
 ): ShipState {
-  return {
+  return baseMakeShip({
     shipname: `Cybrg-${overrides.shipno}`,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5,
-    damage: 0, energy: 50000, phasr: 100, phasrtype: 1,
-    kills: 0, lastfired: 255,
-    shieldtype: 1, shieldstat: 1, shield: 1,
-    cloak: 0, degrees: 0, percent: 0,
-    tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    lastfired: 255,
+    shieldtype: 1,
+    shieldstat: 1,
+    shield: 1,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
-    status: 2, cybmine: 255, cybskill: 10, cybupdate: 50, tick: 6,
-    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 2,
+    cybmine: 255,
+    cybskill: 10,
+    cybupdate: 50,
+    tick: 6,
+    topspeed: 8,
     ...overrides,
-  };
+  });
 }
 
 // ─── Harness builder ──────────────────────────────────────────────────────────
