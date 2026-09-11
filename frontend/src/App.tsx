@@ -17,8 +17,8 @@ import { clearToken } from './auth/tokenStore';
 import { logout } from './auth/logout';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
-import type { EventLogLine, ScanCell, CombatShipDestroyedPayload } from '@ge/wire';
-import type { ScanRenderEvent } from './hooks/useScanRender';
+import type { EventLogLine, CombatShipDestroyedPayload } from '@ge/wire';
+import { useScanMap } from './hooks/useScanMap';
 
 const MAX_LOG_ENTRIES = 500;
 
@@ -86,11 +86,7 @@ function Terminal(): React.JSX.Element {
     useSocket(playerDispatch, (payload) =>
       handleCommandResult(payload, appendLines, () => setLogLines([])),
     );
-  const [scanCells, setScanCells] = useState<ScanCell[] | null>(null);
-  // Which scan produced them — ScanMap needs it to decide whether a sector
-  // crossing invalidates the view. Only `sca se` is sector-scoped.
-  const [scanKind, setScanKind] = useState<ScanRenderEvent['kind'] | null>(null);
-
+  const { cells: scanCells, kind: scanKind } = useScanMap(localShipId);
 
   // Function-key bindings for the F KEY MAP panel. Sent on board and again
   // after every `fset`, so the panel is populated at login rather than only
@@ -100,22 +96,6 @@ function Terminal(): React.JSX.Element {
     const handleFkeys = (e: { fkeys: string[] }) => setFkeys(e.fkeys ?? []);
     socket.on('fkeys.snapshot', handleFkeys);
     return () => { socket.off('fkeys.snapshot', handleFkeys); };
-  }, []);
-
-  // The sector map belongs to the hull that drew it, for the same reason the
-  // SCAN DATA cards do. @see hooks/useScanRender
-  useEffect(() => {
-    setScanCells(null);
-    setScanKind(null);
-  }, [localShipId]);
-
-  useEffect(() => {
-    const handleScanRender = (event: ScanRenderEvent) => {
-      setScanCells(event.cells as ScanCell[]);
-      setScanKind(event.kind);
-    };
-    socket.on('scan:render', handleScanRender);
-    return () => { socket.off('scan:render', handleScanRender); };
   }, []);
 
   useEffect(() => {
