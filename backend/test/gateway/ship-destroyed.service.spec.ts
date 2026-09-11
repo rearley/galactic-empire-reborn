@@ -34,7 +34,7 @@ interface EmitterSpy extends DestroyedEmitter {
   order: string[];
 }
 
-function emitterSpy(ionHit: { name: string; at: number } | null = null): EmitterSpy {
+function emitterSpy(): EmitterSpy {
   const spy: EmitterSpy = {
     roomLines: [],
     exceptLines: [],
@@ -46,7 +46,6 @@ function emitterSpy(ionHit: { name: string; at: number } | null = null): Emitter
     toRoom: (room, _category, text) => { spy.order.push('toRoom'); spy.roomLines.push({ room, text }); },
     toAllExcept: (rooms, _category, text) => { spy.order.push('toAllExcept'); spy.exceptLines.push({ rooms, text }); },
     announceDestroyed: (payload) => { spy.order.push('announce'); spy.announced.push(payload); },
-    takeIonAttacker: () => ionHit,
     recoverVictim: (userid) => { spy.order.push('recoverVictim'); spy.recovered.push(userid); return Promise.resolve(); },
   };
   return spy;
@@ -212,7 +211,10 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
 
   it('names a colony’s ion cannons as the killer when nothing else fired', async () => {
     const h = build();
-    const emit = emitterSpy({ name: 'Ceti Alpha', at: Date.now() });
+    const emit = emitterSpy();
+    // The service owns the ion-hit ledger now; the gateway's PLANET_ION_FIRED
+    // handler is what calls this on every hit.
+    h.service.recordIonAttacker('usr_victim:2', 'Ceti Alpha');
     await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, weapon: null }), emit);
     const payload = emit.announced[0] as Record<string, unknown>;
     expect(payload.weapon).toBe('ion');

@@ -848,21 +848,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  /**
-   * shipId → the planet whose ion cannons last hit it, and when.
-   *
-   * This is the evidence that a planet made a kill. The victim's `lastfired`
-   * cannot serve: `fireion` sets it to -1, but so does NO_CHANNEL when a
-   * firer leaves the game, so inferring from it would blame a colony for any
-   * death whose attacker had disconnected.
-   *
-   * Written on every ion hit, read and cleared when that ship dies, and only
-   * honoured inside ION_ATTRIBUTION_WINDOW_MS so a ship that was shot at,
-   * escaped and died elsewhere cannot inherit the name. Bounded by the number
-   * of ships currently besieging planets.
-   */
-  private readonly lastIonAttacker = new Map<string, { name: string; at: number }>();
-
   @OnEvent(PLANET_BEACON)
   handlePlanetBeacon(event: PlanetBeaconEvent): void {
     this.emitNarration(narratePlanetBeacon(event));
@@ -909,11 +894,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       toAllExcept: (rooms, category, text) =>
         this.server.except(rooms).emit('event.log', { category, text }),
       announceDestroyed: (payload) => this.server.emit(COMBAT_SHIP_DESTROYED, payload),
-      takeIonAttacker: (victimId) => {
-        const hit = this.lastIonAttacker.get(victimId) ?? null;
-        this.lastIonAttacker.delete(victimId);
-        return hit;
-      },
       recoverVictim: (userid) => this.recoverAfterDeath(userid),
     };
   }
@@ -1173,7 +1153,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // kill itself carries no attacker — `fireion` sets lastfired to -1 — and
     // neither this gateway nor CombatTickService can reach planet state, so
     // the name has to come from the hit that caused the death.
-    this.lastIonAttacker.set(event.shipId, { name, at: Date.now() });
+    this.shipDestroyed.recordIonAttacker(event.shipId, name);
     const text = event.shieldsUp
       ? `** ION CANNON from ${name}! Shields absorb it — hull -${event.hullDamage}%, shields knocked ${event.shieldKnock}% **`
       : `** ION CANNON from ${name}! Hull -${event.hullDamage}% — raise shields! **`;
