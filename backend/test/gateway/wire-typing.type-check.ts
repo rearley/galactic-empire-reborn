@@ -116,5 +116,3 @@ type SetEqual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 type _CommandBroadcastEventsMatchDispatch = SetEqual<CommandBroadcast['event'], HandledByDispatch>;
 const _assertAllHandled: _CommandBroadcastEventsMatchDispatch = true;
 void _assertAllHandled;
-
-export {};

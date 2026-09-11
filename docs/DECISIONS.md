@@ -5445,3 +5445,58 @@ documentation-only close-out session is fixing — see
 `docs/PROGRESS.md` 2026-09-11's known issues for the tracked item, and the
 restructure spec's blockers section for the flag against phase 1's
 checklist.
+
+## 2026-09-11 — restructure phase 2: three rulings taken splitting the gateway
+
+**Context:** Phase 2 broke `game.gateway.ts` (2,743 lines at the `fadb7a2`
+baseline) into per-concern collaborators and split `scan.handler.ts` (1,258
+lines). Three calls made mid-execution are worth keeping past the tasks that
+made them.
+
+**Decision 1 — a test-factory seam before touching the constructor.**
+`backend/test/helpers/make-gateway.ts` was built first (Task 1), before any
+extraction task ran. 43 spec files construct `GameGateway` positionally
+against an 11-argument constructor. Without a named-construction seam, every
+later task that reordered or added a constructor argument would have been a
+43-file diff instead of a two-file one. It held: the two tasks that actually
+added a constructor parameter (the death-path extraction and the connection-
+lifecycle extraction) each changed two test files, not 43.
+
+**Decision 2 — `recoverVictim` stays on `DestroyedEmitter`, as debt, not an
+oversight.** `recoverAfterDeath` needs the live Socket.io `Server` to rejoin
+rooms and re-emit state on recovery, and no extracted service holds a `Server`
+reference. Moving `recoverVictim` off `DestroyedEmitter` would still require a
+hop back through the emitter to reach the `Server`, so the member stays where
+it is. Recorded so a later phase doesn't "fix" this into a needless
+indirection.
+
+**Decision 3 — the scan handler's `sca ra` renderer was pulled out in a
+follow-up commit, not the initial split.** The first split (`9eea0f9`)
+carved scan into `scan-strings.ts`, `scan-render.ts` and `scan-planet.ts` but
+left one of the four scan modes (`sca ra`) inline in `scan.handler.ts`.
+Leaving it meant the same category of rendering code existed in two places —
+some in the new `scan-render.ts`, some still in the handler — which is worse
+than not splitting at all, so a second commit (`c0305d1`) finished the
+extraction rather than leaving it as a documented gap.
+
+**Alternatives rejected:** for Decision 1, converting the 43 call sites
+directly instead of building a factory first (rejected — it front-loads the
+exact churn the seam exists to avoid, once per later task instead of once);
+for Decision 2, threading `Server` into `DestroyedEmitter`'s constructor so
+`recoverVictim` could move (rejected — moves the same dependency one hop
+without removing it, for no reduction in coupling); for Decision 3, leaving
+`sca ra` inline as a documented deviation (rejected during Task 7's own
+review — see reasoning above).
+
+**A gap found closing out this phase, not fixed here (verification-only
+session):** `game.gateway.ts` still holds 2 `this.prisma` call sites
+(`finalizeOnboarding`'s P2002 race-recovery read, `handleShipSelectReply`'s
+reload-before-board), down from 10 at baseline but not the 0 the phase-2 plan
+(`docs/superpowers/plans/2026-09-11-restructure-phase-2-gateway-split.md`)
+expected at close-out. Neither site was in scope for Tasks 2-6, which covered
+broadcast dispatch, narration, sector transition, the death path and
+connection lifecycle — onboarding was never assigned a task. This is squarely
+what Phase 3 ("persistence boundary… `PrismaService` appears in one place per
+feature, not in 40 files") exists to finish; recorded here so Phase 3 does not
+have to rediscover it. Full before/after table in `docs/PROGRESS.md`
+2026-09-11.

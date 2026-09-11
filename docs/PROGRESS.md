@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 90 entries.
+Append-only, **newest at the bottom**. 91 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 90 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
 - [2026-09-11 — restructure phase 1: one typed wire contract](#2026-09-11--restructure-phase-1-one-typed-wire-contract)
 - [2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change](#2026-09-10--restructure-phase-0-toolchain-and-runtime-zero-gameplay-change)
 - [2026-09-10 — a new citation now has to carry its quote](#2026-09-10--a-new-citation-now-has-to-carry-its-quote)
@@ -5580,3 +5581,82 @@ must be resolved.
   explicitly with a comment, but the component itself still declares and
   never meaningfully uses the prop. Cosmetic, deferred — not fixed in this
   phase because it is component cleanup, not a wire-contract question.
+
+## 2026-09-11 — restructure phase 2: the gateway split
+
+**Completed:** Broke `game.gateway.ts` into per-concern collaborators
+(transport-focused) and split `scan.handler.ts` by rendering concern. Eight
+tasks total, on branch `restructure`, verified against baseline commit
+`fadb7a2`.
+
+Before/after (measured directly, not copied from an intermediate claim):
+
+| | baseline (`fadb7a2`) | now |
+|---|---|---|
+| `backend/src/gateway/game.gateway.ts` | 2,743 | 1,482 |
+| `backend/src/game/commands/handlers/scan.handler.ts` | 1,258 | 488 |
+| `this.prisma` sites in `game.gateway.ts` | 10 | 2 |
+| backend suite | 609 suites / 6,161 tests | 617 suites / 6,291 tests, all passing |
+
+New modules, all under `backend/src/gateway/` unless noted:
+`broadcast-dispatch.ts` (82 lines), `narration.ts` (298), `sector-transition.ts`
+(235), `ship-destroyed.service.ts` (451), `ship-identity.ts` (41),
+`connection-lifecycle.service.ts` (764), `types.ts` (48), and under
+`backend/src/game/commands/handlers/scan/`: `scan-strings.ts` (125),
+`scan-render.ts` (461), `scan-planet.ts` (309).
+
+**Tests:** Full backend suite green at close-out: 617 suites, 6,291 tests, 9
+snapshots, exit 0. `npx tsc --noEmit` clean. `npm run lint` exit 0 (see known
+issues below — it was exit 1 at phase start on a pre-existing, unrelated
+error, fixed in this close-out session). Both `docker build -f
+backend/Dockerfile .` and `docker build -f frontend/Dockerfile .` succeed
+from repo root; `require.resolve('@ge/wire')` resolves inside the running
+backend image (`docker run --rm --entrypoint node ge-backend-p2 -e
+"require.resolve('@ge/wire')"`). Deploy gate confirmed untouched:
+`.github/workflows/ci.yml`'s `on.push.branches` is still `[master]` and the
+image job is still gated `if: github.event_name == 'push'` — the diff against
+master touches Node version, workspace lockfile paths, and the Dockerfile
+build-context fix from the Phase 1 close-out, none of which are this phase's
+work and none of which touch the gate. `VERSION` unchanged (still not bumped,
+per the restructure ground rules).
+
+**Decisions made:** recorded in full in `docs/DECISIONS.md` 2026-09-11 — the
+test-factory seam built before any extraction task touched the 11-argument
+constructor; `recoverVictim` staying on `DestroyedEmitter` as accepted debt
+(it needs the live `Server`, which no extracted service holds); the `sca ra`
+scan renderer pulled into a second follow-up commit rather than left as a
+documented gap in the initial split.
+
+**Next:** Phase 3 — persistence boundary. Per-feature repositories so
+`PrismaService` appears once per feature instead of in ~40 files; retire the
+7 `forwardRef` calls; narrow injection-seam interfaces. This phase should
+also close the 2 remaining `this.prisma` sites in `game.gateway.ts` (both in
+onboarding — `finalizeOnboarding`'s P2002 race-recovery read and
+`handleShipSelectReply`'s reload-before-board), which no Phase 2 task was
+assigned to touch.
+
+**Known issues:**
+
+- **Gateway `this.prisma` count is 2, not 0.** The phase-2 plan's own
+  close-out step expected the count to reach zero; Tasks 2-6 covered
+  broadcast dispatch, narration, sector transition, the death path and
+  connection lifecycle, and none of them was scoped to onboarding, where both
+  remaining sites live. Not a regression — a real, tracked gap against the
+  phase's stated goal, closed by Phase 3's persistence-boundary work per
+  the restructure spec. See `docs/DECISIONS.md` 2026-09-11 for detail.
+- **(carried from 2026-09-10) #2 `command.notice` reaches no frontend
+  listener** — unchanged this phase, still open.
+- **(carried from 2026-09-10) #4 `combat.hit` / `combat.phaser-fired` still
+  spread internal fields onto the wire** — unchanged this phase, still open.
+- **(carried from 2026-09-10) #6 `ShipSelectPrompt`'s dead `error` prop** —
+  unchanged this phase, still open.
+- **oxlint's `no-useless-empty-export` fired on a pre-existing empty
+  `export {}`** in `backend/test/gateway/wire-typing.type-check.ts` (a
+  compile-time-only fixture full of `@ts-expect-error` assertions, never
+  executed by Jest, type-checked by `tsc --noEmit` on every run). Predated
+  this phase and made `npm run lint` exit 1. Fixed in this close-out session:
+  the `export {}` was redundant (the file's `import type` statements already
+  make it a module) and removing it does not change what makes the file a
+  module or which `@ts-expect-error` lines fire — `tsc --noEmit` stayed clean
+  after the edit, meaning every flagged mistake in the fixture still resolves
+  the way the file exists to prove. `npm run lint` now exits 0.
