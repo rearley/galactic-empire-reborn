@@ -5906,3 +5906,26 @@ cohesion, as before.
 final whole-branch review of Phase 4.
 
 **Known issues:** none new.
+
+**AMENDED, same day.** The handler-attribution table above cited line ranges
+(`App.tsx:83-86`, `App.tsx:88-91`, `App.tsx:93-108`, `App.tsx:118-125`,
+`combatNarration.ts:42-47`) that went stale within the same commit that added
+them — an 8-line comment added to `App.tsx` in that commit shifted every line
+after it, so the citations pointed at the wrong handlers by the time the
+commit landed. The table is restated here with the handlers named by symbol
+instead of by line, since a symbol survives the next edit and a line number
+does not:
+
+| handler | reads the roster (`players`)? |
+|---|---|
+| `handleCombatHit` (registers `combat.hit`) | yes — `ctx.shipName` → `players.find` |
+| `handleShipDestroyed` (registers `combat.ship-destroyed`) | yes — `players.find` directly |
+| `handlePhaserFired` (registers `combat.phaser-fired`) | no — calls `phaserFiredLine`, which ignores both its parameters and returns `null` unconditionally |
+| `handleDecoyIntercept` (registers `combat.decoy-intercept`) | no — reads only its event argument and `localShipId` |
+
+All four handlers and `phaserFiredLine` are unchanged from the original
+correction; only the pointers to them were wrong. Caught by the coordinator's
+review of this fix, not by any guard — the same defect class as issue #22
+(citations nothing verifies) and #24 (a citation to something that never
+existed), this time self-inflicted inside a correction commit. No new issue
+filed: the fix is in this same amendment, not deferred.
