@@ -16,6 +16,13 @@ Updated at the end of every implement session per CLAUDE.md.
 
 ```
 galactic-empire-reborn/
+  package.json               ← npm workspace root (restructure phase 1, `restructure` branch):
+                                workspaces ["packages/*", "backend", "frontend"]; ONE
+                                root package-lock.json — the two per-app lockfiles it
+                                replaced are gone, `npm ci` from backend/ or frontend/
+                                now installs against this one
+  packages/
+    wire/                    ← @ge/wire — see "The wire contract" below
   backend/
     prisma/
       schema.prisma          ← Prisma schema — THE source of truth for every column
@@ -26,7 +33,8 @@ galactic-empire-reborn/
     test/                    ← Jest test suite (run it for the count; a number here only rots)
     config/
       game.config.json       ← DEVIATIONS ONLY; defaults come from canon
-    package.json             ← Backend deps + db:up/db:down/db:reset/test scripts
+    package.json             ← Backend deps + db:up/db:down/db:reset/test scripts; depends
+                                on `@ge/wire` via `file:../packages/wire`
     tsconfig.json            ← TypeScript strict mode
     jest.config.ts
   frontend/
@@ -41,6 +49,55 @@ galactic-empire-reborn/
   specs/
     001-prisma-schema/ … 016-navigation-spy/  ← spec-kit feature specs
   docs/                      ← Living architecture docs (this file)
+```
+
+## The wire contract (`packages/wire`, restructure phase 1, 2026-09-10/11)
+
+```
+@ge/wire (packages/wire/)
+  ├── src/events.ts    — WIRE_EVENTS: 30 server-to-client + 2 client-to-server
+  │                       Socket.io event name strings, `as const` and frozen.
+  │                       Frozen strings, mixed dot/colon convention kept on
+  │                       purpose — see docs/DECISIONS.md 2026-09-11. Five
+  │                       server-to-client names are JSDoc-flagged "RECORDED,
+  │                       NOT ENDORSED" (no frontend listener today):
+  │                       combat.miss, combat.mine-detonation,
+  │                       cybertron.broke-off, beacon, command.notice.
+  ├── src/payloads.ts  — every payload interface that travels on the wire.
+  ├── src/socket.ts    — ServerToClientEvents / ClientToServerEvents, Socket.io's
+  │                       typed-events generic maps, keyed by the literal
+  │                       strings above.
+  ├── src/index.ts     — re-exports all three, plus WIRE_CONTRACT_VERSION.
+  └── dist/{cjs,esm}   — dual build: the backend is CommonJS (Jest/ts-jest),
+                          the frontend is ESM (Vite) — one declaration, two
+                          runtime shapes via `exports` map. Collapses to a
+                          single ESM build once phase 5 moves the backend to
+                          ESM (docs/DECISIONS.md 2026-09-11).
+
+GameGateway (gateway/) — Server<ClientToServerEvents, ServerToClientEvents>,
+Socket<ClientToServerEvents, ServerToClientEvents> throughout (was untyped
+`Server`/`Socket`; every emit was an inline object literal before this phase).
+`CommandResult.broadcasts` is now `CommandBroadcast[]`, a discriminated union
+on `event` (5 members: command.notice, event.log, message.send,
+player.snapshot, ship.renamed) so `dispatchBroadcast`'s switch narrows
+`payload` per branch with no cast, and has an exhaustiveness-asserted
+`default: never` arm.
+
+frontend/src/ — imports ServerToClientEvents/ClientToServerEvents and every
+payload type directly from `@ge/wire`. The hand-synced duplicate that used to
+live at frontend/src/types/contracts.ts, and the parity test at
+frontend/test/contracts-parity.spec.ts that kept it in sync, are both
+DELETED — there is nothing left to keep in sync, and neither path exists any
+more.
+`specs/003-ship-commands/contracts/shared-types.ts` (the other historical
+copy) is kept, annotated SUPERSEDED rather than deleted, per
+`docs/CLAUDE.md`'s keep-the-reasoning rule.
+
+**Known gap, not yet closed:** neither `backend/Dockerfile` nor
+`frontend/Dockerfile` was updated for the new `file:../packages/wire`
+dependency — their build context is still per-app, so `npm ci` fails inside
+either image build today. See `docs/DECISIONS.md` 2026-09-11 and
+`docs/PROGRESS.md` 2026-09-11's known issues.
 ```
 
 

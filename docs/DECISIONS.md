@@ -5218,3 +5218,230 @@ moves this backend onto NestJS 12.
 **Alternatives rejected:** Node 22 (shorter support runway, no offsetting
 benefit — it does not unblock anything Node 24 doesn't also unblock).
 
+
+## 2026-09-11 — restructure phase 1: event names frozen, listener-less events recorded
+
+**Context:** phase 1 of the restructure
+(`docs/superpowers/specs/2026-09-10-restructure-design.md`) built one typed
+declaration, `packages/wire`, for every Socket.io event crossing between the
+backend and the frontend. Two questions came up while writing it that were
+about the *shape* of the contract, not its enforcement, and both were settled
+before Task 2 wrote the declaration rather than left to drift into it.
+
+**Decision 1 — the 30 server-to-client and 2 client-to-server event name
+strings are FROZEN as written, mixed naming convention and all.** 8 of the 30
+server-to-client names use a colon (`command:result`, `scan:render`,
+`auth:logout`, `prompt:ship-name`, `prompt:ship-select`, `sector:ship-left`,
+`sector:ship-entered`), plus the inbound `prompt:reply`; the rest use a dot
+(`event.log`, `player.snapshot`, `combat.hit`, `combat.ship-destroyed`,
+`cybertron.taunt`, and so on). The original restructure plan's phase-1
+checklist had a bullet reading "pick dot or colon and convert." That bullet
+is withdrawn.
+
+**Reason:** renaming an event string buys nothing but cosmetic consistency,
+and it is exactly the kind of change this phase's own ground rule forbids —
+"zero gameplay change... if a canon value moves, that is a bug in the
+refactor, not a decision." A wire event name is not a canon value, but the
+risk profile is the same shape: a missed call site on a rename is a silently
+dropped event in a real-time multiplayer game, and it fails nowhere loud — no
+exception, no red test, the message just never arrives. `@ge/wire`'s single
+typed declaration delivers the phase's actual value (a wrong payload becomes
+a compile error) with the strings held exactly as they were. Task 2's
+`packages/wire/test/event-names.spec.ts` and
+`backend/test/unit/wire-event-parity.spec.ts` both assert the frozen strings
+against the backend's own running constants, byte for byte, so the mix is
+pinned, not merely inherited.
+
+**Alternatives rejected:** converting everything to one convention in this
+phase (rejected — see Reason; also would have touched every emit site and
+every frontend listener, expanding a "one declaration, zero behaviour
+change" phase into a rename sweep); converting only the minority (8 colon
+names) to match the majority (same objection, smaller blast radius, same
+risk of a missed site).
+
+**Decision 2 — five server-to-client events are emitted with no frontend
+listener, and are RECORDED, not removed:** `combat.miss`,
+`combat.mine-detonation`, `cybertron.broke-off`, `beacon`, and
+`command.notice`. All five are declared in `packages/wire` with an explicit
+"RECORDED, NOT ENDORSED" JSDoc note rather than silently included as if
+unremarkable.
+
+**Reason:** deleting an emit is a behaviour change this phase forbids just as
+firmly as renaming one, and the typing pass can prove an event is *unheard*,
+never that it is *unneeded*. `beacon` in particular carries its own payload
+interface and a line in the original spec — a missing listener there reads
+as an unfinished feature, not dead code. `command.notice` is now confirmed
+(Task 3, see the entry below) to be a real gameplay gap: canon's
+SCAN1/SCAN2/SCAN3 "you have been scanned" notice is built and sent and never
+rendered. Recording rather than removing keeps that visible instead of
+erasing the evidence that it needs fixing.
+
+**Alternatives rejected:** deleting the four events with no accompanying spec
+contract and keeping only `beacon` (rejected — `combat.miss` and
+`combat.mine-detonation` in particular are the kind of thing a player would
+notice going quiet, and "no listener found by this reader" is not the same
+claim as "no listener exists or should exist"); wiring up listeners here to
+close the gap (rejected — that is frontend feature work, out of scope for a
+phase whose job is typing what already crosses the wire, not deciding what
+should).
+
+**Alternatives rejected (both decisions):** neither question was escalated
+to Rick — both were judged decidable from the measured evidence
+(`docs/superpowers/sdd/2026-09-10-restructure-phase-1-wire-contract/progress.md`,
+"Rulings made before execution") without a design opinion only he could
+supply.
+
+## 2026-09-11 — restructure phase 1: five defects the typing surfaced, and one accepted behaviour change
+
+**Context:** phase 1's actual justification — typing the producer side of the
+wire contract for the first time — is that a wrong payload becomes a compile
+error instead of a runtime surprise. It found five real defects while doing
+exactly that, none of them known before this phase, and one of the five
+fixes changes what a player can see.
+
+**Defects found (backend side, Task 3, commit `9e1812d`):**
+
+1. `combat.ship-destroyed` was declared against its 11-field *internal*
+   domain-event type (`CombatShipDestroyedEvent`), 8 of those fields
+   required, while `game.gateway.ts:1709-1722` builds the actual wire payload
+   by hand, field by field, "NOT spread from the event," sending only 4:
+   `victimId`, `attackerId`, `weapon`, `attackerName`. The old declaration
+   was stale against a 2026-09-09 security fix that deliberately stopped
+   sector, internal account keys, cargo, and `victimDisconnectReason` from
+   reaching the wire — the declaration just never caught up. Fixed by adding
+   `CombatShipDestroyedPayload` (4 fields, `attackerName: string | null`, not
+   optional — stricter than the type it replaced) and pointing the event at
+   it.
+2. `EventLogCategory` was missing `'alert'`. `handleEngineShutdown`
+   (`game.gateway.ts:2216`) emits `category: 'alert'` for canon's
+   unfilterable engine-shutdown notice (`outprfge(ALWAYS,usrn)`,
+   GEFUNCS.C:528), deliberately distinct from `'system'` per that handler's
+   own comment — the 6-member declared type had been silently discarding a
+   real distinction rather than crashing anything, because the frontend's
+   category-to-style lookup falls back to a default for any unrecognised
+   key. Widened to 7 members.
+
+**Defects found (frontend side, Task 4, commit `f6121d0`):**
+
+3. `App.tsx`'s hand-written `combat.ship-destroyed` listener type declared a
+   required `victimUserid: string` field the backend never sends (stripped
+   by the same 2026-09-09 security fix behind defect 1). Nothing in `App.tsx`
+   or `destructionLine.ts` ever read it — harmless, but wrong. Fixed by
+   importing `CombatShipDestroyedPayload` from `@ge/wire` instead of
+   hand-declaring the shape.
+4. `useSocket.ts` registered `reconnect_attempt` on `socket`
+   (`socket.on('reconnect_attempt', ...)`), which only compiled because the
+   untyped `Socket` fell back to `DefaultEventsMap`'s permissive index
+   signature. `reconnect_attempt` is a `Manager` event (`socket.io`), not a
+   `Socket` event, and is not a member of Socket.io-client's
+   `SocketReservedEvents`. The handler had never fired since it was written
+   — see the behaviour-change note below.
+5. Both `prompt:ship-select` emit sites in `game.gateway.ts` send only
+   `{ step: 'SHIP_SELECT', ships }`. `App.tsx` cast the payload to
+   `{ ships?: FleetEntry[]; error?: string }` and read `payload.error` for
+   the fleet-selection prompt — a field that has never existed on that
+   event. (`prompt:ship-name` does carry a real `error` for a rejected name;
+   the two prompts were conflated.) Fixed by giving `OnboardingPrompt` a
+   discriminated union over the two real wire payload types; `App.tsx` now
+   passes `error={null}` for ship-select with a comment explaining why. The
+   dead prop this leaves on `ShipSelectPrompt` is tracked as issue #6 in
+   `docs/PROGRESS.md`'s known issues for this date, not fixed here — the
+   phase's scope was the wire contract, not the component's remaining props.
+
+**Decision — accept `reconnect_attempt`'s behaviour change (defect 4) rather
+than delete the handler or cast past the error.** Moving the registration to
+`socket.io.on`/`socket.io.off` makes a handler that had been dead since it
+was written go **live**. It is user-visible: during a dropped connection the
+banner can now show orange "Reconnecting…" interleaved with red
+"Disconnected" as Socket.io retries, where before only "Disconnected" ever
+appeared, because the `reconnecting` status transition this handler sets was
+unreachable.
+
+**Reason:** this phase's own rule is "type what is sent without changing
+behaviour," which makes this the one place in the phase that needed a
+deliberate call rather than a mechanical fix. All three options change
+something: leaving the code as `socket.on('reconnect_attempt', ...)` doesn't
+type-check once `Socket` carries the real event map, and silencing that with
+a cast is what this phase exists to stop doing. Deleting the handler
+type-checks cleanly and looks like the conservative choice, but it is also a
+behaviour change — it permanently discards the FR-019/FR-020 reconnect-status
+behaviour the code was written to provide, rather than merely fixing where it
+was registered. Making it live is the only option that honours what the code
+was for. The one hazard checked before accepting this: `handleReconnectAttempt`
+lacks `handleDisconnect`'s `displaced` guard, but `handleServerError` calls
+`socket.disconnect()` on `SESSION_REPLACED` and a manual disconnect suppresses
+Socket.io's own reconnection, so `displaced` cannot be clobbered by a
+reconnect attempt that fires after a forced disconnect.
+
+**Alternatives rejected:** delete `socket.on('reconnect_attempt', ...)`
+entirely (type-checks, but discards working banner behaviour that was
+designed and never shipped due to a bug, not due to a design change); cast
+the payload or widen `Socket`'s event map back toward `DefaultEventsMap`
+locally to keep the old registration (forbidden outright by this phase's
+"no casts" rule, and would have re-hidden the exact class of bug this phase
+exists to catch).
+
+**Cost if wrong:** a connection-status banner flickers between two states
+during a drop, rather than showing only one. No data loss, no incorrect game
+state — a display-only change, confirmed reviewed and accepted (Task 4 fix
+round, `f6121d0`).
+
+## 2026-09-11 — restructure phase 1: dual CJS/ESM build kept for one phase, and the Docker build gap it leaves open
+
+**Context:** `packages/wire` (Task 1, commit `84da4b3`) ships both a CommonJS
+build (`dist/cjs`) and an ESM build (`dist/esm`), with an `exports` map
+routing `require` at the CJS output and `import` at the ESM output. This
+exists because the backend is CommonJS under Jest/`ts-jest` and the frontend
+is ESM under Vite — the one thing phase 0 could not unify, since `ts-jest`
+pins `typescript: ">=4.3 <7"` and Prisma 7 requires ESM, which is why the
+backend's own ESM move is deferred to phase 5.
+
+**Decision:** keep the dual build for phase 1. Do not attempt to collapse it
+now.
+
+**Reason:** collapsing to a single build means either forcing the backend to
+consume an ESM-only package under CommonJS Jest (blocked until phase 5's
+ESM/Prisma-7/NestJS-12 move lands) or forcing the frontend onto a CJS-only
+package (works today via Vite's interop, but throws away the point of a
+types-and-constants package being trivially tree-shakeable and native to
+both runtimes going forward). Phase 1's job was proving one declaration
+resolves from both consumers, not picking their shared module format ahead
+of the phase built for exactly that. **When phase 5 converts the backend to
+ESM, `packages/wire` should collapse to a single ESM build** — recorded here
+so that phase doesn't have to rediscover why the dual build exists before
+deciding to remove it.
+
+**Alternatives rejected:** ESM-only now (blocks the backend until phase 5,
+which inverts phase 5's own ordering — the backend has to reach ESM before
+an ESM-only shared package is safe to depend on, not the other way round);
+CJS-only now (works, but commits the frontend to consuming a CommonJS
+package through Vite's interop indefinitely, for a package phase 5 will
+touch anyway).
+
+---
+
+**A related gap, found verifying this close-out (2026-09-11), not by any of
+the four tasks:** neither Docker image builds on this branch as it stands.
+`backend/package.json` and `frontend/package.json` both declare
+`"@ge/wire": "file:../packages/wire"` (added in `84da4b3`), but neither
+Dockerfile's build context or `COPY` list changed to bring `packages/wire`
+or the root manifest into the image — both still `COPY package*.json ./`
+from inside their own per-app directory and `RUN npm ci` from there, exactly
+as before the workspace existed. Reproduced directly:
+`docker build -t x -f backend/Dockerfile backend/` and the frontend
+equivalent both fail at `npm ci` with `file:` dependencies requiring
+`--install-links` (or a workspace root) that the per-app build context
+cannot see.
+
+The task-1 brief anticipated exactly this ("Step 9: Verify the Docker images
+still build... **Expect this to fail, and treat fixing it as part of this
+task**") and named two acceptable fixes — move both images' build context to
+the repo root, or build `packages/wire` as its own Docker stage and copy its
+`dist` in. Neither was applied; no report or ledger entry records Step 9
+having run for Task 1's actual (recovered) execution, only that it was
+planned. This is a real gap against the phase's own exit criteria ("both
+Docker images build"), not a new deviation and not something this
+documentation-only close-out session is fixing — see
+`docs/PROGRESS.md` 2026-09-11's known issues for the tracked item, and the
+restructure spec's blockers section for the flag against phase 1's
+checklist.

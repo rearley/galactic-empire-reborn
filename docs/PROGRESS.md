@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 89 entries.
+Append-only, **newest at the bottom**. 90 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 89 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-11 — restructure phase 1: one typed wire contract](#2026-09-11--restructure-phase-1-one-typed-wire-contract)
 - [2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change](#2026-09-10--restructure-phase-0-toolchain-and-runtime-zero-gameplay-change)
 - [2026-09-10 — a new citation now has to carry its quote](#2026-09-10--a-new-citation-now-has-to-carry-its-quote)
 - [2026-09-10 — a torpedo volley now tells you it hit](#2026-09-10--a-torpedo-volley-now-tells-you-it-hit)
@@ -22,7 +23,6 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 - [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
-- [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
@@ -5457,3 +5457,126 @@ the dead imports there and in the 46 test files as part of that work, then
 promote the rule to `error` repo-wide. Tracked here and in the oxlint
 decision in `docs/DECISIONS.md`.
 
+
+## 2026-09-11 — restructure phase 1: one typed wire contract
+
+**Completed:** all four phase-1 tasks of the restructure
+(`docs/superpowers/specs/2026-09-10-restructure-design.md`), on the
+`restructure` branch, master untouched:
+
+- **`packages/wire`** — a new npm workspace holding every Socket.io event
+  name (30 server-to-client, 2 client-to-server, `as const` and frozen) and
+  every payload interface, built dual CJS/ESM so the CommonJS backend
+  (Jest/ts-jest) and the ESM frontend (Vite) can both import it, proven by a
+  probe symbol resolved from a spec on each side. The repo root gained its
+  first `package.json` (`workspaces: ["packages/*", "backend", "frontend"]`)
+  and a single root `package-lock.json`, replacing the two per-app lockfiles.
+  (Task 1, `84da4b3`.)
+- **The backend's `Server`/`Socket` are now typed with Socket.io's
+  `ServerToClientEvents`/`ClientToServerEvents` generics, throughout
+  `game.gateway.ts` and `ws-auth.guard.ts`.** A wrong payload at an emit site
+  is now a compile error, not a runtime surprise — the phase's actual point.
+  `CommandResult.broadcasts` became `CommandBroadcast[]`, a discriminated
+  union on `event`, so the dynamic broadcast-dispatch path (`sca sh`,
+  `sen`, `ren`, `tea`) narrows `payload` per event with zero casts, backed by
+  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `64495c2`
+  and `9e1812d`.)
+- **The frontend imports the same declaration.** `frontend/src/types/contracts.ts`
+  and the parity test that kept it in sync with the backend's shadow copy
+  (`frontend/test/contracts-parity.spec.ts`) are deleted; 14 importers
+  repointed at `@ge/wire`; `specs/003-ship-commands/contracts/shared-types.ts`
+  kept with a SUPERSEDED note rather than deleted, per the keep-the-reasoning
+  rule in `docs/CLAUDE.md`. (Task 4, `f6121d0`.)
+
+**Five real defects the typing surfaced** — this phase's actual justification,
+not a side effect of it. Full detail and the reasoning behind each fix in
+`docs/DECISIONS.md` 2026-09-11:
+
+1. `combat.ship-destroyed` was declared against an 11-field internal type
+   when the gateway only ever sends 4 fields — the declaration had not kept
+   up with a 2026-09-09 security fix.
+2. `EventLogCategory` was missing `'alert'`, silently discarding canon's
+   unfilterable engine-shutdown notice's own visual distinction.
+3. A frontend listener declared a `victimUserid` field the backend never
+   sends and nothing ever read.
+4. `reconnect_attempt` was registered on `socket` instead of the Manager
+   (`socket.io`) and had been dead code since it was written.
+5. `prompt:ship-select`'s frontend type carried an `error` field that event
+   never sends — copied from the sibling `prompt:ship-name` prompt, which
+   does have one.
+
+**One accepted behaviour change:** fixing defect 4 makes a previously-dead
+reconnect handler live — during a dropped connection the status banner can
+now show "Reconnecting…" where before it only ever showed "Disconnected."
+This phase's rule is "type what is sent, don't change behaviour," so this
+needed a deliberate ruling rather than a silent fix; see
+`docs/DECISIONS.md` 2026-09-11 for why it was accepted over deleting the
+handler (which would have discarded working FR-019/FR-020 behaviour) or
+casting past the type error (forbidden outright by this phase's own rule).
+
+**Tests:** backend 609 suites / 6,161 tests (up from the phase-0 baseline of
+607/6,154 — `packages/wire`'s own parity spec plus growth in two gateway
+broadcast specs during Task 3's fix rounds), ~118s local. Frontend **down**
+to 39 files / 299 tests from 40/311 — the only reduction of this restructure
+so far, entirely `contracts-parity.spec.ts` (1 file, 12 tests) going away with
+the duplication it existed to guard. `packages/wire` carries its own small
+Jest run (1 suite / 3 tests) outside both app counts. Both `tsc --noEmit`
+clean, both `npm run lint` exit 0.
+
+**Decisions made:** recorded in full in `docs/DECISIONS.md` 2026-09-11 —
+event name strings frozen (mixed dot/colon convention kept, not tidied);
+five server-to-client events recorded as emitted-with-no-listener rather
+than removed (`combat.miss`, `combat.mine-detonation`, `cybertron.broke-off`,
+`beacon`, `command.notice`); the dual CJS/ESM build kept for this phase,
+collapsing to single-ESM in phase 5; and the `reconnect_attempt` behaviour
+change above.
+
+**Next:** phase 2 — split `game.gateway.ts` (2,681 lines, 11 injected
+dependencies) into per-concern collaborators, and split `scan.handler.ts`
+(1,258 lines). See the restructure spec for the full phase list. Before any
+Docker image is rebuilt from this branch, the known issue immediately below
+must be resolved.
+
+**Known issues:**
+
+- **Neither Docker image builds on this branch, right now.** Found verifying
+  this close-out, not by any of the four phase-1 tasks: `backend/package.json`
+  and `frontend/package.json` both depend on `@ge/wire` via
+  `file:../packages/wire`, but neither Dockerfile's build context was moved
+  to the repo root (or given a `packages/wire` build stage) to make that
+  resolvable — both still `COPY package*.json ./` and `RUN npm ci` from
+  inside their own per-app directory. `docker build -f backend/Dockerfile
+  backend/` and the frontend equivalent both fail at `npm ci`. Task 1's own
+  brief named this exact failure as an expected step to fix before
+  proceeding; nothing in the ledger shows that step having run against Task
+  1's actual (recovered, post-session-disconnect) execution. Full detail in
+  `docs/DECISIONS.md` 2026-09-11. Must be fixed — repo-root build context or
+  a `packages/wire` Docker stage, per Task 1's own brief — before phase 2
+  work or any deploy-adjacent testing of this branch.
+- **(#2) `command.notice` reaches no frontend listener.** Confirmed during
+  Task 3's review, not a coverage artifact: canon's SCAN1/SCAN2/SCAN3 "you
+  have been scanned" notice is built and sent (`scan.handler.ts`'s `sca sh`)
+  and never rendered. A real gameplay gap, out of this phase's scope (typing
+  what crosses the wire, not adding what should).
+- **(#4) `combat.hit` and `combat.phaser-fired` still spread internal domain
+  event fields onto the wire** rather than building a narrow payload by hand
+  the way `combat.ship-destroyed` now does (defect 1 above) — sector and
+  internal ids cross the wire on these two events. Noted by Task 3's
+  reviewer, out of scope for this phase.
+- **(#5) An unidentified flaky test.** Surfaced twice this phase (once in
+  Task 1, once in Task 3) as a burst of failures — 22 spurious failures the
+  second time, traced to two concurrent `jest` processes racing the same
+  `ge_test` Postgres database, cleared immediately by rerunning serially. The
+  original failing test's name from the first occurrence was lost to a
+  `tail`-piped run and was never recovered, so this is a plausible shared
+  cause rather than a proven one. The harness has no guard against two
+  `jest` invocations sharing one test database — a lockfile or per-worker
+  schema would turn this into an immediate, legible error instead of a
+  baffling one. **Always run one jest/vitest process at a time on this repo
+  until that guard exists.**
+- **(#6) `ShipSelectPrompt` carries a dead `error` prop.** Surfaced fixing
+  defect 5 above: `prompt:ship-select` never sent an `error` field, so the
+  prop was always `undefined` in practice; `App.tsx` now passes `error={null}`
+  explicitly with a comment, but the component itself still declares and
+  never meaningfully uses the prop. Cosmetic, deferred — not fixed in this
+  phase because it is component cleanup, not a wire-contract question.

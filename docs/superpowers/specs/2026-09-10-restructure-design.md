@@ -1,6 +1,6 @@
 # Restructure spec
 
-**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 1 next.
+**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 2 next.
 
 This is the SPEC for the restructure and the recovery document for a lost session.
 Executable per-phase plans live beside it in `docs/superpowers/plans/2026-09-10-restructure-phase-N-*.md`. If a session is lost or
@@ -75,6 +75,18 @@ backend 607 suites / 6,154 tests, ~117s local; frontend unchanged at 39 files /
 310 tests, ~15s. The backend suite grew by 2 suites / 12 tests across phase 0:
 `node-runtime-version.spec.ts` (Task 1, 5 tests) and `lint-gate.spec.ts`
 (Task 4, grew from 4 to 7 tests during its fix round).
+
+**Post-phase-1 (2026-09-10/11), measured, not overwriting the baselines above:**
+backend 609 suites / 6,161 tests (up 2 suites / 7 tests: `wire-event-parity.spec.ts`
+in `packages/wire`'s own Jest run plus the growth of
+`gateway-broadcast-branches.spec.ts` and `gateway-event-coverage.spec.ts` during
+Task 3's fix rounds), ~118s local. Frontend **dropped** 40 files / 311 tests to
+39 files / 299 tests — the only reduction either suite has taken this
+restructure, and it is accounted for exactly: `frontend/test/contracts-parity.spec.ts`
+(1 file, 12 tests) was deleted because the duplication it guarded no longer
+exists. `packages/wire` carries its own small Jest run (1 suite / 3 tests),
+outside both app suites' counts, per its own toolchain (Task 2, allowed by the
+brief).
 
 ### What the analysis found
 
@@ -223,16 +235,46 @@ Split by **whether an upgrade can change runtime behaviour**, not by calendar.
       `--type-aware`; backend runs syntax-only (see the `moduleResolution`
       blocker above). (`1050298`, fix round `30f9975`.)
 
-### Phase 1 — one typed wire contract
+### Phase 1 — one typed wire contract — COMPLETE 2026-09-10
 
-- [ ] Root npm workspace (none exists today; no root `package.json`).
-- [ ] Shared package holding the wire types **and** the event names as
-      `as const`. Types-only plus a few constants sidesteps most of the
-      CJS/ESM friction.
-- [ ] Backend adopts Socket.IO's `ServerToClientEvents` / `ClientToServerEvents`
-      generics so emits are typed at the producer.
-- [ ] One naming convention for events. Pick dot or colon and convert.
-- [ ] Retire the duplicated `contracts.ts` and the parity test that guarded it.
+- [x] Root npm workspace (`packages/*`, `backend`, `frontend`), single root
+      `package-lock.json`, `@ge/wire` symlinked in. (Task 1, `84da4b3`.)
+- [x] `packages/wire` — dual CJS/ESM build, `WIRE_EVENTS` (30 server-to-client +
+      2 client-to-server names, `as const`), the payload interfaces, and the
+      Socket.io `ServerToClientEvents`/`ClientToServerEvents` generic maps.
+      Proven to resolve from both a CommonJS and an ESM consumer. (Task 2,
+      `64495c2`.)
+- [x] Backend's `Server`/`Socket` typed with those generics throughout
+      `game.gateway.ts` and `ws-auth.guard.ts`; `CommandBroadcast` made a real
+      discriminated union so the broadcast-dispatch path narrows without a
+      cast; zero `as`/`any`/non-null assertions anywhere in the diff. (Task 3,
+      `9e1812d`.)
+- [x] Frontend repointed at the same declaration: `contracts.ts` and
+      `frontend/test/contracts-parity.spec.ts` deleted, 14 importers
+      repointed, `specs/003-ship-commands/contracts/shared-types.ts` kept with
+      a SUPERSEDED note rather than deleted. (Task 4, `f6121d0`.)
+
+**Blocker execution proved wrong:** the plan's "pick dot or colon and
+convert" bullet was withdrawn before execution (see the ruling in the
+phase-1 ledger and the frozen-names decision in `docs/DECISIONS.md`
+2026-09-11), not discovered wrong mid-task.
+
+**Open gap against this phase's own exit criteria, found verifying this
+close-out and NOT fixed here (documentation-only session):** neither Docker
+image builds on this branch. `backend/package.json` and
+`frontend/package.json` both depend on `@ge/wire` via `file:../packages/wire`
+(added `84da4b3`), but neither Dockerfile's build context was moved to the
+repo root and neither builds `packages/wire` as its own stage — the fix
+Task 1's own brief anticipated and named two shapes for, Step 9 of that
+brief. `docker build -f backend/Dockerfile backend/` and the frontend
+equivalent both fail at `npm ci`. See `docs/DECISIONS.md` 2026-09-11 for the
+full reproduction and `docs/PROGRESS.md` 2026-09-11 for the tracked known
+issue. **Phase 2 (or a fix commit ahead of it) must resolve this before any
+Docker image is rebuilt from this branch** — it is not a phase-1-in-progress
+state, it is phase 1 shipping without one of its own exit criteria met.
+
+The five defects the typing surfaced and the one accepted behaviour change
+are recorded in `docs/DECISIONS.md` 2026-09-11, not here.
 
 After this the frontend and backend are genuinely independent and phases 2-4 can
 run in any order or in parallel.
