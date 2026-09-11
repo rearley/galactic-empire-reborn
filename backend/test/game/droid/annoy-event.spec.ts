@@ -62,6 +62,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 const SCOW_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 1, maxPhaser: 1, maxShields: 1,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,

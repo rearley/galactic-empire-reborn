@@ -89,7 +89,6 @@ async function makeService(ships: ShipState[], mines: MineState[], scanRange = 1
     planetServiceMock as unknown as PlanetStateService,
     registry,
   );
-  await service.onModuleInit();
   return service;
 }
 
@@ -111,7 +110,6 @@ async function makeServiceWithPlanet(ship: ShipState) {
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
   );
-  await service.onModuleInit();
   return service;
 }
 

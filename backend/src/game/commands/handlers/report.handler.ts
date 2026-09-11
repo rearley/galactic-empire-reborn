@@ -1,7 +1,8 @@
 import { damstr } from '../../combat/combat-math';
 import { SHIELDDM } from '../../constants';
-import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ShipClassCacheService, ShipClassEntry } from '../../physics/ship-class-cache.service';
 import { UserRepository } from '../../player/user.repository';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -18,23 +19,7 @@ import { coord1, coord2 } from '../../physics/coord';
  * @see GECMDS.C:1946 cmd_report
  */
 @Injectable()
-export class ReportHandlerService implements OnModuleInit {
-  private readonly logger = new Logger(ReportHandlerService.name);
-  private readonly classCache = new Map<number, {
-    typeName: string;
-    maxPhaser: number;
-    maxShields: number;
-    hasTorpedo: boolean;
-    hasMissile: boolean;
-    hasDecoy: boolean;
-    hasJammer: boolean;
-    hasZipper: boolean;
-    hasMine: boolean;
-    hasCloak: boolean;
-    maxTons: number;
-    maxWarp: number;
-  }>();
-
+export class ReportHandlerService {
   constructor(
     private readonly prisma: PrismaService,
     /**
@@ -49,21 +34,21 @@ export class ReportHandlerService implements OnModuleInit {
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Ship-class fields (typeName, weapon fit, tonnage, warp) come from the
+     * boot-time cache — the table is static seed data — rather than a
+     * per-`onModuleInit` `prisma.shipClass.findMany`. `@Optional()` so the
+     * many direct `new ReportHandlerService(prisma, users)` test
+     * constructions keep compiling; a missing cache falls back to the same
+     * `cls?.field ?? …` placeholders an unrecognised class number always hit.
+     * @see specs — restructure Phase 3 Task 3
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    const classes = await this.prisma.shipClass.findMany({
-      select: {
-        classNumber: true, typeName: true,
-        maxPhaser: true, maxShields: true, hasTorpedo: true, hasMissile: true,
-        hasDecoy: true, hasJammer: true, hasZipper: true,
-        hasMine: true, hasCloak: true, maxTons: true, maxWarp: true,
-      },
-    });
-    for (const cls of classes) {
-      this.classCache.set(cls.classNumber, cls);
-    }
-    this.logger.log(`Cached ${this.classCache.size} ship class type names`);
+  private classOf(classNumber: number): ShipClassEntry | undefined {
+    return this.shipClassCache?.get(classNumber);
   }
 
   get command(): Command {
@@ -79,7 +64,7 @@ export class ReportHandlerService implements OnModuleInit {
 
   private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     const sub = args[0]?.toLowerCase() ?? '';
-    const cls = this.classCache.get(ship.shpclass);
+    const cls = this.classOf(ship.shpclass);
     const typeName = cls?.typeName ?? `Class ${ship.shpclass}`;
 
     const lines: CommandResultLine[] = [];

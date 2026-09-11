@@ -5,6 +5,7 @@
  */
 import { NewShipHandlerService, quoteUpgrade } from '../../src/game/commands/handlers/new-ship.handler';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService, ShipClassEntry } from '../../src/game/physics/ship-class-cache.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import type { Random } from '../../src/game/combat/random.port';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
@@ -65,6 +66,15 @@ const DROID_CLASS = {
   typeName: 'Lydorian Scow',
   category: 'DROID',
 };
+
+/** Seeds a ShipClassCacheService test double the way ShipClassCacheService itself would, from boot. */
+function makeShipClassCache(classes: Array<Partial<ShipClassEntry> & { classNumber: number }>): ShipClassCacheService {
+  const cache = new ShipClassCacheService({} as never);
+  for (const { classNumber, ...rest } of classes) {
+    cache.setForTest(classNumber, { maxAcceleration: 0, maxWarp: 0, ...rest });
+  }
+  return cache;
+}
 
 /**
  * Build a test harness.
@@ -145,11 +155,15 @@ function makeService(
     loadShip: jest.fn(),
   };
 
+  const shipClassCache = makeShipClassCache([PLAYER_CLASS_4, DROID_CLASS]);
+
   const service = new NewShipHandlerService(
     prismaMock as unknown as PrismaService,
     shipStateMock as unknown as ShipStateService,
     { bySector: () => [] } as unknown as PlanetStateService,
     { next: () => 0.5 } as Random,
+    undefined,
+    shipClassCache,
   );
 
   return { service, prismaMock, shipStateMock };
@@ -333,6 +347,8 @@ describe('NewShipHandlerService', () => {
         { loadShip: jest.fn() } as unknown as ShipStateService,
         { bySector: () => [] } as unknown as PlanetStateService,
         { next: () => 0.5 } as Random,
+        undefined,
+        makeShipClassCache([PLAYER_CLASS_4]),
       );
       const result = await service.command.handler(makeShip(), ['ship', '4'], {});
       // Canon's NEW4 names the class and does not quote the shortfall.
@@ -528,6 +544,8 @@ describe('NewShipHandlerService — shipyard narration for new phaser/shield', (
       { mutate, loadShip: jest.fn() } as unknown as ShipStateService,
       { bySector: () => [] } as unknown as PlanetStateService,
       { next: () => 0.5 } as Random,
+      undefined,
+      makeShipClassCache([{ ...PLAYER_CLASS_4, classNumber: 1, maxPhaser: 10, maxShields: 10 }]),
     );
     return { service, user, mutate };
   }

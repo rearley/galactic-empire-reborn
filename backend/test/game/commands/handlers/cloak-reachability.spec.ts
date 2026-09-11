@@ -98,14 +98,11 @@ describe('cloak reachability — torpedo.handler.ts:82 (firer cloaked)', () => {
 // ---------------------------------------------------------------------------
 
 describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', () => {
-  async function makeReportService() {
-    const mockPrisma = {
-      shipClass: {
-        findMany: jest.fn().mockResolvedValue([{ classNumber: 1, typeName: 'Fighter', hasCloak: true }]),
-      },
-    } as unknown as PrismaService;
-    const service = new ReportHandlerService(mockPrisma);
-    await service.onModuleInit();
+  function makeReportService() {
+    const mockPrisma = {} as unknown as PrismaService;
+    const shipClassCache = new ShipClassCacheService({} as never);
+    shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, typeName: 'Fighter', hasCloak: true });
+    const service = new ReportHandlerService(mockPrisma, undefined, shipClassCache);
     return service;
   }
 

@@ -95,7 +95,6 @@ describe('scan se — ship outside the generated sector grid', () => {
   test.each(outOfBounds)('does not throw for %s', async (_label, xcoord, ycoord) => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord, ycoord });
     const { service } = makeBoundedService([self]);
-    await service.onModuleInit();
 
     await expect(
       service.command.handler(self, ['se'], {}) as Promise<CommandResult>,
@@ -105,7 +104,6 @@ describe('scan se — ship outside the generated sector grid', () => {
   test('still renders the in-sector case correctly (guard does not break the happy path)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const { service } = makeBoundedService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();

@@ -20,6 +20,7 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -48,18 +49,21 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
   } as ShipState;
 }
 
-async function makeService(scanRange = 100_000) {
+function makeService(scanRange = 100_000) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const service = new ScanHandlerService(
     { findAllShips: () => [], findByName: () => undefined, findByUserid: () => [] } as unknown as ShipStateService,
-    { shipClass: { findMany: async () => [{ classNumber: 1, scanRange }] } } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
       findPlanetByName: () => null, getMeta: () => undefined, onModuleInit: () => undefined,
     } as unknown as GalaxyService,
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 

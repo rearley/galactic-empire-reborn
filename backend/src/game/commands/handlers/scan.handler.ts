@@ -1,7 +1,8 @@
-import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { showarp } from '../../ship/showarp';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRepository } from '../../player/user.repository';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
@@ -33,10 +34,7 @@ import { scanPl } from './scan/scan-planet';
  */
 
 @Injectable()
-export class ScanHandlerService implements OnModuleInit {
-  private readonly logger = new Logger(ScanHandlerService.name);
-  private readonly classCache = new Map<number, { scanRange: number; typeName: string; maxTons: number }>();
-
+export class ScanHandlerService {
   /**
    * Per-player scantab state — keyed by `${userid}#${shipno}`.
    * Populated on `scan ra`/`scan se`; cleared on disconnect, death, or dock.
@@ -68,6 +66,18 @@ export class ScanHandlerService implements OnModuleInit {
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Per-class scan range / type name / tonnage come from the boot-time
+     * cache rather than a per-`onModuleInit` `prisma.shipClass.findMany` — the
+     * table is static seed data (see ShipClassCacheService). `@Optional()` so
+     * the many direct `new ScanHandlerService(...)` test constructions keep
+     * compiling; a missing cache makes every class lookup miss, which falls
+     * back to the same `?? 0` / `?? \`class n\`` defaults an unrecognised
+     * class number always hit.
+     * @see specs — restructure Phase 3 Task 3
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
   ) {}
 
   /**
@@ -116,20 +126,6 @@ export class ScanHandlerService implements OnModuleInit {
         { text: '  lo full — local scan, full detail', category: 'system' },
       ],
     };
-  }
-
-  async onModuleInit(): Promise<void> {
-    const classes = await this.prisma.shipClass.findMany({
-      select: { classNumber: true, scanRange: true, typeName: true, maxTons: true },
-    });
-    for (const cls of classes) {
-      this.classCache.set(cls.classNumber, {
-        scanRange: cls.scanRange,
-        typeName: cls.typeName,
-        maxTons: cls.maxTons,
-      });
-    }
-    this.logger.log(`Cached ${this.classCache.size} ship class scan ranges`);
   }
 
   get command(): Command {
@@ -207,7 +203,7 @@ export class ScanHandlerService implements OnModuleInit {
    * which carries the citation for this behaviour.
    */
   private scanLo(ship: ShipState): CommandResult {
-    const classInfo = this.classCache.get(ship.shpclass);
+    const classInfo = this.shipClassCache?.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -224,7 +220,7 @@ export class ScanHandlerService implements OnModuleInit {
    * the pure renderer in `./scan/scan-render.ts`, which carries the citation.
    */
   private scanLoFull(ship: ShipState): CommandResult {
-    const classInfo = this.classCache.get(ship.shpclass);
+    const classInfo = this.shipClassCache?.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -250,7 +246,7 @@ export class ScanHandlerService implements OnModuleInit {
       level = 1;
     }
 
-    const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+    const scanRange = this.shipClassCache?.get(ship.shpclass)?.scanRange ?? 0;
 
     // Build/update the scantab using the full scanRange for in-range detection
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -273,7 +269,7 @@ export class ScanHandlerService implements OnModuleInit {
     const xsect = Math.floor(ship.xcoord);
     const ysect = Math.floor(ship.ycoord);
 
-    const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+    const scanRange = this.shipClassCache?.get(ship.shpclass)?.scanRange ?? 0;
 
     // Build / update the shared scantab (same slot as sca ra)
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
@@ -325,7 +321,7 @@ export class ScanHandlerService implements OnModuleInit {
     // and `sca sh @` is the only way to re-read your actual target without
     // guessing which letter it wears now.
     if (arg.trim() === '@') {
-      const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
+      const scanRange = this.shipClassCache?.get(ship.shpclass)?.scanRange ?? 0;
       const found = findShip(
         '@',
         ship,
@@ -383,7 +379,7 @@ export class ScanHandlerService implements OnModuleInit {
         lines: [{ text: 'You look in a mirror.', category: 'system' }],
       };
     }
-    const classInfo = this.classCache.get(ship.shpclass);
+    const classInfo = this.shipClassCache?.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
     const dist = Math.sqrt(
       Math.pow(target.xcoord - ship.xcoord, 2) + Math.pow(target.ycoord - ship.ycoord, 2),
@@ -398,7 +394,7 @@ export class ScanHandlerService implements OnModuleInit {
     // SCAN03's second field is the RECIPROCAL bearing — where I am from HIM,
     // using HIS heading (GECMDS.C:2223). Near zero means his nose is on you.
     const reciprocal = Math.round(cbearing(target, ship, target.heading));
-    const targetClass = this.classCache.get(target.shpclass);
+    const targetClass = this.shipClassCache?.get(target.shpclass);
     const maxTons = targetClass?.maxTons ?? 0;
 
     // C tells the scanned ship it was looked at, every time — reconnaissance
@@ -469,7 +465,7 @@ export class ScanHandlerService implements OnModuleInit {
     scanner: ShipState,
     target: ShipState,
   ): CommandResult['broadcasts'] {
-    const targetRange = this.classCache.get(target.shpclass)?.scanRange ?? 0;
+    const targetRange = this.shipClassCache?.get(target.shpclass)?.scanRange ?? 0;
     // `ltr == '?'` — has the scanned ship ever scanned the scanner?
     const targetTab = this.getScantab(target.userid, target.shipno);
     const scannerKey = `${scanner.userid}#${scanner.shipno}`;

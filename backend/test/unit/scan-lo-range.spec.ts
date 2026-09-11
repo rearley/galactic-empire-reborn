@@ -17,6 +17,7 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -50,11 +51,9 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
     findByName: jest.fn().mockReturnValue(undefined),
     get: jest.fn(),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
     getSectorPlanets: jest.fn().mockReturnValue([]),
     getSectorWormholes: jest.fn().mockReturnValue([]),
@@ -68,6 +67,8 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
 }
 
@@ -80,7 +81,6 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
   it('header reports the RAW projectionRange under SCAN24', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     // SCAN24 prints the RAW range: 100000 x 3 = 300000. Canon divides by
@@ -93,7 +93,6 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
     // 9 sectors east: still within scanRange/10000 = 10 sector scantab gate
     const distant = makeShip({ userid: 'other', shipno: 1, xcoord: 14, ycoord: 5 });
     const svc = makeService([self, distant], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
@@ -103,7 +102,6 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
   it('large scanRange projects proportionally (500_000 -> 1.5m raw at 3x)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self], 500_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     // 500000 x 3 = 1500000 raw.
@@ -113,7 +111,6 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
   it('self-cell at centre (15, 7)', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self]);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     const selfCells = result.scanRender!.cells.filter((c) => c.type === 'self');
@@ -141,7 +138,6 @@ describe('scan lo uses SCAN_LO_PROJECTION_MULTIPLIER × scanRange projection', (
       userid: 'cloaked', shipno: 1, xcoord: 6, ycoord: 5, cloak: 10,
     });
     const svc = makeService([self, cloaked], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['lo'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');

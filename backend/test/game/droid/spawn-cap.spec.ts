@@ -30,6 +30,7 @@ import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.
 // ─── Shared class entry for all droid classes ──────────────────────────────
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200,
   maxWarp: 4,
   maxPhaser: 1,

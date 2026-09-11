@@ -27,6 +27,7 @@ import { CommandResult, CommandContext } from '../../../../src/game/commands/com
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 
@@ -115,10 +116,14 @@ describe('SysHandlerService — `sys class` reaches the sparse high numbers', ()
         fn(s); return s;
       },
     } as unknown as ShipStateService;
+    const shipClassCache = new ShipClassCacheService({} as never);
+    for (const c of TABLE) shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, maxWarp: c.maxWarp });
     return new SysHandlerService(
       shipState,
-      { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue(TABLE) } } as unknown as PrismaService,
+      { user: { update: jest.fn() } } as unknown as PrismaService,
       new CybertronControlService(),
+      undefined,
+      shipClassCache,
     );
   }
 

@@ -2,6 +2,7 @@ import { CommandResult } from '../../../src/game/commands/command.types';
 import { ReportHandlerService } from '../../../src/game/commands/handlers/report.handler';
 import { SHIELDDM } from '../../../src/game/constants';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 
@@ -27,14 +28,14 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(typeName = 'Interceptor', hasCloak = false) {
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([
-        { classNumber: 1, typeName, hasCloak },
-      ]),
-    },
-  };
-  const service = new ReportHandlerService(prismaMock as unknown as PrismaService);
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, typeName, hasCloak });
+  const service = new ReportHandlerService(
+    prismaMock as unknown as PrismaService,
+    undefined,
+    shipClassCache,
+  );
   return { service, prismaMock };
 }
 
@@ -42,7 +43,6 @@ describe('ReportHandlerService', () => {
   describe('nav report', () => {
     it('returns REP01 header with typename and shipname', async () => {
       const { service } = makeService('Interceptor');
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
       expect(result.lines[0].text).toBe(formatMessage(MessageId.REP01, 'Interceptor', 'USS Test'));
       expect(result.lines[0].category).toBe('system');
@@ -50,14 +50,12 @@ describe('ReportHandlerService', () => {
 
     it('returns DASHES after header', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
       expect(result.lines[1].text).toBe(formatMessage(MessageId.DASHES));
     });
 
     it('returns REP35 navigation section header', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       expect(texts).toContain(formatMessage(MessageId.REP35));
@@ -65,7 +63,6 @@ describe('ReportHandlerService', () => {
 
     it('where==0 returns REP05 (in sector)', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 0 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       // REP05 {Navigating SS# %d %d}
@@ -74,7 +71,6 @@ describe('ReportHandlerService', () => {
 
     it('where==1 returns REP02 (in hyperspace)', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 1 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       // REP02 {Nav Hyperspace (SS# %d %d)}
@@ -83,7 +79,6 @@ describe('ReportHandlerService', () => {
 
     it('where>=10 returns REP08 (in orbit)', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ where: 15 }), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       // REP08 {Orbiting Planet........  %d SS# %d  %d}
@@ -92,7 +87,6 @@ describe('ReportHandlerService', () => {
 
     it('always includes REP32 position line', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       // REP32 {Galactic Pos. Xsect:%d Ysect:%d}
@@ -103,7 +97,6 @@ describe('ReportHandlerService', () => {
   describe('sys report', () => {
     it('includes REP09 energy line', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ energy: 850 }), ['sys'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       expect(texts.some(t => t.includes('850'))).toBe(true);
@@ -111,7 +104,6 @@ describe('ReportHandlerService', () => {
 
     it('REP09 has info category', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['sys'], {}) as Promise<CommandResult>);
       // REP09 {Neutron Flux............ %u} — canon calls it flux, not energy.
       const energyLine = result.lines.find(l => l.text.startsWith('Neutron Flux'));
@@ -120,7 +112,6 @@ describe('ReportHandlerService', () => {
 
     it('REP10 included when shieldtype > 0 and shieldstat==1 (up)', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(
         makeShip({ shieldtype: 1, shieldstat: 1 }),
         ['sys'],
@@ -132,7 +123,6 @@ describe('ReportHandlerService', () => {
 
     it('REP11 included when shieldtype > 0 and shieldstat==0 (down)', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(
         makeShip({ shieldtype: 2, shieldstat: 0 }),
         ['sys'],
@@ -144,7 +134,6 @@ describe('ReportHandlerService', () => {
 
     it('cloak line included when ship has cloak capability', async () => {
       const { service } = makeService('Fighter', true);
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip({ cloak: 0 }), ['sys'], {}) as Promise<CommandResult>);
       const texts = result.lines.map(l => l.text);
       expect(texts.some(t => t.toLowerCase().includes('cloak'))).toBe(true);
@@ -154,7 +143,6 @@ describe('ReportHandlerService', () => {
   describe('missing arg returns REPFMT', () => {
     it('argMissingMessage is REPFMT', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       expect(service.command.argMissingMessage).toBe(formatMessage(MessageId.REPFMT));
     });
   });
@@ -162,7 +150,6 @@ describe('ReportHandlerService', () => {
   describe('alias', () => {
     it('keyword is "report", alias includes "rep"', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       expect(service.command.keyword).toBe('report');
       expect(service.command.aliases).toContain('rep');
     });
@@ -171,7 +158,6 @@ describe('ReportHandlerService', () => {
   describe('cargo placeholder', () => {
     it('cargo returns a placeholder info line', async () => {
       const { service } = makeService();
-      await service.onModuleInit();
       const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
       expect(result.lines.some(l => l.category === 'info')).toBe(true);
     });
@@ -199,7 +185,6 @@ describe('ReportHandlerService', () => {
 describe('rep sys — subsystem status (GECMDS.C:2037-2050)', () => {
   async function sysLines(over: Partial<ShipState>) {
     const { service } = makeService('Interceptor', true);
-    await service.onModuleInit();
     const result = await (service.command.handler(
       makeShip(over), ['sys'], {},
     ) as Promise<CommandResult>);

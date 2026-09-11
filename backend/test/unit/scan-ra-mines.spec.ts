@@ -25,6 +25,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandContext, CommandResult } from '../../src/game/commands/command.types';
@@ -65,16 +66,19 @@ function build() {
     xcoord: 20.05, ycoord: 20, deployedBy: 'someone',
   } as never);
 
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, {
+    maxAcceleration: 0, maxWarp: 0, scanRange: 100_000, typeName: 'Interceptor', maxTons: 1000,
+  });
   const svc = new ScanHandlerService(
     { findAllShips: () => [ship] } as unknown as ShipStateService,
-    { shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     { getSector: () => undefined, getWormholes: () => [] } as unknown as GalaxyService,
     { getAll: () => [], get: () => undefined, getBySector: () => [] } as unknown as PlanetStateService,
     registry,
+    undefined,
+    shipClassCache,
   );
-  (svc as unknown as { classCache: Map<number, unknown> }).classCache.set(1, {
-    scanRange: 100_000, typeName: 'Interceptor', maxTons: 1000,
-  });
   return { svc, ship };
 }
 

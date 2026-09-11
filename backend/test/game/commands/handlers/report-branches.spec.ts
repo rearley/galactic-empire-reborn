@@ -44,6 +44,7 @@
  */
 import { ReportHandlerService } from '../../../../src/game/commands/handlers/report.handler';
 import type { PrismaService } from '../../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import type { CommandResult } from '../../../../src/game/commands/command.types';
 import type { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
@@ -131,12 +132,14 @@ async function makeHarness(
   const userFind = jest.fn().mockResolvedValue(user);
   const teamFind = jest.fn().mockResolvedValue(team);
   const prisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue(classes) },
     user: { findUnique: userFind },
     team: { findUnique: teamFind },
   } as unknown as PrismaService;
-  const service = new ReportHandlerService(prisma);
-  await service.onModuleInit();
+  const shipClassCache = new ShipClassCacheService({} as never);
+  for (const c of classes) {
+    shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, ...c });
+  }
+  const service = new ReportHandlerService(prisma, undefined, shipClassCache);
   return { service, userFind, teamFind };
 }
 
