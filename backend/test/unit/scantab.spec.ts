@@ -2,11 +2,14 @@ import { buildScantab, Scantab, ScantabEntry } from '../../src/game/commands/han
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { makeShip as buildShip } from '../helpers/make-ship';
 
-// Local default layered on the shared factory: this suite's ships are not
-// yet boarded (status 0), matching every scan fixture in this file.
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', not yet boarded (status 0), and stationary (topspeed 0), matching
+// every scan fixture in this file.
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return buildShip({
+    shipname: 'Test',
     status: 0,
+    topspeed: 0,
     ...overrides,
   });
 }

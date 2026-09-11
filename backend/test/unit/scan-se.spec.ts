@@ -33,11 +33,12 @@ import { makeShip as buildShip } from '../helpers/make-ship';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-// Local defaults layered on the shared factory: this suite's ships sit at a
-// fixed sub-sector position, stationary (topspeed 0) and not yet boarded
-// (status 0).
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', sit at a fixed sub-sector position, stationary (topspeed 0) and not
+// yet boarded (status 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return buildShip({
+    shipname: 'Test',
     xcoord: 5.5,
     ycoord: 7.5,
     status: 0,
