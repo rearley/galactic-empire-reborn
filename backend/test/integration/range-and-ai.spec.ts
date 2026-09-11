@@ -36,6 +36,7 @@ import { COMBAT_PHASER_FIRED } from '../../src/game/combat/combat-events';
 import { CYBERTRON_EVENT } from '../../src/game/cybertron/cybertron-events';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { SHIP_CLASSES } from '../../prisma/seed/ship-classes';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 import {
   DROID_CLASS_TRANSPORT,
   DROID_SPAWN_TICK_CADENCE,
@@ -45,24 +46,32 @@ import {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function makeShip(o: Partial<ShipState> & { userid: string; shipno: number; shpclass: number }): ShipState {
-  return {
-    shipname: 'T', heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000, phasr: 100, phasrtype: 2,
-    kills: 0, lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
+  return baseMakeShip({
+    shipname: 'T',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 2,
+    lastfired: 255,
+    shieldtype: 2,
+    shieldstat: 1,
+    shield: 2,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0,
-    destruct: 0, status: 1, cybmine: 255, cybskill: 10, cybupdate: 50, tick: 1,
-    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false, dirty: false,
-    ...o,
+    cybmine: 255,
+    cybskill: 10,
+    cybupdate: 50,
+    tick: 1,
+    topspeed: 8,
     // A ship in the game holds a unique `channel` (this port's usrnum) and
     // attribution reads it, not `shipno`. These fixtures stage firer and
     // victim by giving each a distinct shipno, so mirror it into channel.
     channel: o.channel ?? o.shipno ?? 1,
-  };
+    ...o,
+  });
 }
 
 function classCacheEntry(c: typeof SHIP_CLASSES[number]) {
