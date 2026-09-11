@@ -46,7 +46,7 @@ function makeHarness(ships: ShipState[]) {
   // because it has no dependencies and a mock would only test itself.
   return new SysHandlerService(
     shipState,
-    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    { user: { update: jest.fn() } } as unknown as PrismaService,
     new CybertronControlService(),
   );
 }

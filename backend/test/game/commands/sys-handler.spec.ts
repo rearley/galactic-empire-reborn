@@ -40,7 +40,7 @@ function makeService(opts: { ships?: ShipState[] } = {}) {
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 5, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 });
   shipClassCache.setForTest(2, { maxAcceleration: 0, maxWarp: 9, typeName: 'Star Cruiser', cybCanAttack: true, noClaim: 2 });
   const svc = new SysHandlerService(shipState, prisma, new CybertronControlService(), undefined, shipClassCache);
-  return { svc, state, mutate, prisma };
+  return { svc, state, mutate, prisma, shipClassCache };
 }
 
 async function run(svc: SysHandlerService, ship: ShipState, args: string[]): Promise<CommandResult> {
@@ -195,5 +195,30 @@ describe('audit trail', () => {
     await run(svc, makeShip(), ['cash', '999']);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('`sys class` / `sys classlist` read the boot-time cache, not the table', () => {
+  beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'rick'; });
+  afterEach(() => { delete process.env.GE_SYSOP_USERNAME; });
+
+  it('sys class resolves the target class through ShipClassCacheService.get/getClassNumbers', async () => {
+    const { svc, state, shipClassCache } = makeService();
+    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+
+    await run(svc, state, ['class', '2']);
+
+    expect(getSpy).toHaveBeenCalledWith(2);
+    expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('sys classlist enumerates classes through ShipClassCacheService.getClassNumbers', async () => {
+    const { svc, shipClassCache } = makeService();
+    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+
+    await run(svc, makeShip(), ['classlist']);
+
+    expect(listSpy).toHaveBeenCalled();
   });
 });

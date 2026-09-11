@@ -41,7 +41,6 @@ export class ReportHandlerService {
      * many direct `new ReportHandlerService(prisma, users)` test
      * constructions keep compiling; a missing cache falls back to the same
      * `cls?.field ?? …` placeholders an unrecognised class number always hit.
-     * @see specs — restructure Phase 3 Task 3
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,

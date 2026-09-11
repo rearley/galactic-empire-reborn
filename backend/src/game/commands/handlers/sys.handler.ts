@@ -84,7 +84,6 @@ export class SysHandlerService {
      * table is static seed data. `@Optional()` so the direct
      * `new SysHandlerService(...)` test constructions that never exercise
      * these two subcommands keep compiling.
-     * @see specs — restructure Phase 3 Task 3
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,

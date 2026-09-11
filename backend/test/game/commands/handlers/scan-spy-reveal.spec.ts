@@ -108,9 +108,9 @@ function makeService(opts: {
     byName: jest.fn().mockReturnValue(prismaPlane),
   } as unknown as PlanetStateService;
 
-  // PrismaService — shipClass.findMany for onModuleInit, user.findUnique for scanPl owner resolution.
+  // PrismaService — user.findUnique for scanPl owner resolution. Ship-class
+  // fields come from the boot-time ShipClassCacheService now, not a query.
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
     user: { findUnique: jest.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
 

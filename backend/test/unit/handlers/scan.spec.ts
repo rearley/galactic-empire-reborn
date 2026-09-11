@@ -53,8 +53,20 @@ function makeService(ships: ShipState[], scanRange = 5000, galaxyMock = defaultG
     undefined,
     shipClassCache,
   );
-  return { service, shipServiceMock, prismaMock, galaxyMock };
+  return { service, shipServiceMock, prismaMock, galaxyMock, shipClassCache };
 }
+
+describe('scan reads scanRange/typeName/maxTons from the boot-time cache, not the database', () => {
+  it('sca lo resolves the ship class through ShipClassCacheService.get, not a query', async () => {
+    const { service, shipClassCache } = makeService([], 42_000);
+    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const ship = makeShip();
+
+    await service.command.handler(ship, ['lo'], {});
+
+    expect(getSpy).toHaveBeenCalledWith(ship.shpclass);
+  });
+});
 
 describe('ScanHandlerService', () => {
   describe('scan lo — scanHome mode', () => {

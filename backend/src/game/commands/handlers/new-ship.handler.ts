@@ -168,7 +168,6 @@ export class NewShipHandlerService {
      * `new NewShipHandlerService(...)` test constructions keep compiling;
      * without it every class lookup below misses and the command answers
      * "Invalid ship class", same as it always has for an unrecognised one.
-     * @see specs — restructure Phase 3 Task 3
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,

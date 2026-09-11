@@ -136,15 +136,13 @@ export class ShipClassCacheService implements OnModuleInit {
    * validate `sys class <n>` and to enumerate `sys classlist` / `new ship`
    * against the full table — previously done with a fresh
    * `prisma.shipClass.findMany`, now served from the boot-time cache.
-   * @see specs — restructure Phase 3 Task 3
    */
   getClassNumbers(): number[] {
+    // `Array.from` already returns a fresh array with no other references, so
+    // sorting it in place — rather than `.toSorted()`, unavailable at this
+    // project's `lib` target — mutates nothing a caller could observe.
+    // eslint-disable-next-line unicorn/no-array-sort
     return Array.from(this.cache.keys()).sort((a, b) => a - b);
-  }
-
-  /** Synchronous lookup. Throws if the class is not in the cache. */
-  getMaxPrice(classNumber: number): bigint {
-    return this.entry(classNumber).maxPrice;
   }
 
   /** Synchronous lookup. Throws if the class is not in the cache. */

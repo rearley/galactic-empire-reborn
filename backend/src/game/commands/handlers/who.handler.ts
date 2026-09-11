@@ -35,7 +35,6 @@ export class WhoHandlerService {
      * `new WhoHandlerService(shipService)` test constructions keep compiling;
      * a missing cache falls back to the "Class n" placeholder below, same as
      * an unrecognised class number always has.
-     * @see specs — restructure Phase 3 Task 3
      */
     @Optional() private readonly shipClassCache?: ShipClassCacheService,
   ) {}
