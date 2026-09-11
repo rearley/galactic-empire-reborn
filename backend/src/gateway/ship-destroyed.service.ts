@@ -23,9 +23,6 @@ import { handleOf, shipNameOf } from './ship-identity';
  *   • `recoverVictim` is `GameGateway.recoverAfterDeath`, which goes on to call
  *     `presentShipEntry`. That is connection-lifecycle code and stays on the
  *     gateway; this is the seam that reaches it.
- *   • `takeIonAttacker` reads and clears `GameGateway.lastIonAttacker`, which
- *     is written by `handlePlanetIonFired` — the other half of a colony kill,
- *     and also still gateway-resident.
  *
  * Logging is NOT in here: the service has its own `Logger`, so the forensics
  * line and the two error lines come out under `[ShipDestroyedService]`.
@@ -37,8 +34,6 @@ export interface DestroyedEmitter {
   toAllExcept(rooms: string | string[], category: EventLogCategory, text: string): void;
   /** The structured `combat.ship-destroyed` announcement, galaxy-wide. */
   announceDestroyed(payload: CombatShipDestroyedPayload): void;
-  /** The planet that last hit this ship, consumed. @see GameGateway.lastIonAttacker */
-  takeIonAttacker(victimId: string): { name: string; at: number } | null;
   /** Re-seat the pilot who just died. @see GameGateway.recoverAfterDeath */
   recoverVictim(userid: string): Promise<void>;
 }
@@ -64,6 +59,30 @@ export class ShipDestroyedService {
   ) {}
 
   private readonly logger = new Logger(ShipDestroyedService.name);
+
+  /**
+   * shipId → the planet whose ion cannons last hit it, and when.
+   *
+   * This is the evidence that a planet made a kill. The victim's `lastfired`
+   * cannot serve: `fireion` sets it to -1, but so does NO_CHANNEL when a
+   * firer leaves the game, so inferring from it would blame a colony for any
+   * death whose attacker had disconnected.
+   *
+   * Written on every ion hit, read and cleared when that ship dies, and only
+   * honoured inside ION_ATTRIBUTION_WINDOW_MS so a ship that was shot at,
+   * escaped and died elsewhere cannot inherit the name. Bounded by the number
+   * of ships currently besieging planets.
+   */
+  private readonly lastIonAttacker = new Map<string, { name: string; at: number }>();
+
+  /**
+   * The other half of a colony kill: `GameGateway.handlePlanetIonFired` reports
+   * every ion hit here, and `handle` consumes the most recent one when that
+   * ship dies. @see GEFUNCS.C:1799, 1805
+   */
+  recordIonAttacker(shipId: string, name: string): void {
+    this.lastIonAttacker.set(shipId, { name, at: Date.now() });
+  }
 
   handle(event: CombatShipDestroyedEvent, emit: DestroyedEmitter): Promise<void> {
     const keyParts = event.victimShipKey.split(':');
@@ -151,7 +170,8 @@ export class ShipDestroyedService {
     // attacker and no weapon — the same shape a self-destruct produces — and
     // announced the kill as "destroyed by unknown", so a defender was never
     // told their own colony had done it.
-    const ionHit = emit.takeIonAttacker(event.victimId);
+    const ionHit = this.lastIonAttacker.get(event.victimId) ?? null;
+    this.lastIonAttacker.delete(event.victimId);
     const killedByPlanet = attributePlanetKill({
       hasAttackerShip: event.attackerId !== null,
       lastIonHitAt: ionHit?.at ?? null,
