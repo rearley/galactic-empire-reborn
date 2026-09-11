@@ -11,6 +11,7 @@ const config: Config = {
     "<rootDir>/test/e2e",
     "<rootDir>/test/game",
     "<rootDir>/test/gateway",
+    "<rootDir>/test/helpers",
     "<rootDir>/test/balance",
     "<rootDir>/test/mail",
     "<rootDir>/test/team",
