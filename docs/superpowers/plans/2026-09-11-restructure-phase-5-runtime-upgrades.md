@@ -31,6 +31,51 @@ wrong plan. Rick ruled on 2026-09-11 to drop ESM and keep CommonJS.
 **If you are implementing a task and find evidence that contradicts the table
 above, stop and say so.** It is the load-bearing assumption of the whole plan.
 
+## Ruling, 2026-09-11 — the task order changed during execution
+
+**Vitest moves BEFORE NestJS 12.** The plan as written had Nest 12 as Task 4
+and Vitest as Task 7. Task 4 was attempted and reverted; the order below now
+reads 1, 2, 3, Vitest, Nest 12, Prisma 7, TypeScript 7.
+
+Two blockers, both found by doing it rather than by reading about it:
+
+1. **Jest 30 cannot load NestJS 12 from a CommonJS test.** Nest 12 ships its
+   packages as ESM and CommonJS consumers rely on `require(esm)`. Importing
+   `@nestjs/testing` fails with `Must use import to load ES Module`, on Node
+   24.21 — above the 24.9 floor Jest's own error message names — and adding
+   `@nestjs` to `transformIgnorePatterns` does not help, because ts-jest's
+   transform only matches `.tsx?` and the Nest entrypoints are `.js`.
+   **Vitest handles ESM dependencies natively**, so migrating the runner first
+   removes the problem instead of configuring around it.
+
+2. **`@nestjs/throttler@6.5.0` peer-refuses Nest 12** — its range stops at
+   `^11.0.0`, and npm halts the whole install. npm `overrides` do not relax a
+   peer *conflict*, only resolved versions, so that is not a way through.
+   Installing with `--legacy-peer-deps` produces a correct tree (verified:
+   exactly one `@nestjs/common` on disk, 12.0.1), but the flag is not durable —
+   `npm ci` in CI and in the Dockerfile would still fail. **This blocker is
+   unresolved and Nest 12 cannot land until it is.** The options, for whoever
+   reaches that task: wait for a throttler release supporting Nest 12, pin
+   `legacy-peer-deps` in `.npmrc` and accept that it disables peer checking for
+   every package in the monorepo, or replace `@nestjs/throttler` — it is used
+   in exactly one place, `ThrottlerGuard` on `AuthController`, covered by
+   `test/integration/auth/rate-limit.spec.ts`.
+
+**Salvaged from the reverted attempt, for whoever redoes Task 4:**
+`@nestjs/event-emitter@12` types its listener parameters more strictly, and 16
+call sites across 7 spec files fail `tsc` with TS7006. They are all
+`events.on(EVENT, (e) => ...)` and want an explicit `unknown`. The list:
+`shutdown-kill-drain.spec.ts:151`, `droid-hyper-phaser-no-gate.spec.ts:107`,
+`droid-phaser-bank-spend.spec.ts:102`, `gravity-hyperspace-exempt.spec.ts:69`,
+`missile-shake.spec.ts:64`, `call-for-help.spec.ts:48,109,126,146,214,231`,
+`range-and-ai.spec.ts:320,332,352,369,485`.
+
+**Also found and filed, not fixed:** #30 (the heartbeats start before the
+galaxy exists and before the ship-class cache is warm), #31 (the Node version
+guard checks four files and never the runtime running the tests — this machine
+was on Node 22 while everything declared 24), #28 and #29 (the first
+type-aware lint findings).
+
 ## Global Constraints
 
 Every task's requirements implicitly include this section.
