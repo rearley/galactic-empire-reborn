@@ -1,19 +1,35 @@
 FROM node:24-alpine AS builder
 
+# Build context is the repo root (not ./backend) so this stage can reach
+# packages/wire — @ge/wire is a workspace dependency resolved via
+# `file:../packages/wire`, which npm can only follow from a root install.
 WORKDIR /app
 
-# Install all deps (including devDeps — needed for nest build, prisma generate, ts-node seed)
+# Install deps (including devDeps — needed for nest build, prisma generate,
+# ts-node seed, and building @ge/wire) via the workspace root lockfile, so the
+# resolved tree matches what CI's backend test job runs against. Scoped to the
+# backend and @ge/wire workspaces only — the frontend workspace (Vite,
+# Playwright, Tailwind, React, ...) has nothing to do with this image, and
+# `npm ci` across all three roughly doubled node_modules when tried unscoped.
 COPY package*.json ./
-RUN npm ci
+COPY packages/wire/package.json ./packages/wire/package.json
+COPY backend/package.json ./backend/package.json
+RUN npm ci --workspace=backend --workspace=packages/wire
+
+# Build @ge/wire before the app that imports it.
+COPY packages/wire ./packages/wire
+RUN npm run build --workspace=@ge/wire
+
+WORKDIR /app/backend
 
 # Generate Prisma client
-COPY prisma ./prisma
+COPY backend/prisma ./prisma
 RUN npx prisma generate
 
 # Build the NestJS application
-COPY tsconfig*.json nest-cli.json ./
-COPY src ./src
-COPY config ./config
+COPY backend/tsconfig*.json backend/nest-cli.json ./
+COPY backend/src ./src
+COPY backend/config ./config
 RUN npm run build
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
@@ -21,24 +37,36 @@ FROM node:24-alpine
 
 RUN apk add --no-cache postgresql-client openssl
 
-WORKDIR /app
+WORKDIR /app/backend
 
 # Copy compiled output, all node_modules (ts-node needed for prisma db seed), prisma artifacts
 # --chown=node:node, not a later `chown -R`: Prisma checks that it can WRITE to
-# /app/node_modules/@prisma/engines before it will run, so a non-root container
+# node_modules/@prisma/engines before it will run, so a non-root container
 # with root-owned node_modules fails `migrate deploy` outright — the entrypoint
 # is `set -e`, so that is a container that exits instead of a game that starts.
 # Caught by booting the image, not by reading it.
-COPY --from=builder --chown=node:node /app/dist ./dist
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/prisma ./prisma
-# The sysop tuning file. WORKDIR is /app and the entrypoint runs dist/src/main,
-# so the resolver looks for /app/config/game.config.json. Omitting this does not
-# fail: a missing file legitimately falls back to canon defaults, silently. That
-# is how a UNIVMAX of 100 became a 601x601 galaxy in a container.
+#
+# node_modules is hoisted to the workspace root by `npm ci`, and node's module
+# resolution walks up from /app/backend looking for node_modules, so it is
+# copied to /app/node_modules here rather than /app/backend/node_modules.
+# node_modules/@ge/wire is a symlink to ../packages/wire (npm's workspace
+# link), so packages/wire's built dist has to come along too or that symlink
+# dangles — `require('@ge/wire')` would resolve to a target with no `dist/`.
+COPY --from=builder --chown=node:node /app/node_modules /app/node_modules
+COPY --from=builder --chown=node:node /app/packages/wire /app/packages/wire
+# docker-entrypoint.sh below invokes `./node_modules/.bin/prisma` relative to
+# WORKDIR (/app/backend); node_modules lives one level up at /app/node_modules
+# (see above), so link it in rather than rewrite the entrypoint's paths.
+RUN ln -s /app/node_modules /app/backend/node_modules
+COPY --from=builder --chown=node:node /app/backend/dist ./dist
+COPY --from=builder --chown=node:node /app/backend/prisma ./prisma
+# The sysop tuning file. The entrypoint runs dist/src/main from /app/backend,
+# so the resolver looks for /app/backend/config/game.config.json. Omitting this
+# does not fail: a missing file legitimately falls back to canon defaults,
+# silently. That is how a UNIVMAX of 100 became a 601x601 galaxy in a container.
 # @see test/unit/config/config-ships-in-image.spec.ts
-COPY --from=builder --chown=node:node /app/config ./config
-COPY --chown=node:node package*.json ./
+COPY --from=builder --chown=node:node /app/backend/config ./config
+COPY --chown=node:node backend/package*.json ./
 
 # Build identity, reported on /public/stats. Read at RUNTIME here (unlike the
 # frontend, where Vite inlines it at build time), so these are plain ENV.
@@ -48,7 +76,7 @@ ENV GIT_SHA=$GIT_SHA
 ENV APP_VERSION=$APP_VERSION
 
 # Copy and set entrypoint
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY backend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Drop root. Nothing here writes to disk at runtime and 3000 needs no privilege,
