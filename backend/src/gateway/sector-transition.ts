@@ -8,6 +8,8 @@ import { ConnectedPlayer } from './connected-ships.registry';
 import { PhysicsSectorTransitionEvent } from '../game/physics/physics-events';
 import { shouldBroadcastTransition } from './transition-visibility';
 import { moverVisibilityUpdates } from './player-visibility';
+import { UNIVMAX } from '../game/constants';
+import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
 
 /** The fields of a moving ship this planner needs, looked up by `shipId`. */
 export interface TransitionShipInfo {
@@ -27,21 +29,52 @@ export type MoverEmit =
 
 /**
  * An emit addressed to a sector room. `exceptSelf: true` marks the two notices
- * C sends with the mover excluded — without it the mover's own socket, having
- * already joined the destination room, would be told about its own arrival.
+ * C sends with the mover excluded — see `TransitionPlan` for how that combines
+ * with room-membership timing to decide who actually receives each one.
  */
 export type RoomEmit =
   | { room: string; event: 'player.sector'; payload: PlayerSectorPayload }
   | { room: string; event: 'sector:ship-left'; payload: SectorShipTransitPayload; exceptSelf: true }
-  | { room: string; event: 'sector:ship-entered'; payload: SectorShipTransitPayload; exceptSelf: true };
+  | { room: string; event: 'sector:ship-entered'; payload: SectorShipTransitPayload; exceptSelf: true }
+  | { room: string; event: typeof BEACON_EVENT; payload: BeaconEvent };
+
+/**
+ * The two facts the beacon decision needs that a pure planner must not
+ * compute itself: whether an observer sits in the destination sector — which
+ * requires the full ship roster, AI hulls included, not just `roster` — and
+ * the random draw. The caller already has `findAllShips()` and already owns
+ * the RNG, so it computes both and hands them in; `planTransition` stays
+ * deterministic. See the beacon block below for the citation and the exact
+ * conditions these two fields stand in for.
+ */
+export interface BeaconRoll {
+  hasObserver: boolean;
+  roll: number;
+}
 
 /**
  * What `handleSectorTransition` should do about one `physics.sector-transition`
- * event, as data. `leave`/`join` are the mover's own socket room changes, in
- * order; `moverEmits` go to the mover's socket alone; `roomEmits` go to a
- * sector room (see `RoomEmit.exceptSelf`).
+ * event, as data. `leave`/`join` are the mover's own socket room changes.
+ * `moverEmits` go to the mover's socket alone, order-independent of the room
+ * move since they never depend on room membership.
  *
- * All four are empty when the moving ship cannot be found, or when the
+ * The two room-emit lists encode a real ordering requirement, not a
+ * cosmetic one: room membership at the MOMENT OF THE EMIT decides who a
+ * plain `.to(room).emit()` reaches, because neither the arrival nor the
+ * departure `player.sector` broadcast carries `.except()`.
+ *
+ *  - `roomEmitsBeforeMove` MUST be sent while the mover is still in the old
+ *    room and not yet in the new one — that membership state is exactly what
+ *    keeps the mover off the arrival broadcast (not yet joined) while
+ *    leaving them a recipient of the departure one (not yet left), matching
+ *    `moverEmits`'s separate, correct copy of both.
+ *  - `roomEmitsAfterMove` MUST be sent once the mover has left/joined:
+ *    `sector:ship-left`/`sector:ship-entered` use `.except()` so timing does
+ *    not change who receives them, but the beacon does not — canon includes
+ *    the mover in its own beacon because by the time C sends it the mover has
+ *    already been added to the destination room.
+ *
+ * All fields are empty when the moving ship cannot be found, or when the
  * transition did not actually cross a sector boundary — both cases where the
  * original handler returns before doing anything at all.
  */
@@ -49,10 +82,17 @@ export interface TransitionPlan {
   leave: string[];
   join: string[];
   moverEmits: MoverEmit[];
-  roomEmits: RoomEmit[];
+  roomEmitsBeforeMove: RoomEmit[];
+  roomEmitsAfterMove: RoomEmit[];
 }
 
-const emptyPlan = (): TransitionPlan => ({ leave: [], join: [], moverEmits: [], roomEmits: [] });
+const emptyPlan = (): TransitionPlan => ({
+  leave: [],
+  join: [],
+  moverEmits: [],
+  roomEmitsBeforeMove: [],
+  roomEmitsAfterMove: [],
+});
 
 /**
  * Plans the joins, leaves and emits for one sector-boundary crossing.
@@ -82,6 +122,7 @@ export function planTransition(
   event: PhysicsSectorTransitionEvent,
   roster: ConnectedPlayer[],
   lookup: TransitionShipLookup,
+  beacon?: BeaconRoll,
 ): TransitionPlan {
   const { shipId, fromSector, toSector } = event;
   const plan = emptyPlan();
@@ -100,12 +141,12 @@ export function planTransition(
   // loses them, and the mover's own view of everyone else flips both ways.
   // Nobody else's view changed, so nobody else is told. @see player-visibility.ts
   if (shouldBroadcastTransition(ship.status)) {
-    plan.roomEmits.push({
+    plan.roomEmitsBeforeMove.push({
       room: `sector:${toSector.x}:${toSector.y}`,
       event: 'player.sector',
       payload: { updates: [{ shipId, sector: toSector }] },
     });
-    plan.roomEmits.push({
+    plan.roomEmitsBeforeMove.push({
       room: `sector:${fromSector.x}:${fromSector.y}`,
       event: 'player.sector',
       payload: { updates: [{ shipId, sector: null }] },
@@ -154,19 +195,41 @@ export function planTransition(
   // seen. @see GEFUNCS.C:714, :719
   if (ship.speed >= 21000) return plan;
 
-  plan.roomEmits.push({
+  plan.roomEmitsAfterMove.push({
     room: `sector:${fromSector.x}:${fromSector.y}`,
     event: 'sector:ship-left',
     payload: { shipId, shipName: name },
     exceptSelf: true,
   });
 
-  plan.roomEmits.push({
+  plan.roomEmitsAfterMove.push({
     room: `sector:${toSector.x}:${toSector.y}`,
     event: 'sector:ship-entered',
     payload: { shipId, shipName: name },
     exceptSelf: true,
   });
+
+  // S-005: beacon-on-move (GEFUNCS.C:808-816). Re-emit BEACON_EVENT when:
+  //   (a) at least one OBSERVER ship is in the destination sector
+  //       (status === GESTAT_USER (1) or GESTAT_AUTO (2), excluding mover)
+  //   (b) gernd()%10 === 0 (1-in-10 probability gate from C source)
+  // Restores audit 020 F-005 which regressed in commit d75d337.
+  //
+  // `hasObserver` and `roll` are supplied by the caller (see `BeaconRoll`
+  // above) — this planner stays deterministic and never touches the RNG.
+  if (beacon?.hasObserver && beacon.roll % 10 === 0) {
+    plan.roomEmitsAfterMove.push({
+      room: `sector:${toSector.x}:${toSector.y}`,
+      event: BEACON_EVENT,
+      payload: {
+        shipId,
+        shipName: name,
+        // Flat sector id, offset so the -UNIVMAX..+UNIVMAX square maps to 0..n.
+        fromSector: (fromSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (fromSector.x + UNIVMAX),
+        toSector: (toSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (toSector.x + UNIVMAX),
+      },
+    });
+  }
 
   return plan;
 }
