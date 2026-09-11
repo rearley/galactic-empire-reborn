@@ -52,6 +52,7 @@ import {
   JAMTIME,
 } from '../../../src/game/constants';
 import { I_JAMMER, I_MINE } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /**
  * Canon's Vakory scanner: `S33SRNG {Scan Range: 25000}`
@@ -64,26 +65,29 @@ const SCAN_RANGE = 25_000;
 const SECTOR = 10_000;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'p1', shipno: 1, shipname: 'Victim', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 100, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [],
+  return baseMakeShip({
+    userid: 'p1',
+    shipname: 'Victim',
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    lastfired: -1,
+    shieldtype: 2,
+    shield: 100,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    freq: [],
     items: new Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_USER, cybmine: 255, cybskill: 0,
-    cybupdate: 0, tick: 6, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...over,
+    status: GESTAT_USER,
+    cybmine: 255,
+    tick: 6,
+    topspeed: 8,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 const CLASS_ENTRY: ShipClassEntry = {
