@@ -25,6 +25,7 @@ import {
   GESTAT_USER,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
   maxPrice: 0n,
@@ -35,21 +36,16 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
 };
 
 function makePlayer(): ShipState {
-  return {
-    userid: 'player1', shipno: 1, shipname: 'PlayerShip', shpclass: 5,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0, xcoord: 0, ycoord: 0,
-    damage: 0, energy: 50_000, phasr: 100, phasrtype: 3, kills: 0,
-    lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [],
-    lmisslDistance: [], lmisslEnergy: [], decout: [], jammer: 0, freq: [],
-    items: Array(14).fill(0n), titem: 0, hostile: 0, cantexit: 0,
-    repair: 0, hypha: 0, firecntl: 0, destruct: 0, status: GESTAT_USER,
-    cybmine: 255, cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  return baseMakeShip({
+    userid: 'player1', shipname: 'PlayerShip', shpclass: 5,
+    energy: 50_000, phasr: 100, phasrtype: 3,
+    lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2,
+    helm: 1,
+    freq: [],
+    items: Array(14).fill(0n),
+    status: GESTAT_USER, cybmine: 255,
+    topspeed: 8_000, // NOTE: not a canon 0-255 warp factor — pre-existing, carried over unchanged (see task-6 report)
+  });
 }
 
 interface Harness {
