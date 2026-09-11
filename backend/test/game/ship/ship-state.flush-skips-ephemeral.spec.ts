@@ -13,68 +13,30 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function makeState(overrides: Partial<ShipState>): ShipState {
-  return {
+  return baseMakeShip({
     userid: 'test-user',
-    shipno: 1,
     shipname: 'TestShip',
-    shpclass: 1,
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5,
     ycoord: 5,
-    damage: 0,
     energy: 50000,
     phasr: 100,
     phasrtype: 2,
-    kills: 0,
     lastfired: 255,
     shieldtype: 2,
     shieldstat: 1,
     shield: 2,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
     helm: 1,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
     decout: [0, 0, 0, 0, 0],
-    jammer: 0,
     freq: [],
     items: Array(16).fill(0n),
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
-    status: 1,
-    cybmine: 0,
-    cybskill: 0,
-    cybupdate: 0,
-    tick: 0,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
     topspeed: 8,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 // ─── T006 ─────────────────────────────────────────────────────────────────────
