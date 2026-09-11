@@ -23,7 +23,7 @@ import type {
   GatewayError,
   OnboardingState,
   PendingShipSelectEntry,
-} from './game.gateway';
+} from './types';
 
 /**
  * What the connection lifecycle needs of the gateway, and nothing else.

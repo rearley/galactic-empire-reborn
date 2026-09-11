@@ -1,6 +1,6 @@
 import type { CommandBroadcast } from '../game/commands/command.types';
 import type { ShipState } from '../game/ship/ship-state.types';
-import type { BroadcastTarget, GameServer } from './game.gateway';
+import type { BroadcastTarget, GameServer } from './types';
 
 /** Socket ids currently in `room`, or an empty set when the room is gone. */
 export function roomMembers(server: GameServer, room: string): Set<string> {
