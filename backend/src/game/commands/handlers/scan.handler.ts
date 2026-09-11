@@ -4,21 +4,20 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { MineRegistry, MINE_SLOT_FREE } from '../../combat/mine.registry';
-import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } from '../command.types';
+import { MineRegistry } from '../../combat/mine.registry';
+import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { cbearing } from '../../physics/physics-math';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, UNIVMAX } from '../../constants';
+import { UNIVMAX } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { findShip } from '../helpers/find-ship';
 import { displayName } from '../../ship/display-name';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
-import { scanShipColour } from './helpers/scan-ship-colour';
 import { relativeBearing } from './scan/scan-strings';
-import { buildSidePanel, renderLoScan, renderLoFullScan, renderSectorScan } from './scan/scan-render';
+import { renderLoScan, renderLoFullScan, renderRangeScan, renderSectorScan } from './scan/scan-render';
 import { scanPl } from './scan/scan-planet';
 
 /**
@@ -224,25 +223,14 @@ export class ScanHandlerService implements OnModuleInit {
   }
 
   /**
-   * Range-radar scan — projects all in-range ships onto a 30×15 grid at the
-   * requested zoom level. Level is coerced to 1 when out-of-range or non-numeric.
+   * Range-radar scan — the only scan mode with an adjustable zoom level.
+   * Builds/updates the scantab (owned here — see getScantab/setScantab) and
+   * delegates grid + header assembly to the pure renderer in
+   * `./scan/scan-render.ts`, which carries the citation.
    *
-   * Formula (GECMDS.C:2510):
-   *   effective_range = scanrange / pow(10.0 - level, 2.0)
-   *
-   * Grid projection (GECMDS.C:2515-2540):
-   *   range_doubled = 2 * effective_range
-   *   xfactor = range_doubled / (MAXX - 1)
-   *   yfactor = range_doubled / (MAXY - 1)
-   *   xf = (other.xcoord - self.xcoord) / xfactor + MAXX / 2.0
-   *   yf = (other.ycoord - self.ycoord) / yfactor + MAXY / 2.0
-   *
-   * @see GECMDS.C:2484 scan_ra
-   * @see GECMDS.C:2510 range = scanrange / pow(10.0 - scan_level, 2.0)
+   * Not-in-flight guard is enforced centrally in handle() (spec 015 FR-011/SC-006).
    */
   private handleRangeScan(ship: ShipState, args: string[]): CommandResult {
-    // Not-in-flight guard is enforced centrally in handle() (spec 015 FR-011/SC-006).
-
     // Parse and coerce level: 0 | >9 | non-numeric | missing → 1
     let level = parseInt(args[0] ?? '', 10);
     if (isNaN(level) || level < 1 || level > 9) {
@@ -251,97 +239,13 @@ export class ScanHandlerService implements OnModuleInit {
 
     const scanRange = this.classCache.get(ship.shpclass)?.scanRange ?? 0;
 
-    // GECMDS.C:2510 — effective range in raw units (e.g. scanrange=100000, level=1 → 1234)
-    const effectiveRangeRaw = scanRange / Math.pow(10 - level, 2);
-
-    // S-003: GECMDS.C:2517 — convert raw → sector units before projection.
-    // Without this divide-by-10000, xfactor is in raw-units-per-cell while
-    // target coords are in sector-units → every target collapses to the centre.
-    const effectiveRangeSectors = effectiveRangeRaw / 10000.0;
-
     // Build/update the scantab using the full scanRange for in-range detection
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
     const allShips = this.shipService.findAllShips();
     const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
     this.setScantab(ship.userid, ship.shipno, newScantab);
 
-    const cells: ScanCell[] = [];
-
-    // Project each scantab entry onto the grid
-    const rangeDbl = 2 * effectiveRangeSectors;
-    const xfactor = rangeDbl / (SCAN_GRID_WIDTH - 1);
-    const yfactor = rangeDbl / (SCAN_GRID_HEIGHT - 1);
-
-    // Live mines. Canon's mine loop belongs to scan_ra — this is the zoomable
-    // tactical scan, the only mode with an adjustable range, and therefore the
-    // one a pilot uses to pick a way through a minefield.
-    //
-    //   for (i=0,mptr = mines; i<nummines;++mptr,++i)
-    //       if (mptr->channel != 255) { xf = ...; yf = ...; }
-    //
-    // @see GECMDS.C:2529-2545. Drawn before ships so a contact in the same cell
-    // takes it, matching canon's write order.
-    for (const mine of this.mineRegistry.getAll()) {
-      if (mine.channel === MINE_SLOT_FREE) continue;
-      const mxf = (mine.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
-      const myf = (mine.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
-      if (mxf >= 0 && mxf < SCAN_GRID_WIDTH && myf >= 0 && myf < SCAN_GRID_HEIGHT) {
-        cells.push({ x: Math.floor(mxf), y: Math.floor(myf), type: 'mine', char: '.' });
-      }
-    }
-
-    for (const entry of newScantab) {
-      // Find the ship state for this scantab entry
-      const other = allShips.find(
-        s => `${s.userid}#${s.shipno}` === entry.shipKey,
-      );
-      if (!other) continue;
-
-      const xf = (other.xcoord - ship.xcoord) / xfactor + SCAN_GRID_WIDTH / 2.0;
-      const yf = (other.ycoord - ship.ycoord) / yfactor + SCAN_GRID_HEIGHT / 2.0;
-
-      if (xf >= 0 && xf < SCAN_GRID_WIDTH && yf >= 0 && yf < SCAN_GRID_HEIGHT) {
-        const colour: ScanCell['colour'] = scanShipColour(other.status);
-        cells.push({
-          x: Math.floor(xf),
-          y: Math.floor(yf),
-          type: 'ship',
-          char: entry.letter,
-          colour,
-        });
-      }
-    }
-
-    // Self-cell at grid centre — GECMDS.C:2550 map[MAXY/2][MAXX/2] = '*'
-    cells.push({
-      x: Math.floor(SCAN_GRID_WIDTH / 2),
-      y: Math.floor(SCAN_GRID_HEIGHT / 2),
-      type: 'self',
-      char: '*',
-      colour: 'self',
-    });
-
-    const xsect = Math.floor(ship.xcoord);
-    const ysect = Math.floor(ship.ycoord);
-    const header = formatMessage(MessageId.SCAN24, Math.round(effectiveRangeRaw), xsect, ysect);
-
-    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-
-    return {
-      lines: [{ text: header, category: 'info' }],
-      // GECMDS.C:2571 — `if (waruptr->options[SCANFULL]) printmapfull(); else
-      // printmap();`. SCANFULL is read in scan_ra and NOWHERE else: scan_se
-      // (:2635) and scan_lo (:2723) call printmap() unconditionally. Omitting
-      // the panel entirely, rather than sending an empty one, is what keeps
-      // the option's two states distinguishable to the client.
-      scanRender: {
-        kind: 'ra',
-        mode,
-        cells,
-        header,
-        ...(ship.scanFull ? { sidePanel: buildSidePanel(ship, newScantab, allShips) } : {}),
-      },
-    };
+    return renderRangeScan(ship, level, scanRange, allShips, newScantab, this.mineRegistry.getAll());
   }
 
   /**
