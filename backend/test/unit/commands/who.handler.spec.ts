@@ -1,5 +1,6 @@
 import { WhoHandlerService } from '../../../src/game/commands/handlers/who.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
 
@@ -270,5 +271,29 @@ describe('`who` — position is scoped to your own sector', () => {
     const out = rows(svc.command.handler(me, [], ctx) as never);
 
     expect(new Set(out.map((t) => t.length)).size).toBe(1);
+  });
+});
+
+describe('class labels come from the boot-time cache, not the database', () => {
+  const rows = (r: import('../../../src/game/commands/command.types').CommandResult) =>
+    r.lines.filter((l) => l.category === 'info').map((l) => l.text);
+
+  it('reads the type name from ShipClassCacheService', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', shpclass: 3 });
+    const shipClassCache = new ShipClassCacheService({} as never);
+    shipClassCache.setForTest(3, { maxAcceleration: 0, maxWarp: 0, typeName: 'Star Cruiser' });
+    const svc = new WhoHandlerService({ findAllShips: () => [me] } as unknown as ShipStateService, shipClassCache);
+    const line = rows(svc.command.handler(me, [], ctx) as never)[0] ?? '';
+
+    expect(line).toContain('Star Cruiser');
+  });
+
+  it('falls back to "Class n" when the cache has no entry — never queries prisma', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', shpclass: 9 });
+    const shipClassCache = new ShipClassCacheService({} as never);
+    const svc = new WhoHandlerService({ findAllShips: () => [me] } as unknown as ShipStateService, shipClassCache);
+    const line = rows(svc.command.handler(me, [], ctx) as never)[0] ?? '';
+
+    expect(line).toContain('Class 9');
   });
 });

@@ -36,6 +36,7 @@ import {
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 
 const TRANSPORT_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 3, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 30_000, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,

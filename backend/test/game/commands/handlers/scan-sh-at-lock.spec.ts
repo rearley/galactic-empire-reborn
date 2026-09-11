@@ -25,6 +25,7 @@
  */
 
 import { ScanHandlerService } from '../../../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../../src/game/constants/items';
 import { NOLOCK_SENTINEL } from '../../../../src/game/commands/helpers/find-ship';
@@ -52,6 +53,8 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 }
 
 function build(ships: ShipState[]) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000 });
   return new ScanHandlerService(
     {
       findAllShips: () => ships,
@@ -60,13 +63,15 @@ function build(ships: ShipState[]) {
       get: (uid: string, no: number) => ships.find((s) => s.userid === uid && s.shipno === no),
       mutate: () => undefined,
     } as never,
-    { shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]) } } as never,
+    {} as never,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
       findPlanetByName: () => null, getMeta: jest.fn(),
     } as never,
     { get: () => undefined } as never,
     { all: () => [] } as never,
+    undefined,
+    shipClassCache,
   );
 }
 
@@ -75,7 +80,6 @@ describe('sca sh @ — scan the locked target (GECMDS.C:2207)', () => {
     const target = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bogey', xcoord: 5.2, ycoord: 5 });
     const self = makeShip({ lock: 2, lockUserid: 'u2' } as Partial<ShipState>);
     const svc = build([self, target]);
-    await svc.onModuleInit();
 
     const res = await svc.command.handler(self, ['sh', '@'], {} as never);
 
@@ -85,7 +89,6 @@ describe('sca sh @ — scan the locked target (GECMDS.C:2207)', () => {
   it('refuses when nothing is locked, rather than scanning something else', async () => {
     const self = makeShip({ lock: NOLOCK_SENTINEL });
     const svc = build([self]);
-    await svc.onModuleInit();
 
     const res = await svc.command.handler(self, ['sh', '@'], {} as never);
 
@@ -97,7 +100,6 @@ describe('sca sh @ — scan the locked target (GECMDS.C:2207)', () => {
     // resolving to whoever now occupies that slot. @see GECMDS.C:1453-1458
     const self = makeShip({ lock: 99 });
     const svc = build([self]);
-    await svc.onModuleInit();
 
     const res = await svc.command.handler(self, ['sh', '@'], {} as never);
 

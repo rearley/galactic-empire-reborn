@@ -27,6 +27,7 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -56,7 +57,10 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
   } as ShipState;
 }
 
-async function makeService(ships: ShipState[]) {
+function makeService(ships: ShipState[]) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000, typeName: 'Interceptor', maxTons: 1_000 });
+  shipClassCache.setForTest(24, { maxAcceleration: 0, maxWarp: 0, scanRange: 20_000, typeName: 'Sarten Attack Drone', maxTons: 9_600 });
   const service = new ScanHandlerService(
     {
       findAllShips: () => ships,
@@ -64,22 +68,16 @@ async function makeService(ships: ShipState[]) {
       findByUserid: () => [],
       get: (u: string, n: number) => ships.find((s) => s.userid === u && s.shipno === n),
     } as unknown as ShipStateService,
-    {
-      shipClass: {
-        findMany: async () => [
-          { classNumber: 1, scanRange: 100_000, typeName: 'Interceptor', maxTons: 1_000 },
-          { classNumber: 24, scanRange: 20_000, typeName: 'Sarten Attack Drone', maxTons: 9_600 },
-        ],
-      },
-    } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
       findPlanetByName: () => null, getMeta: () => undefined, onModuleInit: () => undefined,
     } as unknown as GalaxyService,
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 

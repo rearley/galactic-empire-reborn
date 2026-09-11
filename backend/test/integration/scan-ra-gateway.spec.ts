@@ -20,6 +20,7 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -76,11 +77,9 @@ async function makeScanService(ships: ShipState[], scanRange = 50_000) {
     findByName: jest.fn().mockReturnValue(undefined),
     findByUserid: jest.fn().mockReturnValue([]),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
     getSectorPlanets: jest.fn().mockReturnValue([]),
     getSectorWormholes: jest.fn().mockReturnValue([]),
@@ -94,8 +93,9 @@ async function makeScanService(ships: ShipState[], scanRange = 50_000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 

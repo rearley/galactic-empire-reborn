@@ -14,6 +14,7 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
@@ -50,11 +51,9 @@ function makeService(self: ShipState, target: ShipState | null) {
     }),
     get: jest.fn(),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000, typeName: 'Interceptor' });
   const galaxyMock = {
     getSectorPlanets: jest.fn().mockReturnValue([]),
     getSectorWormholes: jest.fn().mockReturnValue([]),
@@ -68,6 +67,8 @@ function makeService(self: ShipState, target: ShipState | null) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return service;
 }
@@ -83,14 +84,13 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       kills: 7,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'EnemyShip'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
 
     // First line: abbreviated bearing/distance still present
     expect(text).toContain('EnemyShip');
-    expect(text).toContain('class');
+    expect(text).toContain('Interceptor');
     expect(text).toContain('Bearing:');
 
     // Intel lines: damage, shields, kills
@@ -107,7 +107,6 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       damage: 0, shieldstat: 0, kills: 0,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'DownTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
@@ -122,7 +121,6 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       damage: 0, shieldstat: 3, kills: 2,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'DamagedShields'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
@@ -138,7 +136,6 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       damage: 50, shieldstat: 1, kills: 9,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'WarpTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
@@ -161,7 +158,6 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       damage: 20, shieldstat: 1, kills: 3,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'SteadyTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');
@@ -183,7 +179,6 @@ describe('S-008 — scan sh intel: damage/shields/kills when neither at warp', (
       damage: 60, shieldstat: 0, kills: 1,
     });
     const svc = makeService(self, target);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'OrbiterTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join('\n');

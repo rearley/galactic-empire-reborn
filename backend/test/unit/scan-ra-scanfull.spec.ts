@@ -26,6 +26,7 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
@@ -53,12 +54,16 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeService(ships: ShipState[]) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000 });
   const service = new ScanHandlerService(
     { findAllShips: jest.fn().mockReturnValue(ships), findByName: jest.fn(), findByUserid: jest.fn().mockReturnValue([]) } as unknown as ShipStateService,
-    { shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]) } } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     { getSectorPlanets: jest.fn().mockReturnValue([]), getSectorWormholes: jest.fn().mockReturnValue([]), findPlanetByName: jest.fn().mockReturnValue(null), getMeta: jest.fn(), onModuleInit: jest.fn() } as unknown as GalaxyService,
     { get: jest.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return service;
 }
@@ -68,7 +73,6 @@ const OTHER = makeShip({ userid: 'u2', shipno: 1, shipname: 'Vraska', xcoord: 0.
 
 async function scanRa(ship: ShipState, others: ShipState[]): Promise<CommandResult> {
   const service = makeService([ship, ...others]);
-  await service.onModuleInit();
   return (await service.command.handler(ship, ['ra', '9'], {})) as CommandResult;
 }
 

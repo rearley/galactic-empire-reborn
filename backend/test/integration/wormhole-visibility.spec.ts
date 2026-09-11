@@ -15,6 +15,7 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -49,11 +50,9 @@ function makeService(wormholes: GalaxyWormholeView[], scanRange = 20000) {
     findByName: jest.fn().mockReturnValue(undefined),
     findByUserid: jest.fn().mockReturnValue([]),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
     getSectorPlanets: jest.fn().mockReturnValue([]),
     getSectorWormholes: jest.fn().mockReturnValue(wormholes),
@@ -68,6 +67,8 @@ function makeService(wormholes: GalaxyWormholeView[], scanRange = 20000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return { svc, galaxyMock };
 }
@@ -84,7 +85,6 @@ describe('T020 — wormhole visibility gate', () => {
       for (const visible of [true, false]) {
         const w: GalaxyWormholeView = { xcoord: 5.5, ycoord: 5.6, visible };
         const { svc } = makeService([w]);
-        await svc.onModuleInit();
         const result = await (svc.command.handler(makeShip(), ['lo'], {}) as Promise<CommandResult>);
         expect(result.scanRender!.cells.filter((c) => c.type === 'wormhole')).toHaveLength(0);
       }
@@ -97,7 +97,6 @@ describe('T020 — wormhole visibility gate', () => {
         xcoord: 5.5, ycoord: 5.6, visible: false,
       };
       const { svc } = makeService([hidden]);
-      await svc.onModuleInit();
       const result = await (svc.command.handler(makeShip(), ['se'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells).toHaveLength(0);
@@ -108,7 +107,6 @@ describe('T020 — wormhole visibility gate', () => {
         xcoord: 5.5, ycoord: 5.6, visible: true,
       };
       const { svc } = makeService([visible]);
-      await svc.onModuleInit();
       const result = await (svc.command.handler(makeShip(), ['se'], {}) as Promise<CommandResult>);
       const wCells = result.scanRender!.cells.filter((c) => c.type === 'wormhole');
       expect(wCells.length).toBeGreaterThan(0);

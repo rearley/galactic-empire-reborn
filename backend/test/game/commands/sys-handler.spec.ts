@@ -1,6 +1,7 @@
 import { SysHandlerService } from '../../../src/game/commands/handlers/sys.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { CybertronControlService } from '../../../src/game/cybertron/cybertron-control.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../../src/game/commands/command.types';
@@ -34,12 +35,11 @@ function makeService(opts: { ships?: ShipState[] } = {}) {
   } as unknown as ShipStateService;
   const prisma = {
     user: { update: jest.fn().mockResolvedValue({}) },
-    shipClass: { findMany: jest.fn().mockResolvedValue([
-      { classNumber: 1, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 },
-      { classNumber: 2, typeName: 'Star Cruiser', cybCanAttack: true, noClaim: 2 },
-    ]) },
   } as unknown as PrismaService;
-  const svc = new SysHandlerService(shipState, prisma, new CybertronControlService());
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 5, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 });
+  shipClassCache.setForTest(2, { maxAcceleration: 0, maxWarp: 9, typeName: 'Star Cruiser', cybCanAttack: true, noClaim: 2 });
+  const svc = new SysHandlerService(shipState, prisma, new CybertronControlService(), undefined, shipClassCache);
   return { svc, state, mutate, prisma };
 }
 

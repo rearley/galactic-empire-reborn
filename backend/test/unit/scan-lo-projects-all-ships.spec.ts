@@ -34,6 +34,7 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
@@ -66,15 +67,15 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 const INTERCEPTOR_SCAN_RANGE = 100_000;
 
 function makeService(ships: ShipState[], scanRange = INTERCEPTOR_SCAN_RANGE) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const service = new ScanHandlerService(
     {
       findAllShips: jest.fn().mockReturnValue(ships),
       findByName: jest.fn().mockReturnValue(undefined),
       findByUserid: jest.fn().mockReturnValue([]),
     } as unknown as ShipStateService,
-    {
-      shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]) },
-    } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     {
       getSectorPlanets: jest.fn().mockReturnValue([]),
       getSectorWormholes: jest.fn().mockReturnValue([]),
@@ -83,6 +84,8 @@ function makeService(ships: ShipState[], scanRange = INTERCEPTOR_SCAN_RANGE) {
     } as unknown as GalaxyService,
     { get: jest.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return service;
 }
@@ -104,7 +107,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
       status: GESTAT_AUTO, ...FAR_CONTACT,
     });
     const service = makeService([self, cybertron]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -120,7 +122,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
       status: GESTAT_USER, ...FAR_CONTACT,
     });
     const service = makeService([self, rival]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -138,7 +139,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
       xcoord: 2.5, ycoord: 0.5,
     });
     const service = makeService([self, near]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -156,7 +156,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
       userid: 'u2', shipno: 1, status: GESTAT_USER, cloak: 10, ...FAR_CONTACT,
     });
     const service = makeService([self, ghost]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -166,7 +165,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
   it('never draws the scanning ship as a contact', async () => {
     const self = makeShip();
     const service = makeService([self]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -180,7 +178,6 @@ describe('sca lo — canon projects every ship, gated by nothing', () => {
       userid: 'u2', shipno: 1, status: GESTAT_AUTO, xcoord: 80, ycoord: 80,
     });
     const service = makeService([self, tooFar]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo'], {} as never);
 
@@ -196,7 +193,6 @@ describe('sca lo full — same map, and the side panel stays scantab-only', () =
       status: GESTAT_AUTO, ...FAR_CONTACT,
     });
     const service = makeService([self, cybertron]);
-    await service.onModuleInit();
 
     const res = await service.command.handler(self, ['lo', 'full'], {} as never);
 

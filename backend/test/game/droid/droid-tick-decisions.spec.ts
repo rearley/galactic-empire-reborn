@@ -87,6 +87,7 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 }
 
 const CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 4, maxPhaser: 1, maxShields: 1,
   scanRange: SCAN_RANGE, maxTons: 100, hasTorpedo: true, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false,

@@ -2,6 +2,7 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import { buildPurchasedShipName } from './purchased-ship-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRepository } from '../../player/user.repository';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { ShipStateService } from '../../ship/ship-state.service';
@@ -160,6 +161,17 @@ export class NewShipHandlerService {
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Ship-class fields (price, category, weapon caps, warp) come from the
+     * boot-time cache rather than a per-call `prisma.shipClass` query — the
+     * table is static seed data. `@Optional()` so the direct
+     * `new NewShipHandlerService(...)` test constructions keep compiling;
+     * without it every class lookup below misses and the command answers
+     * "Invalid ship class", same as it always has for an unrecognised one.
+     * @see specs — restructure Phase 3 Task 3
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
   ) {}
 
   /**
@@ -237,25 +249,29 @@ export class NewShipHandlerService {
     return this.purchaseShip(ship, classArg);
   }
 
-  private async listClasses(): Promise<CommandResult> {
-    const classes = await this.prisma.shipClass.findMany({
-      // C bounds BOTH the listing and the purchase at cyb_class — the index of
-      // the first CYBORG class, which is 21 (GECMDS.C:378 `for (i=0;i<cyb_class;++i)`
-      // and :4562-4566 `type >= 0 && type < cyb_class && ... == CLASSTYPE_USER`).
-      // Filtering on category alone let the Sysopian Death Star (class 41,
-      // 32M credits, warp 255, 100M tons) be advertised to every pilot from day
-      // one and bought by anyone rich enough. It is admin-only in the original
-      // and unreachable through this command.
-      where: { category: 'PLAYER', classNumber: { lt: FIRST_CPU_CLASS } },
-      orderBy: { classNumber: 'asc' },
+  private listClasses(): CommandResult {
+    // C bounds BOTH the listing and the purchase at cyb_class — the index of
+    // the first CYBORG class, which is 21 (GECMDS.C:378 `for (i=0;i<cyb_class;++i)`
+    // and :4562-4566 `type >= 0 && type < cyb_class && ... == CLASSTYPE_USER`).
+    // Filtering on category alone let the Sysopian Death Star (class 41,
+    // 32M credits, warp 255, 100M tons) be advertised to every pilot from day
+    // one and bought by anyone rich enough. It is admin-only in the original
+    // and unreachable through this command.
+    const cache = this.shipClassCache;
+    const classNumbers = cache?.getClassNumbers() ?? [];
+    const rows = classNumbers.flatMap((classNumber) => {
+      if (classNumber >= FIRST_CPU_CLASS) return [];
+      const c = cache?.get(classNumber);
+      if (!c || c.category !== 'PLAYER') return [];
+      return [{
+        text: `  ${classNumber.toString().padEnd(3)} ${c.typeName.padEnd(20)}  ${c.maxPrice.toLocaleString()} cr`,
+        category: 'system' as const,
+      }];
     });
 
     const lines = [
       { text: 'Available ships at Zygor station:', category: 'system' as const },
-      ...classes.map((c) => ({
-        text: `  ${c.classNumber.toString().padEnd(3)} ${c.typeName.padEnd(20)}  ${c.maxPrice.toLocaleString()} cr`,
-        category: 'system' as const,
-      })),
+      ...rows,
     ];
 
     return { lines };
@@ -309,11 +325,9 @@ export class NewShipHandlerService {
     }
 
     // Validate: class must exist and be PLAYER category
-    const shipClass = await this.prisma.shipClass.findFirst({
-      where: { classNumber },
-    });
+    const shipClass = this.shipClassCache?.get(classNumber);
 
-    if (!shipClass || shipClass.category !== 'PLAYER' || shipClass.classNumber >= FIRST_CPU_CLASS) {
+    if (!shipClass || shipClass.category !== 'PLAYER' || classNumber >= FIRST_CPU_CLASS) {
       return {
         lines: [{ text: "Invalid ship class. Type 'new ship' to see available classes.", category: 'system' }],
       };
@@ -426,7 +440,7 @@ export class NewShipHandlerService {
     const priceTable = kind === 'phaser' ? PHASER_PRICE : SHIELD_PRICE;
     const currentType = kind === 'phaser' ? ship.phasrtype : ship.shieldtype;
 
-    const shipClass = await this.prisma.shipClass.findFirst({ where: { classNumber: ship.shpclass } });
+    const shipClass = this.shipClassCache?.get(ship.shpclass);
     const classMax = kind === 'phaser' ? (shipClass?.maxPhaser ?? 0) : (shipClass?.maxShields ?? 0);
 
     // No type arg — show price list
