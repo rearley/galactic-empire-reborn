@@ -307,9 +307,11 @@ jobs:
       matrix:
         include:
           - name: ge-backend
-            context: ./backend
+            context: .
+            dockerfile: ./backend/Dockerfile
           - name: ge-frontend
-            context: ./frontend
+            context: .
+            dockerfile: ./frontend/Dockerfile
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -333,6 +335,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           # Baked into the image so the running app can say which commit it is.
           # Same value as the :sha tag below, so a version on screen names a
