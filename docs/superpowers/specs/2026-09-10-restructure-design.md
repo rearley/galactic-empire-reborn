@@ -1,6 +1,6 @@
 # Restructure spec
 
-**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 2 next.
+**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 3 next.
 
 This is the SPEC for the restructure and the recovery document for a lost session.
 Executable per-phase plans live beside it in `docs/superpowers/plans/2026-09-10-restructure-phase-N-*.md`. If a session is lost or
@@ -287,13 +287,23 @@ are recorded in `docs/DECISIONS.md` 2026-09-11, not here.
 After this the frontend and backend are genuinely independent and phases 2-4 can
 run in any order or in parallel.
 
-### Phase 2 — split the gateway
+### Phase 2 — split the gateway — COMPLETE 2026-09-11
 
-- [ ] Break `game.gateway.ts` into per-concern collaborators. Transport only:
+- [x] Break `game.gateway.ts` into per-concern collaborators. Transport only:
       parse in, dispatch, serialise out. No game logic, no Prisma.
-- [ ] Split `scan.handler.ts` (1,258 lines).
+      `game.gateway.ts` 2,743 → 1,482 lines; `this.prisma` sites 10 → 2 (both
+      onboarding, deferred to phase 3 — see `docs/DECISIONS.md` 2026-09-11).
+      New modules: `broadcast-dispatch.ts`, `narration.ts`,
+      `sector-transition.ts`, `ship-destroyed.service.ts`, `ship-identity.ts`,
+      `connection-lifecycle.service.ts`, `types.ts`.
+- [x] Split `scan.handler.ts` (1,258 lines) → 488, plus
+      `commands/handlers/scan/{scan-strings,scan-render,scan-planet}.ts`.
 
-Medium risk, mostly moving code behind unchanged entry points.
+Medium risk, mostly moving code behind unchanged entry points. Verified at
+close-out: full suite 617 suites / 6,291 tests passing, both Docker images
+build from repo root, deploy gate (`branches: [master]`,
+`if: github.event_name == 'push'`) unchanged, `VERSION` unchanged. Full
+before/after table in `docs/PROGRESS.md` 2026-09-11.
 
 ### Phase 3 — persistence boundary
 
