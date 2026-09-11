@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GameGateway } from './game.gateway';
 import { ConnectedShipsRegistry } from './connected-ships.registry';
+import { ShipDestroyedService } from './ship-destroyed.service';
 import { ShipModule } from '../game/ship/ship.module';
 import { CommandsModule } from '../game/commands/commands.module';
 import { CombatModule } from '../game/combat/combat.module';
@@ -12,7 +13,7 @@ import { PublicModule } from '../public/public.module';
 
 @Module({
   imports: [ShipModule, CommandsModule, CombatModule, AuthModule, PrismaModule, OnboardingModule, PhysicsModule, PublicModule],
-  providers: [ConnectedShipsRegistry, GameGateway],
+  providers: [ConnectedShipsRegistry, ShipDestroyedService, GameGateway],
   exports: [GameGateway, ConnectedShipsRegistry],
 })
 export class GatewayModule {}
