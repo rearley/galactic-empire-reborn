@@ -507,13 +507,39 @@ describe('ConnectionLifecycleService — disconnect', () => {
     return { ...built, sock, ...host };
   }
 
-  it('un-counts the captain and prunes the socket map before anything else', async () => {
+  it('un-counts the captain, before anything the kill branch could throw at', async () => {
     const { svc, host, sock, presence } = buildDisconnect(undefined);
     presence.arrive(USERID);
 
     await svc.onDisconnect(host, sock as unknown as GameSocket);
 
     expect(presence.count()).toBe(0);
+  });
+
+  it('frees the account\'s socket-cap slot on the way out', async () => {
+    // `socketsByUser` is private, so the prune is asserted through its only
+    // observable consequence: a departed socket must stop occupying a slot, or
+    // an account that opens and closes tabs would evict itself.
+    const { svc } = build();
+    const open: Sock[] = [];
+    const sockets = new Map<string, unknown>();
+    for (let i = 0; i < MAX_SOCKETS_PER_USER; i++) {
+      const s = makeSocket(`tab-${i}`, { userid: USERID });
+      open.push(s);
+      sockets.set(s.id, s);
+    }
+    const { host } = makeHost(sockets);
+    for (const s of open) await svc.onConnect(host, s as unknown as GameSocket);
+
+    await svc.onDisconnect(host, open[0] as unknown as GameSocket);
+
+    const arriving = makeSocket('fresh', {});
+    sockets.set('fresh', arriving);
+    await svc.onConnect(host, arriving as unknown as GameSocket);
+
+    // Without the prune the list would still hold MAX_SOCKETS_PER_USER ids and
+    // this connect would evict tab-1.
+    expect(open[1].disconnect).not.toHaveBeenCalled();
   });
 
   it('does not treat a server-side disconnect as a rage-quit kill', async () => {
@@ -554,6 +580,60 @@ describe('ConnectionLifecycleService — disconnect', () => {
 
     expect(eventsBus.emit).not.toHaveBeenCalled();
     expect(shipStateService.unboard).toHaveBeenCalledWith(USERID, 1);
+  });
+
+  it('draws spoils through the same helper the combat tick uses', async () => {
+    // The other half of the guard below: inverting the ternary so spoils were
+    // NEVER drawn would pass that test and fail this one. Canon has one killem
+    // and its cargo loop does not ask how the victim died.
+    // @see GEFUNCS.C:1123 `for (i=1;i<NUMITEMS;++i)`
+    const victimItems = new Array<bigint>(14).fill(0n);
+    victimItems[1] = 10n;
+    const victim = liveShip({ cantexit: 5, lastfired: 9, items: victimItems });
+    const attacker = {
+      ...liveShip(),
+      userid: 'u2',
+      shipno: 1,
+      channel: 9,
+      status: 1,
+      items: new Array<bigint>(14).fill(0n),
+    };
+    const shipStateService = {
+      get: jest.fn(() => victim),
+      findAllShips: jest.fn(() => [victim, attacker]),
+      unboard: jest.fn().mockResolvedValue(undefined),
+      mutate: jest.fn(),
+      board: jest.fn(),
+    } as unknown as ShipStateService;
+    const registry = new ConnectedShipsRegistry(shipStateService);
+    const { svc, random, eventsBus } = build({
+      shipStateService,
+      registry,
+      prisma: {
+        ship: { findMany: jest.fn(), findFirst: jest.fn() },
+        user: { findUnique: jest.fn() },
+        mailStat: { findFirst: jest.fn() },
+        shipClass: { findFirst: jest.fn().mockResolvedValue({ points: 7 }) },
+      },
+    });
+    const sock = makeSocket('sock-1', {
+      userid: USERID,
+      activeShipNo: 1,
+      disconnectReason: 'transport close',
+    });
+    const { host } = makeHost(new Map([['sock-1', sock]]));
+
+    await svc.onDisconnect(host, sock as unknown as GameSocket);
+
+    expect((random as unknown as { next: jest.Mock }).next).toHaveBeenCalled();
+    expect(eventsBus.emit).toHaveBeenCalledWith(
+      COMBAT_SHIP_DESTROYED,
+      expect.objectContaining({
+        attackerUserid: 'u2',
+        scoreAwarded: 7,
+        loot: [{ itemIndex: 1, amount: 10n }],
+      }),
+    );
   });
 
   it('draws no spoils when no attacker can be resolved', async () => {

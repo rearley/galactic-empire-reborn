@@ -22,7 +22,6 @@ import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@ge/wire';
-import { GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
@@ -72,12 +71,9 @@ import {
   PhysicsSectorTransitionEvent,
 } from '../game/physics/physics-events';
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
-import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
-import { scopePlayers } from './player-visibility';
 import { planTransition, RoomEmit } from './sector-transition';
-import { capSocketsForUser, MAX_SOCKETS_PER_USER } from './socket-cap';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT } from './events/beacon.event';
@@ -112,10 +108,8 @@ import {
 } from '../game/physics/speed-events';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { damstr } from '../game/combat/combat-math';
-import { attackerNameFromLastFired, resolveKillSpoils } from '../game/combat/kill-resolution';
 import { isAiUserid } from '../game/commands/helpers/ai-userid';
-import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
-import { DOC_PLANET_LIMIT, MAIL_CLASS_DISTRESS, RNDDOC } from '../game/constants';
+import { DOC_PLANET_LIMIT, RNDDOC } from '../game/constants';
 import type { CommandBroadcast } from '../game/commands/command.types';
 import { dispatchBroadcast, emitToSockets, roomMembers } from './broadcast-dispatch';
 import { DestroyedEmitter, ShipDestroyedService } from './ship-destroyed.service';
@@ -289,13 +283,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * original context. @see connection-lifecycle.service.ts LifecycleHost
    */
   private lifecycleHost(): LifecycleHost {
-    const gateway = this;
+    // Arrows, not a `this` alias: an object literal's `get server()` is a
+    // method and would bind its own `this`, so the live server is reached
+    // through a closure that captured this gateway instead.
+    const getServer = (): GameServer => this.server;
+    const log = (message: string): void => this.logger.log(message);
+    const error = (message: string, err: unknown): void => this.logger.error(message, err);
     return {
       get server(): GameServer {
-        return gateway.server;
+        return getServer();
       },
-      log: (message) => this.logger.log(message),
-      error: (message, err) => this.logger.error(message, err),
+      log,
+      error,
     };
   }
 
