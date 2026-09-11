@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import type { ScanCell, PhysicsSectorTransitionPayload } from '@ge/wire';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, WIRE_EVENTS } from '@ge/wire';
+import { socket } from '../socket/socketClient';
 
 const PHYSICS_SECTOR_TRANSITION = WIRE_EVENTS.SERVER_TO_CLIENT.PHYSICS_SECTOR_TRANSITION;
-import { socket } from '../socket/socketClient';
 
 /**
  * Overlap priority for cells at the same grid position (FR-015, research.md R7).
