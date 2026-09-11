@@ -20,6 +20,7 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipRepository } from '../../src/game/ship/ship.repository';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
@@ -35,6 +36,7 @@ export interface GatewayDeps {
   registry: ConnectedShipsRegistry;
   wsAuthGuard: WsAuthGuard;
   prisma: PrismaService;
+  shipRepository: ShipRepository;
   onboardingService: OnboardingService;
   scanHandler: ScanHandlerService;
   shipClassCache: ShipClassCacheService;
@@ -58,7 +60,7 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
       size: jest.fn(() => 0),
     } as unknown as ShipStateService);
 
-  const flat: Omit<GatewayDeps, 'shipDestroyed' | 'connectionLifecycle'> = {
+  const flat: Omit<GatewayDeps, 'shipDestroyed' | 'connectionLifecycle' | 'shipRepository'> = {
     shipStateService,
     commandRouter: { dispatch: jest.fn() } as unknown as CommandRouterService,
     registry: new ConnectedShipsRegistry(shipStateService),
@@ -83,6 +85,13 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
   // the same way `registry` is built from the resolved ShipStateService.
   const deps: GatewayDeps = {
     ...flat,
+    // Derived from `flat.prisma` (unless overridden by name) rather than left
+    // inert: several existing specs override `prisma` with a `ship.findFirst`
+    // mock and assert on it being called — a real ShipRepository wrapping
+    // that same mock keeps those assertions true without those specs
+    // changing. The same technique `shipDestroyed` and `connectionLifecycle`
+    // already use below.
+    shipRepository: overrides.shipRepository ?? new ShipRepository(flat.prisma),
     shipDestroyed:
       overrides.shipDestroyed ??
       new ShipDestroyedService(
@@ -121,7 +130,7 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     deps.shipStateService,
     deps.commandRouter,
     deps.registry,
-    deps.prisma,
+    deps.shipRepository,
     deps.onboardingService,
     deps.scanHandler,
     deps.shipClassCache,
