@@ -29,30 +29,22 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { makeShip as buildShip } from '../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------
 
+// Local defaults layered on the shared factory: this suite's ships sit at a
+// fixed sector (5,5), stationary (topspeed 0) and not yet boarded (status 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return buildShip({
+    xcoord: 5,
+    ycoord: 5,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeService(ships: ShipState[], scanRange = 500000) {
