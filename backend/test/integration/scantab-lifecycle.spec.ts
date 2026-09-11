@@ -63,9 +63,7 @@ describe('ScanHandlerService — scantab lifecycle', () => {
       get: () => null,
     } as unknown as ShipStateService;
 
-    const prisma = {
-      shipClass: { findMany: async () => [] },
-    } as unknown as PrismaService;
+    const prisma = {} as unknown as PrismaService;
 
     const galaxyService = {
       getSectorPlanets: () => [],

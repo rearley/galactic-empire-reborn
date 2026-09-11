@@ -36,8 +36,20 @@ function makeService(typeName = 'Interceptor', hasCloak = false) {
     undefined,
     shipClassCache,
   );
-  return { service, prismaMock };
+  return { service, prismaMock, shipClassCache };
 }
+
+describe('rep reads the ship class from the boot-time cache, not the database', () => {
+  it('resolves typeName/hasCloak through ShipClassCacheService.get, not a query', async () => {
+    const { service, shipClassCache } = makeService('Fighter', true);
+    const getSpy = jest.spyOn(shipClassCache, 'get');
+
+    const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
+
+    expect(getSpy).toHaveBeenCalledWith(1);
+    expect(result.lines[0].text).toContain('Fighter');
+  });
+});
 
 describe('ReportHandlerService', () => {
   describe('nav report', () => {

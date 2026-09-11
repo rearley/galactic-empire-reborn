@@ -52,10 +52,6 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 
 function service() {
   const prisma = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
     user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n, noships: 1, topshipno: 1 }), update: jest.fn() },
     ship: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),

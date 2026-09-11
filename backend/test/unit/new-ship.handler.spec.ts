@@ -166,8 +166,38 @@ function makeService(
     shipClassCache,
   );
 
-  return { service, prismaMock, shipStateMock };
+  return { service, prismaMock, shipStateMock, shipClassCache };
 }
+
+describe('new ship / new phaser / new shield read the class table from the boot-time cache, not the database', () => {
+  it('new ship (listing) enumerates classes through ShipClassCacheService.getClassNumbers', async () => {
+    const { service, shipClassCache } = makeService();
+    const listSpy = jest.spyOn(shipClassCache, 'getClassNumbers');
+
+    await service.command.handler(makeShip(), ['ship'], {});
+
+    expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('new ship <N> (purchase) resolves the class through ShipClassCacheService.get', async () => {
+    const { service, shipClassCache } = makeService();
+    const getSpy = jest.spyOn(shipClassCache, 'get');
+
+    await service.command.handler(makeShip(), ['ship', '4'], {});
+
+    expect(getSpy).toHaveBeenCalledWith(4);
+  });
+
+  it('new phaser resolves the class through ShipClassCacheService.get', async () => {
+    const { service, shipClassCache } = makeService();
+    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const ship = makeShip();
+
+    await service.command.handler(ship, ['phaser'], {});
+
+    expect(getSpy).toHaveBeenCalledWith(ship.shpclass);
+  });
+});
 
 describe('NewShipHandlerService', () => {
   describe('new (no args) → usage help', () => {

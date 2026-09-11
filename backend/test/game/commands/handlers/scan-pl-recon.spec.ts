@@ -83,7 +83,6 @@ function makeService(planet: PlanetState, wormholes: unknown[] = []) {
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
     user: { findUnique: jest.fn().mockResolvedValue(null) },
     wormhole: {
       findMany: jest.fn().mockImplementation(() => Promise.resolve(wormholes)),

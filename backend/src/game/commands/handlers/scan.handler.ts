@@ -74,7 +74,6 @@ export class ScanHandlerService {
      * compiling; a missing cache makes every class lookup miss, which falls
      * back to the same `?? 0` / `?? \`class n\`` defaults an unrecognised
      * class number always hit.
-     * @see specs — restructure Phase 3 Task 3
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,

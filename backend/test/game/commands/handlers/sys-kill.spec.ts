@@ -68,7 +68,7 @@ function makeHarness(ships: ShipState[]) {
   } as unknown as ShipStateService;
   return new SysHandlerService(
     shipState,
-    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    { user: { update: jest.fn() } } as unknown as PrismaService,
     new CybertronControlService(),
   );
 }
