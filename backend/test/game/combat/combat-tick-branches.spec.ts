@@ -49,6 +49,7 @@ import {
   TORPSPED,
 } from '../../../src/game/constants';
 import { I_GOLD } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /** A Random that always draws the same value. */
 function fixedRandom(value: number): Random {
@@ -68,29 +69,25 @@ function sequenceRandom(values: number[]): Random {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    // phasrtype 0 keeps the reload block — and its energy debit — out of every
-    // fixture, so the only PRNG draws in a tick are the ones under test.
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [0, 0, 0], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'T',
+    energy: 50_000,
+    lastfired: -1,
+    shieldtype: 2,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    decout: [0, 0, 0],
     items: new Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_USER, cybmine: 255, cybskill: 0,
-    cybupdate: 0, tick: 0, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...over,
+    status: GESTAT_USER,
+    cybmine: 255,
+    topspeed: 8,
     // Attribution reads `channel` (this port's usrnum), never `shipno`.
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 interface Harness {
