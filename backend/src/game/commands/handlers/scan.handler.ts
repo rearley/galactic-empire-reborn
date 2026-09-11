@@ -5,128 +5,21 @@ import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { MineRegistry, MINE_SLOT_FREE } from '../../combat/mine.registry';
-import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent, SidePanelRow } from '../command.types';
+import { Command, CommandContext, CommandResult, ScanCell, ScanRenderEvent } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { cbearing } from '../../physics/physics-math';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, SCAN_LO_PROJECTION_MULTIPLIER, projectRangeCell, MAXX, MAXY, UNIVMAX, GESTAT_AUTO } from '../../constants';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, UNIVMAX } from '../../constants';
 import { buildScantab, Scantab } from './helpers/scantab';
 import { findShip } from '../helpers/find-ship';
 import { displayName } from '../../ship/display-name';
 import { resolveScanSubcommand } from './helpers/scan-subcommand';
 import { decideScanAnnouncement } from '../scan-announce';
 import { inScanRange, damstr } from '../../combat/combat-math';
-import { ITEM_NAMES, capitaliseItem, I_MEN, I_TROOPS, I_MISSL, I_TORP, I_FLUX, I_FOOD, I_FIGHTER } from '../../constants/items';
-import { planetOwnerLabel, isNeutralZoneOwner, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../combat/neutral-zone';
-import { scanDistanceUnits } from './helpers/scan-distance';
 import { scanShipColour } from './helpers/scan-ship-colour';
-
-/**
- * Convert raw speed units to a display string for the side panel.
- * - speed === 0            → 'Stopped'
- * - speed > 0 && < 1000   → 'Impulse'
- * - speed >= 1000          → 'Warp X.Y'  (e.g. 4500 → 'Warp 4.5')
- *
- * @see GECMDS.C:3019 printmapfull — speed formatting
- */
-
-/**
- * The port's own Stopped/Impulse/Warp wording. Canon's side panel uses
- * `showarp` (GECMDS.C:3061), which is why this is no longer called from the
- * scan row — kept only for callers that genuinely want the prose form.
- */
-function showarpDisplay(speed: number): string {
-  if (speed === 0) return 'Stopped';
-  if (speed < 1000) return 'Impulse';
-  return `Warp ${(speed / 1000).toFixed(1)}`;
-}
-
-/** Environment string table indexed by `enviorn` (0..3). @see GECMDS.C:2338-2349 */
-const ENV_STRINGS = [
-  MessageId.SCAN12, // 0 — Inferno-like (worst)
-  MessageId.SCAN13, // 1 — Toxic
-  MessageId.SCAN14, // 2 — Hostile
-  MessageId.SCAN15, // 3 — Earth-like (best)
-] as const;
-
-/** Resource string table indexed by `resource` (0..3). @see GECMDS.C:2351-2356 */
-const RES_STRINGS = [
-  MessageId.SCAN12, // 0 — Barren (C reuses one table for both axes)
-  MessageId.SCAN13, // 1 — Sparse
-  MessageId.SCAN14, // 2 — Rich
-  MessageId.SCAN15, // 3 — Abundant
-] as const;
-
-/**
- * The reconnaissance strings a NON-owner sees on `sca pl <n>`.
- *
- * These are SCAN28..SCAN34 in MBMGEMSG.MSG:3637-3390, filled from `gechrbuf`
- * words that the C builds inline (GECMDS.C:2377-2448). They are not in
- * `messages.ts` because that file is frozen this run and never carried these
- * ids — see the report; they belong there.
- *
- * Spelling is the original's: "Sparsly" and "Moderatly" are how the shipped
- * binary printed them (GECMDS.C:2381, 2387).
- */
-/** Fill `%s` in a raw canon template. `formatMessage` only takes MessageIds. */
-function fmt(template: string, arg: string): string {
-  return template.replace('%s', arg);
-}
-
-const SCAN28_POPULATED = '%s Populated';
-const SCAN29_MISSILES = '%s stockpile of missiles';
-const SCAN30_TORPEDOES = '%s stockpile of torpedoes.';
-const SCAN31_NO_FIGHTERS = 'No sign of fighters anywhere.';
-const SCAN32_FIGHTERS = 'There are indications of fighters.';
-const SCAN33_FLUXPODS = '%s stockpile of fluxpods.';
-const SCAN34_FOOD = '%s stockpile of food.';
-/**
- * SCANWRM / SCANWRM1 — GE/REL/MBMGEMSG.MSG:3676, 3676.
- *
- * Canon indents both with a leading space; we drop it to match the SCAN08/09/10
- * siblings above, which the port already renders unindented.
- */
-const SCANWRM = 'Object Class: Wormhole';
-const SCANWRM1 = 'Named: %s';
-
-/**
- * Population band for the non-owner readout: men + troops, six bands.
- * @see GECMDS.C:2378-2392
- */
-function populationBand(total: bigint): string {
-  if (total === 0n) return 'Not';
-  if (total < 2500n) return 'Sparsly';
-  if (total < 10000n) return 'Lightly';
-  if (total < 100000n) return 'Moderatly';
-  if (total < 1000000n) return 'Widely';
-  return 'Heavily';
-}
-
-/**
- * Stockpile band for the non-owner readout — the same four words for missiles,
- * torpedoes, fluxpods and food.
- * @see GECMDS.C:2395-2404 (and the three identical ladders that follow)
- */
-function stockpileBand(qty: bigint): string {
-  if (qty === 0n) return 'No';
-  if (qty < 25n) return 'Small';
-  if (qty < 100n) return 'Moderate';
-  return 'Large';
-}
-
-/**
- * Canon indexes ONE table for both axes — SCAN12..SCAN15, Poor/Marginal/Good/
- * Very Good (GECMDS.C:2338-2356). A third hardcoded table lived here with the
- * comment "the original uses separate text for resources vs environment",
- * which is not true, and it showed: an owner's scan printed canon's word for
- * environment and ours for resources in the same block —
- *
- *   Environment:Good        <- SCAN14, canon
- *   Resources: Abundant     <- ours
- *
- * The words are axis-neutral on purpose, because they have to serve both.
- */
-const QUALITY = [MessageId.SCAN12, MessageId.SCAN13, MessageId.SCAN14, MessageId.SCAN15] as const;
+import { relativeBearing } from './scan/scan-strings';
+import { buildSidePanel, renderLoScan, renderLoFullScan, renderSectorScan } from './scan/scan-render';
+import { scanPl } from './scan/scan-planet';
 
 /**
  * Handles the `scan` / `sc` command family.
@@ -138,22 +31,6 @@ const QUALITY = [MessageId.SCAN12, MessageId.SCAN13, MessageId.SCAN14, MessageId
  * @see GECMDS.C:2190 scan_sh
  * @see GECMDS.C:2295 scan_pl (deviation: named lookup — research.md Decision 8)
  */
-
-/**
- * Relative bearing from a ship to a point, in whole degrees, 0 = dead ahead.
- *
- * @see GEFUNCS.C cbearing(from, to, heading)
- */
-function relativeBearing(
-  ship: { xcoord: number; ycoord: number; heading: number },
-  target: { xcoord: number; ycoord: number },
-): number {
-  // Delegates to the shared cbearing so scans report the SIGNED -180..180
-  // bearing the original does. This used to fold to 0..359, which made every
-  // target off the port bow print a value `pha` and `rot` reject outright.
-  // @see GELIB.C:142-166
-  return Math.round(cbearing(ship, target, ship.heading));
-}
 
 @Injectable()
 export class ScanHandlerService implements OnModuleInit {
@@ -297,7 +174,7 @@ export class ScanHandlerService implements OnModuleInit {
     }
 
     if (sub === 'pl') {
-      return await this.scanPl(ship, args.slice(1));
+      return await scanPl(ship, args.slice(1), { planetService: this.planetService, prisma: this.prisma });
     }
 
     if (sub === 'ra') {
@@ -312,233 +189,38 @@ export class ScanHandlerService implements OnModuleInit {
   }
 
   /**
-   * Canon's `scan_lo` map loop — every ship in the game, projected, gated by
-   * nothing:
-   *
-   *   for (othusn=0 ; othusn < nships ; othusn++)
-   *     if (ingegame(othusn))
-   *       { ...project...
-   *         if (in grid) map[y][x] = (status == GESTAT_AUTO) ? '+' : '='; }
-   *
-   * This used to iterate the SCANTAB instead. The scantab is canon's
-   * IDENTIFICATION table, gated on cloak and on `scanrange` (GECMDS.C:1371) —
-   * a third of the radius this projects, and a tenth of it in canon. So every
-   * contact between the detection radius and the edge of the map was
-   * structurally invisible: the outer ~90% of the grid could never draw
-   * anything, which is the entire point of a LONG RANGE scan. A pilot parked
-   * at the hub ran this with three Cybertrons 17.8, 21.6 and 21.7 sectors out
-   * and saw empty space.
-   *
-   * The two tables answer different questions and canon keeps them apart:
-   * the MAP says something is out there, the SCANTAB says what it is, how far
-   * and on what bearing. Cloak is gated in the scantab alone, so a cloaked
-   * ship shows here as a contact that cannot be identified, ranged or locked
-   * — which is what canon does, deliberately or not.
-   *
-   * Deviation D1 is preserved where it means anything: a ship the scanner has
-   * resolved keeps its scantab letter, so the map and the `sca lo full` legend
-   * still agree and `loc <letter>` still addresses what you can see. Anything
-   * unresolved falls back to canon's own glyphs.
-   *
-   * @see GECMDS.C:2686-2718 scan_lo
-   * @see GECMDS.C:1371 the scantab's cloak + scanrange gate
-   */
-  private projectAllShips(
-    ship: ShipState,
-    allShips: ReadonlyArray<ShipState>,
-    scantab: Scantab,
-    projectionRange: number,
-  ): ScanCell[] {
-    const letterByKey = new Map(scantab.map((e) => [e.shipKey, e.letter]));
-    const selfKey = `${ship.userid}#${ship.shipno}`;
-
-    const cells: ScanCell[] = [];
-    for (const other of allShips) {
-      const key = `${other.userid}#${other.shipno}`;
-      if (key === selfKey) continue;
-
-      const cell = projectRangeCell(ship, other, projectionRange);
-      if (!cell) continue;
-
-      const char = letterByKey.get(key) ?? (other.status === GESTAT_AUTO ? '+' : '=');
-      cells.push({ x: cell.x, y: cell.y, type: 'ship', char });
-    }
-    return cells;
-  }
-
-  /**
-   * Range-centred tactical scan producing a scanGrid payload.
-   * Projection order per contracts/scan-projection.md:
-   *   1. All in-range ships (excluding self)
-   *   2. All planets in player's current sector
-   *   3. All visible wormholes in player's current sector
-   *   4. Self-cell
-   *
-   * Deviation D1: ship cells use scantab letters (A..Z) instead of the original
-   * '+' (AI) and '=' (manual) glyphs. This aligns `sca lo` with `sca ra`/`sca se`
-   * for consistent letter-based identification.
-   *
-   * @see GECMDS.C:2640 scan_lo
+   * Range-centred tactical scan producing a scanGrid payload. Builds/updates
+   * the scantab (owned here — see getScantab/setScantab) and delegates the
+   * grid + header assembly to the pure renderer in `./scan/scan-render.ts`,
+   * which carries the citation for this behaviour.
    */
   private scanLo(ship: ShipState): CommandResult {
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
-    // S-001: C `scan_lo` projects at 10× scanRange — the long-range overview.
-    // @see GECMDS.C:2668 range = scanrange * 10.0
-    // @see reference/wiki/player-ships.md:39 "long range scanner is 10x this value"
-    // The scantab detection gate remains at full scanRange so cloaking and
-    // range-based exclusion stay consistent with all other scan modes;
-    // only the *projection radius* widens. Ships beyond scanRange but within
-    // 10×scanRange are NOT projected (we don't know about them via the scantab).
-    // To match C's "iterate all ships and project" semantics we additionally
-    // project ships up to 10× scanRange that are NOT cloaked.
-    const projectionRange = scanRange * SCAN_LO_PROJECTION_MULTIPLIER;
-
-    // Build / update the scantab (D1: letters used for ship cells)
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
     const allShips = this.shipService.findAllShips();
     const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
     this.setScantab(ship.userid, ship.shipno, newScantab);
 
-    const grid: ScanCell[] = [];
-
-    // NO mine loop here. `scan_lo` (GECMDS.C:2640 onward) contains no `mptr`
-    // iteration at all before printmap() — the mine loop belongs to scan_ra
-    // (GECMDS.C:2529) and to scan_se (GECMDS.C:2598). This method used to carry
-    // it while citing scan_ra's line numbers, so the long-range overview drew
-    // mines canon never puts there and the tactical scan showed clean space.
-
-    // 1. Project EVERY ship in the game — GECMDS.C:2686-2718
-    grid.push(...this.projectAllShips(ship, allShips, newScantab, projectionRange));
-
-    // NO PLANETS. `scan_lo`'s only projection loop is over ships
-    // (GECMDS.C:2686 `for (othusn=0; othusn < nships; othusn++)`), and
-    // `map_planets()` is called exactly once in the whole source — at
-    // GECMDS.C:2634, inside `scan_se`, four lines before scan_lo even begins.
-    // Planets are deliberately absent from the long-range overview.
-    //
-    // Drawing them put roughly two thousand 'P' cells onto a 450-cell grid in
-    // our galaxy: a solid wall of planets with the ship markers and the '*'
-    // self-cell buried inside it. `sca lo` is the first thing the welcome text
-    // tells a new player to type, and it rendered as noise.
-    // `sca se` is the mode that shows planets, and it still does.
-    const xsect = Math.floor(ship.xcoord);
-    const ysect = Math.floor(ship.ycoord);
-
-    // 4. Self-cell — GECMDS.C:2721 map[MAXY/2][MAXX/2] = '*'
-    grid.push({
-      x: Math.floor(SCAN_GRID_WIDTH / 2),
-      y: Math.floor(SCAN_GRID_HEIGHT / 2),
-      type: 'self',
-      char: '*',
-    });
-
-    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-
-    const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
-    return {
-      lines: [{ text: header, category: 'info' }],
-      scanRender: { kind: 'lo', mode, cells: grid, header },
-    };
+    return renderLoScan(ship, scanRange, allShips, newScantab);
   }
 
   /**
-   * Full-detail tactical scan — same grid as `sca lo` but with a side-panel legend.
-   * Each visible ship gets a SidePanelRow: letter, distance (integer parsecs),
-   * bearing (0..359), heading (0..359), speedDisplay, and optionally name.
-   *
-   * The name field is only included when `ship.scanNames === true` (SCANNAMES).
-   *
-   * Rows are ordered by ascending distance (same order as the scantab).
-   *
-   * @see GECMDS.C:3019 printmapfull
-   * @see specs/015-scan-modes/plan.md §T032
+   * Full-detail tactical scan — same grid as `sca lo` but with a side-panel
+   * legend. Scantab handling as `scanLo`; grid + panel assembly delegated to
+   * the pure renderer in `./scan/scan-render.ts`, which carries the citation.
    */
-
-  /**
-   * The scantab side panel — canon's `printmapfull()` (GECMDS.C:3019).
-   *
-   * Shared by `scan ra` (when SCANFULL is on, GECMDS.C:2571) and by this
-   * port's `scan lo full`. It was written inline in the latter, which is how
-   * SCANFULL came to be a settable option that no rendering code consulted.
-   */
-  private buildSidePanel(
-    ship: ShipState,
-    scantab: ReturnType<typeof buildScantab>,
-    allShips: ShipState[],
-  ): SidePanelRow[] {
-    return scantab.map((entry) => {
-      const other = allShips.find((s) => `${s.userid}#${s.shipno}` === entry.shipKey);
-      const row: SidePanelRow = {
-        letter: entry.letter,
-        // RAW units, as C prints them: `spr("%ld",(long)(sptr->ship[i].dist))`
-        // at GECMDS.C:5985. Dividing by 10 000 collapsed the only continuous
-        // range readout in the game to a single digit -- a droid closing from
-        // 14 900 to 10 100 read "1" both times, and anything inside half a
-        // sector read "0" -- exactly when a new pilot is deciding to fight or
-        // run. docs/DECISIONS.md D7 already specifies a right-justified 6-char
-        // field, which only makes sense for the raw magnitude.
-        distance: Math.trunc(entry.dist),
-        bearing: entry.bearing,
-        // Already relative and signed from scantab; see its `heading` docs.
-        heading: entry.heading,
-        speedDisplay: showarp(entry.speed),
-      };
-      // GECMDS.C:3064 — the name row is printed only when SCANNAMES is set.
-      if (ship.scanNames && other) {
-        row.name = other.shipname;
-      }
-      return row;
-    });
-  }
-
   private scanLoFull(ship: ShipState): CommandResult {
     const classInfo = this.classCache.get(ship.shpclass);
     const scanRange = classInfo?.scanRange ?? 0;
 
-    // S-001: long-range projection — see scanLo for rationale.
-    const projectionRange = scanRange * SCAN_LO_PROJECTION_MULTIPLIER;
-
-    // Build / update the scantab
     const prevScantab = this.getScantab(ship.userid, ship.shipno);
     const allShips = this.shipService.findAllShips();
     const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
     this.setScantab(ship.userid, ship.shipno, newScantab);
 
-    const grid: ScanCell[] = [];
-
-    // 1. Same map as `sca lo` — every ship, gated by nothing.
-    grid.push(...this.projectAllShips(ship, allShips, newScantab, projectionRange));
-
-    // NO PLANETS — same as `sca lo`. See the note there: map_planets() belongs
-    // to scan_se alone (GECMDS.C:2634), and scan_lo projects ships only.
-    const xsect = Math.floor(ship.xcoord);
-    const ysect = Math.floor(ship.ycoord);
-
-    // 4. Self-cell
-    grid.push({
-      x: Math.floor(SCAN_GRID_WIDTH / 2),
-      y: Math.floor(SCAN_GRID_HEIGHT / 2),
-      type: 'self',
-      char: '*',
-    });
-
-    // Build side-panel rows (sorted by ascending distance — scantab is already sorted)
-    const sidePanel = this.buildSidePanel(ship, newScantab, allShips);
-
-    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-    const header = formatMessage(MessageId.SCAN24, Math.round(projectionRange), xsect, ysect);
-
-    // No log line: this is the ONE mode that produces a SCAN DATA card, and
-    // the card carries the same header. Echoing it as well filled the event
-    // log with rows of "Range Scan Dist:300000 (s:0 0)" duplicating the card
-    // beside them. The other modes keep their line — they draw only to the
-    // map, so the log is their sole textual confirmation.
-    return {
-      lines: [],
-      scanRender: { kind: 'lo-full', mode, cells: grid, header, sidePanel },
-    };
+    return renderLoFullScan(ship, scanRange, allShips, newScantab);
   }
 
   /**
@@ -657,25 +339,18 @@ export class ScanHandlerService implements OnModuleInit {
         mode,
         cells,
         header,
-        ...(ship.scanFull ? { sidePanel: this.buildSidePanel(ship, newScantab, allShips) } : {}),
+        ...(ship.scanFull ? { sidePanel: buildSidePanel(ship, newScantab, allShips) } : {}),
       },
     };
   }
 
   /**
-   * Sector scan — projects all objects in the player's current 1×1 sector onto a
-   * 30×15 grid at high resolution. The grid covers only the current sector
-   * (sector-relative coords 0.0..1.0 mapped to 0..29 × 0..14).
-   *
-   * Rendering precedence (last-writer wins): mine → planet → ship → self.
-   *
-   * Colour categories: self → 'self', human (status≠1) → 'human',
-   * AI (status===1) → 'ai', planet → 'planet'.
-   *
-   * Letter assignment is shared with `sca ra` via the same scantab slot so
-   * letters are sticky across mode switches.
-   *
-   * @see GECMDS.C:2562 scan_se
+   * Sector scan — projects all objects in the player's current 1×1 sector onto
+   * a 30×15 grid at high resolution. Builds/updates the shared scantab (same
+   * slot as `sca ra`) and resolves live mines/wormholes/planets, then
+   * delegates grid assembly to the pure renderer in `./scan/scan-render.ts`,
+   * which carries the citation. The `inGalaxy` guard stays here because
+   * `GalaxyService.getSector*` throws outside `-UNIVMAX..+UNIVMAX`.
    */
   private handleSectorScan(ship: ShipState): CommandResult {
     const xsect = Math.floor(ship.xcoord);
@@ -689,34 +364,6 @@ export class ScanHandlerService implements OnModuleInit {
     const newScantab = buildScantab(ship, allShips, prevScantab, scanRange);
     this.setScantab(ship.userid, ship.shipno, newScantab);
 
-    /**
-     * Project a galaxy-space coordinate into the sector grid.
-     * Sector-relative coords (0.0..1.0) map to grid (0..SCAN_GRID_WIDTH-1).
-     * @see specs/015-scan-modes/plan.md §"Projection for sector scan"
-     */
-    const project = (xcoord: number, ycoord: number): { x: number; y: number } => {
-      const relX = xcoord - xsect;  // 0.0..1.0
-      const relY = ycoord - ysect;  // 0.0..1.0
-      const x = Math.max(0, Math.min(SCAN_GRID_WIDTH - 1, Math.floor(relX * SCAN_GRID_WIDTH)));
-      const y = Math.max(0, Math.min(SCAN_GRID_HEIGHT - 1, Math.floor(relY * SCAN_GRID_HEIGHT)));
-      return { x, y };
-    };
-
-    // Use a Map keyed by "${x},${y}" so later writes overwrite earlier ones.
-    //
-    // Canon's order, and it is not the intuitive one (GECMDS.C:2598-2634):
-    //   mines '.'  ->  ships (letter)  ->  self '*'  ->  map_planets()
-    // `map_planets()` is called LAST, four lines before printmap(), so a
-    // planet overwrites a ship and even your own '*'. That reads wrong until
-    // you notice that a planet sharing your cell means you are on top of it,
-    // which `rep` and `orb` already tell you. Wormholes are ours and sit at
-    // the bottom. @see docs/DECISIONS.md
-    const cellMap = new Map<string, ScanCell>();
-
-    const put = (cell: ScanCell) => {
-      cellMap.set(`${cell.x},${cell.y}`, cell);
-    };
-
     // The galaxy now covers the whole universe — sectors -UNIVMAX..+UNIVMAX on
     // both axes, matching where Cybertrons spawn (GECYBS.C:158
     // `rndm(univmax*2.0) - univmax`). It used to be generated only for
@@ -727,65 +374,10 @@ export class ScanHandlerService implements OnModuleInit {
     const inGalaxy =
       xsect >= -UNIVMAX && xsect <= UNIVMAX && ysect >= -UNIVMAX && ysect <= UNIVMAX;
 
-    // 0. Live mines in THIS sector — canon draws them before anything else,
-    // so a ship or the '*' standing on the same cell covers them.
-    //   if (mptr->channel != 255 && (x==xsect && y==ysect)) map[y][x] = '.';
-    // There is no ownership or detection gate: a live mine is drawn for
-    // everyone, the ship that laid it included. @see GECMDS.C:2598-2609
-    for (const mine of this.mineRegistry.getAll()) {
-      if (mine.channel === MINE_SLOT_FREE) continue;
-      if (Math.floor(mine.xcoord) !== xsect || Math.floor(mine.ycoord) !== ysect) continue;
-      const { x, y } = project(mine.xcoord, mine.ycoord);
-      put({ x, y, type: 'mine', char: '.' });
-    }
+    const wormholes = inGalaxy ? this.galaxyService.getSectorWormholes(xsect, ysect) : [];
+    const planets = inGalaxy ? this.galaxyService.getSectorPlanets(xsect, ysect) : [];
 
-    // 1. Visible wormholes in this sector
-    if (inGalaxy) {
-      const wormholes = this.galaxyService.getSectorWormholes(xsect, ysect);
-      for (const wh of wormholes) {
-        if (!wh.visible) continue;
-        const { x, y } = project(wh.xcoord, wh.ycoord);
-        put({ x, y, type: 'wormhole', char: 'W' });
-      }
-    }
-
-    // 3. Other ships in this sector (from scantab for letter assignment)
-    for (const entry of newScantab) {
-      const other = allShips.find(s => `${s.userid}#${s.shipno}` === entry.shipKey);
-      if (!other) continue;
-      // Sector filter — only include ships in the same sector
-      if (Math.floor(other.xcoord) !== xsect || Math.floor(other.ycoord) !== ysect) continue;
-
-      const { x, y } = project(other.xcoord, other.ycoord);
-      const colour: ScanCell['colour'] = scanShipColour(other.status);
-      put({ x, y, type: 'ship', char: entry.letter, colour });
-    }
-
-    // 4. Self — GECMDS.C:2629-2632
-    const selfPos = project(ship.xcoord, ship.ycoord);
-    put({ x: selfPos.x, y: selfPos.y, type: 'self', char: '*', colour: 'self' });
-
-    // 5. Planets LAST — `map_planets()` at GECMDS.C:2634, after the self-cell.
-    // The glyph is the planet's index WITHIN THE SECTOR: `'1' + i`, so the
-    // first planet here is '1' whatever its id. MAXPLANETS is 9 (GEMAIN.H:119),
-    // so it never runs past '9'.
-    if (inGalaxy) {
-      const planets = this.galaxyService.getSectorPlanets(xsect, ysect);
-      for (const planet of planets) {
-        const { x, y } = project(planet.xcoord, planet.ycoord);
-        put({ x, y, type: 'planet', char: String(planet.plnum), colour: 'planet' });
-      }
-    }
-
-    const cells: ScanCell[] = Array.from(cellMap.values());
-
-    const mode: ScanRenderEvent['mode'] = ship.scanHome ? 'overwrite' : 'append';
-    const header = formatMessage(MessageId.SCAN25, xsect, ysect);
-
-    return {
-      lines: [{ text: header, category: 'info' }],
-      scanRender: { kind: 'se', mode, cells, header },
-    };
+    return renderSectorScan(ship, allShips, newScantab, this.mineRegistry.getAll(), wormholes, planets);
   }
 
   /**
@@ -944,272 +536,6 @@ export class ScanHandlerService implements OnModuleInit {
     }
 
     return { lines, broadcasts: announcement };
-  }
-
-  /**
-   * Text-only planet lookup by name — galaxy-wide named-planet resolution.
-   * Deviation from original: original used numeric plnum in current sector.
-   * @see GECMDS.C:2295 scan_pl (deviation documented in research.md Decision 8)
-   * @see contracts/scan-projection.md §"scan pl"
-   */
-  private async scanPl(ship: ShipState, args: string[]): Promise<CommandResult> {
-    const xsect = Math.floor(ship.xcoord);
-    const ysect = Math.floor(ship.ycoord);
-
-    // No arg → list planets in current sector (@see GECMDS.C:2295 plnum loop)
-    //
-    // Read the LIVE planet state, not GalaxyService's read-model: that one
-    // hydrates once at boot and is never updated, so a planet claimed since
-    // startup still listed as "(unnamed)" with no owner. Players scanned a
-    // sector, picked what looked like a free planet, flew to it and only found
-    // out it was taken when the landing was refused.
-    if (args.length === 0) {
-      const sectorPlanets = this.planetService.bySector(xsect, ysect);
-      if (sectorPlanets.length === 0) {
-        return { lines: [{ text: 'No planets in this sector.', category: 'system' }] };
-      }
-      const lines: CommandResult['lines'] = [
-        { text: `Planets in sector (${xsect}, ${ysect}):`, category: 'system' },
-      ];
-      for (const p of sectorPlanets) {
-        const label = p.name ? `${p.plnum}. ${p.name}` : `${p.plnum}. (unnamed)`;
-        const owner = planetOwnerLabel(p.userid);
-        lines.push({ text: `  ${label}${owner}`, category: 'info' });
-      }
-      // Wormholes share the planet slot space, so their numbers belong in the
-      // same list -- otherwise `sca pl 3` on a wormhole slot looks like a bug.
-      // Only VISIBLE ones: the listing is our addition (C's `sca pl` demands an
-      // argument, GECMDS.C:2303-2309), and a hidden wormhole is hidden.
-      const worms = await this.prisma.wormhole.findMany({
-        where: { xsect, ysect, visible: 1 },
-        select: { plnum: true, name: true },
-      });
-      for (const w of worms) {
-        lines.push({
-          text: `  ${w.plnum}. ${w.name || '(unnamed)'} — wormhole`,
-          category: 'info',
-        });
-      }
-      lines.push({ text: 'Use "sca pl <number>" to scan a planet.', category: 'system' });
-      return { lines };
-    }
-
-    // Numeric arg → plnum lookup in current sector (original GECMDS.C:2295)
-    const num = parseInt(args[0], 10);
-    let planet = !isNaN(num) && String(num) === args[0]
-      ? this.planetService.bySector(xsect, ysect).find((p) => p.plnum === num) ?? null
-      : null;
-
-    // Name arg → cross-sector lookup (deviation D8)
-    if (!planet) {
-      planet = this.planetService.byName(args.join(' ')) ?? null;
-    }
-
-    // A wormhole occupies a planet slot in the sector, so `sca pl <n>` can name
-    // one. C falls through to `plptr->type == PLTYPE_WORM` after the planet
-    // branch and prints class, name, bearing and distance.
-    // @see GECMDS.C:2455-2468
-    if (!planet && !isNaN(num) && String(num) === args[0]) {
-      const worm = await this.findSectorWormhole(xsect, ysect, num);
-      if (worm) return this.scanWormhole(ship, worm);
-    }
-
-    if (!planet) {
-      return {
-        lines: [{ text: formatMessage(MessageId.NO_SUCH_PLANET), category: 'system' }],
-      };
-    }
-
-    const lines: CommandResult['lines'] = [];
-
-    // GECMDS.C:2326 — Planet #<plnum>: <name>
-    lines.push({
-      text: formatMessage(MessageId.SCAN08, planet.plnum, planet.name),
-      category: 'info',
-    });
-
-    // GECMDS.C:2327 — dashes
-    lines.push({ text: formatMessage(MessageId.SCAN_DASHES), category: 'info' });
-
-    // GECMDS.C:2330 — ownership (optional)
-    if (planet.userid) {
-      // The neutral sentinel has no User row; resolving it through Prisma is
-      // both a wasted query and how `**neutral**` reached the player's screen.
-      const ownerRow = isNeutralZoneOwner(planet.userid)
-        ? null
-        : await this.prisma.user.findUnique({
-            where: { userid: planet.userid },
-            select: { username: true },
-          });
-      const ownerName = isNeutralZoneOwner(planet.userid)
-        ? NEUTRAL_ZONE_OWNER_DISPLAY
-        : ownerRow?.username ?? planet.userid;
-      lines.push({
-        text: formatMessage(MessageId.SCAN09, ownerName),
-        category: 'info',
-      });
-    }
-
-    // GECMDS.C:2332 — bearing/distance only when planet is in player's sector
-    // Omitted for cross-sector lookups (research.md Decision 8)
-    if (planet.xsect === xsect && planet.ysect === ysect) {
-      const dist = Math.sqrt(
-        Math.pow(planet.xcoord - ship.xcoord, 2) +
-        Math.pow(planet.ycoord - ship.ycoord, 2),
-      );
-      // C uses the same cbearing(from, to, heading) call here as for ships
-      // (GECMDS.C:2324 vs :2222). This was a literal 0 behind a TODO, so every
-      // planet in a sector reported bearing 0 and there was no way to steer to
-      // the one worth claiming.
-      lines.push({
-        text: formatMessage(MessageId.SCAN10, relativeBearing(ship, planet), scanDistanceUnits(dist)),
-        category: 'info',
-      });
-    }
-
-    // GECMDS.C:2337-2349 — environment
-    const envIdx = Math.max(0, Math.min(3, planet.enviorn));
-    const envStr = formatMessage(QUALITY[envIdx]);
-    lines.push({
-      text: formatMessage(MessageId.SCAN11) + envStr,
-      category: 'info',
-    });
-
-    // GECMDS.C:2350-2356 — resources (table-driven like env)
-    const resIdx = Math.max(0, Math.min(3, planet.resource));
-    const resStr = formatMessage(QUALITY[resIdx]);
-    lines.push({
-      text: formatMessage(MessageId.SCAN16) + resStr,
-      category: 'info',
-    });
-
-    // Cross-sector location line
-    if (planet.xsect !== xsect || planet.ysect !== ysect) {
-      lines.push({
-        text: formatMessage(MessageId.SCAN_LOCATED_IN, planet.xsect, planet.ysect),
-        category: 'info',
-      });
-    }
-
-    // Beacon visibility — research Decision 10
-    const planetState = this.planetService.get(planet.xsect, planet.ysect, planet.plnum);
-    if (planetState?.beacon) {
-      lines.push({
-        text: formatMessage(MessageId.SCAN_BEACON, planet.name || `planet ${planet.plnum}`, planetState.beacon),
-        category: 'info',
-      });
-    }
-
-    // Owner vs. everyone else. C branches on `sameas(plptr->userid,
-    // warsptr->userid)`: the owner gets the exact per-item inventory, and a
-    // stranger gets the reconnaissance summary — bands, not numbers. The port
-    // implemented neither half for the owner and none at all for the stranger,
-    // which is what made scouting pointless: nothing in `sca pl` told you
-    // whether a colony was defended.
-    // @see GECMDS.C:2365-2448
-    //
-    // The spy-owner reveal is our documented deviation (D3): a planted spy buys
-    // the owner's view.
-    const viewer = ship.userid.toLowerCase();
-    const isOwner = !!planetState?.userid && planetState.userid.toLowerCase() === viewer;
-    const isSpy = !!planetState?.spyowner && planetState.spyowner.toLowerCase() === viewer;
-
-    if (planetState && (isOwner || isSpy)) {
-      if (!isOwner) lines.push({ text: 'Spy intel — Planet Inventory:', category: 'info' });
-      for (let i = 0; i < planetState.items.length; i++) {
-        const it = planetState.items[i];
-        if (it && it.qty > 0n) {
-          const selling = it.sell ? ' (selling)' : '';
-          lines.push({
-            // `gechrbuf[0] = toupper(gechrbuf[0])` on the owner's item list.
-            // @see GECMDS.C:2371-2372
-            text: `  ${capitaliseItem(ITEM_NAMES[i])}:  ${it.qty}${selling}`,
-            category: 'info',
-          });
-        }
-      }
-    } else if (planetState) {
-      const qty = (i: number): bigint => planetState.items[i]?.qty ?? 0n;
-
-      lines.push({
-        text: fmt(SCAN28_POPULATED, populationBand(qty(I_MEN) + qty(I_TROOPS))),
-        category: 'info',
-      });
-      lines.push({ text: fmt(SCAN29_MISSILES, stockpileBand(qty(I_MISSL))), category: 'info' });
-      lines.push({ text: fmt(SCAN30_TORPEDOES, stockpileBand(qty(I_TORP))), category: 'info' });
-      lines.push({ text: fmt(SCAN33_FLUXPODS, stockpileBand(qty(I_FLUX))), category: 'info' });
-      lines.push({ text: fmt(SCAN34_FOOD, stockpileBand(qty(I_FOOD))), category: 'info' });
-      lines.push({
-        text: qty(I_FIGHTER) === 0n ? SCAN31_NO_FIGHTERS : SCAN32_FIGHTERS,
-        category: 'info',
-      });
-    } else {
-      // Neither branch is reachable without live planet state — ownership
-      // itself is read from it — so say so rather than returning a header with
-      // nothing under it. In practice both lookup paths now come from
-      // PlanetStateService, so this is a "should not happen" that reports
-      // itself instead of looking like an undefended colony.
-      lines.push({
-        text: 'Sensors cannot resolve that planet right now, Sir!',
-        category: 'system',
-      });
-    }
-
-    return { lines };
-  }
-  /**
-   * The wormhole occupying slot `plnum` in this sector, if any.
-   *
-   * Wormholes share the planet slot space in C (`sector.planets[]` holds both,
-   * discriminated by `type`), but our read models split them: GalaxyService's
-   * wormhole view carries no slot number and no name, so the row itself is the
-   * only place both live. Positions and names are fixed at generation, so a
-   * point read on a rare command is cheap.
-   *
-   * @see GEMAIN.H:467 GALWORM  @see GECMDS.C:2455
-   */
-  private async findSectorWormhole(
-    xsect: number,
-    ysect: number,
-    plnum: number,
-  ): Promise<{ xcoord: number; ycoord: number; name: string } | null> {
-    const row = await this.prisma.wormhole.findFirst({
-      where: { xsect, ysect, plnum },
-      select: { xcoord: true, ycoord: true, name: true },
-    });
-    return row ?? null;
-  }
-
-  /**
-   * The wormhole readout: class, optional name, bearing and distance — no
-   * environment, no resources, no inventory. C prints exactly these four
-   * messages between two rules.
-   *
-   * No `visible` gate: C's scan_pl tests only `plptr->type`, so a slot number
-   * that names a wormhole reports one whether or not the map is drawing it.
-   *
-   * @see GECMDS.C:2455-2468, MBMGEMSG.MSG:3673-3676
-   */
-  private scanWormhole(
-    ship: ShipState,
-    worm: { xcoord: number; ycoord: number; name: string },
-  ): CommandResult {
-    const lines: CommandResult['lines'] = [
-      { text: SCANWRM, category: 'info' },
-    ];
-    if (worm.name) {
-      lines.push({ text: fmt(SCANWRM1, worm.name), category: 'info' });
-    }
-    lines.push({ text: formatMessage(MessageId.SCAN_DASHES), category: 'info' });
-    const dist = Math.sqrt(
-      Math.pow(worm.xcoord - ship.xcoord, 2) + Math.pow(worm.ycoord - ship.ycoord, 2),
-    );
-    lines.push({
-      text: formatMessage(MessageId.SCAN10, relativeBearing(ship, worm), scanDistanceUnits(dist)),
-      category: 'info',
-    });
-    lines.push({ text: formatMessage(MessageId.SCAN_DASHES), category: 'info' });
-    return { lines };
   }
 
   /**
