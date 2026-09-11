@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
 import { ShipDestroyedService, DestroyedEmitter } from '../../src/gateway/ship-destroyed.service';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
@@ -47,8 +48,6 @@ function emitterSpy(ionHit: { name: string; at: number } | null = null): Emitter
     announceDestroyed: (payload) => { spy.order.push('announce'); spy.announced.push(payload); },
     takeIonAttacker: () => ionHit,
     recoverVictim: (userid) => { spy.order.push('recoverVictim'); spy.recovered.push(userid); return Promise.resolve(); },
-    warn: (message) => { spy.order.push('warn'); spy.warnings.push(message); },
-    error: (message, err) => { spy.order.push('error'); spy.errors.push({ message, err }); },
   };
   return spy;
 }
@@ -85,7 +84,12 @@ interface Doubles {
   roll?: number;
 }
 
-function build(over: Doubles = {}) {
+/**
+ * The manifest line and the two error lines go to the SERVICE's own `Logger`,
+ * not through the emitter — so `build` routes that logger into the same spy
+ * the emitter writes to, keeping `warnings`, `errors` and `order` intact.
+ */
+function build(over: Doubles = {}, spy?: EmitterSpy) {
   const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
   const userFindUnique = jest.fn().mockResolvedValue({ noships: 2 });
   const userUpdate = jest.fn().mockResolvedValue(undefined);
@@ -124,6 +128,16 @@ function build(over: Doubles = {}) {
     { next: () => over.roll ?? 0 } as unknown as Random,
   );
 
+  const logger = (service as unknown as { logger: Logger }).logger;
+  jest.spyOn(logger, 'warn').mockImplementation((message: unknown) => {
+    spy?.order.push('warn');
+    spy?.warnings.push(String(message));
+  });
+  jest.spyOn(logger, 'error').mockImplementation((message: unknown, err?: unknown) => {
+    spy?.order.push('error');
+    spy?.errors.push({ message: String(message), err: err as Error });
+  });
+
   return { service, $transaction, deleteMany, userUpdate, userFindUnique, shipFindFirst, planetFindMany, removeFromGame, clearScantab };
 }
 
@@ -137,8 +151,8 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
 
   // 2. forensics manifest
   it('warns the loss manifest, with the hull, its fittings and its cargo', async () => {
-    const h = build();
     const emit = emitterSpy();
+    const h = build({}, emit);
     await h.service.handle(destroyedEvent({ victimDisconnectReason: 'ping timeout' }), emit);
     const line = emit.warnings.join('\n');
     expect(line).toContain('ship destroyed:');
@@ -171,8 +185,8 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
 
   // 3c. a failed write is logged, never thrown
   it('logs a failed hull write instead of taking the kill down with it', async () => {
-    const h = build({ prisma: { $transaction: jest.fn().mockRejectedValue(new Error('deadlock')) } });
     const emit = emitterSpy();
+    const h = build({ prisma: { $transaction: jest.fn().mockRejectedValue(new Error('deadlock')) } }, emit);
     await h.service.handle(destroyedEvent(), emit);
     expect(emit.errors.map((e) => e.message).join('\n')).toContain('death delete/decrement failed');
   });
@@ -275,7 +289,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     // The expected array is the sequence OBSERVED before the move, not a
     // sequence anyone thinks is nicer.
     const emit = emitterSpy();
-    const h = build({ prisma: { $transaction: jest.fn(async () => { emit.order.push('transaction'); }) } });
+    const h = build({ prisma: { $transaction: jest.fn(async () => { emit.order.push('transaction'); }) } }, emit);
 
     await h.service.handle(destroyedEvent(), emit);
 
