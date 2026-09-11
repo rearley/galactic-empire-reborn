@@ -22,10 +22,10 @@
  * reason attached, rather than a number nobody looked at.
  *
  * GAP — a bare field name is not a domain. `percent` is `ShipState.percent`
- * (the `imp` throttle, `valpcnt(...,0,99)`, GECMDS.C:509) in most fixtures, but
- * the SAME name is also `ShipShieldChargeEvent.percent` and
+ * (the `imp` throttle, GECMDS.C:509 `valpcnt(margv[1],0,99)`) in most
+ * fixtures, but the SAME name is also `ShipShieldChargeEvent.percent` and
  * `CombatPhaserFiredEvent.percent` — a shield/phaser charge level, 0-100
- * (GEFUNCS.C:2510-2523). Keying on the name alone made a canon-correct
+ * (GEFUNCS.C:2513 `wptr->shield += (type*3);`). Keying on the name alone made a canon-correct
  * `percent: 100` shield fixture fail, and it would have let a canon-incorrect
  * `percent: 150` shield fixture pass had nobody happened to name a field
  * `percent` for it. Both are wrong for the same reason: the rule was checking
@@ -99,19 +99,19 @@ const CHARGE_EVENT_SCOPE = /\b(shipId|bearing|hyper)\s*:|kind:\s*'(?:charging|fu
 const SCOPED_DOMAINS: Record<string, ScopedCandidate[]> = {
   percent: [
     {
-      // `imp <0-99>`. @see GECMDS.C:509 valpcnt(margv[1],0,99)
+      // `imp <0-99>`. @see GECMDS.C:509 `valpcnt(margv[1],0,99)`
       label: 'percent — ShipState.percent (imp)',
       min: 0,
       max: 99,
-      why: 'GECMDS.C:509 valpcnt(...,0,99)',
+      why: 'GECMDS.C:509 `valpcnt(margv[1],0,99)`',
       scope: SHIP_STATE_SCOPE,
     },
     {
-      // @see GEFUNCS.C:2510-2523 shieldchg — shield charge ramps 0..100
+      // @see GEFUNCS.C:2513 `wptr->shield += (type*3);` — the shield charge ramp
       label: 'percent — shield/phaser charge event (ShipShieldChargeEvent / CombatPhaserFiredEvent)',
       min: 0,
       max: 100,
-      why: 'GEFUNCS.C:2510-2523 shield charge is 0-100, not the imp 0-99',
+      why: 'GEFUNCS.C:2513 `wptr->shield += (type*3);` — shield charge is 0-100, not the imp 0-99',
       scope: CHARGE_EVENT_SCOPE,
     },
   ],
