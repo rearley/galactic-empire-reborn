@@ -1,24 +1,17 @@
 import { findShip, NOLOCK_SENTINEL } from '../../../../src/game/commands/helpers/find-ship';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'me', shipno: 1, shipname: 'Self', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 0,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: NOLOCK_SENTINEL, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  };
+  return baseMakeShip({
+    userid: 'me',
+    shipname: 'Self',
+    energy: 0,
+    freq: [],
+    lock: NOLOCK_SENTINEL,
+    topspeed: 10,
+    ...over,
+  });
 }
 
 const SCAN_RANGE = 100_000; // distance × 10000 ≤ this → in range; ie distance ≤ 10
