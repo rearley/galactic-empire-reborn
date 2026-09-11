@@ -22,7 +22,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@ge/wire';
-import { UNIVMAX, GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
+import { GESTAT_AUTO, GESTAT_USER, MAXPLRS } from '../game/constants';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
@@ -76,11 +76,11 @@ import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constan
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
 import { scopePlayers } from './player-visibility';
-import { planTransition } from './sector-transition';
+import { planTransition, RoomEmit } from './sector-transition';
 import { capSocketsForUser, MAX_SOCKETS_PER_USER } from './socket-cap';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
-import { BEACON_EVENT, BeaconEvent } from './events/beacon.event';
+import { BEACON_EVENT } from './events/beacon.event';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
@@ -1857,9 +1857,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Plans the transition with `planTransition` (sector-transition.ts, which
    * carries the full derivation and every `GEFUNCS.C` citation) and executes
-   * the plan: move the mover's socket between rooms, emit to it directly, and
-   * emit to the two sector rooms. The beacon re-broadcast below is the one
-   * piece kept out of that plan — see the comment at its call site for why.
+   * the plan: emit the pre-move room broadcasts (relying on the mover's
+   * current room membership — see `TransitionPlan`), move the mover's socket
+   * between rooms, emit to it directly, then emit the post-move room
+   * broadcasts.
+   *
+   * `hasObserver`/`gernd()` for the beacon are computed here, guarded by the
+   * same three conditions `planTransition` itself gates on, so a transition
+   * that would never reach the beacon decision does not consume a random
+   * draw it did not consume before this was split out — a pure planner must
+   * not call `gernd()` itself, but the caller calling it more often than the
+   * original code did would be its own small behaviour change.
    */
   @OnEvent(PHYSICS_SECTOR_TRANSITION)
   handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
@@ -1868,10 +1876,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
     const moverSocketId = this.registry.getSocketId(shipId);
 
-    const plan = planTransition(event, this.registry.list(), (id) =>
-      id === shipId && movingShip
-        ? { status: movingShip.status, speed: movingShip.speed, shipname: movingShip.shipname }
-        : undefined,
+    let beacon: { hasObserver: boolean; roll: number } | undefined;
+    const crossedSector = fromSector.x !== toSector.x || fromSector.y !== toSector.y;
+    if (crossedSector && movingShip && movingShip.speed < 21000) {
+      const allShips = this.shipStateService.findAllShips();
+      const hasObserver = allShips.some(
+        (s) =>
+          shipKey(s.userid, s.shipno) !== shipId &&
+          Math.floor(s.xcoord) === toSector.x &&
+          Math.floor(s.ycoord) === toSector.y &&
+          (s.status === 1 || s.status === 2),
+      );
+      beacon = { hasObserver, roll: gernd(this.random) };
+    }
+
+    const plan = planTransition(
+      event,
+      this.registry.list(),
+      (id) =>
+        id === shipId && movingShip
+          ? { status: movingShip.status, speed: movingShip.speed, shipname: movingShip.shipname }
+          : undefined,
+      beacon,
     );
 
     const moverSocket = moverSocketId ? this.server.sockets.sockets.get(moverSocketId) : undefined;
@@ -1890,58 +1916,36 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
+    // A local closure, not a class method: some older tests bind a bare
+    // `GameGateway.prototype.handleSectorTransition` reference onto a
+    // partial mock object via `.call()`, which would not have a new
+    // prototype method available on it (test/integration/beacon.spec.ts).
+    const emitRoomBatch = (emits: RoomEmit[]): void => {
+      for (const emit of emits) {
+        const target = 'exceptSelf' in emit ? this.server.to(emit.room).except(moverSocketId ?? '') : this.server.to(emit.room);
+        switch (emit.event) {
+          case 'player.sector':
+            target.emit('player.sector', emit.payload);
+            break;
+          case 'sector:ship-left':
+            target.emit('sector:ship-left', emit.payload);
+            break;
+          case 'sector:ship-entered':
+            target.emit('sector:ship-entered', emit.payload);
+            break;
+          case BEACON_EVENT:
+            target.emit(BEACON_EVENT, emit.payload);
+            break;
+        }
+      }
+    };
+
+    emitRoomBatch(plan.roomEmitsBeforeMove);
+
     for (const room of plan.leave) void moverSocket?.leave(room);
     for (const room of plan.join) void moverSocket?.join(room);
 
-    for (const emit of plan.roomEmits) {
-      const target = 'exceptSelf' in emit ? this.server.to(emit.room).except(moverSocketId ?? '') : this.server.to(emit.room);
-      switch (emit.event) {
-        case 'player.sector':
-          target.emit('player.sector', emit.payload);
-          break;
-        case 'sector:ship-left':
-          target.emit('sector:ship-left', emit.payload);
-          break;
-        case 'sector:ship-entered':
-          target.emit('sector:ship-entered', emit.payload);
-          break;
-      }
-    }
-
-    // S-005: beacon-on-move (GEFUNCS.C:808-816). Re-emit BEACON_EVENT when:
-    //   (a) at least one OBSERVER ship is in the destination sector
-    //       (status === GESTAT_USER (1) or GESTAT_AUTO (2), excluding mover)
-    //   (b) gernd()%10 === 0 (1-in-10 probability gate from C source)
-    // Restores audit 020 F-005 which regressed in commit d75d337.
-    //
-    // Kept out of `planTransition`: it needs the full ship roster including
-    // AI hulls (the connected-player roster the planner takes does not carry
-    // those), and a random draw, which a pure planner must not perform. Its
-    // own guards mirror the planner's early returns exactly.
-    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
-    if (!movingShip) return;
-    if (movingShip.speed >= 21000) return;
-
-    const name = movingShip.shipname;
-    const allShips = this.shipStateService.findAllShips();
-    const hasObserver = allShips.some(
-      (s) =>
-        shipKey(s.userid, s.shipno) !== shipId &&
-        Math.floor(s.xcoord) === toSector.x &&
-        Math.floor(s.ycoord) === toSector.y &&
-        (s.status === 1 || s.status === 2),
-    );
-    if (!hasObserver) return;
-    if (gernd(this.random) % 10 !== 0) return;
-
-    const beaconPayload: BeaconEvent = {
-      shipId,
-      shipName: name,
-      // Flat sector id, offset so the -UNIVMAX..+UNIVMAX square maps to 0..n.
-      fromSector: (fromSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (fromSector.x + UNIVMAX),
-      toSector: (toSector.y + UNIVMAX) * (UNIVMAX * 2 + 1) + (toSector.x + UNIVMAX),
-    };
-    this.server.to(`sector:${toSector.x}:${toSector.y}`).emit(BEACON_EVENT, beaconPayload);
+    emitRoomBatch(plan.roomEmitsAfterMove);
   }
 
   /**
