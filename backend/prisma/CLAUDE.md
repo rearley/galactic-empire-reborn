@@ -48,3 +48,24 @@ adds them back:
 
 `docs/DATA_MODEL.md` is the plain-English description of this schema and must be
 updated in the same commit as any schema change.
+
+## The test database resets itself, but only when it has to
+
+Every backend suite shares one `ge_test` database, and Jest's global setup
+starts a run with `prisma db push --force-reset`. Two consequences worth
+knowing before you run anything:
+
+- **One Jest process at a time.** Two concurrent runs race the reset and
+  interleave their output. That has happened here once, and the two disagreeing
+  summaries in a single file were initially misread as a flaky suite.
+- **A run that reaches no database does not reset it.** Global setup classifies
+  the selected specs by walking their imports
+  (`test/prisma-schema/helpers/needs-database.ts`) and skips the reset when
+  none of them reach Prisma, saying so on stdout. That is what makes
+  `npx jest canon-citations.balance.spec.ts` safe to run beside other work; it
+  used to wipe the database to count strings in files.
+
+The classifier fails CLOSED. Anything it cannot work out — an unresolvable
+import, a pattern that is not a valid regex, an empty selection — means reset.
+A needless reset is slow; a wrongly skipped one runs a suite against stale
+state and reports failures that have nothing to do with the code.

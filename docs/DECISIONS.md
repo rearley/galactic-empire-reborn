@@ -5685,3 +5685,99 @@ already happened to move citations correctly — rejected because the note's
 job is to warn the *next* phase, and Phase 5 (backend-only) will not
 re-encounter this, but any future frontend work would repeat the same false
 assumption without the correction on record.
+
+---
+
+## 2026-09-11 — Three test guards were weaker than they looked, and two baselines moved
+
+**Context:** the agreed order put the outstanding test-guard issues (#11, #13)
+before Phase 5, on the grounds that Phase 5's own justification in the
+restructure spec is that it "needs the test suite as an unambiguous oracle",
+and all three findings say a guard does less than its name claims. #23 was
+added to the set because Phase 5 runs the backend suite on every change and
+the hazard it describes fires on every filtered run.
+
+**Decision 1 — the citation scanner.** `canon-citations.balance.spec.ts` and
+`docs-truth.balance.spec.ts` both found citations with a regex requiring the
+filename on every line number. The codebase does not write them that way; it
+names the file once and continues bare (`GECMDS.C:1198, :1313`), in at least
+five different separators. 201 citations across `backend/src` and
+`backend/test` were written that way and were invisible to every assertion
+both files make — including the bounds check, so one could have pointed past
+the end of a file and nothing would have said so. The rule now lives in
+`backend/test/balance/citation-scan.ts` and is positional rather than
+syntactic: **a bare `:NNN` belongs to the most recent GE file named on the
+same line**. Line-scoped deliberately — carrying the file across lines would
+let an unrelated number two paragraphs down inherit a file no reader would
+connect to it.
+
+**Reason:** the alternative considered in issue #11 was to discourage the
+shorthand and keep the regex simple. Rejected: 201 existing citations would
+have needed rewriting by hand, which is exactly the kind of mechanical edit
+that drops a digit, and the shorthand is genuinely more readable in prose.
+
+**The baselines moved, and this is the one kind of move the guards allow.**
+`unquoted` 3268 → 3469, `TOTAL_FLOOR` 3355 → 3561, quoted-pair floor 78 → 86.
+Both files carry a rule against raising a number to clear a failure. This is
+not that: the corpus did not change, the measurement did. The distinction is
+written into the comment beside each number so a later reader can check the
+claim rather than trust it. Five of the newly visible citations already
+carried a quote and now verify against the original; all 201 pass the bounds
+check.
+
+**Decision 2 — comments are masked before the fixture scan.**
+`fixture-domains.spec.ts` had no notion of comments, so prose describing a
+banned value was indistinguishable from a fixture holding one. It exempted
+one file — itself — because its own header has to name the value it exists to
+ban. `backend/test/invariants/mask-comments.ts` blanks comments before the
+scan and the exemption is gone, so the guard now scans itself.
+
+**Reason:** the guard exists because a wrong fixture value hid the Cybertron
+movement bug for 339 commits, and the defence against a repeat is writing
+down why a value matters next to the value — which requires naming the bad
+one. A guard that punishes the explanation discourages the documentation that
+prevents the recurrence. It had already happened once: a comment in
+`make-ship.spec.ts` was reworded to get past the guard.
+
+**The masker is length-preserving, and that is load-bearing, not tidiness.**
+The guard reports line numbers and resolves a value's type by walking outward
+through enclosing object literals *by character offset*. Deleting text would
+move every report it makes. Comment characters become spaces; newlines
+survive. Masking the braces inside comments is a second, quieter fix — a `{`
+in prose used to be counted by that walk as if it opened a literal.
+
+**Strings are deliberately NOT masked.** A string is code, and a fixture value
+written inside one is still a fixture value. The cost is that a spec quoting a
+banned value in a string literal still declares itself with `domain-ok:`,
+which is what the masker's own spec does four times.
+
+**Decision 3 — a run that reaches no database does not reset one.** Jest's
+global setup ran `prisma db push --force-reset` against the shared `ge_test`
+database for every invocation, including a single read-only spec. Global setup
+now classifies the selected specs by walking their imports
+(`backend/test/prisma-schema/helpers/needs-database.ts`) and skips the reset
+when none of them reach Prisma.
+
+**Reason:** the three options in issue #23 were (1) make the reset
+conditional, (2) split database specs into a separate Jest project, (3)
+document it. (2) was rejected as a larger change landing immediately before
+Phase 5 moves the whole runner to Vitest — the split would be rebuilt within
+the phase. (3) alone was rejected as the cheap floor; it is done as well, in
+`backend/prisma/CLAUDE.md`.
+
+**It is an import walk, not a directory list, because the signal is not
+local.** `test/integration/scan-ra-gateway.spec.ts` never writes the word
+Prisma and needs the database anyway, through the service graph it imports.
+Both the classifier and the pattern matcher **fail closed**: an unresolvable
+import, an uncompilable pattern, or an empty selection all mean reset. A
+needless reset is only slow; a wrongly skipped one runs a suite against stale
+state and reports failures that have nothing to do with the code. A test
+asserts the resolver has no unresolved import anywhere in the current tree,
+so the walk cannot quietly be answering "needs the database" for files it
+merely failed to read.
+
+**Verification note:** the fixture guard was checked by mutation rather than
+by the suite going green. A temporary spec holding a real `topspeed: 8000`
+fixture alongside the same value in a line comment and in a docblock was
+reported for the fixture and for neither comment. A masker that blanked
+everything would also have made the suite pass.

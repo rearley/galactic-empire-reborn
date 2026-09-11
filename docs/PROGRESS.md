@@ -5929,3 +5929,67 @@ review of this fix, not by any guard — the same defect class as issue #22
 (citations nothing verifies) and #24 (a citation to something that never
 existed), this time self-inflicted inside a correction commit. No new issue
 filed: the fix is in this same amendment, not deferred.
+
+---
+
+## 2026-09-11 — Test-guard issues #11, #13 and #23 closed, ahead of Phase 5
+
+The agreed order put the outstanding test-guard findings before Phase 5,
+because Phase 5's own justification in the restructure spec is that it needs
+the test suite as an unambiguous oracle, and all three findings say a guard
+does less than its name claims. #23 was added to the set because Phase 5 runs
+the backend suite on every change.
+
+**#11 — the citation guards could not see the shorthand.** Both
+`canon-citations.balance.spec.ts` and `docs-truth.balance.spec.ts` required the
+filename on every line number. This codebase names the file once and continues
+bare, in at least five separators (`, :NNN`, `and :NNN`, `then :NNN`, `/ :NNN`,
+and after a parenthesised symbol). **201 citations** across `backend/src` and
+`backend/test` were written that way. None was counted, none was bounds-checked,
+none could ever be quote-verified. `backend/test/balance/citation-scan.ts` now
+owns one rule covering every form. All 201 pass the bounds check on first run;
+five already carried a quote and verify against the vendored original.
+
+Baselines re-measured in the same commit, with the reason written beside each:
+
+| baseline | was | now |
+|---|---|---|
+| `unquoted` ceiling | 3268 | 3469 |
+| `TOTAL_FLOOR` | 3355 | 3561 |
+| quoted-pair floor | 78 | 86 |
+
+The scanner rule was validated against the whole corpus before it shipped:
+197 hits under the pre-existing file set, hand-checked, zero false positives,
+14 of them in `describe` titles rather than comments.
+
+**#13 — the fixture guard read prose as a fixture.**
+`backend/test/invariants/mask-comments.ts` blanks comments before the scan,
+length-preservingly, because the guard resolves a value's type by walking
+outward through enclosing object literals by character offset. The
+self-exemption is gone and the guard now scans itself. Verified by mutation,
+not by the suite going green: a temporary spec holding a real `topspeed: 8000`
+fixture alongside the same value in a line comment and a docblock was reported
+for the fixture and for neither comment.
+
+**#23 — a single read-only spec no longer resets the shared database.** Jest
+global setup classifies the selected specs with a transitive import walk
+(`backend/test/prisma-schema/helpers/needs-database.ts`) and skips
+`prisma db push --force-reset` when none of them reach Prisma. It is a walk
+rather than a directory list because the signal is not local — an integration
+spec that never writes the word Prisma still reaches the database through the
+service graph it imports. Both directions were verified by running one spec of
+each kind and reading global setup's output.
+
+**Suite:** 626 suites / 6385 tests green, up from 623 / 6356. `tsc --noEmit`
+clean. No production code was touched; every change is in `backend/test`,
+Jest's global setup, and `backend/prisma/CLAUDE.md`.
+
+**Known issues:** none new. Open backlog is unchanged apart from these three
+closing. The `ge_test` "one Jest process at a time" rule still stands — this
+fix removes one hazard (a narrow run with a wide side effect) and not the
+other (two runs racing).
+
+**Not done, deliberately:** the 45 canon citations in `frontend/` remain
+unguarded. That is issue #22, and it is a scope question — the citation guards
+are backend Jest specs and the frontend runs Vitest — which Phase 5 will be in
+a position to answer once the runners converge.
