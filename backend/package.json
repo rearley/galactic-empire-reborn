@@ -8,7 +8,7 @@
   "scripts": {
     "db:reset": "PGPASSWORD=ge psql -v ON_ERROR_STOP=1 -h localhost -U ge -d postgres -c 'DROP DATABASE IF EXISTS ge;' -c 'CREATE DATABASE ge OWNER ge;' -c 'DROP DATABASE IF EXISTS ge_test;' -c 'CREATE DATABASE ge_test OWNER ge;' && npx prisma migrate deploy && npx prisma db seed",
     "test": "jest",
-    "lint": "oxlint -c ../.oxlintrc.json .",
+    "lint": "oxlint -c ../.oxlintrc.json --type-aware .",
     "test:manual": "jest --config jest.manual.config.ts",
     "prisma:generate": "prisma generate",
     "start": "nest start",
