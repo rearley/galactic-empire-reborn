@@ -17,6 +17,7 @@ import { ShipDebugController } from '../../../src/game/ship/ship.debug.controlle
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_TORP, I_MISSL, I_MINE } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return {
@@ -40,7 +41,7 @@ function build(ship: ShipState | undefined) {
   } as unknown as ShipStateService;
   const userUpdate = jest.fn().mockResolvedValue({});
   const prisma = { user: { update: userUpdate } } as never;
-  return { controller: new ShipDebugController(shipState, prisma), mutate, userUpdate };
+  return { controller: new ShipDebugController(shipState, new UserRepository(prisma)), mutate, userUpdate };
 }
 
 describe('POST /debug/ship/outfit', () => {

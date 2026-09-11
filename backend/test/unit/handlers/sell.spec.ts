@@ -7,6 +7,7 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_FOOD, ITEM_NAMES } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -40,7 +41,7 @@ function makeService(sellResult: Awaited<ReturnType<PlanetStateService['sell']>>
 
   const svc = new SellHandlerService(
     planetMock as unknown as PlanetStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
   return { svc, sellMock, prismaUpdateMock };
 }

@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
 import { showarp } from '../../ship/showarp';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
@@ -55,6 +56,16 @@ export class ScanHandlerService implements OnModuleInit {
      * missile shake never fired once in the live game.
      */
     private readonly mineRegistry: MineRegistry,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ScanHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -173,7 +184,7 @@ export class ScanHandlerService implements OnModuleInit {
     }
 
     if (sub === 'pl') {
-      return await scanPl(ship, args.slice(1), { planetService: this.planetService, prisma: this.prisma });
+      return await scanPl(ship, args.slice(1), { planetService: this.planetService, prisma: this.prisma, users: this.users });
     }
 
     if (sub === 'ra') {

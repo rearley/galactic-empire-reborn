@@ -17,6 +17,7 @@ import { SetHandlerService } from '../../src/game/commands/handlers/set.handler'
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -69,7 +70,7 @@ function makeSetService(ship: ShipState, dbOptions: number[] = []) {
   };
 
   return {
-    handler: new SetHandlerService(mockShipState, mockPrisma as unknown as PrismaService),
+    handler: new SetHandlerService(mockShipState, new UserRepository(mockPrisma as unknown as PrismaService)),
     mockPrisma,
     ship,
   };

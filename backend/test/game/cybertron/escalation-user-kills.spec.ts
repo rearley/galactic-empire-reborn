@@ -65,10 +65,16 @@ describe('userKills is hydrated everywhere teamcode is', () => {
     ['src/game/ship/ship-state.service.ts', 'boot hydration'],
     ['src/gateway/connection-lifecycle.service.ts', 'boarding a ship'],
   ])('%s populates it (%s)', (path) => {
-    const text = src(path);
-    // Wherever the User row is read for teamcode, kills must come with it.
-    expect(text).toMatch(/kills: true/);
-    expect(text).toMatch(/state\.userKills = /);
+    expect(src(path)).toMatch(/state\.userKills = /);
+  });
+
+  it('the session-profile read carries kills alongside teamcode', () => {
+    // The `select` itself moved behind `UserRepository` when the persistence
+    // boundary went in; the invariant did not. Wherever the User row is read
+    // for teamcode on boarding, kills must come with it.
+    expect(src('src/game/player/user.repository.ts')).toMatch(
+      /teamcode: true, options: true, kills: true/,
+    );
   });
 
   it('the escalation gates read it rather than the hull count', () => {

@@ -22,6 +22,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { CLOAK_ENERGY_USE_DEFAULT } from '../../../src/game/commands/cloak.config';
 import { MAINT_COST_NORMAL } from '../../../src/game/commands/_ship-management-constants';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 // ---------------------------------------------------------------------------
 // Ship factory
@@ -95,7 +96,7 @@ function buildRouter() {
   router.register(new MaintHandlerService(mockMaintService).command);
   router.register(new TransferHandlerService(mockShipState, {} as any).command);
   router.register(new JettisonHandlerService(mockShipState).command);
-  router.register(new SetHandlerService(mockShipState, mockPrisma).command);
+  router.register(new SetHandlerService(mockShipState, new UserRepository(mockPrisma)).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
   router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);

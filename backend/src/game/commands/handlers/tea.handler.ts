@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { TeamService } from '../../team/team.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -44,6 +45,16 @@ export class TeaHandlerService {
     private readonly prisma: PrismaService,
     private readonly shipService: ShipStateService,
     private readonly teamService: TeamService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new TeaHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   get command(): Command {
@@ -131,10 +142,7 @@ export class TeaHandlerService {
       return { lines: [{ text: TEAMNOT, category: 'system' }] };
     }
 
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { teamcode: null },
-    });
+    await this.users.setTeamcode(ship.userid, null);
     ship.teamcode = undefined;
     ship.dirty = true;
 

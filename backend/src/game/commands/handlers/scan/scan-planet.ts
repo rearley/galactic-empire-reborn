@@ -1,4 +1,5 @@
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { UserRepository } from '../../../player/user.repository';
 import { PlanetStateService } from '../../../planet/planet-state.service';
 import { CommandResult } from '../../command.types';
 import { formatMessage, MessageId } from '../../messages';
@@ -33,6 +34,7 @@ import {
 export interface ScanPlanetDeps {
   planetService: PlanetStateService;
   prisma: PrismaService;
+  users: UserRepository;
 }
 
 /**
@@ -102,7 +104,7 @@ export async function scanPl(
   args: string[],
   deps: ScanPlanetDeps,
 ): Promise<CommandResult> {
-  const { planetService, prisma } = deps;
+  const { planetService, prisma, users } = deps;
   const xsect = Math.floor(ship.xcoord);
   const ysect = Math.floor(ship.ycoord);
 
@@ -185,15 +187,12 @@ export async function scanPl(
   if (planet.userid) {
     // The neutral sentinel has no User row; resolving it through Prisma is
     // both a wasted query and how `**neutral**` reached the player's screen.
-    const ownerRow = isNeutralZoneOwner(planet.userid)
+    const ownerUsername = isNeutralZoneOwner(planet.userid)
       ? null
-      : await prisma.user.findUnique({
-          where: { userid: planet.userid },
-          select: { username: true },
-        });
+      : await users.getUsername(planet.userid);
     const ownerName = isNeutralZoneOwner(planet.userid)
       ? NEUTRAL_ZONE_OWNER_DISPLAY
-      : ownerRow?.username ?? planet.userid;
+      : ownerUsername ?? planet.userid;
     lines.push({
       text: formatMessage(MessageId.SCAN09, ownerName),
       category: 'info',

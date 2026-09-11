@@ -1,6 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { ShipStateService } from '../ship/ship-state.service';
 import { RANDOM, Random, gernd, rndm } from '../combat/random.port';
 import { PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS } from '../commands/attack.config';
@@ -45,6 +46,16 @@ export class PlanetAttackService {
     @Inject(PLATTRF2) private readonly plattrf2: number,
     @Inject(PLATTRF3) private readonly plattrf3: number,
     @Inject(FIRETICKS) private readonly fireticks: number,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new PlanetAttackService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -172,10 +183,7 @@ export class PlanetAttackService {
       this.ships.mutate(ship.userid, ship.shipno, (s) => {
         s.hostile = 0;
       });
-      await this.prisma.user.update({
-        where: { userid: ship.userid },
-        data: { planets: { increment: 1 } },
-      });
+      await this.users.incrementPlanets(ship.userid);
     }
 
     // ATTACKM6 is "%s troops have returned to the ship" — canon prints it only
@@ -307,10 +315,7 @@ export class PlanetAttackService {
       this.ships.mutate(ship.userid, ship.shipno, (s) => {
         s.hostile = 0;
       });
-      await this.prisma.user.update({
-        where: { userid: ship.userid },
-        data: { planets: { increment: 1 } },
-      });
+      await this.users.incrementPlanets(ship.userid);
     }
 
     // ATTACKF6 only when fighters actually came home (GECMDS.C:3905-3909).

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { Ship } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipStateService } from '../game/ship/ship-state.service';
@@ -7,6 +7,7 @@ import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
 import { PresenceService } from '../public/presence.service';
 import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRepository } from '../game/player/user.repository';
 import { ConnectedShipsRegistry, ConnectedPlayer } from './connected-ships.registry';
 import { GESTAT_USER, MAXPLRS, MAIL_CLASS_DISTRESS } from '../game/constants';
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
@@ -86,6 +87,16 @@ export class ConnectionLifecycleService {
     @Inject(RANDOM) private readonly random: Random,
     private readonly events: EventEmitter2,
     private readonly presence: PresenceService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ConnectionLifecycleService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -356,7 +367,7 @@ export class ConnectionLifecycleService {
       // with no User row means the DB was reset under this account — force logout
       // so the client lands on the register screen rather than hitting a crash
       // when onboarding.finalize() tries to update a non-existent User.
-      const userExists = await this.prisma.user.findUnique({ where: { userid }, select: { userid: true } });
+      const userExists = await this.users.exists(userid);
       if (!userExists) {
         client.emit('auth:logout', { reason: 'Account not found. Please register again.' });
         client.disconnect(true);
@@ -447,7 +458,7 @@ export class ConnectionLifecycleService {
         return;
       }
       try {
-        const userRow = await this.prisma.user.findUnique({ where: { userid }, select: { teamcode: true, options: true, kills: true, username: true, fkeys: true } });
+        const userRow = await this.users.getSessionProfile(userid);
         if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
         if (userRow?.username) state.username = userRow.username;
         if (userRow?.fkeys) state.fkeys = userRow.fkeys;

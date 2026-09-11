@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { UserRepository } from '../game/player/user.repository';
 import { PresenceService } from './presence.service';
-import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../game/player/roster-query';
 import { buildVersion, releaseVersion } from './build-version';
 
 /** Long enough that polling costs nothing; short enough to feel live. */
@@ -48,7 +47,7 @@ export class StatsService {
   private pending: Promise<CachedShape> | null = null;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
     private readonly presence: PresenceService,
   ) {}
 
@@ -116,13 +115,8 @@ export class StatsService {
 
   private async fetchAndCache(now: number): Promise<CachedShape> {
     const [commanders, rows] = await Promise.all([
-      this.prisma.user.count({ where: { passwordHash: { not: null } } }),
-      this.prisma.user.findMany({
-        where: ROSTER_WHERE,
-        orderBy: ROSTER_ORDER_BY,
-        take: PUBLIC_ROSTER_LIMIT,
-        select: { userid: true, username: true, score: true, kills: true, planets: true },
-      }),
+      this.users.countRegistered(),
+      this.users.findPublicRoster(PUBLIC_ROSTER_LIMIT),
     ]);
 
     const result: CachedShape = {

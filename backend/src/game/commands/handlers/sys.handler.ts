@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { CybertronControlService } from '../../cybertron/cybertron-control.service';
 import { UNIVMAX } from '../../constants';
 import { ITEM_KEYWORDS, ITEM_NAMES } from '../../constants/items';
@@ -64,6 +65,16 @@ export class SysHandlerService {
     private readonly shipState: ShipStateService,
     private readonly prisma: PrismaService,
     private readonly cybControl: CybertronControlService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new SysHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   readonly command: Command = {
@@ -226,10 +237,7 @@ export class SysHandlerService {
    */
   private async giveCash(ship: ShipState, amt: number | null, rest: readonly string[]): Promise<CommandResult> {
     if (amt === null) return SysHandlerService.huh();
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { increment: BigInt(amt) } },
-    });
+    await this.users.addCash(ship.userid, BigInt(amt));
     this.audit(ship, 'cash', rest, `cash ${amt >= 0 ? '+' : ''}${amt}`);
     return SysHandlerService.say(`Cash adjusted by ${amt}.`);
   }

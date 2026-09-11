@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { FKEY_SLOTS, parseFsetArgs } from '../fkeys';
 
 /**
@@ -23,7 +23,7 @@ import { FKEY_SLOTS, parseFsetArgs } from '../fkeys';
  */
 @Injectable()
 export class FsetHandlerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly users: UserRepository) {}
 
   readonly command: Command = {
     keyword: 'fset',
@@ -72,10 +72,7 @@ export class FsetHandlerService {
     while (bindings.length < FKEY_SLOTS) bindings.push('');
     bindings[parsed.slot] = parsed.command;
 
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { fkeys: bindings },
-    });
+    await this.users.setFkeys(ship.userid, bindings);
     ship.fkeys = bindings;
 
     const n = parsed.slot + 1;

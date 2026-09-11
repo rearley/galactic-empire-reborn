@@ -32,6 +32,7 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { computeBuyOutcome } from '../../../../src/game/planet/planet-trade';
 import { BASEPRICE, ITEM_NAMES, I_FOOD, I_SPY, NUMITEMS } from '../../../../src/game/constants/items';
+import { UserRepository } from '../../../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -81,7 +82,7 @@ function makeBuy(buyResult: Awaited<ReturnType<PlanetStateService['buy']>>) {
   return new BuyHandlerService(
     planetMock as unknown as PlanetStateService,
     shipMock as unknown as ShipStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
 }
 
@@ -116,7 +117,7 @@ describe('pri — canon messages', () => {
     const prismaMock = {
       user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }) },
     } as unknown as PrismaService;
-    return new PriceHandlerService(planetMock, prismaMock);
+    return new PriceHandlerService(planetMock, new UserRepository(prismaMock));
   }
 
   it('quotes BUY3 with the available count', async () => {
@@ -144,7 +145,7 @@ describe('sell — canon messages', () => {
       sell: jest.fn().mockResolvedValue({ ok: true, transferred: 10, proceeds: 19n, fee: 1n }),
     } as unknown as PlanetStateService;
     const prismaMock = { user: { update: jest.fn().mockResolvedValue({}) } } as unknown as PrismaService;
-    const svc = new SellHandlerService(planetMock, prismaMock);
+    const svc = new SellHandlerService(planetMock, new UserRepository(prismaMock));
 
     const text = (await svc.command.handler(makeShip(), ['10', 'food'], {})).lines[0].text;
     expect(text).toBe(`After the Transfer Tax of 1 we have netted 19 C's for our 10 ${ITEM_NAMES[I_FOOD]}, Sir!`);

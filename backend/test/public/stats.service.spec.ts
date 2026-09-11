@@ -1,13 +1,14 @@
 import { StatsService } from '../../src/public/stats.service';
 import { PresenceService } from '../../src/public/presence.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 function makeService(rows: unknown[], commanderCount: number) {
   const findMany = jest.fn().mockResolvedValue(rows);
   const count = jest.fn().mockResolvedValue(commanderCount);
   const prisma = { user: { findMany, count } } as unknown as PrismaService;
   const presence = new PresenceService();
-  return { svc: new StatsService(prisma, presence), findMany, count, presence };
+  return { svc: new StatsService(new UserRepository(prisma), presence), findMany, count, presence };
 }
 
 const RICK = { userid: 'usr_rick', username: 'rick', score: 15345n, kills: 31, planets: 3, population: 0n };
@@ -107,7 +108,7 @@ describe('getStats', () => {
     const count = jest.fn().mockReturnValue(countPromise);
     const findMany = jest.fn().mockReturnValue(findManyPromise);
     const prisma = { user: { count, findMany } } as unknown as PrismaService;
-    const svc = new StatsService(prisma, new PresenceService());
+    const svc = new StatsService(new UserRepository(prisma), new PresenceService());
 
     // Two callers arrive before either query has resolved.
     const p1 = svc.getStats();
@@ -129,7 +130,7 @@ describe('getStats', () => {
       .mockResolvedValueOnce([RICK]);
     const count = jest.fn().mockResolvedValue(9);
     const prisma = { user: { findMany, count } } as unknown as PrismaService;
-    const svc = new StatsService(prisma, new PresenceService());
+    const svc = new StatsService(new UserRepository(prisma), new PresenceService());
 
     await expect(svc.getStats()).rejects.toThrow('db down');
 

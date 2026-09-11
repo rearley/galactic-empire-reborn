@@ -1,6 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { buildPurchasedShipName } from './purchased-ship-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { Random, RANDOM } from '../../combat/random.port';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { ShipStateService } from '../../ship/ship-state.service';
@@ -147,6 +148,16 @@ export class NewShipHandlerService {
     private readonly shipStateService: ShipStateService,
     private readonly planetState: PlanetStateService,
     @Inject(RANDOM) private readonly random: Random,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new NewShipHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -307,10 +318,7 @@ export class NewShipHandlerService {
     }
 
     // Fetch user state (cash + fleet counters)
-    const userRow = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true, noships: true, topshipno: true },
-    });
+    const userRow = await this.users.getCashAndFleet(ship.userid);
 
     const cash = userRow?.cash ?? 0n;
     const noships = userRow?.noships ?? 0;
@@ -451,8 +459,7 @@ export class NewShipHandlerService {
     }
 
 
-    const userRow = await this.prisma.user.findUnique({ where: { userid: ship.userid }, select: { cash: true } });
-    const cash = userRow?.cash ?? 0n;
+    const cash = (await this.users.getCash(ship.userid)) ?? 0n;
 
     const quote = quoteUpgrade(priceTable, currentType, newType);
     const lines: CommandResult['lines'] = [];
@@ -507,10 +514,7 @@ export class NewShipHandlerService {
 
     // Apply — update DB and mutate in-memory state
     if (quote.cost > 0n || quote.credit > 0n) {
-      await this.prisma.user.update({
-        where: { userid: ship.userid },
-        data: { cash: quote.cost > 0n ? { decrement: quote.cost } : { increment: quote.credit } },
-      });
+      await this.users.applyUpgradeCharge(ship.userid, quote.cost, quote.credit);
     }
 
     this.shipStateService.mutate(ship.userid, ship.shipno, (s) => {

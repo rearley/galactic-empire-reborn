@@ -1,25 +1,24 @@
 import { formatPopulation } from './ros-format';
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
 import { formatMessage, MessageId } from '../messages';
 import { MAXLIST } from '../../constants';
-import { ROSTER_WHERE, ROSTER_ORDER_BY } from '../../player/roster-query';
 
 /** `ros all` — `j = 200` (GECMDS.C:4024). */
 const ROSTER_ALL_CAP = 200;
 
 /**
  * Handles `ros [all]` — leaderboard sorted by score, AI excluded.
- * Reads User rows directly via Prisma; the cap is the MAXLIST sysop option.
+ * Reads User rows through UserRepository; the cap is the MAXLIST sysop option.
  * Canon's roster has no Team column, so no team lookup is needed.
  * @see GECMDS.C:5276 cmd_geroster
  */
 @Injectable()
 export class RosHandlerService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   get command(): Command {
@@ -41,16 +40,11 @@ export class RosHandlerService {
     const showAll = args[0]?.toLowerCase() === 'all';
     const limit = showAll ? ROSTER_ALL_CAP : MAXLIST;
 
-    const allRows = await this.prisma.user.findMany({
-      // C lists only players who have actually scored — `tmpusr.score > 0`
-      // (GECMDS.C:4038). Without it every dormant and never-flown account
-      // padded the board, which is what filled the roster with e2e_* rows on
-      // the shared development database.
-      where: ROSTER_WHERE,
-      orderBy: ROSTER_ORDER_BY,
-      take: limit,
-      select: { userid: true, username: true, score: true, kills: true, planets: true, population: true },
-    });
+    // The repository runs canon's board query — it lists only players who have
+    // actually scored, `tmpusr.score > 0` (GECMDS.C:4038). Without that every
+    // dormant and never-flown account padded the board, which is what filled
+    // the roster with e2e_* rows on the shared development database.
+    const allRows = await this.users.findRoster(limit);
     const rows = allRows.slice(0, limit);
 
     // ROSTER2 is the wide-terminal heading and takes the list length, so the

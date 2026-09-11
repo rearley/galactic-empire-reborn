@@ -15,6 +15,7 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -54,7 +55,7 @@ function makeService() {
   };
   const svc = new SetHandlerService(
     shipStateMock as unknown as ShipStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
   return { svc, shipStateMock, prismaMock, getMutated: () => mutatedShip };
 }

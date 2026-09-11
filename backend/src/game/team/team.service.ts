@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { TeamRepository } from './team.repository';
 import { ShipState } from '../ship/ship-state.types';
 import {
@@ -64,6 +65,16 @@ export class TeamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repo: TeamRepository,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new TeamService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -97,10 +108,7 @@ export class TeamService {
           const max = await this.repo.getMaxTeamcode();
           const code = max + 1n;
           await this.repo.insertTeam({ teamcode: code, teamname: name, password, secret });
-          await this.prisma.user.update({
-            where: { userid: ship.userid },
-            data: { teamcode: code },
-          });
+          await this.users.setTeamcode(ship.userid, code);
           return code;
         });
 
@@ -237,14 +245,9 @@ export class TeamService {
     const team = await this.currentTeam(ship);
     if (!team) return { error: 'not_on_team' };
 
-    const rows = await this.prisma.user.findMany({
-      where: { teamcode: team.teamcode },
-      select: { userid: true },
-      orderBy: { userid: 'asc' },
-      take: TEAMMAX,
-    });
+    const members = await this.users.listTeamMemberIds(team.teamcode, TEAMMAX);
 
-    return { ok: true, teamname: team.teamname, members: rows.map((r) => r.userid) };
+    return { ok: true, teamname: team.teamname, members };
   }
 
   /**
@@ -262,17 +265,11 @@ export class TeamService {
     if ('error' in gate) return gate;
     const { team } = gate;
 
-    const target = await this.prisma.user.findUnique({
-      where: { userid: args.userid },
-      select: { userid: true, teamcode: true },
-    });
+    const target = await this.users.findTeamMembership(args.userid);
     if (!target) return { error: 'user_not_found' };
     if (target.teamcode !== team.teamcode) return { error: 'not_on_your_team' };
 
-    await this.prisma.user.update({
-      where: { userid: target.userid },
-      data: { teamcode: null },
-    });
+    await this.users.setTeamcode(target.userid, null);
 
     // TEAMKYOU. The body text ("...revoked by X") has no payload shape in the
     // inbox renderer, so the team name rides in name1 and the kicker in dtime,

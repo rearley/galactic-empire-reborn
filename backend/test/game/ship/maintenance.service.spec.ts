@@ -13,6 +13,7 @@ import { PlanetStateService } from '../../../src/game/planet/planet-state.servic
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { MAINT_COST_NORMAL, MAINT_COST_NEUTRAL } from '../../../src/game/commands/_ship-management-constants';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -76,7 +77,7 @@ function makeService(opts: {
     },
   } as unknown as PrismaService;
 
-  const svc = new MaintenanceService(mockShipState, mockPlanetService, mockPrisma);
+  const svc = new MaintenanceService(mockShipState, mockPlanetService, new UserRepository(mockPrisma));
   return { svc, mockShipState, mockPlanetService, mockPrisma, mutated };
 }
 

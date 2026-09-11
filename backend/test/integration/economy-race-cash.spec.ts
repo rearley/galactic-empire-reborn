@@ -31,6 +31,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_FOOD } from '../../src/game/constants/items';
 import { CommandResult } from '../../src/game/commands/command.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 const USERID = 'u-econ-race';
 const START_CASH = 1_000n;
@@ -121,7 +122,7 @@ describe('concurrent `buy` cannot overdraw a balance (M1)', () => {
     handler = new BuyHandlerService(
       planets,
       ships,
-      prisma as unknown as PrismaService,
+      new UserRepository(prisma as unknown as PrismaService),
     );
   });
 

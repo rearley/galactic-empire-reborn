@@ -7,6 +7,7 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -50,7 +51,7 @@ function makeService(
 
   const svc = new WithdrawHandlerService(
     planetMock as unknown as PlanetStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
   return { svc, withdrawTaxMock, prismaUpdateMock };
 }
