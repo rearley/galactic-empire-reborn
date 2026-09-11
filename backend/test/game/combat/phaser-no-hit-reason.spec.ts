@@ -20,6 +20,7 @@ import { selectPhaserVictims } from '../../../src/game/combat/firep';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, PHATOWRP } from '../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -32,7 +33,7 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     phasrtype: 2,
     percent: 1,
     items: new Array(NUMITEMS).fill(0n),
-    topspeed: 8_000,
+    topspeed: canonMaxWarp(over.shpclass ?? 1),
     channel: over.channel ?? over.shipno ?? 1,
     ...over,
   });

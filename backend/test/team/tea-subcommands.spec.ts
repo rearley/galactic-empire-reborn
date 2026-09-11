@@ -31,6 +31,8 @@ interface PrismaStub {
   user: { findUnique: Mock; update: Mock; count: Mock; findMany: Mock };
   mailStat: { create: Mock };
   $transaction: Mock;
+  /** `create` takes a transaction-scoped advisory lock first. @see issue #14 */
+  $queryRaw: Mock;
 }
 
 function makePrisma(over: Partial<Record<string, unknown>> = {}): PrismaStub {
@@ -52,6 +54,7 @@ function makePrisma(over: Partial<Record<string, unknown>> = {}): PrismaStub {
       findMany: vi.fn().mockResolvedValue([{ userid: 'u1' }, { userid: 'victim' }]),
     },
     mailStat: { create: vi.fn().mockResolvedValue({}) },
+    $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(p)),
   };
   Object.assign(p, over);

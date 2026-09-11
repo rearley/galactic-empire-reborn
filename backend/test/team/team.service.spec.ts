@@ -48,6 +48,9 @@ function makeService(
   } as unknown as TeamRepository;
 
   const prisma = {
+    // `create` takes a transaction-scoped advisory lock as the callback's first
+    // statement, so the double has to answer $queryRaw. @see issue #14
+    $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
     user: {
       update: vi.fn().mockResolvedValue({}),
@@ -79,6 +82,7 @@ describe('TeamService.create', () => {
     } as unknown as TeamRepository;
     const userUpdate = vi.fn().mockResolvedValue({});
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: userUpdate },
     } as unknown as PrismaService;
@@ -96,6 +100,7 @@ describe('TeamService.create', () => {
     } as unknown as TeamRepository;
     const userUpdate = vi.fn().mockResolvedValue({});
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: userUpdate },
     } as unknown as PrismaService;
@@ -112,6 +117,7 @@ describe('TeamService.create', () => {
       insertTeam: vi.fn().mockResolvedValue(undefined),
     } as unknown as TeamRepository;
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
@@ -130,6 +136,7 @@ describe('TeamService.create', () => {
       insertTeam,
     } as unknown as TeamRepository;
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
@@ -137,7 +144,11 @@ describe('TeamService.create', () => {
     const ship = makeShip({ teamcode: undefined });
     const result = await svc.create({ ship, name: 'Galactic Raiders', password: 'pw' });
     expect(result).toMatchObject({ ok: true, teamname: 'Galactic Raiders' });
-    expect(insertTeam).toHaveBeenCalledWith(expect.objectContaining({ teamname: 'Galactic Raiders' }));
+    expect(insertTeam).toHaveBeenCalledWith(
+      expect.objectContaining({ teamname: 'Galactic Raiders' }),
+      // The transaction client — both writes ride it. @see issue #14
+      expect.anything(),
+    );
   });
 
   it('returns already_on_team when ship.teamcode is set', async () => {
@@ -155,6 +166,7 @@ describe('TeamService.create', () => {
       insertTeam: vi.fn().mockRejectedValue(p2002),
     } as unknown as TeamRepository;
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
@@ -178,6 +190,7 @@ describe('TeamService.create', () => {
       }),
     } as unknown as TeamRepository;
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       $transaction: vi.fn().mockImplementation(async (fn: (p: unknown) => unknown) => fn(prisma)),
       user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;

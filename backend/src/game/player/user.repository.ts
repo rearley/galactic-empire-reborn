@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ROSTER_WHERE, ROSTER_ORDER_BY, RosterRow } from './roster-query';
+import type { TxClient } from '../../prisma/tx-client';
 
 /** The public board renders everything canon's `ros` does except population. */
 export type PublicRosterRow = Omit<RosterRow, 'population'>;
@@ -316,8 +317,8 @@ export class UserRepository {
   // -------------------------------------------------------------- other writes
 
   /** Join a team, or leave one by passing null. @see GECMDS.C cmd_team */
-  async setTeamcode(userid: string, teamcode: bigint | null): Promise<void> {
-    await this.prisma.user.update({
+  async setTeamcode(userid: string, teamcode: bigint | null, tx?: TxClient): Promise<void> {
+    await (tx ?? this.prisma).user.update({
       where: { userid },
       data: { teamcode },
     });

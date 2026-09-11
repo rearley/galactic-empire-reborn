@@ -27,6 +27,7 @@ import {
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import type { Mock } from 'vitest';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
   maxPrice: 0n,
@@ -45,7 +46,7 @@ function makePlayer(): ShipState {
     freq: [],
     items: Array(14).fill(0n),
     status: GESTAT_USER, cybmine: 255,
-    topspeed: 8_000, // NOTE: not a canon 0-255 warp factor — pre-existing, carried over unchanged (see task-6 report)
+    topspeed: canonMaxWarp(5),
   });
 }
 

@@ -47,6 +47,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { SHIP_CLASSES } from '../../prisma/seed/ship-classes';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import { canonMaxWarp } from '../helpers/canon-max-warp';
 
 /** Class 2 Stealth Fighter — hasMissile: true, maxWarp 20. */
 const MISSILE_CLASS = 2;
@@ -74,7 +75,7 @@ function makeShip(over: Partial<ShipState>): ShipState {
     lmisslDistance: [0, 0, 0],
     lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    topspeed: 20_000,
+    topspeed: canonMaxWarp(MISSILE_CLASS),
     ...over,
   });
 }

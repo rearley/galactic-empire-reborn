@@ -32,6 +32,7 @@ import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, PHATOWRP } from '../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 const CYB_CLASS = 21;
 
@@ -52,7 +53,7 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     cybskill: 10,
     cybupdate: 50,
     tick: 1,
-    topspeed: 8_000,
+    topspeed: canonMaxWarp(CYB_CLASS),
     channel: over.channel ?? over.shipno ?? 1,
     ...over,
   });
