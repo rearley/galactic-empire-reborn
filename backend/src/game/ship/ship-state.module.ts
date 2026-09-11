@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ShipStateService } from './ship-state.service';
 import { ShipChannelRegistry } from './ship-channel.registry';
 import { ShipRepository } from './ship.repository';
@@ -21,7 +20,7 @@ import { PlayerModule } from '../player/player.module';
  * `imports: [ShipModule]` keeps resolving `ShipStateService` unchanged.
  */
 @Module({
-  imports: [PrismaModule, PlayerModule, EventEmitterModule],
+  imports: [PrismaModule, PlayerModule],
   providers: [
     ShipChannelRegistry,
     ShipStateService,

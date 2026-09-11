@@ -44,8 +44,10 @@ Module edges are now all plain: `PlanetModule -> ShipStateModule`,
 `ShipModule -> {ShipStateModule, PlanetModule}`, and `TickModule` imports neither.
 **Do not add a method to either port unless a consumer on the far side
 calls it**, and do not reach for `forwardRef` to fix a new cycle — the port is
-the cheaper answer, and `test/game/ship/ship-state.port.spec.ts` asserts each
-port's surface exactly.
+the cheaper answer. `test/game/ship/ship-state.port.spec.ts` pins each port's
+surface at COMPILE time: it assigns an object literal to the port type, so
+widening or narrowing either interface breaks `tsc`. Its runtime `expect`s are
+incidental.
 
 ## 1. The two tick timers are not split the way you would guess
 

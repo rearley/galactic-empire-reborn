@@ -3,7 +3,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
 import { ShipStateModule } from './ship-state.module';
-import { PrismaModule } from '../../prisma/prisma.module';
 import { PlayerModule } from '../player/player.module';
 import { PlanetModule } from '../planet/planet.module';
 import { ShipDebugController } from './ship.debug.controller';
@@ -24,7 +23,7 @@ const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
  */
 @Module({
   imports: [
-    PrismaModule, PlayerModule,
+    PlayerModule,
     EventEmitterModule,
     ShipStateModule,
     PlanetModule,
