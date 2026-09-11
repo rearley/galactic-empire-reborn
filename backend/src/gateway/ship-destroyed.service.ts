@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { CombatShipDestroyedPayload, EventLogCategory } from '@ge/wire';
 import { CombatShipDestroyedEvent } from '../game/combat/combat-events';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,8 +26,9 @@ import { handleOf, shipNameOf } from './ship-identity';
  *   • `takeIonAttacker` reads and clears `GameGateway.lastIonAttacker`, which
  *     is written by `handlePlanetIonFired` — the other half of a colony kill,
  *     and also still gateway-resident.
- *   • `warn` / `error` go to the GATEWAY's logger, so the forensics line keeps
- *     coming out under the same context it always has.
+ *
+ * Logging is NOT in here: the service has its own `Logger`, so the forensics
+ * line and the two error lines come out under `[ShipDestroyedService]`.
  */
 export interface DestroyedEmitter {
   /** One `event.log` line to a single room. */
@@ -40,8 +41,6 @@ export interface DestroyedEmitter {
   takeIonAttacker(victimId: string): { name: string; at: number } | null;
   /** Re-seat the pilot who just died. @see GameGateway.recoverAfterDeath */
   recoverVictim(userid: string): Promise<void>;
-  warn(message: string): void;
-  error(message: string, err?: Error): void;
 }
 
 /**
@@ -63,6 +62,8 @@ export class ShipDestroyedService {
     private readonly shipClassCache: ShipClassCacheService,
     @Inject(RANDOM) private readonly random: Random,
   ) {}
+
+  private readonly logger = new Logger(ShipDestroyedService.name);
 
   handle(event: CombatShipDestroyedEvent, emit: DestroyedEmitter): Promise<void> {
     const keyParts = event.victimShipKey.split(':');
@@ -92,7 +93,7 @@ export class ShipDestroyedService {
     // WARN, not LOG: this is the line someone goes looking for months later,
     // and it must survive a log level that filters routine chatter.
     // @see docs/DECISIONS.md 2026-09-08 — ship-loss forensics
-    emit.warn(this.shipLossManifest(event));
+    this.logger.warn(this.shipLossManifest(event));
 
     // Delete the victim's hull row and decrement the fleet count atomically — but
     // ONLY for PLAYER ships. AI (status AUTO) hulls are managed by the AI layer
@@ -142,7 +143,7 @@ export class ShipDestroyedService {
             });
           }
         }
-      }).catch((err: Error) => emit.error('death delete/decrement failed', err));
+      }).catch((err: Error) => this.logger.error('death delete/decrement failed', err));
       this.shipStateService.removeFromGame({ userid: event.victimUserid, shipno: victimShipno });
     }
 
@@ -286,7 +287,7 @@ export class ShipDestroyedService {
       void this.revealCapturedDocument(event.victimUserid, event.attackerUserid, emit)
         .catch((err: unknown) => {
           const stack = err instanceof Error ? err.stack : String(err);
-          emit.error(`Captured-document reveal failed: ${stack}`);
+          this.logger.error(`Captured-document reveal failed: ${stack}`);
         });
     }
 

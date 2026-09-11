@@ -171,7 +171,10 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     // when asked to make someone whole — so it must survive a log level that
     // filters routine chatter. @see test/gateway/ship-loss-forensics.spec.ts
     gateway = buildGateway(1);
-    const logSpy = jest.spyOn((gateway as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn');
+    // The manifest is warned by `ShipDestroyedService`'s own logger; the
+    // gateway's `@OnEvent` handler is a one-line delegate that logs nothing.
+    const service = (gateway as unknown as { shipDestroyed: { logger: { warn: (m: string) => void } } }).shipDestroyed;
+    const logSpy = jest.spyOn(service.logger, 'warn');
 
     gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
     await new Promise((r) => setImmediate(r));

@@ -915,8 +915,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return hit;
       },
       recoverVictim: (userid) => this.recoverAfterDeath(userid),
-      warn: (message) => this.logger.warn(message),
-      error: (message, err) => this.logger.error(message, err),
     };
   }
 

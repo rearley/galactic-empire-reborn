@@ -24,6 +24,18 @@ import { makeGateway } from '../helpers/make-gateway';
  * This pins the manifest, because a deploy, a flaky connection or (Rick's
  * words) call waiting should be recoverable.
  */
+/**
+ * The manifest line is WARNed by `ShipDestroyedService`'s own logger — the
+ * gateway's `@OnEvent` handler is a one-line delegate and prints nothing of its
+ * own. Both loggers are captured: `logger.log` still belongs to the gateway.
+ */
+function captureLogs(gateway: GameGateway, logs: string[]): void {
+  const gatewayLogger = (gateway as unknown as { logger: { log: (m: string) => void } }).logger;
+  gatewayLogger.log = (m: string) => { logs.push(m); };
+  const service = (gateway as unknown as { shipDestroyed: { logger: { warn: (m: string) => void } } }).shipDestroyed;
+  service.logger.warn = (m: string) => { logs.push(m); };
+}
+
 describe('ship-loss forensics — the log must be enough to restore from', () => {
   const VICTIM = {
     userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8,
@@ -47,9 +59,7 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
       scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
     });
-    const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
-    logger.log = (m: string) => { logs.push(m); };
-    logger.warn = (m: string) => { logs.push(m); };
+    captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
@@ -121,9 +131,7 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
       scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
       shipClassCache: { getTypeName: () => undefined } as unknown as ShipClassCacheService,
     });
-    const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
-    logger.log = (m: string) => { logs.push(m); };
-    logger.warn = (m: string) => { logs.push(m); };
+    captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
