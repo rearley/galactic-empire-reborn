@@ -5500,3 +5500,116 @@ what Phase 3 ("persistence boundary… `PrismaService` appears in one place per
 feature, not in 40 files") exists to finish; recorded here so Phase 3 does not
 have to rediscover it. Full before/after table in `docs/PROGRESS.md`
 2026-09-11.
+
+**RESOLVED 2026-09-11 (Phase 3 close-out).** `game.gateway.ts` now has 0
+`this.prisma` call sites (`grep -c 'this.prisma' backend/src/gateway/game.gateway.ts`
+prints 0). Both sites named above moved to `ShipRepository` and
+`UserRepository` calls during Phase 3's Tasks 2 and 4. Kept per
+`docs/CLAUDE.md`'s doc-hygiene rule — do not delete a closed gap, annotate it.
+Full Phase 3 measurement in the entry below.
+
+## 2026-09-11 — Phase 3 close-out: the persistence boundary, measured
+
+**Context:** Phase 3 (`8af4ed2`..`1ff4bea`) built per-feature repositories,
+retired the `forwardRef` cycles between `ship`/`planet`/`tick`, cached the
+boot-time ship-class table, and moved 334 inline `ShipState` fixtures onto a
+shared factory. This entry is Task 7's independent verification, measured
+directly against the `8af4ed2` and `1ff4bea` trees rather than copied from
+any task's own report.
+
+**Measured before/after** (`backend/`, commands run against both commits):
+
+| Metric | `8af4ed2` (phase start) | `1ff4bea` (now) |
+|---|---|---|
+| files injecting `PrismaService` | 46 | 34 |
+| `forwardRef(` actual calls | 3 | 0 |
+| raw string `forwardRef` (incl. comments/docs) | 7 | 7 (all now comments/docblocks — `game/CLAUDE.md`, `ship.module.ts` docblock, port docblocks; zero live calls) |
+| `this.prisma.user.*` calls outside a repository file | 36 | 4 (all in `auth/auth.service.ts`, untouched by this phase — see below) |
+| `this.prisma` in `game.gateway.ts` | 2 | 0 |
+| files building a whole `ShipState` inline (`cybskill:` in `test/`) | 260 | 37 |
+| `as never` in `backend/test/` | 509 | 551 |
+| backend suite | 617 suites / 6,295 tests | 623 suites / 6,356 tests, all green |
+
+Note on the `forwardRef` row: the brief's own grep (`grep -rn 'forwardRef'`)
+counts the bare string and returns 7 at both ends of the phase, which reads as
+"unchanged" at a glance. It is not — at `8af4ed2` those 7 lines include 3 real
+`forwardRef(` calls (`planet.module.ts` x2, `ship.module.ts` x1, plus
+`tick.module.ts` x1 caught by a second grep) wiring the ship/planet/tick
+cycle; at `1ff4bea` all 7 are prose in `CLAUDE.md`/docblocks describing the
+now-retired pattern. Task 5's ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`)
+removed every live call. Grepping for `forwardRef(` — the call, not the word —
+is the correct check and gives 3 → 0.
+
+**Repository map** (files under `backend/src/`, by when they were introduced):
+
+Pre-existing (before `8af4ed2`): `combat/mine.repository.ts`,
+`cybertron/cybertron.repository.ts`, `mail/mail-inbox.repository.ts`,
+`midnight/midnight.repository.ts`, `player/player-score.repository.ts`,
+`team/team.repository.ts`.
+
+New in Phase 3: `player/user.repository.ts` (Task 2, `6bccd3d`),
+`ship/ship.repository.ts` and `galaxy/wormhole.repository.ts` (Task 4,
+`3108806`/`6fcdf34`).
+
+**Finding — `as never` went the wrong way, and the spec's premise only holds
+for one of its two seams.** Phase 3's own text claims typed seams make such
+casts unnecessary. Measured per commit:
+
+```
+8af4ed2  509   phase start
+d969409  511   Task 1, ship factory          +2
+6bccd3d  512   Task 2, user repository       +1
+c5bda05  544   Task 3, ship-class cache     +32
+3108806  552   Task 4, repositories          +8
+602e725  551   fix round
+1ff4bea  551   Task 6, fixture sweep          0
+```
+
+509 → 551, +42, the wrong direction. Split by seam: the **fixture** seam
+(Tasks 1 and 6) is where the premise holds — together they removed 71
+`as ShipState` casts (375 → 304 across `test/`) while adding only 2 `as
+never`. The **service** seam (Tasks 2-4) is where it fails: narrowing a
+dependency to a port (`ShipStatePort`, `UserRepository`'s narrow return
+types, the ship-class cache) makes a hand-rolled partial test double harder
+to satisfy structurally than a loose `PrismaService` mock was, and specs
+reach for `as never` to get the double past the compiler rather than
+building a structurally complete one. This is a real, reproducible cost of
+this phase's design, not noise — Task 3 alone (the ship-class cache) added
+32 in one commit. **Phase 5 leans on the same "narrow the seam, casts go
+away" reasoning for its Prisma/ESM migration risk assessment; that
+assessment should account for this finding, not assume it away.**
+
+**Caveat — `ShipRepository` is a beachhead, not a boundary.** Of 15 live
+`this.prisma.ship.*` call sites in `backend/src/`, `ShipRepository` covers 2
+(`findFirst` by `userid`, `findFirst` by `userid`+`shipno`). The remaining 13
+are still direct Prisma calls in `ship-state.service.ts` (6: the auto-ship
+hydration `findMany`, three `updateMany`s, two `update`s), `cybertron.repository.ts`
+(3, spawning/updating AI hulls — arguably correctly its own repository's
+concern, not `ShipRepository`'s), `onboarding.service.ts` (1, ship creation),
+`connection-lifecycle.service.ts` (1, reconnect hydration), and
+`onboarding/rename.service.ts` (2, rename conflict check + update). The
+metric "`PrismaService` appears once per feature" must not be read as "ship
+persistence is behind a repository" — it is not yet.
+
+**`prisma.user.*` calls left outside any repository, and why:** all 4 real
+remaining call sites are in `backend/src/auth/auth.service.ts`
+(`create` at registration, `findUnique` in `chooseUsername`, `updateMany` for
+the username race guard, `findFirst` for password-reset lookup by email).
+`auth/` was not assigned to any Phase 3 task — Task 2's `UserRepository`
+covers the game-side user reads/writes (score, cash, teamcode, kills, etc.)
+consumed by `team.service.ts`, `ship-state.service.ts`,
+`planet-state.service.ts`, `planet-attack.service.ts`, and the command
+handlers that touched `prisma.user.*` before this phase (`buy`, `fset`,
+`new-ship`, `price`, `report`, `ros`, `sell`, `sys`, `tea`, `withdraw`) — all
+of which now go through `UserRepository`. `auth.service.ts` staying direct is
+a real gap for a future `AuthRepository`, not a decision this phase made; it
+is recorded here rather than left implicit so Phase 4/5 doesn't assume auth
+is already behind a seam.
+
+**Deploy gate, Docker, VERSION:** `git diff --name-only 8af4ed2..HEAD --
+.github/` is empty; `.github/workflows/ci.yml` still gates on
+`branches: [master]` and `if: github.event_name == 'push'`; `git diff master
+-- VERSION` is empty. Both `backend/Dockerfile` and `frontend/Dockerfile`
+build clean from the repo root; `require.resolve('@ge/wire')` resolves inside
+the running backend image. Full suite: one `npx jest` process, `Ran all test
+suites.` appears exactly once, 623/623 suites and 6,356/6,356 tests passed.

@@ -1,6 +1,6 @@
 # Restructure spec
 
-**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 3 next.
+**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 4 next.
 
 This is the SPEC for the restructure and the recovery document for a lost session.
 Executable per-phase plans live beside it in `docs/superpowers/plans/2026-09-10-restructure-phase-N-*.md`. If a session is lost or
@@ -305,19 +305,37 @@ build from repo root, deploy gate (`branches: [master]`,
 `if: github.event_name == 'push'`) unchanged, `VERSION` unchanged. Full
 before/after table in `docs/PROGRESS.md` 2026-09-11.
 
-### Phase 3 — persistence boundary
+### Phase 3 — persistence boundary — COMPLETE 2026-09-11
 
-- [ ] Per-feature repositories. `PrismaService` appears in one place per feature,
-      not in 40 files.
-- [ ] Retire the 7 `forwardRef` calls by fixing the cycles they mask.
-- [ ] Narrow interfaces at the injection seams.
+- [x] Per-feature repositories. `PrismaService` injection sites 46 → 34;
+      `ShipRepository` and `UserRepository` added, plus the wormhole
+      repository. **Not a full boundary** — `ShipRepository` covers 2 of 15
+      live `this.prisma.ship.*` call sites, a beachhead. `auth.service.ts`'s
+      4 `prisma.user.*` sites were out of scope for every task and have no
+      repository of their own. See `docs/DECISIONS.md` 2026-09-11.
+- [x] Retire the `forwardRef` calls by fixing the cycles they mask. 3 actual
+      `forwardRef(` calls (ship/planet/tick) → 0, replaced by
+      `SHIP_STATE_PORT`/`PLANET_STATE_PORT`. `game.gateway.ts`'s last 2
+      `this.prisma` sites also went to 0.
+- [x] Narrow interfaces at the injection seams. Ports for ship/planet state;
+      ship-class lookups moved to the boot-time cache.
 
-**This phase doubles as the test-fixture fix.** Typed seams turn the 1,862
-`as never` casts from a liability into compile-checked coverage, and a shared
-typed ship factory retires the 248 inline copies. Same work, two payoffs. It is
-also what makes phase 5's Prisma upgrade touch ~4 files instead of 40.
+**This phase doubled as the test-fixture fix, and the prediction was only
+half right.** The fixture seam (a shared typed ship factory, `260 → 37` files
+building `ShipState` inline) behaved exactly as predicted: 71 `as ShipState`
+casts removed for +2 `as never`. **The service seam did not**: `as never` in
+`backend/test/` rose 509 → 551, because narrowing a dependency to a port
+makes a hand-rolled partial test double harder to satisfy structurally than a
+loose `PrismaService` mock was. Recorded as a finding, not a regression to
+chase — see `docs/DECISIONS.md` 2026-09-11 for the per-commit breakdown and
+why Phase 5 needs to account for it.
 
-Highest value, highest test churn.
+Verified at close-out: full suite 623 suites / 6,356 tests passing (one
+tracked `npx jest` process, `Ran all test suites.` printed once), both Docker
+images build from repo root, `@ge/wire` resolves in the backend image, deploy
+gate (`branches: [master]`, `if: github.event_name == 'push'`) unchanged in
+this phase's own `8af4ed2..HEAD` range, `VERSION` unchanged. Full before/after
+table in `docs/PROGRESS.md` 2026-09-11.
 
 ### Phase 4 — frontend restructure
 

@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 92 entries.
+Append-only, **newest at the bottom**. 93 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-11 — Phase 3 close-out: the persistence boundary, verified](#2026-09-11--phase-3-close-out-the-persistence-boundary-verified)
 - [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
 - [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
 - [2026-09-11 — restructure phase 1: one typed wire contract](#2026-09-11--restructure-phase-1-one-typed-wire-contract)
@@ -5712,3 +5713,64 @@ what a reader checks against the pre-split source.
 **Known issues:** none new. The phase-2 known issues above (gateway
 `this.prisma` count of 2, and the four carried frontend/wire items) are
 untouched by this session.
+
+## 2026-09-11 — Phase 3 close-out: the persistence boundary, verified
+
+**Completed:** independent verification of Phase 3 (persistence boundary) —
+per-feature repositories, `forwardRef` retirement, ship-class boot cache,
+and the shared `ShipState` test factory. Task 7 only; no new feature code.
+
+Measured directly against `8af4ed2` (phase start) and `1ff4bea` (phase end):
+
+| Metric | Phase start | Now |
+|---|---|---|
+| files injecting `PrismaService` | 46 | 34 |
+| `forwardRef(` actual calls | 3 | 0 |
+| `this.prisma.user.*` outside a repository | 36 | 4 (all `auth.service.ts`) |
+| `this.prisma` in `game.gateway.ts` | 2 | 0 |
+| inline `ShipState` fixtures (`cybskill:` in `test/`) | 260 | 37 |
+| `as never` in `backend/test/` | 509 | 551 |
+| backend suite | 617 suites / 6,295 tests | 623 suites / 6,356 tests |
+
+Full derivation, the repository map, and the per-commit `as never` breakdown
+are in `docs/DECISIONS.md` 2026-09-11 ("Phase 3 close-out: the persistence
+boundary, measured").
+
+**Tests:** ran the full backend suite as one tracked `npx jest` process
+(never backgrounded, never piped through `head`/`tail` mid-run — the shared
+`ge_test` database corrupts under two concurrent runs, which is exactly what
+happened once earlier in this phase). `Ran all test suites.` printed exactly
+once. Result: 623 suites / 6,356 tests, all passing, 9 snapshots passing,
+122.67s. Both `backend/Dockerfile` and `frontend/Dockerfile` build clean from
+the repo root; `require.resolve('@ge/wire')` resolves inside the running
+backend image. Deploy gate unchanged in this phase's own range
+(`8af4ed2..HEAD`): `.github/` untouched, `branches: [master]` and
+`if: github.event_name == 'push'` intact. `VERSION` unchanged from master, as
+expected — restructure phases bump once, at merge.
+
+**Decisions made:** none new; one ruling recorded in `docs/DECISIONS.md`
+2026-09-11 — the `as never` count rising 509 → 551 is a real cost of the
+service-seam design (narrowed ports make hand-rolled test doubles harder to
+satisfy structurally), not noise, and it applies only to the service seam —
+the fixture seam (Tasks 1 and 6) behaved exactly as the spec predicted
+(71 `as ShipState` casts removed for +2 `as never`).
+
+**Next:** Phase 4 — frontend restructure (3,521 lines / 43 files). Can start
+any time; independent of Phase 5.
+
+**Known issues:**
+- `ShipRepository` covers 2 of 15 live `this.prisma.ship.*` call sites — a
+  beachhead, not a boundary. See `docs/DECISIONS.md` 2026-09-11 for the full
+  list of the other 13 and which service/repository each lives in.
+- `auth/auth.service.ts` has 4 `prisma.user.*` call sites with no repository
+  of its own — out of scope for every Phase 3 task, real gap for a future
+  `AuthRepository`.
+- Nine issues were filed during Phase 3; #9 and #10 were fixed in this phase
+  and are closed. Eight remain open, unrelated to Task 7's scope:
+  #11 (88 canon citations invisible to the ratchet), #12 (cybertron spec logs
+  a real ERROR during a passing test), #13 (`fixture-domains` scans
+  comments), #14 (team-creation `$transaction` never receives `tx`), #15
+  (planet counter `update` vs `updateMany`), #18 (`SectorTransitionSubscriber`
+  is in no module and would break sector transitions if wired), #19
+  (`fixture-domains` reads `topspeed: 8_000` as `8` and validates it), #20 (a
+  fixture sets two fields that exist nowhere).
