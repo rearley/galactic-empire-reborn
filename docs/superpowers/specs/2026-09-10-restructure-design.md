@@ -355,8 +355,12 @@ table in `docs/PROGRESS.md` 2026-09-11.
   derived from reading `App.tsx` itself (12 `socket.on` calls, 15 hooks),
   since this is the one phase whose spec entry states no goal — see
   `docs/DECISIONS.md` 2026-09-11. Result: `App.tsx` 388 → 221 lines (43%),
-  `socket.on` calls 12 → 4 (the four remaining need the player roster and
-  stayed deliberately), hook calls 15 → 3, extracted into
+  `socket.on` calls 12 → 4 (of the four remaining, `combat.hit` and
+  `combat.ship-destroyed` need the player roster; `combat.phaser-fired` and
+  `combat.decoy-intercept` do not — all four stayed together for cohesion,
+  as combat narration — see `docs/PROGRESS.md` 2026-09-11 CORRECTION), hook
+  calls 15 → 6 (all hook calls, including custom hooks, isolated to the
+  `Terminal` component — see the same correction), extracted into
   `hooks/useEventLog.ts`, `hooks/useFkeys.ts`, `hooks/useScanMap.ts`, and
   `features/combat/combatNarration.ts`.
 

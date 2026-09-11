@@ -3,9 +3,11 @@
  * nothing at all.
  *
  * These are the decisions the combat socket handlers used to make inline. They
- * are pure: an event plus who is watching, in; a line or `null`, out. Three of
- * the four paths return `null`, and each of those silences is a canon
- * derivation rather than an omission — see the comments on each branch.
+ * are pure: an event plus who is watching, in; a line or `null`, out. There
+ * are five return paths across the two functions here — `phaserFiredLine`,
+ * and `combatHitLine`'s victim / narrated-to-firer / emit / bystander
+ * branches — four of which return `null`, and each of those silences is a
+ * canon derivation rather than an omission — see the comments on each branch.
  *
  * `combat.ship-destroyed` is deliberately NOT here: it keeps its own module.
  * @see features/combat/destructionLine.ts
