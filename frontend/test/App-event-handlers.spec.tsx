@@ -319,7 +319,10 @@ describe('command submit', () => {
  * the answer to every command.
  */
 describe('onboarding prompt replies', () => {
-  const shipName: OnboardingPrompt = { type: 'ship-name', payload: {} };
+  const shipName: OnboardingPrompt = {
+    type: 'ship-name',
+    payload: { step: 'NAME', rule: '1-19 printable ASCII' },
+  };
 
   it('sends the chosen ship name', () => {
     const { emitPromptReply } = useSocketReturning({ onboardingPrompt: shipName });
@@ -332,7 +335,10 @@ describe('onboarding prompt replies', () => {
 
   it('surfaces the gateway\'s name-taken error on the prompt', () => {
     useSocketReturning({
-      onboardingPrompt: { type: 'ship-name', payload: { error: 'name-taken' } },
+      onboardingPrompt: {
+        type: 'ship-name',
+        payload: { step: 'NAME', rule: '1-19 printable ASCII', error: 'name-taken' },
+      },
     });
     render(<App />);
     expect(screen.getByRole('alert').textContent).toContain('already taken');
@@ -343,6 +349,7 @@ describe('onboarding prompt replies', () => {
       onboardingPrompt: {
         type: 'ship-select',
         payload: {
+          step: 'SHIP_SELECT',
           ships: [
             { index: 1, shipno: 1, className: 'Interceptor', shipname: 'Phoenix', sector: { x: 0, y: 0 } },
             { index: 2, shipno: 2, className: 'Stealth Fighter', shipname: 'Shadow', sector: { x: 3, y: -4 } },
@@ -364,7 +371,7 @@ describe('onboarding prompt replies', () => {
    */
   it('offers a way out of the fleet menu', () => {
     useSocketReturning({
-      onboardingPrompt: { type: 'ship-select', payload: { ships: [] } },
+      onboardingPrompt: { type: 'ship-select', payload: { step: 'SHIP_SELECT', ships: [] } },
     });
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /log out/i }));

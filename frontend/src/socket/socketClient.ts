@@ -1,6 +1,11 @@
 import { io, Socket } from 'socket.io-client';
 import { getToken, clearToken } from '../auth/tokenStore';
-import type { CommandRequest, CommandResultPayload } from '../types/contracts';
+import type {
+  CommandRequest,
+  CommandResultPayload,
+  ServerToClientEvents,
+  ClientToServerEvents,
+} from '@ge/wire';
 
 /**
  * Singleton Socket.io client.
@@ -9,10 +14,14 @@ import type { CommandRequest, CommandResultPayload } from '../types/contracts';
  * Auto-reconnects with exponential backoff: initial delay 1s, max 30s with
  * 50% jitter so thundering-herd bursts are spread across ±15s (FR-020).
  *
+ * Typed with the same `@ge/wire` generics the backend's `Server` uses, so a
+ * listener registered on the wrong event name or with the wrong payload shape
+ * is a build error here too, not just on the emitting side.
+ *
  * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/research.md R3 (reconnection tuning FR-020)
  */
-const socket: Socket = io({
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: Infinity,

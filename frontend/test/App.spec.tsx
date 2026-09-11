@@ -89,6 +89,7 @@ describe('App — multi-ship fleet menu', () => {
       onboardingPrompt: {
         type: 'ship-select' as const,
         payload: {
+          step: 'SHIP_SELECT' as const,
           ships: [
             { index: 1, shipno: 1, className: 'Interceptor', shipname: 'Phoenix', sector: { x: 0, y: 0 } },
             { index: 2, shipno: 2, className: 'Stealth Fighter', shipname: 'Shadow', sector: { x: 3, y: -4 } },

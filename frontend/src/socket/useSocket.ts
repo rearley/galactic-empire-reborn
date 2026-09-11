@@ -9,7 +9,9 @@ import type {
   PhysicsSectorTransitionPayload,
   PlayerSectorPayload,
   ShipRenamedPayload,
-} from '../types/contracts';
+  PromptShipNamePayload,
+  PromptShipSelectPayload,
+} from '@ge/wire';
 import type { UsePlayerListReturn } from '../state/usePlayerList';
 
 export type ConnectionStatus =
@@ -24,15 +26,23 @@ export type ConnectionStatus =
    */
   | 'displaced';
 
-export interface OnboardingPrompt {
-  /**
-   * `ship-select` is the fleet menu a captain with more than one hull gets on
-   * connect. The gateway boards nothing until it receives the reply, so without
-   * a listener the session sits with no active ship.
-   */
-  type: 'ship-name' | 'ship-select';
-  payload: Record<string, unknown>;
-}
+/**
+ * `ship-select` is the fleet menu a captain with more than one hull gets on
+ * connect. The gateway boards nothing until it receives the reply, so without
+ * a listener the session sits with no active ship.
+ *
+ * A discriminated union on `type` rather than a loose `Record<string, unknown>`
+ * payload: typing the socket with the `@ge/wire` generics (see `socketClient.ts`)
+ * means a handler receiving `PromptShipNamePayload`/`PromptShipSelectPayload`
+ * can no longer be smuggled into a `Record<string, unknown>` field — TypeScript
+ * correctly refuses that assignment (no index signature). The two payload
+ * shapes differ for a real reason: `prompt:ship-name` carries an `error` field
+ * for a rejected name; `prompt:ship-select`, per every emit site in
+ * `game.gateway.ts`, never does — a re-emitted menu just repeats the fleet list.
+ */
+export type OnboardingPrompt =
+  | { type: 'ship-name'; payload: PromptShipNamePayload }
+  | { type: 'ship-select'; payload: PromptShipSelectPayload };
 
 export interface UseSocketReturn {
   status: ConnectionStatus;
@@ -89,16 +99,23 @@ export function useSocket(
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
-    socket.on('reconnect_attempt', handleReconnectAttempt);
+    // `reconnect_attempt` is a MANAGER event (socket.io-client's `Manager`,
+    // exposed as `socket.io`), not a Socket event — it is not even a member of
+    // `SocketReservedEvents`. Registering it on `socket` itself compiled only
+    // because the untyped `Socket` used `DefaultEventsMap`'s permissive index
+    // signature; typing the socket with the wire generics turned this into a
+    // build error, which is how it surfaced. The handler never fired: this
+    // status transition to 'reconnecting' was dead since it was written.
+    socket.io.on('reconnect_attempt', handleReconnectAttempt);
     socket.on('connect_error', handleConnectError);
 
     const unsubResult = onCommandResult((payload) => resultSink.push(payload));
 
-    const handleShipName = (payload: Record<string, unknown>) => {
+    const handleShipName = (payload: PromptShipNamePayload) => {
       setOnboardingPrompt({ type: 'ship-name', payload });
     };
 
-    const handleShipSelect = (payload: Record<string, unknown>) => {
+    const handleShipSelect = (payload: PromptShipSelectPayload) => {
       setOnboardingPrompt({ type: 'ship-select', payload });
     };
 
@@ -109,7 +126,7 @@ export function useSocket(
       socket.off('error', handleServerErr);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
-      socket.off('reconnect_attempt', handleReconnectAttempt);
+      socket.io.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('connect_error', handleConnectError);
       socket.off('prompt:ship-name', handleShipName);
       socket.off('prompt:ship-select', handleShipSelect);

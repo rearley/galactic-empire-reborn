@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { ScanMap } from '../src/components/ScanMap';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../src/types/contracts';
-import type { ScanCell, PhysicsSectorTransitionPayload } from '../src/types/contracts';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '@ge/wire';
+import type { ScanCell, PhysicsSectorTransitionPayload } from '@ge/wire';
 
 // T014: mock socket so we can trigger physics.sector-transition in tests (FR-013)
 const socketListeners = new Map<string, Set<(...args: unknown[]) => void>>();

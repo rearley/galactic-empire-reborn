@@ -28,7 +28,7 @@ import type {
   PhysicsSectorTransitionPayload,
   PlayerSectorPayload,
   ShipRenamedPayload,
-} from '../src/types/contracts';
+} from '@ge/wire';
 
 type Handler = (...args: unknown[]) => void;
 
@@ -54,7 +54,7 @@ const fake = vi.hoisted(() => {
   const emitted: Array<{ event: string; args: unknown[] }> = [];
   const connectCalls = { count: 0 };
 
-  const socket: S = {
+  const socket: S & { io: S } = {
     connected: false,
     on(event, handler) {
       const list = handlers.get(event) ?? [];
@@ -75,6 +75,13 @@ const fake = vi.hoisted(() => {
     },
     disconnect() {
       socket.connected = false;
+      return socket;
+    },
+    // `reconnect_attempt` (and other reconnection events) are Manager events,
+    // exposed on the real socket.io-client as `socket.io`. The fake records
+    // them into the SAME `handlers` map so `fire('reconnect_attempt')` still
+    // reaches whichever emitter (`socket.on` or `socket.io.on`) registered it.
+    get io() {
       return socket;
     },
   };
