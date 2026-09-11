@@ -313,8 +313,11 @@ before/after table in `docs/PROGRESS.md` 2026-09-11.
       live `this.prisma.ship.*` call sites, a beachhead. `auth.service.ts`'s
       4 `prisma.user.*` sites were out of scope for every task and have no
       repository of their own. See `docs/DECISIONS.md` 2026-09-11.
-- [x] Retire the `forwardRef` calls by fixing the cycles they mask. 3 actual
-      `forwardRef(` calls (ship/planet/tick) → 0, replaced by
+- [x] Retire the `forwardRef` calls by fixing the cycles they mask. 4 actual
+      `forwardRef(` calls on 3 lines (`planet.module.ts:29` carries two on
+      one line, plus one each in `ship.module.ts` and `tick.module.ts`)
+      retiring two distinct cycles — `ship ↔ planet`, and
+      `planet → tick → ship` — → 0, replaced by
       `SHIP_STATE_PORT`/`PLANET_STATE_PORT`. `game.gateway.ts`'s last 2
       `this.prisma` sites also went to 0.
 - [x] Narrow interfaces at the injection seams. Ports for ship/planet state;
@@ -323,12 +326,21 @@ before/after table in `docs/PROGRESS.md` 2026-09-11.
 **This phase doubled as the test-fixture fix, and the prediction was only
 half right.** The fixture seam (a shared typed ship factory, `260 → 37` files
 building `ShipState` inline) behaved exactly as predicted: 71 `as ShipState`
-casts removed for +2 `as never`. **The service seam did not**: `as never` in
-`backend/test/` rose 509 → 551, because narrowing a dependency to a port
-makes a hand-rolled partial test double harder to satisfy structurally than a
-loose `PrismaService` mock was. Recorded as a finding, not a regression to
-chase — see `docs/DECISIONS.md` 2026-09-11 for the per-commit breakdown and
-why Phase 5 needs to account for it.
+casts removed for +2 `as never`. **The service seam's `as never` count rose
+too** — 509 → 551 in `backend/test/` — but line-level attribution shows this
+is not because narrowing a dependency to a port makes a test double harder to
+satisfy. Task 3 added 32 casts, 30 of them on the test's fake `PrismaService`
+*constructor argument* for a concrete class the spec instantiates for real
+(`new ShipClassCacheService({} as never)`) — the narrowed seam itself needed
+no cast. Task 4 added 8, including one (`{ existsInSector: async () => false
+} as never`) that needed its cast *because* the parameter was typed as a
+concrete class rather than a port. Task 5, the only task that introduced real
+ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`), added **zero**. Casts track
+concrete-class dependencies, not ports — ports were cast-neutral, which
+*supports* rather than undercuts this phase's narrowing approach. Recorded as
+a finding, not a regression to chase — see `docs/DECISIONS.md` 2026-09-11
+(2026-09-11 CORRECTION) for the per-commit breakdown and why Phase 5 should
+read this as evidence for narrowing seams, not against it.
 
 Verified at close-out: full suite 623 suites / 6,356 tests passing (one
 tracked `npx jest` process, `Ran all test suites.` printed once), both Docker
@@ -342,6 +354,12 @@ table in `docs/PROGRESS.md` 2026-09-11.
 - [ ] 3,521 lines across 43 files. `App.tsx` at 388 is the largest.
 
 Runs in parallel with 2 and 3, any time after phase 1.
+
+**No headroom on the citation ratchet.** `backend/test/balance/canon-citations.balance.spec.ts`
+sits exactly at its `TOTAL_FLOOR` (3355 = 3355) as of the Phase 3 close-out.
+That is by design, but it means the first commit in this phase that touches
+any cited line will fail until `TOTAL_FLOOR` is re-measured — this is
+expected, not a regression, and is not something Phase 3 introduced.
 
 ### Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky)
 
