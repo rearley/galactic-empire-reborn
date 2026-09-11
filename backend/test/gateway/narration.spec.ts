@@ -149,10 +149,9 @@ describe('narrateUniverseEdge', () => {
 
 describe('narrateShieldCharge', () => {
   it('reports SHLDUP at full charge', () => {
-    // This `percent` is shield charge (0-100 inclusive), not the unrelated
-    // `imp` command's percent field the fixture-domains guard's `percent`
-    // domain is keyed for.
-    // domain-ok: 100 is a real, full-charge value.
+    // This `percent` is shield charge (0-100 inclusive), a ShipShieldChargeEvent
+    // field distinct from ShipState.percent (the `imp` command's 0-99 throttle).
+    // 100 is a real, full-charge value.
     expect(narrateShieldCharge({ shipId: 'rick:1', kind: 'full', percent: 100 } as never)).toEqual({
       room: 'user:rick',
       category: 'system',
