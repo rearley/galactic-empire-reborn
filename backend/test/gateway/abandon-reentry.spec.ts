@@ -1,15 +1,13 @@
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * FR-704: after `abandon` the captain stays authenticated but shipless and must
@@ -68,23 +66,20 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
       },
     } as unknown as PrismaService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      {
+      wsAuthGuard: {
         validate: jest.fn().mockImplementation((sock: { data: Record<string, unknown> }) => {
           sock.data.userid = USERID;
           return Promise.resolve({ sub: USERID, username: USERID });
         }),
       } as unknown as WsAuthGuard,
       prisma,
-      { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn().mockReturnValue('Interceptor') } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      onboardingService: { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: jest.fn().mockReturnValue('Interceptor') } as unknown as ShipClassCacheService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),
       // .except() is part of the real Socket.io chain — WARHUP uses it.

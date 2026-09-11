@@ -33,7 +33,8 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { PresenceService } from '../../src/public/presence.service';
+import { Random } from '../../src/game/combat/random.port';
+import { makeGateway } from '../helpers/make-gateway';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
@@ -44,13 +45,10 @@ function build(planets: Array<{ name: string; xsect: number; ysect: number; plnu
     to: (r: string) => chain([...rooms, r]),
     emit: (event: string, payload: unknown) => { emits.push({ rooms, event, payload }); },
   });
-  const gateway = new GameGateway(
-    {} as never, {} as never, {} as never, {} as never,
-    { planet: { findMany } } as unknown as PrismaService,
-    {} as never, {} as never, {} as never,
-    { next: () => roll } as never,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({
+    prisma: { planet: { findMany } } as unknown as PrismaService,
+    random: { next: () => roll } as unknown as Random,
+  });
   (gateway as unknown as { server: unknown }).server = { to: (r: string) => chain([r]) };
   return { gateway, emits, findMany };
 }

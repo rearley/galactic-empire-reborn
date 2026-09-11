@@ -15,13 +15,13 @@
  * player-visible line at all, so Cybertrons — the game's escalating threat —
  * arrived in complete silence.
  */
-import { GameGateway } from '../../src/gateway/game.gateway';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { Random } from '../../src/game/combat/random.port';
 import { CybertronSpawnedPayload } from '../../src/game/cybertron/cybertron-events';
 import { DroidSpawnedEvent } from '../../src/game/droid/droid-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 interface Emit { rooms: string[]; except: string[]; event: string; payload: unknown }
 
@@ -33,11 +33,10 @@ function build(others: ShipState[] = [], roll = 0.5) {
     emit: (event: string, payload: unknown) => { emits.push({ rooms, except, event, payload }); },
   });
   const shipState = { findAllShips: () => others } as unknown as ShipStateService;
-  const gateway = new GameGateway(
-    shipState, {} as never, {} as never, {} as never, {} as never,
-    {} as never, {} as never, {} as never, { next: () => roll } as never,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({
+    shipStateService: shipState,
+    random: { next: () => roll } as unknown as Random,
+  });
   (gateway as unknown as { server: unknown }).server = {
     to: (r: string) => chain([r], []),
     except: (e: string[]) => chain([], e),

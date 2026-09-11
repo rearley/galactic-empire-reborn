@@ -44,15 +44,13 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 
@@ -575,22 +573,14 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
       findByUserid: jest.fn().mockReturnValue([]),
     };
 
-    const registry = new ConnectedShipsRegistry(
-      mockShipStateSvc as ShipStateService,
-    );
-
-    const gw = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
-      registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      mockPrisma,
-      { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    const gw = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      prisma: mockPrisma,
+      onboardingService: { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().

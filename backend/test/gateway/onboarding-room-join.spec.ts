@@ -1,14 +1,11 @@
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * A brand-new pilot never joined any Socket.io room.
@@ -66,18 +63,14 @@ describe('GameGateway — a new pilot joins their rooms', () => {
       }),
     } as unknown as OnboardingService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      { ship: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      prisma: { ship: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
       onboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
       emit: jest.fn(),
       to: () => ({ emit: jest.fn() }),

@@ -1,6 +1,10 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * A destroyed hull is DELETED, canon's `gepdb(GEDELETE)`, and nothing recorded
@@ -30,24 +34,19 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
 
   function build() {
     const logs: string[] = [];
-    const gateway = new GameGateway(
-      {
+    const gateway = makeGateway({
+      shipStateService: {
         get: (userid: string, shipno: number) =>
           userid === VICTIM.userid && shipno === VICTIM.shipno ? VICTIM : undefined,
         findAllShips: () => [VICTIM],
         removeFromGame: jest.fn(),
-      } as never,
-      {} as never, {} as never, {} as never,
-      { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
         user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as never,
-      {} as never,
-      { clearScantab: jest.fn() } as never,
-      { getTypeName: () => 'Dreadnought' } as never,
-      {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+        $transaction: jest.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    });
     const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
     logger.log = (m: string) => { logs.push(m); };
     logger.warn = (m: string) => { logs.push(m); };
@@ -114,16 +113,14 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
   it('still logs a usable line when the hull is already out of memory', () => {
     // Races and AI victims: never throw, and never lose the identity.
     const logs: string[] = [];
-    const gateway = new GameGateway(
-      { get: () => undefined, findAllShips: () => [], removeFromGame: jest.fn() } as never,
-      {} as never, {} as never, {} as never,
-      { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    const gateway = makeGateway({
+      shipStateService: { get: () => undefined, findAllShips: () => [], removeFromGame: jest.fn() } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
         user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as never,
-      {} as never, { clearScantab: jest.fn() } as never,
-      { getTypeName: () => undefined } as never, {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+        $transaction: jest.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => undefined } as unknown as ShipClassCacheService,
+    });
     const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
     logger.log = (m: string) => { logs.push(m); };
     logger.warn = (m: string) => { logs.push(m); };
@@ -163,21 +160,16 @@ describe('handleCombatShipDestroyed — awaitable by the shutdown drain', () => 
       shipClass: { findFirst: jest.fn() },
     };
 
-    const gateway = new GameGateway(
-      {
+    const gateway = makeGateway({
+      shipStateService: {
         get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
         findAllShips: () => [],
         removeFromGame: jest.fn(),
-      } as never,
-      {} as never, {} as never, {} as never,
-      prisma as never,
-      {} as never,
-      { clearScantab: jest.fn() } as never,
-      { getTypeName: () => 'Dreadnought' } as never,
-      {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+      } as unknown as ShipStateService,
+      prisma: prisma as unknown as PrismaService,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    });
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },

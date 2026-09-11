@@ -13,15 +13,14 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { Random } from '../../src/game/combat/random.port';
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { I_MEN, I_TROOPS, NUMITEMS } from '../../src/game/constants/items';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 const I_FOOD = 1;
 
@@ -110,18 +109,16 @@ describe('GameGateway — disconnect kill awards spoils (canon killem)', () => {
       getPoints: jest.fn().mockReturnValue(500),
     } as unknown as ShipClassCacheService;
 
-    gateway = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
+    gateway = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      mockPrisma,
-      {} as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      mockClassCache,
-      { next: () => 0 },
-      { emit: eventsEmitMock, on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      prisma: mockPrisma,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      shipClassCache: mockClassCache,
+      random: { next: () => 0 } as unknown as Random,
+      events: { emit: eventsEmitMock, on: jest.fn() } as never,
+    });
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: () => undefined }),
       emit: jest.fn(),

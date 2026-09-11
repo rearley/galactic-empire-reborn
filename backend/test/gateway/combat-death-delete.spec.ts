@@ -16,13 +16,12 @@
  */
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { makeGateway } from '../helpers/make-gateway';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
@@ -102,7 +101,6 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
       findByUserid: jest.fn().mockReturnValue([]),
     };
 
-    const registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
     const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
     const mockOnboarding = {
       buildClassListPayload: jest.fn().mockResolvedValue([]),
@@ -110,18 +108,15 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockEvents = { emit: jest.fn(), on: jest.fn() };
 
-    const gw = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
-      registry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      mockEvents as never, new PresenceService(),
-    );
+    const gw = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+      events: mockEvents as never,
+    });
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().

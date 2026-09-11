@@ -9,8 +9,6 @@
 import 'reflect-metadata';
 import { GameGateway } from '../../../src/gateway/game.gateway';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../../src/game/commands/command-router.service';
-import { ConnectedShipsRegistry } from '../../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { OnboardingService } from '../../../src/game/onboarding/onboarding.service';
@@ -20,7 +18,7 @@ import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../../../src/game/combat/combat-events';
-import { PresenceService } from '../../../src/public/presence.service';
+import { makeGateway } from '../../helpers/make-gateway';
 
 describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
   let gateway: GameGateway;
@@ -39,7 +37,14 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
     const mockShipState = { removeFromGame: jest.fn(), get: jest.fn().mockReturnValue(undefined), findAllShips: () => [] } as unknown as ShipStateService;
-    gateway = new GameGateway(mockShipState, {} as CommandRouterService, {} as ConnectedShipsRegistry, mockWsGuard, mockPrisma, mockOnboarding, mockScanHandler, { getTypeName: jest.fn() } as never, mockRandom, { emit: jest.fn(), on: jest.fn() } as never, new PresenceService());
+    gateway = makeGateway({
+      shipStateService: mockShipState,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
       to: toMock,
       emit: serverEmitMock,

@@ -2,14 +2,13 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import type { ConnectedPlayer } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * Verifies player.snapshot is emitted to the joining socket only (not broadcast),
@@ -93,18 +92,15 @@ describe('GameGateway player.snapshot', () => {
     const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
 
     const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    gateway = new GameGateway(
-      shipStateService as ShipStateService,
-      {} as CommandRouterService,
+    gateway = makeGateway({
+      shipStateService: shipStateService as ShipStateService,
       registry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().

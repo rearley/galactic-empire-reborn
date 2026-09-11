@@ -1,18 +1,16 @@
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { BEACON_EVENT } from '../../src/gateway/events/beacon.event';
 import { CYBERTRON_EVENT } from '../../src/game/cybertron/cybertron-events';
 import { GESTAT_AVAIL, GESTAT_USER, GESTAT_AUTO, UNIVMAX } from '../../src/game/constants';
 import { Random } from '../../src/game/combat/random.port';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * The gateway's BROADCAST AND SCOPING decisions — who is addressed, and in
@@ -102,24 +100,20 @@ const build = (random: Random = mockRandom) => {
 
   const registry = new ConnectedShipsRegistry(shipStateService);
 
-  const gateway = new GameGateway(
+  const gateway = makeGateway({
     shipStateService,
-    { dispatch: jest.fn() } as unknown as CommandRouterService,
     registry,
-    { validate: jest.fn() } as unknown as WsAuthGuard,
-    {
+    wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+    prisma: {
       $transaction: jest.fn().mockResolvedValue(undefined),
       shipClass: { findFirst: jest.fn() },
       ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       user: { update: jest.fn() },
     } as unknown as PrismaService,
-    {} as unknown as OnboardingService,
-    { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-    { getTypeName: () => 'Interceptor' } as never,
+    scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+    shipClassCache: { getTypeName: () => 'Interceptor' } as unknown as ShipClassCacheService,
     random,
-    { emit: jest.fn(), on: jest.fn() } as never,
-    new PresenceService(),
-  );
+  });
 
   const target = (room: string): Record<string, unknown> => ({
     emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },

@@ -2,13 +2,10 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * The rebroadcast after a rename must not hand out everyone's position.
@@ -62,18 +59,13 @@ describe('GameGateway — the roster rebroadcast is scoped per recipient', () =>
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
-    gateway = new GameGateway(
+    gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      {} as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
       emit: serverEmit,
       to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),

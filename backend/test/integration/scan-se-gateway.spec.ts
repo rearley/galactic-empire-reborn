@@ -21,16 +21,11 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
-import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
-import { mockRandom } from '../fixtures/mock-random';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult, ScanRenderEvent } from '../../src/game/commands/command.types';
 import { Socket } from 'socket.io';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway as makeTestGateway } from '../helpers/make-gateway';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -102,18 +97,7 @@ async function makeScanService(ships: ShipState[], scanRange = 50_000) {
 }
 
 function makeGateway(scanHandler: ScanHandlerService): GameGateway {
-  return new GameGateway(
-    {} as unknown as ShipStateService,
-    {} as unknown as CommandRouterService,
-    {} as unknown as ConnectedShipsRegistry,
-    {} as unknown as WsAuthGuard,
-    {} as unknown as PrismaService,
-    {} as unknown as OnboardingService,
-    scanHandler,
-    { getTypeName: jest.fn() } as never,
-    mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  return makeTestGateway({ scanHandler });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
