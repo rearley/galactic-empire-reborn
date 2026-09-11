@@ -267,3 +267,77 @@ describe('GameGateway — sector transition respects real room membership', () =
     expect(left!.recipients).not.toContain(moverSocket.id);
   });
 });
+
+/**
+ * FINDING (round 2, 2026-09-11 quality review): `gernd()` must be called ONLY
+ * when an observer is present in the destination sector — the original
+ * guarded the DRAW itself with `if (!hasObserver) return;` before ever
+ * calling `gernd()`. A prior fix computed `hasObserver` but called `gernd()`
+ * unconditionally, using `hasObserver` only to decide whether the RESULT was
+ * used. `gernd()` advances a PRNG stream shared with combat and spawning, so
+ * an extra draw on every crossing into an empty sector silently shifts every
+ * later roll in the game — a real gameplay change invisible to every test
+ * above, none of which assert on draw COUNT (they only assert on emitted
+ * events, using a `mockRandom` that never records calls).
+ */
+describe('GameGateway — the beacon roll only draws from the PRNG when there is something to roll for', () => {
+  const build = (observerInDestination: boolean) => {
+    const moverSocket = {
+      id: 'sock-mover', connected: true,
+      data: {} as Record<string, unknown>,
+      emit: jest.fn(), on: jest.fn(), join: jest.fn(), leave: jest.fn(),
+      disconnect: jest.fn(), broadcast: { emit: jest.fn() },
+    };
+
+    const mover = { userid: 'u1', shipno: 1, shipname: 'Wanderer', speed: 100, status: 1, xcoord: 5.02, ycoord: 3.5 };
+    const observer = { userid: 'obs', shipno: 1, shipname: 'Observer', speed: 0, status: 1, xcoord: 5.5, ycoord: 3.5 };
+    const ships = observerInDestination ? [mover, observer] : [mover];
+
+    const shipStateService = {
+      findAllShips: () => ships,
+      findByUserid: () => ships,
+      get: jest.fn().mockReturnValue(mover),
+    } as unknown as ShipStateService;
+
+    const registry = new ConnectedShipsRegistry(shipStateService);
+    jest.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
+
+    const next = jest.fn().mockReturnValue(0);
+    const gateway = makeGateway({
+      shipStateService,
+      registry,
+      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      random: { next },
+    });
+
+    (gateway as unknown as { server: unknown }).server = {
+      emit: jest.fn(),
+      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
+      sockets: { sockets: new Map([[moverSocket.id, moverSocket]]), adapter: { rooms: new Map() } },
+    };
+
+    return { gateway, next };
+  };
+
+  const fire = (gateway: GameGateway) =>
+    gateway.handleSectorTransition({
+      shipId: 'u1:1',
+      fromSector: { x: 4, y: 3 },
+      toSector: { x: 5, y: 3 },
+      x: 5.02,
+      y: 3.5,
+    } as never);
+
+  it('does not draw when no observer is present in the destination sector', () => {
+    const { gateway, next } = build(false);
+    fire(gateway);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('draws exactly once when an observer is present', () => {
+    const { gateway, next } = build(true);
+    fire(gateway);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+});

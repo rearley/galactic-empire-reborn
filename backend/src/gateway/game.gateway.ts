@@ -1863,11 +1863,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * broadcasts.
    *
    * `hasObserver`/`gernd()` for the beacon are computed here, guarded by the
-   * same three conditions `planTransition` itself gates on, so a transition
-   * that would never reach the beacon decision does not consume a random
-   * draw it did not consume before this was split out — a pure planner must
-   * not call `gernd()` itself, but the caller calling it more often than the
-   * original code did would be its own small behaviour change.
+   * same conditions the original inline code guarded them with — including
+   * `hasObserver` itself gating the `gernd()` DRAW, not just its result — so
+   * a transition that would never have drawn before this was split out still
+   * does not draw now. A pure planner must not call `gernd()` itself, but the
+   * caller drawing even one extra time would be its own small, silent
+   * behaviour change: `gernd()` advances a PRNG stream shared with combat and
+   * spawning, so an extra draw shifts every later roll in the game.
    */
   @OnEvent(PHYSICS_SECTOR_TRANSITION)
   handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
@@ -1876,6 +1878,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
     const moverSocketId = this.registry.getSocketId(shipId);
 
+    // `gernd()` must be called ONLY when an observer is present — the
+    // original guarded the draw itself with `if (!hasObserver) return;`
+    // before ever calling `gernd()`. Drawing unconditionally and only
+    // gating the RESULT downstream would silently consume an extra roll
+    // from the shared PRNG stream on every crossing into an empty sector,
+    // shifting every later combat/spawn roll in the game — a real gameplay
+    // change, not a refactor.
     let beacon: { hasObserver: boolean; roll: number } | undefined;
     const crossedSector = fromSector.x !== toSector.x || fromSector.y !== toSector.y;
     if (crossedSector && movingShip && movingShip.speed < 21000) {
@@ -1887,7 +1896,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           Math.floor(s.ycoord) === toSector.y &&
           (s.status === 1 || s.status === 2),
       );
-      beacon = { hasObserver, roll: gernd(this.random) };
+      if (hasObserver) {
+        beacon = { hasObserver, roll: gernd(this.random) };
+      }
     }
 
     const plan = planTransition(
