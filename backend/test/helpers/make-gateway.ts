@@ -92,11 +92,13 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
         flat.shipClassCache,
         flat.random,
       ),
-    // Inert for the same reason `shipDestroyed` is not: the connect and
-    // disconnect specs drive the gateway's OnGatewayConnection hooks and assert
-    // on what happens behind them — the seat cap, the boarding, the rage-quit
-    // kill. A double that did nothing would turn every one of them green
-    // without exercising a line of it.
+    // Deliberately NOT inert either, for the same reason as `shipDestroyed`
+    // above. The connect and disconnect specs drive the gateway's
+    // OnGatewayConnection / OnGatewayDisconnect hooks and assert on what
+    // happens behind them — the seat cap, the boarding sequence, the rage-quit
+    // kill, the departure notice. A double that did nothing would turn every
+    // one of them green without exercising a line of it. Built from the
+    // resolved deps above, the same way `registry` and `shipDestroyed` are.
     connectionLifecycle:
       overrides.connectionLifecycle ??
       new ConnectionLifecycleService(
