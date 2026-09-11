@@ -8,28 +8,18 @@ import { TransferHandlerService } from '../../../../src/game/commands/handlers/t
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { I_GOLD, ITEM_NAMES, NUMITEMS } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   const items = Array(NUMITEMS).fill(0n) as bigint[];
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alice', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
-    items,
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Alice',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 10000,
+    items: items,
     ...overrides,
-  };
+  });
 }
 
 function buildService(alice: ShipState, bob: ShipState) {

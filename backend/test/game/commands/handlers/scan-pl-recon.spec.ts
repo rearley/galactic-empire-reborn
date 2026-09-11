@@ -21,31 +21,22 @@ import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { CommandContext } from '../../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 import {
   NUMITEMS, I_MEN, I_TROOPS, I_MISSL, I_TORP, I_FLUX, I_FOOD, I_FIGHTER,
 } from '../../../../src/game/constants/items';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'alice', shipno: 1, shipname: 'Scout', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 10.5, ycoord: 7.5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'alice',
+    shipname: 'Scout',
+    xcoord: 10.5,
+    ycoord: 7.5,
+    energy: 50000,
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 0,
     ...overrides,
-  } as ShipState;
+  });
 }
 
 function makePlanetState(qty: Partial<Record<number, bigint>> = {}, overrides: Partial<PlanetState> = {}): PlanetState {
