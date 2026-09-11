@@ -19,7 +19,8 @@ import {
   PhysicsUniverseEdgeEvent,
 } from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
+import type { Ship } from '@prisma/client';
 import type {
   BroadcastTarget,
   GameServer,
@@ -32,7 +33,6 @@ import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
 import { CommandRouterService } from '../game/commands/command-router.service';
 import { ScanHandlerService } from '../game/commands/handlers/scan.handler';
-import { PresenceService } from '../public/presence.service';
 import { shipLetter } from '../game/commands/helpers/find-ship';
 import {
   COMBAT_DECOY_INTERCEPT,
@@ -83,7 +83,6 @@ import { planTransition, RoomEmit } from './sector-transition';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT } from './events/beacon.event';
-import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, SpawnSectorMissingError } from '../game/onboarding/onboarding.service';
 import {
@@ -231,14 +230,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly shipStateService: ShipStateService,
     private readonly commandRouter: CommandRouterService,
     private readonly registry: ConnectedShipsRegistry,
-    private readonly wsAuthGuard: WsAuthGuard,
     private readonly prisma: PrismaService,
     private readonly onboardingService: OnboardingService,
     private readonly scanHandler: ScanHandlerService,
     private readonly shipClassCache: ShipClassCacheService,
     @Inject(RANDOM) private readonly random: Random,
-    private readonly events: EventEmitter2,
-    private readonly presence: PresenceService,
     private readonly shipDestroyed: ShipDestroyedService,
     private readonly connectionLifecycle: ConnectionLifecycleService,
   ) {}
@@ -332,7 +328,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async boardShipAndWelcome(
     client: GameSocket,
     userid: string,
-    ship: { shipno: number; shipname: string; shpclass: number; xcoord: number; ycoord: number; damage: number; energy: number; heading: number; speed: number; where: number; [key: string]: unknown },
+    ship: Ship,
   ): Promise<void> {
     await this.connectionLifecycle.boardShipAndWelcome(this.lifecycleHost(), client, userid, ship);
   }
