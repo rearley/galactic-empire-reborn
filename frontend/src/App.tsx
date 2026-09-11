@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LogEntry } from './types/logEntry';
 import { destructionLine } from './features/combat/destructionLine';
+import { combatHitLine, phaserFiredLine } from './features/combat/combatNarration';
+import type { CombatHitNarrationEvent, NarrationContext } from './features/combat/combatNarration';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
@@ -152,66 +154,18 @@ function Terminal(): React.JSX.Element {
       return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];
     };
 
-    // Canon shows a bystander NOTHING about someone else's weapons fire.
-    // `PFIRED` goes `outprfge(FILTER, usrn)` — to the firer alone
-    // (GECMDS.C:943-944). The sector-wide broadcasts canon does make are cloak
-    // collapse (GEFUNCS.C:1380), the self-destruct countdown (:1836), sector
-    // entry/exit (:717-722), radio traffic and the destruction energy burst.
-    // Combat is not among them: to know whether two ships off your bow are
-    // fighting, you scan them and read their damage.
-    // @see docs/DECISIONS.md 2026-09-07
-    const handlePhaserFired = (_event: { shipId: string }) => {};
+    // Whether either of these says anything at all is a canon decision, and
+    // usually the answer is no. @see features/combat/combatNarration.ts
+    const ctx: NarrationContext = { localShipId, shipName };
 
-    const handleCombatHit = (event: { attackerId: string; attackerName?: string; victimId: string; victimName?: string; weapon: string; damageHull: number; damageShield: number }) => {
-      if (event.victimId === localShipId) {
-        // Nothing. The gateway already relays canon's own text for whatever hit
-        // you — THIT1/THIT2, MHIT1/MHIT2, PHITYOU/PHITDEF, MINE4 — over
-        // `event.log`, and this banner was a second telling of the same event
-        // with two departures baked in.
-        //
-        // Canon reports hull damage as a number NOWHERE: not to the attacker
-        // (PHITHIM passes a damstr word), not to the victim (THIT2 gives no
-        // magnitude at all), not even to you about your own ship — `rep` sends
-        // REP14 with the damstr word too (GECMDS.C:2037-2040). Shield charge
-        // gets a number; hull never does. And canon names the attacker at
-        // LAUNCH (TFIRE2, by scan letter) and deliberately not at impact.
-        //
-        // So: you are told you were hit and by what. `rep` tells you your
-        // condition, in words. @see docs/DECISIONS.md 2026-09-07
-        return;
-      }
+    const handlePhaserFired = (event: { shipId: string }) => {
+      const line = phaserFiredLine(event, ctx);
+      if (line) appendLines([line]);
+    };
 
-      // Ordnance the LOCAL ship fired: confirm the strike, assess nothing.
-      //
-      // Canon's silence to the firer is deliberate — every message about a
-      // torpedo after launch goes to the TARGET: the tracking alert (TORP1),
-      // the decoy intercept (TORDEST, GEFUNCS.C:1587-1588) and the impact
-      // (THIT1/THIT2). The firer is meant to `sca sh <name>` and read
-      // `Damage: severe damage` off the target, which is what the scan's damage
-      // line exists for. Handing the shooter a hull percentage removed the
-      // reason to type it, and was more precise than canon is anywhere: hull
-      // condition is one of damstr's six words, always (GECMDS.C:2110).
-      //
-      // Phaser and hyper-phaser are excluded: canon narrates those to the firer
-      // itself (PHITHIM / PDEFLECT, GECMDS.C:985-995) and the gateway relays
-      // them, so a line here would duplicate — and arrive first, since the
-      // broadcast leaves the server inside the command handler while
-      // `command:result` is written only after it returns.
-      if (event.attackerId === localShipId) {
-        const narratedToFirer = event.weapon === 'phaser' || event.weapon === 'hyper-phaser';
-        if (narratedToFirer) return;
-        // Prefer the ship name the server resolved: the roster excludes AI, so
-        // falling back to the key would print a userid ("Cybrg-222") that no
-        // command accepts — `sca sh` wants the ship name ("Cybrg-49340").
-        const victim = event.victimName ?? shipName(event.victimId);
-        appendLines([{
-          text: `Sensors confirm a ${event.weapon} strike on ${victim}.`,
-          category: 'combat' as const,
-        }]);
-      }
-
-      // Anyone else's fight is not narrated to you at all — see the note on
-      // handlePhaserFired above.
+    const handleCombatHit = (event: CombatHitNarrationEvent) => {
+      const line = combatHitLine(event, ctx);
+      if (line) appendLines([line]);
     };
 
     const handleShipDestroyed = (event: CombatShipDestroyedPayload) => {
