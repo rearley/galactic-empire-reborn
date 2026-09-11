@@ -27,6 +27,7 @@ import {
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 // ─── Shared class entry for all droid classes ──────────────────────────────
 
@@ -83,7 +84,7 @@ function buildHarness(seed = 42) {
     freq: [],
     items: Array(14).fill(0n),
     status: GESTAT_USER, cybmine: 255,
-    topspeed: 8_000, // NOTE: not a canon 0-255 warp factor — pre-existing, carried over unchanged (see task-6 report)
+    topspeed: canonMaxWarp(5),
   });
 
   const shipMap = new Map<string, ShipState>();

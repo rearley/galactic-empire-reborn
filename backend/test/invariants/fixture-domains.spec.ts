@@ -44,6 +44,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { maskComments } from './mask-comments';
+import { fixtureNumbers } from './numeric-fixtures';
 
 const TEST_ROOT = resolve(__dirname, '..');
 
@@ -238,8 +239,7 @@ describe('test fixtures hold values a real ship could hold', () => {
     for (const f of files) {
       const { maskedLines, rawLines } = readForScan(f);
       for (let i = 0; i < maskedLines.length; i++) {
-        for (const m of maskedLines[i].matchAll(new RegExp(`\\b${field}:\\s*(-?\\d+)`, 'g'))) {
-          const v = Number(m[1]);
+        for (const { value: v } of fixtureNumbers(maskedLines[i], field)) {
           if (v >= domain.min && v <= domain.max) continue;
           // Deliberate? It has to say so, here or on the line above.
           if (/domain-ok:/.test(rawLines[i]) || /domain-ok:/.test(rawLines[i - 1] ?? '')) continue;
@@ -259,9 +259,8 @@ describe('test fixtures hold values a real ship could hold', () => {
         let runningOffset = 0;
         for (let i = 0; i < maskedLines.length; i++) {
           const line = maskedLines[i];
-          for (const m of line.matchAll(new RegExp(`\\b${field}:\\s*(-?\\d+)`, 'g'))) {
-            const v = Number(m[1]);
-            const offset = runningOffset + m.index!;
+          for (const { value: v, index } of fixtureNumbers(line, field)) {
+            const offset = runningOffset + index;
             const domain = resolveScope(masked, offset, candidates);
             const rel = `${f.slice(TEST_ROOT.length + 1)}:${i + 1}`;
             if (!domain) {

@@ -504,7 +504,7 @@ function emptyShip(): Omit<ShipState, 'userid' | 'shipno' | 'shpclass'> {
     items: Array(16).fill(0n) as bigint[], titem: 0, hostile: 0,
     cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
     status: 1, cybmine: 255, cybskill: 0, cybupdate: 0, tick: 0,
-    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
+    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
     scanNames: false, scanHome: false, scanFull: false, msgFilter: false, dirty: false,
   };
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { escapeIlikePattern } from '../../prisma/ilike-escape';
+import type { TxClient } from '../../prisma/tx-client';
 
 @Injectable()
 export class TeamRepository {
@@ -26,14 +27,18 @@ export class TeamRepository {
     });
   }
 
-  /** @see GECMDS.C:5277 cmd_team */
+  /**
+   * @param tx  The caller's transaction client, when the insert has to commit
+   *   or roll back with the founder's `teamcode`. @see issue #14
+   * @see GECMDS.C:5277 cmd_team
+   */
   async insertTeam(data: {
     teamcode: bigint;
     teamname: string;
     password: string;
     secret: string;
-  }): Promise<void> {
-    await this.prisma.team.create({
+  }, tx?: TxClient): Promise<void> {
+    await (tx ?? this.prisma).team.create({
       data: {
         teamcode: data.teamcode,
         teamname: data.teamname,
@@ -67,9 +72,15 @@ export class TeamRepository {
     });
   }
 
-  /** Returns the highest teamcode in use, or 0n if no teams exist. @see GECMDS.C:5277 cmd_team */
-  async getMaxTeamcode(): Promise<bigint> {
-    const result = await this.prisma.team.aggregate({ _max: { teamcode: true } });
+  /**
+   * Returns the highest teamcode in use, or 0n if no teams exist.
+   * @param tx  The caller's transaction client. Reading the max OUTSIDE the
+   *   transaction that inserts the next one is the read-modify-write race the
+   *   P2002 retry loop used to absorb. @see issue #14
+   * @see GECMDS.C:5277 cmd_team
+   */
+  async getMaxTeamcode(tx?: TxClient): Promise<bigint> {
+    const result = await (tx ?? this.prisma).team.aggregate({ _max: { teamcode: true } });
     return result._max.teamcode ?? 0n;
   }
 
