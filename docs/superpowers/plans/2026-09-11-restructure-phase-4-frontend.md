@@ -29,7 +29,18 @@ That is an observation. Every other phase names what to change and what done loo
 - **Never pipe a test run through `tail`/`head`.** It discards the failing test's name and masks the exit code. Redirect to a file and grep it.
 - **`npm run lint` must stay at exit 0** in `frontend/`.
 - **No `any`, no non-null assertions in new code.**
-- **The C source is authoritative and `/reference/` is READ ONLY.** Read `reference/CLAUDE.md` before opening anything there. Every `@see GECMDS.C:` / `GEFUNCS.C:` citation and every canon comment moves WITH the code it documents, unchanged. Do not re-derive or re-word one while relocating it. `backend/test/balance/canon-citations.balance.spec.ts` scans the whole repo and **currently sits exactly at its floor with zero headroom** — a dropped citation fails it immediately, which is the intended behaviour.
+- **The C source is authoritative and `/reference/` is READ ONLY.** Read `reference/CLAUDE.md` before opening anything there. Every `@see GECMDS.C:` / `GEFUNCS.C:` citation and every canon comment moves WITH the code it documents, unchanged. Do not re-derive or re-word one while relocating it.
+
+  **CORRECTED 2026-09-11, during Task 1's review.** An earlier version of this
+  constraint said `backend/test/balance/canon-citations.balance.spec.ts` "scans the
+  whole repo" and that dropping a frontend citation would fail it. **That is false.**
+  Its `SOURCE_FILES` walks only `backend/src` and `backend/test`. The 45 canon
+  citations currently in `frontend/` are checked by **nothing** — not counted, not
+  quote-verified against `/reference/ge-source/`. Filed as issue #22.
+
+  So the rule stands on its own merit, not because a test enforces it: **move
+  citations unchanged because they are the canon derivation, and nothing will catch
+  you if you do not.**
 - **TDD.** Failing test first, watch the red, then implement.
 
 ## Baseline — measure before you start
@@ -447,7 +458,9 @@ docker build -f frontend/Dockerfile -t ge-frontend-p4 .
 
 - [ ] **Step 4: Run BOTH suites**
 
-The frontend suite is the one this phase changed, but the backend's citation ratchet scans the whole repo — including `frontend/` — and has zero headroom, so a dropped citation in a frontend comment fails a BACKEND test.
+Run both. The frontend suite is the one this phase changed. The backend suite is run
+as a regression check only — **not** because the citation ratchet covers `frontend/`,
+which it does not (see the corrected constraint above, and issue #22).
 
 ```bash
 npm test > /tmp/fe.txt 2>&1; echo "fe=$?"; grep -E "Test Files|Tests " /tmp/fe.txt
