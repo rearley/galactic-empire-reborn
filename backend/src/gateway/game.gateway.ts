@@ -118,6 +118,7 @@ import { isAiUserid } from '../game/commands/helpers/ai-userid';
 import { MESG_SHIPLOSS } from '../game/player/ship-loss-mail.service';
 import { DOC_PLANET_LIMIT, MAIL_CLASS_DISTRESS, RNDDOC } from '../game/constants';
 import type { CommandBroadcast } from '../game/commands/command.types';
+import { dispatchBroadcast, emitToSockets, roomMembers } from './broadcast-dispatch';
 
 interface CommandPayload {
   input: unknown;
@@ -222,15 +223,15 @@ function hitText(
  *
  * @see docs/superpowers/plans/2026-09-10-restructure-phase-1-wire-contract.md
  */
-type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
-type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
+export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 /**
  * Every shape `processBroadcasts`/`emitToSockets` actually call `.emit()` on:
  * the whole server (galaxy-wide), a room operator (`server.to(room)`), or one
  * connected socket. All three carry the same `ServerToClientEvents` map.
  */
-type BroadcastTarget = GameServer | GameSocket | ReturnType<GameServer['to']>;
+export type BroadcastTarget = GameServer | GameSocket | ReturnType<GameServer['to']>;
 
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -2632,111 +2633,48 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Tuned transmission — only ships carrying this frequency on one of
         // their three channels hear it. @see GEMAIN.C:2583 outsect / outwar
         const members =
-          broadcast.room === 'galaxy' ? undefined : this.roomMembers(broadcast.room);
-        this.emitToSockets(broadcast, members, excludeId, (ship) =>
-          ship.freq.includes(broadcast.freq as number),
+          broadcast.room === 'galaxy' ? undefined : roomMembers(this.server, broadcast.room);
+        emitToSockets(
+          this.server,
+          broadcast,
+          members,
+          excludeId,
+          (ship) => ship.freq.includes(broadcast.freq as number),
+          (uid, shipno) => this.shipStateService.get(uid, shipno),
         );
       } else if (broadcast.room === 'galaxy') {
         // Galaxy-wide: all connected sockets, no filtering
-        this.dispatchBroadcast(this.server, broadcast);
+        dispatchBroadcast(this.server, broadcast);
       } else if (broadcast.room.startsWith('ship:')) {
         // A message addressed to ONE pilot, the way C writes to a single
         // terminal with `outprfge(FILTER, shpnum)`. Used by `sca sh` to tell
         // a ship it has been scanned. @see GECMDS.C:2280
         const [, uid, shipnoRaw] = broadcast.room.split(':');
         const shipno = Number(shipnoRaw);
-        this.emitToSockets(
+        emitToSockets(
+          this.server,
           broadcast,
           undefined,
           excludeId,
           (ship) => ship.userid === uid && ship.shipno === shipno,
+          (userid, shipNo) => this.shipStateService.get(userid, shipNo),
         );
       } else if (broadcast.room === 'hail') {
         // Hail: every ship in the game hears it. `outwar` (GEMAIN.C:1518-1540)
         // delivers to every `ingegame` ship and never examines cloak —
         // running silent hides you from scanners, not from your own radio.
         // @see GECMDS.C:1845
-        this.emitToSockets(broadcast, undefined, excludeId, () => true);
+        emitToSockets(
+          this.server,
+          broadcast,
+          undefined,
+          excludeId,
+          () => true,
+          (uid, shipno) => this.shipStateService.get(uid, shipno),
+        );
       } else {
-        this.dispatchBroadcast(this.server.to(broadcast.room), broadcast);
+        dispatchBroadcast(this.server.to(broadcast.room), broadcast);
       }
-    }
-  }
-
-  /** Socket ids currently in `room`, or an empty set when the room is gone. */
-  private roomMembers(room: string): Set<string> {
-    return this.server.sockets.adapter.rooms.get(room) ?? new Set<string>();
-  }
-
-  /**
-   * Emits `broadcast` on `target`, narrowing `broadcast.event` so
-   * `broadcast.payload` is checked against the ONE wire payload type that
-   * event actually carries, rather than passing a union `event` and an
-   * unrelated `payload` to a single `.emit()` call (which the typed
-   * `Server`/`Socket` generics correctly refuse — `event` and `payload` are
-   * a discriminated union on `CommandBroadcast`, and Socket.io's overloaded
-   * `emit` cannot verify that correlation across a union without this
-   * per-branch narrowing).
-   *
-   * `'player.snapshot'` never reaches here — `processBroadcasts` resolves it
-   * to `emitScopedSnapshotToAll()` before any target-based dispatch. The case
-   * exists only so this switch is exhaustive over `CommandBroadcast['event']`.
-   */
-  private dispatchBroadcast(target: BroadcastTarget, broadcast: CommandBroadcast): void {
-    switch (broadcast.event) {
-      case 'command.notice':
-        target.emit('command.notice', broadcast.payload);
-        return;
-      case 'event.log':
-        target.emit('event.log', broadcast.payload);
-        return;
-      case 'message.send':
-        target.emit('message.send', broadcast.payload);
-        return;
-      case 'ship.renamed':
-        target.emit('ship.renamed', broadcast.payload);
-        return;
-      case 'player.snapshot':
-        return;
-      default: {
-        // Exhaustiveness check, not dead code: if `CommandBroadcast` ever
-        // grows a sixth `event` variant, every case above still compiles —
-        // `broadcast.event` would just be a value the switch does not
-        // recognise, and the broadcast would silently vanish at runtime
-        // exactly like the pre-fix probe test this switch replaced. Assigning
-        // the unhandled remainder to `never` makes that a compile error
-        // instead: TypeScript can only narrow `broadcast` to `never` here if
-        // every union member was already matched above.
-        const _exhaustive: never = broadcast;
-        return _exhaustive;
-      }
-    }
-  }
-
-  /**
-   * Emits `broadcast` to every socket whose active ship satisfies `accept`.
-   *
-   * `members` limits the sweep to one room's socket ids; omit it to consider
-   * every connected socket. `excludeId` drops the sender, which C does by
-   * passing `usrnum` to outsect/outwar.
-   */
-  private emitToSockets(
-    broadcast: CommandBroadcast,
-    members: Set<string> | undefined,
-    excludeId: string | undefined,
-    accept: (ship: ShipState) => boolean,
-  ): void {
-    const ids = members ?? this.server.sockets.sockets.keys();
-    for (const socketId of ids) {
-      if (socketId === excludeId) continue;
-      const sock = this.server.sockets.sockets.get(socketId);
-      if (!sock) continue;
-      const uid = sock.data.userid as string | undefined;
-      const shipno = sock.data.activeShipNo as number | undefined;
-      if (uid == null || shipno == null) continue;
-      const ship = this.shipStateService.get(uid, shipno);
-      if (!ship || !accept(ship)) continue;
-      this.dispatchBroadcast(sock, broadcast);
     }
   }
 
