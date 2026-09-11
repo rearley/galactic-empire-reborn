@@ -59,8 +59,10 @@ export function App(): React.JSX.Element {
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
 
-  // Reads only `players`, which the combat effect below (:134) lists in its
-  // dep array — that's what keeps this closure current without re-running
+  // Reads only `players`, which the combat-subscription `useEffect` below
+  // (the one registering `handlePhaserFired`/`handleCombatHit`/
+  // `handleShipDestroyed`/`handleDecoyIntercept`) lists in its dependency
+  // array — that's what keeps this closure current without re-running
   // the effect on every render. Nothing enforces that invariant if a future
   // edit makes this read something else: `react-hooks/exhaustive-deps` is
   // not enabled anywhere in this repo (`.oxlintrc.json` loads no React
