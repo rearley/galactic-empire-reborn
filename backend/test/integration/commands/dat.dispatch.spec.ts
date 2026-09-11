@@ -1,7 +1,7 @@
 import { CommandRouterService } from '../../../src/game/commands/command-router.service';
 import { DatHandlerService } from '../../../src/game/commands/handlers/dat.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
-import { PrismaService } from '../../../src/prisma/prisma.service';
+import { TeamRepository } from '../../../src/game/team/team.repository';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
 
@@ -31,10 +31,10 @@ const ctx: CommandContext = {};
 
 function buildRouter(ships: ShipState[]): CommandRouterService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
-  const prismaMock = {
-    team: { findFirst: jest.fn().mockResolvedValue(null) },
-  } as unknown as PrismaService;
-  const handler = new DatHandlerService(shipSvc, prismaMock);
+  const teamsMock = {
+    findNameByCode: jest.fn().mockResolvedValue(null),
+  } as unknown as TeamRepository;
+  const handler = new DatHandlerService(shipSvc, teamsMock);
   const router = new CommandRouterService();
   router.register(handler.command);
   return router;

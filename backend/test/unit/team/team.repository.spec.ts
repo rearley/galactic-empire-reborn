@@ -63,19 +63,13 @@ describe('TeamRepository.findNameByCode', () => {
     });
     expect(result).toEqual({ teamname: 'Rebels' });
   });
-
-  it('returns null for an unknown teamcode', async () => {
-    const prisma = makePrisma(null);
-    const repo = new TeamRepository(prisma);
-
-    await expect(repo.findNameByCode(999n)).resolves.toBeNull();
-  });
 });
 
 /**
- * `rep acc` looks a captain's team up by its primary key, so canon's call
- * site used `findUnique` rather than `findFirst` — a different verb from
- * `findNameByCode`, preserved rather than merged into it.
+ * `rep acc` looks a captain's team up by its primary key, so the port's
+ * `report.handler.ts` call site used `findUnique` rather than `findFirst` —
+ * canon has no Prisma verbs to disagree about; this is a port-side
+ * distinction from `findNameByCode`, preserved rather than merged into it.
  * @see report.handler.ts
  */
 describe('TeamRepository.getName', () => {

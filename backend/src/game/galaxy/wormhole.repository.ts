@@ -9,14 +9,8 @@ import { PrismaService } from '../../prisma/prisma.service';
  * wormhole lookup is always its own statement rather than a shared one with
  * planets.
  *
- * @see GEMAIN.H GALWORM  @see GECMDS.C scan_pl
- *
- * These methods are scaffolded from the current call sites' exact queries —
- * same `where`, same `select`, same verb — but the call sites themselves
- * (`orbit.handler.ts`, `scan-planet.ts`, `galaxy.service.ts`) were left
- * untouched: they were not in this task's file list, and repointing them
- * would have touched several more handler test files than the gateway debt
- * this task exists to clear. @see docs/DECISIONS.md
+ * @see GEMAIN.H:467 `GALWORM {`
+ * @see GECMDS.C:2456 `if (plptr->type == PLTYPE_WORM)`
  */
 @Injectable()
 export class WormholeRepository {

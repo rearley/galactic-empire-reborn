@@ -252,12 +252,17 @@ describe('a quoted citation says what the original says', () => {
     // lower TOTAL_FLOOR to the new total and say why in a comment here — do
     // NOT lower it just to clear a failure caused by an accidental loss.
     //
-    // Lowered 3355 → 3353 the same day: scan-planet.ts's local
+    // Lowered 3355 → 3353 the same day (fix round 1): scan-planet.ts's local
     // `findSectorWormhole` helper (and its two-citation docblock, GEMAIN.H
     // and GECMDS.C) was deleted when the call site was repointed at
     // `WormholeRepository.findSectorWormhole` — dead code removed, its
-    // citation went with it. Restructure Phase 3 task 4, fix round 1.
-    const TOTAL_FLOOR = 3353;
+    // citation went with it.
+    //
+    // Restored to 3355 in fix round 2: `WormholeRepository`'s class-level
+    // citations (GEMAIN.H:467, GECMDS.C:2456) were re-quoted rather than left
+    // digit-free, replacing the two lost above with two that are checkable —
+    // net total measured back at 3355.
+    const TOTAL_FLOOR = 3355;
     expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
   });
 });
