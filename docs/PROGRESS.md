@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 91 entries.
+Append-only, **newest at the bottom**. 92 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -8,6 +8,7 @@ Append-only, **newest at the bottom**. 91 entries.
 The 15 latest entries, reversed — the log itself reads oldest-first, which makes
 "what is the current state" the hardest thing to find in it.
 
+- [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
 - [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
 - [2026-09-11 — restructure phase 1: one typed wire contract](#2026-09-11--restructure-phase-1-one-typed-wire-contract)
 - [2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change](#2026-09-10--restructure-phase-0-toolchain-and-runtime-zero-gameplay-change)
@@ -5660,3 +5661,52 @@ assigned to touch.
   module or which `@ts-expect-error` lines fire — `tsc --noEmit` stayed clean
   after the edit, meaning every flagged mistake in the fixture still resolves
   the way the file exists to prove. `npm run lint` now exits 0.
+
+
+## 2026-09-11 — phase 2 final review: the mover's own sector came back null
+
+**Completed:** three findings from the whole-branch review of the gateway
+split.
+
+- **C-1 (critical, gameplay regression).** Extracting `handleSectorTransition`
+  into a `TransitionPlan` collapsed three separately-positioned mover emits
+  into one `moverEmits` array, and the executor sent all of it before any room
+  emit. That put the mover's repairing `player.sector` in FRONT of the
+  departure broadcast `{ shipId, sector: null }` — which the mover still
+  receives, because its socket has not yet left `sector:from`. `usePlayerList`
+  is last-write-wins on `sector`, so a player's own row in their own player
+  list blanked to an em dash after every boundary crossing and stayed blank
+  until the next `player.snapshot`. `TransitionPlan` now has three mover
+  buckets (`moverEmitsBeforeRoomEmits`, `moverEmitsAfterRoomEmits`,
+  `moverEmitsAfterMove`) whose declared field order IS the execution order,
+  and both the interface docblock and the handler docblock write that
+  sequence out. Restores the pre-split behaviour exactly; no other behaviour
+  changed.
+- **I-1.** Restored two canon citations (`GECMDS.C:2529` scan_ra,
+  `GECMDS.C:2598` scan_se) deleted from the no-mine-loop comment when the scan
+  handler was split into `scan/scan-render.ts`. Restored verbatim from
+  `fadb7a2`, not re-derived.
+- **M-2 (operational).** Commit `b22b935` moved the ship-loss forensics
+  warnings out of the `[GameGateway]` logging context and into
+  `[ShipDestroyedService]` — a production-log grep for gateway warnings on a
+  ship loss now finds nothing, and must search the new context instead.
+
+**Tests:** `backend/test/gateway/sector-transition.spec.ts` grew a suite that
+records BOTH delivery channels — room emits and mover-socket emits — into ONE
+ordered timeline, which is the hole that hid C-1: room emits went to a shared
+array while mover emits went to a separate `jest.fn()`, so the two were never
+compared for order. Two new cases: one replays `usePlayerList`'s
+last-write-wins reducer over everything the mover actually receives and
+asserts the final believed sector is `toSector`, the other pins the full
+seven-emit interleaved sequence. Mutation-checked: reapplying the wrong order
+fails the first with `Received: null`, which is the reported bug exactly.
+
+**Decisions made:** three named buckets rather than interleaving markers — the
+plan stays a plain data object and the field order is the contract, which is
+what a reader checks against the pre-split source.
+
+**Next:** Phase 3 — persistence boundary, unchanged.
+
+**Known issues:** none new. The phase-2 known issues above (gateway
+`this.prisma` count of 2, and the four carried frontend/wire items) are
+untouched by this session.

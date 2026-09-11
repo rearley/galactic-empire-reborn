@@ -141,7 +141,8 @@ export function renderLoScan(
   const grid: ScanCell[] = [];
 
   // NO mine loop here. `scan_lo` (GECMDS.C:2640 onward) contains no `mptr`
-  // iteration at all before printmap(). This method used to carry
+  // iteration at all before printmap() — the mine loop belongs to scan_ra
+  // (GECMDS.C:2529) and to scan_se (GECMDS.C:2598). This method used to carry
   // it while citing scan_ra's line numbers, so the long-range overview drew
   // mines canon never puts there and the tactical scan showed clean space.
 
