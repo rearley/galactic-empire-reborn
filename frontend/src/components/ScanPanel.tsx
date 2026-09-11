@@ -1,6 +1,6 @@
 import React from 'react';
 import { useScanRender } from '../hooks/useScanRender';
-import type { ScanRenderEvent } from '../hooks/useScanRender';
+import type { ScanRenderEvent } from '@ge/wire';
 
 export const SCAN_WIDTH = 30;
 export const SCAN_HEIGHT = 15;

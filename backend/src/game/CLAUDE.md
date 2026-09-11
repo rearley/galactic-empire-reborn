@@ -8,7 +8,7 @@ from memory and got the wrong answer.
 
 ```
 backend/src/game/
-  tick/           ← TickService — drives the 1s and 6s game loops
+  tick/           ← TickService — drives the 1s, 6s and 55s game loops
   ship/           ← ShipStateService — in-memory state Map + async DB flush;
                     ShipTickService, MaintenanceService, ShipChannelRegistry
   planet/         ← PlanetStateService, PlanetEconomyService,
@@ -49,7 +49,7 @@ surface at COMPILE time: it assigns an object literal to the port type, so
 widening or narrowing either interface breaks `tsc`. Its runtime `expect`s are
 incidental.
 
-## 1. The two tick timers are not split the way you would guess
+## 1. The three tick timers are not split the way you would guess
 
 - **Ship update tick, 1 second** (`setInterval(…, 1000)`) — **movement**:
   rotate, accelerate, move, and the self-destruct countdown. Also energy regen
@@ -64,12 +64,21 @@ incidental.
   torpedo/missile/decoy flight (`checktm`, including the `hypha` and `cantexit`
   countdowns), ion cannons, phaser recharge and damage control.
 
+- **Planet update tick, 55 seconds** (`PLANTIME`, `GEMAIN.H:136`) — the planet
+  economy sweep. Canon derives the per-planet cadence as
+  `plantime = plantock / numrecs` (`GEMAIN.C:656`), so every owned planet is
+  updated once per `PLANTOCK_SECONDS` and the sweep itself fires on the fixed
+  55-second interval. **This one does not start in `onModuleInit`**:
+  `PlanetTickService` calls `TickService.startPlanetUpdateTimer(PLANTIME * 1000)`
+  once the planet set is known. Lifecycle-hook ordering therefore does not
+  govern it, which is the opposite of the other two.
+
 - **Midnight job**, `@Cron('0 0 * * *')` — recalculate scores, send planet
   production reports, purge mail older than 3 days (`MAILDAYS`, GEMAIN.C:497 —
   7 is the clamp ceiling, not the default), rebuild team scores. Must be
   idempotent and wrapped in a Postgres transaction.
 
-**This table used to have the two backwards on movement**, saying the 6-second
+**This table used to have the fast two backwards on movement**, saying the 6-second
 tick moves ships. `positionIntegration` carries canon's per-CALL displacement
 with no `dt` term, so every ship flew at exactly HALF canon's speed, turned half
 as fast, took twice as long to reach an ordered warp and twice as long to

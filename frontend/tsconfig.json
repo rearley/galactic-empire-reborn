@@ -14,7 +14,12 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    // Node types are for the test tree only — two guards read the repo from
+    // disk (the wire-contract duplication check and the citation ratchet).
+    // `vite/client` stays available through src/vite-env.d.ts's triple-slash
+    // reference, which a `types` array does not suppress.
+    "types": ["node"]
   },
   "include": ["src", "test"]
 }

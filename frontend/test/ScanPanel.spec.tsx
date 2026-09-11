@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { ScanPanel } from '../src/components/ScanPanel';
-import type { ScanRenderEvent } from '../src/hooks/useScanRender';
+import type { ScanRenderEvent } from '@ge/wire';
 
 // T011/T012/T013: mock socket so we can trigger scan:render in tests
 const socketListeners = new Map<string, Set<(...args: unknown[]) => void>>();
