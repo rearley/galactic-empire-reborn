@@ -43,6 +43,7 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { maskComments } from './mask-comments';
 
 const TEST_ROOT = resolve(__dirname, '..');
 
@@ -202,10 +203,27 @@ function specFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);
     if (statSync(p).isDirectory()) return specFiles(p);
-    // This file's own prose quotes the bad value it exists to ban.
-    if (e === 'fixture-domains.spec.ts') return [];
     return /\.spec\.ts$/.test(e) ? [p] : [];
   });
+}
+
+/**
+ * The text a scan should look at, and the text a `domain-ok:` marker lives in.
+ *
+ * Values are matched against the COMMENT-MASKED source, so prose describing a
+ * banned value is no longer indistinguishable from a fixture holding one. The
+ * marker is matched against the ORIGINAL, because the marker is itself written
+ * in a comment and masking would erase it.
+ *
+ * This file used to exempt itself from the scan — its own header has to name
+ * the value it exists to ban — and every other file in the suite had the same
+ * need with no exemption. Masking removes the need, so the exemption is gone
+ * and the guard finally scans itself. @see issue #13
+ */
+function readForScan(f: string): { masked: string; maskedLines: string[]; rawLines: string[] } {
+  const text = readFileSync(f, 'utf8');
+  const masked = maskComments(text);
+  return { masked, maskedLines: masked.split('\n'), rawLines: text.split('\n') };
 }
 
 describe('test fixtures hold values a real ship could hold', () => {
@@ -218,14 +236,13 @@ describe('test fixtures hold values a real ship could hold', () => {
   it.each(Object.entries(DOMAINS))('%s stays inside its canon domain', (field, domain) => {
     const offenders: string[] = [];
     for (const f of files) {
-      const text = readFileSync(f, 'utf8');
-      const lines = text.split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        for (const m of lines[i].matchAll(new RegExp(`\\b${field}:\\s*(-?\\d+)`, 'g'))) {
+      const { maskedLines, rawLines } = readForScan(f);
+      for (let i = 0; i < maskedLines.length; i++) {
+        for (const m of maskedLines[i].matchAll(new RegExp(`\\b${field}:\\s*(-?\\d+)`, 'g'))) {
           const v = Number(m[1]);
           if (v >= domain.min && v <= domain.max) continue;
           // Deliberate? It has to say so, here or on the line above.
-          if (/domain-ok:/.test(lines[i]) || /domain-ok:/.test(lines[i - 1] ?? '')) continue;
+          if (/domain-ok:/.test(rawLines[i]) || /domain-ok:/.test(rawLines[i - 1] ?? '')) continue;
           offenders.push(`${f.slice(TEST_ROOT.length + 1)}:${i + 1} → ${field}: ${v}`);
         }
       }
@@ -238,15 +255,14 @@ describe('test fixtures hold values a real ship could hold', () => {
     (field, candidates) => {
       const offenders: string[] = [];
       for (const f of files) {
-        const text = readFileSync(f, 'utf8');
-        const lines = text.split('\n');
+        const { masked, maskedLines, rawLines } = readForScan(f);
         let runningOffset = 0;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
+        for (let i = 0; i < maskedLines.length; i++) {
+          const line = maskedLines[i];
           for (const m of line.matchAll(new RegExp(`\\b${field}:\\s*(-?\\d+)`, 'g'))) {
             const v = Number(m[1]);
             const offset = runningOffset + m.index!;
-            const domain = resolveScope(text, offset, candidates);
+            const domain = resolveScope(masked, offset, candidates);
             const rel = `${f.slice(TEST_ROOT.length + 1)}:${i + 1}`;
             if (!domain) {
               // Not a domain violation — a SCOPING gap. Extend SHIP_STATE_SCOPE
@@ -257,7 +273,7 @@ describe('test fixtures hold values a real ship could hold', () => {
             }
             if (v >= domain.min && v <= domain.max) continue;
             // Deliberate? It has to say so, here or on the line above.
-            if (/domain-ok:/.test(line) || /domain-ok:/.test(lines[i - 1] ?? '')) continue;
+            if (/domain-ok:/.test(rawLines[i]) || /domain-ok:/.test(rawLines[i - 1] ?? '')) continue;
             offenders.push(`${rel} → ${domain.label}: ${v}`);
           }
           runningOffset += line.length + 1;
