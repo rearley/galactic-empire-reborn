@@ -5645,3 +5645,43 @@ is already behind a seam.
 build clean from the repo root; `require.resolve('@ge/wire')` resolves inside
 the running backend image. Full suite: one `npx jest` process, `Ran all test
 suites.` appears exactly once, 623/623 suites and 6,356/6,356 tests passed.
+
+## 2026-09-11 — Phase 4 scope was derived from the code, and a plan constraint was corrected
+
+**Context:** Phase 4 of the restructure (the frontend) is the only phase
+whose spec entry in `docs/superpowers/specs/2026-09-10-restructure-design.md`
+states no goal — its entire content is "3,521 lines across 43 files.
+`App.tsx` at 388 is the largest." That is an observation, not a requirement
+list, unlike every other phase in the restructure.
+
+**Decision:** Phase 4's scope (extract `useEventLog`, `useFkeys`,
+`useScanMap`, and `combatNarration` out of `App.tsx`) was chosen by reading
+`App.tsx` directly and counting its 12 `socket.on` subscriptions and 15 hook
+calls, not by following a written requirement. Recorded here so a later
+question — "why was Phase 4 smaller than its neighbours?" — has an answer:
+there was no larger spec to fall short of.
+
+**Reason:** the alternative was inventing a fuller scope not grounded in
+either the spec or an observed problem, which the restructure's own ground
+rules (behaviour-neutral, incremental) argue against.
+
+**Correction, filed as issue #22:** during Task 1's review, the plan's Global
+Constraints section was found to claim
+`backend/test/balance/canon-citations.balance.spec.ts` "scans the whole repo"
+and that dropping a frontend `@see` citation would fail it. **That claim is
+false.** The spec's `SOURCE_FILES` list walks only `backend/src` and
+`backend/test`; the 45 canon citations living in `frontend/` are checked by
+nothing — not counted, not quote-verified against `/reference/ge-source/`.
+The plan was corrected in place at commit `dcdb521` rather than silently
+fixed, because the false constraint had already been acted on (Task 1 moved
+citations under the belief a test would catch a mistake, when none would
+have). The corrected framing: citations move unchanged because they are the
+canon derivation, not because a guard enforces it. Every frontend canon
+citation touched in this phase was verified by hand against
+`/reference/ge-source/` as a result, not by CI.
+
+**Alternatives rejected:** leaving the false claim in place since the phase
+already happened to move citations correctly — rejected because the note's
+job is to warn the *next* phase, and Phase 5 (backend-only) will not
+re-encounter this, but any future frontend work would repeat the same false
+assumption without the correction on record.
