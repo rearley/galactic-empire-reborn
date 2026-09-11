@@ -41,9 +41,12 @@ import { App } from '../src/App';
 
 /**
  * A pilot is in their own sector room, so the sector-wide COMBAT_HIT broadcast
- * comes back to the ship that fired it. `handlePhaserFired` has always guarded
- * against that (`if (event.shipId === localShipId) return;`); `handleCombatHit`
- * did not, so a player watched themselves in the third person:
+ * comes back to the ship that fired it. The phaser-fired path never narrated a
+ * thing to anyone — not the firer, not a bystander — because canon shows a
+ * bystander NOTHING about someone else's weapons fire; see the canon note on
+ * `phaserFiredLine` in `src/features/combat/combatNarration.ts`.
+ * `handleCombatHit` had no such silence, so a player watched themselves in the
+ * third person:
  *
  *     QuiteCat hits Cybertron 43319 (phaser, hull -24%)
  *     Shields are now down, Sir!

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { socket } from '../socket/socketClient';
-import type { ScanCell } from '@ge/wire';
-import type { ScanRenderEvent } from './useScanRender';
+import type { ScanCell, ScanRenderEvent } from '@ge/wire';
 
 /**
  * Subscribes to `scan:render` socket events and keeps only the most recent
@@ -28,7 +27,7 @@ export function useScanMap(
 
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
-      setCells(event.cells as ScanCell[]);
+      setCells(event.cells);
       setKind(event.kind);
     };
     socket.on('scan:render', handleScanRender);
