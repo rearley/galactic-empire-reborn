@@ -76,6 +76,24 @@ guard checks four files and never the runtime running the tests — this machine
 was on Node 22 while everything declared 24), #28 and #29 (the first
 type-aware lint findings).
 
+## Outcome, 2026-09-11 — the phase closed with two items deferred
+
+Five of the nine tasks landed. Two are waiting on other people's packages, and
+both were verified as blocked rather than assumed:
+
+- **Task 4, NestJS 12 — blocked (#34).** `@nestjs/throttler` has no Nest 12
+  release; npm halts the install and `overrides` do not relax a peer conflict.
+- **Task 8, TypeScript 7 — deferred to 7.1 (#35).** `tsc --noEmit` passed clean
+  on 7.0.2 first try, decorator metadata is identical at 153 emissions, and the
+  build goes 8.9s → 1.7s. But TypeScript 7.0 ships no programmatic compiler API,
+  so `nest build`, `nest start` and `nest start --watch` all break.
+
+Tasks 5 and 6 (Prisma 7) landed as one commit rather than two — the schema,
+config, adapter and importers could not be split without leaving the suite red
+in between for longer than the split was worth.
+
+Full record in `docs/DECISIONS.md` and `docs/PROGRESS.md`, both 2026-09-11.
+
 ## Global Constraints
 
 Every task's requirements implicitly include this section.
