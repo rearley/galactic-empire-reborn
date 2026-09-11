@@ -37,7 +37,7 @@ Recorded 2026-09-11 on `restructure` at `541914b`:
 | `prisma.user.*` calls, repo-wide | 53 |
 | `prisma.shipClass.*` calls in commands | 8 |
 | `forwardRef` occurrences | 7, across 3 module files |
-| test files building a `ShipState` inline | 334 |
+| test files building a `ShipState` inline (`cybskill:`, see Task 1 Step 5) | 260 |
 | `as never` in `backend/test/` | 509 |
 | backend suite | 617 suites / 6,295 tests |
 
@@ -213,8 +213,14 @@ grep -E "^Tests:|FAIL" /tmp/green.txt
 Then find where inline ships are densest and migrate **the top 15 files only**:
 
 ```bash
-for f in $(grep -rl "xcoord:" test/); do echo "$(grep -c 'xcoord:' $f) $f"; done | sort -rn | head -15
+for f in $(grep -rl "cybskill:" test/); do echo "$(grep -c 'cybskill:' $f) $f"; done | sort -rn | head -15
 ```
+
+**Count on `cybskill:`, not `xcoord:`.** A test legitimately passes `xcoord` as an
+override when it cares about position, so that string does not distinguish "builds a
+whole ship" from "overrides one field" — measured on it, this task's own migration
+makes the number go UP. `cybskill` is a field almost nothing overrides, so it tracks
+full inline builds. Baseline at the start of this phase: **260 files**.
 
 **Migrate only those 15 in this task.** A 334-file sweep in one commit is
 unreviewable, and unreviewable is how a real bug reached the end of Phase 2. The
@@ -688,9 +694,11 @@ one diff was too large to hold.
 ```bash
 cd /home/rick/dev/galactic-empire-reborn/backend
 for d in test/gateway test/game test/integration test/unit test/balance test/invariants; do
-  echo "$d: $(grep -rl 'xcoord:' $d 2>/dev/null | wc -l) files"
+  echo "$d: $(grep -rl 'cybskill:' $d 2>/dev/null | wc -l) files"
 done
 ```
+
+Count on `cybskill:` — see Task 1 Step 5 for why `xcoord:` is the wrong proxy.
 
 - [ ] **Step 2: Migrate one directory, run it, commit it**
 
@@ -716,8 +724,8 @@ load-bearing** — a field set to something unusual with no comment — do not
 
 ```bash
 cd /home/rick/dev/galactic-empire-reborn/backend
-grep -rl "xcoord:" test/ | grep -v "helpers/make-ship.ts" | wc -l
-grep -ro "as never" test/ | wc -l    # compare against the 509 baseline
+grep -rl "cybskill:" test/ | grep -v "helpers/make-ship.ts" | wc -l   # was 260 at phase start, 248 after Task 1
+grep -ro "as never" test/ | wc -l                                      # was 509 at phase start
 ```
 
 Report both numbers. If files remain, name them and say why they resisted.
@@ -747,7 +755,7 @@ grep -E "^Tests:|^Test Suites:|FAIL" /tmp/full.txt
 cd /home/rick/dev/galactic-empire-reborn/backend
 echo "files injecting PrismaService: $(grep -rl 'PrismaService' src/ | wc -l)"   # was 46
 echo "forwardRef: $(grep -rn 'forwardRef' src/ | wc -l)"                          # was 7
-echo "inline ship fixtures: $(grep -rl 'xcoord:' test/ | wc -l)"                  # was 334
+echo "inline ship fixtures: $(grep -rl 'cybskill:' test/ | wc -l)"                # was 260 at phase start
 echo "as never in test/: $(grep -ro 'as never' test/ | wc -l)"                    # was 509
 echo "prisma in gateway: $(grep -c 'this.prisma' src/gateway/game.gateway.ts)"    # was 2
 ```
