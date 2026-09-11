@@ -19,6 +19,7 @@ import {
   GESTAT_AUTO,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import type { Mock } from 'vitest';
 
 // ─── Class entry stubs ────────────────────────────────────────────────────────
 
@@ -55,10 +56,10 @@ function entryFor(classNumber: number): ShipClassEntry | undefined {
 
 // ─── Spawner factory ──────────────────────────────────────────────────────────
 
-function buildSpawner(seed: number): { spawner: DroidSpawner; loadShipSpy: jest.Mock } {
+function buildSpawner(seed: number): { spawner: DroidSpawner; loadShipSpy: Mock } {
   const rand = new Mulberry32Adapter(seed);
 
-  const loadShipSpy = jest.fn();
+  const loadShipSpy = vi.fn();
   const shipState = {
     loadShip: loadShipSpy,
     findAllShips: () => [],

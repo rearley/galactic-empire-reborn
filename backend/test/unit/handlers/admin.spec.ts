@@ -34,8 +34,8 @@ function makeService(
     items: Array.from({ length: 14 }, () => ({ qty: 0n, rate: 0, sell: false })),
     ...planetState,
   } : null;
-  const applyAdminChangeMock = jest.fn().mockResolvedValue(adminChangeResult);
-  const getMock = jest.fn().mockReturnValue(fullState);
+  const applyAdminChangeMock = vi.fn().mockResolvedValue(adminChangeResult);
+  const getMock = vi.fn().mockReturnValue(fullState);
   const planetMock = {
     get: getMock,
     applyAdminChange: applyAdminChangeMock,

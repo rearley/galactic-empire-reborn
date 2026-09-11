@@ -44,7 +44,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 function makeHandler(ships: ShipState[], teamname?: string): DatHandlerService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
   const teamsMock = {
-    findNameByCode: jest.fn().mockResolvedValue(teamname ? { teamname } : null),
+    findNameByCode: vi.fn().mockResolvedValue(teamname ? { teamname } : null),
   } as unknown as TeamRepository;
   return new DatHandlerService(shipSvc, teamsMock);
 }

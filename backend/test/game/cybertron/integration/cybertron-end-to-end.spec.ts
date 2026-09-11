@@ -106,14 +106,14 @@ async function buildHarness(seed = 77) {
   const createdSpawns: unknown[] = [];
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
       createdSpawns.push(slot);
       const s = makeShip({ userid: slot.userid, shipno: slot.shipno, shpclass: slot.classNumber, status: 2, tick: slot.tick });
       shipMap.set(`${slot.userid}:${slot.shipno}`, s);
     }),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 

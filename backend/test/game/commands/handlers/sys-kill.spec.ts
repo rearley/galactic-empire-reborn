@@ -57,7 +57,7 @@ function makeHarness(ships: ShipState[]) {
   } as unknown as ShipStateService;
   return new SysHandlerService(
     shipState,
-    { user: { update: jest.fn() } } as unknown as PrismaService,
+    { user: { update: vi.fn() } } as unknown as PrismaService,
     new CybertronControlService(),
   );
 }
@@ -109,7 +109,7 @@ describe('SysHandlerService — `sys class` reaches the sparse high numbers', ()
     for (const c of TABLE) shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, maxWarp: c.maxWarp });
     return new SysHandlerService(
       shipState,
-      { user: { update: jest.fn() } } as unknown as PrismaService,
+      { user: { update: vi.fn() } } as unknown as PrismaService,
       new CybertronControlService(),
       undefined,
       shipClassCache,

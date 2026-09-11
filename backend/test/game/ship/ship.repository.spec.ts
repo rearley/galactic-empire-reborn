@@ -8,7 +8,7 @@ import { ShipRepository } from '../../../src/game/ship/ship.repository';
  */
 describe('ShipRepository', () => {
   it("finds a captain's first hull by userid alone", async () => {
-    const findFirst = jest.fn().mockResolvedValue({ userid: 'usr_a', shipno: 1 });
+    const findFirst = vi.fn().mockResolvedValue({ userid: 'usr_a', shipno: 1 });
     const repo = new ShipRepository({ ship: { findFirst } } as never);
 
     await repo.findFirstForUser('usr_a');
@@ -17,7 +17,7 @@ describe('ShipRepository', () => {
   });
 
   it('finds one specific hull by userid and shipno', async () => {
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const repo = new ShipRepository({ ship: { findFirst } } as never);
 
     await repo.findHull('usr_a', 2);

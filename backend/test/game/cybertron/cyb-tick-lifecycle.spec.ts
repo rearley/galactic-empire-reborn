@@ -190,12 +190,12 @@ function harness(ships: ShipState[], rand: Random): Harness {
   // production (see the boot-seed note in onModuleInit) — the population cap
   // is only correct because the next count sees it, so the fake does the same.
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n,
-    flushShipsImmediate: jest.fn(),
-    incrementKills: jest.fn().mockResolvedValue(undefined),
-    creditAllowances: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn(async (slot: {
+    flushShipsImmediate: vi.fn(),
+    incrementKills: vi.fn().mockResolvedValue(undefined),
+    creditAllowances: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn(async (slot: {
       userid: string; shipno: number; classNumber: number;
       xcoord: number; ycoord: number; topspeed: number;
     }) => {
@@ -212,12 +212,12 @@ function harness(ships: ShipState[], rand: Random): Harness {
   } as unknown as CybertronRepository;
 
   const mineRepo = {
-    create: jest.fn(async (input: { channel: number; xcoord: number; ycoord: number }) => {
+    create: vi.fn(async (input: { channel: number; xcoord: number; ycoord: number }) => {
       const mine = { id: nextMineId++, timer: 10, ...input };
       mines.push({ xcoord: input.xcoord, ycoord: input.ycoord, channel: input.channel });
       return mine;
     }),
-    delete: jest.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
   } as unknown as MineRepository;
 
   const mineRegistry = {

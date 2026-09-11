@@ -19,6 +19,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { UserRepository } from '../../src/game/player/user.repository';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -37,14 +38,14 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 interface MockPrisma {
   user: {
-    findUnique: jest.Mock;
-    update: jest.Mock;
+    findUnique: Mock;
+    update: Mock;
   };
 }
 
 function makeService(ship: ShipState, dbOptions: number[] = []) {
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(ship);
         return ship;
@@ -54,8 +55,8 @@ function makeService(ship: ShipState, dbOptions: number[] = []) {
 
   const mockPrisma: MockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ options: dbOptions }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ options: dbOptions }),
+      update: vi.fn().mockResolvedValue({}),
     },
   };
 

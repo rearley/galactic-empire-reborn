@@ -20,16 +20,16 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 function makePrisma(findFirstResult: object | null = null) {
   return {
     ship: {
-      findFirst: jest.fn().mockResolvedValue(findFirstResult),
-      update: jest.fn().mockResolvedValue({}),
+      findFirst: vi.fn().mockResolvedValue(findFirstResult),
+      update: vi.fn().mockResolvedValue({}),
     },
   };
 }
 
 function makeShipStateService(ship: ShipState | undefined) {
   return {
-    get: jest.fn().mockReturnValue(ship),
-    mutate: jest.fn().mockImplementation(
+    get: vi.fn().mockReturnValue(ship),
+    mutate: vi.fn().mockImplementation(
       (_userid: string, _shipno: number, fn: (s: ShipState) => void) => {
         if (ship) fn(ship);
         return ship;
@@ -210,8 +210,8 @@ describe('RenameService (T053)', () => {
       const prisma = makePrisma(null);
       // Use real mutate behaviour to verify shipname is updated
       const shipStateService = {
-        get: jest.fn().mockReturnValue(ship),
-        mutate: jest.fn().mockImplementation(
+        get: vi.fn().mockReturnValue(ship),
+        mutate: vi.fn().mockImplementation(
           (_u: string, _n: number, fn: (s: ShipState) => void) => {
             fn(ship);
             return ship;

@@ -122,14 +122,14 @@ async function makeHarness(ships: ShipState[], random: Random): Promise<Harness>
       handler = h;
       return () => undefined;
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const deletedMines: number[] = [];
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    delete: jest.fn((id: number) => { deletedMines.push(id); return Promise.resolve(); }),
+    findAllActive: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    delete: vi.fn((id: number) => { deletedMines.push(id); return Promise.resolve(); }),
   } as unknown as MineRepository;
 
   // damageFactor 100 makes damageScale exactly 1, so every expectation below
@@ -147,7 +147,7 @@ async function makeHarness(ships: ShipState[], random: Random): Promise<Harness>
 
   const mines = new MineRegistry();
   const events = new EventEmitter2();
-  const logger = { log: jest.fn(), error: jest.fn(), warn: jest.fn() } as unknown as Logger;
+  const logger = { log: vi.fn(), error: vi.fn(), warn: vi.fn() } as unknown as Logger;
 
   const service = new CombatTickService(
     tickService, shipState, mineRepo, mines, random, events, logger, classCache,

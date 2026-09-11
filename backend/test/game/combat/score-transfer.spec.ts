@@ -34,8 +34,8 @@ function makeEvent(over: Partial<CombatShipDestroyedEvent> = {}): CombatShipDest
 
 function buildHarness() {
   const events = new EventEmitter2();
-  const transferKillScore = jest.fn().mockResolvedValue(undefined);
-  const repo = { transferKillScore, getRospos: jest.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
+  const transferKillScore = vi.fn().mockResolvedValue(undefined);
+  const repo = { transferKillScore, getRospos: vi.fn().mockResolvedValue(0) } as unknown as PlayerScoreRepository;
   const svc = new PlayerScoreService(events, repo, 0);
   svc.onModuleInit();
   return { events, transferKillScore };
@@ -97,12 +97,12 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
   }
 
   it('victim score and klscore floor at 0 when scr exceeds current values', async () => {
-    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const updateMock = vi.fn().mockResolvedValue(undefined);
     const prisma = {
-      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+      $transaction: vi.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
         fn({
           user: {
-            findUnique: jest.fn().mockResolvedValue({ score: 10n, klscore: 5n }),
+            findUnique: vi.fn().mockResolvedValue({ score: 10n, klscore: 5n }),
             update: updateMock,
           },
         }),
@@ -128,12 +128,12 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
    * @see GEFUNCS.C:1157
    */
   it('a sub-100-point kill costs the victim nothing (amt/100 truncates to 0)', async () => {
-    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const updateMock = vi.fn().mockResolvedValue(undefined);
     const prisma = {
-      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+      $transaction: vi.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
         fn({
           user: {
-            findUnique: jest.fn().mockResolvedValue({ score: 1000n, klscore: 800n }),
+            findUnique: vi.fn().mockResolvedValue({ score: 1000n, klscore: 800n }),
             update: updateMock,
           },
         }),
@@ -151,12 +151,12 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
   });
 
   it('deducts (amt/100)*score_f2 for a kill worth more than 100', async () => {
-    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const updateMock = vi.fn().mockResolvedValue(undefined);
     const prisma = {
-      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+      $transaction: vi.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
         fn({
           user: {
-            findUnique: jest.fn().mockResolvedValue({ score: 5000n, klscore: 5000n }),
+            findUnique: vi.fn().mockResolvedValue({ score: 5000n, klscore: 5000n }),
             update: updateMock,
           },
         }),
@@ -177,10 +177,10 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
   });
 
   it('skips victim deduction when isAiVictim=true', async () => {
-    const updateMock = jest.fn().mockResolvedValue(undefined);
-    const findUniqueMock = jest.fn().mockResolvedValue({ score: 0n, klscore: 0n });
+    const updateMock = vi.fn().mockResolvedValue(undefined);
+    const findUniqueMock = vi.fn().mockResolvedValue({ score: 0n, klscore: 0n });
     const prisma = {
-      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+      $transaction: vi.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
         fn({
           user: {
             findUnique: findUniqueMock,
@@ -200,12 +200,12 @@ describe('PlayerScoreRepository — score floor at 0 (GEFUNCS.C:killem 1165-1182
   });
 
   it('attacker score and klscore are incremented', async () => {
-    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const updateMock = vi.fn().mockResolvedValue(undefined);
     const prisma = {
-      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
+      $transaction: vi.fn().mockImplementation((fn: (tx: unknown) => Promise<void>) =>
         fn({
           user: {
-            findUnique: jest.fn().mockResolvedValue({ score: 100n, klscore: 100n }),
+            findUnique: vi.fn().mockResolvedValue({ score: 100n, klscore: 100n }),
             update: updateMock,
           },
         }),

@@ -8,6 +8,7 @@
  * @see GEFUNCS.C:1161 — AI 1/10 branch
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { Mock } from 'vitest';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
@@ -36,14 +37,14 @@ function makeEvent(overrides: Partial<CombatShipDestroyedEvent>): CombatShipDest
   };
 }
 
-function makeService(transferKillScoreMock: jest.Mock) {
+function makeService(transferKillScoreMock: Mock) {
   const events = new EventEmitter2();
   const repo = {
     transferKillScore: transferKillScoreMock,
-    applyCashPenalty: jest.fn().mockResolvedValue(0n),
+    applyCashPenalty: vi.fn().mockResolvedValue(0n),
     // SCRBONUS divides by the victim's roster position (GEFUNCS.C:1150-1153);
     // 0 is unranked and pays no bonus, so these assertions stay about the base.
-    getRospos: jest.fn().mockResolvedValue(0),
+    getRospos: vi.fn().mockResolvedValue(0),
   };
   const service = new PlayerScoreService(
     events,
@@ -56,7 +57,7 @@ function makeService(transferKillScoreMock: jest.Mock) {
 
 describe('PlayerScoreService — AI kill handling (T029)', () => {
   it('passes isAiAttacker=false for human attacker', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(COMBAT_SHIP_DESTROYED, makeEvent({ attackerUserid: 'admiral', victimUserid: 'target' }));
@@ -66,7 +67,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('passes isAiAttacker=true for Cybertron attacker (Cybrg- prefix)', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(
@@ -79,7 +80,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('passes isAiAttacker=true for Droid attacker (@Droid- prefix)', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(
@@ -92,7 +93,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('passes isAiVictim=true when victim is a Cybertron', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(
@@ -105,7 +106,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('emits CYBERTRON_SCORED_KILL event with correct payload when Cybrg- attacker scores', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     const received: CybertronScoredKillEvent[] = [];
@@ -122,7 +123,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('does NOT emit CYBERTRON_SCORED_KILL for Droid attackers', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     const received: CybertronScoredKillEvent[] = [];
@@ -138,7 +139,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('skips when scoreAwarded=0', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(COMBAT_SHIP_DESTROYED, makeEvent({ scoreAwarded: 0 }));
@@ -148,7 +149,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
   });
 
   it('skips when attackerUserid is null', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     events.emit(COMBAT_SHIP_DESTROYED, makeEvent({ attackerUserid: null, attackerId: null, attackerShipKey: null }));
@@ -160,7 +161,7 @@ describe('PlayerScoreService — AI kill handling (T029)', () => {
 
 describe('PlayerScoreService — idempotency (T029a)', () => {
   it('registers the listener exactly once — single event produces one transferKillScore call', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const { events } = makeService(transferMock);
 
     // Emit one event
@@ -171,12 +172,12 @@ describe('PlayerScoreService — idempotency (T029a)', () => {
   });
 
   it('does not accumulate duplicate listeners when onModuleInit-like re-registration happens', async () => {
-    const transferMock = jest.fn().mockResolvedValue(undefined);
+    const transferMock = vi.fn().mockResolvedValue(undefined);
     const events = new EventEmitter2();
     const repo = {
       transferKillScore: transferMock,
-      applyCashPenalty: jest.fn().mockResolvedValue(0n),
-      getRospos: jest.fn().mockResolvedValue(0),
+      applyCashPenalty: vi.fn().mockResolvedValue(0n),
+      getRospos: vi.fn().mockResolvedValue(0),
     };
     const service = new PlayerScoreService(events, repo as never, 0);
 

@@ -94,7 +94,7 @@ function buildHarness() {
 
   const shipState: ShipStateService = {
     findAllShips: () => allShips,
-    get: jest.fn().mockImplementation((uid: string, no: number) => {
+    get: vi.fn().mockImplementation((uid: string, no: number) => {
       if (uid === '@Droid-99') {
         throw new Error('Simulated fault: bad droid state read');
       }
@@ -123,9 +123,9 @@ function buildHarness() {
     getMaxShields: (n: number) => (n === DROID_CLASS_TRANSPORT ? 2 : 1),
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];

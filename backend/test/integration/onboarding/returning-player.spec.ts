@@ -16,6 +16,7 @@ import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../../src/game/onboarding/onboarding.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const TEST_USERID = 'u-returning-test';
 const TEST_SHIPNO = 1;
@@ -57,22 +58,22 @@ function makeClient(port: number): Socket {
 describe('Returning player (T046)', () => {
   let app: INestApplication;
   let port: number;
-  let loadShipMock: jest.Mock;
+  let loadShipMock: Mock;
 
   beforeAll(async () => {
-    loadShipMock = jest.fn();
+    loadShipMock = vi.fn();
 
     // Ship is always warm in memory — hydration path is skipped
     const shipStateServiceMock = {
-      findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
-      findAllShips: jest.fn().mockReturnValue([TEST_SHIP]),
-      get: jest.fn().mockReturnValue(TEST_SHIP),
+      findByUserid: vi.fn().mockReturnValue([TEST_SHIP]),
+      findAllShips: vi.fn().mockReturnValue([TEST_SHIP]),
+      get: vi.fn().mockReturnValue(TEST_SHIP),
       loadShip: loadShipMock,
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(1),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(1),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -81,44 +82,44 @@ describe('Returning player (T046)', () => {
       .overrideProvider(ShipStateService)
       .useValue(shipStateServiceMock)
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue({
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-        mine: { findMany: jest.fn().mockResolvedValue([]) },
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+        mine: { findMany: vi.fn().mockResolvedValue([]) },
         ship: {
-          findMany: jest.fn().mockResolvedValue([{
+          findMany: vi.fn().mockResolvedValue([{
             userid: TEST_USERID,
             shipno: TEST_SHIPNO,
             shipname: 'StarFalcon',
           }]),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = TEST_USERID;
           client.data.username = 'TestPilot';
           return { sub: TEST_USERID, username: 'TestPilot' };
         }),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .compile();
 
@@ -177,22 +178,22 @@ describe('Returning player (T046)', () => {
 describe('Warm cache (T047)', () => {
   let app: INestApplication;
   let port: number;
-  let loadShipSpy: jest.Mock;
+  let loadShipSpy: Mock;
 
   beforeAll(async () => {
-    loadShipSpy = jest.fn();
+    loadShipSpy = vi.fn();
 
     // get() ALWAYS returns the ship — warm cache, no hydration needed
     const shipStateServiceMock = {
-      findByUserid: jest.fn().mockReturnValue([TEST_SHIP]),
-      findAllShips: jest.fn().mockReturnValue([TEST_SHIP]),
-      get: jest.fn().mockReturnValue(TEST_SHIP),
+      findByUserid: vi.fn().mockReturnValue([TEST_SHIP]),
+      findAllShips: vi.fn().mockReturnValue([TEST_SHIP]),
+      get: vi.fn().mockReturnValue(TEST_SHIP),
       loadShip: loadShipSpy,
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(1),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(1),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -201,44 +202,44 @@ describe('Warm cache (T047)', () => {
       .overrideProvider(ShipStateService)
       .useValue(shipStateServiceMock)
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue({
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-        mine: { findMany: jest.fn().mockResolvedValue([]) },
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+        mine: { findMany: vi.fn().mockResolvedValue([]) },
         ship: {
-          findMany: jest.fn().mockResolvedValue([{
+          findMany: vi.fn().mockResolvedValue([{
             userid: TEST_USERID,
             shipno: TEST_SHIPNO,
             shipname: 'StarFalcon',
           }]),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = TEST_USERID;
           client.data.username = 'TestPilot';
           return { sub: TEST_USERID, username: 'TestPilot' };
         }),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .compile();
 

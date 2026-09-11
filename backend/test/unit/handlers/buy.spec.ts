@@ -40,13 +40,13 @@ function makePlanetState(overrides: Partial<PlanetState> = {}): PlanetState {
 }
 
 function makeService(planetState: PlanetState | null, buyResult: Awaited<ReturnType<PlanetStateService['buy']>> = { ok: true, transferred: 10, unitPrice: 2, totalCost: 20n }) {
-  const buyMock = jest.fn().mockResolvedValue(buyResult);
-  const mutateMock = jest.fn();
-  const prismaUpdateMock = jest.fn().mockResolvedValue({});
-  const prismaFindMock = jest.fn().mockResolvedValue({ cash: 1_000_000n });
+  const buyMock = vi.fn().mockResolvedValue(buyResult);
+  const mutateMock = vi.fn();
+  const prismaUpdateMock = vi.fn().mockResolvedValue({});
+  const prismaFindMock = vi.fn().mockResolvedValue({ cash: 1_000_000n });
 
   const planetMock = {
-    get: jest.fn().mockReturnValue(planetState),
+    get: vi.fn().mockReturnValue(planetState),
     buy: buyMock,
   };
   const shipMock = { mutate: mutateMock };

@@ -10,7 +10,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const request = require('supertest') as (app: unknown) => import('supertest').SuperTest<import('supertest').Test>;
 import { PrismaModule } from '../../../src/prisma/prisma.module';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { MidnightService, MidnightLockHeldError } from '../../../src/game/midnight/midnight.service';
@@ -20,6 +19,7 @@ import { AdminTokenGuard } from '../../../src/game/midnight/admin-token.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { seedNeutralZonePlanets } from './neutral-zone.fixture';
+import request from 'supertest';
 
 const VALID_TOKEN = 'test-admin-token-secret';
 
@@ -44,7 +44,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
 
     const module = await Test.createTestingModule({
       imports: [PrismaModule, ScheduleModule.forRoot()],
-      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
       controllers: [AdminMidnightController],
     }).compile();
 
@@ -66,7 +66,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
   beforeEach(async () => {
     await truncateAll(prisma);
     await seedNeutralZonePlanets(prisma);
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('returns 401 when Authorization header is missing', async () => {
@@ -101,7 +101,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
   });
 
   it('returns 409 when advisory lock is held', async () => {
-    jest.spyOn(midnightService, 'run').mockRejectedValueOnce(new MidnightLockHeldError());
+    vi.spyOn(midnightService, 'run').mockRejectedValueOnce(new MidnightLockHeldError());
 
     await request(app.getHttpServer())
       .post('/admin/midnight/run')
@@ -118,7 +118,7 @@ describe('POST /admin/midnight/run — admin endpoint (FR-002)', () => {
 
     const freshModule = await Test.createTestingModule({
       imports: [PrismaModule, ScheduleModule.forRoot()],
-      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+      providers: [MidnightService, MidnightRepository, AdminTokenGuard, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
       controllers: [AdminMidnightController],
     }).compile();
     const freshApp = freshModule.createNestApplication();

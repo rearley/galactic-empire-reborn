@@ -26,6 +26,7 @@ import {
   TORPSPED,
 } from '../../../src/game/constants';
 import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // Local defaults layered on the shared factory: this suite's ships run hot
 // (50000 energy) at warp-capable topspeed so combat resolves in one tick.
@@ -72,20 +73,20 @@ async function makeHarness(ships: ShipState[] = []): Promise<Harness> {
       subscribers.push(h);
       return () => {};
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    delete: jest.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    delete: vi.fn(),
   } as unknown as MineRepository;
 
   const mineRegistry = new MineRegistry();
   const events = new EventEmitter2();
   const logger = new Logger('CombatTickServiceSpec');
   // Suppress error noise from fault-isolation case.
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const classCache = new ShipClassCacheService({} as never);
   classCache.setForTest(1, {
@@ -228,19 +229,19 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
         subscribers.push(h);
         return () => {};
       },
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
     const mineRepo = {
-      findAllActive: jest.fn().mockResolvedValue([]),
-      create: jest.fn(),
-      delete: jest.fn(),
+      findAllActive: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      delete: vi.fn(),
     } as unknown as MineRepository;
 
     const mineRegistry = new MineRegistry();
     const events = new EventEmitter2();
     const logger = new Logger('CombatTickServiceProjectileSpec');
-    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
     const classCache = new ShipClassCacheService({} as never);
     classCache.setForTest(1, {
@@ -547,7 +548,7 @@ describe('CombatTickService — mine sweep (T036)', () => {
     fire: () => Promise<void>;
     events: EventEmitter2;
     shipMap: Map<string, ShipState>;
-    deleteSpy: jest.Mock;
+    deleteSpy: Mock;
     registry: MineRegistry;
   }> {
     const shipMap = new Map<string, ShipState>();
@@ -569,20 +570,20 @@ describe('CombatTickService — mine sweep (T036)', () => {
         subscribers.push(h);
         return () => {};
       },
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
-    const deleteSpy = jest.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
     const mineRepo = {
-      findAllActive: jest.fn().mockResolvedValue(mines),
-      create: jest.fn(),
+      findAllActive: vi.fn().mockResolvedValue(mines),
+      create: vi.fn(),
       delete: deleteSpy,
     } as unknown as MineRepository;
 
     const registry = new MineRegistry();
     const events = new EventEmitter2();
     const logger = new Logger('MineSweepSpec');
-    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
     const classCache = new ShipClassCacheService({} as never);
     classCache.setForTest(1, {

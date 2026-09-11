@@ -30,11 +30,11 @@ describe('PlanetStateService — the live view scans read', () => {
     }));
 
     const prisma = {
-      planet: { findMany: jest.fn().mockResolvedValue(rows), update: jest.fn().mockResolvedValue({}) },
-      planetItem: { findMany: jest.fn().mockResolvedValue([]) },
-      user: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({}) },
+      planet: { findMany: vi.fn().mockResolvedValue(rows), update: vi.fn().mockResolvedValue({}) },
+      planetItem: { findMany: vi.fn().mockResolvedValue([]) },
+      user: { update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
-    const ships = { findAllShips: jest.fn().mockReturnValue([]) } as unknown as ShipStateService;
+    const ships = { findAllShips: vi.fn().mockReturnValue([]) } as unknown as ShipStateService;
 
     planets = new PlanetStateService(prisma, ships);
     await planets.onModuleInit();

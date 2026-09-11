@@ -17,14 +17,14 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeHandler(teamSvcOverrides: Partial<TeamService> = {}, foundTeam: { teamcode: bigint; teamname: string } | null = null): TeaHandlerService {
   const prismaMock = {
-    team: { findFirst: jest.fn().mockResolvedValue(foundTeam) },
-    user: { update: jest.fn().mockResolvedValue({}) },
+    team: { findFirst: vi.fn().mockResolvedValue(foundTeam) },
+    user: { update: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
   const shipStateSvcMock = {} as unknown as ShipStateService;
   const teamSvc = {
-    create: jest.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders' }),
-    joinByPassword: jest.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }),
-    list: jest.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders' }),
+    joinByPassword: vi.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }),
+    list: vi.fn().mockResolvedValue([]),
     ...teamSvcOverrides,
   } as unknown as TeamService;
   return new TeaHandlerService(prismaMock, shipStateSvcMock, teamSvc);
@@ -37,9 +37,9 @@ const ctx: CommandContext = {};
 describe('TeaHandlerService — tea create', () => {
   it('returns success line on create', async () => {
     const teamSvc = {
-      create: jest.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Galactic Raiders' }),
-      list: jest.fn(),
-      joinByPassword: jest.fn(),
+      create: vi.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Galactic Raiders' }),
+      list: vi.fn(),
+      joinByPassword: vi.fn(),
     } as unknown as TeamService;
     const handler = makeHandler(teamSvc);
     const result = await handler.command.handler(makeShip(), ['create', 'Galactic', 'Raiders', 's3cret'], ctx);
@@ -48,13 +48,13 @@ describe('TeaHandlerService — tea create', () => {
   });
 
   it('emits player.snapshot broadcast on create success', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'Raiders', 'pw'], ctx);
     expect(result.broadcasts?.some((b) => b.event === 'player.snapshot')).toBe(true);
   });
 
   it('returns already-on-team error', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ error: 'already_on_team' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ error: 'already_on_team' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'Raiders', 'pw'], ctx);
     expect(result.lines[0].text).toBe("You are already on a team. Use 'tea leave' first.");
     expect(result.lines[0].category).toBe('system');
@@ -68,28 +68,28 @@ describe('TeaHandlerService — tea create', () => {
   });
 
   it('returns name-too-long error', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ error: 'name_too_long' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ error: 'name_too_long' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'a'.repeat(31), 'pw'], ctx);
     expect(result.lines[0].text).toBe('Team name must be 30 characters or fewer.');
     expect(result.lines[0].category).toBe('system');
   });
 
   it('returns password-too-long error', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ error: 'password_too_long' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ error: 'password_too_long' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'Raiders', '123456789'], ctx);
     expect(result.lines[0].text).toBe('Team password must be 8 characters or fewer.');
     expect(result.lines[0].category).toBe('system');
   });
 
   it('returns password-has-space error', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ error: 'password_has_space' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ error: 'password_has_space' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'Raiders', 'a b'], ctx);
     expect(result.lines[0].text).toBe('Team password may not contain spaces.');
     expect(result.lines[0].category).toBe('system');
   });
 
   it('returns name-taken error', async () => {
-    const handler = makeHandler({ create: jest.fn().mockResolvedValue({ error: 'name_taken' }) });
+    const handler = makeHandler({ create: vi.fn().mockResolvedValue({ error: 'name_taken' }) });
     const result = await handler.command.handler(makeShip(), ['create', 'Raiders', 'pw'], ctx);
     expect(result.lines[0].text).toBe('Team name already taken.');
     expect(result.lines[0].category).toBe('system');
@@ -100,34 +100,34 @@ describe('TeaHandlerService — tea create', () => {
 
 describe('TeaHandlerService — tea password-gated join', () => {
   it('returns success line on join with correct password', async () => {
-    const handler = makeHandler({ joinByPassword: jest.fn().mockResolvedValue({ ok: true, teamname: 'Galactic Raiders' }) });
+    const handler = makeHandler({ joinByPassword: vi.fn().mockResolvedValue({ ok: true, teamname: 'Galactic Raiders' }) });
     const result = await handler.command.handler(makeShip(), ['Galactic', 'Raiders', 's3cret'], ctx);
     expect(result.lines[0].text).toBe('You have joined team Galactic Raiders.');
     expect(result.lines[0].category).toBe('success');
   });
 
   it('emits player.snapshot broadcast on join success', async () => {
-    const handler = makeHandler({ joinByPassword: jest.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }) });
+    const handler = makeHandler({ joinByPassword: vi.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }) });
     const result = await handler.command.handler(makeShip(), ['Raiders', 'pw'], ctx);
     expect(result.broadcasts?.some((b) => b.event === 'player.snapshot')).toBe(true);
   });
 
   it('returns already-on-team error', async () => {
-    const handler = makeHandler({ joinByPassword: jest.fn().mockResolvedValue({ error: 'already_on_team' }) });
+    const handler = makeHandler({ joinByPassword: vi.fn().mockResolvedValue({ error: 'already_on_team' }) });
     const result = await handler.command.handler(makeShip(), ['Raiders', 'pw'], ctx);
     expect(result.lines[0].text).toBe("You are already on a team. Use 'tea leave' first.");
     expect(result.lines[0].category).toBe('system');
   });
 
   it('returns no-such-team error', async () => {
-    const handler = makeHandler({ joinByPassword: jest.fn().mockResolvedValue({ error: 'no_such_team' }) });
+    const handler = makeHandler({ joinByPassword: vi.fn().mockResolvedValue({ error: 'no_such_team' }) });
     const result = await handler.command.handler(makeShip(), ['Nonexistent', 'pw'], ctx);
     expect(result.lines[0].text).toBe('No such team: Nonexistent');
     expect(result.lines[0].category).toBe('system');
   });
 
   it('returns wrong-password error', async () => {
-    const handler = makeHandler({ joinByPassword: jest.fn().mockResolvedValue({ error: 'wrong_password' }) });
+    const handler = makeHandler({ joinByPassword: vi.fn().mockResolvedValue({ error: 'wrong_password' }) });
     const result = await handler.command.handler(makeShip(), ['Raiders', 'wrongpw'], ctx);
     expect(result.lines[0].text).toBe('Wrong password.');
     expect(result.lines[0].category).toBe('system');
@@ -148,7 +148,7 @@ describe('TeaHandlerService — tea password-gated join', () => {
 describe('TeaHandlerService — tea list', () => {
   it('aligns numeric column right-edges with their headers', async () => {
     const handler = makeHandler({
-      list: jest.fn().mockResolvedValue([
+      list: vi.fn().mockResolvedValue([
         { rank: 1, teamcode: 1n, teamname: 'Raiders', members: 3, score: 100n },
       ]),
     });
@@ -166,7 +166,7 @@ describe('TeaHandlerService — tea list', () => {
 
   it('returns header line', async () => {
     const handler = makeHandler({
-      list: jest.fn().mockResolvedValue([
+      list: vi.fn().mockResolvedValue([
         { rank: 1, teamcode: 1n, teamname: 'Raiders', members: 3, score: 100n },
       ]),
     });
@@ -177,7 +177,7 @@ describe('TeaHandlerService — tea list', () => {
 
   it('returns row with correct fixed-width fields', async () => {
     const handler = makeHandler({
-      list: jest.fn().mockResolvedValue([
+      list: vi.fn().mockResolvedValue([
         { rank: 1, teamcode: 1n, teamname: 'Raiders', members: 3, score: 12450n },
       ]),
     });
@@ -190,7 +190,7 @@ describe('TeaHandlerService — tea list', () => {
   });
 
   it('returns "No teams have been formed." when empty', async () => {
-    const handler = makeHandler({ list: jest.fn().mockResolvedValue([]) });
+    const handler = makeHandler({ list: vi.fn().mockResolvedValue([]) });
     const result = await handler.command.handler(makeShip(), ['list'], ctx);
     expect(result.lines[0].text).toBe('No teams have been formed.');
     expect(result.lines[0].category).toBe('info');
@@ -212,7 +212,7 @@ describe('TeaHandlerService — tea list', () => {
 describe('tea create renders TOOMANY when the table is full (GECMDS.C:5488)', () => {
   it('prints canon text with the limit filled in', async () => {
     const handler = makeHandler({
-      create: jest.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
+      create: vi.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
     } as unknown as Partial<TeamService>);
 
     const result = await handler.command.handler(makeShip(), ['create', 'Latecomers', 'pw'], ctx);
@@ -223,7 +223,7 @@ describe('tea create renders TOOMANY when the table is full (GECMDS.C:5488)', ()
 
   it('is not the generic usage line — a full table is not a typo', async () => {
     const handler = makeHandler({
-      create: jest.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
+      create: vi.fn().mockResolvedValue({ error: 'too_many', limit: MAXTEAMS }),
     } as unknown as Partial<TeamService>);
 
     const result = await handler.command.handler(makeShip(), ['create', 'Latecomers', 'pw'], ctx);
@@ -244,9 +244,9 @@ describe('tea create renders TOOMANY when the table is full (GECMDS.C:5488)', ()
  */
 describe('tea leave requires actually being on a team (GECMDS.C:5464)', () => {
   it('answers TEAMNOT and does not touch the row', async () => {
-    const update = jest.fn().mockResolvedValue({});
+    const update = vi.fn().mockResolvedValue({});
     const prisma = {
-      team: { findFirst: jest.fn().mockResolvedValue(null) },
+      team: { findFirst: vi.fn().mockResolvedValue(null) },
       user: { update },
     } as unknown as PrismaService;
     const handler = new TeaHandlerService(
@@ -261,8 +261,8 @@ describe('tea leave requires actually being on a team (GECMDS.C:5464)', () => {
 
   it('does not rebroadcast a snapshot for a no-op', async () => {
     const prisma = {
-      team: { findFirst: jest.fn().mockResolvedValue(null) },
-      user: { update: jest.fn().mockResolvedValue({}) },
+      team: { findFirst: vi.fn().mockResolvedValue(null) },
+      user: { update: vi.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
     const handler = new TeaHandlerService(
       prisma, {} as unknown as ShipStateService, {} as unknown as TeamService,
@@ -274,9 +274,9 @@ describe('tea leave requires actually being on a team (GECMDS.C:5464)', () => {
   });
 
   it('still lets a real member leave', async () => {
-    const update = jest.fn().mockResolvedValue({});
+    const update = vi.fn().mockResolvedValue({});
     const prisma = {
-      team: { findFirst: jest.fn().mockResolvedValue(null) },
+      team: { findFirst: vi.fn().mockResolvedValue(null) },
       user: { update },
     } as unknown as PrismaService;
     const handler = new TeaHandlerService(

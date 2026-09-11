@@ -27,8 +27,8 @@ describe('/public/stats carries the backend build', () => {
   function makeService() {
     const prisma = {
       user: {
-        count: jest.fn().mockResolvedValue(1),
-        findMany: jest.fn().mockResolvedValue([]),
+        count: vi.fn().mockResolvedValue(1),
+        findMany: vi.fn().mockResolvedValue([]),
       },
     } as unknown as PrismaService;
     return new StatsService(new UserRepository(prisma), new PresenceService());

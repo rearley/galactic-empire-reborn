@@ -87,7 +87,7 @@ function harness(rand: Random, ships: ShipState[]) {
       getTypeName: () => 'Cybertron Scout',
     } as unknown as ShipClassCacheService,
     {
-      hydrateAll: jest.fn().mockResolvedValue(undefined),
+      hydrateAll: vi.fn().mockResolvedValue(undefined),
       clampCybertronCash: (n: bigint) => n,
     } as unknown as CybertronRepository,
     events,

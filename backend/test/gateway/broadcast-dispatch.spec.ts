@@ -4,7 +4,7 @@ import type { ShipState } from '../../src/game/ship/ship-state.types';
 
 /** A minimal fake socket: an `emit` spy plus the `data` fields `emitToSockets` reads. */
 function fakeSocket(userid: string | undefined, activeShipNo: number | undefined) {
-  return { emit: jest.fn(), data: { userid, activeShipNo } };
+  return { emit: vi.fn(), data: { userid, activeShipNo } };
 }
 
 function fakeServer(sockets: Record<string, ReturnType<typeof fakeSocket>>) {
@@ -13,7 +13,7 @@ function fakeServer(sockets: Record<string, ReturnType<typeof fakeSocket>>) {
 
 describe('dispatchBroadcast', () => {
   it('emits command.notice with its own payload', () => {
-    const emit = jest.fn();
+    const emit = vi.fn();
     const broadcast: CommandBroadcast = {
       room: 'sector:0:0',
       event: 'command.notice',
@@ -24,7 +24,7 @@ describe('dispatchBroadcast', () => {
   });
 
   it('resolves player.snapshot to nothing — the caller handles it before dispatch', () => {
-    const emit = jest.fn();
+    const emit = vi.fn();
     const broadcast: CommandBroadcast = {
       room: 'galaxy',
       event: 'player.snapshot',
@@ -48,7 +48,7 @@ describe('emitToSockets', () => {
     const a = fakeSocket('a', 1);
     const b = fakeSocket('b', 2);
     const server = fakeServer({ a, b });
-    const lookup = jest.fn((uid: string) => (uid === 'a' ? shipA : shipB));
+    const lookup = vi.fn((uid: string) => (uid === 'a' ? shipA : shipB));
 
     emitToSockets(server as never, broadcast, undefined, undefined, (ship) => ship === shipA, lookup);
 
@@ -60,7 +60,7 @@ describe('emitToSockets', () => {
     const a = fakeSocket('a', 1);
     const b = fakeSocket('b', 2);
     const server = fakeServer({ a, b });
-    const lookup = jest.fn().mockReturnValue(shipB);
+    const lookup = vi.fn().mockReturnValue(shipB);
 
     emitToSockets(server as never, broadcast, undefined, 'a', () => true, lookup);
 
@@ -74,7 +74,7 @@ describe('emitToSockets', () => {
   it('passes uid and shipno to lookup in that order', () => {
     const a = fakeSocket('a', 7);
     const server = fakeServer({ a });
-    const lookup = jest.fn().mockReturnValue(shipA);
+    const lookup = vi.fn().mockReturnValue(shipA);
 
     emitToSockets(server as never, broadcast, undefined, undefined, () => true, lookup);
 
@@ -85,7 +85,7 @@ describe('emitToSockets', () => {
     const a = fakeSocket('a', 1);
     const b = fakeSocket('b', 2);
     const server = fakeServer({ a, b });
-    const lookup = jest.fn().mockReturnValue(shipA);
+    const lookup = vi.fn().mockReturnValue(shipA);
 
     emitToSockets(server as never, broadcast, new Set(['a']), undefined, () => true, lookup);
 
@@ -98,7 +98,7 @@ describe('emitToSockets', () => {
     const a = fakeSocket('a', 1);
     const b = fakeSocket('b', 2);
     const server = fakeServer({ a, b });
-    const lookup = jest.fn().mockReturnValue(shipA);
+    const lookup = vi.fn().mockReturnValue(shipA);
 
     emitToSockets(server as never, broadcast, undefined, undefined, () => true, lookup);
 
@@ -110,7 +110,7 @@ describe('emitToSockets', () => {
     const noUser = fakeSocket(undefined, 1);
     const noShip = fakeSocket('c', undefined);
     const server = fakeServer({ noUser, noShip });
-    const lookup = jest.fn().mockReturnValue(shipA);
+    const lookup = vi.fn().mockReturnValue(shipA);
 
     emitToSockets(server as never, broadcast, undefined, undefined, () => true, lookup);
 
@@ -122,8 +122,8 @@ describe('emitToSockets', () => {
   it('skips a socket whose lookup returns undefined', () => {
     const a = fakeSocket('a', 1);
     const server = fakeServer({ a });
-    const lookup = jest.fn().mockReturnValue(undefined);
-    const accept = jest.fn(() => true);
+    const lookup = vi.fn().mockReturnValue(undefined);
+    const accept = vi.fn(() => true);
 
     emitToSockets(server as never, broadcast, undefined, undefined, accept, lookup);
 

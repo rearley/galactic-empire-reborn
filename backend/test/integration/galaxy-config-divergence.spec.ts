@@ -162,7 +162,7 @@ describe('GalaxyService config divergence (G-DIV-1)', () => {
         imports: [PrismaModule, GalaxyModule],
       }).compile();
 
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
 
       await app2.init();
 
@@ -195,7 +195,7 @@ describe('GalaxyService config divergence (G-DIV-1)', () => {
         imports: [PrismaModule, GalaxyModule],
       }).compile();
 
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
 
       await app2.init();
 

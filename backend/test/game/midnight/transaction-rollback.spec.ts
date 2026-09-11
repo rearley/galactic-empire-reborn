@@ -41,7 +41,7 @@ async function truncateAll() {
 beforeAll(async () => {
   app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
   }).compile();
   prisma = app.get(PrismaService);
   service = app.get(MidnightService);
@@ -81,7 +81,7 @@ describe('transaction rollback on fault (FR-012a)', () => {
     // Inject a fault: processOwnedPlanets throws on the 3rd planet
     let planetCallCount = 0;
     const originalProcessOwnedPlanets = repo.processOwnedPlanets.bind(repo);
-    jest.spyOn(repo, 'processOwnedPlanets').mockImplementation(async (tx) => {
+    vi.spyOn(repo, 'processOwnedPlanets').mockImplementation(async (tx) => {
       planetCallCount++;
       if (planetCallCount === 1) {
         throw new Error('Simulated phase-2 fault');
@@ -105,6 +105,6 @@ describe('transaction rollback on fault (FR-012a)', () => {
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 });

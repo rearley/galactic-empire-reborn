@@ -23,13 +23,13 @@ describe('ShipStateService.loadIfAbsent', () => {
   beforeEach(async () => {
     const prismaMock = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({}),
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue({}),
       },
       // onModuleInit awaits Promise.all([ship.findMany, shipClass.findMany]).
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const tickSubscribeMock = jest.fn().mockImplementation(
+    const tickSubscribeMock = vi.fn().mockImplementation(
       (_kind: TickKind, _handler: () => Promise<void>) => () => {},
     );
 
@@ -41,7 +41,7 @@ describe('ShipStateService.loadIfAbsent', () => {
           provide: TickService,
           useValue: {
             subscribe: tickSubscribeMock,
-            registerSnapshotProvider: jest.fn(),
+            registerSnapshotProvider: vi.fn(),
           },
         },
       ],

@@ -48,7 +48,7 @@ function bootWith(planets: TestPlanet[], nowMs: number) {
   const fake = new FakePlanets(planets);
   const svc = new PlanetTickService(
     fake as never,
-    { subscribe: jest.fn(), startPlanetUpdateTimer: jest.fn() } as never,
+    { subscribe: vi.fn(), startPlanetUpdateTimer: vi.fn() } as never,
     () => nowMs,
   );
   return { svc, fake, advance: () => (svc as unknown as { advance(): Promise<void> }).advance() };
@@ -127,9 +127,9 @@ describe('the schedule reaches Postgres', () => {
 
   it('writes lastTickAt in the same update as the production result', async () => {
     const NOW = 1_757_000_000_000;
-    const update = jest.fn().mockResolvedValue({});
+    const update = vi.fn().mockResolvedValue({});
     const prisma = {
-      planet: { findMany: jest.fn().mockResolvedValue([colonyRow()]), update },
+      planet: { findMany: vi.fn().mockResolvedValue([colonyRow()]), update },
     } as unknown as PrismaService;
     const ships = { get: () => undefined, mutate: () => undefined } as unknown as ShipStateService;
 
@@ -138,7 +138,7 @@ describe('the schedule reaches Postgres', () => {
 
     const tick = new PlanetTickService(
       planets,
-      { subscribe: jest.fn(), startPlanetUpdateTimer: jest.fn() } as never,
+      { subscribe: vi.fn(), startPlanetUpdateTimer: vi.fn() } as never,
       () => NOW,
     );
     await (tick as unknown as { advance(): Promise<void> }).advance();

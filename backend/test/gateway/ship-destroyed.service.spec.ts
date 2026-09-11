@@ -89,18 +89,18 @@ interface Doubles {
  * the emitter writes to, keeping `warnings`, `errors` and `order` intact.
  */
 function build(over: Doubles = {}, spy?: EmitterSpy) {
-  const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
-  const userFindUnique = jest.fn().mockResolvedValue({ noships: 2 });
-  const userUpdate = jest.fn().mockResolvedValue(undefined);
-  const shipFindFirst = jest.fn().mockResolvedValue(undefined);
-  const planetFindMany = jest.fn().mockResolvedValue([]);
+  const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+  const userFindUnique = vi.fn().mockResolvedValue({ noships: 2 });
+  const userUpdate = vi.fn().mockResolvedValue(undefined);
+  const shipFindFirst = vi.fn().mockResolvedValue(undefined);
+  const planetFindMany = vi.fn().mockResolvedValue([]);
   const tx = {
     ship: { deleteMany, findFirst: shipFindFirst },
     user: { findUnique: userFindUnique, update: userUpdate },
   };
-  const $transaction = jest.fn(async (fn: (t: typeof tx) => Promise<void>) => fn(tx));
-  const removeFromGame = jest.fn();
-  const clearScantab = jest.fn();
+  const $transaction = vi.fn(async (fn: (t: typeof tx) => Promise<void>) => fn(tx));
+  const removeFromGame = vi.fn();
+  const clearScantab = vi.fn();
 
   const ships = {
     get: (userid: string, shipno: number) => {
@@ -128,11 +128,11 @@ function build(over: Doubles = {}, spy?: EmitterSpy) {
   );
 
   const logger = (service as unknown as { logger: Logger }).logger;
-  jest.spyOn(logger, 'warn').mockImplementation((message: unknown) => {
+  vi.spyOn(logger, 'warn').mockImplementation((message: unknown) => {
     spy?.order.push('warn');
     spy?.warnings.push(String(message));
   });
-  jest.spyOn(logger, 'error').mockImplementation((message: unknown, err?: unknown) => {
+  vi.spyOn(logger, 'error').mockImplementation((message: unknown, err?: unknown) => {
     spy?.order.push('error');
     spy?.errors.push({ message: String(message), err: err as Error });
   });
@@ -185,7 +185,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
   // 3c. a failed write is logged, never thrown
   it('logs a failed hull write instead of taking the kill down with it', async () => {
     const emit = emitterSpy();
-    const h = build({ prisma: { $transaction: jest.fn().mockRejectedValue(new Error('deadlock')) } }, emit);
+    const h = build({ prisma: { $transaction: vi.fn().mockRejectedValue(new Error('deadlock')) } }, emit);
     await h.service.handle(destroyedEvent(), emit);
     expect(emit.errors.map((e) => e.message).join('\n')).toContain('death delete/decrement failed');
   });
@@ -244,7 +244,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
 
   // 8. the captured document
   it('hands the victor the victim’s colony list, one kill in six', async () => {
-    const h = build({ prisma: { planet: { findMany: jest.fn().mockResolvedValue([
+    const h = build({ prisma: { planet: { findMany: vi.fn().mockResolvedValue([
       { name: 'Colony 1', xsect: 1, ysect: -1, plnum: 1 },
     ]) } } });
     const emit = emitterSpy();
@@ -291,7 +291,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     // The expected array is the sequence OBSERVED before the move, not a
     // sequence anyone thinks is nicer.
     const emit = emitterSpy();
-    const h = build({ prisma: { $transaction: jest.fn(async () => { emit.order.push('transaction'); }) } }, emit);
+    const h = build({ prisma: { $transaction: vi.fn(async () => { emit.order.push('transaction'); }) } }, emit);
 
     await h.service.handle(destroyedEvent(), emit);
 
@@ -310,7 +310,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     let release: (() => void) | undefined;
     const gate = new Promise<void>((r) => { release = r; });
     let finished = false;
-    const h = build({ prisma: { $transaction: jest.fn(async () => { await gate; finished = true; }) } });
+    const h = build({ prisma: { $transaction: vi.fn(async () => { await gate; finished = true; }) } });
 
     const returned = h.service.handle(destroyedEvent(), emitterSpy());
     expect(returned).toBeInstanceOf(Promise);

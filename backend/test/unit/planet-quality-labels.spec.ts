@@ -2,6 +2,8 @@ import { applyEconomyTick } from '../../src/game/planet/planet-economy';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
 import { NUMITEMS, I_MEN, I_FOOD } from '../../src/game/constants/items';
 import { formatMessage, MessageId } from '../../src/game/commands/messages';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * The survey's words have to agree with the maths behind them.
@@ -84,8 +86,8 @@ describe('both axes read from canon\'s one table', () => {
   });
 
   it('has no separate resource vocabulary left', () => {
-    const src = require('node:fs').readFileSync(
-      require('node:path').resolve(__dirname, '../../src/game/commands/handlers/scan.handler.ts'),
+    const src = readFileSync(
+      resolve(__dirname, '../../src/game/commands/handlers/scan.handler.ts'),
       'utf8',
     ) as string;
     for (const invented of ['Barren', 'Sparse', 'Rich', 'Abundant']) {

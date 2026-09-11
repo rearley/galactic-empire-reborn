@@ -12,6 +12,7 @@ import { TeamRepository } from '../../src/game/team/team.repository';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../src/game/commands/command.types';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -26,32 +27,32 @@ const ctx: CommandContext = {};
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface PrismaStub {
-  team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock; aggregate: jest.Mock; count: jest.Mock };
-  user: { findUnique: jest.Mock; update: jest.Mock; count: jest.Mock; findMany: jest.Mock };
-  mailStat: { create: jest.Mock };
-  $transaction: jest.Mock;
+  team: { findFirst: Mock; update: Mock; create: Mock; aggregate: Mock; count: Mock };
+  user: { findUnique: Mock; update: Mock; count: Mock; findMany: Mock };
+  mailStat: { create: Mock };
+  $transaction: Mock;
 }
 
 function makePrisma(over: Partial<Record<string, unknown>> = {}): PrismaStub {
   const p: PrismaStub = {
     team: {
-      findFirst: jest.fn().mockResolvedValue({
+      findFirst: vi.fn().mockResolvedValue({
         teamcode: 7n, teamname: 'Raiders', secret: 'FOUND123', password: 'joinpw',
       }),
-      update: jest.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
       // countTeams() — canon's MAXTEAMS gate on `tea create` (GECMDS.C:5484).
-      count: jest.fn().mockResolvedValue(0),
-      create: jest.fn().mockResolvedValue({}),
-      aggregate: jest.fn().mockResolvedValue({ _max: { teamcode: 0n } }),
+      count: vi.fn().mockResolvedValue(0),
+      create: vi.fn().mockResolvedValue({}),
+      aggregate: vi.fn().mockResolvedValue({ _max: { teamcode: 0n } }),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({ userid: 'victim', teamcode: 7n }),
-      update: jest.fn().mockResolvedValue({}),
-      count: jest.fn().mockResolvedValue(1),
-      findMany: jest.fn().mockResolvedValue([{ userid: 'u1' }, { userid: 'victim' }]),
+      findUnique: vi.fn().mockResolvedValue({ userid: 'victim', teamcode: 7n }),
+      update: vi.fn().mockResolvedValue({}),
+      count: vi.fn().mockResolvedValue(1),
+      findMany: vi.fn().mockResolvedValue([{ userid: 'u1' }, { userid: 'victim' }]),
     },
-    mailStat: { create: jest.fn().mockResolvedValue({}) },
-    $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(p)),
+    mailStat: { create: vi.fn().mockResolvedValue({}) },
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(p)),
   };
   Object.assign(p, over);
   return p;
@@ -194,27 +195,27 @@ describe('TeamService.create — founder password (GECMDS.C:5559 TEAMCRT)', () =
 
 function makeHandler(teamSvcOver: Partial<Record<string, unknown>> = {}): {
   handler: TeaHandlerService;
-  teamSvc: Record<string, jest.Mock>;
+  teamSvc: Record<string, Mock>;
   ships: ShipState[];
 } {
   const prismaMock = {
-    team: { findFirst: jest.fn().mockResolvedValue({ teamname: 'Raiders' }) },
-    user: { update: jest.fn().mockResolvedValue({}) },
+    team: { findFirst: vi.fn().mockResolvedValue({ teamname: 'Raiders' }) },
+    user: { update: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
   const ships: ShipState[] = [];
   const shipStateSvcMock = {
-    findByUserid: jest.fn((uid: string) => ships.filter((s) => s.userid === uid)),
+    findByUserid: vi.fn((uid: string) => ships.filter((s) => s.userid === uid)),
   } as unknown as ShipStateService;
   const teamSvc = {
-    create: jest.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders', secret: 'ABCD1234' }),
-    joinByPassword: jest.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }),
-    list: jest.fn().mockResolvedValue([]),
-    membersOf: jest.fn().mockResolvedValue({ ok: true, teamname: 'Raiders', members: ['u1', 'u2'] }),
-    kick: jest.fn().mockResolvedValue({ ok: true, userid: 'victim', teamname: 'Raiders' }),
-    newPassword: jest.fn().mockResolvedValue({ ok: true, password: 'newpw' }),
-    newName: jest.fn().mockResolvedValue({ ok: true, teamname: 'Star Vipers' }),
+    create: vi.fn().mockResolvedValue({ ok: true, teamcode: 1n, teamname: 'Raiders', secret: 'ABCD1234' }),
+    joinByPassword: vi.fn().mockResolvedValue({ ok: true, teamname: 'Raiders' }),
+    list: vi.fn().mockResolvedValue([]),
+    membersOf: vi.fn().mockResolvedValue({ ok: true, teamname: 'Raiders', members: ['u1', 'u2'] }),
+    kick: vi.fn().mockResolvedValue({ ok: true, userid: 'victim', teamname: 'Raiders' }),
+    newPassword: vi.fn().mockResolvedValue({ ok: true, password: 'newpw' }),
+    newName: vi.fn().mockResolvedValue({ ok: true, teamname: 'Star Vipers' }),
     ...teamSvcOver,
-  } as unknown as Record<string, jest.Mock>;
+  } as unknown as Record<string, Mock>;
   return {
     handler: new TeaHandlerService(prismaMock, shipStateSvcMock, teamSvc as unknown as TeamService),
     teamSvc,
@@ -233,7 +234,7 @@ describe('tea members', () => {
   });
 
   it('prints TEAMNOT when the player has no team', async () => {
-    const { handler } = makeHandler({ membersOf: jest.fn().mockResolvedValue({ error: 'not_on_team' }) });
+    const { handler } = makeHandler({ membersOf: vi.fn().mockResolvedValue({ error: 'not_on_team' }) });
     const r = await handler.command.handler(makeShip(), ['members'], ctx);
     expect(r.lines[0].text).toBe("You don't seem to currently be a member of a valid team, Sorry!");
   });
@@ -257,19 +258,19 @@ describe('tea kick', () => {
   });
 
   it('prints TEAMBDSC on a bad founder password', async () => {
-    const { handler } = makeHandler({ kick: jest.fn().mockResolvedValue({ error: 'bad_secret' }) });
+    const { handler } = makeHandler({ kick: vi.fn().mockResolvedValue({ error: 'bad_secret' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['kick', 'wrong', 'victim'], ctx);
     expect(r.lines[0].text).toBe('Sorry, that is not the valid Founders Password.');
   });
 
   it('prints TEAMNFND for an unknown userid', async () => {
-    const { handler } = makeHandler({ kick: jest.fn().mockResolvedValue({ error: 'user_not_found' }) });
+    const { handler } = makeHandler({ kick: vi.fn().mockResolvedValue({ error: 'user_not_found' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['kick', 'pw', 'ghost'], ctx);
     expect(r.lines[0].text).toBe('That Userid does not seem to be currently in the game.');
   });
 
   it('prints TEAMNTM for a userid on another team', async () => {
-    const { handler } = makeHandler({ kick: jest.fn().mockResolvedValue({ error: 'not_on_your_team' }) });
+    const { handler } = makeHandler({ kick: vi.fn().mockResolvedValue({ error: 'not_on_your_team' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['kick', 'pw', 'other'], ctx);
     expect(r.lines[0].text).toBe('That Userid is not currently on your team.');
   });
@@ -290,7 +291,7 @@ describe('tea newpass', () => {
   });
 
   it('prints TEAMBPSS for an over-length password', async () => {
-    const { handler } = makeHandler({ newPassword: jest.fn().mockResolvedValue({ error: 'password_too_long' }) });
+    const { handler } = makeHandler({ newPassword: vi.fn().mockResolvedValue({ error: 'password_too_long' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['newpass', 'ABCD1234', '1234567890X'], ctx);
     expect(r.lines[0].text).toBe('That password is too long - please shorten it to 10 characters or less.');
   });
@@ -310,13 +311,13 @@ describe('tea newname', () => {
   });
 
   it('prints TEAMBNAM for a name under 5 characters', async () => {
-    const { handler } = makeHandler({ newName: jest.fn().mockResolvedValue({ error: 'name_too_short' }) });
+    const { handler } = makeHandler({ newName: vi.fn().mockResolvedValue({ error: 'name_too_short' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['newname', 'ABCD1234', 'abcd'], ctx);
     expect(r.lines[0].text).toBe('The team name must be at least 5 characters long.');
   });
 
   it('prints TEAMEXST when the name is taken', async () => {
-    const { handler } = makeHandler({ newName: jest.fn().mockResolvedValue({ error: 'name_taken' }) });
+    const { handler } = makeHandler({ newName: vi.fn().mockResolvedValue({ error: 'name_taken' }) });
     const r = await handler.command.handler(makeShip({ teamcode: 1n }), ['newname', 'ABCD1234', 'Raiders'], ctx);
     expect(r.lines[0].text).toBe('That team name or team code already exists...choose another.');
   });

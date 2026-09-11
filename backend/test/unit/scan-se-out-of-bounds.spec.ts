@@ -50,24 +50,24 @@ function makeBoundedService(ships: ShipState[]) {
     x >= -UNIVMAX && x <= UNIVMAX && y >= -UNIVMAX && y <= UNIVMAX;
 
   const galaxyMock = {
-    getSectorPlanets: jest.fn((x: number, y: number) => {
+    getSectorPlanets: vi.fn((x: number, y: number) => {
       if (!inRange(x, y)) throw new Error(`getSectorPlanets: out-of-range coords (${x}, ${y})`);
       return [];
     }),
-    getSectorWormholes: jest.fn((x: number, y: number) => {
+    getSectorWormholes: vi.fn((x: number, y: number) => {
       if (!inRange(x, y)) throw new Error(`getSectorWormholes: out-of-range coords (${x}, ${y})`);
       return [];
     }),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
 
   const service = new ScanHandlerService(
-    { findAllShips: jest.fn().mockReturnValue(ships), findByName: jest.fn(), findByUserid: jest.fn().mockReturnValue([]) } as unknown as ShipStateService,
-    { shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]) } } as unknown as PrismaService,
+    { findAllShips: vi.fn().mockReturnValue(ships), findByName: vi.fn(), findByUserid: vi.fn().mockReturnValue([]) } as unknown as ShipStateService,
+    { shipClass: { findMany: vi.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]) } } as unknown as PrismaService,
     galaxyMock as unknown as GalaxyService,
-    { get: jest.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
+    { get: vi.fn().mockReturnValue(undefined) } as unknown as PlanetStateService,
     new MineRegistry(),
   );
   return { service, galaxyMock };

@@ -12,6 +12,7 @@ import { MaintenanceService } from '../../../src/game/ship/maintenance.service';
 import { TickKind, TickContext } from '../../../src/game/tick/tick.types';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
@@ -35,21 +36,21 @@ function makeHarness(ship: ShipState) {
   const mutatedState = { ...ship };
 
   const mockTickService = {
-    subscribe: jest.fn().mockImplementation((_kind: TickKind, h: (ctx: TickContext) => void) => {
+    subscribe: vi.fn().mockImplementation((_kind: TickKind, h: (ctx: TickContext) => void) => {
       capturedHandler = h;
-      return jest.fn();
+      return vi.fn();
     }),
   } as unknown as TickService;
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([ship]),
-    mutate: jest.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
+    findAllShips: vi.fn().mockReturnValue([ship]),
+    mutate: vi.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
       fn(mutatedState as ShipState);
     }),
   } as unknown as ShipStateService;
 
   const mockMaintService = {
-    runAutoRepair: jest.fn().mockResolvedValue(undefined),
+    runAutoRepair: vi.fn().mockResolvedValue(undefined),
   } as unknown as MaintenanceService;
 
   const svc = new ShipTickService(mockTickService, mockShipState, mockMaintService);
@@ -73,8 +74,9 @@ describe('ShipTickService overspeed — noop', () => {
     svc.onModuleInit();
     fireTick();
     // mutate should not be called for overspeed noop (no change)
-    const overspeedMutations = (mockShipState.mutate as jest.Mock).mock.calls.filter(
-      ([, , fn]: [unknown, unknown, (s: ShipState) => void]) => {
+    const overspeedMutations = (mockShipState.mutate as Mock).mock.calls.filter(
+      (call) => {
+        const fn = call[2] as (s: ShipState) => void;
         const s = { ...ship };
         fn(s);
         return s.warncntr !== ship.warncntr;
@@ -159,9 +161,9 @@ describe('overspeed is player-only, sublight-exempt, and rolls every third secon
   function harness(ship: ShipState) {
     let handler: ((ctx: TickContext) => void) | null = null;
     const tick = {
-      subscribe: jest.fn((kind: TickKind, h: (ctx: TickContext) => void) => {
+      subscribe: vi.fn((kind: TickKind, h: (ctx: TickContext) => void) => {
         if (kind === TickKind.SHIP_UPDATE) handler = h;
-        return jest.fn();
+        return vi.fn();
       }),
     } as unknown as TickService;
     const state = {
@@ -171,7 +173,7 @@ describe('overspeed is player-only, sublight-exempt, and rolls every third secon
         return ship;
       },
     } as unknown as ShipStateService;
-    const maint = { runAutoRepair: jest.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
+    const maint = { runAutoRepair: vi.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
     const svc = new ShipTickService(tick, state, maint);
     svc.onModuleInit();
     // Always-fires RNG so any roll that happens is visible.

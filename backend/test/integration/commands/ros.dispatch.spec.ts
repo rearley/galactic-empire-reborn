@@ -6,8 +6,9 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
 import { UserRepository } from '../../../src/game/player/user.repository';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
-const emptyTeamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as TeamRepository;
+const emptyTeamRepo = { findTeamsByCodes: vi.fn().mockResolvedValue([]) } as unknown as TeamRepository;
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -19,7 +20,7 @@ const ctx: CommandContext = {};
 
 function buildRouter(users: Array<{ userid: string; score: bigint; kills: number; planets: number; population: bigint }>): CommandRouterService {
   const prismaMock = {
-    user: { findMany: jest.fn().mockResolvedValue(users) },
+    user: { findMany: vi.fn().mockResolvedValue(users) },
   } as unknown as PrismaService;
   const handler = new RosHandlerService(new UserRepository(prismaMock));
   const router = new CommandRouterService();
@@ -45,12 +46,12 @@ describe('ros dispatch integration', () => {
   });
 
   it('ros all passes to Prisma with all cap', async () => {
-    const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+    const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
     const handler = new RosHandlerService(new UserRepository(prismaMock));
     const router = new CommandRouterService();
     router.register(handler.command);
     await router.dispatch('ros all', makeShip(), ctx);
-    expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
+    expect((prismaMock.user.findMany as Mock).mock.calls[0][0].take).toBe(200);
   });
 
   it('ros with empty result returns only header', async () => {

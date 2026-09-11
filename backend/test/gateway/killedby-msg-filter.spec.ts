@@ -37,15 +37,15 @@ describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
     const shipStateService = {
       findAllShips: () => ships.map((s) => ({ ...s, shipno: 1 })),
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: () => undefined,
     } as unknown as ShipStateService;
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      prisma: { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: { $transaction: vi.fn().mockResolvedValue(undefined), shipClass: { findFirst: vi.fn() } } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
 

@@ -30,17 +30,17 @@ function makeTickService(shipOverrides: Partial<ShipState> = {}): {
   const state = makeShip(shipOverrides);
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([state]),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue([state]),
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         return state;
       },
     ),
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
   } as unknown as ShipStateService;
 
-  const mockTickService = { subscribe: jest.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
+  const mockTickService = { subscribe: vi.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
   const events = new EventEmitter2();
 
   const service = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);
@@ -66,7 +66,7 @@ describe('cloakTick — per-tick drain and auto-decloak (GEFUNCS.C:1374, :1384)'
   it('emits cloak-collapsed event on auto-decloak', () => {
     const lowEnergy = CLOAK_ENERGY_USE_DEFAULT - 1;
     const { service, state, events } = makeTickService({ cloak: CLOAK_RAMP_FULL, energy: lowEnergy });
-    const listener = jest.fn();
+    const listener = vi.fn();
     events.on('ship-management.cloak-collapsed', listener);
     service.cloakTick(state);
     expect(listener).toHaveBeenCalledTimes(1);
@@ -91,7 +91,7 @@ describe('cloakTick — per-tick drain and auto-decloak (GEFUNCS.C:1374, :1384)'
 
   it('does not emit cloak-collapsed when energy is sufficient', () => {
     const { service, state, events } = makeTickService({ cloak: CLOAK_RAMP_FULL, energy: 50000 });
-    const listener = jest.fn();
+    const listener = vi.fn();
     events.on('ship-management.cloak-collapsed', listener);
     service.cloakTick(state);
     expect(listener).not.toHaveBeenCalled();

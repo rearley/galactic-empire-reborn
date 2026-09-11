@@ -44,12 +44,12 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
     const handlers: Array<{ kind: TickKind; fn: (c: TickContext) => void }> = [];
 
     const tickStub: Pick<TickService, 'subscribe' | 'registerSnapshotProvider'> = {
-      subscribe: jest.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
+      subscribe: vi.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
         subscriptions.push({ kind });
         handlers.push({ kind, fn });
         return () => undefined;
       }),
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     };
 
     // Build a fake ship map.
@@ -82,7 +82,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
     const physicsHandlers = handlers.length;
 
     // Stand up CombatTickService manually with a stub MineRepository.
-    const mineRepo = { findAllActive: jest.fn().mockResolvedValue([]) } as unknown as MineRepository;
+    const mineRepo = { findAllActive: vi.fn().mockResolvedValue([]) } as unknown as MineRepository;
     const { MineRegistry } = await import('../../../src/game/combat/mine.registry');
     const { Mulberry32Adapter } = await import('../../../src/game/combat/random.port');
     const { Logger } = await import('@nestjs/common');

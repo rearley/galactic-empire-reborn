@@ -26,19 +26,20 @@ import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.s
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 describe('GameGateway — combat-disconnect kill (P-001)', () => {
   let gateway: GameGateway;
   let registry: ConnectedShipsRegistry;
-  let serverEmitMock: jest.Mock;
-  let updateManyMock: jest.Mock;
-  let flushAndUnloadMock: jest.Mock;
-  let unboardMock: jest.Mock;
-  let removeFromGameMock: jest.Mock;
-  let getSvcMock: jest.Mock;
-  let findAllShipsMock: jest.Mock;
-  let eventsEmitMock: jest.Mock;
-  let shipClassFindFirstMock: jest.Mock;
+  let serverEmitMock: Mock;
+  let updateManyMock: Mock;
+  let flushAndUnloadMock: Mock;
+  let unboardMock: Mock;
+  let removeFromGameMock: Mock;
+  let getSvcMock: Mock;
+  let findAllShipsMock: Mock;
+  let eventsEmitMock: Mock;
+  let shipClassFindFirstMock: Mock;
 
   /** Minimal ship state shape — cantexit controlled per-test. */
   const makeShip = (cantexit: number, lastfired = 255, status = 1) => ({
@@ -70,27 +71,27 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       id: 'sock-1',
       connected: true,
       data,
-      emit: jest.fn(),
-      on: jest.fn(),
-      disconnect: jest.fn(),
-      join: jest.fn(),
-      leave: jest.fn(),
-      broadcast: { emit: jest.fn() },
+      emit: vi.fn(),
+      on: vi.fn(),
+      disconnect: vi.fn(),
+      join: vi.fn(),
+      leave: vi.fn(),
+      broadcast: { emit: vi.fn() },
       handshake: { query: { userid: 'user1' } },
     };
   };
 
   beforeEach(() => {
-    serverEmitMock = jest.fn();
-    updateManyMock = jest.fn().mockResolvedValue({ count: 1 });
-    flushAndUnloadMock = jest.fn().mockResolvedValue(undefined);
-    unboardMock = jest.fn().mockResolvedValue(undefined);
-    removeFromGameMock = jest.fn();
-    findAllShipsMock = jest.fn().mockReturnValue([]);
-    eventsEmitMock = jest.fn();
-    shipClassFindFirstMock = jest.fn().mockResolvedValue({ points: 500 });
+    serverEmitMock = vi.fn();
+    updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
+    flushAndUnloadMock = vi.fn().mockResolvedValue(undefined);
+    unboardMock = vi.fn().mockResolvedValue(undefined);
+    removeFromGameMock = vi.fn();
+    findAllShipsMock = vi.fn().mockReturnValue([]);
+    eventsEmitMock = vi.fn();
+    shipClassFindFirstMock = vi.fn().mockResolvedValue({ points: 500 });
     // getSvcMock is replaced per-test to return the desired ship
-    getSvcMock = jest.fn();
+    getSvcMock = vi.fn();
 
     const mockShipStateSvc: Partial<ShipStateService> = {
       get: getSvcMock,
@@ -98,28 +99,28 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       unboard: unboardMock,
       removeFromGame: removeFromGameMock,
       findAllShips: findAllShipsMock,
-      findByUserid: jest.fn().mockReturnValue([]),
-      mutate: jest.fn() as never,
+      findByUserid: vi.fn().mockReturnValue([]),
+      mutate: vi.fn() as never,
     };
 
     registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
     const mockPrisma = {
       ship: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
         updateMany: updateManyMock,
       },
       shipClass: {
         findFirst: shipClassFindFirstMock,
       },
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
     const mockOnboarding = {
-      buildClassListPayload: jest.fn().mockResolvedValue([]),
+      buildClassListPayload: vi.fn().mockResolvedValue([]),
     } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    const mockEvents = { emit: eventsEmitMock, on: jest.fn() };
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
+    const mockEvents = { emit: eventsEmitMock, on: vi.fn() };
 
     gateway = makeGateway({
       shipStateService: mockShipStateSvc as ShipStateService,
@@ -128,12 +129,12 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       prisma: mockPrisma,
       onboardingService: mockOnboarding,
       scanHandler: mockScanHandler,
-      shipClassCache: { getTypeName: jest.fn(), getMaxTons: jest.fn().mockReturnValue(5000) } as unknown as ShipClassCacheService,
+      shipClassCache: { getTypeName: vi.fn(), getMaxTons: vi.fn().mockReturnValue(5000) } as unknown as ShipClassCacheService,
       random: mockRandom,
       events: mockEvents as never,
     });
     (gateway as unknown as { server: unknown }).server = { to: () => ({ emit: () => undefined, except: () => ({ emit: () => undefined }) }), except: () => ({ emit: () => undefined, to: () => ({ emit: () => undefined }) }), emit: serverEmitMock,
-      sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
+      sockets: { sockets: { get: vi.fn().mockReturnValue(undefined) } },
     };
 
     // Default: this socket ('sock-1') is the registered owner of the ship, as it

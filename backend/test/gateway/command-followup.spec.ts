@@ -5,6 +5,7 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * A handler that asks the player an open question (today: `land` on an unowned
@@ -28,42 +29,42 @@ const drain = async () => { for (let i = 0; i < 12; i++) await Promise.resolve()
 
 describe('GameGateway — expectFollowup redispatch', () => {
   let gateway: GameGateway;
-  let dispatch: jest.Mock;
+  let dispatch: Mock;
 
   const makeSocket = () => ({
     id: 'sock-1',
     connected: true,
     handshake: { query: { userid: 'user1' } },
     data: { userid: 'user1', activeShipNo: 1 } as Record<string, unknown>,
-    emit: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    broadcast: { emit: jest.fn() },
+    emit: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    broadcast: { emit: vi.fn() },
   });
 
   beforeEach(() => {
     const shipStateService = {
       findAllShips: () => [],
-      findByUserid: jest.fn().mockReturnValue([]),
-      get: jest.fn().mockReturnValue({ userid: 'user1', shipno: 1, shipname: 'Merchant1' }),
+      findByUserid: vi.fn().mockReturnValue([]),
+      get: vi.fn().mockReturnValue({ userid: 'user1', shipno: 1, shipname: 'Merchant1' }),
     } as unknown as ShipStateService;
 
-    dispatch = jest.fn().mockReturnValue({ lines: [] });
+    dispatch = vi.fn().mockReturnValue({ lines: [] });
 
     gateway = makeGateway({
       shipStateService,
       commandRouter: { dispatch } as unknown as CommandRouterService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       random: mockRandom,
     });
     (gateway as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
-      to: jest.fn(() => ({ emit: jest.fn() })),
-      emit: jest.fn(),
-      sockets: { sockets: { get: jest.fn() } },
+      to: vi.fn(() => ({ emit: vi.fn() })),
+      emit: vi.fn(),
+      sockets: { sockets: { get: vi.fn() } },
     };
   });
 

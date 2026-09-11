@@ -62,10 +62,10 @@ function buildHarness() {
   } as unknown as ShipStateService;
 
   const repository = new Proxy({
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockResolvedValue(undefined),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => (n > 2_000_000n ? 2_000_000n : n),
   } as Record<string, unknown>, {
     get(target, prop: string) {

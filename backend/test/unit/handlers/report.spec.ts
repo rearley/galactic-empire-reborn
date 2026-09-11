@@ -34,7 +34,7 @@ function makeService(typeName = 'Interceptor', hasCloak = false) {
 describe('rep reads the ship class from the boot-time cache, not the database', () => {
   it('resolves typeName/hasCloak through ShipClassCacheService.get, not a query', async () => {
     const { service, shipClassCache } = makeService('Fighter', true);
-    const getSpy = jest.spyOn(shipClassCache, 'get');
+    const getSpy = vi.spyOn(shipClassCache, 'get');
 
     const result = await (service.command.handler(makeShip(), ['nav'], {}) as Promise<CommandResult>);
 

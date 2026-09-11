@@ -24,20 +24,21 @@ import {
   DroidKilledEvent,
 } from '../../src/game/droid/droid-events';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 describe('GameGateway — droid event bridge', () => {
   let gateway: GameGateway;
-  let emitMock: jest.Mock;
-  let toMock: jest.Mock;
+  let emitMock: Mock;
+  let toMock: Mock;
 
   beforeEach(() => {
-    emitMock = jest.fn();
-    toMock = jest.fn().mockReturnValue({ emit: emitMock, to: jest.fn().mockReturnValue({ emit: emitMock }) });
+    emitMock = vi.fn();
+    toMock = vi.fn().mockReturnValue({ emit: emitMock, to: vi.fn().mockReturnValue({ emit: emitMock }) });
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
-    const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
+    const mockPrisma = { ship: { findFirst: vi.fn() } } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
 
     gateway = makeGateway({
       // DROIDNEW is a galaxy broadcast that skips filtered pilots, so the
@@ -55,7 +56,7 @@ describe('GameGateway — droid event bridge', () => {
     // uses; the roster emit still goes through `to`.
     (gateway as unknown as { server: unknown }).server = {
       to: toMock,
-      except: jest.fn().mockReturnValue({ emit: jest.fn() }),
+      except: vi.fn().mockReturnValue({ emit: vi.fn() }),
     };
   });
 

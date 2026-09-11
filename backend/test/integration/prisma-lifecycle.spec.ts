@@ -25,7 +25,7 @@ describe('PrismaService lifecycle', () => {
     });
 
     it('disconnects on close — $disconnect is called during onModuleDestroy', async () => {
-      const disconnectSpy = jest.spyOn(prisma, '$disconnect');
+      const disconnectSpy = vi.spyOn(prisma, '$disconnect');
       await app.close();
       closed = true;
       expect(disconnectSpy).toHaveBeenCalledTimes(1);

@@ -8,7 +8,7 @@ describe('TickService — subscriber registry (US3)', () => {
   let app: TestingModule;
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     app = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     service = app.get(TickService);
     await app.init();
@@ -16,14 +16,14 @@ describe('TickService — subscriber registry (US3)', () => {
 
   afterEach(async () => {
     await app.close();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('register + fire — handler called with correct kind and sequential tickNumbers', () => {
     const calls: Array<{ kind: TickKind; tickNumber: number }> = [];
     service.subscribe(TickKind.SHIP_UPDATE, (ctx) => { calls.push({ kind: ctx.kind, tickNumber: ctx.tickNumber }); });
 
-    jest.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(3000);
 
     expect(calls).toEqual([
       { kind: TickKind.SHIP_UPDATE, tickNumber: 1 },
@@ -36,9 +36,9 @@ describe('TickService — subscriber registry (US3)', () => {
     const calls: number[] = [];
     const unsub = service.subscribe(TickKind.SHIP_UPDATE, (ctx) => { calls.push(ctx.tickNumber); });
 
-    jest.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
     unsub();
-    jest.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(3000);
 
     expect(calls).toEqual([1, 2]);
   });
@@ -57,7 +57,7 @@ describe('TickService — subscriber registry (US3)', () => {
     service.subscribe(TickKind.SHIP_UPDATE, handler);
     service.subscribe(TickKind.SHIP_UPDATE, handler);
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     expect(count).toBe(1);
   });
@@ -72,7 +72,7 @@ describe('TickService — subscriber registry (US3)', () => {
     });
     service.subscribe(TickKind.SHIP_UPDATE, () => { countGood++; });
 
-    expect(() => jest.advanceTimersByTime(60000)).not.toThrow();
+    expect(() => vi.advanceTimersByTime(60000)).not.toThrow();
 
     expect(countGood).toBe(60);
     expect(countBad).toBe(60);
@@ -82,11 +82,11 @@ describe('TickService — subscriber registry (US3)', () => {
     let physicsCount = 0;
     service.subscribe(TickKind.PHYSICS, () => { physicsCount++; });
 
-    jest.advanceTimersByTime(5000); // 5 × SHIP_UPDATE, 0 × PHYSICS (need 6s)
+    vi.advanceTimersByTime(5000); // 5 × SHIP_UPDATE, 0 × PHYSICS (need 6s)
 
     expect(physicsCount).toBe(0);
 
-    jest.advanceTimersByTime(1000); // now 6s total — one PHYSICS fires
+    vi.advanceTimersByTime(1000); // now 6s total — one PHYSICS fires
 
     expect(physicsCount).toBe(1);
   });
@@ -98,13 +98,13 @@ describe('TickService — subscriber registry (US3)', () => {
       fireTimes.push(Date.now());
     });
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(fireTimes).toHaveLength(1);
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(fireTimes).toHaveLength(2);
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(fireTimes).toHaveLength(3);
   });
 
@@ -116,7 +116,7 @@ describe('TickService — subscriber registry (US3)', () => {
       return new Promise<void>((resolve) => setTimeout(resolve, 5000));
     });
 
-    jest.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(3000);
 
     expect(counts).toEqual([1, 2, 3]);
   });

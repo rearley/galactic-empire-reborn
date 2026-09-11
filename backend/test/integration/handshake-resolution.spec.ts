@@ -14,6 +14,7 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const TEST_USERID = 'u-resolution-test';
 
@@ -44,50 +45,50 @@ describe('GameGateway handshake resolution', () => {
   let app: INestApplication;
   let port: number;
   let shipStateServiceMock: {
-    get: jest.Mock;
-    findByUserid: jest.Mock;
-    findAllShips: jest.Mock;
-    mutate: jest.Mock;
-    size: jest.Mock;
-    loadShip: jest.Mock;
-    flushAndUnload: jest.Mock;
-    unboard: jest.Mock;
-    board: jest.Mock;
+    get: Mock;
+    findByUserid: Mock;
+    findAllShips: Mock;
+    mutate: Mock;
+    size: Mock;
+    loadShip: Mock;
+    flushAndUnload: Mock;
+    unboard: Mock;
+    board: Mock;
   };
   let prismaMock: {
-    ship: { findMany: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
-    shipClass: { findMany: jest.Mock };
-    mine: { findMany: jest.Mock };
-    user: { findUnique: jest.Mock };
+    ship: { findMany: Mock; findFirst: Mock; updateMany: Mock };
+    shipClass: { findMany: Mock };
+    mine: { findMany: Mock };
+    user: { findUnique: Mock };
   };
 
   beforeEach(async () => {
     shipStateServiceMock = {
-      get: jest.fn().mockReturnValue(undefined),
-      findByUserid: jest.fn().mockReturnValue([]),
+      get: vi.fn().mockReturnValue(undefined),
+      findByUserid: vi.fn().mockReturnValue([]),
       // Combat/ship ticks now call findAllShips on the service.
-      findAllShips: jest.fn().mockReturnValue([]),
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(0),
-      loadShip: jest.fn(),
+      findAllShips: vi.fn().mockReturnValue([]),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(0),
+      loadShip: vi.fn(),
       // Gateway calls flushAndUnload during disconnect.
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
     };
 
     prismaMock = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([]),
-        findFirst: jest.fn().mockResolvedValue(null),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-      mine: { findMany: jest.fn().mockResolvedValue([]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+      mine: { findMany: vi.fn().mockResolvedValue([]) },
       // scan_pl uses prisma.user.findUnique for owner resolution, and the
       // gateway's onboarding User-exists guard requires a live User row before
       // it will emit prompt:ship-name (otherwise it force-logs-out).
-      user: { findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ userid: TEST_USERID }) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -96,37 +97,37 @@ describe('GameGateway handshake resolution', () => {
       .overrideProvider(ShipStateService)
       .useValue(shipStateServiceMock)
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: unknown) => {
+        validate: vi.fn().mockImplementation(async (client: unknown) => {
           (client as { data: Record<string, unknown> }).data.userid = TEST_USERID;
           return { sub: TEST_USERID, username: 'TestUser' };
         }),
       })
       .overrideProvider(OnboardingService)
       .useValue({
-        buildClassListPayload: jest.fn().mockResolvedValue([]),
-        validateClassReply: jest.fn().mockResolvedValue(true),
-        validateNameReply: jest.fn().mockReturnValue(true),
-        finalize: jest.fn(),
+        buildClassListPayload: vi.fn().mockResolvedValue([]),
+        validateClassReply: vi.fn().mockResolvedValue(true),
+        validateNameReply: vi.fn().mockReturnValue(true),
+        finalize: vi.fn(),
       })
       .compile();
 

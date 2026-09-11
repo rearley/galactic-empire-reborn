@@ -28,17 +28,17 @@ function makeTickService(initialCloak: number, initialEnergy = 50000): {
   const state = makeShip({ cloak: initialCloak, energy: initialEnergy });
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([state]),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue([state]),
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         return state;
       },
     ),
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
   } as unknown as ShipStateService;
 
-  const mockTickService = { subscribe: jest.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
+  const mockTickService = { subscribe: vi.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
   const events = new EventEmitter2();
 
   const service = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);

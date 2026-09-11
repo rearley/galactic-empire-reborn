@@ -32,13 +32,13 @@ function makeService(ship: ShipState) {
   const mockShipState = {
     // abandon() persists status as well as setting it — the tick flush strips
     // `status`, so the handler cannot go through mutate().
-    abandon: jest.fn().mockImplementation((_uid: string, _no: number) => {
+    abandon: vi.fn().mockImplementation((_uid: string, _no: number) => {
       ship.status = SHIP_STATUS_ABANDONED;
       ship.destruct = 0;
       return Promise.resolve();
     }),
   } as unknown as ShipStateService;
-  return { handler: new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService), mockShipState };
+  return { handler: new AbandonHandlerService(mockShipState, { abandonPlanet: vi.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService), mockShipState };
 }
 
 // ---------------------------------------------------------------------------

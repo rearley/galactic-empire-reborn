@@ -43,7 +43,7 @@ import { TickService } from '../../src/game/tick/tick.service';
  */
 function recordHook(order: string[], proto: { onModuleInit: () => unknown }, label: string): void {
   const original = proto.onModuleInit;
-  jest.spyOn(proto, 'onModuleInit').mockImplementation(function (this: unknown) {
+  vi.spyOn(proto, 'onModuleInit').mockImplementation(function (this: unknown) {
     order.push(label);
     return original.call(this);
   });
@@ -66,7 +66,7 @@ async function bootAndRecord(): Promise<string[]> {
 
 describe('boot order', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('runs the three boot-critical onModuleInit hooks in a fixed order', async () => {

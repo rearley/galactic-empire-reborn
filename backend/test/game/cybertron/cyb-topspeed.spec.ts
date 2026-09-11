@@ -36,9 +36,9 @@ describe('Cybertron spawn — topspeed', () => {
   const build = () => {
     const created: Array<Record<string, unknown>> = [];
     const tx = {
-      user: { upsert: jest.fn().mockResolvedValue({}) },
+      user: { upsert: vi.fn().mockResolvedValue({}) },
       ship: {
-        upsert: jest.fn().mockImplementation((args: { create: Record<string, unknown> }) => {
+        upsert: vi.fn().mockImplementation((args: { create: Record<string, unknown> }) => {
           created.push(args.create);
           return Promise.resolve({ ...args.create, status: 2 });
         }),
@@ -51,7 +51,7 @@ describe('Cybertron spawn — topspeed', () => {
         findUnique: () => Promise.resolve(created.length ? { ...created[created.length - 1], status: 2 } : null),
       },
     } as never;
-    const shipState = { loadShip: jest.fn(), get: jest.fn() } as never;
+    const shipState = { loadShip: vi.fn(), get: vi.fn() } as never;
     return { repo: new CybertronRepository(prisma, shipState), created };
   };
 

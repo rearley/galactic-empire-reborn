@@ -34,26 +34,26 @@ function slot(): SpawnSlotInit {
 
 describe('CybertronRepository.createSpawn — a recycled slot is a fresh ship', () => {
   const run = async () => {
-    const upsert = jest.fn().mockResolvedValue({});
+    const upsert = vi.fn().mockResolvedValue({});
     const prisma = {
-      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<void>) => {
+      $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => {
         await fn({
           user: {
-            upsert: jest.fn().mockResolvedValue({}),
-            findUnique: jest.fn().mockResolvedValue({ userid: 'Cybrg-222', cash: 1000n }),
+            upsert: vi.fn().mockResolvedValue({}),
+            findUnique: vi.fn().mockResolvedValue({ userid: 'Cybrg-222', cash: 1000n }),
           },
           ship: { upsert },
         });
       }),
-      ship: { findUnique: jest.fn().mockResolvedValue(null) },
+      ship: { findUnique: vi.fn().mockResolvedValue(null) },
       user: {},
     } as unknown as PrismaService;
 
     const shipState = {
-      loadShip: jest.fn(), get: jest.fn(),
-      findByUserid: jest.fn().mockReturnValue([]),
-      findAllShips: jest.fn().mockReturnValue([]),
-      removeFromGame: jest.fn(),
+      loadShip: vi.fn(), get: vi.fn(),
+      findByUserid: vi.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue([]),
+      removeFromGame: vi.fn(),
     } as unknown as ShipStateService;
 
     await new CybertronRepository(prisma, shipState).createSpawn(slot());

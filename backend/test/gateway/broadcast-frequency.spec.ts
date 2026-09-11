@@ -5,6 +5,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * `outsect`/`outwar` deliver a transmission ONLY to ships carrying the sender's
@@ -14,7 +15,7 @@ import { makeGateway } from '../helpers/make-gateway';
  * top of the confirmation.
  */
 describe('GameGateway — frequency-filtered broadcasts', () => {
-  type Sock = { id: string; data: Record<string, unknown>; emit: jest.Mock };
+  type Sock = { id: string; data: Record<string, unknown>; emit: Mock };
 
   let gateway: GameGateway;
   let sockets: Map<string, Sock>;
@@ -22,7 +23,7 @@ describe('GameGateway — frequency-filtered broadcasts', () => {
   let ships: Map<string, { freq: number[]; cloak: number }>;
 
   const addSocket = (id: string, freq: number[], opts: { inRoom?: boolean; cloak?: number } = {}): Sock => {
-    const sock: Sock = { id, data: { userid: id, activeShipNo: 1 }, emit: jest.fn() };
+    const sock: Sock = { id, data: { userid: id, activeShipNo: 1 }, emit: vi.fn() };
     sockets.set(id, sock);
     ships.set(id, { freq, cloak: opts.cloak ?? 0 });
     if (opts.inRoom !== false) roomMembers.add(id);
@@ -45,14 +46,14 @@ describe('GameGateway — frequency-filtered broadcasts', () => {
 
     gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
 
-    const roomEmit = jest.fn();
+    const roomEmit = vi.fn();
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: () => ({ emit: roomEmit }),
       sockets: {
         sockets,

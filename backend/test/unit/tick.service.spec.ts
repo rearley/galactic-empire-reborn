@@ -8,7 +8,7 @@ describe('TickService — cadence & lifecycle', () => {
   let app: TestingModule;
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     app = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     service = app.get(TickService);
     await app.init();
@@ -16,14 +16,14 @@ describe('TickService — cadence & lifecycle', () => {
 
   afterEach(async () => {
     await app.close();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('(a) advancing 1000ms fires SHIP_UPDATE once with tickNumber=1', () => {
     const calls: number[] = [];
     service.subscribe(TickKind.SHIP_UPDATE, (ctx) => { calls.push(ctx.tickNumber); });
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     expect(calls).toEqual([1]);
   });
@@ -34,7 +34,7 @@ describe('TickService — cadence & lifecycle', () => {
     service.subscribe(TickKind.SHIP_UPDATE, () => { shipCount++; });
     service.subscribe(TickKind.PHYSICS, () => { physicsCount++; });
 
-    jest.advanceTimersByTime(60000);
+    vi.advanceTimersByTime(60000);
 
     expect(shipCount).toBe(60);
     expect(physicsCount).toBe(10);
@@ -43,26 +43,26 @@ describe('TickService — cadence & lifecycle', () => {
   it('(c) after onModuleDestroy, no further invocations and timer count is 0', async () => {
     let count = 0;
     service.subscribe(TickKind.SHIP_UPDATE, () => { count++; });
-    jest.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
     expect(count).toBe(2);
 
     await app.close();
 
-    jest.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000);
     expect(count).toBe(2);
-    expect(jest.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('(d) tickNumber resets to 0 across init/destroy/init cycle (FR-005)', async () => {
     const nums: number[] = [];
     service.subscribe(TickKind.SHIP_UPDATE, (ctx) => { nums.push(ctx.tickNumber); });
-    jest.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
     expect(nums).toEqual([1, 2]);
 
     await app.close();
-    jest.clearAllTimers();
-    jest.useRealTimers();
-    jest.useFakeTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.useFakeTimers();
 
     const app2 = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     const service2 = app2.get(TickService);
@@ -70,7 +70,7 @@ describe('TickService — cadence & lifecycle', () => {
 
     const nums2: number[] = [];
     service2.subscribe(TickKind.SHIP_UPDATE, (ctx) => { nums2.push(ctx.tickNumber); });
-    jest.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
     expect(nums2).toEqual([1, 2]);
 
     await app2.close();
@@ -80,7 +80,7 @@ describe('TickService — cadence & lifecycle', () => {
     let firedAt: unknown;
     service.subscribe(TickKind.SHIP_UPDATE, (ctx) => { firedAt = ctx.firedAt; });
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     expect(firedAt).toBeInstanceOf(Date);
   });
@@ -95,11 +95,11 @@ describe('TickService — cadence & lifecycle', () => {
       count++;
     });
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(count).toBe(1);
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(count).toBe(2);
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(count).toBe(3);
   });
 
@@ -112,7 +112,7 @@ describe('TickService — cadence & lifecycle', () => {
       return new Promise<void>((resolve) => setTimeout(resolve, 5000));
     });
 
-    jest.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(3000);
     // All 3 ticks should have fired even though the async promise is pending
     expect(count).toBe(3);
   });
@@ -124,7 +124,7 @@ describe('TickService — snapshot providers (Task 8)', () => {
   let app: TestingModule;
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     registry = new InvariantRegistry();
     app = await Test.createTestingModule({
       providers: [TickService, { provide: InvariantRegistry, useValue: registry }],
@@ -135,7 +135,7 @@ describe('TickService — snapshot providers (Task 8)', () => {
 
   afterEach(async () => {
     await app.close();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('snapshotForInvariants merges every registered provider slice', () => {
@@ -162,7 +162,7 @@ describe('TickService — snapshot providers (Task 8)', () => {
 
     process.env.INVARIANTS_RUNTIME = '1';
     try {
-      jest.advanceTimersByTime(6000); // one PHYSICS tick
+      vi.advanceTimersByTime(6000); // one PHYSICS tick
     } finally {
       delete process.env.INVARIANTS_RUNTIME;
     }
@@ -171,10 +171,10 @@ describe('TickService — snapshot providers (Task 8)', () => {
   });
 
   it('snapshot is empty when INVARIANTS_RUNTIME is not set', () => {
-    const fn = jest.fn(() => [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }]);
+    const fn = vi.fn(() => [{ weapon: 'phaser', shooter: { x: 0, y: 0 }, target: { x: 0, y: 0 }, maxRange: 1 }]);
     service.registerSnapshotProvider('combatEvents', fn);
 
-    jest.advanceTimersByTime(6000); // PHYSICS tick
+    vi.advanceTimersByTime(6000); // PHYSICS tick
 
     expect(fn).not.toHaveBeenCalled();
   });
@@ -198,7 +198,7 @@ describe('TickService — snapshot providers (Task 8)', () => {
 
     process.env.INVARIANTS_RUNTIME = '1';
     try {
-      jest.advanceTimersByTime(6000);
+      vi.advanceTimersByTime(6000);
     } finally {
       delete process.env.INVARIANTS_RUNTIME;
     }

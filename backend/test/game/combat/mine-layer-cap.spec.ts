@@ -32,7 +32,7 @@ function build() {
   const created: unknown[] = [];
   const prisma = {
     mine: {
-      create: jest.fn(({ data }: { data: Record<string, unknown> }) => {
+      create: vi.fn(({ data }: { data: Record<string, unknown> }) => {
         created.push(data);
         return Promise.resolve({ id: nextId++, ...data });
       }),

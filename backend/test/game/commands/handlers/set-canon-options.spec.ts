@@ -49,14 +49,14 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(ship: ShipState) {
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_u: string, _n: number, fn: (s: ShipState) => void) => { fn(ship); return ship; },
     ),
   } as unknown as ShipStateService;
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ options: [] }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ options: [] }),
+      update: vi.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
   return { handler: new SetHandlerService(mockShipState, new UserRepository(mockPrisma)), mockShipState };

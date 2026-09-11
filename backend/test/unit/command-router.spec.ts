@@ -19,7 +19,7 @@ function makeCmd(overrides: Partial<Command> & { keyword: string }): Command {
     aliases: overrides.aliases ?? [],
     minArgs: overrides.minArgs ?? 0,
     argMissingMessage: overrides.argMissingMessage ?? 'missing arg',
-    handler: overrides.handler ?? jest.fn().mockReturnValue({ lines: [{ text: 'ok', category: 'success' }] }),
+    handler: overrides.handler ?? vi.fn().mockReturnValue({ lines: [{ text: 'ok', category: 'success' }] }),
   };
 }
 
@@ -36,21 +36,21 @@ describe('CommandRouterService', () => {
 
   describe('tokenisation', () => {
     it('leading/trailing whitespace is stripped', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('   rotate 90   ', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['90'], ctx);
     });
 
     it('internal whitespace is collapsed', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('rotate     90', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['90'], ctx);
     });
 
     it('mixed-case keyword "ROT" matches "rotate"', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       // The original matches on the first 3 characters (GECMDS.C:249 gesearch),
       // and its table entry is {"rot", cmd_rotate} — so ROT resolves, and so
@@ -61,7 +61,7 @@ describe('CommandRouterService', () => {
     });
 
     it('lower-cased keyword "rotate" matches', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('rotate 90', ship, ctx);
       expect(handler).toHaveBeenCalledTimes(1);
@@ -70,14 +70,14 @@ describe('CommandRouterService', () => {
 
   describe('alias resolution', () => {
     it('alias dispatches to the canonical handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'impulse', aliases: ['imp'], minArgs: 1, handler, argMissingMessage: 'IMPFMT' }));
       router.dispatch('imp 50', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['50'], ctx);
     });
 
     it('alias args are passed correctly', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', aliases: ['rot'], minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('rot 45', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['45'], ctx);
@@ -129,7 +129,7 @@ describe('CommandRouterService', () => {
     });
 
     it('arg array passed to handler is post-trim post-split', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
       router.dispatch('warp  5  ', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
@@ -138,14 +138,14 @@ describe('CommandRouterService', () => {
 
   describe('case-insensitive keyword dispatch', () => {
     it('mixed-case keyword "RoTaTe" dispatches correctly', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       router.dispatch('RoTaTe 90', ship, ctx);
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it('mixed-case alias "IMP" dispatches to impulse handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'impulse', aliases: ['imp'], minArgs: 1, handler, argMissingMessage: 'IMPFMT' }));
       router.dispatch('IMP 50', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['50'], ctx);
@@ -155,14 +155,14 @@ describe('CommandRouterService', () => {
   // T039: additional forgiving-input coverage (US3)
   describe('US3 — forgiving input and safe error handling', () => {
     it('WARP (all-caps) dispatches to warp handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', aliases: ['war'], minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
       router.dispatch('WARP 5', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
     });
 
     it('WAR (upper-case alias) dispatches to warp handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', aliases: ['war'], minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
       router.dispatch('WAR 5', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
@@ -171,7 +171,7 @@ describe('CommandRouterService', () => {
     it('rotate with invalid arg passes through to handler — validator failure, not router failure', () => {
       // The router dispatches the call; the handler's validator returns NUMOOR.
       // This verifies the router does NOT intercept validator failures.
-      const handler = jest.fn().mockReturnValue({
+      const handler = vi.fn().mockReturnValue({
         lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }],
       });
       router.register(makeCmd({ keyword: 'rotate', aliases: ['rot'], minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));

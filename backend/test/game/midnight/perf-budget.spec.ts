@@ -46,7 +46,7 @@ async function truncateAll() {
 beforeAll(async () => {
   app = await Test.createTestingModule({
     imports: [PrismaModule, ScheduleModule.forRoot()],
-    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } }],
+    providers: [MidnightService, MidnightRepository, { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } }],
   }).compile();
   prisma = app.get(PrismaService);
   service = app.get(MidnightService);

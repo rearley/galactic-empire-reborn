@@ -65,10 +65,10 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 }
 
 function makeBuy(buyResult: Awaited<ReturnType<PlanetStateService['buy']>>) {
-  const planetMock = { get: jest.fn().mockReturnValue(makePlanet()), buy: jest.fn().mockResolvedValue(buyResult) };
-  const shipMock = { mutate: jest.fn() };
+  const planetMock = { get: vi.fn().mockReturnValue(makePlanet()), buy: vi.fn().mockResolvedValue(buyResult) };
+  const shipMock = { mutate: vi.fn() };
   const prismaMock = {
-    user: { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }) },
+    user: { update: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n }) },
   };
   return new BuyHandlerService(
     planetMock as unknown as PlanetStateService,
@@ -104,9 +104,9 @@ describe('buy — canon messages', () => {
 
 describe('pri — canon messages', () => {
   function makePrice(planet: PlanetState) {
-    const planetMock = { get: jest.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
+    const planetMock = { get: vi.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
     const prismaMock = {
-      user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n }) },
     } as unknown as PrismaService;
     return new PriceHandlerService(planetMock, new UserRepository(prismaMock));
   }
@@ -133,9 +133,9 @@ describe('pri — canon messages', () => {
 describe('sell — canon messages', () => {
   it('leads SELL2 with the transfer tax, as canon does', async () => {
     const planetMock = {
-      sell: jest.fn().mockResolvedValue({ ok: true, transferred: 10, proceeds: 19n, fee: 1n }),
+      sell: vi.fn().mockResolvedValue({ ok: true, transferred: 10, proceeds: 19n, fee: 1n }),
     } as unknown as PlanetStateService;
-    const prismaMock = { user: { update: jest.fn().mockResolvedValue({}) } } as unknown as PrismaService;
+    const prismaMock = { user: { update: vi.fn().mockResolvedValue({}) } } as unknown as PrismaService;
     const svc = new SellHandlerService(planetMock, new UserRepository(prismaMock));
 
     const text = (await svc.command.handler(makeShip(), ['10', 'food'], {})).lines[0].text;

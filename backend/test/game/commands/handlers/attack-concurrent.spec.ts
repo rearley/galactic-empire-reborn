@@ -57,7 +57,7 @@ describe('AttackHandlerService — concurrent attack mutex', () => {
     let lockCount = 0;
 
     const mockShipState = {
-      mutate: jest.fn().mockImplementation(
+      mutate: vi.fn().mockImplementation(
         (_uid: string, _no: number, fn: (s: ShipState) => void) => {
           const s = makeShip('attacker1');
           fn(s);
@@ -67,8 +67,8 @@ describe('AttackHandlerService — concurrent attack mutex', () => {
 
     // Simulate: first attacker captures planet inside lock (userid changes)
     const mockPlanetService = {
-      get: jest.fn().mockImplementation(() => planet),
-      withPlanetLock: jest.fn().mockImplementation(
+      get: vi.fn().mockImplementation(() => planet),
+      withPlanetLock: vi.fn().mockImplementation(
         async (_x: number, _y: number, _p: number, fn: () => Promise<unknown>) => {
           lockCount++;
           if (lockCount === 1) {
@@ -82,26 +82,26 @@ describe('AttackHandlerService — concurrent attack mutex', () => {
           }
         },
       ),
-      flushPlanet: jest.fn().mockResolvedValue(undefined),
+      flushPlanet: vi.fn().mockResolvedValue(undefined),
     } as unknown as PlanetStateService;
 
     const mockAttackService = {
-      attackTroop: jest.fn().mockResolvedValue({
+      attackTroop: vi.fn().mockResolvedValue({
         left1: 300, left2: 0, kill1: 50, kill2: 100, won: 1,
         itemsDestroyed: [], narration: ['attacker won.'],
       }),
-      attackFighter: jest.fn().mockResolvedValue({}),
+      attackFighter: vi.fn().mockResolvedValue({}),
     } as unknown as PlanetAttackService;
 
     const mockShipClassCache = {
-      get: jest.fn().mockReturnValue({ canAttackPlanet: true }),
+      get: vi.fn().mockReturnValue({ canAttackPlanet: true }),
     } as unknown as ShipClassCacheService;
 
     const handler1 = new AttackHandlerService(
       mockShipState, mockPlanetService, mockAttackService, mockShipClassCache, FIRETICKS_DEFAULT,
     );
     const handler2 = new AttackHandlerService(
-      { mutate: jest.fn() } as unknown as ShipStateService,
+      { mutate: vi.fn() } as unknown as ShipStateService,
       mockPlanetService, mockAttackService, mockShipClassCache, FIRETICKS_DEFAULT,
     );
 
@@ -128,24 +128,24 @@ describe('AttackHandlerService — concurrent attack mutex', () => {
     planet.userid = 'attacker';
 
     const mockShipState = {
-      mutate: jest.fn(),
+      mutate: vi.fn(),
     } as unknown as ShipStateService;
 
     const mockPlanetService = {
-      get: jest.fn().mockReturnValue(planet),
-      withPlanetLock: jest.fn().mockImplementation(
+      get: vi.fn().mockReturnValue(planet),
+      withPlanetLock: vi.fn().mockImplementation(
         async (_x: number, _y: number, _p: number, fn: () => Promise<unknown>) => fn(),
       ),
-      flushPlanet: jest.fn().mockResolvedValue(undefined),
+      flushPlanet: vi.fn().mockResolvedValue(undefined),
     } as unknown as PlanetStateService;
 
     const mockAttackService = {
-      attackTroop: jest.fn(),
-      attackFighter: jest.fn(),
+      attackTroop: vi.fn(),
+      attackFighter: vi.fn(),
     } as unknown as PlanetAttackService;
 
     const mockShipClassCache = {
-      get: jest.fn().mockReturnValue({ canAttackPlanet: true }),
+      get: vi.fn().mockReturnValue({ canAttackPlanet: true }),
     } as unknown as ShipClassCacheService;
 
     const handler = new AttackHandlerService(

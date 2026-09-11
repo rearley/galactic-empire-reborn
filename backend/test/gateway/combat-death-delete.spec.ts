@@ -28,6 +28,7 @@ import {
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
 import { PresenceService } from '../../src/public/presence.service';
+import type { Mock } from 'vitest';
 
 /** Build a minimal CombatShipDestroyedEvent for testing. */
 const makeDestroyedEvent = (victimUserid: string, victimShipno: number): CombatShipDestroyedEvent => ({
@@ -47,12 +48,12 @@ const makeDestroyedEvent = (victimUserid: string, victimShipno: number): CombatS
 
 describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement noships (P-007 T5)', () => {
   let gateway: GameGateway;
-  let deleteManyMock: jest.Mock;
-  let userFindUniqueMock: jest.Mock;
-  let userUpdateMock: jest.Mock;
-  let transactionMock: jest.Mock;
-  let removeFromGameMock: jest.Mock;
-  let serverEmitMock: jest.Mock;
+  let deleteManyMock: Mock;
+  let userFindUniqueMock: Mock;
+  let userUpdateMock: Mock;
+  let transactionMock: Mock;
+  let removeFromGameMock: Mock;
+  let serverEmitMock: Mock;
 
   /**
    * Build gateway with a configurable noships value.
@@ -64,49 +65,49 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
    * @param dbStatus       status returned by the in-transaction findFirst fallback.
    */
   const buildGateway = (noships: number, deletedCount = 1, victimStatus?: number, dbStatus = 1) => {
-    serverEmitMock = jest.fn();
-    deleteManyMock = jest.fn().mockResolvedValue({ count: deletedCount });
-    userFindUniqueMock = jest.fn().mockResolvedValue({ noships });
-    userUpdateMock = jest.fn().mockResolvedValue(undefined);
-    removeFromGameMock = jest.fn();
+    serverEmitMock = vi.fn();
+    deleteManyMock = vi.fn().mockResolvedValue({ count: deletedCount });
+    userFindUniqueMock = vi.fn().mockResolvedValue({ noships });
+    userUpdateMock = vi.fn().mockResolvedValue(undefined);
+    removeFromGameMock = vi.fn();
 
     // $transaction callback form — passes a tx proxy to the callback
     const txMock = {
       ship: {
         deleteMany: deleteManyMock,
-        findFirst: jest.fn().mockResolvedValue({ status: dbStatus }),
+        findFirst: vi.fn().mockResolvedValue({ status: dbStatus }),
       },
       user: { findUnique: userFindUniqueMock, update: userUpdateMock },
     };
-    transactionMock = jest.fn().mockImplementation(
+    transactionMock = vi.fn().mockImplementation(
       (fn: (tx: typeof txMock) => Promise<void>) => fn(txMock),
     );
 
     const mockPrisma = {
       ship: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        updateMany: jest.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn(),
       },
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: transactionMock,
     } as unknown as PrismaService;
 
     const mockShipStateSvc: Partial<ShipStateService> = {
-      get: jest.fn().mockReturnValue(victimStatus !== undefined ? { status: victimStatus } : undefined),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      get: vi.fn().mockReturnValue(victimStatus !== undefined ? { status: victimStatus } : undefined),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
       removeFromGame: removeFromGameMock,
-      findAllShips: jest.fn().mockReturnValue([]),
-      findByUserid: jest.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue([]),
+      findByUserid: vi.fn().mockReturnValue([]),
     };
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
     const mockOnboarding = {
-      buildClassListPayload: jest.fn().mockResolvedValue([]),
+      buildClassListPayload: vi.fn().mockResolvedValue([]),
     } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-    const mockEvents = { emit: jest.fn(), on: jest.fn() };
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
+    const mockEvents = { emit: vi.fn(), on: vi.fn() };
 
     const gw = makeGateway({
       shipStateService: mockShipStateSvc as ShipStateService,
@@ -120,11 +121,11 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
-      to: jest.fn(() => ({ emit: jest.fn() })),
+      to: vi.fn(() => ({ emit: vi.fn() })),
       // Canon's DIED goes out with except(victim) — GEFUNCS.C:1263.
-      except: jest.fn(() => ({ emit: jest.fn() })),
+      except: vi.fn(() => ({ emit: vi.fn() })),
       emit: serverEmitMock,
-      sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
+      sockets: { sockets: { get: vi.fn().mockReturnValue(undefined) } },
     };
     return gw;
   };
@@ -174,7 +175,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     // The manifest is warned by `ShipDestroyedService`'s own logger; the
     // gateway's `@OnEvent` handler is a one-line delegate that logs nothing.
     const service = (gateway as unknown as { shipDestroyed: { logger: { warn: (m: string) => void } } }).shipDestroyed;
-    const logSpy = jest.spyOn(service.logger, 'warn');
+    const logSpy = vi.spyOn(service.logger, 'warn');
 
     gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
     await new Promise((r) => setImmediate(r));

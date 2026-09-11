@@ -26,6 +26,7 @@ import {
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
   maxPrice: 0n,
@@ -50,7 +51,7 @@ function makePlayer(): ShipState {
 
 interface Harness {
   svc: DroidTickService;
-  loadShipSpy: jest.Mock;
+  loadShipSpy: Mock;
   subscribed: Array<(ctx: unknown) => void>;
 }
 
@@ -63,7 +64,7 @@ function buildHarness(ships: ShipState[], seed = 42): Harness {
     shipMap.set(`${s.userid}:${s.shipno}`, s);
   }
 
-  const loadShipSpy = jest.fn((s: ShipState) => {
+  const loadShipSpy = vi.fn((s: ShipState) => {
     shipMap.set(`${s.userid}:${s.shipno}`, s);
   });
 
@@ -93,9 +94,9 @@ function buildHarness(ships: ShipState[], seed = 42): Harness {
     getMaxShields: (n: number) => (n === DROID_CLASS_TRANSPORT ? 2 : 1),
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];

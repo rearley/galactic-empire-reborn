@@ -3,6 +3,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../../../src/game/commands/_ship-management-constants';
 import { GESTAT_AVAIL } from '../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 /**
  * `status` is deliberately stripped from the per-tick flush — board/unboard are
@@ -25,12 +26,12 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   });
 }
 
-function makeService(): { svc: ShipStateService; updateMany: jest.Mock; state: ShipState } {
-  const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+function makeService(): { svc: ShipStateService; updateMany: Mock; state: ShipState } {
+  const updateMany = vi.fn().mockResolvedValue({ count: 1 });
   const prisma = {
-    ship: { updateMany, update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
+    ship: { updateMany, update: vi.fn().mockResolvedValue({}), findMany: vi.fn().mockResolvedValue([]) },
   } as never;
-  const svc = new ShipStateService(prisma, { subscribe: jest.fn() } as never);
+  const svc = new ShipStateService(prisma, { subscribe: vi.fn() } as never);
   const state = makeShip();
   (svc as unknown as { map: Map<string, ShipState> }).map.set('u1:2', state);
   return { svc, updateMany, state };

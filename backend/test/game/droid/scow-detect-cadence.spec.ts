@@ -92,7 +92,7 @@ function harness(players: ShipState[]) {
       return s;
     },
     loadShip: (s: ShipState) => shipMap.set(`${s.userid}:${s.shipno}`, s),
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     size: () => shipMap.size,
     findByUserid: () => [],
   } as unknown as ShipStateService;
@@ -106,11 +106,11 @@ function harness(players: ShipState[]) {
   } as unknown as ShipClassCacheService;
 
   const svc = new DroidTickService(
-    { subscribe: jest.fn() } as unknown as TickService,
+    { subscribe: vi.fn() } as unknown as TickService,
     shipState, classCache,
     new DroidSpawner(shipState, classCache, HALF),
-    { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry,
-    { create: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
+    { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry,
+    { create: vi.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
     new EventEmitter2(), HALF,
   );
 

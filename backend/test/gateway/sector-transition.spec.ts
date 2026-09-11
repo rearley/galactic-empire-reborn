@@ -8,6 +8,7 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * `planTransition` is the pure planner behind `GameGateway.handleSectorTransition`
@@ -171,7 +172,7 @@ describe('GameGateway — sector transition respects real room membership', () =
 
   /**
    * ONE ordered log for BOTH delivery channels. Recording room emits into
-   * `emits[]` while mover-socket emits went to a separate `jest.fn()` is what
+   * `emits[]` while mover-socket emits went to a separate `vi.fn()` is what
    * let the C-1 regression through: the two channels were never compared for
    * order, so nothing noticed that the mover's repairing `player.sector` had
    * moved in FRONT of the departure broadcast that nulls it.
@@ -187,7 +188,7 @@ describe('GameGateway — sector transition respects real room membership', () =
 
   const build = () => {
     const rooms = new Map<string, Set<string>>();
-    const sockets = new Map<string, { id: string; emit: jest.Mock; join: jest.Mock; leave: jest.Mock }>();
+    const sockets = new Map<string, { id: string; emit: Mock; join: Mock; leave: Mock }>();
     const emits: RecordedEmit[] = [];
     const timeline: TimelineEntry[] = [];
 
@@ -201,13 +202,13 @@ describe('GameGateway — sector transition respects real room membership', () =
         id,
         connected: true,
         data: {} as Record<string, unknown>,
-        emit: jest.fn((event: string, payload: unknown) => {
+        emit: vi.fn((event: string, payload: unknown) => {
           if (id === 'sock-mover') timeline.push({ channel: 'mover', event, payload });
         }),
-        join: jest.fn((room: string) => addToRoom(id, room)),
-        leave: jest.fn((room: string) => rooms.get(room)?.delete(id)),
-        disconnect: jest.fn(),
-        broadcast: { emit: jest.fn() },
+        join: vi.fn((room: string) => addToRoom(id, room)),
+        leave: vi.fn((room: string) => rooms.get(room)?.delete(id)),
+        disconnect: vi.fn(),
+        broadcast: { emit: vi.fn() },
       };
       sockets.set(id, sock);
       addToRoom(id, startRoom);
@@ -222,17 +223,17 @@ describe('GameGateway — sector transition respects real room membership', () =
     const shipStateService = {
       findAllShips: () => [mover],
       findByUserid: () => [mover],
-      get: jest.fn().mockReturnValue(mover),
+      get: vi.fn().mockReturnValue(mover),
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
-    jest.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
+    vi.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
 
     const gateway = makeGateway({
       shipStateService,
       registry,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: mockRandom,
     });
 
@@ -253,7 +254,7 @@ describe('GameGateway — sector transition respects real room membership', () =
     });
 
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => roomEmitter(room),
       sockets: { sockets, adapter: { rooms } },
     };
@@ -387,8 +388,8 @@ describe('GameGateway — the beacon roll only draws from the PRNG when there is
     const moverSocket = {
       id: 'sock-mover', connected: true,
       data: {} as Record<string, unknown>,
-      emit: jest.fn(), on: jest.fn(), join: jest.fn(), leave: jest.fn(),
-      disconnect: jest.fn(), broadcast: { emit: jest.fn() },
+      emit: vi.fn(), on: vi.fn(), join: vi.fn(), leave: vi.fn(),
+      disconnect: vi.fn(), broadcast: { emit: vi.fn() },
     };
 
     const mover = { userid: 'u1', shipno: 1, shipname: 'Wanderer', speed: 100, status: 1, xcoord: 5.02, ycoord: 3.5 };
@@ -398,24 +399,24 @@ describe('GameGateway — the beacon roll only draws from the PRNG when there is
     const shipStateService = {
       findAllShips: () => ships,
       findByUserid: () => ships,
-      get: jest.fn().mockReturnValue(mover),
+      get: vi.fn().mockReturnValue(mover),
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
-    jest.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
+    vi.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
 
-    const next = jest.fn().mockReturnValue(0);
+    const next = vi.fn().mockReturnValue(0);
     const gateway = makeGateway({
       shipStateService,
       registry,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
       random: { next },
     });
 
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
+      emit: vi.fn(),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
       sockets: { sockets: new Map([[moverSocket.id, moverSocket]]), adapter: { rooms: new Map() } },
     };
 

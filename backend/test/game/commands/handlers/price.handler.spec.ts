@@ -66,19 +66,19 @@ function makeHandler(opts: {
   const { planet = makePlanet(), cash = 1_000_000n } = opts;
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
+    get: vi.fn().mockReturnValue(planet),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash }),
-      create: jest.fn(),
-      update: jest.fn(),
+      findUnique: vi.fn().mockResolvedValue({ cash }),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     planet: {
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   } as unknown as PrismaService;
 

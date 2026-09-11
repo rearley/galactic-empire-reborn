@@ -110,7 +110,7 @@ describe('PlanetEconomyService clears a caught spy', () => {
   const build = (draws: number[]) => {
     const created: Array<{ userid: string }> = [];
     const prisma = {
-      mailStat: { create: jest.fn(async (a: { data: { userid: string } }) => { created.push(a.data); return {}; }) },
+      mailStat: { create: vi.fn(async (a: { data: { userid: string } }) => { created.push(a.data); return {}; }) },
     } as never;
     let i = 0;
     const random = { next: () => draws[i++ % draws.length] } as never;

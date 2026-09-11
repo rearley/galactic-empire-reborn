@@ -45,9 +45,9 @@ function planetState(overrides: Partial<PlanetState> = {}): PlanetState {
 }
 
 function makeService(planets: PlanetState[]) {
-  const mockShips = { mutate: jest.fn() } as unknown as ShipStateService;
+  const mockShips = { mutate: vi.fn() } as unknown as ShipStateService;
   const mockPlanets = {
-    bySector: jest.fn().mockReturnValue(planets),
+    bySector: vi.fn().mockReturnValue(planets),
   } as unknown as PlanetStateService;
   return new OrbitHandlerService(mockShips, mockPlanets, { existsInSector: async () => false } as never);
 }

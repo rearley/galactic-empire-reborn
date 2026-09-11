@@ -52,7 +52,7 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 
 function makeHandler(planet: PlanetState | null = makePlanet()) {
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
+    get: vi.fn().mockReturnValue(planet),
   } as unknown as PlanetStateService;
 
   const handler = new SpyHandlerService(mockPlanetService);

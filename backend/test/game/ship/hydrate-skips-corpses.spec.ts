@@ -48,13 +48,13 @@ describe('ShipStateService hydration — corpses stay dead', () => {
   const build = (rows: Array<Record<string, unknown>>) => {
     // Applies the damage filter the way Postgres would, so this asserts the
     // ships that end up in the map rather than asserting the mock.
-    const findMany = jest.fn().mockImplementation((args: { where?: { damage?: { lt?: number } } }) => {
+    const findMany = vi.fn().mockImplementation((args: { where?: { damage?: { lt?: number } } }) => {
       const lt = args?.where?.damage?.lt;
       return Promise.resolve(lt === undefined ? rows : rows.filter((r) => (r.damage as number) < lt));
     });
     const prisma = {
       ship: { findMany },
-      shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 21, maxWarp: 8, maxTons: 1000 }, { classNumber: 25, maxWarp: 15, maxTons: 30000 }]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([{ classNumber: 21, maxWarp: 8, maxTons: 1000 }, { classNumber: 25, maxWarp: 15, maxTons: 30000 }]) },
     } as unknown as PrismaService;
     const service = new ShipStateService(prisma, { subscribe: () => () => {}, registerSnapshotProvider: () => {} } as never);
     return { service, findMany };

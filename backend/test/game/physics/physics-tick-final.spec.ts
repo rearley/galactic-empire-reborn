@@ -80,23 +80,30 @@ let UNIVWRAP = false;
 /** `TELEDAM`, so the "no telezip" assertions name the damage they exclude. */
 let TELEDAM = 0;
 
-beforeAll(() => {
+beforeAll(async () => {
   const previous = process.env.UNIVWRAP;
   process.env.UNIVWRAP = '1';
   try {
-    jest.isolateModules(() => {
-      /* eslint-disable @typescript-eslint/no-require-imports */
-      const constants = require('../../../src/game/constants') as ConstantsModule;
-      const physics = require('../../../src/game/physics/physics-tick.service') as PhysicsModule;
-      /* eslint-enable @typescript-eslint/no-require-imports */
-      UNIVMAX = constants.UNIVMAX;
-      UNIVWRAP = constants.UNIVWRAP;
-      TELEDAM = constants.TELEDAM;
-      WrappingPhysicsTickService = physics.PhysicsTickService;
-    });
+    // Vitest has no `isolateModules`. Clearing the module registry and
+    // re-importing carries the same contract the Jest version relied on: both
+    // modules are EVALUATED FRESH, so `constants.ts` re-reads UNIVWRAP from the
+    // environment set two lines above rather than returning the cached build
+    // every other spec in this run shares.
+    vi.resetModules();
+    const constants = (await import('../../../src/game/constants')) as ConstantsModule;
+    const physics = (await import(
+      '../../../src/game/physics/physics-tick.service'
+    )) as PhysicsModule;
+    UNIVMAX = constants.UNIVMAX;
+    UNIVWRAP = constants.UNIVWRAP;
+    TELEDAM = constants.TELEDAM;
+    WrappingPhysicsTickService = physics.PhysicsTickService;
   } finally {
     if (previous === undefined) delete process.env.UNIVWRAP;
     else process.env.UNIVWRAP = previous;
+    // Put the registry back, so nothing after this file inherits the
+    // UNIVWRAP=1 build of `constants`.
+    vi.resetModules();
   }
 });
 

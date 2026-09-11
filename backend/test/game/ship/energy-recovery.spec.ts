@@ -44,9 +44,9 @@ function makeHarness(ships: ShipState[]) {
   const byKind = new Map<TickKind, (ctx: TickContext) => void>();
   const map = new Map(ships.map((s) => [shipKey(s.userid, s.shipno), s]));
   const tick = {
-    subscribe: jest.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
+    subscribe: vi.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
       byKind.set(kind, handler);
-      return jest.fn();
+      return vi.fn();
     }),
   } as unknown as TickService;
   const state = {

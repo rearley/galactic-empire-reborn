@@ -147,7 +147,7 @@ function buildHarness(droidOver: Partial<ShipState>, target: ShipState): Harness
       return s;
     },
     loadShip: (s: ShipState) => shipMap.set(`${s.userid}:${s.shipno}`, s),
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     size: () => shipMap.size,
     findByUserid: () => [],
   } as unknown as ShipStateService;
@@ -163,14 +163,14 @@ function buildHarness(droidOver: Partial<ShipState>, target: ShipState): Harness
   const minesLaid: Array<{ deployedBy: string }> = [];
   const mineRegistry = {
     add: (m: { deployedBy: string }) => { minesLaid.push(m); },
-    hydrate: jest.fn(),
+    hydrate: vi.fn(),
   } as unknown as MineRegistry;
   const mineRepo = {
     create: (args: { deployedBy: string }) => Promise.resolve({ id: 1, ...args }),
   } as unknown as MineRepository;
 
   const svc = new DroidTickService(
-    { subscribe: jest.fn() } as unknown as TickService,
+    { subscribe: vi.fn() } as unknown as TickService,
     shipState, classCache,
     new DroidSpawner(shipState, classCache, rand),
     mineRegistry, mineRepo,

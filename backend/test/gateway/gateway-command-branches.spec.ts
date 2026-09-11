@@ -18,6 +18,7 @@ import {
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { ShipOverspeedEvent } from '../../src/game/ship/overspeed-events';
+import type { Mock } from 'vitest';
 
 /**
  * Round 3 — the command-dispatch surface of GameGateway: which branch answers a
@@ -58,33 +59,33 @@ interface SocketDouble {
   id: string;
   connected: boolean;
   data: Record<string, unknown>;
-  emit: jest.Mock;
-  join: jest.Mock;
-  leave: jest.Mock;
-  on: jest.Mock;
-  disconnect: jest.Mock;
+  emit: Mock;
+  join: Mock;
+  leave: Mock;
+  on: Mock;
+  disconnect: Mock;
   broadcast: {
-    emit: jest.Mock;
-    to: (room: string) => { emit: jest.Mock };
-    except: (room: string | string[]) => { emit: jest.Mock };
+    emit: Mock;
+    to: (room: string) => { emit: Mock };
+    except: (room: string | string[]) => { emit: Mock };
   };
 }
 
 const USERID = 'usr_pilot';
 
 function makeSocket(id: string, data: Record<string, unknown>): SocketDouble {
-  const roomEmit = jest.fn();
+  const roomEmit = vi.fn();
   return {
     id,
     connected: true,
     data,
-    emit: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
+    emit: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
     broadcast: {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: () => ({ emit: roomEmit }),
       except: () => ({ emit: roomEmit }),
     },
@@ -107,9 +108,9 @@ describe('GameGateway — prompt replies: which branch answers, and with what', 
   interface Harness {
     gateway: GameGateway;
     registry: ConnectedShipsRegistry;
-    finalize: jest.Mock;
-    validateNameReply: jest.Mock;
-    findFirst: jest.Mock;
+    finalize: Mock;
+    validateNameReply: Mock;
+    findFirst: Mock;
     globalEmits: Array<{ event: string; payload: unknown }>;
     sockets: Map<string, SocketDouble>;
   }
@@ -121,33 +122,33 @@ describe('GameGateway — prompt replies: which branch answers, and with what', 
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn().mockReturnValue(undefined),
-      removeFromGame: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      removeFromGame: vi.fn(),
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
 
-    const finalize = jest.fn();
-    const validateNameReply = jest.fn().mockReturnValue(opts.validName ?? true);
+    const finalize = vi.fn();
+    const validateNameReply = vi.fn().mockReturnValue(opts.validName ?? true);
     const onboardingService = {
       finalize,
       validateNameReply,
     } as unknown as OnboardingService;
 
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const prisma = {
-      ship: { findFirst, findMany: jest.fn().mockResolvedValue([]) },
-      planet: { findMany: jest.fn().mockResolvedValue([]) },
+      ship: { findFirst, findMany: vi.fn().mockResolvedValue([]) },
+      planet: { findMany: vi.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
 
     const gateway = makeGateway({
       shipStateService,
       registry,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       prisma,
       onboardingService,
-      scanHandler: { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
-      shipClassCache: { getTypeName: jest.fn().mockReturnValue('Interceptor') } as unknown as ShipClassCacheService,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: vi.fn().mockReturnValue('Interceptor') } as unknown as ShipClassCacheService,
       random: mockRandom,
     });
 
@@ -155,8 +156,8 @@ describe('GameGateway — prompt replies: which branch answers, and with what', 
       emit: (event: string, payload: unknown) => {
         globalEmits.push({ event, payload });
       },
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
-      except: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets, adapter: { rooms: new Map<string, Set<string>>() } },
     };
 
@@ -529,20 +530,20 @@ describe('GameGateway — a hit reaches its victim exactly once', () => {
     const gateway = makeGateway({
       shipStateService,
       registry,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
       random: mockRandom,
     });
 
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => {
           roomEmits.push({ room, event, payload });
         },
-        except: () => ({ emit: jest.fn() }),
+        except: () => ({ emit: vi.fn() }),
       }),
-      except: () => ({ emit: jest.fn() }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets, adapter: { rooms: new Map<string, Set<string>>() } },
     };
 
@@ -621,24 +622,24 @@ describe('GameGateway — routing a per-captain notice', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn().mockReturnValue(undefined),
+      get: vi.fn().mockReturnValue(undefined),
     } as unknown as ShipStateService;
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
-      scanHandler: { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => {
           roomEmits.push({ room, event, payload });
         },
-        except: () => ({ emit: jest.fn() }),
+        except: () => ({ emit: vi.fn() }),
       }),
-      except: () => ({ emit: jest.fn() }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map<string, Set<string>>() } },
     };
     return { gateway, roomEmits };
@@ -727,7 +728,7 @@ describe('GameGateway — KILLEDBY names the killer by their handle', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: (userid: string, shipno: number) => {
         if (userid === 'usr_kil' && shipno === 1) {
           return { userid, shipno, shipname: 'Marauder', username: 'rick', status: 1 } as never;
@@ -741,12 +742,12 @@ describe('GameGateway — KILLEDBY names the killer by their handle', () => {
 
     const gateway = makeGateway({
       shipStateService,
-      wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       prisma: {
-        $transaction: jest.fn().mockResolvedValue(undefined),
-        planet: { findMany: jest.fn().mockResolvedValue([]) },
+        $transaction: vi.fn().mockResolvedValue(undefined),
+        planet: { findMany: vi.fn().mockResolvedValue([]) },
       } as unknown as PrismaService,
-      scanHandler: { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
       random: mockRandom,
     });
     const record = (evt: string, payload: unknown): void => {
@@ -755,7 +756,7 @@ describe('GameGateway — KILLEDBY names the killer by their handle', () => {
     (gateway as unknown as { server: unknown }).server = {
       emit: record,
       except: () => ({ emit: record }),
-      to: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map<string, Set<string>>() } },
     };
     void gateway.handleCombatShipDestroyed(event);

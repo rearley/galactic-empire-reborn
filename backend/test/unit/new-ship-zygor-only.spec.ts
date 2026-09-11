@@ -46,11 +46,11 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
 
 function service() {
   const prisma = {
-    user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n, noships: 1, topshipno: 1 }), update: jest.fn() },
-    ship: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-    $transaction: jest.fn(),
+    user: { findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n, noships: 1, topshipno: 1 }), update: vi.fn() },
+    ship: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    $transaction: vi.fn(),
   } as unknown as PrismaService;
-  const ships = { mutate: jest.fn(), findAllShips: () => [] } as unknown as ShipStateService;
+  const ships = { mutate: vi.fn(), findAllShips: () => [] } as unknown as ShipStateService;
   return new NewShipHandlerService(prisma, ships, { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
 }
 

@@ -11,6 +11,7 @@ import { GESTAT_AVAIL, GESTAT_USER, GESTAT_AUTO, UNIVMAX } from '../../src/game/
 import { Random } from '../../src/game/combat/random.port';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * The gateway's BROADCAST AND SCOPING decisions — who is addressed, and in
@@ -61,9 +62,9 @@ interface FakeShip {
 interface FakeSocket {
   id: string;
   data: Record<string, unknown>;
-  emit: jest.Mock;
-  join: jest.Mock;
-  leave: jest.Mock;
+  emit: Mock;
+  join: Mock;
+  leave: Mock;
 }
 
 interface RoomEmit {
@@ -94,7 +95,7 @@ const build = (random: Random = mockRandom) => {
   const shipStateService = {
     findAllShips: () => [...ships.values()],
     findByUserid: () => [],
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     get: (userid: string, shipno: number) => ships.get(`${userid}:${shipno}`),
   } as unknown as ShipStateService;
 
@@ -103,14 +104,14 @@ const build = (random: Random = mockRandom) => {
   const gateway = makeGateway({
     shipStateService,
     registry,
-    wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+    wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
     prisma: {
-      $transaction: jest.fn().mockResolvedValue(undefined),
-      shipClass: { findFirst: jest.fn() },
-      ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      user: { update: jest.fn() },
+      $transaction: vi.fn().mockResolvedValue(undefined),
+      shipClass: { findFirst: vi.fn() },
+      ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      user: { update: vi.fn() },
     } as unknown as PrismaService,
-    scanHandler: { clearScantab: jest.fn() } as unknown as ScanHandlerService,
+    scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
     shipClassCache: { getTypeName: () => 'Interceptor' } as unknown as ShipClassCacheService,
     random,
   });
@@ -146,9 +147,9 @@ const build = (random: Random = mockRandom) => {
     const sock: FakeSocket = {
       id,
       data: { userid, activeShipNo: shipno },
-      emit: jest.fn(),
-      join: jest.fn(),
-      leave: jest.fn(),
+      emit: vi.fn(),
+      join: vi.fn(),
+      leave: vi.fn(),
     };
     sockets.set(id, sock);
     return sock;
@@ -572,7 +573,7 @@ describe('processBroadcasts — the room prefixes that are not Socket.io rooms',
    */
   it('an untagged galaxy broadcast goes out unfiltered, payload intact', () => {
     const h = build();
-    const onboarding: FakeSocket = { id: 'sock-new', data: {}, emit: jest.fn(), join: jest.fn(), leave: jest.fn() };
+    const onboarding: FakeSocket = { id: 'sock-new', data: {}, emit: vi.fn(), join: vi.fn(), leave: vi.fn() };
     h.sockets.set(onboarding.id, onboarding);
 
     send(h, { room: 'galaxy', event: 'message.send', payload: { text: 'all hands' } });

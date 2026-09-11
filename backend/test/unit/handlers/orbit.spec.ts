@@ -29,18 +29,18 @@ const makePlanet = (plnum: number, name = '') => ({
 function makeService(planets: ReturnType<typeof makePlanet>[]) {
   const mutated: { where?: number; speed?: number; speed2b?: number } = {};
   const shipMock = {
-    mutate: jest.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
+    mutate: vi.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
       const fake = { where: 0, speed: 0, speed2b: 0 } as ShipState;
       fn(fake);
       Object.assign(mutated, { where: fake.where, speed: fake.speed, speed2b: fake.speed2b });
     }),
-    get: jest.fn(),
+    get: vi.fn(),
   };
   // `orb` reads the LIVE planet map now, not GalaxyService's boot snapshot --
   // that snapshot never sees a planet named after startup, so orbiting a colony
   // claimed this session printed "(unnamed)".
   const planetMock = {
-    bySector: jest.fn().mockReturnValue(planets),
+    bySector: vi.fn().mockReturnValue(planets),
   };
   const svc = new OrbitHandlerService(
     shipMock as unknown as ShipStateService,
@@ -123,7 +123,7 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
   ];
 
   const build = (wormholePlnums: number[]) => new OrbitHandlerService(
-    { get: () => undefined, mutate: jest.fn() } as unknown as ShipStateService,
+    { get: () => undefined, mutate: vi.fn() } as unknown as ShipStateService,
     { bySector: () => twoPlanets } as unknown as PlanetStateService,
     {
       existsInSector: async (_xsect: number, _ysect: number, plnum: number) =>
@@ -174,8 +174,8 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
  */
 describe('orb <n> honours the slot even when the sector holds one planet', () => {
   function serviceWithWormhole(planets: ReturnType<typeof makePlanet>[], wormPlnum: number) {
-    const shipMock = { mutate: jest.fn(), get: jest.fn() };
-    const planetMock = { bySector: jest.fn().mockReturnValue(planets) };
+    const shipMock = { mutate: vi.fn(), get: vi.fn() };
+    const planetMock = { bySector: vi.fn().mockReturnValue(planets) };
     return new OrbitHandlerService(
       shipMock as unknown as ShipStateService,
       planetMock as unknown as PlanetStateService,

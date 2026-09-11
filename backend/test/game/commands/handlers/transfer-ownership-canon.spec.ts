@@ -54,10 +54,10 @@ function build(planetOwner: string) {
   const withdrawals: unknown[] = [];
   const planetState = {
     get: () => ({ userid: planetOwner, items: [{ qty: 1000n }] }),
-    depositToPlanet: jest.fn().mockImplementation((...a: unknown[]) => {
+    depositToPlanet: vi.fn().mockImplementation((...a: unknown[]) => {
       deposits.push(a); return Promise.resolve({ ok: true });
     }),
-    withdrawFromPlanet: jest.fn().mockImplementation((...a: unknown[]) => {
+    withdrawFromPlanet: vi.fn().mockImplementation((...a: unknown[]) => {
       withdrawals.push(a); return Promise.resolve({ ok: true });
     }),
   } as unknown as PlanetStateService;
@@ -79,7 +79,7 @@ const KEY = '20:20:1';
  */
 function planetServiceWith(over: { userid: string | null }) {
   const svc = new RealPlanetStateService(
-    { planet: { update: jest.fn().mockResolvedValue({}) } } as never,
+    { planet: { update: vi.fn().mockResolvedValue({}) } } as never,
     // depositToPlanet now takes the cargo from the hull inside the planet
     // lock, so the ship layer has to answer for real.
     // @see docs/audits/2026-09-09-security-review.md M2
@@ -145,8 +145,8 @@ describe('tra down/up ownership (GECMDS.C:3323, :3374)', () => {
     // about the ship's own state, not merely the wrong wording.
     const planetState = {
       get: () => ({ userid: 'someone-else', items: [{ qty: 1000n }] }),
-      withdrawFromPlanet: jest.fn().mockResolvedValue({ ok: false, reason: 'NOT_OWNER' }),
-      depositToPlanet: jest.fn().mockResolvedValue({ ok: true }),
+      withdrawFromPlanet: vi.fn().mockResolvedValue({ ok: false, reason: 'NOT_OWNER' }),
+      depositToPlanet: vi.fn().mockResolvedValue({ ok: true }),
     } as unknown as PlanetStateService;
     const shipState = {
       mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => fn(makeShip()),

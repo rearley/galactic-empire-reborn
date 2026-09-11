@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const request = require('supertest') as (app: unknown) => import('supertest').SuperTest<import('supertest').Test>;
 import { AppModule } from '../../../src/app.module';
+import request from 'supertest';
 
 process.env['JWT_SECRET'] = 'test-secret-123';
 process.env['DATABASE_URL'] = process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'];

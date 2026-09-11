@@ -29,8 +29,8 @@ function buildService(alice: ShipState, bob: ShipState) {
     [`${bob.userid}:${bob.shipno}`, bob],
   ]);
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue(ships),
+    mutate: vi.fn().mockImplementation(
       (uid: string, no: number, fn: (s: ShipState) => void) => {
         const s = shipMap.get(`${uid}:${no}`);
         if (s) fn(s);

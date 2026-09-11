@@ -54,6 +54,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { FIRETICKS, GESTAT_AUTO } from '../../../src/game/constants';
 import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 /** Class numbers used by the harness. Only the fields the tick reads are set. */
 const CLASS_INTERCEPTOR = 1;
@@ -138,7 +139,7 @@ const CTX: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new D
 
 interface Harness {
   svc: CybertronTickService;
-  flush: jest.Mock;
+  flush: Mock;
 }
 
 function harness(ships: ShipState[], rand: Random): Harness {
@@ -164,16 +165,16 @@ function harness(ships: ShipState[], rand: Random): Harness {
     getTypeName: (c: number) => CLASSES[c]?.typeName ?? '',
   } as unknown as ShipClassCacheService;
 
-  const flush = jest.fn();
+  const flush = vi.fn();
   const svc = new CybertronTickService(
     { subscribe: () => () => {} } as unknown as TickService,
     shipState,
     classCache,
     {
-      hydrateAll: jest.fn().mockResolvedValue(undefined),
+      hydrateAll: vi.fn().mockResolvedValue(undefined),
       clampCybertronCash: (n: bigint) => n,
       flushShipsImmediate: flush,
-      incrementKills: jest.fn(),
+      incrementKills: vi.fn(),
     } as unknown as CybertronRepository,
     new EventEmitter2(),
     rand,

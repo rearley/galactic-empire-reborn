@@ -16,7 +16,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 function makeHandler(renameResult: RenameResult): RenameHandlerService {
-  const renameSvc = { rename: jest.fn().mockResolvedValue(renameResult) } as unknown as RenameService;
+  const renameSvc = { rename: vi.fn().mockResolvedValue(renameResult) } as unknown as RenameService;
   return new RenameHandlerService(renameSvc);
 }
 
@@ -132,7 +132,7 @@ describe('RenameHandlerService', () => {
 
     it('passes the first arg as the new name (casing preserved)', async () => {
       const ship = makeShip();
-      const renameSvc = { rename: jest.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' }) } as unknown as RenameService;
+      const renameSvc = { rename: vi.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' }) } as unknown as RenameService;
       const handler = new RenameHandlerService(renameSvc);
       await handler.command.handler(ship, ['StarFalcon'], ctx);
       expect(renameSvc.rename).toHaveBeenCalledWith('u1', 1, 'StarFalcon');

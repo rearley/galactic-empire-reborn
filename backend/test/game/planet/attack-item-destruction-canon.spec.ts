@@ -71,15 +71,15 @@ function makeShip(troops: number): ShipState {
 function makeService(seed: number) {
   const random = new Mulberry32Adapter(seed);
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => { fn(makeShip(0)); },
     ),
     // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231).
-    findByUserid: jest.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([]),
   } as unknown as ShipStateService;
   const mockPrisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
-    mailStat: { create: jest.fn().mockResolvedValue({}) },
+    user: { update: vi.fn().mockResolvedValue({}) },
+    mailStat: { create: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
   return new PlanetAttackService(
     mockShipState, mockPrisma, new EventEmitter2(), random,

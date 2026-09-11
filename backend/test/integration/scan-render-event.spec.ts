@@ -21,6 +21,7 @@ import { CommandResult, ScanRenderEvent, ScanCell } from '../../src/game/command
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { Socket } from 'socket.io';
 import { makeGateway as makeTestGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /** Minimal mock socket that records emitted events. */
 interface EmittedCall {
@@ -31,7 +32,7 @@ interface EmittedCall {
 function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
   const calls: EmittedCall[] = [];
   const socket = {
-    emit: jest.fn((event: string, payload: unknown) => {
+    emit: vi.fn((event: string, payload: unknown) => {
       calls.push({ event, payload });
     }),
     id: 'test-socket-id',
@@ -42,7 +43,7 @@ function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
 
 /** Build a minimal GameGateway with all dependencies mocked out. */
 function makeGateway(): GameGateway {
-  const scanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+  const scanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
   return makeTestGateway({ scanHandler });
 }
 
@@ -252,8 +253,8 @@ describe('GameGateway.emitCommandResult — scan:render event routing', () => {
   describe('no room broadcasts', () => {
     it('emitCommandResult never calls server.to().emit() for scan events', () => {
       // Attach a mock server that spies on `to` — it must NOT be called.
-      const toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
-      (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+      const toMock = vi.fn().mockReturnValue({ emit: vi.fn() });
+      (gateway as unknown as { server: { to: Mock } }).server = { to: toMock };
 
       const scanRender: ScanRenderEvent = {
         kind: 'lo-full',
@@ -269,8 +270,8 @@ describe('GameGateway.emitCommandResult — scan:render event routing', () => {
     });
 
     it('failure path also never calls server.to().emit()', () => {
-      const toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
-      (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+      const toMock = vi.fn().mockReturnValue({ emit: vi.fn() });
+      (gateway as unknown as { server: { to: Mock } }).server = { to: toMock };
 
       const { socket } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })

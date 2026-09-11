@@ -63,7 +63,7 @@ permissions:
 
 jobs:
   backend:
-    name: Backend — Jest
+    name: Backend — Vitest
     runs-on: ubuntu-latest
     # 605 suites / 6,141 tests measured at 100s on a developer machine and 240s
     # on a hosted runner. This is headroom, not a prediction; it exists so a

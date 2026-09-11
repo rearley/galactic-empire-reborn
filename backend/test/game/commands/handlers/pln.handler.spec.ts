@@ -30,7 +30,7 @@ function makeShip(userid = 'player1'): ShipState {
 function makeHandler(planets: { name: string; xsect: number; ysect: number; plnum: number }[]) {
   const mockPrisma = {
     planet: {
-      findMany: jest.fn().mockResolvedValue(planets),
+      findMany: vi.fn().mockResolvedValue(planets),
     },
   } as unknown as PrismaService;
 
@@ -122,10 +122,10 @@ describe('PlnHandlerService — read-only (FR-014-041)', () => {
   it('never calls any write method on Prisma', async () => {
     const mockPrisma = {
       planet: {
-        findMany: jest.fn().mockResolvedValue([]),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
       },
     } as unknown as PrismaService;
 

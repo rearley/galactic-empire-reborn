@@ -102,7 +102,7 @@ describe('AI torpedoes reach a target whose ltorps arrays are empty (GECMDS.C:11
       shipStateFor([cyb, player]),
       classCache,
       {
-        hydrateAll: jest.fn().mockResolvedValue(undefined),
+        hydrateAll: vi.fn().mockResolvedValue(undefined),
         clampCybertronCash: (n: bigint) => n,
       } as unknown as CybertronRepository,
       new EventEmitter2(),

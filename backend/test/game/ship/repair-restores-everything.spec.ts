@@ -38,9 +38,9 @@ function makeHarness(ships: ShipState[]) {
   const byKind = new Map<TickKind, (ctx: TickContext) => void>();
   const map = new Map(ships.map((s) => [shipKey(s.userid, s.shipno), s]));
   const tick = {
-    subscribe: jest.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
+    subscribe: vi.fn((kind: TickKind, handler: (ctx: TickContext) => void) => {
       byKind.set(kind, handler);
-      return jest.fn();
+      return vi.fn();
     }),
   } as unknown as TickService;
   const state = {
@@ -52,7 +52,7 @@ function makeHarness(ships: ShipState[]) {
       return s;
     },
   } as unknown as ShipStateService;
-  const maint = { runAutoRepair: jest.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
+  const maint = { runAutoRepair: vi.fn().mockResolvedValue(undefined) } as unknown as MaintenanceService;
   const svc = new ShipTickService(tick, state, maint);
   svc.onModuleInit();
   let n = 0;

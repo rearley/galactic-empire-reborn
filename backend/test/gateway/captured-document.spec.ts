@@ -42,7 +42,7 @@ interface Emit { room: string; text: string }
 
 function build(planets: Array<{ name: string; xsect: number; ysect: number; plnum: number }>, roll: number) {
   const emits: Emit[] = [];
-  const findMany = jest.fn().mockResolvedValue(planets);
+  const findMany = vi.fn().mockResolvedValue(planets);
   const emit: DestroyedEmitter = {
     toRoom: (room, _category, text) => { emits.push({ room, text }); },
     toAllExcept: () => {},

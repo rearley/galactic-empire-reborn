@@ -24,9 +24,9 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(deleteByIndexResult: boolean) {
   const mockInbox = {
-    deleteByIndex: jest.fn().mockResolvedValue(deleteByIndexResult),
-    list: jest.fn(),
-    resolveIndex: jest.fn(),
+    deleteByIndex: vi.fn().mockResolvedValue(deleteByIndexResult),
+    list: vi.fn(),
+    resolveIndex: vi.fn(),
   } as unknown as MailInboxService;
 
   const handler = new DelHandlerService(mockInbox);

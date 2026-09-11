@@ -14,7 +14,7 @@ describe('PlanetStateService bootstrap (planet-bootstrap)', () => {
 
   beforeEach(async () => {
     // Fake only setInterval/setTimeout — allow setImmediate/nextTick for Prisma's async internals.
-    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
 
     app = await Test.createTestingModule({
       imports: [AppModule],
@@ -27,7 +27,7 @@ describe('PlanetStateService bootstrap (planet-bootstrap)', () => {
   }, 60_000);
 
   afterEach(async () => {
-    jest.useRealTimers();
+    vi.useRealTimers();
     await app.close();
   }, 30_000);
 

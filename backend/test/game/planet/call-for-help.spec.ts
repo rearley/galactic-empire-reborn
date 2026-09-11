@@ -18,6 +18,7 @@ import {
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { MAIL_TYPE_MAP } from '../../../src/game/planet/planet-attack.service';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeItems(): PlanetState['items'] {
   return Array.from({ length: NUMITEMS }, () => ({
@@ -48,7 +49,7 @@ function buildService(seed: number, opts: { spyowner?: string; ownerInGame?: boo
   events.on('**', (payload, event) => emitted.push({ event, payload }));
 
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         const s = makeShip();
         fn(s);
@@ -56,14 +57,14 @@ function buildService(seed: number, opts: { spyowner?: string; ownerInGame?: boo
     ),
     // ownerIsInGame() — canon's mailit(1) suppression (GEFUNCS.C:2231) and
     // the first arm of call_4_help's chain (GECMDS.C:3955).
-    findByUserid: jest.fn().mockReturnValue(
+    findByUserid: vi.fn().mockReturnValue(
       opts.ownerInGame ? [{ ...makeShip(), userid: 'defender', status: 1 }] : [],
     ),
   } as unknown as ShipStateService;
 
   const mockPrisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
-    mailStat: { create: jest.fn().mockResolvedValue({}) },
+    user: { update: vi.fn().mockResolvedValue({}) },
+    mailStat: { create: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
 
   const makePlanetWithOwner = (ownerUserid: string | null): PlanetState => {
@@ -171,7 +172,7 @@ describe('PlanetAttackService — spy mail roll (troop branch)', () => {
 
     // mailStat.create may have been called for owner mail AND spy mail
     // We just assert it was called at least once when spyowner is set and conditions met
-    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    const calls = (mockPrisma.mailStat.create as Mock).mock.calls;
     if (calls.length > 0) {
       // If spy mail was inserted, recipient should include 'spy1'
       const recipientsIncludeSpy = calls.some(
@@ -194,7 +195,7 @@ describe('PlanetAttackService — spy mail roll (troop branch)', () => {
 
     await service.attackTroop(10000, ship, planet);
 
-    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    const calls = (mockPrisma.mailStat.create as Mock).mock.calls;
     // No spy mail since spyowner is ''
     const hasSpyRecipient = calls.some(
       (c: unknown[]) => (c[0] as { data: { userid: string } }).data.userid === '',
@@ -298,7 +299,7 @@ describe('call_4_help is a chain, not a broadcast (GECMDS.C:3952)', () => {
 
     await service.attackTroop(highRatioAttack, makeShip(), makePlanetWithOwner('defender'));
 
-    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    const calls = (mockPrisma.mailStat.create as Mock).mock.calls;
     expect(calls.filter((c) => c[0].data.userid === 'spook')).toHaveLength(0);
   });
 
@@ -311,7 +312,7 @@ describe('call_4_help is a chain, not a broadcast (GECMDS.C:3952)', () => {
     const out = await service.attackTroop(highRatioAttack, makeShip(), planet);
 
     if (out.won === 1) {
-      const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+      const calls = (mockPrisma.mailStat.create as Mock).mock.calls;
       const spy = calls.find((c) => c[0].data.userid === 'spook');
       expect(spy?.[0].data.type).toBe(MAIL_TYPE_MAP[MessageId.SPY_REPORT_TAKEN]);
     }
@@ -324,7 +325,7 @@ describe('call_4_help is a chain, not a broadcast (GECMDS.C:3952)', () => {
 
     await service.attackTroop(highRatioAttack, makeShip(), planet);
 
-    const calls = (mockPrisma.mailStat.create as jest.Mock).mock.calls;
+    const calls = (mockPrisma.mailStat.create as Mock).mock.calls;
     const spy = calls.find((c) => c[0].data.userid === 'spook');
     // MESG02/MESG04 are the OWNER's distress bodies; a spy must never get one.
     expect([MAIL_TYPE_MAP[MessageId.MESG02], MAIL_TYPE_MAP[MessageId.MESG04]])

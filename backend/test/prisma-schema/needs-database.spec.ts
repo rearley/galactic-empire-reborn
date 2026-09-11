@@ -1,8 +1,8 @@
 /**
- * The classifier that decides whether a Jest invocation may reset `ge_test`.
+ * The classifier that decides whether a test run may reset `ge_test`.
  *
  * Global setup ran `prisma db push --force-reset` for EVERY invocation,
- * including a single read-only spec. `npx jest canon-citations.balance.spec.ts`
+ * including a single read-only spec. `npx vitest run canon-citations.balance.spec.ts`
  * reads files off disk and counts strings; running it alone still wiped the
  * shared database out from under anything else using it. @see issue #23
  *
@@ -13,6 +13,8 @@
  */
 import { join, resolve } from 'node:path';
 import { needsDatabase, selectedSpecs, unresolvedImports } from './helpers/needs-database';
+import { readSelection, runTouchesDatabase } from './helpers/global-setup';
+import { readFileSync } from 'node:fs';
 
 const BACKEND = resolve(__dirname, '../..');
 const ROOTS = [join(BACKEND, 'test')];
@@ -34,7 +36,7 @@ describe('needsDatabase', () => {
     // through the service graph it imports, which is the whole reason this is
     // a walk and not a grep.
     const viaGraph = spec('test/integration/scan-ra-gateway.spec.ts');
-    expect(/prisma/i.test(require('node:fs').readFileSync(viaGraph, 'utf8').split('\n')[0])).toBe(
+    expect(/prisma/i.test(readFileSync(viaGraph, 'utf8').split('\n')[0])).toBe(
       false,
     );
     expect(needsDatabase(viaGraph)).toBe(true);
@@ -66,12 +68,12 @@ describe('selectedSpecs', () => {
     expect(selectedSpecs(ROOTS, []).length).toBeGreaterThan(300);
   });
 
-  it('applies a Jest path pattern as a regex against the absolute path', () => {
+  it('applies a path pattern as a regex against the absolute path', () => {
     const got = selectedSpecs(ROOTS, ['balance/canon-citations']);
     expect(got).toEqual([spec('test/balance/canon-citations.balance.spec.ts')]);
   });
 
-  it('unions multiple patterns, as Jest does', () => {
+  it('unions multiple patterns, as both runners do', () => {
     const got = selectedSpecs(ROOTS, ['balance/canon-citations', 'invariants/fixture-domains']);
     expect(got).toHaveLength(2);
   });
@@ -80,5 +82,64 @@ describe('selectedSpecs', () => {
     // A bad pattern must not take the suite down before it starts, and the
     // safe reading of "I could not tell what you selected" is everything.
     expect(selectedSpecs(ROOTS, ['(']).length).toBeGreaterThan(300);
+  });
+});
+
+describe('readSelection', () => {
+  // A signature change here is SILENT — it does not throw, it stops matching
+  // and falls through to "reset every time". Safe, but it quietly undoes
+  // issue #23, so both runner shapes are pinned.
+
+  it('reads Vitest: a TestProject with config.root and vitest.filenamePattern', () => {
+    expect(
+      readSelection({
+        config: { root: BACKEND },
+        vitest: { filenamePattern: ['balance/canon-citations'] },
+      }),
+    ).toEqual({ roots: [join(BACKEND, 'test')], patterns: ['balance/canon-citations'] });
+  });
+
+  it('reads Jest: globalConfig.testPathPatterns.patterns plus projectConfig.roots', () => {
+    expect(
+      readSelection({ testPathPatterns: { patterns: ['invariants/fixture'] } }, { roots: ROOTS }),
+    ).toEqual({ roots: ROOTS, patterns: ['invariants/fixture'] });
+  });
+
+  it('returns null for a shape it does not recognise', () => {
+    expect(readSelection(undefined, undefined)).toBeNull();
+    expect(readSelection({}, {})).toBeNull();
+  });
+});
+
+describe('runTouchesDatabase', () => {
+  it('skips the reset only for a filtered run of database-free specs', () => {
+    expect(
+      runTouchesDatabase({
+        config: { root: BACKEND },
+        vitest: { filenamePattern: ['balance/canon-citations'] },
+      }),
+    ).toBe(false);
+  });
+
+  it('resets for a filtered run that reaches Prisma', () => {
+    expect(
+      runTouchesDatabase({
+        config: { root: BACKEND },
+        vitest: { filenamePattern: ['prisma-schema/planet'] },
+      }),
+    ).toBe(true);
+  });
+
+  it('resets for a full run, an unknown shape, and a selection matching nothing', () => {
+    expect(runTouchesDatabase({ config: { root: BACKEND }, vitest: { filenamePattern: [] } })).toBe(
+      true,
+    );
+    expect(runTouchesDatabase(undefined, undefined)).toBe(true);
+    expect(
+      runTouchesDatabase({
+        config: { root: BACKEND },
+        vitest: { filenamePattern: ['no-such-spec-anywhere'] },
+      }),
+    ).toBe(true);
   });
 });

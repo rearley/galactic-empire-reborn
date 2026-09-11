@@ -31,24 +31,25 @@ import { MAXPLRS, GESTAT_USER } from '../../src/game/constants';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
 import type { Ship } from '@prisma/client';
 import type { GameSocket } from '../../src/gateway/types';
+import type { Mock } from 'vitest';
 
 const USERID = 'u1';
 
 function makeSocket(id = 'sock-1', data: Record<string, unknown> = {}) {
-  const emit = jest.fn();
+  const emit = vi.fn();
   return {
     id,
     connected: true,
     data,
     emit,
-    on: jest.fn(),
-    disconnect: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
     broadcast: {
-      emit: jest.fn(),
-      to: jest.fn(() => ({ emit: jest.fn() })),
-      except: jest.fn(() => ({ emit: jest.fn() })),
+      emit: vi.fn(),
+      to: vi.fn(() => ({ emit: vi.fn() })),
+      except: vi.fn(() => ({ emit: vi.fn() })),
     },
     handshake: { query: { userid: USERID } },
   };
@@ -58,22 +59,22 @@ type Sock = ReturnType<typeof makeSocket>;
 const events = (s: Sock): string[] => s.emit.mock.calls.map((c) => String(c[0]));
 
 function makeHost(sockets: Map<string, unknown> = new Map()) {
-  const serverEmit = jest.fn();
-  const exceptEmit = jest.fn();
-  const toEmit = jest.fn();
-  const to = jest.fn(() => ({ emit: toEmit, except: jest.fn(() => ({ emit: exceptEmit })) }));
+  const serverEmit = vi.fn();
+  const exceptEmit = vi.fn();
+  const toEmit = vi.fn();
+  const to = vi.fn(() => ({ emit: toEmit, except: vi.fn(() => ({ emit: exceptEmit })) }));
   const server = {
     emit: serverEmit,
     to,
-    except: jest.fn(() => ({ emit: exceptEmit })),
+    except: vi.fn(() => ({ emit: exceptEmit })),
     sockets: { sockets },
   };
   const host: LifecycleHost = {
     get server() {
       return server as never;
     },
-    log: jest.fn(),
-    error: jest.fn(),
+    log: vi.fn(),
+    error: vi.fn(),
   };
   return { host, server, serverEmit, exceptEmit, toEmit };
 }
@@ -81,38 +82,38 @@ function makeHost(sockets: Map<string, unknown> = new Map()) {
 interface Deps {
   shipStateService: Partial<ShipStateService>;
   registry: ConnectedShipsRegistry;
-  wsAuthGuard: { validate: jest.Mock };
+  wsAuthGuard: { validate: Mock };
   prisma: Record<string, unknown>;
-  scanHandler: { clearScantab: jest.Mock; lettersFor: jest.Mock };
+  scanHandler: { clearScantab: Mock; lettersFor: Mock };
   shipClassCache: Partial<ShipClassCacheService>;
   random: Random;
-  eventsBus: { emit: jest.Mock };
+  eventsBus: { emit: Mock };
   presence: PresenceService;
 }
 
 function build(over: Partial<Deps> = {}) {
   const shipStateService = (over.shipStateService ?? {
-    get: jest.fn(),
-    findAllShips: jest.fn(() => []),
-    board: jest.fn(),
-    unboard: jest.fn().mockResolvedValue(undefined),
-    mutate: jest.fn(),
+    get: vi.fn(),
+    findAllShips: vi.fn(() => []),
+    board: vi.fn(),
+    unboard: vi.fn().mockResolvedValue(undefined),
+    mutate: vi.fn(),
   }) as unknown as ShipStateService;
   const registry = over.registry ?? new ConnectedShipsRegistry(shipStateService);
-  const wsAuthGuard = over.wsAuthGuard ?? { validate: jest.fn().mockResolvedValue({ sub: USERID, username: 'Ripley' }) };
+  const wsAuthGuard = over.wsAuthGuard ?? { validate: vi.fn().mockResolvedValue({ sub: USERID, username: 'Ripley' }) };
   const prisma = (over.prisma ?? {
-    ship: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn() },
-    user: { findUnique: jest.fn().mockResolvedValue({ userid: USERID }) },
-    mailStat: { findFirst: jest.fn().mockResolvedValue(null) },
-    shipClass: { findFirst: jest.fn().mockResolvedValue(null) },
+    ship: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn() },
+    user: { findUnique: vi.fn().mockResolvedValue({ userid: USERID }) },
+    mailStat: { findFirst: vi.fn().mockResolvedValue(null) },
+    shipClass: { findFirst: vi.fn().mockResolvedValue(null) },
   }) as unknown as PrismaService;
-  const scanHandler = (over.scanHandler ?? { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) }) as unknown as ScanHandlerService;
+  const scanHandler = (over.scanHandler ?? { clearScantab: vi.fn(), lettersFor: vi.fn(() => []) }) as unknown as ScanHandlerService;
   const shipClassCache = (over.shipClassCache ?? {
-    getTypeName: jest.fn(() => 'Interceptor'),
-    getMaxTons: jest.fn(() => 1000),
+    getTypeName: vi.fn(() => 'Interceptor'),
+    getMaxTons: vi.fn(() => 1000),
   }) as unknown as ShipClassCacheService;
-  const random = over.random ?? ({ next: jest.fn(() => 0) } as unknown as Random);
-  const eventsBus = over.eventsBus ?? { emit: jest.fn() };
+  const random = over.random ?? ({ next: vi.fn(() => 0) } as unknown as Random);
+  const eventsBus = over.eventsBus ?? { emit: vi.fn() };
   const presence = over.presence ?? new PresenceService();
 
   const svc = new ConnectionLifecycleService(
@@ -194,7 +195,7 @@ describe('ConnectionLifecycleService — connect', () => {
     await svc.onConnect(host, sock as unknown as GameSocket);
 
     expect(presence.count()).toBe(0);
-    expect((prisma as unknown as { ship: { findMany: jest.Mock } }).ship.findMany).not.toHaveBeenCalled();
+    expect((prisma as unknown as { ship: { findMany: Mock } }).ship.findMany).not.toHaveBeenCalled();
     expect(sock.data.userid).toBeUndefined();
   });
 
@@ -239,8 +240,8 @@ describe('ConnectionLifecycleService — connect', () => {
     }));
     const { svc, prisma } = build({
       shipStateService: {
-        get: jest.fn(),
-        findAllShips: jest.fn(() => seated),
+        get: vi.fn(),
+        findAllShips: vi.fn(() => seated),
       } as unknown as Partial<ShipStateService>,
     });
     const { host } = makeHost();
@@ -250,7 +251,7 @@ describe('ConnectionLifecycleService — connect', () => {
 
     expect(events(sock)).toEqual(['event.log']);
     expect(sock.disconnect).toHaveBeenCalledWith(true);
-    expect((prisma as unknown as { ship: { findMany: jest.Mock } }).ship.findMany).not.toHaveBeenCalled();
+    expect((prisma as unknown as { ship: { findMany: Mock } }).ship.findMany).not.toHaveBeenCalled();
   });
 
   it('does not count the arriving captain their own seat', async () => {
@@ -263,8 +264,8 @@ describe('ConnectionLifecycleService — connect', () => {
     }));
     const { svc, prisma } = build({
       shipStateService: {
-        get: jest.fn(),
-        findAllShips: jest.fn(() => seated),
+        get: vi.fn(),
+        findAllShips: vi.fn(() => seated),
       } as unknown as Partial<ShipStateService>,
     });
     const { host } = makeHost();
@@ -273,23 +274,23 @@ describe('ConnectionLifecycleService — connect', () => {
     await svc.onConnect(host, sock as unknown as GameSocket);
 
     expect(sock.disconnect).not.toHaveBeenCalled();
-    expect((prisma as unknown as { ship: { findMany: jest.Mock } }).ship.findMany).toHaveBeenCalled();
+    expect((prisma as unknown as { ship: { findMany: Mock } }).ship.findMany).toHaveBeenCalled();
   });
 });
 
 describe('ConnectionLifecycleService — ship entry', () => {
   function prismaWith(rows: ReturnType<typeof shipRow>[], over: Record<string, unknown> = {}) {
     return {
-      ship: { findMany: jest.fn().mockResolvedValue(rows), findFirst: jest.fn() },
-      user: { findUnique: jest.fn().mockResolvedValue({ userid: USERID, options: [0, 0, 0, 0], kills: 0, username: 'Ripley', teamcode: null, fkeys: [] }) },
-      mailStat: { findFirst: jest.fn().mockResolvedValue(null) },
-      shipClass: { findFirst: jest.fn().mockResolvedValue({ maxTons: 1000, points: 7 }) },
+      ship: { findMany: vi.fn().mockResolvedValue(rows), findFirst: vi.fn() },
+      user: { findUnique: vi.fn().mockResolvedValue({ userid: USERID, options: [0, 0, 0, 0], kills: 0, username: 'Ripley', teamcode: null, fkeys: [] }) },
+      mailStat: { findFirst: vi.fn().mockResolvedValue(null) },
+      shipClass: { findFirst: vi.fn().mockResolvedValue({ maxTons: 1000, points: 7 }) },
       ...over,
     };
   }
 
   it('forces a logout when the JWT outlived the account row', async () => {
-    const prisma = prismaWith([], { user: { findUnique: jest.fn().mockResolvedValue(null) } });
+    const prisma = prismaWith([], { user: { findUnique: vi.fn().mockResolvedValue(null) } });
     const { svc } = build({ prisma });
     const { host } = makeHost();
     const sock = makeSocket();
@@ -302,7 +303,7 @@ describe('ConnectionLifecycleService — ship entry', () => {
 
   it('tells an empty-fleet captain they lost a hull, then prompts for a name', async () => {
     const prisma = prismaWith([], {
-      mailStat: { findFirst: jest.fn().mockResolvedValue({ name1: 'Zorg', int1: 4, int2: 9 }) },
+      mailStat: { findFirst: vi.fn().mockResolvedValue({ name1: 'Zorg', int1: 4, int2: 9 }) },
     });
     const { svc } = build({ prisma });
     const { host } = makeHost();
@@ -317,7 +318,7 @@ describe('ConnectionLifecycleService — ship entry', () => {
 
   it('suppresses the loss notice when the caller asked it to', async () => {
     const prisma = prismaWith([], {
-      mailStat: { findFirst: jest.fn().mockResolvedValue({ name1: 'Zorg', int1: 4, int2: 9 }) },
+      mailStat: { findFirst: vi.fn().mockResolvedValue({ name1: 'Zorg', int1: 4, int2: 9 }) },
     });
     const { svc } = build({ prisma });
     const { host } = makeHost();
@@ -331,7 +332,7 @@ describe('ConnectionLifecycleService — ship entry', () => {
 
   it('never leaves a captain out of the game when the mailbox lookup fails', async () => {
     const prisma = prismaWith([], {
-      mailStat: { findFirst: jest.fn().mockRejectedValue(new Error('db down')) },
+      mailStat: { findFirst: vi.fn().mockRejectedValue(new Error('db down')) },
     });
     const { svc } = build({ prisma });
     const { host } = makeHost();
@@ -357,10 +358,10 @@ describe('ConnectionLifecycleService — ship entry', () => {
   it('auto-boards a lone hull on connect', async () => {
     const prisma = prismaWith([shipRow(1)]);
     const state = liveShip();
-    const get = jest.fn().mockReturnValue(state);
+    const get = vi.fn().mockReturnValue(state);
     const { svc } = build({
       prisma,
-      shipStateService: { get, findAllShips: jest.fn(() => [state]), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get, findAllShips: vi.fn(() => [state]), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const { host } = makeHost();
     const sock = makeSocket();
@@ -400,10 +401,10 @@ describe('ConnectionLifecycleService — ship entry', () => {
 
 describe('ConnectionLifecycleService — boarding', () => {
   const prismaOk = () => ({
-    ship: { findMany: jest.fn(), findFirst: jest.fn() },
-    user: { findUnique: jest.fn().mockResolvedValue({ userid: USERID, options: [0, 0, 0, 0], kills: 3, username: 'Ripley', teamcode: null, fkeys: [] }) },
-    mailStat: { findFirst: jest.fn().mockResolvedValue(null) },
-    shipClass: { findFirst: jest.fn().mockResolvedValue({ maxTons: 1000, points: 7 }) },
+    ship: { findMany: vi.fn(), findFirst: vi.fn() },
+    user: { findUnique: vi.fn().mockResolvedValue({ userid: USERID, options: [0, 0, 0, 0], kills: 3, username: 'Ripley', teamcode: null, fkeys: [] }) },
+    mailStat: { findFirst: vi.fn().mockResolvedValue(null) },
+    shipClass: { findFirst: vi.fn().mockResolvedValue({ maxTons: 1000, points: 7 }) },
   });
 
   it('re-boards a single-ship captain without displacing their own socket', async () => {
@@ -412,7 +413,7 @@ describe('ConnectionLifecycleService — boarding', () => {
     const state = liveShip();
     const { svc } = build({
       prisma: prismaOk(),
-      shipStateService: { get: jest.fn(() => state), findAllShips: jest.fn(() => [state]), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get: vi.fn(() => state), findAllShips: vi.fn(() => [state]), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const sock = makeSocket();
     const { host, serverEmit } = makeHost(new Map([['sock-1', sock]]));
@@ -429,7 +430,7 @@ describe('ConnectionLifecycleService — boarding', () => {
     const state = liveShip();
     const { svc } = build({
       prisma: prismaOk(),
-      shipStateService: { get: jest.fn(() => state), findAllShips: jest.fn(() => [state]), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get: vi.fn(() => state), findAllShips: vi.fn(() => [state]), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const first = makeSocket('sock-1');
     const second = makeSocket('sock-2');
@@ -446,7 +447,7 @@ describe('ConnectionLifecycleService — boarding', () => {
   it('refuses to resurrect a hull that is already dead', async () => {
     const { svc } = build({
       prisma: prismaOk(),
-      shipStateService: { get: jest.fn(() => undefined), findAllShips: jest.fn(() => []), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get: vi.fn(() => undefined), findAllShips: vi.fn(() => []), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const sock = makeSocket();
     const { host } = makeHost(new Map([['sock-1', sock]]));
@@ -461,7 +462,7 @@ describe('ConnectionLifecycleService — boarding', () => {
     const state = liveShip();
     const { svc } = build({
       prisma: prismaOk(),
-      shipStateService: { get: jest.fn(() => state), findAllShips: jest.fn(() => [state]), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get: vi.fn(() => state), findAllShips: vi.fn(() => [state]), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const sock = makeSocket();
     const { host } = makeHost(new Map([['sock-1', sock]]));
@@ -479,7 +480,7 @@ describe('ConnectionLifecycleService — boarding', () => {
     const state = liveShip({ cloak: 10 });
     const { svc } = build({
       prisma: prismaOk(),
-      shipStateService: { get: jest.fn(() => state), findAllShips: jest.fn(() => [state]), board: jest.fn() } as unknown as Partial<ShipStateService>,
+      shipStateService: { get: vi.fn(() => state), findAllShips: vi.fn(() => [state]), board: vi.fn() } as unknown as Partial<ShipStateService>,
     });
     const sock = makeSocket();
     const { host, server } = makeHost(new Map([['sock-1', sock]]));
@@ -493,18 +494,18 @@ describe('ConnectionLifecycleService — boarding', () => {
 describe('ConnectionLifecycleService — disconnect', () => {
   function buildDisconnect(ship: ReturnType<typeof liveShip> | undefined, reason?: string) {
     const shipStateService = {
-      get: jest.fn(() => ship),
-      findAllShips: jest.fn(() => (ship ? [ship] : [])),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      mutate: jest.fn(),
-      board: jest.fn(),
+      get: vi.fn(() => ship),
+      findAllShips: vi.fn(() => (ship ? [ship] : [])),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      mutate: vi.fn(),
+      board: vi.fn(),
     } as unknown as ShipStateService;
     const registry = new ConnectedShipsRegistry(shipStateService);
     const prisma = {
-      ship: { findMany: jest.fn(), findFirst: jest.fn() },
-      user: { findUnique: jest.fn() },
-      mailStat: { findFirst: jest.fn() },
-      shipClass: { findFirst: jest.fn().mockResolvedValue({ points: 7 }) },
+      ship: { findMany: vi.fn(), findFirst: vi.fn() },
+      user: { findUnique: vi.fn() },
+      mailStat: { findFirst: vi.fn() },
+      shipClass: { findFirst: vi.fn().mockResolvedValue({ points: 7 }) },
     };
     const built = build({ shipStateService, registry, prisma });
     const data: Record<string, unknown> = { userid: USERID, activeShipNo: 1 };
@@ -606,21 +607,21 @@ describe('ConnectionLifecycleService — disconnect', () => {
       items: new Array<bigint>(14).fill(0n),
     };
     const shipStateService = {
-      get: jest.fn(() => victim),
-      findAllShips: jest.fn(() => [victim, attacker]),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      mutate: jest.fn(),
-      board: jest.fn(),
+      get: vi.fn(() => victim),
+      findAllShips: vi.fn(() => [victim, attacker]),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      mutate: vi.fn(),
+      board: vi.fn(),
     } as unknown as ShipStateService;
     const registry = new ConnectedShipsRegistry(shipStateService);
     const { svc, random, eventsBus } = build({
       shipStateService,
       registry,
       prisma: {
-        ship: { findMany: jest.fn(), findFirst: jest.fn() },
-        user: { findUnique: jest.fn() },
-        mailStat: { findFirst: jest.fn() },
-        shipClass: { findFirst: jest.fn().mockResolvedValue({ points: 7 }) },
+        ship: { findMany: vi.fn(), findFirst: vi.fn() },
+        user: { findUnique: vi.fn() },
+        mailStat: { findFirst: vi.fn() },
+        shipClass: { findFirst: vi.fn().mockResolvedValue({ points: 7 }) },
       },
     });
     const sock = makeSocket('sock-1', {
@@ -632,7 +633,7 @@ describe('ConnectionLifecycleService — disconnect', () => {
 
     await svc.onDisconnect(host, sock as unknown as GameSocket);
 
-    expect((random as unknown as { next: jest.Mock }).next).toHaveBeenCalled();
+    expect((random as unknown as { next: Mock }).next).toHaveBeenCalled();
     expect(eventsBus.emit).toHaveBeenCalledWith(
       COMBAT_SHIP_DESTROYED,
       expect.objectContaining({
@@ -650,7 +651,7 @@ describe('ConnectionLifecycleService — disconnect', () => {
 
     await svc.onDisconnect(host, sock as unknown as GameSocket);
 
-    expect((random as unknown as { next: jest.Mock }).next).not.toHaveBeenCalled();
+    expect((random as unknown as { next: Mock }).next).not.toHaveBeenCalled();
   });
 
   it('clears the scan table for the departing hull', async () => {

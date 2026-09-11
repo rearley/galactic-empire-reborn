@@ -58,7 +58,7 @@ function makeEntry(index: number): MailListEntry {
 }
 
 function makeMaint(result: CommandResult = { lines: [] }) {
-  const handler = jest.fn().mockResolvedValue(result);
+  const handler = vi.fn().mockResolvedValue(result);
   return {
     maint: { command: { handler } } as unknown as MaintHandlerService,
     handler,
@@ -99,7 +99,7 @@ describe('mai — canon maintenance command (GECMDS.C:144)', () => {
 
 describe('maint — the fee is printed, not silent', () => {
   function makeMaintHandler(gate: unknown) {
-    const svc = { runMaintenance: jest.fn().mockResolvedValue(gate) } as unknown as MaintenanceService;
+    const svc = { runMaintenance: vi.fn().mockResolvedValue(gate) } as unknown as MaintenanceService;
     return new MaintHandlerService(svc);
   }
 
@@ -123,9 +123,9 @@ describe('maint — the fee is printed, not silent', () => {
 describe('rea — bare form lists the mailbox', () => {
   function makeRea(listing: MailListing, entry: MailListEntry | null = null) {
     const inbox = {
-      list: jest.fn().mockResolvedValue(listing),
-      resolveIndex: jest.fn().mockResolvedValue(entry),
-      deleteByIndex: jest.fn(),
+      list: vi.fn().mockResolvedValue(listing),
+      resolveIndex: vi.fn().mockResolvedValue(entry),
+      deleteByIndex: vi.fn(),
     } as unknown as MailInboxService;
     return { rea: new ReaHandlerService(inbox), inbox };
   }

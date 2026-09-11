@@ -23,6 +23,7 @@
 import { HELP_TOPICS } from '../../../src/game/commands/help/help-topics';
 import { CLASS_HELP } from '../../../src/game/commands/help/class-help.generated';
 import { classDetailPage } from '../../../src/game/commands/help/class-detail';
+import { HelpHandlerService } from '../../../src/game/commands/handlers/help.handler';
 
 describe('hel class <n> — canon detail page (GECMDS.C:438)', () => {
   it('returns the Interceptor page for class 1', () => {
@@ -71,8 +72,6 @@ describe('hel class <n> — canon detail page (GECMDS.C:438)', () => {
  * the summary table swallow the number.
  */
 describe('hel class <n> through the command router', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { HelpHandlerService } = require('../../../src/game/commands/handlers/help.handler');
 
   const run = (args: string[]) =>
     new HelpHandlerService().command.handler({} as never, args, {} as never) as

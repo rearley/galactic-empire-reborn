@@ -64,7 +64,7 @@ describe('the refusal reaches the player', () => {
 
     const planetService = {
       get: () => ({ xsect: 0, ysect: 0, plnum: 1, userid: null, name: null }),
-      claim: jest.fn().mockResolvedValue({ ok: false, reason: 'PLANET_LIMIT' }),
+      claim: vi.fn().mockResolvedValue({ ok: false, reason: 'PLANET_LIMIT' }),
     };
 
     const svc = new AdminHandlerService(planetService as never);

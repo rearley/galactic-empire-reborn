@@ -41,7 +41,7 @@ interface EmittedCall {
 function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
   const calls: EmittedCall[] = [];
   const socket = {
-    emit: jest.fn((event: string, payload: unknown) => {
+    emit: vi.fn((event: string, payload: unknown) => {
       calls.push({ event, payload });
     }),
     id: 'test-socket-id',
@@ -65,19 +65,19 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 /** Build a ScanHandlerService with mocked dependencies. */
 async function makeScanService(ships: ShipState[], scanRange = 50_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {};
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,

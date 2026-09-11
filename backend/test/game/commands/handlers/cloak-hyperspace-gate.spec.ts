@@ -25,7 +25,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 function makeService(shipState?: Partial<ShipState>) {
   const state = makeShip(shipState);
   const mockShipState = {
-    mutate: jest.fn(),
+    mutate: vi.fn(),
   } as unknown as ShipStateService;
   const handler = new CloakHandlerService(mockShipState, 500, { getHasCloak: () => true } as never);
   return { handler, state, ctx: {} as CommandContext, mockShipState };
@@ -87,7 +87,7 @@ describe('cloak — no device fitted (GECMDS.C:3192-3197)', () => {
   const fire = (over: Partial<ShipState>, arg: string) => {
     const ship = makeShip(over);
     const h = new CloakHandlerService(
-      { mutate: jest.fn() } as unknown as ShipStateService, 500, noCloak,
+      { mutate: vi.fn() } as unknown as ShipStateService, 500, noCloak,
     );
     return h.command.handler(ship, [arg], {} as CommandContext) as { lines: { text: string }[] };
   };

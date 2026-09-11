@@ -4,8 +4,8 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { UserRepository } from '../../src/game/player/user.repository';
 
 function makeService(rows: unknown[], commanderCount: number) {
-  const findMany = jest.fn().mockResolvedValue(rows);
-  const count = jest.fn().mockResolvedValue(commanderCount);
+  const findMany = vi.fn().mockResolvedValue(rows);
+  const count = vi.fn().mockResolvedValue(commanderCount);
   const prisma = { user: { findMany, count } } as unknown as PrismaService;
   const presence = new PresenceService();
   return { svc: new StatsService(new UserRepository(prisma), presence), findMany, count, presence };
@@ -68,7 +68,7 @@ describe('getStats', () => {
 
   it('re-queries once the cache expires', async () => {
     const { svc, findMany } = makeService([RICK], 9);
-    const now = jest.spyOn(Date, 'now');
+    const now = vi.spyOn(Date, 'now');
     now.mockReturnValue(1_000_000);
     await svc.getStats();
     now.mockReturnValue(1_000_000 + 15_001);
@@ -105,8 +105,8 @@ describe('getStats', () => {
     let resolveFindMany!: (v: unknown[]) => void;
     const countPromise = new Promise<number>((r) => { resolveCount = r; });
     const findManyPromise = new Promise<unknown[]>((r) => { resolveFindMany = r; });
-    const count = jest.fn().mockReturnValue(countPromise);
-    const findMany = jest.fn().mockReturnValue(findManyPromise);
+    const count = vi.fn().mockReturnValue(countPromise);
+    const findMany = vi.fn().mockReturnValue(findManyPromise);
     const prisma = { user: { count, findMany } } as unknown as PrismaService;
     const svc = new StatsService(new UserRepository(prisma), new PresenceService());
 
@@ -125,10 +125,10 @@ describe('getStats', () => {
   });
 
   it('does not cache a rejected query — a later call retries instead of failing for 15s', async () => {
-    const findMany = jest.fn()
+    const findMany = vi.fn()
       .mockRejectedValueOnce(new Error('db down'))
       .mockResolvedValueOnce([RICK]);
-    const count = jest.fn().mockResolvedValue(9);
+    const count = vi.fn().mockResolvedValue(9);
     const prisma = { user: { findMany, count } } as unknown as PrismaService;
     const svc = new StatsService(new UserRepository(prisma), new PresenceService());
 

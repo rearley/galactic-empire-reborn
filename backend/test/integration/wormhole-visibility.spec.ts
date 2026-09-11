@@ -36,21 +36,21 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(wormholes: GalaxyWormholeView[], scanRange = 20000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {};
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue(wormholes),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue(wormholes),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
   const svc = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
     prismaMock as unknown as PrismaService,

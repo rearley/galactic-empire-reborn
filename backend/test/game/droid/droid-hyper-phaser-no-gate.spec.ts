@@ -90,7 +90,7 @@ function harness(target: ShipState) {
       if (s) fn(s);
       return s;
     },
-    loadShip: jest.fn(), removeFromGame: jest.fn(),
+    loadShip: vi.fn(), removeFromGame: vi.fn(),
     size: () => shipMap.size, findByUserid: () => [],
   } as unknown as ShipStateService;
 
@@ -107,11 +107,11 @@ function harness(target: ShipState) {
   events.on(COMBAT_HIT, (e) => hits.push(e as { damageHull: number }));
 
   const svc = new DroidTickService(
-    { subscribe: jest.fn() } as unknown as TickService,
+    { subscribe: vi.fn() } as unknown as TickService,
     shipState, classCache,
     new DroidSpawner(shipState, classCache, HALF),
-    { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry,
-    { create: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
+    { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry,
+    { create: vi.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
     events, HALF,
   );
 

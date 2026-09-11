@@ -8,7 +8,7 @@ import { WormholeRepository } from '../../../src/game/galaxy/wormhole.repository
  */
 describe('WormholeRepository', () => {
   it('reports whether a sector slot is a wormhole, selecting only plnum', async () => {
-    const findFirst = jest.fn().mockResolvedValue({ plnum: 2 });
+    const findFirst = vi.fn().mockResolvedValue({ plnum: 2 });
     const repo = new WormholeRepository({ wormhole: { findFirst } } as never);
 
     const result = await repo.existsInSector(3, -1, 2);
@@ -21,14 +21,14 @@ describe('WormholeRepository', () => {
   });
 
   it('is false when no wormhole occupies the slot', async () => {
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const repo = new WormholeRepository({ wormhole: { findFirst } } as never);
 
     await expect(repo.existsInSector(0, 0, 1)).resolves.toBe(false);
   });
 
   it('finds a sector wormhole by coordinates, selecting position and name', async () => {
-    const findFirst = jest.fn().mockResolvedValue({ xcoord: 1.5, ycoord: 2.5, name: 'Rift' });
+    const findFirst = vi.fn().mockResolvedValue({ xcoord: 1.5, ycoord: 2.5, name: 'Rift' });
     const repo = new WormholeRepository({ wormhole: { findFirst } } as never);
 
     const result = await repo.findSectorWormhole(3, -1, 2);
@@ -41,7 +41,7 @@ describe('WormholeRepository', () => {
   });
 
   it('lists visible wormholes in a sector, selecting plnum and name only', async () => {
-    const findMany = jest.fn().mockResolvedValue([{ plnum: 4, name: 'Rift' }]);
+    const findMany = vi.fn().mockResolvedValue([{ plnum: 4, name: 'Rift' }]);
     const repo = new WormholeRepository({ wormhole: { findMany } } as never);
 
     await repo.findVisibleInSector(3, -1);
@@ -53,7 +53,7 @@ describe('WormholeRepository', () => {
   });
 
   it('reads every wormhole with no where and no select, for galaxy hydration', async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
+    const findMany = vi.fn().mockResolvedValue([]);
     const repo = new WormholeRepository({ wormhole: { findMany } } as never);
 
     await repo.findAll();

@@ -54,26 +54,26 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
   const shipStateService =
     overrides.shipStateService ??
     ({
-      get: jest.fn(),
-      findAllShips: jest.fn(() => []),
-      findByUserid: jest.fn(() => []),
-      size: jest.fn(() => 0),
+      get: vi.fn(),
+      findAllShips: vi.fn(() => []),
+      findByUserid: vi.fn(() => []),
+      size: vi.fn(() => 0),
     } as unknown as ShipStateService);
 
   const flat: Omit<GatewayDeps, 'shipDestroyed' | 'connectionLifecycle' | 'shipRepository'> = {
     shipStateService,
-    commandRouter: { dispatch: jest.fn() } as unknown as CommandRouterService,
+    commandRouter: { dispatch: vi.fn() } as unknown as CommandRouterService,
     registry: new ConnectedShipsRegistry(shipStateService),
-    wsAuthGuard: { validate: jest.fn() } as unknown as WsAuthGuard,
+    wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
     prisma: {} as unknown as PrismaService,
     onboardingService: {} as unknown as OnboardingService,
     scanHandler: {
-      clearScantab: jest.fn(),
-      lettersFor: jest.fn(() => []),
+      clearScantab: vi.fn(),
+      lettersFor: vi.fn(() => []),
     } as unknown as ScanHandlerService,
-    shipClassCache: { getTypeName: jest.fn() } as unknown as ShipClassCacheService,
-    random: { next: jest.fn(() => 0) } as unknown as Random,
-    events: { emit: jest.fn(), on: jest.fn() } as unknown as EventEmitter2,
+    shipClassCache: { getTypeName: vi.fn() } as unknown as ShipClassCacheService,
+    random: { next: vi.fn(() => 0) } as unknown as Random,
+    events: { emit: vi.fn(), on: vi.fn() } as unknown as EventEmitter2,
     presence: new PresenceService(),
     ...overrides,
   };

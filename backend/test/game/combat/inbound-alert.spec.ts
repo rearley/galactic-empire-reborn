@@ -74,7 +74,7 @@ async function harness(ships: ShipState[]) {
   const subscribers: Array<(c: TickContext) => void> = [];
   const tickService = {
     subscribe: (_kind: TickKind, h: (c: TickContext) => void) => { subscribers.push(h); return () => {}; },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const classCache = new ShipClassCacheService({} as never);
@@ -88,11 +88,11 @@ async function harness(ships: ShipState[]) {
   events.on(COMBAT_TARGET_WARNING, (e: CombatTargetWarningEvent) => warnings.push(e));
 
   const logger = new Logger('inbound-alert-spec');
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const service = new CombatTickService(
     tickService, shipState,
-    { findAllActive: jest.fn().mockResolvedValue([]), create: jest.fn(), delete: jest.fn() } as unknown as MineRepository,
+    { findAllActive: vi.fn().mockResolvedValue([]), create: vi.fn(), delete: vi.fn() } as unknown as MineRepository,
     new MineRegistry(), new Mulberry32Adapter(1), events, logger, classCache,
   );
   await service.onModuleInit();

@@ -27,6 +27,7 @@ import { CommandContext, CommandResult } from '../../../../src/game/commands/com
 import { NUMITEMS } from '../../../../src/game/constants/items';
 import { NEUTRAL_ZONE_OWNER, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../../../src/game/combat/neutral-zone';
 import { makeShip as buildShip } from '../../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const ctx: CommandContext = {};
 
@@ -66,29 +67,29 @@ const SHIP_CLASSES = [
 interface Harness {
   service: ScanHandlerService;
   shipService: {
-    findAllShips: jest.Mock;
-    findByName: jest.Mock;
-    get: jest.Mock;
+    findAllShips: Mock;
+    findByName: Mock;
+    get: Mock;
   };
   prisma: {
-    user: { findUnique: jest.Mock };
-    wormhole: { findMany: jest.Mock; findFirst: jest.Mock };
+    user: { findUnique: Mock };
+    wormhole: { findMany: Mock; findFirst: Mock };
   };
-  planetService: { get: jest.Mock; bySector: jest.Mock; byName: jest.Mock };
+  planetService: { get: Mock; bySector: Mock; byName: Mock };
   mines: MineRegistry;
 }
 
 function build(ships: ShipState[] = [], planets: PlanetState[] = []): Harness {
   const shipService = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    get: jest.fn().mockReturnValue(undefined),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    get: vi.fn().mockReturnValue(undefined),
   };
   const prisma = {
-    user: { findUnique: jest.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
     wormhole: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
   };
   const shipClassCache = new ShipClassCacheService({} as never);
@@ -96,16 +97,16 @@ function build(ships: ShipState[] = [], planets: PlanetState[] = []): Harness {
     shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, maxWarp: 0, ...c });
   }
   const galaxy = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
   const planetService = {
-    get: jest.fn((x: number, y: number, n: number) =>
+    get: vi.fn((x: number, y: number, n: number) =>
       planets.find((p) => p.xsect === x && p.ysect === y && p.plnum === n)),
-    bySector: jest.fn((x: number, y: number) =>
+    bySector: vi.fn((x: number, y: number) =>
       planets.filter((p) => p.xsect === x && p.ysect === y)),
-    byName: jest.fn().mockReturnValue(undefined),
+    byName: vi.fn().mockReturnValue(undefined),
   };
   const mines = new MineRegistry();
 

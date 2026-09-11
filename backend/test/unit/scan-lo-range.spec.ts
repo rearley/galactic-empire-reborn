@@ -37,19 +37,19 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeService(ships: ShipState[], scanRange = 100_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    get: jest.fn(),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    get: vi.fn(),
   };
   const prismaMock = {};
   const shipClassCache = new ShipClassCacheService({} as never);
   shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   return new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
