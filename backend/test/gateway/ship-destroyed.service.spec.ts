@@ -263,10 +263,30 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     const emit = emitterSpy();
     await h.service.handle(destroyedEvent(), emit);
     expect(emit.recovered).toEqual(['usr_victim']);
-    // The recovery is the LAST thing said: it must not re-board a hull that
-    // the transaction above is still in the middle of deleting.
-    expect(emit.order[emit.order.length - 1]).toBe('recoverVictim');
-    expect(h.$transaction).toHaveBeenCalled();
+  });
+
+  // 1-11. the ORDER, which is wire-visible and was the thing most at risk
+  it('does all of it in the order the wire already depended on', async () => {
+    // Ordering is the property a 256-line move breaks silently: every case
+    // above still passes if `announceDestroyed` is moved below the KILLEDBY
+    // block, and clients would then get the narration before the structured
+    // event. This pins the whole sequence, transaction included.
+    //
+    // The expected array is the sequence OBSERVED before the move, not a
+    // sequence anyone thinks is nicer.
+    const emit = emitterSpy();
+    const h = build({ prisma: { $transaction: jest.fn(async () => { emit.order.push('transaction'); }) } });
+
+    await h.service.handle(destroyedEvent(), emit);
+
+    expect(emit.order).toEqual([
+      'warn',          // the loss manifest, while the hull is still in memory
+      'transaction',   // the hull write, started but not awaited
+      'announce',      // combat.ship-destroyed, the structured announcement
+      'toAllExcept',   // KILLEDBY, galaxy-wide
+      'toRoom',        // YOURDEAD, to the pilot who just died
+      'recoverVictim', // ...and only then re-seat them, never before
+    ]);
   });
 
   // 11. the awaitable

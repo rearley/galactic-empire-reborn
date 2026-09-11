@@ -1438,11 +1438,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Ship destruction is broadcast galaxy-wide.
-   * Also clears the victim's scantab so stale assignments don't persist on respawn.
-   * @see specs/006b-combat/contracts/combat-events.md
-   */
-  /**
    * shipId → the planet whose ion cannons last hit it, and when.
    *
    * This is the evidence that a planet made a kill. The victim's `lastfired`
