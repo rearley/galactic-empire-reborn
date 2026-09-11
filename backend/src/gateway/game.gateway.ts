@@ -859,15 +859,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * A one-line delegate. The body moved to `ShipDestroyedService` with the kill
-   * it belongs to; this entry point stays because `captured-document.spec.ts`
-   * drives it directly, and that spec does not change.
-   */
-  private revealCapturedDocument(victimUserid: string, killerUserid: string): Promise<void> {
-    return this.shipDestroyed.revealCapturedDocument(victimUserid, killerUserid, this.destroyedEmitter());
-  }
-
-  /**
    * Returns the hull write so the shutdown drain can WAIT for it.
    *
    * On a live tick nothing awaits this — EventEmitter2's `emit` discards the

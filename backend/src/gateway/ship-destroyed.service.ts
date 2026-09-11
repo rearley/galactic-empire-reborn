@@ -78,7 +78,7 @@ export class ShipDestroyedService {
   /**
    * The other half of a colony kill: `GameGateway.handlePlanetIonFired` reports
    * every ion hit here, and `handle` consumes the most recent one when that
-   * ship dies. @see GEFUNCS.C:1799, 1805
+   * ship dies.
    */
   recordIonAttacker(shipId: string, name: string): void {
     this.lastIonAttacker.set(shipId, { name, at: Date.now() });
@@ -425,8 +425,8 @@ export class ShipDestroyedService {
    * The 20 is canon's cap on the listing, and the roll is taken BEFORE the
    * lookup so an unlucky kill costs no query.
    */
-  // Public, not private: `GameGateway` keeps a one-line delegate because
-  // `test/gateway/captured-document.spec.ts` drives that entry point directly.
+  // Public, not private: `test/gateway/captured-document.spec.ts` drives this
+  // entry point directly.
   async revealCapturedDocument(
     victimUserid: string,
     killerUserid: string,
