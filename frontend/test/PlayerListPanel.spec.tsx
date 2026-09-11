@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PlayerListPanel } from '../src/components/PlayerListPanel';
-import type { ConnectedPlayer } from '../src/types/contracts';
+import type { ConnectedPlayer } from '@ge/wire';
 
 describe('PlayerListPanel', () => {
   const players: ConnectedPlayer[] = [

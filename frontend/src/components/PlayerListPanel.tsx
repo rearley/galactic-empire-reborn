@@ -1,4 +1,4 @@
-import type { ConnectedPlayer } from '../types/contracts';
+import type { ConnectedPlayer } from '@ge/wire';
 
 interface PlayerListPanelProps {
   players: ConnectedPlayer[];

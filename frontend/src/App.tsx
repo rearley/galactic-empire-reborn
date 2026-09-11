@@ -12,12 +12,12 @@ import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
 import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
-import { ShipSelectPrompt, type FleetEntry } from './onboarding/ShipSelectPrompt';
+import { ShipSelectPrompt } from './onboarding/ShipSelectPrompt';
 import { clearToken } from './auth/tokenStore';
 import { logout } from './auth/logout';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
 import { handleCommandResult } from './socket/command-result-handlers';
-import type { EventLogLine, ScanCell } from './types/contracts';
+import type { EventLogLine, ScanCell, CombatShipDestroyedPayload } from '@ge/wire';
 import type { ScanRenderEvent } from './hooks/useScanRender';
 
 const MAX_LOG_ENTRIES = 500;
@@ -234,7 +234,7 @@ function Terminal(): React.JSX.Element {
       // handlePhaserFired above.
     };
 
-    const handleShipDestroyed = (event: { victimId: string; victimUserid: string; attackerId: string | null; weapon: string | null; attackerName?: string | null }) => {
+    const handleShipDestroyed = (event: CombatShipDestroyedPayload) => {
       // The server narrates deaths in canon's words now — KILLEDBY for a kill,
       // DIED for a death nothing caused, YOURDEAD to the pilot who died — and
       // all three arrive as ordinary event.log lines. Everything this handler
@@ -301,9 +301,7 @@ function Terminal(): React.JSX.Element {
   }, [players, localShipId]);
 
   const shipNameError =
-    onboardingPrompt?.type === 'ship-name'
-      ? ((onboardingPrompt.payload as { error?: string }).error ?? null)
-      : null;
+    onboardingPrompt?.type === 'ship-name' ? (onboardingPrompt.payload.error ?? null) : null;
 
   const renderBottomInput = (): React.JSX.Element => {
     if (onboardingPrompt?.type === 'ship-name') {
@@ -315,12 +313,14 @@ function Terminal(): React.JSX.Element {
       );
     }
     if (onboardingPrompt?.type === 'ship-select') {
-      const payload = onboardingPrompt.payload as { ships?: FleetEntry[]; error?: string };
       return (
         <ShipSelectPrompt
-          ships={payload.ships ?? []}
+          ships={onboardingPrompt.payload.ships}
           onSelect={(index) => emitPromptReply(index)}
-          error={payload.error ?? null}
+          // `prompt:ship-select` never carries an error field on the wire — see
+          // `PromptShipSelectPayload` in packages/wire and every emit site in
+          // game.gateway.ts. A rejected selection just re-emits the fleet list.
+          error={null}
           onLogout={() => logout()}
         />
       );

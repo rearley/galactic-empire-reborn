@@ -7,7 +7,7 @@ import type {
   PhysicsSectorTransitionPayload,
   PlayerSectorPayload,
   ShipRenamedPayload,
-} from '../types/contracts';
+} from '@ge/wire';
 
 type Action =
   | { type: 'SNAPSHOT'; payload: PlayerSnapshotPayload }

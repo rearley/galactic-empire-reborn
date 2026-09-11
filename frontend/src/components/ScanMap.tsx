@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import type { ScanCell, PhysicsSectorTransitionPayload } from '../types/contracts';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, PHYSICS_SECTOR_TRANSITION } from '../types/contracts';
+import type { ScanCell, PhysicsSectorTransitionPayload } from '@ge/wire';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, WIRE_EVENTS } from '@ge/wire';
+
+const PHYSICS_SECTOR_TRANSITION = WIRE_EVENTS.SERVER_TO_CLIENT.PHYSICS_SECTOR_TRANSITION;
 import { socket } from '../socket/socketClient';
 
 /**
