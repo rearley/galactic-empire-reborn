@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../src/prisma/client';
 import { stateToPrismaUpdate, IN_MEMORY_ONLY_SHIP_FIELDS } from '../../src/game/ship/ship-state.mappers';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants/items';

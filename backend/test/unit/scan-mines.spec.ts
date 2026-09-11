@@ -91,7 +91,7 @@ async function makeServiceWithPlanet(ship: ShipState) {
   const planet = {
     id: 1, xsect: 5, ysect: 5, plnum: 1,
     xcoord: ship.xcoord, ycoord: ship.ycoord, name: 'Zygor',
-  } as unknown as import('@prisma/client').Planet;
+  } as unknown as import('../../src/prisma/client').Planet;
   const service = new ScanHandlerService(
     { findAllShips: () => [ship], findByName: () => undefined, findByUserid: () => [] } as unknown as ShipStateService,
     { shipClass: { findMany: async () => [{ classNumber: 1, scanRange: 100_000 }] } } as unknown as PrismaService,

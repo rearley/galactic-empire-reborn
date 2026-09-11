@@ -9,7 +9,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { valuePlanet } from './value-pl';
 import { buildProductionMailStat, productionMailMsgno } from './mailstat-builder';

@@ -1,4 +1,4 @@
-import { Planet, Prisma } from '@prisma/client';
+import { Planet, Prisma } from '../../prisma/client';
 import { NUMITEMS } from '../constants/items';
 import { PlanetItem, PlanetState } from './planet-state.types';
 

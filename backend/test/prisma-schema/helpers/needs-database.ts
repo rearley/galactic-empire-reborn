@@ -25,6 +25,7 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { maskComments } from '../../invariants/mask-comments';
 
 /** `from '…'`, `require('…')` and `import('…')`, which is every form used here. */
 const IMPORT_RE = /(?:from\s*|require\(\s*|import\(\s*)['"]([^'"]+)['"]/g;
@@ -80,12 +81,19 @@ function walk(entry: string): WalkResult {
     if (seen.has(file)) continue;
     seen.add(file);
 
-    const text = readFile(file);
-    if (text === null) {
+    const raw = readFile(file);
+    if (raw === null) {
       unresolved.push(file);
       needsDb = true;
       continue;
     }
+
+    // Comments are masked first. A docblock that QUOTES an import — as
+    // `generated-client-emit.spec.ts` does when it explains the `.ts`
+    // specifier problem — is prose, not a dependency, and reading it as one
+    // made the walk report an unresolvable import for a file that has none.
+    // Same failure as issue #13, which is why the masker already exists.
+    const text = maskComments(raw);
 
     for (const m of text.matchAll(IMPORT_RE)) {
       const spec = m[1];

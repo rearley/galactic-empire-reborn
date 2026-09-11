@@ -20,7 +20,7 @@ import {
 } from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { Ship } from '@prisma/client';
+import type { Ship } from '../prisma/client';
 import type {
   BroadcastTarget,
   GameServer,

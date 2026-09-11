@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MailStat } from '@prisma/client';
+import { MailStat } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { MailInboxRepository } from './mail-inbox.repository';

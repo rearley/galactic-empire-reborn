@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../src/prisma/client';
 import { SHIP_CLASSES } from '../../../prisma/seed/ship-classes';
+import { makePrismaClient } from '../../helpers/make-prisma-client';
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.TEST_DATABASE_URL } },
-});
+const prisma = makePrismaClient(process.env.TEST_DATABASE_URL);
 
 async function runSeed(): Promise<void> {
   for (const row of SHIP_CLASSES) {

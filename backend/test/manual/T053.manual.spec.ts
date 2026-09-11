@@ -11,9 +11,10 @@
  *  - A user row exists in the DB (the test seeds one and cleans up after)
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../src/prisma/client';
+import { makePrismaClient } from '../helpers/make-prisma-client';
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient(process.env.DATABASE_URL);
 
 const TEST_USERID = 'T053-test-user';
 

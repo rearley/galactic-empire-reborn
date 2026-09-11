@@ -8,9 +8,10 @@ import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { INestApplication } from '@nestjs/common';
 import { io as ioc, Socket } from 'socket.io-client';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../src/prisma/client';
 import { sign } from 'jsonwebtoken';
 import { AppModule } from '../../src/app.module';
+import { makePrismaClient } from '../helpers/make-prisma-client';
 
 const BOOT_TEST_USERID = 'boot-e2e-user';
 const BOOT_TEST_SHIPNO = 1;
@@ -35,7 +36,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
   // G1: boot must complete in < 5000ms
   beforeAll(async () => {
     // Seed User + Ship before app boots so ShipStateService.onModuleInit hydrates it.
-    const seedPrisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+    const seedPrisma = makePrismaClient(process.env.DATABASE_URL);
     try {
       await seedPrisma.user.upsert({
         where: { userid: BOOT_TEST_USERID },

@@ -107,7 +107,7 @@ describe('renderLoFullScan', () => {
 describe('renderSectorScan', () => {
   it('draws planets LAST so a planet overwrites a ship/self sharing its cell', () => {
     const ship = makeShip({ xcoord: 0.02, ycoord: 0.02 });
-    const planet = { xcoord: 0.02, ycoord: 0.02, plnum: 7 } as unknown as import('@prisma/client').Planet;
+    const planet = { xcoord: 0.02, ycoord: 0.02, plnum: 7 } as unknown as import('../../../src/prisma/client').Planet;
     const result = renderSectorScan(ship, [ship], [], [], [], [planet]);
     const cellsAtSelf = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
     expect(cellsAtSelf).toHaveLength(1);
@@ -183,7 +183,7 @@ describe('renderSectorScan', () => {
 
     it('a planet overwrites the self cell on the same cell', () => {
       const self = makeShip({ xcoord: CO_X, ycoord: CO_Y });
-      const planet = { xcoord: CO_X, ycoord: CO_Y, plnum: 3 } as unknown as import('@prisma/client').Planet;
+      const planet = { xcoord: CO_X, ycoord: CO_Y, plnum: 3 } as unknown as import('../../../src/prisma/client').Planet;
       const result = renderSectorScan(self, [self], [], [], [], [planet]);
       const cellsAt00 = result.scanRender?.cells.filter((c) => c.x === 0 && c.y === 0);
       expect(cellsAt00).toHaveLength(1);

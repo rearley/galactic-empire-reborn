@@ -7,7 +7,7 @@ import { MailInboxService } from '../../src/game/mail/mail-inbox.service';
 import { MailInboxRepository } from '../../src/game/mail/mail-inbox.repository';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { MailStat } from '@prisma/client';
+import { MailStat } from '../../src/prisma/client';
 import type { Mock } from 'vitest';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

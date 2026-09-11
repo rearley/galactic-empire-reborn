@@ -13,7 +13,7 @@ import { Scantab } from '../helpers/scantab';
 import { MineState, MINE_SLOT_FREE } from '../../../combat/mine.registry';
 import { scanShipColour } from '../helpers/scan-ship-colour';
 import { GalaxyWormholeView } from '../../../galaxy/galaxy.types';
-import type { Planet } from '@prisma/client';
+import type { Planet } from '../../../../prisma/client';
 
 /**
  * Canon's `scan_lo` map loop — every ship in the game, projected, gated by
