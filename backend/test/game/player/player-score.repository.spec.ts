@@ -105,6 +105,31 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       );
     });
 
+    /**
+     * The deduction is the half scoreF2 DOES scale, and nothing in this file
+     * asserted it: the test above is named for the deduction and reads the
+     * award, behind a nested `vi.mock` that was hoisted above the file and
+     * never applied. Vitest refuses that mock outright, which is how it
+     * surfaced. @see issue #33
+     *
+     * At the file-wide scoreF2 of 100, amt 100 deducts 100 — the victim's
+     * 1000 becomes 900. `player-score-scoref2.spec.ts` carries the case that
+     * proves it is the KNOB doing the work and not the arithmetic coinciding,
+     * because a module mock is necessarily file-wide.
+     */
+    it('deducts floor(amt / 100) * scoreF2 from the victim', async () => {
+      const { prisma, updateMock } = makePrisma({ victimScore: 1000n, victimKlscore: 1000n });
+      const repo = new PlayerScoreRepository(prisma as never);
+      await repo.transferKillScore('attacker', 'victim', 100, false, false);
+      expect(killScoreDeduction(100, 100, false)).toBe(100);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userid: 'victim' },
+          data: { score: 900n, klscore: 900n },
+        }),
+      );
+    });
+
     it('floors at zero — never negative (scr=0)', async () => {
       const { prisma, updateMock } = makePrisma({});
       const repo = new PlayerScoreRepository(prisma as never);
