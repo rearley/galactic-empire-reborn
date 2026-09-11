@@ -68,6 +68,14 @@ describe('userKills is hydrated everywhere teamcode is', () => {
     expect(src(path)).toMatch(/state\.userKills = /);
   });
 
+  it('the boot-hydration include still carries kills', () => {
+    // This half did NOT move. `ship-state.service.ts` joins the User row onto
+    // every ship it loads at boot; trim `kills: true` out of that include and
+    // every returning captain hydrates with userKills 0, so Cybertron
+    // escalation resets for exactly the veterans it is meant to punish.
+    expect(src('src/game/ship/ship-state.service.ts')).toMatch(/kills: true/);
+  });
+
   it('the session-profile read carries kills alongside teamcode', () => {
     // The `select` itself moved behind `UserRepository` when the persistence
     // boundary went in; the invariant did not. Wherever the User row is read
