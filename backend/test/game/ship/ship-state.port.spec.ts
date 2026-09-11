@@ -21,6 +21,17 @@ describe('state ports', () => {
     expect(port).toBeDefined();
   });
 
+  // The conformance probe in the next two tests is the object LITERAL, not the
+  // `expect`. Assigning a literal to the port type fires TypeScript's
+  // missing-property and excess-property checks, so adding a method to either
+  // port, or dropping one, fails these tests at COMPILE time. The
+  // `Object.keys` assertions are incidental: they restate the shape of a
+  // literal written two lines above, and prove nothing on their own.
+  //
+  // Do not "strengthen" them by reflecting over `ShipStateService.prototype` —
+  // the port is deliberately a narrow subset of that class, so such a test
+  // would fail the next time an unrelated public method is added to the
+  // service, which is precisely the coupling the port exists to remove.
   it('ShipStatePort exposes only what the planet subsystem consumes', () => {
     const ship = makeShip({ userid: 'u1', shipno: 1 });
     const store = new Map([['u1:1', ship]]);
