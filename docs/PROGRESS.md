@@ -5993,3 +5993,96 @@ other (two runs racing).
 unguarded. That is issue #22, and it is a scope question — the citation guards
 are backend Jest specs and the frontend runs Vitest — which Phase 5 will be in
 a position to answer once the runners converge.
+
+---
+
+## 2026-09-11 — Phase 5 closed: Vitest and Prisma 7 landed, Nest 12 and TypeScript 7 are waiting on upstream
+
+Seven commits on `restructure`, `6a066a8..d5b1754`. Master untouched.
+
+| item | state |
+|---|---|
+| `moduleResolution` node10 → bundler | done, `39e9c74` |
+| oxlint `--type-aware` on the backend | done, `e0b3f41` |
+| boot-order oracle | done, `d589804` |
+| Jest → Vitest | done, `a048856` |
+| Prisma 5 → 7 | done, `d5b1754` |
+| NestJS 10 → 12 | **blocked**, issue #34 |
+| TypeScript 6 → 7 | **deferred to 7.1**, issue #35 |
+| CommonJS → ESM | **struck** — the premise was false |
+
+**Verified at close-out, by running it rather than recalling it:**
+
+| check | result |
+|---|---|
+| backend suite | 631 files / 6,408 tests green |
+| frontend suite | 43 files / 336 tests green |
+| `tsc --noEmit` | clean |
+| `npm run lint` | clean, and now type-aware |
+| both Docker images | build |
+| backend image | loads the Prisma client and the whole app module |
+| `prisma migrate deploy` in the image | reaches the schema, fails only on the connection |
+| deploy gate, `6a066a8..HEAD` | unchanged |
+| `VERSION` | unchanged |
+
+Backend suite was 626 / 6,385 at the start of the phase. The 23 extra tests are
+all new guards, not new features.
+
+**Dependency movement against master:** TypeScript 5.7 → 6.0.3, Jest 29 →
+removed, Vitest → 5.0.0, Prisma 5.22 → 7.10.0, NestJS unchanged at 10.4.15.
+
+### What the phase found that no one was looking for
+
+Eight issues, all pre-existing or upstream, none fixed in-phase per the standing
+rule:
+
+- **#27** — both `CLAUDE.md` files say "the two tick timers"; `TickService`
+  drives three.
+- **#28** — 136 test call sites drop a Promise and assert on the next line, so
+  they may be testing only the synchronous prefix of an async handler, and an
+  async rejection leaves the test green. None in `src`. This one matters beyond
+  its count: the phase's own justification is that it needs the suite as an
+  unambiguous oracle.
+- **#29** — five type-aware correctness findings in `backend/src`, three of them
+  stringification in error and invariant reporting paths, where the failure mode
+  is a diagnostic that reads `[object Object]` exactly when someone needs it.
+- **#30** — the heartbeats start before the galaxy exists and before the
+  ship-class cache is warm. Found because the boot-order test was written
+  expecting the opposite, and failed.
+- **#31** — the Node version guard checks four files and never the runtime
+  running the tests. This machine ran 6,387 tests on Node 22 while every
+  Dockerfile, CI job and `engines` field said 24.
+- **#32** — two `nav.handler` suites carry a docblock and no assertions. Jest
+  reports an empty `describe` as a passing suite.
+- **#33** — a `scoreF2` test asserted the one value `scoreF2` cannot affect,
+  behind a module mock that was hoisted above the file and never applied.
+- **#34, #35** — the two upstream blockers above.
+
+### Honest notes
+
+**The phase's premise was wrong and the plan argued from it.** "Prisma 7
+requires ESM" is false, and so is the chain that made ESM the first task. It was
+caught by testing the claim before planning, which is the only reason the phase
+did not spend its largest effort on work nothing needed.
+
+**The task order changed mid-execution**, on evidence rather than preference:
+Jest cannot load Nest 12, so Vitest moved ahead of it. That ruling is recorded
+in the plan document with the reproduction.
+
+**A causal claim was wrong twice before it was right.** The built image would
+not start; the cause was attributed first to the Dockerfile's `COPY` order, then
+to the generator inspecting `tsconfig.json`. Both were disproved by experiment,
+and a Dockerfile change made on the strength of the first was reverted. The
+third answer was confirmed by removing the fix and watching the container break
+again. The stale local file that produced both wrong answers is the lesson: a
+generated artifact is not evidence about what generation does now.
+
+**Known issue, carried forward:** the backend CI job does not build, so no test
+can inspect `dist/`, and CI has no Docker daemon. Two guards therefore assert
+directives in files and leave the boot to a human — the same split
+`node-runtime-version.spec.ts` has always used. An image that compiles and
+cannot start remains possible, and was possible this evening.
+
+**Next:** the remaining issue backlog, then playtests on local dev AND on
+`restructure`, then the merge conversation. `VERSION` gets its single bump at
+merge.

@@ -402,27 +402,49 @@ on the grounds that it is the largest and riskiest item in the phase (55
 `__dirname`/`__filename` uses, 27 `require()` calls, 50 `jest.mock` uses across
 642 test files) and buys nothing the other four upgrades need.
 
-- [ ] `moduleResolution: "node"` → `"bundler"`, dropping the
-      `ignoreDeprecations: "6.0"` escape hatch. Verified to compile under
-      TypeScript 6 with `module: commonjs`, so it lands first and alone. This is
-      also the phase-0 blocker that kept backend oxlint syntax-only.
-- [ ] NestJS 10 → 12. Requires Node 20.19+/22.12+ (we run 24). **Lifecycle
-      hooks now fire by component hierarchy level**, and this app runs both game
-      heartbeats out of lifecycle hooks — the one item here with a named
-      behaviour risk.
-- [ ] Prisma 5 → 7 on CommonJS: `prisma-client` generator with
-      `moduleFormat = "cjs"`, client generated into the source tree, `url`
-      removed from the datasource block and moved to `prisma.config.ts`, and a
-      `@prisma/adapter-pg` driver adapter passed to the client constructor.
-      197 specs touch Prisma.
-- [ ] Jest → Vitest on the backend. Needed before TypeScript 7 because ts-jest
-      declares `typescript: ">=4.3 <7"`, which is the real blocker the original
-      note guessed at.
-- [ ] TypeScript 6 → 7 once ts-jest is gone.
-- [ ] ~~Backend CommonJS → ESM~~ — struck 2026-09-11, see the correction above.
+- [x] `moduleResolution: "node"` → `"bundler"`, dropping the
+      `ignoreDeprecations: "6.0"` escape hatch (`39e9c74`). Also the phase-0
+      blocker that kept backend oxlint syntax-only — **oxlint now runs
+      `--type-aware`** (`e0b3f41`), its first run ever on this backend, and the
+      3,441 findings were triaged into one rule disabled with a reason and six
+      parked behind issues #28 and #29. No code fixed.
+- [x] Jest → Vitest on the backend (`a048856`). Moved AHEAD of Nest 12 during
+      execution: Jest 30 cannot `require()` Nest 12's ESM entrypoints from a
+      CommonJS test. 2,697 call sites across 296 files. Surfaced #32 and #33,
+      and a **safety fix** — `database-url.ts` identified a test run by
+      `JEST_WORKER_ID`, which Vitest never sets.
+- [x] Prisma 5 → 7 on CommonJS (`d5b1754`): `prisma-client` generator with
+      `moduleFormat = "cjs"`, client generated OUTSIDE `src/` and git-ignored,
+      `url` moved to `prisma.config.ts`, `@prisma/adapter-pg` driver adapter.
+      Caused three regressions, all found and fixed: fail-fast on a bad
+      connection was gone, a duplicate email became a 500, and the built image
+      would not start.
+- [x] A boot-order oracle landed BEFORE any framework move (`d589804`), and
+      immediately found that the heartbeats start before the galaxy exists and
+      before the ship-class cache is warm (#30).
+- [ ] **NestJS 10 → 12 — BLOCKED, see issue #34.** `@nestjs/throttler` has no
+      Nest 12 release; its peer range stops at 11 and npm halts the install.
+      `overrides` do not relax a peer conflict. Deferred out of the phase.
+      The lifecycle-hook risk this item carries is already pinned by the
+      boot-order test above.
+- [ ] **TypeScript 6 → 7 — DEFERRED to 7.1, see issue #35.** ts-jest no longer
+      caps it, and `tsc --noEmit` passed clean on 7.0.2 first try with identical
+      decorator metadata (153 emissions) and a 5.2x faster build. But TypeScript
+      7.0 ships no programmatic compiler API, so `nest build`, `nest start` and
+      `nest start --watch` all break. Not worth rebuilding the dev loop for
+      seven seconds of build time.
+- [x] ~~Backend CommonJS → ESM~~ — struck 2026-09-11, see the correction above.
 
 Last because it is the **only** phase that can change runtime behaviour, and it
 needs the test suite as an unambiguous oracle.
+
+**Closed 2026-09-11 with two of six items deferred to upstream releases**
+(#34, #35), both blocked by other people's packages rather than by anything in
+this repo. Verified at close-out: 631 suites / 6,408 tests green, frontend 43 /
+336 green, `tsc --noEmit` clean, `npm run lint` clean and now type-aware, both
+Docker images build, the backend image loads the Prisma client and the whole
+app module, `prisma migrate deploy` inside it reaches the schema, deploy gate
+unchanged in this phase's own `6a066a8..HEAD` range, `VERSION` unchanged.
 
 ## Pause condition
 

@@ -5781,3 +5781,134 @@ by the suite going green. A temporary spec holding a real `topspeed: 8000`
 fixture alongside the same value in a line comment and in a docblock was
 reported for the fixture and for neither comment. A masker that blanked
 everything would also have made the suite pass.
+
+---
+
+## 2026-09-11 — Phase 5 ran on CommonJS, and two of its six items are waiting on other people
+
+**Context:** the spec's Phase 5 led with "Backend CommonJS → ESM", justified by
+"Prisma 5 → 7 … Requires ESM". The premise was tested rather than trusted,
+before any planning, and it is false. Prisma 7.10.0 ran a real query against
+`ge_test` from a client generated with `moduleFormat = "cjs"` and compiled
+`module: commonjs`. NestJS 12's migration guide says in its own words that a
+CommonJS application can upgrade and stay CommonJS. TypeScript 7.0.2 compiles
+CommonJS and still emits `design:paramtypes`. Prisma's own upgrade guide says
+to set `"type": "module"` and never mentions `moduleFormat`, so reading the
+documentation alone would have produced the wrong plan.
+
+**Decision:** ESM was struck from the phase. Rick ruled on it after being shown
+the three verifications above and the cost — 55 `__dirname` uses, 27 `require()`
+calls and 50 `jest.mock` uses across 642 test files, none of which the other
+four upgrades need touched.
+
+**Reason:** it was the largest and riskiest item in the phase and nothing
+required it. Keeping it would have meant landing it in the one phase the spec
+calls behaviour-risky, alongside four other upgrades.
+
+### The task order changed during execution, and the change was evidence-driven
+
+Nest 12 was planned as task 4 and Vitest as task 7. Nest 12 was attempted,
+found doubly blocked, and reverted:
+
+- **Jest 30 cannot `require()` NestJS 12's ESM entrypoints from a CommonJS
+  test.** Importing `@nestjs/testing` fails with `Must use import to load ES
+  Module` on Node 24.21, above the 24.9 floor Jest's own error names. Adding
+  `@nestjs` to `transformIgnorePatterns` does not help, because ts-jest's
+  transform matches `.tsx?` and the Nest entrypoints are `.js`. Vitest handles
+  ESM dependencies natively, so migrating the runner first removes the problem
+  instead of configuring around it.
+- **`@nestjs/throttler` peer-refuses Nest 12** and npm halts the install. npm
+  `overrides` replace resolved versions; they do not relax a peer conflict.
+  `--legacy-peer-deps` produces a verifiably correct tree — exactly one
+  `@nestjs/common` on disk at 12.0.1 — but is not durable, because `npm ci` in
+  CI and in the Dockerfile would still fail. Pinning it in `.npmrc` would
+  disable peer checking for every package in the monorepo, permanently.
+
+**Ruling: Nest 12 is deferred out of the phase** (#34) rather than forced. The
+lifecycle-hook reordering it brings is already pinned by a boot-order test
+written before the attempt, so the risk is armed for whenever it lands.
+
+### TypeScript 7 is deferred to 7.1, on measurement rather than on caution
+
+`tsc --noEmit` passed clean on 7.0.2 at the first attempt. The emitted
+JavaScript was diffed file by file against the TypeScript 6 output: 55 of ~600
+files differ and every difference is line wrapping inside
+`__metadata("design:paramtypes", [...])`. Metadata emissions are identical at
+153. The build goes from 8.9s to 1.7s.
+
+**But TypeScript 7.0 ships the `tsc` executable only** — no programmatic
+compiler API until 7.1, by the Nest CLI's own error message — so `nest build`,
+`nest start` and `nest start --watch` all break. `@nestjs/cli@12`, which
+installs independently of the blocked Nest 12 runtime, reports the same thing.
+
+**Ruling: wait for 7.1** (#35). Replacing `nest build` is trivial —
+`nest-cli.json` adds nothing over `tsc` but `deleteOutDir` — but replacing
+`nest start --watch` means hand-building the daily development loop, and the
+measured prize is seven seconds against a four-minute test suite.
+
+### Prisma 7 caused three regressions; none was absorbed
+
+1. **Fail-fast on a bad connection was gone.** The driver adapter connects
+   lazily, so `$connect()` resolves against a pool that has opened no socket and
+   an unreachable database boots "successfully", failing at the first player
+   action. FR-013 requires exiting non-zero at boot, and Prisma 5 satisfied it
+   because the engine connected eagerly. `onModuleInit` now issues one trivial
+   query to force the real connection while the process can still refuse to
+   start.
+2. **A duplicate email became a 500.** `P2002` is unchanged but the constraint
+   name moved, from `meta.target` to
+   `meta.driverAdapterError.cause.constraint.index`. Both shapes are now read,
+   pinned at the unit level by a spec watched failing first — the integration
+   test that caught it needs a live database and a booted app, so it is the
+   slowest place to notice and cannot say which shape broke.
+3. **The built image would not start.** Prisma 7 writes relative imports with an
+   explicit `.ts` extension and TypeScript does not rewrite one, so the output
+   required `./internal/class.ts` beside the emitted `class.js`. The image built
+   clean and 6,400 tests passed; the container died on its first `require` of
+   the client. `rewriteRelativeImportExtensions` fixes it, confirmed by
+   mutation.
+
+**Correction, recorded because the reasoning was wrong twice before it was
+right:** the third cause was attributed first to the Dockerfile's `COPY` order
+and then to the generator inspecting `tsconfig.json`. Both were disproved by
+experiment — the reorder changed nothing, and regenerating locally with the
+tsconfig hidden produced identical output. The actual situation is that Prisma
+7.10 always emits `.ts` specifiers, and the local tree that suggested otherwise
+was stale. A Dockerfile reorder made on the strength of the first wrong
+explanation was reverted. The comments and the guard now state only what was
+verified by removing the fix and watching the container break again.
+
+**The generated client lives outside `src/`** and is git-ignored. Two citation
+guards and the user-repository boundary invariant all walk `backend/src` for
+`.ts` files, and generating into it would put thousands of generated files
+inside all three. `src/prisma/client.ts` is the single re-export naming the
+output path, so 34 importers never do.
+
+**`Prisma.dmmf` is removed in 7.** The three schema-drift guards that used it
+now read `prisma/schema.prisma` directly, which is the stronger check and the
+one this project's own rule asks for: re-read the ORIGINAL, not a generated
+artifact that can only confirm generation ran. The parser has its own spec,
+including a "finds the models at all" case so the guards cannot pass vacuously.
+
+### Two safety findings, both about test runs reaching the wrong database
+
+- **`database-url.ts` identified a test run by `JEST_WORKER_ID`.** Vitest sets
+  `VITEST_WORKER_ID` and never that, so the check silently stopped matching the
+  moment the runner changed — leaving `NODE_ENV === 'test'` as the only thing
+  between a test run and the development database, which is the exact failure
+  that function exists to prevent and had already been written for once. Vitest
+  does set `NODE_ENV=test`, so nothing broke, but the protection would have
+  rested on a runner default. Both runners are recognised now, pinned by tests
+  watched failing first: without the fix they resolved to `ge`, not `ge_test`.
+- **Prisma 7 refuses a destructive `db push --force-reset` when it detects an
+  AI agent** and demands explicit user consent naming the exact command and its
+  consequences. Rick consented for the local `ge_test` database on 2026-09-11.
+  Worth knowing before anyone wonders why a test run suddenly fails with a wall
+  of text: this is Prisma's guard working, not a defect.
+
+**Alternatives rejected:** forcing Nest 12 with `.npmrc legacy-peer-deps`
+(disables peer checking monorepo-wide, permanently, to work around one
+package); replacing `@nestjs/throttler` (it guards login against brute force and
+a hand-rolled replacement is very likely worse than a maintained library);
+taking TypeScript 7 now and rebuilding the dev loop (seven seconds, against the
+CLI's own statement that the limitation is temporary).
