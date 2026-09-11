@@ -13,15 +13,16 @@
  */
 
 import { BEACON_EVENT, BeaconEvent } from '../../src/gateway/events/beacon.event';
-import { PHYSICS_SECTOR_TRANSITION_EVENT } from '../../src/game/tick/sector-transition.subscriber';
+import { PHYSICS_SECTOR_TRANSITION } from '../../src/game/physics/physics-events';
+import { UNIVMAX } from '../../src/game/constants';
 
 describe('T043 — beacon socket event smoke test', () => {
   it('BEACON_EVENT constant equals "beacon"', () => {
     expect(BEACON_EVENT).toBe('beacon');
   });
 
-  it('PHYSICS_SECTOR_TRANSITION_EVENT is defined', () => {
-    expect(PHYSICS_SECTOR_TRANSITION_EVENT).toBeTruthy();
+  it('PHYSICS_SECTOR_TRANSITION names the event the gateway listens for', () => {
+    expect(PHYSICS_SECTOR_TRANSITION).toBe('physics.sector-transition');
   });
 
   it('BeaconEvent shape has required fields', () => {
@@ -37,9 +38,22 @@ describe('T043 — beacon socket event smoke test', () => {
     expect(typeof event.toSector).toBe('number');
   });
 
-  it('sector-flat encoding: toSector = y * MAXX + x (MAXX=30)', () => {
-    const MAXX = 30;
-    const sector = { x: 5, y: 3 };
-    expect(sector.y * MAXX + sector.x).toBe(95);
+  /**
+   * The flattening is over the GALAXY, not the scan map. MAXX=30 and MAXY=15
+   * are the character dimensions of the ASCII viewport; the galaxy runs
+   * -UNIVMAX..+UNIVMAX on both axes. This test used to assert
+   * `y * 30 + x`, which is the MAXX-as-galaxy mistake in test form — it passed
+   * because it checked its own arithmetic rather than the encoding the
+   * gateway actually emits.
+   * @see src/gateway/sector-transition.ts  @see backend/src/game/CLAUDE.md §2
+   */
+  it('sector-flat encoding spans the galaxy, not the scan viewport', () => {
+    const side = UNIVMAX * 2 + 1;
+    const flatten = (s: { x: number; y: number }) => (s.y + UNIVMAX) * side + (s.x + UNIVMAX);
+    expect(flatten({ x: -UNIVMAX, y: -UNIVMAX })).toBe(0);
+    expect(flatten({ x: UNIVMAX, y: UNIVMAX })).toBe(side * side - 1);
+    // Distinct cells must not collide — the 30-wide flattening aliased every
+    // pair of cells 30 apart on x into one sector id.
+    expect(flatten({ x: 0, y: 1 })).not.toBe(flatten({ x: 30, y: 0 }));
   });
 });
