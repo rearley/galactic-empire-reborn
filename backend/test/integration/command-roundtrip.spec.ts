@@ -17,6 +17,7 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ScanCell } from '../../src/game/commands/command.types';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -29,31 +30,18 @@ function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promi
 }
 
 function makeShipState(overrides: { userid: string; shipno: number; shipname: string; topspeed?: number }): ShipState {
-  return {
+  return baseMakeShip({
     userid: overrides.userid,
     shipno: overrides.shipno,
     shipname: overrides.shipname,
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
     // phasrtype:1, shieldtype:1 (not 0). ShipStateService.onModuleInit
     // self-heals phasrtype/shieldtype 0 → 1 and marks the ship dirty, which
     // would falsely fail "no ship.update calls" assertions.
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0,
+    phasrtype: 1,
+    shieldtype: 1,
+    status: 0,
     topspeed: overrides.topspeed ?? 5,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  });
 }
 
 describe('command round-trip integration (US1)', () => {
