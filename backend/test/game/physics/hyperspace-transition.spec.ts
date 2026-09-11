@@ -23,25 +23,20 @@
 
 import { applyHyperspaceTransition } from '../../../src/game/physics/hyperspace';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 3, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: -1, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  };
+  return baseMakeShip({
+    shipname: 'T',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasrtype: 1,
+    shieldtype: 3,
+    lock: -1,
+    topspeed: 10,
+    ...over,
+  });
 }
 
 describe('entering hyperspace — GEFUNCS.C:588-612', () => {

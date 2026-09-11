@@ -66,6 +66,7 @@ import { shipKey, type ShipState } from '../../../src/game/ship/ship-state.types
 import type { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import type { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind, type TickContext } from '../../../src/game/tick/tick.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 type PhysicsModule = typeof import('../../../src/game/physics/physics-tick.service');
 type ConstantsModule = typeof import('../../../src/game/constants');
@@ -106,28 +107,23 @@ const INSET = 0.05;
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   const heading = overrides.heading ?? 0;
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Wanderer', shpclass: 1,
-    heading, head2b: overrides.head2b ?? heading,
-    speed: STEP_SPEED, speed2b: STEP_SPEED,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Wanderer',
+    heading: heading,
+    head2b: overrides.head2b ?? heading,
+    speed: STEP_SPEED,
+    speed2b: STEP_SPEED,
+    energy: 50_000,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    topspeed: 10,
     // Canon's `zothusn`. Slot 0 moves on the first 1-second tick.
     channel: 0,
     ...overrides,
-  };
+  });
 }
 
 interface Harness {
