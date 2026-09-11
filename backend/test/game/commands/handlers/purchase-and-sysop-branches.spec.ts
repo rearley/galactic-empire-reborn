@@ -30,6 +30,7 @@ import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-c
 import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { MAXSHIPS, UNIVMAX } from '../../../../src/game/constants';
 import { NUMITEMS, I_TORP } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 const ctx: CommandContext = {};
 
@@ -37,25 +38,22 @@ const ctx: CommandContext = {};
 const AT_ZYGOR = 11;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'usr_buyer', shipno: 1, shipname: 'Test', shpclass: 4,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0.5, ycoord: 0.5, damage: 0, energy: 65000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: AT_ZYGOR, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'usr_buyer',
+    shipname: 'Test',
+    shpclass: 4,
+    xcoord: 0.5,
+    ycoord: 0.5,
+    energy: 65000,
+    phasr: 100,
+    phasrtype: 1,
+    shieldtype: 1,
+    where: AT_ZYGOR,
     items: new Array<bigint>(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 7, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    topspeed: 7,
     username: 'Sysop',
-    dirty: false, ...over,
-  } as ShipState;
+    ...over,
+  });
 }
 
 interface FakeClass {

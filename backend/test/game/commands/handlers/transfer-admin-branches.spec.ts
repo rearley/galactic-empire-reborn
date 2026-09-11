@@ -70,6 +70,7 @@ import type { ShipStateService } from '../../../../src/game/ship/ship-state.serv
 import type { ShipState } from '../../../../src/game/ship/ship-state.types';
 import type { CommandContext, CommandResult } from '../../../../src/game/commands/command.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 import {
   NUMITEMS, I_FOOD, I_GOLD, I_ION, I_MEN, I_TORP,
 } from '../../../../src/game/constants/items';
@@ -83,25 +84,19 @@ const PLNUM = 1;
 const KEY = planetKey(XSECT, YSECT, PLNUM);
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'trader', shipno: 1, shipname: 'Trader', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: XSECT + 0.5, ycoord: YSECT + 0.5, damage: 0, energy: 50_000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 10 + PLNUM, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'trader',
+    shipname: 'Trader',
+    xcoord: XSECT + 0.5,
+    ycoord: YSECT + 0.5,
+    energy: 50_000,
+    phasrtype: 1,
+    where: 10 + PLNUM,
     items: new Array<bigint>(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    maxTons: 1_000, dirty: false,
+    topspeed: 10,
+    maxTons: 1_000,
     ...over,
-  } as unknown as ShipState;
+  });
 }
 
 function makePlanet(over: Partial<PlanetState> = {}): PlanetState {

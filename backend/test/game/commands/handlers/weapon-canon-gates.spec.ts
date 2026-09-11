@@ -10,6 +10,7 @@ import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-c
 import { Mulberry32Adapter } from '../../../../src/game/combat/random.port';
 import { DECOYTIME, MAXDECOY, MISENGFC } from '../../../../src/game/constants';
 import { I_DECOY, I_MISSL } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function itemsWith(map: Record<number, bigint>): bigint[] {
   const arr: bigint[] = [];
@@ -19,25 +20,16 @@ function itemsWith(map: Record<number, bigint>): bigint[] {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 100000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Test',
+    energy: 100000,
+    phasr: 100,
+    phasrtype: 1,
     items: itemsWith({ [I_MISSL]: 5n, [I_DECOY]: 3n }),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+    topspeed: 10,
     channel: over.channel ?? over.shipno ?? 1,
-  };
+    ...over,
+  });
 }
 
 function makeShipState(ships: ShipState[]): ShipStateService {

@@ -49,6 +49,7 @@ import type { CommandResult } from '../../../../src/game/commands/command.types'
 import type { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { PMINFIRE } from '../../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 interface ClassRow {
   classNumber: number;
@@ -98,24 +99,16 @@ function makeUser(over: Partial<UserRow> = {}): UserRow {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'captain1', shipno: 1, shipname: 'USS Test', shpclass: 1,
-    heading: 270, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 3.25, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [100, 200, 300], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    userid: 'captain1',
+    shipname: 'USS Test',
+    heading: 270,
+    xcoord: 5.5,
+    ycoord: 3.25,
+    freq: [100, 200, 300],
+    status: 0,
     ...over,
-  } as unknown as ShipState;
+  });
 }
 
 interface Harness {
