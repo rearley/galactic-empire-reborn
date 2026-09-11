@@ -2,7 +2,7 @@
  * Builds a GameGateway for unit tests with every dependency defaulted to an
  * inert double, overridable by NAME rather than position.
  *
- * This exists because the gateway's constructor takes 11 positional arguments
+ * This exists because the gateway's constructor takes ten positional arguments
  * and 43 test files were calling it directly. Every restructure task that adds
  * or removes a dependency would otherwise be a 43-file diff no reviewer could
  * read. Change the constructor, change this file; the specs do not move.
@@ -114,18 +114,18 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
       ),
   };
 
+  // `wsAuthGuard`, `events` and `presence` stay in `GatewayDeps` — and stay
+  // overridable by name — because `ConnectionLifecycleService` is built from
+  // them above. The gateway itself no longer takes any of the three.
   return new GameGateway(
     deps.shipStateService,
     deps.commandRouter,
     deps.registry,
-    deps.wsAuthGuard,
     deps.prisma,
     deps.onboardingService,
     deps.scanHandler,
     deps.shipClassCache,
     deps.random,
-    deps.events,
-    deps.presence,
     deps.shipDestroyed,
     deps.connectionLifecycle,
   );

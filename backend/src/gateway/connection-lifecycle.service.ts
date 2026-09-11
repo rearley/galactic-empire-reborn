@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { Ship } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipStateService } from '../game/ship/ship-state.service';
 import { ShipClassCacheService } from '../game/physics/ship-class-cache.service';
@@ -429,14 +430,14 @@ export class ConnectionLifecycleService {
     host: LifecycleHost,
     client: GameSocket,
     userid: string,
-    ship: { shipno: number; shipname: string; shpclass: number; xcoord: number; ycoord: number; damage: number; energy: number; heading: number; speed: number; where: number; [key: string]: unknown },
+    ship: Ship,
   ): Promise<void> {
     const shipId = shipKey(userid, ship.shipno);
 
     // Hydrate into memory if not already loaded
     if (!this.shipStateService.get(userid, ship.shipno)) {
       const { prismaShipToState } = await import('../game/ship/ship-state.mappers');
-      const state = prismaShipToState(ship as never);
+      const state = prismaShipToState(ship);
       // In the delete-model a dead hull (damage >= 100) is removed from the world,
       // so such a row should not normally reach here. If one does (race with the
       // death-delete that hasn't completed yet), do NOT resurrect it — treat it as

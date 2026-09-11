@@ -29,6 +29,7 @@ import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { MAX_SOCKETS_PER_USER } from '../../src/gateway/socket-cap';
 import { MAXPLRS, GESTAT_USER } from '../../src/game/constants';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
+import type { Ship } from '@prisma/client';
 import type { GameSocket } from '../../src/gateway/types';
 
 const USERID = 'u1';
@@ -128,7 +129,13 @@ function build(over: Partial<Deps> = {}) {
   return { svc, shipStateService, registry, wsAuthGuard, prisma, scanHandler, shipClassCache, random, eventsBus, presence };
 }
 
-const shipRow = (shipno = 1, extra: Record<string, unknown> = {}) => ({
+/**
+ * `boardShipAndWelcome` takes a real Prisma `Ship` row — that is what
+ * `ship.findMany`/`findFirst` hand it in production. The double carries only
+ * the columns the boarding path reads, so the cast is at the spec boundary
+ * rather than a loosened parameter type in the service.
+ */
+const shipRow = (shipno = 1, extra: Record<string, unknown> = {}): Ship => ({
   userid: USERID,
   shipno,
   shipname: `Ship${shipno}`,
@@ -143,7 +150,7 @@ const shipRow = (shipno = 1, extra: Record<string, unknown> = {}) => ({
   status: GESTAT_USER,
   items: new Array<bigint>(16).fill(0n),
   ...extra,
-});
+} as unknown as Ship);
 
 const liveShip = (extra: Record<string, unknown> = {}) => ({
   userid: USERID,
