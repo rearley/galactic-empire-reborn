@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-11 — Phase 4 close-out: the frontend, verified](#2026-09-11--phase-4-close-out-the-frontend-verified)
 - [2026-09-11 — Phase 3 close-out: the persistence boundary, verified](#2026-09-11--phase-3-close-out-the-persistence-boundary-verified)
 - [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
 - [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
@@ -5774,3 +5775,67 @@ any time; independent of Phase 5.
   is in no module and would break sector transitions if wired), #19
   (`fixture-domains` reads `topspeed: 8_000` as `8` and validates it), #20 (a
   fixture sets two fields that exist nowhere).
+
+## 2026-09-11 — Phase 4 close-out: the frontend, verified
+
+**Completed:** independent verification of Phase 4 (frontend restructure) —
+`App.tsx` decomposed into three new hook/feature modules
+(`hooks/useEventLog.ts`, `hooks/useFkeys.ts`, `hooks/useScanMap.ts`,
+`features/combat/combatNarration.ts`); Task 4 only, no new feature code.
+
+This is the one phase in the restructure whose scope was derived from the
+code, not the spec: Phase 4's own spec entry states no goal, only an
+observation — "3,521 lines across 43 files. `App.tsx` at 388 is the largest."
+The 12 `socket.on` subscriptions and 15 hook calls found by reading the file
+are what Tasks 1-3 actually addressed.
+
+Measured directly against `1d76d70` (phase start, the plan commit) and `HEAD`
+(phase end):
+
+| Metric | Phase start | Now |
+|---|---|---|
+| `frontend/src/App.tsx` lines | 388 | 221 (43% reduction) |
+| `socket.on` calls in `App.tsx` | 12 | 4 |
+| hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in `App.tsx` | 15 | 3 |
+| `frontend/src` files (`.ts`/`.tsx`) | 42 | 46 |
+| frontend suite | 39 files / 299 tests | 43 files / 336 tests |
+
+`App.tsx` shrank meaningfully (43%) but did not lose its socket-subscription
+role entirely. Four `socket.on` calls remain, deliberately:
+`combat.phaser-fired`, `combat.hit`, `combat.ship-destroyed`,
+`combat.decoy-intercept`. All four need the live player roster that only
+`App.tsx` holds; extracting them would mean threading that roster into a new
+hook for no simplification. Phase 4 moved eight of twelve subscriptions out,
+it did not eliminate the pattern.
+
+**Tests:** frontend suite run via `npm test`, exit 0: 43 test files / 336
+tests, all passing — matches the phase's own claim exactly. Backend suite run
+as a regression check (this phase touched no backend code) in one tracked
+`npx jest` process, never backgrounded: `Ran all test suites.` printed
+exactly once, 623 suites / 6,356 tests, all passing — unchanged from Phase
+3's close-out numbers, as expected. Both `backend/Dockerfile` and
+`frontend/Dockerfile` build clean from the repo root. Deploy gate unchanged
+in this phase's own range (`1d76d70..HEAD`): `git diff --name-only
+1d76d70..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
+on `branches: [master]` and `if: github.event_name == 'push'`; `git diff
+master -- VERSION` is empty.
+
+**Decisions made:** none new by this close-out; one correction made mid-phase
+and recorded in `docs/DECISIONS.md` 2026-09-11 ("Phase 4 plan corrected —
+the canon-citation ratchet does not scan `frontend/`") — the plan originally
+claimed `backend/test/balance/canon-citations.balance.spec.ts` scans the
+whole repo and would fail on a dropped frontend citation. It does not;
+`SOURCE_FILES` walks only `backend/src` and `backend/test`. The 45 canon
+citations in `frontend/` are checked by nothing, and every one moved in this
+phase was verified by hand rather than by a guard. Corrected in the plan at
+commit `dcdb521`. Filed as issue #22.
+
+**Next:** Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky). Can start any
+time.
+
+**Known issues:**
+- Issue #22 — 45 canon citations in `frontend/` are invisible to the
+  citation ratchet (see above).
+- Issue #23 — backend Jest global setup resets the shared `ge_test` database
+  on any invocation, including a single read-only spec.
+- Issue #24 — a test docblock cites a guard that has never existed.

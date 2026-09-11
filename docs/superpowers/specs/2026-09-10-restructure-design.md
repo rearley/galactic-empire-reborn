@@ -1,6 +1,6 @@
 # Restructure spec
 
-**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 4 next.
+**Branch:** `restructure`. **Started:** 2026-09-10. **Status:** phase 5 next.
 
 This is the SPEC for the restructure and the recovery document for a lost session.
 Executable per-phase plans live beside it in `docs/superpowers/plans/2026-09-10-restructure-phase-N-*.md`. If a session is lost or
@@ -349,17 +349,27 @@ gate (`branches: [master]`, `if: github.event_name == 'push'`) unchanged in
 this phase's own `8af4ed2..HEAD` range, `VERSION` unchanged. Full before/after
 table in `docs/PROGRESS.md` 2026-09-11.
 
-### Phase 4 — frontend restructure
+### Phase 4 — frontend restructure — COMPLETE 2026-09-11
 
-- [ ] 3,521 lines across 43 files. `App.tsx` at 388 is the largest.
+- [x] 3,521 lines across 43 files. `App.tsx` at 388 is the largest. Scope was
+  derived from reading `App.tsx` itself (12 `socket.on` calls, 15 hooks),
+  since this is the one phase whose spec entry states no goal — see
+  `docs/DECISIONS.md` 2026-09-11. Result: `App.tsx` 388 → 221 lines (43%),
+  `socket.on` calls 12 → 4 (the four remaining need the player roster and
+  stayed deliberately), hook calls 15 → 3, extracted into
+  `hooks/useEventLog.ts`, `hooks/useFkeys.ts`, `hooks/useScanMap.ts`, and
+  `features/combat/combatNarration.ts`.
 
-Runs in parallel with 2 and 3, any time after phase 1.
+Ran in parallel with 2 and 3, any time after phase 1.
 
 **No headroom on the citation ratchet.** `backend/test/balance/canon-citations.balance.spec.ts`
 sits exactly at its `TOTAL_FLOOR` (3355 = 3355) as of the Phase 3 close-out.
 That is by design, but it means the first commit in this phase that touches
 any cited line will fail until `TOTAL_FLOOR` is re-measured — this is
-expected, not a regression, and is not something Phase 3 introduced.
+expected, not a regression, and is not something Phase 3 introduced. **This
+ratchet does not cover `frontend/` at all** — the plan originally claimed
+otherwise; corrected at commit `dcdb521`, filed as issue #22, full account in
+`docs/DECISIONS.md` 2026-09-11.
 
 ### Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky)
 
