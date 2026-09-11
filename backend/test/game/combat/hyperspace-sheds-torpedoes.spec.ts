@@ -36,27 +36,23 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { MAXTORPS, MAXMISSL } from '../../../src/game/constants';
 import { findFreeTorpSlot } from '../../../src/game/combat/projectile-slots';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'p1', shipno: 1, shipname: 'QuiteCat', shpclass: 2,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50_000,
-    phasr: 100, phasrtype: 5, kills: 0, lastfired: 0,
-    shieldtype: 4, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'p1',
+    shipname: 'QuiteCat',
+    shpclass: 2,
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50_000,
+    phasr: 100,
+    phasrtype: 5,
+    shieldtype: 4,
     items: Array.from({ length: NUMITEMS }, () => 0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 20, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    topspeed: 20,
     ...over,
-  } as ShipState;
+  });
 }
 
 /** Two torpedoes closing, one decoy out, one missile inbound. */

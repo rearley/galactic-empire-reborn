@@ -16,30 +16,26 @@ import { MineHandlerService } from '../../../src/game/commands/handlers/mine.han
 import { MineTableFullError } from '../../../src/game/combat/mine.repository';
 import { MessageId, formatMessage } from '../../../src/game/commands/messages';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const I_MINE_IDX = 11; // GEMAIN.H:154
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   const items = Array(14).fill(0n) as bigint[];
   items[I_MINE_IDX] = 5n;
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Layer', shpclass: 1, channel: 3,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 5.5, damage: 0, energy: 60000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: -1,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items,
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Layer',
+    channel: 3,
+    xcoord: 5.5,
+    ycoord: 5.5,
+    energy: 60000,
+    phasrtype: 1,
+    lastfired: -1,
+    shieldtype: 1,
+    items: items,
+    topspeed: 10,
     ...over,
-  } as ShipState;
+  });
 }
 
 describe('mine — galaxy table full', () => {
