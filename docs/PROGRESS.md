@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 93 entries.
+Append-only, **newest at the bottom**. 94 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible](#2026-09-11--correction-to-the-phase-4-close-out-the-roster-claim-was-wrong-for-two-of-four-handlers-and-the-hook-count-metric-was-not-reproducible)
 - [2026-09-11 — Phase 4 close-out: the frontend, verified](#2026-09-11--phase-4-close-out-the-frontend-verified)
 - [2026-09-11 — Phase 3 close-out: the persistence boundary, verified](#2026-09-11--phase-3-close-out-the-persistence-boundary-verified)
 - [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
@@ -5839,3 +5840,69 @@ time.
 - Issue #23 — backend Jest global setup resets the shared `ge_test` database
   on any invocation, including a single read-only spec.
 - Issue #24 — a test docblock cites a guard that has never existed.
+
+## 2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible
+
+**Completed:** nothing new. This is a correction to the 2026-09-11 "Phase 4
+close-out: the frontend, verified" entry above, found during the final
+whole-branch review of Phase 4. Two claims in that entry do not hold up
+against the code as it stands at `HEAD`.
+
+**Correction one — the roster claim.** That entry said the four surviving
+`socket.on` calls in `App.tsx` — `combat.phaser-fired`, `combat.hit`,
+`combat.ship-destroyed`, `combat.decoy-intercept` — "All four need the live
+player roster that only `App.tsx` holds." That is false for two of the four,
+checked directly against the handlers:
+
+| handler | reads the roster (`players`)? |
+|---|---|
+| `combat.hit` (`App.tsx:88-91`) | yes — `ctx.shipName` → `players.find` |
+| `combat.ship-destroyed` (`App.tsx:93-108`) | yes — `players.find` directly |
+| `combat.phaser-fired` (`App.tsx:83-86`) | no — `phaserFiredLine` ignores both its parameters and returns `null` unconditionally (`combatNarration.ts:42-47`) |
+| `combat.decoy-intercept` (`App.tsx:118-125`) | no — reads only `event` and `localShipId` |
+
+The honest reason all four stayed in `App.tsx` is cohesion: they are combat
+narration, and two of them do need the roster, so splitting the other two
+into their own hook would separate siblings for no gain. Cohesion is a fine
+reason. It is not the reason the close-out entry gave. This sentence
+originated in the close-out brief, not in independent verification, and the
+close-out repeated it without checking. `docs/superpowers/specs/2026-09-10-restructure-design.md`
+carried the same claim in its Phase 4 checklist line and has been corrected
+in place (it is not append-only).
+
+**Correction two — the hook-count metric.** That entry's table reported
+"hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in
+`App.tsx`: 15 → 3." No definition of "hook calls in `App.tsx`" reproduces a
+3. Measured directly against `1d76d70` (phase start) and `HEAD` (phase end)
+with `grep -noE '\b(use[A-Z][A-Za-z]*)(<[^>]*>)?\('`, filtered by hand to the
+relevant set:
+
+| reading | start | now |
+|---|---|---|
+| the five primitives, whole file | 14 | 2 |
+| the five primitives, `Terminal` only | 13 | 1 |
+| every hook call (primitives + custom hooks: `usePlayerList`, `useSocket`, `useEventLog`, `useScanMap`, `useFkeys`), `Terminal` only | 15 | 6 |
+
+The third reading is the only one that reproduces the "15" baseline the
+entry itself claims (`Terminal` is where every hook call in the file already
+lived, even at phase start — `App`'s own body has never held one but a
+single `useEffect`). Under that same reading the end-state figure is 6, not
+3: `usePlayerList`, `useEventLog`, `useSocket`, `useScanMap`, `useFkeys`, and
+one remaining `useEffect` (the combat-subscription effect). No reading in
+the table above produces a 3. The honest figure for this metric is **15 →
+6**, counting every hook call — primitive or custom — in the `Terminal`
+component, the only place in the file that calls hooks at all.
+
+**Tests:** none — no code changed. `npx tsc --noEmit` and the frontend Jest
+suite were re-run after adding one code comment as a separate item on the
+same branch (see the entry, if any, immediately following this one); both
+passed.
+
+**Decisions made:** none new. This is a correction of record, not a design
+change — the four `socket.on` calls stay together in `App.tsx` for
+cohesion, as before.
+
+**Next:** nothing — closes the two findings this entry addresses out of the
+final whole-branch review of Phase 4.
+
+**Known issues:** none new.

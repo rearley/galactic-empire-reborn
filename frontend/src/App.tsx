@@ -59,6 +59,14 @@ export function App(): React.JSX.Element {
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
 
+  // Reads only `players`, which the combat effect below (:134) lists in its
+  // dep array — that's what keeps this closure current without re-running
+  // the effect on every render. Nothing enforces that invariant if a future
+  // edit makes this read something else: `react-hooks/exhaustive-deps` is
+  // not enabled anywhere in this repo (`.oxlintrc.json` loads no React
+  // plugin), so a stale closure here would compile, lint clean, and pass
+  // review on a diff. If `shipName` starts reading anything beyond
+  // `players`, add it to that dep array by hand.
   const shipName = (shipId: string): string => {
     return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];
   };
