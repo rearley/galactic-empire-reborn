@@ -375,17 +375,54 @@ ratchet does not cover `frontend/` at all** — the plan originally claimed
 otherwise; corrected at commit `dcdb521`, filed as issue #22, full account in
 `docs/DECISIONS.md` 2026-09-11.
 
-### Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky)
+### Phase 5 — Prisma 7, NestJS 12, Vitest, TypeScript 7 (behaviour-risky)
 
-- [ ] Backend CommonJS → ESM.
-- [ ] Prisma 5 → 7 (Rust-free client, driver adapters, client generated into the
-      source tree). Requires ESM.
-- [ ] NestJS 10 → 12 via `nest upgrade`. Requires Node 20.19+/22.12+.
-- [ ] Jest → Vitest on the backend (Nest 12's toolchain; also unblocks TS 7).
-- [ ] TypeScript 6 → 7 once ts-jest is gone. 8-12x faster builds on 137k lines.
+**(2026-09-11 CORRECTION — the ESM premise was wrong, and ESM is out of scope.)**
+This section previously read "ESM, Prisma 7, NestJS 12" and listed
+"Backend CommonJS → ESM" first, justified by "Prisma 5 → 7 … Requires ESM."
+**That requirement does not exist.** It was checked before planning rather than
+trusted, on this machine, against this database:
+
+- **Prisma 7.10.0 runs under CommonJS.** The `prisma-client` generator takes
+  `moduleFormat = "cjs"`; the generated client, compiled with `module:
+  commonjs`, plus `@prisma/adapter-pg`, executed a real query against `ge_test`
+  and returned a row. Prisma's own upgrade guide says to set
+  `"type": "module"` and does not mention `moduleFormat`, which is why reading
+  the documentation alone would have produced the wrong plan.
+- **NestJS 12 supports CommonJS**, in its migration guide's own words: "a
+  CommonJS application can upgrade to v12 and stay CommonJS for as long as you
+  like."
+- **TypeScript 7.0.2 supports CommonJS** and still emits
+  `design:paramtypes` under `emitDecoratorMetadata`, so Nest's DI survives. The
+  only thing it removes is `moduleResolution: "node"` (node10).
+
+So **nothing in this phase forces ESM**; it was an independent choice resting
+on a false dependency. Rick ruled on 2026-09-11 to drop it and keep CommonJS,
+on the grounds that it is the largest and riskiest item in the phase (55
+`__dirname`/`__filename` uses, 27 `require()` calls, 50 `jest.mock` uses across
+642 test files) and buys nothing the other four upgrades need.
+
+- [ ] `moduleResolution: "node"` → `"bundler"`, dropping the
+      `ignoreDeprecations: "6.0"` escape hatch. Verified to compile under
+      TypeScript 6 with `module: commonjs`, so it lands first and alone. This is
+      also the phase-0 blocker that kept backend oxlint syntax-only.
+- [ ] NestJS 10 → 12. Requires Node 20.19+/22.12+ (we run 24). **Lifecycle
+      hooks now fire by component hierarchy level**, and this app runs both game
+      heartbeats out of lifecycle hooks — the one item here with a named
+      behaviour risk.
+- [ ] Prisma 5 → 7 on CommonJS: `prisma-client` generator with
+      `moduleFormat = "cjs"`, client generated into the source tree, `url`
+      removed from the datasource block and moved to `prisma.config.ts`, and a
+      `@prisma/adapter-pg` driver adapter passed to the client constructor.
+      197 specs touch Prisma.
+- [ ] Jest → Vitest on the backend. Needed before TypeScript 7 because ts-jest
+      declares `typescript: ">=4.3 <7"`, which is the real blocker the original
+      note guessed at.
+- [ ] TypeScript 6 → 7 once ts-jest is gone.
+- [ ] ~~Backend CommonJS → ESM~~ — struck 2026-09-11, see the correction above.
 
 Last because it is the **only** phase that can change runtime behaviour, and it
-needs the test suite as an unambiguous oracle. 197 specs touch Prisma.
+needs the test suite as an unambiguous oracle.
 
 ## Pause condition
 
