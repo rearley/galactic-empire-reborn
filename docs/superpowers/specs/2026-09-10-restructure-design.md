@@ -273,6 +273,14 @@ issue. **Phase 2 (or a fix commit ahead of it) must resolve this before any
 Docker image is rebuilt from this branch** — it is not a phase-1-in-progress
 state, it is phase 1 shipping without one of its own exit criteria met.
 
+**RESOLVED 2026-09-11, `540f65f`** — before phase 2 started, as this entry
+required. Both Dockerfiles now take the repo root as build context
+(`docker build -f backend/Dockerfile .`), build `packages/wire` as its own
+stage, and `@ge/wire` was verified resolvable inside the running backend
+image. CI's `context:`/`file:` pair was updated to match. Phase 1's exit
+criteria are met as of this commit; the gap above is kept as the record of
+how it was missed.
+
 The five defects the typing surfaced and the one accepted behaviour change
 are recorded in `docs/DECISIONS.md` 2026-09-11, not here.
 
