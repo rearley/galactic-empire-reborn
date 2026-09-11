@@ -79,12 +79,13 @@ export class ScanHandlerService {
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,
     /**
-     * The wormhole repository. `@Optional()` with a default built over the
-     * same client this class already holds, for the same reason as `users`
-     * above: the many direct `new ScanHandlerService(...)` test constructions
-     * keep compiling, and keep asserting on the same `prisma.wormhole.*`
-     * calls now made through it. Nest injects the shared provider in
-     * production.
+     * The wormhole repository. `@Optional()` with a default built over
+     * `prisma`, for the same reason as `users` above — `prisma` itself has no
+     * live call left in this class; it is kept purely to seed these
+     * `@Optional()` defaults, so the many direct
+     * `new ScanHandlerService(...)` test constructions keep compiling, and
+     * keep asserting on the same `prisma.wormhole.*` calls now made through
+     * it. Nest injects the shared provider in production.
      */
     @Optional()
     private readonly wormholes: WormholeRepository = new WormholeRepository(prisma),

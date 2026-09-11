@@ -1,6 +1,6 @@
 import { DatHandlerService } from '../../../src/game/commands/handlers/dat.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
-import { PrismaService } from '../../../src/prisma/prisma.service';
+import { TeamRepository } from '../../../src/game/team/team.repository';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext, CommandResult } from '../../../src/game/commands/command.types';
 
@@ -50,10 +50,10 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 
 function makeHandler(ships: ShipState[], teamname?: string): DatHandlerService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
-  const prismaMock = {
-    team: { findFirst: jest.fn().mockResolvedValue(teamname ? { teamname } : null) },
-  } as unknown as PrismaService;
-  return new DatHandlerService(shipSvc, prismaMock);
+  const teamsMock = {
+    findNameByCode: jest.fn().mockResolvedValue(teamname ? { teamname } : null),
+  } as unknown as TeamRepository;
+  return new DatHandlerService(shipSvc, teamsMock);
 }
 
 const ctx: CommandContext = {};

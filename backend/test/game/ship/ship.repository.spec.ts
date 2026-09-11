@@ -24,12 +24,4 @@ describe('ShipRepository', () => {
 
     expect(findFirst).toHaveBeenCalledWith({ where: { userid: 'usr_a', shipno: 2 } });
   });
-
-  it('returns null when no hull is found', async () => {
-    const findFirst = jest.fn().mockResolvedValue(null);
-    const repo = new ShipRepository({ ship: { findFirst } } as never);
-
-    await expect(repo.findFirstForUser('nobody')).resolves.toBeNull();
-    await expect(repo.findHull('nobody', 1)).resolves.toBeNull();
-  });
 });

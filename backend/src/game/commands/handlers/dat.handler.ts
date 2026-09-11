@@ -1,5 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Injectable } from '@nestjs/common';
 import { TeamRepository } from '../../team/team.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -39,16 +38,7 @@ const CARGO_LABELS = [
 export class DatHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
-    private readonly prisma: PrismaService,
-    /**
-     * The team repository, `@Optional()` with a default built over the same
-     * client this class already holds, so the suite's direct
-     * `new DatHandlerService(...)` sites keep compiling and keep asserting on
-     * the same `prisma.team.findFirst` call, now made through it.
-     * `TeamRepository` is stateless and constructible from `(prisma)` alone.
-     */
-    @Optional()
-    private readonly teams: TeamRepository = new TeamRepository(prisma),
+    private readonly teams: TeamRepository,
   ) {}
 
   get command(): Command {
