@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { UserRepository } from '../player/user.repository';
 import { ShipStateService } from './ship-state.service';
 import { ShipState } from './ship-state.types';
-import { PlanetStateService } from '../planet/planet-state.service';
+import { PLANET_STATE_PORT, type PlanetStatePort } from '../planet/planet-state.port';
 import { MAINT_COST_NORMAL, MAINT_COST_NEUTRAL } from '../commands/_ship-management-constants';
 
 /** Planet index of the Zygor galactic market in the neutral zone (sector 0,0). */
@@ -37,7 +37,7 @@ export type GateResult =
 export class MaintenanceService {
   constructor(
     private readonly shipState: ShipStateService,
-    private readonly planetService: PlanetStateService,
+    @Inject(PLANET_STATE_PORT) private readonly planetService: PlanetStatePort,
     private readonly users: UserRepository,
   ) {}
 

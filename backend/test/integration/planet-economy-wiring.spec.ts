@@ -3,7 +3,7 @@ import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { PlanetEconomyService } from '../../src/game/planet/planet-economy.service';
-import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { SHIP_STATE_PORT, type ShipStatePort } from '../../src/game/ship/ship-state.port';
 import { RANDOM, MathRandomAdapter } from '../../src/game/combat/random.port';
 import { planetKey } from '../../src/game/planet/planet-state.types';
 import { I_FOOD, I_MEN, NUMITEMS } from '../../src/game/constants/items';
@@ -34,7 +34,8 @@ describe('PlanetStateService — economy service is wired in production', () => 
         PlanetStateService,
         PlanetEconomyService,
         { provide: RANDOM, useClass: MathRandomAdapter },
-        { provide: ShipStateService, useValue: { get: () => undefined } },
+        // The seam is the narrow SHIP_STATE_PORT, not the whole ShipStateService.
+        { provide: SHIP_STATE_PORT, useValue: { get: () => undefined } as unknown as ShipStatePort },
       ],
     }).compile();
 

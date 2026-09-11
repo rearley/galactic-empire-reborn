@@ -2,7 +2,7 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRepository } from '../player/user.repository';
-import { ShipStateService } from '../ship/ship-state.service';
+import { SHIP_STATE_PORT, type ShipStatePort } from '../ship/ship-state.port';
 import { RANDOM, Random, gernd, rndm } from '../combat/random.port';
 import { PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS } from '../commands/attack.config';
 import { AttackKind, ITEM_DESTRUCTION_RANGE } from '../commands/_attack-constants';
@@ -36,7 +36,7 @@ export interface AttackOwnerAlertPayload {
 @Injectable()
 export class PlanetAttackService {
   constructor(
-    private readonly ships: ShipStateService,
+    @Inject(SHIP_STATE_PORT) private readonly ships: ShipStatePort,
     private readonly prisma: PrismaService,
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,

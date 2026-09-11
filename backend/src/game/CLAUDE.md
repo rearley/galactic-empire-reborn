@@ -27,6 +27,26 @@ State lives in a NestJS service singleton (`Map<shipId, ShipState>`) and is the
 source of truth during gameplay. Postgres is the durable store, flushed async.
 **No Redis. No external cache layer.**
 
+### `ship` <-> `planet` cross the boundary through ports, not `forwardRef`
+
+`planet/` needs ship state and `ship/` needs planet state, which used to be a
+Nest module cycle deferred with `forwardRef` on three modules. It is now two
+narrow interfaces and their tokens:
+
+- `ship/ship-state.port.ts` — `SHIP_STATE_PORT` / `ShipStatePort`: `get`,
+  `mutate`, `findByUserid`. Bound in `ship/ship-state.module.ts`, the leaf
+  module holding `ShipStateService`, `ShipChannelRegistry` and `ShipRepository`.
+  `ShipModule` re-exports it, so `imports: [ShipModule]` still resolves them.
+- `planet/planet-state.port.ts` — `PLANET_STATE_PORT` / `PlanetStatePort`:
+  `get`. Bound in `PlanetModule`.
+
+Module edges are now all plain: `PlanetModule -> ShipStateModule`,
+`ShipModule -> {ShipStateModule, PlanetModule}`, and `TickModule` imports neither.
+**Do not add a method to either port unless a consumer on the far side
+calls it**, and do not reach for `forwardRef` to fix a new cycle — the port is
+the cheaper answer, and `test/game/ship/ship-state.port.spec.ts` asserts each
+port's surface exactly.
+
 ## 1. The two tick timers are not split the way you would guess
 
 - **Ship update tick, 1 second** (`setInterval(…, 1000)`) — **movement**:
