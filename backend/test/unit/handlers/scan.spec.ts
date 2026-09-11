@@ -10,10 +10,11 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { makeShip as buildShip } from '../../helpers/make-ship';
 
-// Local default layered on the shared factory: this suite's ships are not
-// yet boarded (status 0), stationary (topspeed 0).
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', not yet boarded (status 0), stationary (topspeed 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return buildShip({
+    shipname: 'Test',
     status: 0,
     topspeed: 0,
     ...overrides,
