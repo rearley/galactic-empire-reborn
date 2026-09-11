@@ -51,6 +51,7 @@ import {
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
 import { makeGateway } from '../helpers/make-gateway';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 
@@ -65,27 +66,15 @@ function makeShipState(overrides: {
   xcoord?: number;
   ycoord?: number;
 }): ShipState {
-  return {
+  return baseMakeShip({
     userid: overrides.userid,
     shipno: overrides.shipno,
     shipname: overrides.shipname,
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: overrides.xcoord ?? 5, ycoord: overrides.ycoord ?? 3,
-    damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+    xcoord: overrides.xcoord ?? 5,
+    ycoord: overrides.ycoord ?? 3,
+    status: 0,
+    topspeed: 0,
+  });
 }
 
 /** Minimal Prisma-shaped ship row for use in findMany mocks. */
