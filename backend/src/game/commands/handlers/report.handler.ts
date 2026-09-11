@@ -1,7 +1,8 @@
 import { damstr } from '../../combat/combat-math';
 import { SHIELDDM } from '../../constants';
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { PMINFIRE } from '../../constants';
@@ -34,7 +35,19 @@ export class ReportHandlerService implements OnModuleInit {
     maxWarp: number;
   }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ReportHandlerService(...)` sites keep compiling — and keep asserting on the very
+     * same `prisma.user.*` calls, which is what proves the queries did not
+     * change when they moved behind it. Nest injects the shared provider in
+     * production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const classes = await this.prisma.shipClass.findMany({
@@ -277,10 +290,7 @@ export class ReportHandlerService implements OnModuleInit {
     const lines: CommandResultLine[] = [];
     lines.push({ text: formatMessage(MessageId.REP25), category: 'system' });
 
-    const user = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true, score: true, kills: true, planets: true, teamcode: true },
-    });
+    const user = await this.users.getAccountSummary(ship.userid);
 
     if (!user) return lines;
 

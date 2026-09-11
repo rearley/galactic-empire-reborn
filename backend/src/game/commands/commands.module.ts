@@ -63,6 +63,7 @@ import { NewShipHandlerService } from './handlers/new-ship.handler';
 import { TeamModule } from '../team/team.module';
 import { ShipModule } from '../ship/ship.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PlayerModule } from '../player/player.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { PlanetModule } from '../planet/planet.module';
 import { PhysicsModule } from '../physics/physics.module';
@@ -72,7 +73,7 @@ import { MailModule } from '../mail/mail.module';
 import { CybertronControlModule } from '../cybertron/cybertron-control.module';
 
 @Module({
-  imports: [CybertronControlModule, ShipModule, PrismaModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule, TeamModule],
+  imports: [CybertronControlModule, ShipModule, PrismaModule, PlayerModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, OnboardingModule, MailModule, TeamModule],
   providers: [
     CommandRouterService,
     ScanHandlerService,

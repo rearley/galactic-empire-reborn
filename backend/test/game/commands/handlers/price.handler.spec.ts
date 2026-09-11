@@ -12,6 +12,7 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { I_TROOPS, I_FOOD, I_GOLD, NUMITEMS, BASEPRICE, ITEM_NAMES } from '../../../../src/game/constants/items';
+import { UserRepository } from '../../../../src/game/player/user.repository';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -89,7 +90,7 @@ function makeHandler(opts: {
     },
   } as unknown as PrismaService;
 
-  const handler = new PriceHandlerService(mockPlanetService, mockPrisma);
+  const handler = new PriceHandlerService(mockPlanetService, new UserRepository(mockPrisma));
   return { handler, mockPlanetService, mockPrisma };
 }
 

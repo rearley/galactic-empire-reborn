@@ -33,6 +33,7 @@ import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../../../src/game/commands/command.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
+import { UserRepository } from '../../../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -68,7 +69,7 @@ function makeService(ship: ShipState) {
       update: jest.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
-  return { handler: new SetHandlerService(mockShipState, mockPrisma), mockShipState };
+  return { handler: new SetHandlerService(mockShipState, new UserRepository(mockPrisma)), mockShipState };
 }
 
 const run = async (ship: ShipState, args: string[]) => {

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { TickKind } from '../tick/tick.types';
 import { TickService } from '../tick/tick.service';
 import { ShipState, shipKey } from './ship-state.types';
@@ -52,6 +53,16 @@ export class ShipStateService implements OnModuleInit {
     // working; Nest injects the shared singleton when ShipModule is in play.
     @Optional()
     private readonly channels: ShipChannelRegistry = new ShipChannelRegistry(),
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ShipStateService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Same pattern as `ShipStateService.channels`.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /** Put a ship in the map and give it a channel. */
@@ -453,10 +464,7 @@ export class ShipStateService implements OnModuleInit {
       Array.from(this.map.values()).map((s) => s.userid),
     ));
 
-    const rows = await this.prisma.user.findMany({
-      where: { userid: { in: allUserids } },
-      select: { userid: true, teamcode: true },
-    });
+    const rows = await this.users.findTeamcodesFor(allUserids);
 
     const teamcodeByUserid = new Map<string, bigint | null>();
     for (const row of rows) {

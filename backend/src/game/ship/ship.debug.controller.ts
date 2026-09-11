@@ -13,7 +13,7 @@
 
 import { Controller, Post, Query, BadRequestException } from '@nestjs/common';
 import { ShipStateService } from './ship-state.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { I_TORP, I_MISSL, I_MINE } from '../constants/items';
 
 /** Parses an optional non-negative integer query param. */
@@ -30,7 +30,7 @@ function optionalCount(raw: string | undefined, name: string): number | undefine
 export class ShipDebugController {
   constructor(
     private readonly shipState: ShipStateService,
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   /**
@@ -53,10 +53,7 @@ export class ShipDebugController {
     const target = this.shipState.findByName(shipname);
     if (!target) throw new BadRequestException(`no live ship named '${shipname}'`);
 
-    await this.prisma.user.update({
-      where: { userid: target.userid },
-      data: { cash: BigInt(amount) },
-    });
+    await this.users.setCash(target.userid, BigInt(amount));
 
     return { ok: true, shipname: target.shipname, credits: amount };
   }

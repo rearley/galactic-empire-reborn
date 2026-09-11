@@ -9,6 +9,7 @@ import { PlanetState, planetKey } from '../../../src/game/planet/planet-state.ty
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_FOOD, ITEM_NAMES } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -63,7 +64,7 @@ function makeService(planetState: PlanetState | null, buyResult: Awaited<ReturnT
   const svc = new BuyHandlerService(
     planetMock as unknown as PlanetStateService,
     shipMock as unknown as ShipStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
   return { svc, buyMock, mutateMock, prismaUpdateMock, prismaFindMock };
 }

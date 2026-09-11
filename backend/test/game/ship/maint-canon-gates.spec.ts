@@ -31,6 +31,7 @@ import { PlanetStateService } from '../../../src/game/planet/planet-state.servic
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
 
 const ZYGOR = 1;
 const TAHANIAN = 2;
@@ -66,7 +67,7 @@ function svcWith(planet: unknown) {
       update: jest.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
-  return new MaintenanceService(mockShipState, mockPlanetService, mockPrisma);
+  return new MaintenanceService(mockShipState, mockPlanetService, new UserRepository(mockPrisma));
 }
 
 const colonised = (over: Record<string, unknown> = {}) => ({

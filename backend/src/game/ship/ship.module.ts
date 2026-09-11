@@ -5,6 +5,7 @@ import { ShipChannelRegistry } from './ship-channel.registry';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PlayerModule } from '../player/player.module';
 import { PlanetModule } from '../planet/planet.module';
 import { ShipDebugController } from './ship.debug.controller';
 import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
@@ -20,7 +21,7 @@ const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
  */
 @Module({
   imports: [
-    PrismaModule,
+    PrismaModule, PlayerModule,
     EventEmitterModule,
     forwardRef(() => PlanetModule),
   ],

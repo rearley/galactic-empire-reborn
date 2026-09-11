@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PlayerModule } from '../game/player/player.module';
 import { PresenceService } from './presence.service';
 import { StatsService } from './stats.service';
 import { StatsController } from './stats.controller';
 import { GuideController } from './guide.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PlayerModule],
   controllers: [StatsController, GuideController],
   providers: [PresenceService, StatsService],
   exports: [PresenceService],

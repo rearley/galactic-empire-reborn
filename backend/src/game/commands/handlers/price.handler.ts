@@ -5,7 +5,7 @@ import { computeBuyOutcome } from '../../planet/planet-trade';
 import { isInNeutralZone } from '../../combat/neutral-zone';
 import { ShipState } from '../../ship/ship-state.types';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { BASEPRICE, ITEM_NAMES, ITEM_TONS, NUMITEMS } from '../../constants/items';
 import { ITEM_SHORT_KEYWORDS, resolveItemKeyword, parseUint32 } from '../validators';
 
@@ -22,7 +22,7 @@ import { ITEM_SHORT_KEYWORDS, resolveItemKeyword, parseUint32 } from '../validat
 export class PriceHandlerService {
   constructor(
     private readonly planetService: PlanetStateService,
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   readonly command: Command = {
@@ -102,11 +102,7 @@ export class PriceHandlerService {
     for (let i = 0; i < NUMITEMS; i++) {
       usedTons += Number(ship.items[i] ?? 0n) * ITEM_TONS[i];
     }
-    const userRow = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true },
-    });
-    const cash = userRow?.cash ?? 0n;
+    const cash = (await this.users.getCash(ship.userid)) ?? 0n;
 
     const outcome = computeBuyOutcome({
       planet,

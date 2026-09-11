@@ -3,10 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 import { OnboardingService } from './onboarding.service';
 import { RenameService } from './rename.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PlayerModule } from '../player/player.module';
 import { ShipModule } from '../ship/ship.module';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ShipModule],
+  imports: [ConfigModule, PrismaModule, PlayerModule, ShipModule],
   providers: [OnboardingService, RenameService],
   exports: [OnboardingService, RenameService],
 })

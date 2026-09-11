@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PlayerModule } from '../player/player.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
 import { ShipModule } from '../ship/ship.module';
 import { TickModule } from '../tick/tick.module';
@@ -26,7 +27,7 @@ const devOnlyControllers = debugEndpointsEnabled() ? [PlanetDebugController] : [
 
 @Module({
   controllers: devOnlyControllers,
-  imports: [PrismaModule, GalaxyModule, forwardRef(() => ShipModule), forwardRef(() => TickModule)],
+  imports: [PrismaModule, PlayerModule, GalaxyModule, forwardRef(() => ShipModule), forwardRef(() => TickModule)],
   providers: [
     PlanetStateService,
     PlanetTickService,
