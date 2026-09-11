@@ -25,28 +25,18 @@ import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { CommandContext, CommandResult } from '../../../../src/game/commands/command.types';
 import { NUMITEMS } from '../../../../src/game/constants/items';
 import { NEUTRAL_ZONE_OWNER, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../../../src/game/combat/neutral-zone';
+import { makeShip as buildShip } from '../../../helpers/make-ship';
 
 const ctx: CommandContext = {};
 
+// Local default layered on the shared factory: this suite's ships are not
+// yet boarded (status 0), stationary (topspeed 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return buildShip({
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {

@@ -17,6 +17,7 @@ import {
   CombatSubsystemDamagedEvent,
 } from '../../../../src/game/combat/combat-events';
 import { FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
+import { makeShip as buildShip } from '../../../helpers/make-ship';
 
 /**
  * Fixture engagement distance, in sectors.
@@ -35,28 +36,21 @@ import { FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRES
  */
 const ENGAGEMENT_DIST = 0.05;
 
+// Local defaults layered on the shared factory: this suite's ships run hot
+// (50000 energy, a fitted phaser) so every fixture doesn't have to say so.
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+  return buildShip({
+    shipname: 'Test',
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    topspeed: 10,
+    ...over,
     // A ship in the game holds a unique `channel` (this port's usrnum) and
     // attribution reads it, not `shipno`. These fixtures stage firer and victim
     // by giving each a distinct shipno, so mirror it into channel.
     channel: over.channel ?? over.shipno ?? 1,
-  };
+  });
 }
 
 interface Harness {
