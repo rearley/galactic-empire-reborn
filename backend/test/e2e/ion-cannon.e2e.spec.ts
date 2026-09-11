@@ -34,26 +34,26 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants';
 import { I_ION } from '../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState>): ShipState {
-  return {
-    userid: 'ion-e2e', shipno: 1, shipname: 'Probe', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 4.5, ycoord: 3.5, damage: 0, energy: 500_000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'ion-e2e',
+    shipname: 'Probe',
+    xcoord: 4.5,
+    ycoord: 3.5,
+    energy: 500_000,
+    phasrtype: 1,
+    shieldtype: 1,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  } as ShipState;
+    topspeed: 8,
+    ...over,
+  });
 }
 
 describe('ion cannons (real services, no mocks)', () => {
