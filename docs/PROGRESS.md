@@ -5,8 +5,10 @@ Append-only, **newest at the bottom**. 92 entries.
 <!-- INDEX -->
 ## Most recent first
 
-The 15 latest entries, reversed — the log itself reads oldest-first, which makes
-"what is the current state" the hardest thing to find in it.
+Recent entries, reversed — the log itself reads oldest-first, which makes
+"what is the current state" the hardest thing to find in it. This list is not
+every entry; it is the recent ones, and it carries no count on purpose, because
+a hardcoded number here went stale the first time someone appended without it.
 
 - [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
 - [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
