@@ -251,7 +251,13 @@ describe('a quoted citation says what the original says', () => {
     // above). If this fails because citations were deliberately removed,
     // lower TOTAL_FLOOR to the new total and say why in a comment here — do
     // NOT lower it just to clear a failure caused by an accidental loss.
-    const TOTAL_FLOOR = 3355;
+    //
+    // Lowered 3355 → 3353 the same day: scan-planet.ts's local
+    // `findSectorWormhole` helper (and its two-citation docblock, GEMAIN.H
+    // and GECMDS.C) was deleted when the call site was repointed at
+    // `WormholeRepository.findSectorWormhole` — dead code removed, its
+    // citation went with it. Restructure Phase 3 task 4, fix round 1.
+    const TOTAL_FLOOR = 3353;
     expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
   });
 });

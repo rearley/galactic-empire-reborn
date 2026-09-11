@@ -1,4 +1,4 @@
-import { PrismaService } from '../../../../prisma/prisma.service';
+import { WormholeRepository } from '../../../galaxy/wormhole.repository';
 import { UserRepository } from '../../../player/user.repository';
 import { PlanetStateService } from '../../../planet/planet-state.service';
 import { CommandResult } from '../../command.types';
@@ -33,32 +33,8 @@ import {
  */
 export interface ScanPlanetDeps {
   planetService: PlanetStateService;
-  prisma: PrismaService;
+  wormholes: WormholeRepository;
   users: UserRepository;
-}
-
-/**
- * The wormhole occupying slot `plnum` in this sector, if any.
- *
- * Wormholes share the planet slot space in C (`sector.planets[]` holds both,
- * discriminated by `type`), but our read models split them: GalaxyService's
- * wormhole view carries no slot number and no name, so the row itself is the
- * only place both live. Positions and names are fixed at generation, so a
- * point read on a rare command is cheap.
- *
- * @see GEMAIN.H:467 GALWORM  @see GECMDS.C:2455
- */
-async function findSectorWormhole(
-  prisma: PrismaService,
-  xsect: number,
-  ysect: number,
-  plnum: number,
-): Promise<{ xcoord: number; ycoord: number; name: string } | null> {
-  const row = await prisma.wormhole.findFirst({
-    where: { xsect, ysect, plnum },
-    select: { xcoord: true, ycoord: true, name: true },
-  });
-  return row ?? null;
 }
 
 /**
@@ -104,7 +80,7 @@ export async function scanPl(
   args: string[],
   deps: ScanPlanetDeps,
 ): Promise<CommandResult> {
-  const { planetService, prisma, users } = deps;
+  const { planetService, wormholes, users } = deps;
   const xsect = Math.floor(ship.xcoord);
   const ysect = Math.floor(ship.ycoord);
 
@@ -132,10 +108,7 @@ export async function scanPl(
     // same list -- otherwise `sca pl 3` on a wormhole slot looks like a bug.
     // Only VISIBLE ones: the listing is our addition (C's `sca pl` demands an
     // argument, GECMDS.C:2303-2309), and a hidden wormhole is hidden.
-    const worms = await prisma.wormhole.findMany({
-      where: { xsect, ysect, visible: 1 },
-      select: { plnum: true, name: true },
-    });
+    const worms = await wormholes.findVisibleInSector(xsect, ysect);
     for (const w of worms) {
       lines.push({
         text: `  ${w.plnum}. ${w.name || '(unnamed)'} — wormhole`,
@@ -162,7 +135,7 @@ export async function scanPl(
   // branch and prints class, name, bearing and distance.
   // @see GECMDS.C:2455-2468
   if (!planet && !isNaN(num) && String(num) === args[0]) {
-    const worm = await findSectorWormhole(prisma, xsect, ysect, num);
+    const worm = await wormholes.findSectorWormhole(xsect, ysect, num);
     if (worm) return scanWormhole(ship, worm);
   }
 

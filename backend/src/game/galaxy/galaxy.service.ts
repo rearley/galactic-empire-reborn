@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Planet, Prisma, Wormhole, GalaxyMeta } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { WormholeRepository } from './wormhole.repository';
 import { UNIVMAX, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constants';
 import { BASEPRICE, NUMITEMS } from '../constants/items';
 import { loadGalaxyConfig } from './galaxy.config';
@@ -54,7 +55,10 @@ export class GalaxyService implements OnModuleInit {
   private planetsByName = new Map<string, Planet>();
   private _meta: GalaxyMeta | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly wormholes: WormholeRepository,
+  ) {}
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -550,7 +554,7 @@ export class GalaxyService implements OnModuleInit {
   private async hydrate(): Promise<void> {
     const [planets, wormholes] = await Promise.all([
       this.prisma.planet.findMany(),
-      this.prisma.wormhole.findMany(),
+      this.wormholes.findAll(),
     ]);
 
     this.planetsBySector.clear();
