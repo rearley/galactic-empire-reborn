@@ -63,12 +63,7 @@ function Terminal(): React.JSX.Element {
     return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];
   };
 
-  // `useEventLog` takes a `NarrationContext` for shape parity with the combat
-  // handlers below (which build their own, real one once `localShipId` is
-  // known) but reads none of it — see the hook's docstring for why. `null`
-  // here costs nothing.
-  const { lines: logLines, append: appendLines, clear: clearLog } =
-    useEventLog({ localShipId: null, shipName });
+  const { lines: logLines, append: appendLines, clear: clearLog } = useEventLog();
 
   // Delivered synchronously from the socket callback — no state slot to
   // overwrite, so a burst cannot drop results. @see socket/useCommandResultQueue

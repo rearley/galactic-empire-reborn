@@ -2,21 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { socket } from '../socket/socketClient';
 import type { LogEntry } from '../types/logEntry';
 import type { EventLogLine } from '@ge/wire';
-import type { NarrationContext } from '../features/combat/combatNarration';
 
 const MAX_LOG_ENTRIES = 500;
 
 /**
  * The scrolling event-log state and every subscription that feeds it apart
  * from combat narration, which stays in `App.tsx` because it also needs the
- * player roster to name ships. `ctx` is accepted for the same reason
- * `combatNarration.ts`'s functions do — `App.tsx` already builds one for the
- * combat handlers — but nothing moved into this hook reads it: `event.log`
- * and `message.send` carry their own text, `sector:ship-entered` /
- * `sector:ship-left` carry the mover's name in the payload, and the AI taunts
- * are opaque server strings.
+ * player roster to name ships. `event.log` and `message.send` carry their own
+ * text, `sector:ship-entered` / `sector:ship-left` carry the mover's name in
+ * the payload, and the AI taunts are opaque server strings — none of it needs
+ * a `NarrationContext`.
  */
-export function useEventLog(_ctx: NarrationContext): {
+export function useEventLog(): {
   lines: LogEntry[];
   append: (lines: EventLogLine[]) => void;
   clear: () => void;
