@@ -79,7 +79,7 @@ import {
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
-import { planTransition, RoomEmit } from './sector-transition';
+import { planTransition, MoverEmit, RoomEmit } from './sector-transition';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
 import { BEACON_EVENT } from './events/beacon.event';
@@ -1204,10 +1204,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Plans the transition with `planTransition` (sector-transition.ts, which
    * carries the full derivation and every `GEFUNCS.C` citation) and executes
-   * the plan: emit the pre-move room broadcasts (relying on the mover's
-   * current room membership — see `TransitionPlan`), move the mover's socket
-   * between rooms, emit to it directly, then emit the post-move room
-   * broadcasts.
+   * the plan IN ITS DECLARED FIELD ORDER, which is not free to rearrange:
+   *
+   *   1. `moverEmitsBeforeRoomEmits`  → the mover's socket
+   *   2. `roomEmitsBeforeMove`        → rooms, mover still in `sector:from`
+   *   3. `moverEmitsAfterRoomEmits`   → the mover's socket
+   *   4. `leave` / `join`             → the mover's socket changes rooms
+   *   5. `moverEmitsAfterMove`        → the mover's socket
+   *   6. `roomEmitsAfterMove`         → rooms, mover now in `sector:to`
+   *
+   * Steps 2 and 3 in that order are the fix for a real regression: the mover
+   * is still in `sector:from` at step 2 and so receives the departure
+   * broadcast saying its own sector is `null`; step 3 is the row that repairs
+   * it. Running all the mover emits up front — which an earlier version of
+   * this split did — lets the null land last and blanks the player's own row
+   * in their own player list after every crossing. See `TransitionPlan`.
    *
    * `hasObserver`/`gernd()` for the beacon are computed here, guarded by the
    * same conditions the original inline code guarded them with — including
@@ -1260,19 +1271,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const moverSocket = moverSocketId ? this.server.sockets.sockets.get(moverSocketId) : undefined;
 
-    for (const emit of plan.moverEmits) {
-      switch (emit.event) {
-        case 'physics.sector-transition':
-          moverSocket?.emit('physics.sector-transition', emit.payload);
-          break;
-        case 'player.sector':
-          moverSocket?.emit('player.sector', emit.payload);
-          break;
-        case 'event.log':
-          moverSocket?.emit('event.log', emit.payload);
-          break;
+    const emitMoverBatch = (emits: MoverEmit[]): void => {
+      for (const emit of emits) {
+        switch (emit.event) {
+          case 'physics.sector-transition':
+            moverSocket?.emit('physics.sector-transition', emit.payload);
+            break;
+          case 'player.sector':
+            moverSocket?.emit('player.sector', emit.payload);
+            break;
+          case 'event.log':
+            moverSocket?.emit('event.log', emit.payload);
+            break;
+        }
       }
-    }
+    };
 
     // A local closure, not a class method: some older tests bind a bare
     // `GameGateway.prototype.handleSectorTransition` reference onto a
@@ -1298,11 +1311,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     };
 
+    emitMoverBatch(plan.moverEmitsBeforeRoomEmits);
     emitRoomBatch(plan.roomEmitsBeforeMove);
+    emitMoverBatch(plan.moverEmitsAfterRoomEmits);
 
     for (const room of plan.leave) void moverSocket?.leave(room);
     for (const room of plan.join) void moverSocket?.join(room);
 
+    emitMoverBatch(plan.moverEmitsAfterMove);
     emitRoomBatch(plan.roomEmitsAfterMove);
   }
 

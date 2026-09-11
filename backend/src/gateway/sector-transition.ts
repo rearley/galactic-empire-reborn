@@ -55,24 +55,42 @@ export interface BeaconRoll {
 /**
  * What `handleSectorTransition` should do about one `physics.sector-transition`
  * event, as data. `leave`/`join` are the mover's own socket room changes.
- * `moverEmits` go to the mover's socket alone, order-independent of the room
- * move since they never depend on room membership.
  *
- * The two room-emit lists encode a real ordering requirement, not a
- * cosmetic one: room membership at the MOMENT OF THE EMIT decides who a
- * plain `.to(room).emit()` reaches, because neither the arrival nor the
- * departure `player.sector` broadcast carries `.except()`.
+ * THE FIELD ORDER BELOW IS THE EXECUTION ORDER, and every boundary between
+ * two of these buckets is load-bearing. Two separate things depend on it:
  *
- *  - `roomEmitsBeforeMove` MUST be sent while the mover is still in the old
+ * 1. WHO RECEIVES a room emit. Room membership at the MOMENT OF THE EMIT
+ *    decides who a plain `.to(room).emit()` reaches, because neither the
+ *    arrival nor the departure `player.sector` broadcast carries `.except()`.
+ *    `roomEmitsBeforeMove` MUST be sent while the mover is still in the old
  *    room and not yet in the new one — that membership state is exactly what
- *    keeps the mover off the arrival broadcast (not yet joined) while
- *    leaving them a recipient of the departure one (not yet left), matching
- *    `moverEmits`'s separate, correct copy of both.
- *  - `roomEmitsAfterMove` MUST be sent once the mover has left/joined:
+ *    keeps the mover off the arrival broadcast (not yet joined) while leaving
+ *    them a recipient of the departure one (not yet left).
+ *    `roomEmitsAfterMove` MUST be sent once the mover has left/joined:
  *    `sector:ship-left`/`sector:ship-entered` use `.except()` so timing does
  *    not change who receives them, but the beacon does not — canon includes
  *    the mover in its own beacon because by the time C sends it the mover has
  *    already been added to the destination room.
+ *
+ * 2. WHAT THE MOVER ENDS UP BELIEVING. The mover emits are NOT
+ *    order-independent of the room emits, even though no mover emit depends on
+ *    room membership. The mover is still in `sector:from` when
+ *    `roomEmitsBeforeMove` goes out, so it RECEIVES the departure broadcast
+ *    `{ shipId, sector: null }` about itself. `moverEmitsAfterRoomEmits`
+ *    carries the correcting `{ shipId, sector: toSector }` row and MUST follow
+ *    it, because the client's player list is last-write-wins on `sector`
+ *    (frontend/src/state/usePlayerList.ts). Send the mover emits first and the
+ *    null wins: the player's own row in their own list blanks to an em dash
+ *    after every crossing, and stays blank until the next `player.snapshot`.
+ *
+ * The full sequence, which must match the pre-split handler line for line:
+ *   1. `moverEmitsBeforeRoomEmits`  — `physics.sector-transition`
+ *   2. `roomEmitsBeforeMove`        — arrival to `sector:to`, departure to
+ *                                     `sector:from` (the mover hears this one)
+ *   3. `moverEmitsAfterRoomEmits`   — `player.sector`, repairing the above
+ *   4. `leave` / `join`             — the mover's socket changes rooms
+ *   5. `moverEmitsAfterMove`        — MOVE1 "You have moved…" `event.log`
+ *   6. `roomEmitsAfterMove`         — MOVE2 / MOVE3 / beacon
  *
  * All fields are empty when the moving ship cannot be found, or when the
  * transition did not actually cross a sector boundary — both cases where the
@@ -81,16 +99,20 @@ export interface BeaconRoll {
 export interface TransitionPlan {
   leave: string[];
   join: string[];
-  moverEmits: MoverEmit[];
+  moverEmitsBeforeRoomEmits: MoverEmit[];
   roomEmitsBeforeMove: RoomEmit[];
+  moverEmitsAfterRoomEmits: MoverEmit[];
+  moverEmitsAfterMove: MoverEmit[];
   roomEmitsAfterMove: RoomEmit[];
 }
 
 const emptyPlan = (): TransitionPlan => ({
   leave: [],
   join: [],
-  moverEmits: [],
+  moverEmitsBeforeRoomEmits: [],
   roomEmitsBeforeMove: [],
+  moverEmitsAfterRoomEmits: [],
+  moverEmitsAfterMove: [],
   roomEmitsAfterMove: [],
 });
 
@@ -115,8 +137,8 @@ const emptyPlan = (): TransitionPlan => ({
  *
  * @see GEFUNCS.C:709-723 moveship sector-change branch
  * @see GEFUNCS.C:711 MOVE1 prfmsg (the mover's own "you have moved" line)
- * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector, mover excluded)
- * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector, mover excluded)
+ * @see GEFUNCS.C:716 `prfmsg(MOVE2,ptr->shipname);` — left sector, mover excluded
+ * @see GEFUNCS.C:721 `prfmsg(MOVE3,ptr->shipname);` — entered sector, mover excluded
  */
 export function planTransition(
   event: PhysicsSectorTransitionEvent,
@@ -130,7 +152,7 @@ export function planTransition(
   const ship = lookup(shipId);
 
   if (shouldBroadcastTransition(ship?.status)) {
-    plan.moverEmits.push({ event: 'physics.sector-transition', payload: event });
+    plan.moverEmitsBeforeRoomEmits.push({ event: 'physics.sector-transition', payload: event });
   }
 
   if (fromSector.x === toSector.x && fromSector.y === toSector.y) return plan;
@@ -152,14 +174,18 @@ export function planTransition(
       payload: { updates: [{ shipId, sector: null }] },
     });
 
-    // The mover's own row is included explicitly: their socket does not join
-    // `sector:to` until further down this method, so the arrival broadcast
-    // above does not reach them and their own position would go stale.
+    // The mover's own row is included explicitly, and this emit MUST follow
+    // the two room broadcasts above (see `TransitionPlan`): their socket does
+    // not join `sector:to` until further down, so the arrival broadcast does
+    // not reach them and their own position would go stale — and their socket
+    // has not left `sector:from` either, so the departure broadcast's
+    // `sector: null` about themselves DOES reach them and has to be repaired
+    // by this row landing after it.
     const forMover = [
       { shipId, sector: toSector },
       ...moverVisibilityUpdates(roster, shipId, fromSector, toSector),
     ];
-    plan.moverEmits.push({ event: 'player.sector', payload: { updates: forMover } });
+    plan.moverEmitsAfterRoomEmits.push({ event: 'player.sector', payload: { updates: forMover } });
   }
 
   // Move the player's socket to the new sector room so they receive sector-scoped events.
@@ -183,7 +209,7 @@ export function planTransition(
   // running account of where it was. Nothing surfaced it until a hull that
   // fast existed in play: the starting classes cap at warp 10 and it took a
   // Dreadnought at warp 50 to find.
-  plan.moverEmits.push({
+  plan.moverEmitsAfterMove.push({
     event: 'event.log',
     payload: {
       category: 'nav',
