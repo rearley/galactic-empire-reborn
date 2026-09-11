@@ -165,6 +165,27 @@ const MAX_SCOPE_HOPS = 6;
  * `scope` matches. Zero or more-than-one matches (checked at the SAME hop,
  * so a literal that happens to carry both kinds of marker is caught too) is
  * reported as `null` — the caller must not guess.
+ *
+ * Two further properties of this search are deliberate, and both are
+ * load-bearing:
+ *
+ * **It commits to the FIRST hop that resolves.** An outer hop is never
+ * consulted once an inner one has matched exactly one candidate. That is what
+ * makes a nested override literal bind to the type it sits inside rather than
+ * to whatever encloses it. The cost: a bare `percent` override nested inside a
+ * literal carrying an event marker binds to the event domain even if the value
+ * semantically belongs to the ship built by an outer factory. No such fixture
+ * exists today — every one of the current occurrences resolves unambiguously —
+ * but if one appears, it binds to the wider domain and a genuinely
+ * out-of-range value slips through. Prefer writing the type marker into the
+ * same literal as the value over relying on the walk.
+ *
+ * **It fails CLOSED.** Zero matches and more-than-one match both return null,
+ * and a null scope is reported as an offender rather than skipped. A new or
+ * ambiguous fixture therefore breaks this test and forces someone to extend
+ * the scope patterns deliberately. When that happens, extend the markers to
+ * describe the new type — do NOT loosen an existing marker regex until it
+ * happens to match, which converts a loud failure into a silent blind spot.
  */
 function resolveScope(text: string, offset: number, candidates: ScopedCandidate[]): ScopedCandidate | null {
   let literal = enclosingLiteral(text, offset);
