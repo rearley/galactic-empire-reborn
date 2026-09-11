@@ -53,6 +53,9 @@ function makeShip(over: Partial<ShipState> = {}): ShipState {
     phasr: 100,
     phasrtype: 2,
     shieldtype: 1,
+    // ltorpsChannel/ltorpsDistance/lmisslChannel/lmisslDistance/lmisslEnergy
+    // are left at the factory's empty-array default deliberately: that's the
+    // shape Prisma actually hands back for a ship nothing has ever fired at.
     items: Array.from({ length: NUMITEMS }, () => 0n),
     cybmine: 255,
     cybskill: 5,

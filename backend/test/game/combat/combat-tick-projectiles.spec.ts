@@ -67,6 +67,9 @@ function fixedRandom(value: number): Random {
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
+    // phasrtype 0 (the factory default) keeps the reload block — and its
+    // energy debit — out of every fixture, so the only PRNG draws in a tick
+    // are the ones under test.
     shipname: 'T',
     energy: 50_000,
     lastfired: -1,
