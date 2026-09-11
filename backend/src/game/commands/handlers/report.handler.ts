@@ -4,6 +4,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ShipClassCacheService, ShipClassEntry } from '../../physics/ship-class-cache.service';
 import { UserRepository } from '../../player/user.repository';
+import { TeamRepository } from '../../team/team.repository';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { PMINFIRE } from '../../constants';
@@ -44,6 +45,15 @@ export class ReportHandlerService {
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,
+    /**
+     * The team repository, `@Optional()` for the same reason as `users`
+     * above: constructible from `(prisma)` alone, so the suite's direct
+     * `new ReportHandlerService(...)` sites keep compiling and keep
+     * asserting on the same `prisma.team.findUnique` call, now made
+     * through it.
+     */
+    @Optional()
+    private readonly teams: TeamRepository = new TeamRepository(prisma),
   ) {}
 
   private classOf(classNumber: number): ShipClassEntry | undefined {
@@ -294,10 +304,7 @@ export class ReportHandlerService {
     lines.push({ text: formatMessage(MessageId.REP31, user.kills), category: 'info' });
 
     if (user.teamcode && user.teamcode > 0n) {
-      const team = await this.prisma.team.findUnique({
-        where: { teamcode: user.teamcode },
-        select: { teamname: true },
-      });
+      const team = await this.teams.getName(user.teamcode);
       if (team) {
         lines.push({ text: formatMessage(MessageId.REP31A, team.teamname), category: 'info' });
       }

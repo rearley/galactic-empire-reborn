@@ -48,7 +48,8 @@ function build() {
   const shipState = {
     mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => fn(makeShip()),
   } as unknown as ShipStateService;
-  return new OrbitHandlerService(shipState, planetService, {} as never);
+  const wormholes = { existsInSector: async () => false };
+  return new OrbitHandlerService(shipState, planetService, wormholes as never);
 }
 
 const ctx: CommandContext = {};

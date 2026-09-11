@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRepository } from '../../player/user.repository';
+import { TeamRepository } from '../../team/team.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { TeamService } from '../../team/team.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -57,6 +58,14 @@ export class TeaHandlerService {
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * The team repository, `@Optional()` for the same reason as `users`
+     * above: constructible from `(prisma)` alone, so the suite's direct
+     * `new TeaHandlerService(...)` sites keep compiling and keep asserting on
+     * the same `prisma.team.findFirst` call, now made through it.
+     */
+    @Optional()
+    private readonly teams: TeamRepository = new TeamRepository(prisma),
   ) {}
 
   get command(): Command {
@@ -127,10 +136,7 @@ export class TeaHandlerService {
     if (ship.teamcode == null) {
       return { lines: [{ text: 'You are not on a team.', category: 'info' }] };
     }
-    const team = await this.prisma.team.findFirst({
-      where: { teamcode: ship.teamcode },
-      select: { teamname: true },
-    });
+    const team = await this.teams.findNameByCode(ship.teamcode);
     const name = team?.teamname ?? ship.teamcode.toString();
     return { lines: [{ text: `You are on team ${name}.`, category: 'info' }] };
   }

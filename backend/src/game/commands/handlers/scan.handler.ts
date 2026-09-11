@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { showarp } from '../../ship/showarp';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRepository } from '../../player/user.repository';
+import { WormholeRepository } from '../../galaxy/wormhole.repository';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
@@ -77,6 +78,16 @@ export class ScanHandlerService {
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,
+    /**
+     * The wormhole repository. `@Optional()` with a default built over the
+     * same client this class already holds, for the same reason as `users`
+     * above: the many direct `new ScanHandlerService(...)` test constructions
+     * keep compiling, and keep asserting on the same `prisma.wormhole.*`
+     * calls now made through it. Nest injects the shared provider in
+     * production.
+     */
+    @Optional()
+    private readonly wormholes: WormholeRepository = new WormholeRepository(prisma),
   ) {}
 
   /**
@@ -181,7 +192,7 @@ export class ScanHandlerService {
     }
 
     if (sub === 'pl') {
-      return await scanPl(ship, args.slice(1), { planetService: this.planetService, prisma: this.prisma, users: this.users });
+      return await scanPl(ship, args.slice(1), { planetService: this.planetService, wormholes: this.wormholes, users: this.users });
     }
 
     if (sub === 'ra') {

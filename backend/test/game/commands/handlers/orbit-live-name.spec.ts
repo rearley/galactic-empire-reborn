@@ -58,7 +58,7 @@ function makeService(planets: PlanetState[]) {
   const mockPlanets = {
     bySector: jest.fn().mockReturnValue(planets),
   } as unknown as PlanetStateService;
-  return new OrbitHandlerService(mockShips, mockPlanets, { wormhole: { findFirst: async () => null } } as never);
+  return new OrbitHandlerService(mockShips, mockPlanets, { existsInSector: async () => false } as never);
 }
 
 const ctx: CommandContext = {};

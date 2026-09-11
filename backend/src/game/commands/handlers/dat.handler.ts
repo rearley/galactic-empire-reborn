@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { TeamRepository } from '../../team/team.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
@@ -39,6 +40,15 @@ export class DatHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
     private readonly prisma: PrismaService,
+    /**
+     * The team repository, `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new DatHandlerService(...)` sites keep compiling and keep asserting on
+     * the same `prisma.team.findFirst` call, now made through it.
+     * `TeamRepository` is stateless and constructible from `(prisma)` alone.
+     */
+    @Optional()
+    private readonly teams: TeamRepository = new TeamRepository(prisma),
   ) {}
 
   get command(): Command {
@@ -67,13 +77,10 @@ export class DatHandlerService {
 
     const target = ship;
 
-    // Resolve team name and score via Prisma (single call covers both)
+    // Resolve team name and score via the team repository (single call covers both)
     let teamname = '—';
     if (target.teamcode != null) {
-      const team = await this.prisma.team.findFirst({
-        where: { teamcode: target.teamcode },
-        select: { teamname: true },
-      });
+      const team = await this.teams.findNameByCode(target.teamcode);
       if (team) teamname = team.teamname;
     }
 

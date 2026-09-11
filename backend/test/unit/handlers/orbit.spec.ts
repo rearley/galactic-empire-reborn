@@ -55,7 +55,7 @@ function makeService(planets: ReturnType<typeof makePlanet>[]) {
     shipMock as unknown as ShipStateService,
     planetMock as unknown as PlanetStateService,
     // No wormhole in these fixtures' sectors.
-    { wormhole: { findFirst: async () => null } } as never,
+    { existsInSector: async () => false } as never,
   );
   return { svc, shipMock, planetMock, mutated };
 }
@@ -135,10 +135,8 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
     { get: () => undefined, mutate: jest.fn() } as unknown as ShipStateService,
     { bySector: () => twoPlanets } as unknown as PlanetStateService,
     {
-      wormhole: {
-        findFirst: async ({ where }: { where: { plnum: number } }) =>
-          (wormholePlnums.includes(where.plnum) ? { plnum: where.plnum } : null),
-      },
+      existsInSector: async (_xsect: number, _ysect: number, plnum: number) =>
+        wormholePlnums.includes(plnum),
     } as never,
   );
 
@@ -191,10 +189,8 @@ describe('orb <n> honours the slot even when the sector holds one planet', () =>
       shipMock as unknown as ShipStateService,
       planetMock as unknown as PlanetStateService,
       {
-        wormhole: {
-          findFirst: async ({ where }: { where: { plnum: number } }) =>
-            where.plnum === wormPlnum ? { plnum: wormPlnum } : null,
-        },
+        existsInSector: async (_xsect: number, _ysect: number, plnum: number) =>
+          plnum === wormPlnum,
       } as never,
     );
   }

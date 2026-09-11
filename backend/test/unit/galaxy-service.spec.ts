@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
+import { WormholeRepository } from '../../src/game/galaxy/wormhole.repository';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { Planet } from '@prisma/client';
 import { S00, S00_PLNUM } from '../../src/game/galaxy/s00';
@@ -76,6 +77,7 @@ beforeAll(async () => {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       GalaxyService,
+      WormholeRepository,
       { provide: PrismaService, useValue: prismaMock },
     ],
   }).compile();
