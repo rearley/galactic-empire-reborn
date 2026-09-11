@@ -75,8 +75,8 @@ import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
 import { RANDOM, Random, gernd } from '../game/combat/random.port';
 import { attributePlanetKill } from '../game/combat/planet-kill';
-import { shouldBroadcastTransition } from './transition-visibility';
-import { scopePlayers, moverVisibilityUpdates } from './player-visibility';
+import { scopePlayers } from './player-visibility';
+import { planTransition } from './sector-transition';
 import { capSocketsForUser, MAX_SOCKETS_PER_USER } from './socket-cap';
 import { SHIP_OVERSPEED, ShipOverspeedEvent } from '../game/ship/overspeed-events';
 import { PLANET_BEACON, PlanetBeaconEvent } from '../game/ship/beacon-events';
@@ -1855,120 +1855,74 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Broadcast sector-transition event to all clients (for ScanMap clear etc.)
-   * and emit MOVE2/MOVE3 sector-entry notices to the affected sector rooms.
-   *
-   * MOVE2: "X has left the sector." → emitted to fromSector room
-   * MOVE3: "X has entered the sector." → emitted to toSector room
-   * Both only fire when speed < 21000 (not at high warp) — faithful to
-   * GEFUNCS.C:714 which gates on `ptr->speed < 21000.0`.
-   *
-   * @see GEFUNCS.C:709-723 moveship sector-change branch
-   * @see GEFUNCS.C:711 MOVE1 prfmsg (the mover's own "you have moved" line)
-   * @see GEFUNCS.C:716 MOVE2 prfmsg (left sector, mover excluded)
-   * @see GEFUNCS.C:721 MOVE3 prfmsg (entered sector, mover excluded)
+   * Plans the transition with `planTransition` (sector-transition.ts, which
+   * carries the full derivation and every `GEFUNCS.C` citation) and executes
+   * the plan: move the mover's socket between rooms, emit to it directly, and
+   * emit to the two sector rooms. The beacon re-broadcast below is the one
+   * piece kept out of that plan — see the comment at its call site for why.
    */
   @OnEvent(PHYSICS_SECTOR_TRANSITION)
   handleSectorTransition(event: PhysicsSectorTransitionEvent): void {
     const { shipId, fromSector, toSector } = event;
 
     const movingShip = this.shipStateService.findAllShips().find((s) => shipKey(s.userid, s.shipno) === shipId);
-
-    // This event carries the mover's RAW x/y — finer than a sector — and used
-    // to go to every connected client on every boundary crossing. That was a
-    // live position feed for all 24 Cybertrons and every droid, and, once
-    // `who` stopped publishing player sectors, for every player too.
-    //
-    // Its one consumer is the mover's own ScanMap, which clears when the local
-    // ship changes sector (FR-013), so the mover is the whole audience. The
-    // status gate stays as a second lock: an AI has no socket to send to, but
-    // nothing should depend on that staying true.
-    // @see transition-visibility.ts, player-visibility.ts
     const moverSocketId = this.registry.getSocketId(shipId);
-    if (shouldBroadcastTransition(movingShip?.status) && moverSocketId) {
-      this.server.sockets.sockets.get(moverSocketId)?.emit('physics.sector-transition', event);
-    }
 
-    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
-    if (!movingShip) return;
+    const plan = planTransition(event, this.registry.list(), (id) =>
+      id === shipId && movingShip
+        ? { status: movingShip.status, speed: movingShip.speed, shipname: movingShip.shipname }
+        : undefined,
+    );
 
-    // Position is scoped to your own sector, so a crossing changes what three
-    // audiences may see: the sector entered gains the mover, the sector left
-    // loses them, and the mover's own view of everyone else flips both ways.
-    // Nobody else's view changed, so nobody else is told. @see player-visibility.ts
-    if (shouldBroadcastTransition(movingShip.status)) {
-      this.server
-        .to(`sector:${toSector.x}:${toSector.y}`)
-        .emit('player.sector', { updates: [{ shipId, sector: toSector }] });
-      this.server
-        .to(`sector:${fromSector.x}:${fromSector.y}`)
-        .emit('player.sector', { updates: [{ shipId, sector: null }] });
+    const moverSocket = moverSocketId ? this.server.sockets.sockets.get(moverSocketId) : undefined;
 
-      // The mover's own row is included explicitly: their socket does not join
-      // `sector:to` until further down this method, so the arrival broadcast
-      // above does not reach them and their own position would go stale.
-      const forMover = [
-        { shipId, sector: toSector },
-        ...moverVisibilityUpdates(this.registry.list(), shipId, fromSector, toSector),
-      ];
-      if (moverSocketId) {
-        this.server.sockets.sockets.get(moverSocketId)?.emit('player.sector', { updates: forMover });
+    for (const emit of plan.moverEmits) {
+      switch (emit.event) {
+        case 'physics.sector-transition':
+          moverSocket?.emit('physics.sector-transition', emit.payload);
+          break;
+        case 'player.sector':
+          moverSocket?.emit('player.sector', emit.payload);
+          break;
+        case 'event.log':
+          moverSocket?.emit('event.log', emit.payload);
+          break;
       }
     }
 
-    // Move the player's socket to the new sector room so they receive sector-scoped events.
-    const socketId = moverSocketId;
-    if (socketId) {
-      const playerSocket = this.server.sockets.sockets.get(socketId);
-      if (playerSocket) {
-        void playerSocket.leave(`sector:${fromSector.x}:${fromSector.y}`);
-        void playerSocket.join(`sector:${toSector.x}:${toSector.y}`);
+    for (const room of plan.leave) void moverSocket?.leave(room);
+    for (const room of plan.join) void moverSocket?.join(room);
+
+    for (const emit of plan.roomEmits) {
+      const target = 'exceptSelf' in emit ? this.server.to(emit.room).except(moverSocketId ?? '') : this.server.to(emit.room);
+      switch (emit.event) {
+        case 'player.sector':
+          target.emit('player.sector', emit.payload);
+          break;
+        case 'sector:ship-left':
+          target.emit('sector:ship-left', emit.payload);
+          break;
+        case 'sector:ship-entered':
+          target.emit('sector:ship-entered', emit.payload);
+          break;
       }
     }
-
-    // Gate: no notices at high warp (speed >= 21000) — GEFUNCS.C:714
-    const name = movingShip.shipname;
-
-    // C tells the mover they moved, and tells the two sectors about them while
-    // EXCLUDING the mover: `outsect(FILTER, &sect, usrn, 0)` (GEFUNCS.C:717,722).
-    // Without the exclusion a pilot was told "<their own ship> has entered the
-    // sector" on every boundary crossing, because their socket joins the
-    // destination room just above; and without MOVE1 nothing told them they had
-    // changed sector at all.
-    //
-    // MOVE1 is UNCONDITIONAL. Only the two sector broadcasts carry the
-    // `ptr->speed < 21000.0` gate (GEFUNCS.C:714, :719); the mover's own line
-    // sits above it at :711-713. The port returned early on the gate and
-    // silenced all three, so a ship above warp 21 crossed boundaries with no
-    // running account of where it was. Nothing surfaced it until a hull that
-    // fast existed in play: the starting classes cap at warp 10 and it took a
-    // Dreadnought at warp 50 to find.
-    if (socketId) {
-      this.server.sockets.sockets.get(socketId)?.emit('event.log', {
-        category: 'nav',
-        text: `You have moved from sector (${fromSector.x}, ${fromSector.y}) to (${toSector.x}, ${toSector.y}).`,
-      });
-    }
-
-    // Gate: no SECTOR notices at high warp — you are through too fast to be
-    // seen. @see GEFUNCS.C:714, :719
-    if (movingShip.speed >= 21000) return;
-
-    this.server
-      .to(`sector:${fromSector.x}:${fromSector.y}`)
-      .except(socketId ?? '')
-      .emit('sector:ship-left', { shipId, shipName: name });
-
-    this.server
-      .to(`sector:${toSector.x}:${toSector.y}`)
-      .except(socketId ?? '')
-      .emit('sector:ship-entered', { shipId, shipName: name });
 
     // S-005: beacon-on-move (GEFUNCS.C:808-816). Re-emit BEACON_EVENT when:
     //   (a) at least one OBSERVER ship is in the destination sector
     //       (status === GESTAT_USER (1) or GESTAT_AUTO (2), excluding mover)
     //   (b) gernd()%10 === 0 (1-in-10 probability gate from C source)
     // Restores audit 020 F-005 which regressed in commit d75d337.
+    //
+    // Kept out of `planTransition`: it needs the full ship roster including
+    // AI hulls (the connected-player roster the planner takes does not carry
+    // those), and a random draw, which a pure planner must not perform. Its
+    // own guards mirror the planner's early returns exactly.
+    if (fromSector.x === toSector.x && fromSector.y === toSector.y) return;
+    if (!movingShip) return;
+    if (movingShip.speed >= 21000) return;
+
+    const name = movingShip.shipname;
     const allShips = this.shipStateService.findAllShips();
     const hasObserver = allShips.some(
       (s) =>
