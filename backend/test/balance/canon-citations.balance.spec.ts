@@ -38,6 +38,7 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { scanLine } from './citation-scan';
 
 const REPO = resolve(__dirname, '../../..');
 
@@ -75,12 +76,17 @@ const SOURCE_FILES = [
 const rel = (f: string) => f.replace(`${REPO}/`, '');
 
 /**
- * This file quotes citations as EXAMPLES — real ones to show the shape, and
- * invented ones to show what a failure looks like. Scanning itself would make
- * the examples fail and would move both counts below, so it sits outside every
- * check it performs.
+ * These two files quote citations as EXAMPLES — real ones to show the shape,
+ * and invented ones to show what a failure looks like. Scanning them would make
+ * the examples fail and would move the counts below, so they sit outside every
+ * check this file performs.
+ *
+ * `citation-scan.spec.ts` is the scanner's own test: it asserts on a fabricated
+ * quote (`\`torpedo lock\``) to prove the quote binds to the right number, which
+ * is exactly the shape the verification below exists to reject.
  */
-const SCANNED = SOURCE_FILES.filter((f) => !f.endsWith('canon-citations.balance.spec.ts'));
+const EXAMPLES_NOT_CITATIONS = ['canon-citations.balance.spec.ts', 'citation-scan.spec.ts'];
+const SCANNED = SOURCE_FILES.filter((f) => !EXAMPLES_NOT_CITATIONS.some((e) => f.endsWith(e)));
 
 describe('a quoted citation says what the original says', () => {
   const canon = loadCanon();
@@ -99,12 +105,12 @@ describe('a quoted citation says what the original says', () => {
    * and a quote that differs only in spacing is a correct quote. Matching on
    * exact text produced six false failures out of forty-seven and would have
    * made this file the kind of test people delete.
+   *
+   * Finding them is `scanLine`'s job (`citation-scan.ts`), which also resolves
+   * the shorthand this file used to miss: `GECMDS.C:1198, :1313` is two
+   * citations, not one. The quote binds to the number it directly follows, so
+   * only the second of that pair could ever carry one.
    */
-  // Matched per LINE, not across the file: the quote has to sit on the same
-  // line as the citation. A wrapped quote is simply not counted, which costs a
-  // handful of legitimate ones and is worth it — a whole-file match would pair
-  // a citation with any backtick that happened to follow it anywhere below.
-  const QUOTED = /\b(GE[A-Z]+\.[CH]):(\d+)\s*`([^`]+)`/g;
 
   /**
    * How far either side of the cited line to look. Canon citations routinely
@@ -127,18 +133,18 @@ describe('a quoted citation says what the original says', () => {
     const pairs: Array<{ where: string; file: string; line: number; frag: string }> = [];
     for (const f of SCANNED) {
       readFileSync(f, 'utf8').split('\n').forEach((text, idx) => {
-        for (const m of text.matchAll(QUOTED)) {
-          const frag = m[3];
+        for (const c of scanLine(text)) {
+          if (c.quote === null) continue;
           // Too short to be distinctive — a stray backtick after a citation
           // catches things like a lone comma.
-          if (strip(frag).length < 6) continue;
+          if (strip(c.quote).length < 6) continue;
           // A paraphrase, not a quote: `if (delta > 0) ... else delta = 0`.
-          if (frag.includes('...')) continue;
+          if (c.quote.includes('...')) continue;
           pairs.push({
             where: `${rel(f)}:${idx + 1}`,
-            file: m[1].toUpperCase(),
-            line: Number(m[2]),
-            frag,
+            file: c.file,
+            line: c.line,
+            frag: c.quote,
           });
         }
       });
@@ -180,7 +186,10 @@ describe('a quoted citation says what the original says', () => {
    * time to raise it is when you touch a citation for any other reason.
    */
   it('never loses ground on the number of citations that prove themselves', () => {
-    const BASELINE = 78;
+    // 84 → 92 when `scanLine` replaced the long-form-only regex (issue #11):
+    // five of the shorthand continuations already carried a quote and were
+    // simply not being counted. Floor keeps the same six of slack it had at 84.
+    const BASELINE = 86;
     expect(pairs.length).toBeGreaterThanOrEqual(BASELINE);
   });
 
@@ -190,7 +199,7 @@ describe('a quoted citation says what the original says', () => {
    *
    * The pair works like a pincer. The count above may not fall and the count
    * below may not rise, so adding `GECMDS.C:1234` on its own fails while adding
-   * ``GECMDS.C:1234 `if (x > 0)` `` passes. Nobody has to backfill the 3,268
+   * ``GECMDS.C:1234 `if (x > 0)` `` passes. Nobody has to backfill the 3,469
    * bare citations already here; they are grandfathered and get quoted when
    * someone touches them for another reason.
    *
@@ -208,13 +217,20 @@ describe('a quoted citation says what the original says', () => {
   it('never adds a citation that cannot prove itself', () => {
     let total = 0;
     for (const f of SCANNED) {
-      total += [...readFileSync(f, 'utf8').matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)].length;
+      for (const line of readFileSync(f, 'utf8').split('\n')) total += scanLine(line).length;
     }
     const unquoted = total - pairs.length;
     // To fix a failure here: put the cited line in backticks after the
     // citation. Do not raise this number to get past it — that is the one move
     // that makes the guard stop working.
-    const BASELINE = 3268;
+    //
+    // Raised 3268 → 3469 on 2026-09-11 (issue #11). This is the one kind of
+    // raise the rule above allows, because the CORPUS did not change — the
+    // MEASUREMENT did. `scanLine` resolves the `FILE.C:123, :456` shorthand, so
+    // 201 citations that were always here became visible to the count for the
+    // first time. Every one of them is a citation that existed before this
+    // commit and that no ratchet was watching. Re-measured, not chosen.
+    const BASELINE = 3469;
     expect(unquoted).toBeLessThanOrEqual(BASELINE);
   });
 
@@ -245,7 +261,7 @@ describe('a quoted citation says what the original says', () => {
   it('never loses ground on the total number of citations, quoted or not', () => {
     let total = 0;
     for (const f of SCANNED) {
-      total += [...readFileSync(f, 'utf8').matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)].length;
+      for (const line of readFileSync(f, 'utf8').split('\n')) total += scanLine(line).length;
     }
     // Measured 2026-09-11 by running this file's own scan (see GAP THREE
     // above). If this fails because citations were deliberately removed,
@@ -262,7 +278,13 @@ describe('a quoted citation says what the original says', () => {
     // citations (GEMAIN.H:467, GECMDS.C:2456) were re-quoted rather than left
     // digit-free, replacing the two lost above with two that are checkable —
     // net total measured back at 3355.
-    const TOTAL_FLOOR = 3355;
+    //
+    // Raised 3355 → 3561 on 2026-09-11 (issue #11), for the same reason as the
+    // ceiling above: `scanLine` made the shorthand form countable. A floor only
+    // ever moves UP on a re-measurement like this, which is the safe direction —
+    // the 201 newly visible citations are now protected from silent deletion
+    // exactly like the rest.
+    const TOTAL_FLOOR = 3561;
     expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
   });
 });
