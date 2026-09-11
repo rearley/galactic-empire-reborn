@@ -1,11 +1,11 @@
 import { I_MEN, I_FOOD } from '../constants/items';
 import { clampRateToBudget, RateClampResult } from './rate-budget';
-import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { NEUTRAL_ZONE_SECTOR } from '../combat/neutral-zone';
 import { MAXPLNTS } from '../constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRepository } from '../player/user.repository';
-import { ShipStateService } from '../ship/ship-state.service';
+import { SHIP_STATE_PORT, type ShipStatePort } from '../ship/ship-state.port';
 import { AdminChange, PlanetState, planetKey } from './planet-state.types';
 import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers';
 import { applyEconomyTick, applyNeutralZoneRestock, isNeutralZoneRestockPlanet } from './planet-economy';
@@ -58,7 +58,7 @@ export class PlanetStateService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ships: ShipStateService,
+    @Inject(SHIP_STATE_PORT) private readonly ships: ShipStatePort,
     /**
      * Optional — when omitted (legacy unit-test wiring) the pure
      * `applyEconomyTick` formula is used directly with no revolt branch.
