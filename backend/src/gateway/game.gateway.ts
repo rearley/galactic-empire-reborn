@@ -120,7 +120,7 @@ import type { CommandBroadcast } from '../game/commands/command.types';
 import { dispatchBroadcast, emitToSockets, roomMembers } from './broadcast-dispatch';
 import { DestroyedEmitter, ShipDestroyedService } from './ship-destroyed.service';
 import { ConnectionLifecycleService, LifecycleHost } from './connection-lifecycle.service';
-import { shipNameOf } from './ship-identity';
+import { shipNameOf, useridOf, shipnoOf } from './ship-identity';
 import {
   Narration,
   narratePlanetBeacon,
@@ -156,16 +156,6 @@ interface PromptReplyPayload {
  * @see specs/003-ship-commands/contracts/websocket-events.md
  * @see specs/011-onboarding/contracts/websocket-events.md
  */
-/** `usr_x:2` -> `usr_x`. A userid may itself contain colons, so drop only the last segment. */
-function useridOf(shipKey: string): string {
-  const parts = shipKey.split(':');
-  return parts.slice(0, -1).join(':');
-}
-
-/** `usr_x:2` -> `2`. The counterpart to {@link useridOf}. */
-function shipnoOf(shipKey: string): number {
-  return Number(shipKey.split(':').pop());
-}
 
 
 /**

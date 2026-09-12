@@ -5,13 +5,15 @@ FROM node:24-alpine AS builder
 # `file:../packages/wire`, which npm can only follow from a root install.
 WORKDIR /app
 
-# Install all deps via the workspace root lockfile, so the resolved tree
-# matches what CI's backend/frontend test jobs run against.
+# Install deps via the workspace root lockfile, so the resolved tree matches
+# what CI's frontend test job runs against. Scoped to the frontend and @ge/wire
+# workspaces only — the backend workspace (Nest, Prisma, the Prisma CLI,
+# Vitest, ...) has nothing to do with a `tsc && vite build`, and an unscoped
+# `npm ci` here installed all of it to produce a static bundle.
 COPY package*.json ./
 COPY packages/wire/package.json ./packages/wire/package.json
-COPY backend/package.json ./backend/package.json
 COPY frontend/package.json ./frontend/package.json
-RUN npm ci
+RUN npm ci --workspace=frontend --workspace=packages/wire
 
 # Build @ge/wire before the app that imports it.
 COPY packages/wire ./packages/wire

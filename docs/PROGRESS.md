@@ -6086,3 +6086,47 @@ cannot start remains possible, and was possible this evening.
 **Next:** the remaining issue backlog, then playtests on local dev AND on
 `restructure`, then the merge conversation. `VERSION` gets its single bump at
 merge.
+
+## 2026-09-12 — Review of the restructure pull request (#45)
+
+`VERSION` took its single bump for the whole restructure: **0.15.0**. The branch
+opened as a pull request against master and CI ran on it for the first time —
+both suites green, the image build correctly skipped for a pull request. That
+closes **#40**.
+
+A read of the 117 production files in the diff produced six findings. Five are
+fixed here; the sixth is recorded below as deliberate.
+
+- **The `@ge/wire` suite ran nowhere.** Both CI jobs built the package and
+  neither tested it, so the one package whose change breaks two applications at
+  once was the only one with no gate. The backend job now runs it.
+  `test/unit/ci-runs-wire-tests.spec.ts` pins the step.
+- **Three command handlers took the ship-class cache `@Optional()`.** Absent it,
+  a scan finds nothing, `new ship` refuses every purchase and `rep` prints a
+  class number where a type name belongs — all silently, and invisibly to a
+  suite whose doubles supply the cache the container might not. The wiring was
+  correct; nothing asserted it. `test/integration/optional-deps-resolve.spec.ts`
+  boots the real container and does. Verified by unwiring `PhysicsModule` and
+  watching it go red.
+- **Two copies of the ship-key parser.** `useridOf` was defined in
+  `game.gateway.ts` and again in `narration.ts`, routing every private narration
+  line. `ship-identity.ts` exists for exactly this and says so. The stated reason
+  for the copy — a cycle with the gateway — does not apply to that module. Both
+  moved there, pinned by
+  `test/invariants/ship-key-parser-single-definition.spec.ts`.
+- **The `FIRST_CPU_CLASS` guard could not fail.** It filtered the class table
+  using the constant and then asserted the result was below it, which holds for
+  any value. It now derives the bound from the first non-PLAYER entry in the
+  generated table, the way GEMAIN.C:882 `cyb_class = i;` does.
+- **The frontend image installed the backend workspace.** An unscoped `npm ci`
+  pulled Nest, Prisma and Vitest in to run `tsc && vite build`. Scoped to
+  `frontend` and `packages/wire`, as the backend image already was. Guarded by
+  `test/unit/dockerfile-workspace-scope.spec.ts` and verified by building the
+  image and reading the bundle out of it.
+
+**Not fixed, deliberately:** `backend/package.json` and `frontend/package.json`
+still read `"version": "0.0.1"`. Neither is read by anything — the root `VERSION`
+is what the build bakes into both images — and giving them real numbers would
+create a second place for a release number to be wrong. The root `CLAUDE.md`
+cites that field's history for a reason; the answer is that it is not a version,
+not that it needs maintaining.

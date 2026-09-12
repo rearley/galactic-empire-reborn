@@ -145,6 +145,15 @@ jobs:
         working-directory: backend
         run: npm run build --workspace @ge/wire
 
+      # The contract's own suite. It runs HERE rather than in a third job
+      # because it needs nothing this job has not already done, and because
+      # the alternative was what shipped for the whole restructure: both jobs
+      # built @ge/wire and neither checked it, so the one package whose change
+      # breaks two applications at once was the only one with no gate.
+      - name: Test @ge/wire
+        working-directory: backend
+        run: npm test --workspace @ge/wire
+
       # DATABASE_URL is scoped to this step and is a placeholder. `prisma
       # generate` never opens a connection — it reads the schema and writes
       # TypeScript — but prisma.config.ts resolves the variable eagerly and
