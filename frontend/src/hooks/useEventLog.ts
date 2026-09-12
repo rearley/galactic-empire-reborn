@@ -81,11 +81,33 @@ export function useEventLog(): {
       append([{ text: `${channel}${payload.from}: ${payload.text}`, category: 'chat' }]);
     };
 
+    /**
+     * `command.notice` is the gateway's unsolicited-notice channel for lines
+     * addressed to ONE ship rather than a sector, and today its only producer
+     * is canon's SCAN1/2/3 — "Sir! We are being scanned by Ship A, The Ranger."
+     * Nothing listened, so a player never learned they had been looked at,
+     * which in the original is how you find out someone is sizing you up
+     * before they close. Scan ranges are asymmetric, so the hunter is often
+     * outside your own scanners and this notice is the only warning.
+     *
+     * Its payload is `{ lines: EventLogLine[] }` — a different contract from
+     * `event.log`'s single `{ text, category }`, hence a separate handler.
+     * @see issue #2  @see GE/REL/MBMGEMSG.MSG SCAN1, SCAN2, SCAN3
+     */
+    const handleCommandNotice = (payload: { lines?: Array<{ text?: string; category?: EventLogLine['category'] }> }) => {
+      const lines = (payload?.lines ?? [])
+        .filter((l): l is { text: string; category?: EventLogLine['category'] } => typeof l?.text === 'string')
+        .map((l) => ({ text: l.text, category: l.category ?? 'system' }));
+      if (lines.length > 0) append(lines);
+    };
+
     socket.on('event.log', handleServerNotice);
     socket.on('message.send', handleTransmission);
+    socket.on('command.notice', handleCommandNotice);
     return () => {
       socket.off('event.log', handleServerNotice);
       socket.off('message.send', handleTransmission);
+      socket.off('command.notice', handleCommandNotice);
     };
   }, [append]);
 
