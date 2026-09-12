@@ -25,6 +25,37 @@ function read(rel: string): string {
 describe('Node runtime version', () => {
   const dockerfiles = ['backend/Dockerfile', 'frontend/Dockerfile'];
 
+  /**
+   * The one runtime this file can actually observe: the one running it.
+   *
+   * Every other assertion here reads a FILE. All four agreed on 24 while this
+   * machine ran the whole backend suite on Node v22.22.2 for weeks, and the
+   * guard stayed green — `engines` is advisory unless `engine-strict` is set,
+   * so nothing refused. That is the exact failure the docblock above describes,
+   * in the environment where most of the evidence is produced.
+   *
+   * It stopped being theoretical in Phase 5: NestJS 12 ships ESM and a
+   * CommonJS consumer needs `require(esm)`, which arrived in Node 24.9. On 22
+   * that surfaced as "Must use import to load ES Module" from `@nestjs/testing`
+   * — a runtime-version problem wearing a module-system costume.
+   *
+   * A hard failure, not a warning: a suite run on the wrong major is not weaker
+   * evidence, it is evidence about a runtime nobody deploys. `.nvmrc` names the
+   * version and `.npmrc` sets `engine-strict`, so the fix is `nvm use`.
+   * @see issue #31
+   */
+  it('runs on the Node major everything else declares', () => {
+    expect(process.versions.node.split('.')[0]).toBe(String(EXPECTED_MAJOR));
+  });
+
+  it('has a .nvmrc naming that major, so `nvm use` needs no lore', () => {
+    expect(read('.nvmrc').trim()).toMatch(new RegExp(`^v?${EXPECTED_MAJOR}(\\.|$)`));
+  });
+
+  it('sets engine-strict, so npm refuses the wrong major instead of warning', () => {
+    expect(read('.npmrc')).toMatch(/^engine-strict\s*=\s*true$/m);
+  });
+
   it.each(dockerfiles)('%s builds on the expected Node major', (rel) => {
     const froms = read(rel)
       .split('\n')

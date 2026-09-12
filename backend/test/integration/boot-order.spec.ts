@@ -1,29 +1,24 @@
 /**
- * Boot order is a contract, not an accident — and right now it is an accident.
+ * The heartbeats must start AFTER the world they tick.
  *
- * NestJS 12 executes lifecycle hooks by component hierarchy level, which can
- * reorder hooks that previously ran in registration order. `TickService`,
- * `GalaxyService` and `ShipClassCacheService` all implement `onModuleInit`, so
- * they are same-phase peers: Nest's phase ordering guarantees nothing between
- * them, and they are exactly what the v12 change moves.
- *
- * This file was written to assert that the heartbeats start LAST. It failed.
- * The measured order under NestJS 10 is:
+ * This file was written to assert exactly that, and it failed: the measured
+ * order under NestJS 10 was
  *
  *     tick  ->  galaxy  ->  ship-class-cache
  *
- * `TickService.onModuleInit` opens the 1-second ship-update and 6-second
- * physics `setInterval`s before the galaxy exists and before the ship-class
- * table has been read. That is a latent race, not an observed bug — the first
- * tick fires a second later, by which time boot has normally finished — and it
- * is filed rather than fixed, per the standing rule on pre-existing defects.
- * @see issue #30
+ * because `TickService` opened its 1-second and 6-second intervals in
+ * `onModuleInit`, a same-phase peer of the two services that build the world.
+ * Nest guarantees nothing between peers in one phase, so the order was an
+ * accident of registration — and the intervals were live before the galaxy
+ * existed and before the ship-class table had been read. It stood as a
+ * CHARACTERIZATION test pinning that accident while the restructure ran.
  *
- * So this is a CHARACTERIZATION test. It pins the order as it is, not as it
- * should be, and its whole job is to make the Nest 12 upgrade's effect on that
- * order visible instead of silent. **If it fails during the upgrade, do not
- * adjust it** — report the new order. A green suite around a changed boot
- * order is precisely the failure this exists to prevent.
+ * `TickService` now starts them in `onApplicationBootstrap`, which Nest runs
+ * strictly after every `onModuleInit` has resolved. So this asserts the
+ * invariant rather than the accident: whatever order the two `onModuleInit`
+ * peers run in, both finish before a tick can fire. That also survives NestJS
+ * 12's move to hierarchy-level hook ordering, which is what would have
+ * reshuffled the old pin silently. @see issue #30
  *
  * @see docs/superpowers/plans/2026-09-11-restructure-phase-5-runtime-upgrades.md Task 3
  */
@@ -41,7 +36,11 @@ import { TickService } from '../../src/game/tick/tick.service';
  * the doubles in, which is only the same question if the doubles carry the
  * same dependencies — and they do not.
  */
-function recordHook(order: string[], proto: { onModuleInit: () => unknown }, label: string): void {
+function recordModuleInit(
+  order: string[],
+  proto: { onModuleInit: () => unknown },
+  label: string,
+): void {
   const original = proto.onModuleInit;
   vi.spyOn(proto, 'onModuleInit').mockImplementation(function (this: unknown) {
     order.push(label);
@@ -49,13 +48,26 @@ function recordHook(order: string[], proto: { onModuleInit: () => unknown }, lab
   });
 }
 
+function recordBootstrap(
+  order: string[],
+  proto: { onApplicationBootstrap: () => unknown },
+  label: string,
+): void {
+  const original = proto.onApplicationBootstrap;
+  vi.spyOn(proto, 'onApplicationBootstrap').mockImplementation(function (this: unknown) {
+    order.push(label);
+    return original.call(this);
+  });
+}
+
 async function bootAndRecord(): Promise<string[]> {
   const order: string[] = [];
-  recordHook(order, TickService.prototype, 'tick');
-  recordHook(order, GalaxyService.prototype, 'galaxy');
-  recordHook(order, ShipClassCacheService.prototype, 'ship-class-cache');
+  recordBootstrap(order, TickService.prototype, 'tick');
+  recordModuleInit(order, GalaxyService.prototype, 'galaxy');
+  recordModuleInit(order, ShipClassCacheService.prototype, 'ship-class-cache');
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  // `init()` runs onModuleInit AND onApplicationBootstrap, in that order.
   await moduleRef.init();
   // close() before returning, so the real setInterval timers TickService opened
   // are cleared whatever the caller then asserts. A failed assertion that
@@ -69,14 +81,22 @@ describe('boot order', () => {
     vi.restoreAllMocks();
   });
 
-  it('runs the three boot-critical onModuleInit hooks in a fixed order', async () => {
-    expect(await bootAndRecord()).toEqual(['tick', 'galaxy', 'ship-class-cache']);
+  it('starts the heartbeats only after the galaxy and the class cache are built', async () => {
+    const order = await bootAndRecord();
+
+    expect(order).toContain('galaxy');
+    expect(order).toContain('ship-class-cache');
+    // The assertion that matters: tick is LAST, whatever order its two
+    // predecessors ran in between themselves.
+    expect(order.at(-1)).toBe('tick');
+    expect(order.indexOf('tick')).toBeGreaterThan(order.indexOf('galaxy'));
+    expect(order.indexOf('tick')).toBeGreaterThan(order.indexOf('ship-class-cache'));
   });
 
-  it('is the same order on a second boot, so the pin is not a coincidence', async () => {
-    // An order that varies run to run would make the assertion above a flake
-    // rather than a contract, and would mean the upgrade could reorder things
-    // without this file ever going red.
-    expect(await bootAndRecord()).toEqual(['tick', 'galaxy', 'ship-class-cache']);
+  it('holds on a second boot, so it is a contract and not a coincidence', async () => {
+    // An order that varied run to run would make the assertion above a flake
+    // rather than a contract, and would mean a later change could reorder
+    // things without this file ever going red.
+    expect((await bootAndRecord()).at(-1)).toBe('tick');
   });
 });

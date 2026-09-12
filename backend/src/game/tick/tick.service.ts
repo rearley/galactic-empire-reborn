@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { TickContext, TickHandler, TickKind, Unsubscribe } from './tick.types';
 import { TickOrder } from './tick-order';
 
@@ -23,7 +23,7 @@ export type SnapshotProvider = () => unknown;
  * @see GEMAIN.C:656 plantime = plantock / numrecs (PLANET_UPDATE cadence)
  */
 @Injectable()
-export class TickService implements OnModuleInit, OnModuleDestroy {
+export class TickService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TickService.name);
   private shipUpdateTimer: NodeJS.Timeout | null = null;
   private physicsTimer: NodeJS.Timeout | null = null;
@@ -51,7 +51,27 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     [TickKind.PLANET_UPDATE]: 0,
   };
 
-  onModuleInit(): void {
+  /**
+   * The heartbeats open in `onApplicationBootstrap`, NOT `onModuleInit`.
+   *
+   * They used to open in `onModuleInit`, and the measured boot order was
+   * `tick -> galaxy -> ship-class-cache`: the 1-second and 6-second intervals
+   * started before `GalaxyService` had generated or verified the galaxy and
+   * before `ShipClassCacheService` had read the ship-class table. Nothing was
+   * observed to break, because the first tick lands a second later and boot
+   * normally finishes inside that second — but the window is not fixed. On a
+   * fresh database the galaxy generation writes 40,401 sectors at the deployed
+   * UNIVMAX=100 inside one transaction, and the timer does not wait for it. A
+   * tick running against an empty class cache is the same shape as the bug that
+   * left every Cybertron with a default-zero `topspeed`, unable to move, for
+   * 339 commits.
+   *
+   * Nest runs `onApplicationBootstrap` strictly after every `onModuleInit` has
+   * resolved, so this makes the dependency a guarantee rather than a
+   * coincidence of registration order — and it survives NestJS 12's change to
+   * hierarchy-level hook ordering. @see issue #30
+   */
+  onApplicationBootstrap(): void {
     this.tickNumbers = {
       [TickKind.SHIP_UPDATE]: 0,
       [TickKind.PHYSICS]: 0,
