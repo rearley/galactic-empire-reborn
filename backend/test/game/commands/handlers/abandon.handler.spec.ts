@@ -46,10 +46,10 @@ function makeService(ship: ShipState) {
 // ---------------------------------------------------------------------------
 
 describe('AbandonHandlerService — happy path (SC-007)', () => {
-  it('marks ship.status = SHIP_STATUS_ABANDONED (3)', () => {
+  it('marks ship.status = SHIP_STATUS_ABANDONED (3)', async () => {
     const ship = makeShip({ status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship', 'yes'], {});
+    await handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
 
@@ -74,12 +74,12 @@ describe('AbandonHandlerService — happy path (SC-007)', () => {
     expect(result.broadcasts![0].payload.text).toContain('USS Freedom');
   });
 
-  it('clears ctx.client.data.activeShipNo when client is present', () => {
+  it('clears ctx.client.data.activeShipNo when client is present', async () => {
     const ship = makeShip();
     const { handler } = makeService(ship);
     const fakeClient = { data: { activeShipNo: ship.shipno } };
     const ctx: CommandContext = { client: fakeClient as unknown as CommandContext['client'] };
-    handler.command.handler(ship, ['ship', 'yes'], ctx);
+    await handler.command.handler(ship, ['ship', 'yes'], ctx);
     expect(fakeClient.data.activeShipNo).toBeUndefined();
   });
 

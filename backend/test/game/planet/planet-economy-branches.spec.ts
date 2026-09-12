@@ -174,12 +174,12 @@ function buildHyperHarness(firerOver: Partial<ShipState>, victims: ShipState[]) 
   return { svc, firer };
 }
 
-function fire(svc: PhaserHandlerService, firer: ShipState, args: string[]): void {
-  svc.command.handler(firer, args, {} as CommandContext);
+async function fire(svc: PhaserHandlerService, firer: ShipState, args: string[]): Promise<void> {
+  await svc.command.handler(firer, args, {} as CommandContext);
 }
 
 describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)', () => {
-  it('burns a ship that is in hyperspace, in the beam and in range', () => {
+  it('burns a ship that is in hyperspace, in the beam and in range', async () => {
     // 0.5 sectors dead ahead: dd = 1 - 5000/40000 = 0.875, dam = trunc(50 *
     // 0.875^5) = 25, factor = 25 * 5 / 1.00667 -> 124 hull. The baseline that
     // makes every "no damage" case below mean something.
@@ -187,12 +187,12 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     const victim = makeShip({ userid: 'v1', shipno: 2, channel: 2, where: 1, ...at });
     const { svc, firer } = buildHyperHarness({ xcoord: 5.5, ycoord: 5.5 }, [victim]);
 
-    fire(svc, firer, ['0']);
+    await fire(svc, firer, ['0']);
 
     expect(victim.damage).toBeGreaterThan(0);
   });
 
-  it('skips a hull nobody is flying and still burns the AI beside it', () => {
+  it('skips a hull nobody is flying and still burns the AI beside it', async () => {
     // `ingegame(othusn)` — status 1 (player) or 2 (AI). A status-0 slot is a
     // ship record with no pilot behind it; canon never puts one in the loop.
     const ghost = makeShip({
@@ -205,13 +205,13 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     });
     const { svc, firer } = buildHyperHarness({ xcoord: 5.5, ycoord: 5.5 }, [ghost, cyb]);
 
-    fire(svc, firer, ['0']);
+    await fire(svc, firer, ['0']);
 
     expect(ghost.damage).toBe(0);
     expect(cyb.damage).toBeGreaterThan(0);
   });
 
-  it('passes straight through a ship in normal space', () => {
+  it('passes straight through a ship in normal space', async () => {
     // `wptr->where == 1` (GECMDS.C:1045). The hyper-phaser is a hyperspace-only
     // weapon at BOTH ends; a ship in normal space is not in this fight, and a
     // firer at warp that could hit it would be untouchable while doing so.
@@ -221,12 +221,12 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     });
     const { svc, firer } = buildHyperHarness({ xcoord: 5.5, ycoord: 5.5 }, [normalSpace]);
 
-    fire(svc, firer, ['0']);
+    await fire(svc, firer, ['0']);
 
     expect(normalSpace.damage).toBe(0);
   });
 
-  it('cannot reach into the neutral zone, while the ship just outside it burns', () => {
+  it('cannot reach into the neutral zone, while the ship just outside it burns', async () => {
     // `!neutral(&wptr->coord)` (GECMDS.C:1047). The zone is the WHOLE of sector
     // (0,0) — floor() on each axis, GECMDS.C:3102 — so these two victims are a
     // sixth of a sector apart with the sector line between them. The firer sits
@@ -236,13 +236,13 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     const outside = makeShip({ userid: 'exposed', shipno: 3, channel: 3, where: 1, xcoord: 1.05, ycoord: 0.5 });
     const { svc, firer } = buildHyperHarness({ ...firerPos, heading: 270 }, [inside, outside]);
 
-    fire(svc, firer, ['0']);
+    await fire(svc, firer, ['0']);
 
     expect(inside.damage).toBe(0);
     expect(outside.damage).toBeGreaterThan(0);
   });
 
-  it('stops at the firer class scan range, though the damage curve has not', () => {
+  it('stops at the firer class scan range, though the damage curve has not', async () => {
     // `ddistance < shipclass[ptr->shpclass].scanrange` (GECMDS.C:1054) is the
     // range cap, and it bites well BEFORE the falloff does: at 2.0 sectors
     // dd = 1 - 20000/40000 = 0.5, dam = trunc(50 * 0.5^5) = 1, so 4 hull would
@@ -257,13 +257,13 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     });
     const { svc, firer } = buildHyperHarness({ xcoord: 5.5, ycoord: 5.5 }, [near, far]);
 
-    fire(svc, firer, ['0']);
+    await fire(svc, firer, ['0']);
 
     expect(near.damage).toBeGreaterThan(0);
     expect(far.damage).toBe(0);
   });
 
-  it('keeps the fixed five-degree beam even at maximum focus', () => {
+  it('keeps the fixed five-degree beam even at maximum focus', async () => {
     // `smallest(heading,deg) < HPBEAMW` — HPBEAMW is 5 and `ptr->percent` is
     // never read on this path (GECMDS.C:1050). The normal beam at focus 5 is
     // `focus + PHABIAS` = 7 degrees wide, so the ship at 6 degrees is inside
@@ -279,7 +279,7 @@ describe('firehp victim selection, through the pha command (GECMDS.C:1041-1086)'
     });
     const { svc, firer } = buildHyperHarness({ xcoord: 5.5, ycoord: 5.5 }, [inBeam, justOutside]);
 
-    fire(svc, firer, ['0', '5']);
+    await fire(svc, firer, ['0', '5']);
 
     expect(inBeam.damage).toBeGreaterThan(0);
     expect(justOutside.damage).toBe(0);

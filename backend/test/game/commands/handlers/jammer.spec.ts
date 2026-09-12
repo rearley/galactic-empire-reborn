@@ -78,33 +78,33 @@ describe('JammerHandlerService — `jam`', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.JAM_NOAMMO));
   });
 
-  it('distance scaling — ship at scanrange/2 gets floor(JAMTIME * 0.5); self gets JAMTIME', () => {
+  it('distance scaling — ship at scanrange/2 gets floor(JAMTIME * 0.5); self gets JAMTIME', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 0.5, ycoord: 0 });
     const carol = makeShip({ userid: 'c', shipno: 3, xcoord: 2, ycoord: 0 }); // outside
     const handler = makeHarness([alice, bob, carol], 10000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(alice.jammer).toBe(JAMTIME);
     expect(bob.jammer).toBe(Math.floor(JAMTIME * 0.5));
     expect(carol.jammer).toBe(0); // out of range
   });
 
-  it('does not jam a ship on the far side of the galaxy', () => {
+  it('does not jam a ship on the far side of the galaxy', async () => {
     // scanRange 15_000 = 1.5 sectors. Bob is 10 sectors away.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 2, ycoord: 3 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 12, ycoord: 3 });
     const handler = makeHarness([alice, bob], 15000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(bob.jammer).toBe(0);
   });
 
-  it('leaves an out-of-range ship\'s existing jammer counter alone', () => {
+  it('leaves an out-of-range ship\'s existing jammer counter alone', async () => {
     // C only writes wptr->jammer inside the in-range branch, so a jammer
     // already running on a distant ship must not be reset to 0.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 9, ycoord: 0, jammer: 7 });
     const handler = makeHarness([alice, bob], 15000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(bob.jammer).toBe(7);
   });
 });

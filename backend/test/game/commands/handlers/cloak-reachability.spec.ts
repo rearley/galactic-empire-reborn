@@ -100,7 +100,7 @@ describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', 
   }
 
   it('ship.cloak === CLOAK_RAMP_FULL (10) → report includes REP12 "Cloak: active."', async () => {
-    const service = await makeReportService();
+    const service = makeReportService();
     const ship = makeShip({ cloak: CLOAK_RAMP_FULL, shpclass: 1 });
     const result = await (service.command.handler(ship, ['sys'], {}) as Promise<{ lines: { text: string }[] }>);
     const texts = result.lines.map(l => l.text);
@@ -109,7 +109,7 @@ describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', 
   });
 
   it('ship.cloak === 0 → report shows REP13 "Cloak: inactive." not REP12', async () => {
-    const service = await makeReportService();
+    const service = makeReportService();
     const ship = makeShip({ cloak: 0, shpclass: 1 });
     const result = await (service.command.handler(ship, ['sys'], {}) as Promise<{ lines: { text: string }[] }>);
     const texts = result.lines.map(l => l.text);
@@ -122,7 +122,7 @@ describe('cloak reachability — report.handler.ts:189 (REP12 cloaked status)', 
 // 3–5. cybertron-tick.service — three cloak===10 call sites
 // ---------------------------------------------------------------------------
 
-function buildCybertronHarness() {
+async function buildCybertronHarness() {
   const rand = new Mulberry32Adapter(0); // deterministic seed
   const events = new EventEmitter2();
   const shipMap = new Map<string, ShipState>();
@@ -185,7 +185,7 @@ function buildCybertronHarness() {
   } as unknown as TickService;
 
   const svc = new CybertronTickService(tickService, shipStateService, shipClassCache, repository, events, rand);
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(): void {
     for (const fn of subscribed) {
@@ -202,7 +202,7 @@ function buildCybertronHarness() {
 
 describe('cloak reachability — cybertron-tick.service.ts:268 (scan loop skips cloak=10)', () => {
   it('Cybertron does not acquire cloaked player (cloak=10) as a new target', async () => {
-    const { events, addShip, fireTick } = buildCybertronHarness();
+    const { events, addShip, fireTick } = await buildCybertronHarness();
 
     // Cybertron with no current target (cybmine=255)
     const cyb = makeShip({
@@ -231,7 +231,7 @@ describe('cloak reachability — cybertron-tick.service.ts:268 (scan loop skips 
 
 describe('cloak reachability — cybertron-tick.service.ts:494 (current target cloaks → hold course)', () => {
   it('Cybertron with existing lock on player who cloaks → holds course, does not fire', async () => {
-    const { events, addShip, fireTick } = buildCybertronHarness();
+    const { events, addShip, fireTick } = await buildCybertronHarness();
 
     // Player ship locked in cybertron's sights — now fully cloaked
     const player = makeShip({
@@ -261,7 +261,7 @@ describe('cloak reachability — cybertron-tick.service.ts:494 (current target c
 
 describe('cloak reachability — cybertron-tick.service.ts:513 (acquisition scan skips cloak=10)', () => {
   it('Cybertron scans for new target — cloaked player is invisible, uncloaked player is acquired', async () => {
-    const { events, addShip, fireTick } = buildCybertronHarness();
+    const { events, addShip, fireTick } = await buildCybertronHarness();
 
     const cyb = makeShip({
       userid: 'cyb1', shipno: 101, shpclass: 21,

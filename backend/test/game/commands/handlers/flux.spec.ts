@@ -65,9 +65,9 @@ describe('fluxCommand — `flux`', () => {
     expect(result.lines).toHaveLength(1);
   });
 
-  it('still consumes pod even if energy already at max (no short-circuit)', () => {
+  it('still consumes pod even if energy already at max (no short-circuit)', async () => {
     const s = makeShip({ energy: ENGYMAX, items: itemsWith({ [I_FLUX]: 3n }) });
-    fluxCommand.handler(s, [], ctx);
+    await fluxCommand.handler(s, [], ctx);
     expect(s.items[I_FLUX]).toBe(2n);
     expect(s.energy).toBe(ENGYMAX);
   });

@@ -30,15 +30,15 @@ describe('FreHandlerService', () => {
   });
 
   describe('FR-017: hail keyword sets freq to 0', () => {
-    it('sets ship.freq[0] to 0 on "fre a hail"', () => {
+    it('sets ship.freq[0] to 0 on "fre a hail"', async () => {
       const ship = makeShip({ freq: [5, 0, 0] });
-      handler.command.handler(ship, ['a', 'hail'], ctx);
+      await handler.command.handler(ship, ['a', 'hail'], ctx);
       expect(ship.freq[0]).toBe(0);
     });
 
-    it('hail is case-insensitive', () => {
+    it('hail is case-insensitive', async () => {
       const ship = makeShip({ freq: [5, 0, 0] });
-      handler.command.handler(ship, ['A', 'HAIL'], ctx);
+      await handler.command.handler(ship, ['A', 'HAIL'], ctx);
       expect(ship.freq[0]).toBe(0);
     });
 
@@ -104,35 +104,35 @@ describe('FreHandlerService', () => {
   });
 
   describe('FR-021: dirty flag set on success', () => {
-    it('sets dirty=true on successful fre', () => {
+    it('sets dirty=true on successful fre', async () => {
       const ship = makeShip({ dirty: false });
-      handler.command.handler(ship, ['a', 'hail'], ctx);
+      await handler.command.handler(ship, ['a', 'hail'], ctx);
       expect(ship.dirty).toBe(true);
     });
 
-    it('does NOT set dirty on error', () => {
+    it('does NOT set dirty on error', async () => {
       const ship = makeShip({ dirty: false });
-      handler.command.handler(ship, ['a', '0'], ctx);
+      await handler.command.handler(ship, ['a', '0'], ctx);
       expect(ship.dirty).toBe(false);
     });
   });
 
   describe('FR-022: channel mapping', () => {
-    it('channel A maps to freq[0]', () => {
+    it('channel A maps to freq[0]', async () => {
       const ship = makeShip({ freq: [0, 0, 0] });
-      handler.command.handler(ship, ['a', '1000'], ctx);
+      await handler.command.handler(ship, ['a', '1000'], ctx);
       expect(ship.freq[0]).toBe(1000);
     });
 
-    it('channel B maps to freq[1]', () => {
+    it('channel B maps to freq[1]', async () => {
       const ship = makeShip({ freq: [0, 0, 0] });
-      handler.command.handler(ship, ['b', '1000'], ctx);
+      await handler.command.handler(ship, ['b', '1000'], ctx);
       expect(ship.freq[1]).toBe(1000);
     });
 
-    it('channel C maps to freq[2]', () => {
+    it('channel C maps to freq[2]', async () => {
       const ship = makeShip({ freq: [0, 0, 0] });
-      handler.command.handler(ship, ['c', '1000'], ctx);
+      await handler.command.handler(ship, ['c', '1000'], ctx);
       expect(ship.freq[2]).toBe(1000);
     });
   });

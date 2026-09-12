@@ -103,35 +103,35 @@ describe('warp gate sequence (FR-012)', () => {
  * `imp` already handled this (impulse.handler.ts:44); warp did not.
  */
 describe('warp course argument — GECMDS.C:cmd_warp', () => {
-  it('turns to a relative course given alongside the speed', () => {
+  it('turns to a relative course given alongside the speed', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 100, head2b: 100 });
-    h.command.handler(ship, ['6', '45'], {});
+    await h.command.handler(ship, ['6', '45'], {});
     expect(ship.head2b).toBe(145);
   });
 
-  it('wraps past 360', () => {
+  it('wraps past 360', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 350, head2b: 350 });
-    h.command.handler(ship, ['6', '30'], {});
+    await h.command.handler(ship, ['6', '30'], {});
     expect(ship.head2b).toBe(20);
   });
 
-  it('accepts a negative relative course', () => {
+  it('accepts a negative relative course', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 10, head2b: 10 });
-    h.command.handler(ship, ['6', '-30'], {});
+    await h.command.handler(ship, ['6', '-30'], {});
     expect(ship.head2b).toBe(340);
   });
 
-  it('holds the current heading when no course is given', () => {
+  it('holds the current heading when no course is given', async () => {
     // C defaults the argument to "0", so a bare `war` means straight ahead.
     const h = build({ 1: 10 });
     // head2b == heading: this ship is flying straight, not mid-turn. A bare
   // `war` holds a turn already ordered (head2b != heading), so a fixture that
   // disagreed with itself would exercise that path instead of this one.
   const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 174, head2b: 174 });
-    h.command.handler(ship, ['6'], {});
+    await h.command.handler(ship, ['6'], {});
     expect(ship.head2b).toBe(174);
   });
 

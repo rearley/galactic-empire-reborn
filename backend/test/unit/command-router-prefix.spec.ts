@@ -51,15 +51,15 @@ function textOf(result: CommandResult): string {
 
 describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)', () => {
   describe('longer input resolves on its first 3 characters', () => {
-    it.each(['sca', 'scan', 'scanner', 'scandalous'])('%s resolves to the sca command', (input) => {
+    it.each(['sca', 'scan', 'scanner', 'scandalous'])('%s resolves to the sca command', async (input) => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch(input, makeShip(), ctx);
+      await router.dispatch(input, makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
 
-    it('passes the remaining tokens through as args, unaffected by verb length', () => {
+    it('passes the remaining tokens through as args, unaffected by verb length', async () => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch('scan lo', makeShip(), ctx);
+      await router.dispatch('scan lo', makeShip(), ctx);
       expect(handler).toHaveBeenCalledWith(expect.anything(), ['lo'], ctx);
     });
   });
@@ -74,23 +74,23 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   });
 
   describe('a differing 3rd character is a different command', () => {
-    it('sel and sen do not collide', () => {
+    it('sel and sen do not collide', async () => {
       const router = new CommandRouterService();
       const sell = vi.fn().mockReturnValue({ lines: [] });
       const send = vi.fn().mockReturnValue({ lines: [] });
       router.register({ keyword: 'sel', aliases: [], minArgs: 0, argMissingMessage: '', handler: sell });
       router.register({ keyword: 'sen', aliases: [], minArgs: 0, argMissingMessage: '', handler: send });
 
-      router.dispatch('sell', makeShip(), ctx);
+      await router.dispatch('sell', makeShip(), ctx);
       expect(sell).toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
     });
   });
 
   describe('short table entries keep exact-match semantics', () => {
-    it('? resolves to the help command', () => {
+    it('? resolves to the help command', async () => {
       const { router, handler } = makeRouter('?');
-      router.dispatch('?', makeShip(), ctx);
+      await router.dispatch('?', makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
 
@@ -103,9 +103,9 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   });
 
   describe('case insensitivity is preserved', () => {
-    it.each(['SCAN', 'Sca', 'ScAnNeR'])('%s resolves', (input) => {
+    it.each(['SCAN', 'Sca', 'ScAnNeR'])('%s resolves', async (input) => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch(input, makeShip(), ctx);
+      await router.dispatch(input, makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
   });

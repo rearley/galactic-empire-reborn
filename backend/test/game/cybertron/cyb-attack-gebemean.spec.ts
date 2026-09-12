@@ -52,7 +52,7 @@ function makeShip(
   });
 }
 
-function buildHarness(seed: number) {
+async function buildHarness(seed: number) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
   const shipMap = new Map<string, ShipState>();
@@ -101,7 +101,7 @@ function buildHarness(seed: number) {
   const svc = new CybertronTickService(
     tickService, shipStateService, shipClassCache, repository, events, rand,
   );
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -152,7 +152,7 @@ describe('A-003 — gebemean gate: GECYBS.C:514 phaser blocked when gebemean ret
      *   - gebemean (r3=0.527): floor(0.527*3)=1 ≠ 0 → false
      * Result: mean=false → phaser gate blocks fire even though phasr=100 >= PMINFIRE=60
      */
-    const { shipMap, events, fireTick } = buildHarness(5);
+    const { shipMap, events, fireTick } = await buildHarness(5);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -192,7 +192,7 @@ describe('A-003 — gebemean gate: phaser fires when gebemean is true and cybwho
      * seed=42: breakoff=false, cybwhoops r3=0.852 → floor(0.852*10)=8 ≠ 1 → whoops=false.
      * Result: mean=true, !cybwhoops=true, phasr=100 >= PMINFIRE=60 → phaser fires.
      */
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,

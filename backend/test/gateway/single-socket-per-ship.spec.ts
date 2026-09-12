@@ -42,9 +42,9 @@ describe('GameGateway single-socket-per-ship invariant', () => {
       emit: vi.fn().mockImplementation((ev: string) => {
         emitOrder.push(`socket[${id}]:${ev}`);
       }),
-      disconnect: vi.fn().mockImplementation(() => {
+      disconnect: vi.fn().mockImplementation(async () => {
         // Simulate socket.io calling handleDisconnect when disconnect(true) is called
-        gateway.handleDisconnect(sock as never);
+        await gateway.handleDisconnect(sock as never);
       }),
       on: vi.fn(),
       join: vi.fn(),

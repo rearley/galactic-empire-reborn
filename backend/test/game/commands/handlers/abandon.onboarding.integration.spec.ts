@@ -75,11 +75,11 @@ describe('FR-803 — post-abandon router gate rejects all commands', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SHIP_ABANDONED));
   });
 
-  it('abandon handler → sets status=3 → subsequent dispatch blocked', () => {
+  it('abandon handler → sets status=3 → subsequent dispatch blocked', async () => {
     const { router, ship, abandonHandler } = buildHarness();
 
     // Execute abandon via the handler
-    abandonHandler.command.handler(ship, ['ship', 'yes'], {});
+    await abandonHandler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
 
     // Next command via router is blocked

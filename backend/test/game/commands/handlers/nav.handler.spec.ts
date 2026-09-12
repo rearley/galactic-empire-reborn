@@ -68,9 +68,9 @@ describe('NavHandlerService — status form (no args)', () => {
     expect(handler.command.argMissingMessage).toBe(formatMessage(MessageId.NAVFMT));
   });
 
-  it('changes nothing about the ship — a rejected nav is not a manoeuvre', () => {
+  it('changes nothing about the ship — a rejected nav is not a manoeuvre', async () => {
     const { handler, state, ctx, mockShipState } = makeService({ heading: 90, where: 3 });
-    handler.command.handler(state, [], ctx);
+    await handler.command.handler(state, [], ctx);
     expect(mockShipState.mutate).not.toHaveBeenCalled();
     expect(state.heading).toBe(90);
     expect(state.where).toBe(3);
@@ -196,7 +196,7 @@ describe('NavHandlerService — target inside the current sector', () => {
 
 describe('NavHandlerService — engagement happy path', () => {
 
-  it('writes NOTHING to the ship — it is a read-only report', () => {
+  it('writes NOTHING to the ship — it is a read-only report', async () => {
     // cmd_navigate computes and prints. It touches no field, which is why
     // asking for a bearing can no longer undock you, cancel a turn, or leave a
     // course behind for the tick to fly. @see GECMDS.C:5109-5156
@@ -204,7 +204,7 @@ describe('NavHandlerService — engagement happy path', () => {
     const snap = (o: object) =>
       JSON.stringify(o, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
     const before = snap(state);
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(snap(state)).toBe(before);
   });
 
@@ -239,11 +239,11 @@ describe('NavHandlerService — nav never breaks orbit', () => {
    * autopilot course itself is a documented deviation (docs/DECISIONS.md,
    * feature 016 D1) and stays; the undocking does not.
    */
-  it('in orbit (where >= 10) → orbit and repair progress are preserved', () => {
+  it('in orbit (where >= 10) → orbit and repair progress are preserved', async () => {
     const { handler, state, ctx } = makeService({
       where: 13, repair: 42, xcoord: 5.0, ycoord: 5.0,
     });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(13);
     expect(state.repair).toBe(42);
   });
@@ -257,15 +257,15 @@ describe('NavHandlerService — nav never breaks orbit', () => {
     expect(res.lines.some((l) => l.text === leaveorb)).toBe(false);
   });
 
-  it('where === 10 → still in orbit afterwards', () => {
+  it('where === 10 → still in orbit afterwards', async () => {
     const { handler, state, ctx } = makeService({ where: 10 });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(10);
   });
 
-  it('where < 10 → where unchanged', () => {
+  it('where < 10 → where unchanged', async () => {
     const { handler, state, ctx } = makeService({ where: 0 });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(0);
   });
 });

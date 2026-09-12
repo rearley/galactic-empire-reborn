@@ -69,7 +69,7 @@ const header = async (service: ScanHandlerService, ship: ShipState, args: string
 
 describe('scan headers follow SCAN24 / SCAN25', () => {
   it('`sca se` says mag:1x and carries NO range — SCAN25', async () => {
-    const service = await makeService();
+    const service = makeService();
     const h = await header(service, makeShip(), ['se']);
 
     expect(h).toBe('   Sector Scan mag:1x (s:5 5)');
@@ -77,7 +77,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('`sca lo` prints the RAW range under SCAN24, not range/10000', async () => {
-    const service = await makeService(100_000);
+    const service = makeService(100_000);
     const h = await header(service, makeShip(), ['lo']);
 
     // 100 000 scanRange x SCAN_LO_PROJECTION_MULTIPLIER (3) = 300 000 raw.
@@ -85,7 +85,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('`sca ra` uses the same SCAN24 shape, so the two agree', async () => {
-    const service = await makeService(100_000);
+    const service = makeService(100_000);
     const lo = await header(service, makeShip(), ['lo']);
     const ra = await header(service, makeShip(), ['ra']);
 
@@ -94,7 +94,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('never says "pc" — canon has no such unit anywhere', async () => {
-    const service = await makeService();
+    const service = makeService();
     for (const mode of [['se'], ['lo'], ['ra'], ['lo', 'full']]) {
       expect(await header(service, makeShip(), mode)).not.toMatch(/pc/);
     }

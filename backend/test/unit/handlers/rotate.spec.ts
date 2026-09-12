@@ -26,9 +26,9 @@ describe('rotateCommand', () => {
     expect(result.lines[0].category).toBe('success');
   });
 
-  it('success path sets dirty=true', () => {
+  it('success path sets dirty=true', async () => {
     const ship = makeShip();
-    rotateCommand.handler(ship, ['45'], ctx);
+    await rotateCommand.handler(ship, ['45'], ctx);
     expect(ship.dirty).toBe(true);
   });
 

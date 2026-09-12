@@ -256,7 +256,7 @@ async function runOneAiTick(over: Partial<Scenario> = {}): Promise<{ cyb: ShipSt
     tickNumber: 1,
     firedAt: new Date('2026-09-10T00:00:00Z'),
   };
-  for (const fn of handlers.get(TickKind.SHIP_UPDATE) ?? []) fn(ctx);
+  for (const fn of handlers.get(TickKind.SHIP_UPDATE) ?? []) await fn(ctx);
 
   return { cyb, prey };
 }
