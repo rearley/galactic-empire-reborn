@@ -154,6 +154,15 @@ async function buildHarness(seed = 42) {
     scanRange: 1_000_000, maxTons: 12500, hasTorpedo: true, hasMissile: false,
     hasJammer: true, hasMine: true, hasZipper: false, noClaim: 3, tough: 1, cybLowestClassAttacks: 2,
   });
+  // Class 1 (Interceptor) is what the player fixtures in this file fly, and it
+  // was the one class nobody registered — so `getMaxTons(1)` threw, production's
+  // per-ship fault isolation caught it, and a real ERROR line was printed during
+  // a green run. Values from the canon table. @see issue #12
+  (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(1, {
+    maxAcceleration: 5000, maxWarp: 10, maxPhaser: 10, maxShields: 10,
+    scanRange: 100_000, maxTons: 1000, hasTorpedo: true, hasMissile: false,
+    hasJammer: true, hasMine: true, hasZipper: true, noClaim: 1, tough: 0, cybLowestClassAttacks: 0,
+  });
   (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(3, {
     maxAcceleration: 1000, maxWarp: 5, maxPhaser: 1, maxShields: 1,
     scanRange: 30_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
@@ -697,5 +706,57 @@ describe('a Cybertron engaging a player deploys decoys', () => {
     await new Promise((r) => setImmediate(r));
 
     expect(cyb.decout.filter((t) => t > 0).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * One bad Cybertron must not take down the AI tick for every other ship.
+ *
+ * `onAiTick` wraps each ship's `cybLives` in a per-ship try/catch and logs and
+ * continues, deliberately. That boundary had no test — it was exercised only by
+ * accident, because a player fixture flew a class this file's cache mock did not
+ * register, so a real ERROR line appeared in a green run and taught everyone
+ * reading CI output to skim ERROR lines from this file. The accident is fixed
+ * (class 1 is registered); the boundary is asserted here instead, where the log
+ * is the expected output of a test that means to produce it. @see issue #12
+ */
+describe('a faulting Cybertron does not stop the others', () => {
+  it('logs the fault, names the ship, and keeps going', async () => {
+    const h = await buildHarness();
+
+    // A per-field cache lookup that throws is the real fault shape — the
+    // original instance was `getMaxTons` throwing for a class this file's mock
+    // had never registered. Class 99 is registered so `selectAiShips` picks the
+    // hull up (it filters on getCategory), and the field lookup throws, which
+    // is what puts execution inside the production catch.
+    const setClass = (h.shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass;
+    setClass(99, {
+      maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2,
+      scanRange: 50_000, maxTons: 900, hasTorpedo: true, hasMissile: false,
+      hasJammer: true, hasMine: true, hasZipper: true, noClaim: 3, tough: 0, cybLowestClassAttacks: 1,
+    });
+    const cache = h.shipClassCache as unknown as { get: (n: number) => unknown };
+    const realGet = cache.get.bind(cache);
+    cache.get = (n: number) => {
+      if (n === 99) throw new Error(`Class ${n} not found`);
+      return realGet(n);
+    };
+
+    // domain-ok: no such class — that is the fault being injected
+    const broken = makeShip({ userid: '@cybX', shipno: 9, shpclass: 99, status: 2, tick: 0, cybupdate: 100, jammer: 1 });
+    const healthy = makeShip({ userid: '@cyb1', shipno: 1, shpclass: 21, status: 2, tick: 0, cybupdate: 100 });
+    h.shipMap.set('@cybX:9', broken);
+    h.shipMap.set('@cyb1:1', healthy);
+
+    const errors: string[] = [];
+    const logger = (h.svc as unknown as { logger: { error: (m: string) => void } }).logger;
+    const spy = vi.spyOn(logger, 'error').mockImplementation((m: unknown) => { errors.push(String(m)); });
+
+    expect(() => h.fireAiTick()).not.toThrow();
+
+    expect(errors.join('\n')).toContain('cybLives fault for @cybX:9');
+    // The healthy ship still ran: cybLives sets cybupdate on every activation.
+    expect(healthy.cybupdate).not.toBe(100);
+    spy.mockRestore();
   });
 });
