@@ -126,6 +126,18 @@ export const GUIDE_CORRECTIONS: Readonly<Record<string, string>> = Object.freeze
     'consult your kill count at all. The Scout\'s "lowest class it will attack" ' +
     'is 0, meaning every class. A brand-new pilot in a starter Interceptor can ' +
     'therefore be attacked unprovoked, and regularly is.',
+  buy:
+    'This page describes buying "from one of your own planets or another players ' +
+    'planet" and never mentions that those are two different prices. They are. ' +
+    'The original\'s price routine branches on who owns the world: the OWNER pays ' +
+    '`baseprice[item]`, the fixed galactic price, and everybody else pays that ' +
+    'planet\'s own `markup2a` (GECMDS.C price(), the `sameas(plptr->userid, ' +
+    'warsptr->userid)` test). So the price you set on your colony is the price ' +
+    'other captains pay, never the price you pay — set missiles to 10 and you ' +
+    'will still be charged the base 20 when you buy one yourself. It also means ' +
+    'you can price a good BELOW what it costs you, which the original allows: an ' +
+    'earlier version added the markup to the base price and the author commented ' +
+    'that line out in favour of the markup alone.',
   planets:
     'This page says anything you transfer to a planet "belongs to them, you cannot ' +
     'transfer it back". That is not what the original actually does. Its own ' +

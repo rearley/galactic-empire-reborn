@@ -65,6 +65,18 @@ export class PriceHandlerService {
           });
         }
       }
+      if (isOwner && lines.length > 0) {
+        // The two-price rule, said out loud. Canon charges the owner
+        // `baseprice[item]` and everyone else the planet's `markup2a`:
+        // GECMDS.C:4437 `if (sameas(plptr->userid, warsptr->userid))`. A
+        // captain who sets their own missile price to 10 and is then charged
+        // 20 has met canon, not a bug — but nothing anywhere said so, and it
+        // was reported as one. @see issue #1
+        lines.push({
+          text: 'Your own planet sells to you at base price; `adm markup` sets what other captains pay.',
+          category: 'success',
+        });
+      }
       if (lines.length === 0) {
         // BUY5 is the item-scoped refusal for `pri <qty> <item>`; a bare `pri`
         // named no item, so answering with it told the pilot an item they had

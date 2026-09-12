@@ -27,7 +27,7 @@ const BEACON_MAX = 75;
 const ADMIN_USAGE: readonly string[] = [
   'Commands:',
   '  adm rate <item> <0-100>        production rate',
-  '  adm markup <item> <value>      sale price',
+  '  adm markup <item> <value>      price OTHERS pay (you pay base)',
   '  adm sellflag <item> on|off     offer item to visitors',
   '  adm reserve <item> <value>     hold back from sale',
   '  adm tax <0-100>                tax rate',

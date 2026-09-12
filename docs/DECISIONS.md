@@ -3745,6 +3745,41 @@ else's.**
 
 **Status:** port addition, not canon text. The string is ours.
 
+**CORRECTED 2026-09-12 — the firer-side string is canon's, and the port's goes.**
+This entry's central factual claim is wrong. It says "there is no unused string
+in MBMGEMSG.MSG for a firer-side impact either; the vocabulary simply does not
+exist, because the code never asks for one." Two strings exist and the code does
+ask: `MTACC1` ("Sensors indicate our torpedo has hit ship %c, The %s.") and
+`MTACC2` (the hyper-missile form), printed by `acctm` to the firer's own channel
+on every torpedo or missile hit —
+
+    if (channel != 255)
+      {
+      prfmsg(MTACC1+mt,shpltr(channel,usrn),ptr->shipname);
+      outprfge(ALWAYS,channel);
+      ptr->lastfired = channel;
+      }
+
+GEFUNCS.C:1730-1748. `acctm` was read as scoring; it is scoring AND a message.
+The rejected alternative "full canon — say nothing to the firer" was therefore
+answering a question canon had already answered differently: canon does speak to
+the firer, in its own words, naming the target and its scan letter.
+
+The gateway was later wired to relay both strings, without this entry being
+revisited, so a pilot received canon's line AND the port's `Sensors confirm a
+<weapon> strike on <ship>.` for the same hit. That is the playtest log in issue
+#8. The port's string is now removed, along with the whole client-side
+`combat.hit` / `combat.phaser-fired` narration path, and canon's text stands
+alone.
+
+Everything else in this entry holds, and one part of it is strengthened: hull
+damage is still reported as a number nowhere, and MTACC assesses nothing either
+— it confirms the hit and names the ship, which is exactly the loop this entry
+argued for. The scan letter reads `?` when the target is not on your scan table,
+which is canon's own `shpltr` fallback (GEFUNCS.C:2591) and is what a `sca sh`
+by name alone leaves you with, since only the range, local and data scans assign
+letters.
+
 ## 2026-09-07 — A bystander is told nothing about a fight they are not in
 **Context:** Third and final pass over combat messaging, closing the same thread
 as the two entries above. The port rendered two client-side lines to everyone in
