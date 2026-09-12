@@ -109,9 +109,32 @@ export class ScanHandlerService {
    */
   lettersFor(userid: string, shipno: number): ReadonlyArray<{ shipKey: string; letter: string }> {
     return (this.getScantab(userid, shipno) ?? []).map((e) => ({
-      shipKey: e.shipKey,
+      // Translated to the `userid:shipno` ShipState key on the way OUT.
+      //
+      // A scantab entry is keyed `userid#shipno` internally, and every consumer
+      // of this method asks with the ShipState key: the torpedo and missile
+      // handlers, and the gateway's three hit-report sites. `shipLetter`
+      // compares the strings exactly, so nothing ever matched and every report
+      // read `?` — "Sensors indicate our hyper-missile has hit ship ?, The
+      // SADx348006", on a ship the pilot had just scanned and locked. Canon
+      // prints `?` only when the target is genuinely absent from the scan table
+      // (GEFUNCS.C:2591 `return('?');` shpltr), which is a real state and stays reachable.
+      //
+      // Converted here, at the one boundary, rather than by changing the
+      // internal format: `#` is woven through the scan renderers, and the
+      // letter -> ship direction in `findShip` already tolerates both.
+      shipKey: ScanHandlerService.toShipStateKey(e.shipKey),
       letter: e.letter,
     }));
+  }
+
+  /**
+   * `userid#shipno` -> `userid:shipno`. Split on the LAST separator, because a
+   * userid may contain one and a shipno may not.
+   */
+  private static toShipStateKey(scantabKey: string): string {
+    const at = scantabKey.lastIndexOf('#');
+    return at < 0 ? scantabKey : `${scantabKey.slice(0, at)}:${scantabKey.slice(at + 1)}`;
   }
 
   private getScantab(userid: string, shipno: number): Scantab | null {

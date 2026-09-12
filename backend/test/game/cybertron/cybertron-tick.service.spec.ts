@@ -265,15 +265,34 @@ describe('T017 — hyperwarp: Cybertron enters hyperwarp for distant target', ()
 
 // ─── T018: hyperwarp shield restore ───────────────────────────────────────
 
-describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
-  it('Cybertron dropping from hyperwarp (where=1 → brake band) restores shield to class max', async () => {
+/**
+ * REVISED: the brake band does not end hyperspace, and does not raise shields.
+ *
+ * This asserted `where === 0` and `shieldstat === 1` after one brake-band tick
+ * from hyperwarp — the port's behaviour, not canon's. GECYBS.C's brake band
+ * (:756-769) contains no `shieldup` call and no `where` write; the exit comes
+ * from `accel()` when the ship decelerates back under warp 1
+ * (GEFUNCS.C:538 `	if ((ptr->speed2b < 1000) && (ptr->speed/1000 >=1) && ((ptr->speed-decelrate)/1000 <1))`), and only then does `if (ptr->where == 0) shieldup(...)`
+ * fire in the two close bands.
+ *
+ * Keeping the old assertions meant an AI fought at warp behind shields a player
+ * at the same speed cannot have. @see issue #42
+ *
+ * The CHARGE restore is left as it was: it is the port's own R-9 decision
+ * rather than canon, and it is filed separately rather than changed here.
+ */
+describe('T018 — hyperwarp: the brake band neither leaves hyperspace nor grants charge', () => {
+  it('keeps where=1, shields down, and the charge where combat left it', async () => {
     const { shipMap, fireTick } = await buildHarness(42);
 
     // Place Cybertron outside NZ in hyperwarp (where=1), distance 15 = brake band (hyperdist2=10 < 15 < hyperdist1=25)
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
       xcoord: 5, ycoord: 5, cybmine: 255, tick: 1, cybupdate: 100, holdcourse: 0,
-      where: 1, shield: 0, // currently in hyperwarp with shields down
+      // In hyperwarp, which by definition means shields down: canon drops them
+      // on entry (GEFUNCS.C:590 `	if (ptr->shieldstat == SHIELDUP)`) and the fixture's default of `up` is a
+      // state this ship cannot be in.
+      where: 1, shield: 0, shieldstat: 0,
     });
     shipMap.set('Cybrg-200:200', cyb);
 
@@ -286,9 +305,17 @@ describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
     fireTick(1);
     await new Promise((r) => setImmediate(r));
 
-    expect(cyb.where).toBe(0); // dropped from hyperwarp
-    expect(cyb.shield).toBe(2); // class 21 maxShields=2 restored
-    expect(cyb.shieldstat).toBe(1); // shields raised
+    // Still in hyperspace: only deceleration under warp 1 ends that, and the
+    // physics tick is what applies it.
+    expect(cyb.where).toBe(1);
+    // Shields stay DOWN while in hyperspace — canon drops them on entry and
+    // nothing in the brake band puts them back.
+    expect(cyb.shieldstat).toBe(0);
+    // No free charge. Canon's bands never touch `ptr->shield`; it comes back
+    // through `shieldchg` at shieldtype*3 per six-second tick, the same path a
+    // player's does — and the tick loop that runs it filters on nothing, so the
+    // AI is on the same terms rather than defenceless. @see issue #43
+    expect(cyb.shield).toBe(0);
   });
 });
 
