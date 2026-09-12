@@ -10,6 +10,26 @@
 import { ShipStateService } from '../game/ship/ship-state.service';
 
 /**
+ * `usr_x:2` -> `usr_x`. A userid may itself contain colons, so drop only the
+ * last segment.
+ *
+ * Lives here, with the other two, because it had drifted into a second copy:
+ * `narration.ts` carried its own to avoid a circular import with the gateway.
+ * This module imports neither, so there is no cycle to avoid — and a ship-key
+ * parser with two implementations is the shape of the bug that made every hit
+ * report read "ship ?" in a live game. @see issue #44
+ */
+export function useridOf(shipKey: string): string {
+  const parts = shipKey.split(':');
+  return parts.slice(0, -1).join(':');
+}
+
+/** `usr_x:2` -> `2`. The counterpart to {@link useridOf}. */
+export function shipnoOf(shipKey: string): number {
+  return Number(shipKey.split(':').pop());
+}
+
+/**
  * The ship name behind a `userid:shipno` key, or undefined if it has left.
  *
  * Guarded: this only decorates a combat notice, and a thrown lookup inside

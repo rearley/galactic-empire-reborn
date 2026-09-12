@@ -1,4 +1,5 @@
 import type { EventLogCategory } from '@ge/wire';
+import { useridOf } from './ship-identity';
 import { formatMessage, MessageId } from '../game/commands/messages';
 import { showarp } from '../game/ship/showarp';
 import { damstr } from '../game/combat/combat-math';
@@ -28,15 +29,6 @@ export interface Narration {
   text: string;
 }
 
-/**
- * `usr_x:2` -> `usr_x`. A userid may itself contain colons, so drop only the
- * last segment. Duplicated from `game.gateway.ts` rather than imported, to
- * avoid a circular import between the gateway and this pure-function module.
- */
-function useridOf(shipKey: string): string {
-  const parts = shipKey.split(':');
-  return parts.slice(0, -1).join(':');
-}
 
 /**
  * A colony's beacon, to the one captain who rolled it.
