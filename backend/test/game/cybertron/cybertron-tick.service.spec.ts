@@ -276,7 +276,7 @@ describe('T017 — hyperwarp: Cybertron enters hyperwarp for distant target', ()
  * fire in the two close bands.
  *
  * Keeping the old assertions meant an AI fought at warp behind shields a player
- * at the same speed cannot have. @see issue #42
+ * at the same speed cannot have. @see issue #43
  *
  * The CHARGE restore is left as it was: it is the port's own R-9 decision
  * rather than canon, and it is filed separately rather than changed here.
@@ -314,7 +314,7 @@ describe('T018 — hyperwarp: the brake band neither leaves hyperspace nor grant
     // No free charge. Canon's bands never touch `ptr->shield`; it comes back
     // through `shieldchg` at shieldtype*3 per six-second tick, the same path a
     // player's does — and the tick loop that runs it filters on nothing, so the
-    // AI is on the same terms rather than defenceless. @see issue #43
+    // AI is on the same terms rather than defenceless. @see issue #44
     expect(cyb.shield).toBe(0);
   });
 });

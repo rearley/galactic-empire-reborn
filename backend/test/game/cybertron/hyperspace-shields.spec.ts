@@ -21,7 +21,7 @@ import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
  * that should still be in it. The next activation then read `currentWhere === 0`
  * and raised its shields. Reported from play: a Sarten Attack Drone scanned at
  * "Speed: Warp 3.20 / Shields: UP" while the player's own shields drop the
- * moment they pass warp 1. @see issue #42
+ * moment they pass warp 1. @see issue #43
  */
 describe('the pursuit bands do not fake an exit from hyperspace', () => {
   const rand = new Mulberry32Adapter(1);

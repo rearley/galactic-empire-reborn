@@ -157,7 +157,7 @@ describe('pickPursuitBand (T014)', () => {
    * hyperspace happens in `accel()` when a decelerating ship crosses back under
    * warp 1 (GEFUNCS.C:538 `	if ((ptr->speed2b < 1000) && (ptr->speed/1000 >=1) && ((ptr->speed-decelrate)/1000 <1))`). Forcing 0 here was an exit by fiat that left an
    * AI at 3,200 units of speed in "normal space", where the next band raised
-   * its shields — at warp, which no player can do. @see issue #42
+   * its shields — at warp, which no player can do. @see issue #43
    */
   it('brake band: hyperdist2 ≤ distance < hyperdist1 → no where write, desiredSpeed=topSpeed', () => {
     const dist = 15; // between 10 and 25
@@ -175,7 +175,7 @@ describe('pickPursuitBand (T014)', () => {
    * (GEFUNCS.C:2420-2427), so an AI was coming out of every hyperwarp run with a
    * full screen for free while a player's only comes back at `shieldtype * 3`
    * per six-second tick. The AI regenerates through that same `shieldchg` path,
-   * so it is on equal terms now rather than defenceless. @see issue #43
+   * so it is on equal terms now rather than defenceless. @see issue #44
    */
   it('brake band: dropping from hyperwarp grants no charge and raises nothing', () => {
     const dist = 15;

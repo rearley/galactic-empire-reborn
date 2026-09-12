@@ -23,7 +23,7 @@ export interface PursuitBand {
    * movement code, which calls `hyperspace(ptr,usrn,0)` when a decelerating
    * ship crosses back under warp 1 (GEFUNCS.C:538 `	if ((ptr->speed2b < 1000) && (ptr->speed/1000 >=1) && ((ptr->speed-decelrate)/1000 <1))`). Writing 0 here yanked
    * an AI out of hyperspace at 3,200 units of speed and let the next band raise
-   * its shields at warp. @see issue #42
+   * its shields at warp. @see issue #43
    */
   where?: number;
   /**
@@ -38,7 +38,7 @@ export interface PursuitBand {
    * `shieldtype * 3` per six-second tick through `shieldchg`. The AI regenerates
    * through that same path — the tick loop filters on nothing — so removing the
    * gift leaves it on equal terms rather than leaving it defenceless.
-   * @see issue #43
+   * @see issue #44
    */
   shield?: number;
   /** True when Cybertron is dropping from hyperwarp back to normal space */

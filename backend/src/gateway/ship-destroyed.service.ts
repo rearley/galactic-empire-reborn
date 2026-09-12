@@ -353,6 +353,16 @@ export class ShipDestroyedService {
       'ship destroyed:',
       `victim=${event.victimShipKey}`,
       `attacker=${event.attackerShipKey ?? 'none'}`,
+      // The two facts that explain an `attacker=none`, which has at least three
+      // causes and printed none of them: a colony's ion cannons set the
+      // victim's `lastfired` to -1 so the planet's kill credits nobody
+      // (GEFUNCS.C:1797), `leave()` scrubs it to the same value when the firer
+      // logs off, and a live channel can simply fail to resolve. The channel
+      // and the name recorded when the damage LANDED separate those three, and
+      // the name survives a scrub. Asked for after a player put two missiles
+      // into a Cyberquad, watched it die and got no credit. @see issue #42
+      `lastfired=${event.attackerChannel >= 0 ? event.attackerChannel : 'none'}`,
+      `lastfiredBy=${event.attackerName ? `'${event.attackerName}'` : 'none'}`,
       `cause=${event.weapon ?? 'unknown'}`,
       `sector=(${event.sector.x},${event.sector.y})`,
     ];
