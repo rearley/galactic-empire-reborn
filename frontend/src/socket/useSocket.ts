@@ -133,7 +133,7 @@ export function useSocket(
       socket.off('prompt:ship-select', handleShipSelect);
       unsubResult();
     };
-  }, []);
+  }, [resultSink]);
 
   useEffect(() => {
     if (!playerDispatch) return;

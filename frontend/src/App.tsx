@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { destructionLine } from './features/combat/destructionLine';
 import { combatHitLine, phaserFiredLine } from './features/combat/combatNarration';
 import type { CombatHitNarrationEvent, NarrationContext } from './features/combat/combatNarration';
@@ -59,19 +59,17 @@ export function App(): React.JSX.Element {
 function Terminal(): React.JSX.Element {
   const { players, dispatch: playerDispatch } = usePlayerList();
 
-  // Reads only `players`, which the combat-subscription `useEffect` below
-  // (the one registering `handlePhaserFired`/`handleCombatHit`/
-  // `handleShipDestroyed`/`handleDecoyIntercept`) lists in its dependency
-  // array — that's what keeps this closure current without re-running
-  // the effect on every render. Nothing enforces that invariant if a future
-  // edit makes this read something else: `react-hooks/exhaustive-deps` is
-  // not enabled anywhere in this repo (`.oxlintrc.json` loads no React
-  // plugin), so a stale closure here would compile, lint clean, and pass
-  // review on a diff. If `shipName` starts reading anything beyond
-  // `players`, add it to that dep array by hand.
-  const shipName = (shipId: string): string => {
-    return players.find(p => p.shipId === shipId)?.name ?? shipId.split(':')[0];
-  };
+  // `useCallback` so the combat-subscription effect below can depend on this
+  // rather than on the values it happens to read. That comment used to say "if
+  // `shipName` starts reading anything beyond `players`, add it to that dep
+  // array by hand", because no React lint plugin was loaded and nothing
+  // enforced it. One is loaded now, so the rule holds this invariant instead of
+  // a reader remembering to. @see issue #25
+  const shipName = useCallback(
+    (shipId: string): string =>
+      players.find((p) => p.shipId === shipId)?.name ?? shipId.split(':')[0],
+    [players],
+  );
 
   const { lines: logLines, append: appendLines, clear: clearLog } = useEventLog();
 
@@ -141,7 +139,7 @@ function Terminal(): React.JSX.Element {
       socket.off('combat.ship-destroyed', handleShipDestroyed);
       socket.off('combat.decoy-intercept', handleDecoyIntercept);
     };
-  }, [players, localShipId]);
+  }, [players, localShipId, shipName, appendLines]);
 
   const shipNameError =
     onboardingPrompt?.type === 'ship-name' ? (onboardingPrompt.payload.error ?? null) : null;

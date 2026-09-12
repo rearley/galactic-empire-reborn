@@ -165,8 +165,8 @@ export function ScanPanel({ shipId = null }: ScanPanelProps): React.JSX.Element 
             * Tested on `!= null`, not on length: a readout mode that finds
             * NOTHING should still say so rather than vanish.
             */}
-          {cards.slice().reverse().filter((c) => c.sidePanel != null).map((card, idx) => (
-            <ScanCard key={idx} event={card} />
+          {cards.slice().reverse().filter((c) => c.sidePanel != null).map((card) => (
+            <ScanCard key={card.id} event={card} />
           ))}
         </div>
       )}

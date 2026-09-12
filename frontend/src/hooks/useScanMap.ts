@@ -20,10 +20,20 @@ export function useScanMap(
   // crossing invalidates the view. Only `sca se` is sector-scoped.
   const [kind, setKind] = useState<ScanRenderEvent['kind'] | null>(null);
 
-  useEffect(() => {
+  /**
+   * A new hull starts blind.
+   *
+   * Compared during render rather than reset in an effect: React's own recipe
+   * for adjusting state when a prop changes, and it avoids the extra render an
+   * effect-reset costs — the old shape painted the previous hull's grid once
+   * before clearing it. @see issue #25
+   */
+  const [lastShipId, setLastShipId] = useState(shipId);
+  if (shipId !== lastShipId) {
+    setLastShipId(shipId);
     setCells(null);
     setKind(null);
-  }, [shipId]);
+  }
 
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {

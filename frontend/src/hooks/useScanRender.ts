@@ -1,8 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket/socketClient';
 // One declaration per wire contract — the frontend imports the same shapes the
 // gateway emits. @see test/no-redeclared-wire-types.spec.ts
 import type { ScanRenderEvent } from '@ge/wire';
+
+/**
+ * A scan card with a stable identity.
+ *
+ * `<ScanPanel>` renders the list REVERSED, so the array index of any given card
+ * changes every time a new one arrives — React then re-renders every card and
+ * can carry DOM state across to the wrong one. Same reason `useEventLog` stamps
+ * its lines. @see issue #25
+ */
+export interface ScanCardEntry extends ScanRenderEvent {
+  id: number;
+}
 
 /**
  * Subscribes to `scan:render` socket events and maintains an ordered list of
@@ -36,18 +48,26 @@ export const MAX_SCAN_CARDS = 40;
  *   current. Stale scan data is worse than none: it is indistinguishable from a
  *   live reading. @see test/scan-resets-on-ship-change.spec.tsx
  */
-export function useScanRender(shipId?: string | null): ScanRenderEvent[] {
-  const [cards, setCards] = useState<ScanRenderEvent[]>([]);
+export function useScanRender(shipId?: string | null): ScanCardEntry[] {
+  const [cards, setCards] = useState<ScanCardEntry[]>([]);
+  const nextCardId = useRef(0);
 
-  // Changing hull discards the previous hull's readings.
-  useEffect(() => { setCards([]); }, [shipId]);
+  // Changing hull discards the previous hull's readings. Compared during render
+  // rather than reset in an effect, so the new hull never paints the old hull's
+  // cards first. @see issue #25, hooks/useScanMap.ts
+  const [lastShipId, setLastShipId] = useState(shipId);
+  if (shipId !== lastShipId) {
+    setLastShipId(shipId);
+    setCards([]);
+  }
 
   useEffect(() => {
     const handleScanRender = (event: ScanRenderEvent) => {
+      const card: ScanCardEntry = { ...event, id: nextCardId.current++ };
       if (event.mode === 'overwrite') {
-        setCards([event]);
+        setCards([card]);
       } else {
-        setCards((prev) => [...prev, event].slice(-MAX_SCAN_CARDS));
+        setCards((prev) => [...prev, card].slice(-MAX_SCAN_CARDS));
       }
     };
 
