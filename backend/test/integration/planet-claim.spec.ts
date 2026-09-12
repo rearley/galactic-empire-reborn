@@ -67,7 +67,9 @@ describe('T023 — PlanetStateService.claim()', () => {
       findMany: Mock;
       update: Mock;
     };
-    user: { updateMany: Mock };
+    // `update` for winning a world (a missing row is an error), `updateMany`
+    // for the floored decrement's predicate. @see issue #15
+    user: { updateMany: Mock; update: Mock };
   };
 
   beforeEach(() => {
@@ -82,7 +84,7 @@ describe('T023 — PlanetStateService.claim()', () => {
         }),
       },
       // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
-      user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }), update: vi.fn().mockResolvedValue({}) },
     };
   });
 

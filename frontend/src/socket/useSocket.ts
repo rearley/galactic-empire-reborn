@@ -36,9 +36,10 @@ export type ConnectionStatus =
  * means a handler receiving `PromptShipNamePayload`/`PromptShipSelectPayload`
  * can no longer be smuggled into a `Record<string, unknown>` field — TypeScript
  * correctly refuses that assignment (no index signature). The two payload
- * shapes differ for a real reason: `prompt:ship-name` carries an `error` field
- * for a rejected name; `prompt:ship-select`, per every emit site in
- * `game.gateway.ts`, never does — a re-emitted menu just repeats the fleet list.
+ * Both payloads carry an optional `error`: `prompt:ship-name` for a rejected
+ * name, and `prompt:ship-select` for a refused selection — a number outside the
+ * list, or a hull destroyed between the prompt and the reply. The select form
+ * used to send nothing, so the client's banner could never fill. @see issue #6
  */
 export type OnboardingPrompt =
   | { type: 'ship-name'; payload: PromptShipNamePayload }

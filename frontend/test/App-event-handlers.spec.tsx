@@ -365,6 +365,47 @@ describe('onboarding prompt replies', () => {
   });
 
   /**
+   * A refused selection must say why.
+   *
+   * The screen has had an error banner since the fleet menu landed, and App
+   * passed a hard-coded `null` into it because the payload carried no such
+   * field — provably dead UI. The gateway now sends one on a re-emitted menu,
+   * and this is the wiring that puts it on screen. @see issue #6
+   */
+  it("shows the gateway's reason for refusing a fleet choice", () => {
+    useSocketReturning({
+      onboardingPrompt: {
+        type: 'ship-select',
+        payload: {
+          step: 'SHIP_SELECT',
+          ships: [
+            { index: 1, shipno: 1, className: 'Interceptor', shipname: 'Phoenix', sector: { x: 0, y: 0 } },
+          ],
+          error: 'Enter a number from 1 to 1.',
+        },
+      },
+    });
+    render(<App />);
+    expect(screen.getByRole('alert').textContent).toContain('Enter a number from 1 to 1.');
+  });
+
+  it('shows no banner on the first prompt, which has refused nothing', () => {
+    useSocketReturning({
+      onboardingPrompt: {
+        type: 'ship-select',
+        payload: {
+          step: 'SHIP_SELECT',
+          ships: [
+            { index: 1, shipno: 1, className: 'Interceptor', shipname: 'Phoenix', sector: { x: 0, y: 0 } },
+          ],
+        },
+      },
+    });
+    render(<App />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  /**
    * The fleet menu is modal: there is no command input behind it, so the logout
    * button is the ONLY way out of a session that is stuck there. It must be
    * wired, and it must be wired on this prompt.

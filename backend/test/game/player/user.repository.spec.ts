@@ -306,15 +306,20 @@ describe('UserRepository', () => {
       });
     });
 
-    it('increments the planet counter tolerantly on claim', async () => {
-      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
-      const repo = makeRepo({ updateMany });
-
-      await repo.incrementPlanetsIfPresent('usr_a');
-      expect(updateMany).toHaveBeenCalledWith({
-        where: { userid: 'usr_a' },
-        data: { planets: { increment: 1 } },
-      });
+    /**
+     * ONE verb for one counter. Canon has one routine — `wonplnt()` does
+     * `++waruptr->planets` (GECMDS.C:4001) and `cmd_attack` calls it from both
+     * the troop and fighter branches — so the port's two verbs were its own
+     * invention, and they disagreed about a missing row: `update` throws
+     * P2025, `updateMany` is a silent no-op.
+     *
+     * Loud, on both paths: a world won or claimed by a captain with no account
+     * means something upstream is already broken, and the only account sweep in
+     * this codebase deletes abandoned SIGNUPS, which own no planets. @see #15
+     */
+    it('has no tolerant variant — a missing row is an error on every path', () => {
+      const repo = makeRepo({});
+      expect((repo as unknown as Record<string, unknown>).incrementPlanetsIfPresent).toBeUndefined();
     });
 
     it('decrements the planet counter only while it is above zero', async () => {

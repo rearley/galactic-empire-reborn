@@ -187,6 +187,15 @@ export interface ShipSelectEntry {
 export interface PromptShipSelectPayload {
   step: 'SHIP_SELECT';
   ships: ShipSelectEntry[];
+  /**
+   * Why the last reply was refused, when the menu is a RE-emit.
+   *
+   * Absent on the first prompt. The gateway re-emits this event on a bad reply,
+   * and the client had a banner for it that nothing could ever fill, so a
+   * captain who typed 9 of 2 — or picked a hull destroyed between the prompt
+   * and the reply — saw the same menu again with no explanation. @see issue #6
+   */
+  error?: string;
 }
 
 // ─── player.* ─────────────────────────────────────────────────────────────

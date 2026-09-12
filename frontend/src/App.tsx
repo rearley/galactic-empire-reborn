@@ -160,10 +160,9 @@ function Terminal(): React.JSX.Element {
         <ShipSelectPrompt
           ships={onboardingPrompt.payload.ships}
           onSelect={(index) => emitPromptReply(index)}
-          // `prompt:ship-select` never carries an error field on the wire — see
-          // `PromptShipSelectPayload` in packages/wire and every emit site in
-          // game.gateway.ts. A rejected selection just re-emits the fleet list.
-          error={null}
+          // Present only on a RE-emitted menu: the gateway says whether the
+          // number was outside the list or the hull is gone. @see issue #6
+          error={onboardingPrompt.payload.error ?? null}
           onLogout={() => logout()}
         />
       );
