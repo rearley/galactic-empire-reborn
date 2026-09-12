@@ -44,23 +44,26 @@ COPY backend/src ./src
 COPY backend/config ./config
 RUN npm run build
 
-# The linter does not go to production.
+# ─── Runtime dependencies ────────────────────────────────────────────────────
 #
-# The runtime stage copies this whole tree, because `docker-entrypoint.sh` runs
-# `prisma migrate deploy` at container start and the Prisma CLI is a
-# devDependency. `oxlint` and `oxlint-tsgolint` ride along on that decision,
-# bringing their platform binaries — about 52 MB of an 822 MB image, in a
-# runtime that will never lint anything. Watchtower pulls a new `:latest` on
-# every merge, so that is bandwidth and disk on every deploy.
+# The same install minus devDependencies, kept in its own stage so the runtime
+# image never sees the build toolchain. Previously the runtime copied the
+# builder's whole `node_modules`, because `docker-entrypoint.sh` shells the
+# Prisma CLI and that was a devDependency — so `@swc/core`, `@rolldown`, `vite`,
+# `@nestjs/cli`, `vitest` and the linter all shipped to production, about 250MB
+# of an image pulled on every deploy.
 #
-# Removed by name rather than by an `--omit=dev` install, which cannot work
-# until the runtime's own dependencies are classified as such: `@prisma/client`,
-# `prisma` and `ts-node` all sit in devDependencies today, and the app requires
-# the first at runtime. That reclassification is the larger fix.
-# @see issue #7  @see test/unit/dockerfile-no-linters.spec.ts
-RUN rm -rf /app/node_modules/oxlint /app/node_modules/oxlint-tsgolint \
-           /app/node_modules/@oxlint /app/node_modules/@oxlint-tsgolint \
-           /app/node_modules/.bin/oxlint /app/node_modules/.bin/oxlint-tsgolint
+# What made this possible was fixing the classification rather than the copy:
+# `@prisma/client` (the generated client requires `@prisma/client/runtime/*`),
+# `prisma`, `typescript` and `ts-node` are dependencies now, because this
+# container genuinely needs all four — the CLI reads `prisma.config.ts`, which is
+# TypeScript. @see issue #39
+FROM node:24-alpine AS prod-deps
+WORKDIR /app
+COPY package*.json ./
+COPY packages/wire/package.json ./packages/wire/package.json
+COPY backend/package.json ./backend/package.json
+RUN npm ci --omit=dev --workspace=backend --workspace=packages/wire
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 FROM node:24-alpine
@@ -88,7 +91,7 @@ WORKDIR /app/backend
 # node_modules/@ge/wire is a symlink to ../packages/wire (npm's workspace
 # link), so packages/wire's built dist has to come along too or that symlink
 # dangles — `require('@ge/wire')` would resolve to a target with no `dist/`.
-COPY --from=builder --chown=node:node /app/node_modules /app/node_modules
+COPY --from=prod-deps --chown=node:node /app/node_modules /app/node_modules
 COPY --from=builder --chown=node:node /app/packages/wire /app/packages/wire
 # docker-entrypoint.sh below invokes `./node_modules/.bin/prisma` relative to
 # WORKDIR (/app/backend); node_modules lives one level up at /app/node_modules

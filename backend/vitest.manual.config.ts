@@ -18,6 +18,9 @@ export default defineConfig({
     environment: 'node',
     root: __dirname,
     include: ['test/manual/**/*.manual.spec.ts'],
+    // The env the live stack runs on. Not the global setup — that resets
+    // `ge_test`, which is exactly what these specs must not do. @see issue #37
+    setupFiles: ['test/helpers/load-dotenv.ts'],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',
