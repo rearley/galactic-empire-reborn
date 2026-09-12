@@ -40,6 +40,22 @@ describe('lint gate', () => {
     expect(parseJsonc(read('.oxlintrc.json'))).toHaveProperty('rules');
   });
 
+  /**
+   * The frontend is a React app, and a React linter is the one ruleset that
+   * matters most in it: `exhaustive-deps` catches the stale closure that
+   * compiles, lints clean and passes review. The plugin was absent, so every
+   * dependency array in `frontend/src` was unchecked — loading it found two
+   * real missing dependencies, three state mirrors kept in sync by an effect,
+   * a ref written during render and two unstable list keys. @see issue #25
+   *
+   * Asserted here because a plugin is one word in a config file, which is the
+   * easiest kind of enforcement to delete by accident.
+   */
+  it('loads the React plugin, so hook dependencies are checked', () => {
+    const config = parseJsonc(read('.oxlintrc.json')) as { plugins?: string[] };
+    expect(config.plugins).toContain('react');
+  });
+
   it('the config declares non-empty rule categories', () => {
     const config = parseJsonc(read('.oxlintrc.json')) as {
       categories?: Record<string, string>;

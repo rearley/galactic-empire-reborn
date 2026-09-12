@@ -6,7 +6,14 @@ interface PlayerListPanelProps {
   fkeys?: string[];
 }
 
-export function PlayerListPanel({ players, fkeys = [] }: PlayerListPanelProps) {
+/**
+ * Shared empty binding list. A `[]` default is a fresh array on every render,
+ * which breaks referential equality for anything downstream that compares
+ * props. @see issue #25
+ */
+const NO_FKEYS: string[] = [];
+
+export function PlayerListPanel({ players, fkeys = NO_FKEYS }: PlayerListPanelProps) {
   return (
     <div data-testid="player-list-panel" className="font-mono text-sm flex flex-col h-full">
       <div className="border-b border-gray-800 px-3 py-1 shrink-0">
@@ -52,7 +59,7 @@ export function PlayerListPanel({ players, fkeys = [] }: PlayerListPanelProps) {
           {fkeys.some((c) => c !== '')
             ? fkeys.map((cmd, i) =>
                 cmd === '' ? null : (
-                  <div key={i} data-testid={`fkey-row-f${i + 1}`}>
+                  <div key={`f${i + 1}`} data-testid={`fkey-row-f${i + 1}`}>
                     <span className="text-yellow-400">{`f${i + 1}`.padStart(4)}</span>
                     <span className="text-gray-300">{`  ${cmd}`}</span>
                   </div>

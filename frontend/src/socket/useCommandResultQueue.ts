@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /**
  * A drop-free sink for command results.
@@ -18,11 +18,23 @@ export function useCommandResultQueue<T>(onResult: (payload: T) => void): {
   push: (payload: T) => void;
 } {
   const handler = useRef(onResult);
-  handler.current = onResult;
+
+  // Written in an effect, not during render. A render can be thrown away in
+  // concurrent React, and mutating a ref in one that is discarded leaves the
+  // ref describing a render that never committed — which is why the rule
+  // forbids it. Between a render and this effect the previous handler is
+  // still live, and that is the correct handler for that moment.
+  // @see issue #25
+  useEffect(() => {
+    handler.current = onResult;
+  });
 
   const push = useCallback((payload: T) => {
     handler.current(payload);
   }, []);
 
-  return { push };
+  // Memoised so a consumer can depend on the sink itself rather than on
+  // `push`: a fresh object literal each render would re-run any effect that
+  // listed it, which for `useSocket` means tearing down every subscription.
+  return useMemo(() => ({ push }), [push]);
 }
