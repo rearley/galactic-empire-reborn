@@ -1,6 +1,6 @@
 import { CLASS_HELP } from './class-help.generated';
 import { SHIP_CLASSES } from '../../../../prisma/seed/ship-classes';
-import { FIRST_CPU_CLASS } from '../handlers/new-ship.handler';
+import { isPlayerBuyableClass } from '../../ship/buyable-class';
 
 /**
  * Canon's answer when the class number is not one you can buy.
@@ -41,7 +41,7 @@ export function classDetailPage(arg: string | undefined): readonly string[] | nu
   if (!Number.isInteger(n)) return HLPCLS3;
 
   const cls = SHIP_CLASSES.find((c) => c.classNumber === n);
-  if (!cls || cls.category !== 'PLAYER' || cls.classNumber >= FIRST_CPU_CLASS) {
+  if (!isPlayerBuyableClass(cls)) {
     return HLPCLS3;
   }
 

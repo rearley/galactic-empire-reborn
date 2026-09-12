@@ -32,7 +32,8 @@ export interface ParsedSysArgs {
   sub: string;
   rest: string[];
   /** The nth `rest` element as an integer, or null if absent or not a clean integer. */
-  int(index: number): number | null;
+  /** A property, not a method — the caller destructures this object. */
+  int: (index: number) => number | null;
 }
 
 export function parseSysArgs(args: readonly string[]): ParsedSysArgs {
@@ -41,7 +42,12 @@ export function parseSysArgs(args: readonly string[]): ParsedSysArgs {
   return {
     sub,
     rest,
-    int(index: number): number | null {
+    // An arrow property, not a shorthand method: the caller destructures this
+    // object (`const { sub, rest, int } = parseSysArgs(args)`), which detaches
+    // a method from its receiver. It reads `rest` from the closure and never
+    // needs `this`, so binding it away removes the hazard rather than
+    // documenting it. @see issue #29
+    int: (index: number): number | null => {
       const raw = rest[index]?.trim();
       if (!raw) return null;
       // Number(), not parseInt(): parseInt('12abc') is 12, which turns an

@@ -11,6 +11,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ENGYMAX, MAXSHIPS, GESTAT_AVAIL } from '../../constants';
 import { START_FLUX_PODS } from '../../constants/onboarding';
 import { formatMessage, MessageId } from '../messages';
+import { FIRST_CPU_CLASS, isPlayerBuyableClass } from '../../ship/buyable-class';
 
 /**
  * Phaser/shield prices indexed by type-1 (type 1 = index 0).
@@ -28,11 +29,12 @@ import { formatMessage, MessageId } from '../messages';
  * @see GEMAIN.C:575-591, reference/ge-upstream/PROVENANCE.md
  */
 /**
- * cyb_class — the index of the first CYBORG entry, which bounds what `new ship`
- * may list or sell. GEMAIN.C:881-882 computes it; in the shipped table the
- * first CYBORG is class 21.
+ * cyb_class — re-exported so the importers that already read it from here keep
+ * working. The value and the predicate that uses it live in
+ * `src/game/ship/buyable-class.ts`, because this bound had drifted into two
+ * definitions and onboarding held the one without it. @see issue #21
  */
-export const FIRST_CPU_CLASS = 21;
+export { FIRST_CPU_CLASS };
 
 export const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
   1_200_000n, 2_000_000n, 3_800_000n, 5_000_000n, 7_000_000n, 9_000_000n,
@@ -259,9 +261,8 @@ export class NewShipHandlerService {
     const cache = this.shipClassCache;
     const classNumbers = cache?.getClassNumbers() ?? [];
     const rows = classNumbers.flatMap((classNumber) => {
-      if (classNumber >= FIRST_CPU_CLASS) return [];
       const c = cache?.get(classNumber);
-      if (!c || c.category !== 'PLAYER') return [];
+      if (!c || !isPlayerBuyableClass({ classNumber, category: c.category })) return [];
       return [{
         text: `  ${classNumber.toString().padEnd(3)} ${c.typeName.padEnd(20)}  ${c.maxPrice.toLocaleString()} cr`,
         category: 'system' as const,
@@ -326,7 +327,7 @@ export class NewShipHandlerService {
     // Validate: class must exist and be PLAYER category
     const shipClass = this.shipClassCache?.get(classNumber);
 
-    if (!shipClass || shipClass.category !== 'PLAYER' || classNumber >= FIRST_CPU_CLASS) {
+    if (!shipClass || !isPlayerBuyableClass({ classNumber, category: shipClass.category })) {
       return {
         lines: [{ text: "Invalid ship class. Type 'new ship' to see available classes.", category: 'system' }],
       };

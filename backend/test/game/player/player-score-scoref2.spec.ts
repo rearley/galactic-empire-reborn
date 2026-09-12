@@ -11,7 +11,7 @@
  * Here the knob is 3, not the shipped 100, so the two halves of a kill's score
  * movement come apart and the deduction has to be doing the scaling.
  *
- * @see GEFUNCS.C:1183 `	 ded_amt = (amt/100L)*score_f2;`
+ * @see GEFUNCS.C:1157 `	ded_amt = (amt/100L)*score_f2;`
  */
 vi.mock('../../../src/game/player/score.config', () => ({ scoreF2: 3 }));
 

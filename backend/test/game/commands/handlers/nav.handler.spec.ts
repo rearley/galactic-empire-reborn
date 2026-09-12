@@ -57,7 +57,7 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
 describe('NavHandlerService — status form (no args)', () => {
   it('answers NAVFMT rather than a status line', () => {
     const { handler, state, ctx } = makeService();
-    const result = handler.command.handler(state, [], ctx);
+    const result = handler.command.handler(state, [], ctx) as { lines: unknown[] };
     expect(result.lines).toEqual([
       { text: formatMessage(MessageId.NAVFMT), category: 'system' },
     ]);
@@ -292,7 +292,8 @@ describe('NavHandlerService — nav never breaks orbit', () => {
 describe('NavHandlerService — explains the shrinking bearing', () => {
   /** The bearing NAV01 printed, parsed back out of the canon sentence. */
   function bearingOf(ship: ShipState, handler: NavHandlerService, ctx: CommandContext): number {
-    const text = handler.command.handler(ship, ['0', '0'], ctx).lines[0].text;
+    const result = handler.command.handler(ship, ['0', '0'], ctx) as { lines: { text: string }[] };
+    const text = result.lines[0].text;
     const m = /bearing (-?\d+)/.exec(text);
     expect(m).not.toBeNull();
     return Number(m![1]);
@@ -322,9 +323,10 @@ describe('NavHandlerService — explains the shrinking bearing', () => {
 
   it('the distance does NOT move when only the heading does', () => {
     const { handler, ctx } = makeService();
-    const a = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 0 }), ['0', '0'], ctx);
-    const b = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 137 }), ['0', '0'], ctx);
-    const dist = (r: typeof a) => /distance (\S+)\./.exec(r.lines[0].text)![1];
+    type Lines = { lines: { text: string }[] };
+    const a = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 0 }), ['0', '0'], ctx) as Lines;
+    const b = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 137 }), ['0', '0'], ctx) as Lines;
+    const dist = (r: Lines) => /distance (\S+)\./.exec(r.lines[0].text)![1];
     expect(dist(a)).toBe(dist(b));
   });
 });

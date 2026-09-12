@@ -83,8 +83,12 @@ function isUniqueViolation(err: unknown, markers: readonly string[]): boolean {
   const constraint = e.meta?.driverAdapterError?.cause?.constraint;
   const candidates: unknown[] = [e.meta?.target, constraint?.index, constraint?.fields];
 
+  // Strings only. `String(c)` on an object is `[object Object]`, which is then
+  // compared against every marker — a question answered by accident rather than
+  // by rule, and the shape a future Prisma could hand us for `fields`.
+  // @see issue #29
   const names = candidates.flatMap((c) =>
-    c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)],
+    typeof c === 'string' ? [c] : Array.isArray(c) ? c.filter((x) => typeof x === 'string') : [],
   );
   return names.some((n) => markers.some((marker) => n.toLowerCase().includes(marker.toLowerCase())));
 }

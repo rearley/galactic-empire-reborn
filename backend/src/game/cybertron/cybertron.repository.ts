@@ -295,7 +295,12 @@ export class CybertronRepository {
         data: { kills: { increment: 1 } },
       });
     } catch (err: unknown) {
-      this.logger.error(`incrementKills failed for ${userid}:${shipno}: ${err}`);
+      // `${err}` on an unknown renders `[object Object]` for anything that is
+      // not an Error, and a driver-adapter rejection is exactly that — the one
+      // line recording a lost kill counter then says nothing about why.
+      // @see issue #29
+      const reason = err instanceof Error ? (err.stack ?? err.message) : JSON.stringify(err);
+      this.logger.error(`incrementKills failed for ${userid}:${shipno}: ${reason}`);
     }
   }
 

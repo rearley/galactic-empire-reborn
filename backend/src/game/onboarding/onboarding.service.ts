@@ -10,6 +10,7 @@ import { ShipState } from '../ship/ship-state.types';
 import { ENGYMAX, GESTAT_USER } from '../constants';
 import { START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
 import { onboardingUserUpdate } from './onboarding-cash';
+import { FIRST_CPU_CLASS, isPlayerBuyableClass } from '../ship/buyable-class';
 
 export interface ClassListEntry {
   classNumber: number;
@@ -57,11 +58,14 @@ export class OnboardingService {
 
   /**
    * Builds the class list payload for prompt:class-list.
-   * Only PLAYER category ship classes are included.
+   *
+   * PLAYER category AND below cyb_class — both halves of the rule, from the
+   * one predicate `new ship` uses. Category alone is what advertised the
+   * Sysopian Death Star to every pilot. @see src/game/ship/buyable-class.ts
    */
   async buildClassListPayload(): Promise<ClassListEntry[]> {
     const classes = await this.prisma.shipClass.findMany({
-      where: { category: 'PLAYER' },
+      where: { category: 'PLAYER', classNumber: { lt: FIRST_CPU_CLASS } },
       orderBy: { classNumber: 'asc' },
     });
     return classes.map((c) => ({
@@ -79,12 +83,17 @@ export class OnboardingService {
     }));
   }
 
-  /** Returns true if classNumber is a valid PLAYER ship class. */
+  /**
+   * Returns true if classNumber is one a player may actually buy.
+   * @see src/game/ship/buyable-class.ts — the bound, and why it is not
+   *   category alone.
+   */
   async validateClassReply(classNumber: number): Promise<boolean> {
     const cls = await this.prisma.shipClass.findFirst({
-      where: { classNumber, category: 'PLAYER' },
+      where: { classNumber },
+      select: { classNumber: true, category: true },
     });
-    return cls !== null;
+    return isPlayerBuyableClass(cls);
   }
 
   /**
