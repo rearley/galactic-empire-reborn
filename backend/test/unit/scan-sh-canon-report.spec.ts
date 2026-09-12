@@ -87,14 +87,14 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('reports the target SPEED — the field that decides if a fight is possible', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Speed: Warp 5.20');
   });
 
   it('names the ship class rather than printing a bare number', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Ship Class: Sarten Attack Drone');
     expect(out).not.toMatch(/class 24/);
@@ -102,21 +102,21 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('gives bearing, heading and distance on one line, as SCAN03 does', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toMatch(/Bearing: -?\d+ Heading: -?\d+ Dist: \d+/);
   });
 
   it('gives the galactic heading and the sector it is in', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Galactic Heading: 90 Sect: 6 5');
   });
 
   it('gives the hull size, max_tons/32 by max_tons/96', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     // 9600/32 = 300, 9600/96 = 100
     expect(out).toContain('Size: 300m long by 100m wide');
@@ -124,7 +124,7 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('withholds damage, shields and kills while the target is in hyperspace', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).not.toContain('Damage:');
     expect(out).not.toContain('Shields:');
@@ -137,7 +137,7 @@ describe('`sca sh` reports what canon reports', () => {
     slow.speed = 224;
     slow.where = 0;
     slow.kills = 3;
-    const out = await scan(await makeService([me, slow]), me, 'SADx348871');
+    const out = await scan(makeService([me, slow]), me, 'SADx348871');
 
     // showarp gives the bare figure; 224 raw is warp 0.22 — plainly sub-warp.
     expect(out).toContain('Speed: Warp 0.22');
@@ -167,7 +167,7 @@ describe('`sca sh` — Commanded by', () => {
       userid: 'usr_11aaf162ae9b2af979259bbd', shipno: 3, shipname: 'The AngryGoatBoy',
       username: 'AngryGoatBoy', status: 1, xcoord: 6.7, ycoord: 5.0, channel: 3,
     });
-    const out = await scan(await makeService([me, friend]), me, 'The AngryGoatBoy');
+    const out = await scan(makeService([me, friend]), me, 'The AngryGoatBoy');
 
     expect(out).toContain('Commanded by: AngryGoatBoy');
     expect(out).not.toContain('usr_11aaf162ae9b2af979259bbd');
@@ -179,7 +179,7 @@ describe('`sca sh` — Commanded by', () => {
       userid: 'Cybrg-222', shipno: 2, shipname: 'Cyberquad 44135', shpclass: 24,
       status: 2, xcoord: 6.7, ycoord: 5.0, channel: 2,
     });
-    const out = await scan(await makeService([me, cyb]), me, 'Cyberquad 44135');
+    const out = await scan(makeService([me, cyb]), me, 'Cyberquad 44135');
 
     expect(out).toContain('Commanded by: Cyberquad 44135');
     expect(out).not.toContain('Cybrg-222');

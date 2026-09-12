@@ -138,7 +138,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2); // victim owns 2 ships
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Let the void transaction resolve
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
@@ -177,7 +177,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     const service = (gateway as unknown as { shipDestroyed: { logger: { warn: (m: string) => void } } }).shipDestroyed;
     const logSpy = vi.spyOn(service.logger, 'warn');
 
-    gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
+    await gateway.handleCombatShipDestroyed(makeDestroyedEvent('victim', 1));
     await new Promise((r) => setImmediate(r));
 
     const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
@@ -189,7 +189,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(1);
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -209,7 +209,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2);
     const event = makeDestroyedEvent('user1', 1); // killing shipno 1
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -225,7 +225,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2);
     const event = makeDestroyedEvent('user1', 2); // killing shipno 2
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -243,7 +243,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(0); // noships already 0 (stale state / race)
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -261,7 +261,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(1, 0); // deletedCount = 0 → row not found
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -276,7 +276,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(0, 0); // row already gone
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -295,7 +295,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2, 1, /* victimStatus */ 2);
     const event = makeDestroyedEvent('Cybrg-1', 5);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -311,7 +311,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2, 1, /* victimStatus */ undefined, /* dbStatus */ 2);
     const event = makeDestroyedEvent('Cybrg-1', 5);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -324,7 +324,7 @@ describe('GameGateway — handleCombatShipDestroyed: delete hull + decrement nos
     gateway = buildGateway(2, 1, /* victimStatus */ 1);
     const event = makeDestroyedEvent('user1', 1);
 
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // Flush enough microtasks for the void $transaction chain (status read →
     // deleteMany → findUnique → update) to settle.
     for (let i = 0; i < 8; i++) await Promise.resolve();

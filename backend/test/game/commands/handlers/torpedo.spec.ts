@@ -241,7 +241,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
     expect(firer.damage).toBe(0);
   });
 
-  it('happy path — allocates into first free slot when others occupied', () => {
+  it('happy path — allocates into first free slot when others occupied', async () => {
     const alice = makeShip({ userid: 'a', shipno: 5, xcoord: 1, ycoord: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1,
@@ -249,7 +249,7 @@ describe('TorpedoHandlerService — `tor <target>`', () => {
       ltorpsDistance: [1000, 0, 2000],
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['Bob'], ctx);
+    await h.handler.command.handler(alice, ['Bob'], ctx);
     expect(bob.ltorpsChannel[1]).toBe(5);
   });
 

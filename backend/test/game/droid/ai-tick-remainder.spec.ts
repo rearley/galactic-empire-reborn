@@ -605,7 +605,7 @@ describe('the Zipper clears only the mines it can see (GECMDS.C:1690-1712)', () 
 
     scan(svc, cyb);
 
-    expect(mines.getAll().map((m) => m.id).sort()).toEqual([2, 3]);
+    expect(mines.getAll().map((m) => m.id).sort((a, b) => a - b)).toEqual([2, 3]);
     expect(deletedMineIds).toEqual([1]);
     // `minesnear` is cleared on the same roll that fires the sweep.
     expect(cyb.minesnear).toBe(0);

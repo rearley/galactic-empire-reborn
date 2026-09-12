@@ -43,15 +43,15 @@ function makeService(shipState?: Partial<ShipState>) {
 
 describe('CloakHandlerService', () => {
   describe('cloak on — happy path', () => {
-    it('sets cloak = CLOAK_RAMP_INIT (1) on success', () => {
+    it('sets cloak = CLOAK_RAMP_INIT (1) on success', async () => {
       const { handler, state, ctx } = makeService({ cloak: 0, energy: 10000 });
-      handler.command.handler(state, ['on'], ctx);
+      await handler.command.handler(state, ['on'], ctx);
       expect(state.cloak).toBe(CLOAK_RAMP_INIT);
     });
 
-    it('debits CLOAK_ENERGY_USE from energy', () => {
+    it('debits CLOAK_ENERGY_USE from energy', async () => {
       const { handler, state, ctx } = makeService({ cloak: 0, energy: 10000 });
-      handler.command.handler(state, ['on'], ctx);
+      await handler.command.handler(state, ['on'], ctx);
       expect(state.energy).toBe(10000 - CLOAK_ENERGY_USE_DEFAULT);
     });
 
@@ -69,9 +69,9 @@ describe('CloakHandlerService', () => {
       expect(result.lines[0].text).toBe(formatMessage(MessageId.CLOAK_NO_ENERGY));
     });
 
-    it('boundary: energy = CLOAK_ENERGY_USE + 1 → cloak succeeds', () => {
+    it('boundary: energy = CLOAK_ENERGY_USE + 1 → cloak succeeds', async () => {
       const { handler, state, ctx } = makeService({ cloak: 0, energy: CLOAK_ENERGY_USE_DEFAULT + 1 });
-      handler.command.handler(state, ['on'], ctx);
+      await handler.command.handler(state, ['on'], ctx);
       expect(state.cloak).toBe(CLOAK_RAMP_INIT);
     });
   });
@@ -107,9 +107,9 @@ describe('CloakHandlerService', () => {
   });
 
   describe('cloak off — happy path', () => {
-    it('sets cloak = 0 on success', () => {
+    it('sets cloak = 0 on success', async () => {
       const { handler, state, ctx } = makeService({ cloak: 10 });
-      handler.command.handler(state, ['off'], ctx);
+      await handler.command.handler(state, ['off'], ctx);
       expect(state.cloak).toBe(0);
     });
 

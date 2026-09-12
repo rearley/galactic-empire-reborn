@@ -116,7 +116,7 @@ describe('T069 — fault isolation: one bad Cybertron doesn\'t block others', ()
     const svc = new CybertronTickService(
       tickService, shipStateService, shipClassCache, repository, events, rand,
     );
-    svc.onModuleInit();
+    await svc.onModuleInit();
 
     // Track which ships had their tick decremented
     const originalTick = new Map(allShips.map((s) => [`${s.userid}:${s.shipno}`, s.tick]));

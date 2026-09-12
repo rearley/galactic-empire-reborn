@@ -39,7 +39,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
   });
 }
 
-function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
+async function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -93,7 +93,7 @@ function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
     events,
     rand,
   );
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -145,7 +145,7 @@ describe('T020 — noClaim cap: at most noClaim Cybertrons claim a player at onc
   it('with noClaim=3, N+1=4 Cybertrons: at most 3 hold cybmine=playerShipno after many ticks', async () => {
     const noClaim = 3;
     const numCybertrons = noClaim + 1; // 4 Cybertrons competing for noClaim=3 slots
-    const { shipMap, fireTick } = buildHarness(noClaim, numCybertrons, 42);
+    const { shipMap, fireTick } = await buildHarness(noClaim, numCybertrons, 42);
 
     // Drive enough ticks that all Cybertrons have had a chance to activate
     // Each Cybertron starts with tick=1 so first activation is next tick.
@@ -166,7 +166,7 @@ describe('T020 — noClaim cap: at most noClaim Cybertrons claim a player at onc
   it('with noClaim=1, exactly at most 1 Cybertron can claim a player', async () => {
     const noClaim = 1;
     const numCybertrons = 3; // 3 Cybertrons, only 1 can claim
-    const { shipMap, fireTick } = buildHarness(noClaim, numCybertrons, 77);
+    const { shipMap, fireTick } = await buildHarness(noClaim, numCybertrons, 77);
 
     fireTick(10);
     await new Promise((r) => setImmediate(r));

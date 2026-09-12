@@ -68,12 +68,15 @@
     // delete one of these lines to quiet the output — that is the move that
     // makes the whole exercise pointless.
     //
-    // Issue #28 — 136 test call sites drop a Promise and assert on the next
-    // line, so they may be testing only the synchronous prefix of an async
-    // handler, and an async rejection leaves the test green. None in src.
-    "typescript/no-floating-promises": "warn",
-    "typescript/await-thenable": "warn",
-    "typescript/require-array-sort-compare": "warn",
+    // Issue #28 CLOSED — all 137 sites await now, so this is back at "error" as
+    // that entry promised. They were calls to async handlers whose result was
+    // dropped with an assertion on the very next line: the assertion could be
+    // reading the synchronous prefix only, and a rejection left the test green.
+    // Awaiting them turned two tests red, both of which were measuring one PRNG
+    // sequence rather than the property they named.
+    "typescript/no-floating-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/require-array-sort-compare": "error",
     //
     // Issue #29 CLOSED — the five findings in backend/src are fixed, so these
     // three are back at "error" as that entry promised. Three of the five were

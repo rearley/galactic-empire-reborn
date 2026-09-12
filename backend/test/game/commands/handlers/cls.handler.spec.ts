@@ -36,11 +36,11 @@ describe('ClsHandlerService', () => {
     expect(result).toEqual({ lines: [], clearLog: true });
   });
 
-  it('does not mutate ship state', () => {
+  it('does not mutate ship state', async () => {
     const ship = makeShip({ energy: 12345, heading: 90 });
     // Capture a snapshot of primitive fields that a handler might mutate
     const snapshot = { energy: ship.energy, heading: ship.heading, speed: ship.speed, dirty: ship.dirty };
-    handler.command.handler(ship, [], {});
+    await handler.command.handler(ship, [], {});
     expect(ship.energy).toBe(snapshot.energy);
     expect(ship.heading).toBe(snapshot.heading);
     expect(ship.speed).toBe(snapshot.speed);

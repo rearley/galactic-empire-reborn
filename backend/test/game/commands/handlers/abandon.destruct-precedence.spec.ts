@@ -35,26 +35,26 @@ function makeService(ship: ShipState) {
 }
 
 describe('abandon destruct precedence edge case', () => {
-  it('abandon while destruct=15 → destruct cleared to 0, status=ABANDONED', () => {
+  it('abandon while destruct=15 → destruct cleared to 0, status=ABANDONED', async () => {
     const ship = makeShip({ destruct: 15, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship', 'yes'], {});
+    await handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
 
-  it('abandon while destruct=1 (final tick imminent) → destruct cleared before countdown expires', () => {
+  it('abandon while destruct=1 (final tick imminent) → destruct cleared before countdown expires', async () => {
     const ship = makeShip({ destruct: 1, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship', 'yes'], {});
+    await handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });
 
-  it('abandon with destruct=0 → status still set to ABANDONED (no-destruct path also works)', () => {
+  it('abandon with destruct=0 → status still set to ABANDONED (no-destruct path also works)', async () => {
     const ship = makeShip({ destruct: 0, status: 1 });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['ship', 'yes'], {});
+    await handler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.destruct).toBe(0);
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
   });

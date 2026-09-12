@@ -99,10 +99,10 @@ describe('warpCommand (full gate sequence)', () => {
     expect(h.command.argMissingMessage).toBe(formatMessage(MessageId.WARPFMT));
   });
 
-  it('speed2b is 1000 * speed (warp, not impulse percentage)', () => {
+  it('speed2b is 1000 * speed (warp, not impulse percentage)', async () => {
     const h = makeHandler();
     const ship = makeShip({ topspeed: 6 });
-    h.command.handler(ship, ['3'], ctx);
+    await h.command.handler(ship, ['3'], ctx);
     expect(ship.speed2b).toBeCloseTo(3000.0);
   });
 
@@ -123,10 +123,10 @@ describe('warpCommand (full gate sequence)', () => {
     expect(result.lines[0].text).toBe('Engines fired, new course 180. Accelerating to warp 4.');
   });
 
-  it('dirty is false when validation fails (WARP03)', () => {
+  it('dirty is false when validation fails (WARP03)', async () => {
     const h = makeHandler();
     const ship = makeShip({ topspeed: 6 });
-    h.command.handler(ship, ['10'], ctx);
+    await h.command.handler(ship, ['10'], ctx);
     expect(ship.dirty).toBe(false);
   });
 

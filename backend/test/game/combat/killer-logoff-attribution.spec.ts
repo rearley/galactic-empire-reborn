@@ -116,7 +116,7 @@ async function makeCombatHarness(ships: ShipState[]) {
 const ctx: CommandContext = {};
 
 describe('attacker name survives a channel scrub', () => {
-  it('a phaser hit records the firer NAME alongside lastfired on the victim', () => {
+  it('a phaser hit records the firer NAME alongside lastfired on the victim', async () => {
     const firer = makeShip({
       userid: 'usr_kil', shipno: 1, channel: 7, shipname: 'Marauder',
       xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20,
@@ -130,7 +130,7 @@ describe('attacker name survives a channel scrub', () => {
       svc, makeClassCache(), new EventEmitter2(), new Mulberry32Adapter(42),
     );
 
-    handler.command.handler(firer, ['90', '0'], ctx);
+    await handler.command.handler(firer, ['90', '0'], ctx);
 
     expect(victim.lastfired).toBe(7);
     expect(victim.lastfiredBy).toEqual({ channel: 7, name: 'Marauder' });

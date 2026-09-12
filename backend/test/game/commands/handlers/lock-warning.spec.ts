@@ -143,19 +143,19 @@ function distantEngagement() {
 
 describe('lockon warns the target and pins both ships (GECMDS.C:1395-1422)', () => {
   describe('successful lock', () => {
-    it('warns the target that fire control is locked on it', () => {
+    it('warns the target that fire control is locked on it', async () => {
       const { handler, firer, target, warnings } = closeEngagement();
 
-      handler.command.handler(firer, ['Quarry'], ctx);
+      await handler.command.handler(firer, ['Quarry'], ctx);
 
       expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
         .toContainEqual({ kind: 'lock-acquired', victim: shipKey(target.userid, target.shipno) });
     });
 
-    it("pins the TARGET in place, not just the firer", () => {
+    it("pins the TARGET in place, not just the firer", async () => {
       const { handler, firer, target } = closeEngagement();
 
-      handler.command.handler(firer, ['Quarry'], ctx);
+      await handler.command.handler(firer, ['Quarry'], ctx);
 
       expect({ firer: firer.cantexit, target: target.cantexit })
         .toEqual({ firer: FIRETICKS, target: FIRETICKS });
@@ -163,19 +163,19 @@ describe('lockon warns the target and pins both ships (GECMDS.C:1395-1422)', () 
   });
 
   describe('failed lock', () => {
-    it('still warns the target — a failed lock betrays the stalker', () => {
+    it('still warns the target — a failed lock betrays the stalker', async () => {
       const { handler, firer, target, warnings } = distantEngagement();
 
-      handler.command.handler(firer, ['Quarry'], ctx);
+      await handler.command.handler(firer, ['Quarry'], ctx);
 
       expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
         .toContainEqual({ kind: 'lock-attempt', victim: shipKey(target.userid, target.shipno) });
     });
 
-    it('still pins BOTH ships for FIRETICKS', () => {
+    it('still pins BOTH ships for FIRETICKS', async () => {
       const { handler, firer, target } = distantEngagement();
 
-      handler.command.handler(firer, ['Quarry'], ctx);
+      await handler.command.handler(firer, ['Quarry'], ctx);
 
       expect({ firer: firer.cantexit, target: target.cantexit })
         .toEqual({ firer: FIRETICKS, target: FIRETICKS });
@@ -188,29 +188,29 @@ describe('the missile path shares canon\'s lockon, so it warns identically', () 
   // so the warnings and the double battle-lock are not torpedo-specific. The
   // port reimplemented the gate separately in each handler, which is exactly
   // how the two drifted apart before.
-  it('warns the target on a missile lock', () => {
+  it('warns the target on a missile lock', async () => {
     const { missile, firer, target, warnings } = closeEngagement();
 
-    missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
+    await missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
 
     expect(warnings.map((w) => w.kind)).toContain('lock-acquired');
     expect(warnings.map((w) => w.victimId))
       .toContain(shipKey(target.userid, target.shipno));
   });
 
-  it('pins both ships on a missile lock', () => {
+  it('pins both ships on a missile lock', async () => {
     const { missile, firer, target } = closeEngagement();
 
-    missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
+    await missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
 
     expect({ firer: firer.cantexit, target: target.cantexit })
       .toEqual({ firer: FIRETICKS, target: FIRETICKS });
   });
 
-  it('warns and pins on a FAILED missile lock too', () => {
+  it('warns and pins on a FAILED missile lock too', async () => {
     const { missile, firer, target, warnings } = distantEngagement();
 
-    missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
+    await missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
 
     expect(warnings.map((w) => w.kind)).toContain('lock-attempt');
     expect({ firer: firer.cantexit, target: target.cantexit })
@@ -232,30 +232,30 @@ describe('launch warns the target (GECMDS.C:1198, :1313)', () => {
    * they existed in the generated table and were emitted nowhere, so the first
    * thing a victim knew of a torpedo was the detonation six seconds later.
    */
-  it('warns the target that a torpedo is inbound', () => {
+  it('warns the target that a torpedo is inbound', async () => {
     const { handler, firer, target, warnings } = closeEngagement();
 
-    handler.command.handler(firer, ['Quarry'], ctx);
+    await handler.command.handler(firer, ['Quarry'], ctx);
 
     expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
       .toContainEqual({ kind: 'torpedo-launched', victim: shipKey(target.userid, target.shipno) });
   });
 
-  it('warns the target that a missile is inbound', () => {
+  it('warns the target that a missile is inbound', async () => {
     const { missile, firer, target, warnings } = closeEngagement();
 
-    missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
+    await missile.command.handler(firer, ['Quarry', MISSILE_CHARGE], ctx);
 
     expect(warnings.map((w) => ({ kind: w.kind, victim: w.victimId })))
       .toContainEqual({ kind: 'missile-launched', victim: shipKey(target.userid, target.shipno) });
   });
 
-  it('does not announce a launch that never happened', () => {
+  it('does not announce a launch that never happened', async () => {
     // A failed lock returns before the tube is emptied, so the target gets the
     // lock warning and nothing else — no phantom "incoming torpedo".
     const { handler, firer, warnings } = distantEngagement();
 
-    handler.command.handler(firer, ['Quarry'], ctx);
+    await handler.command.handler(firer, ['Quarry'], ctx);
 
     expect(warnings.map((w) => w.kind)).not.toContain('torpedo-launched');
   });

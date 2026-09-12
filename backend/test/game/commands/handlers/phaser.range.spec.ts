@@ -94,7 +94,7 @@ describe('PhaserHandlerService — C-001 range gate', () => {
   // sysop phaser (phasrtype 20), which deals a flat 101 damage at ANY distance.
   // That way the only thing that can stop a hit is the scanRange gate itself.
   // Firing direction: degree 90 relative to heading 0 ⇒ absolute east.
-  it('does not hit a target outside scanRange (cdistance × 10000 > scanRange)', () => {
+  it('does not hit a target outside scanRange (cdistance × 10000 > scanRange)', async () => {
     // scanRange = 100000 ⇒ 10 sectors. Target at 20 sectors east.
     const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20 });
     const farTarget = makeShip({
@@ -103,7 +103,7 @@ describe('PhaserHandlerService — C-001 range gate', () => {
     });
     const { handler, emitted } = makeHarness([firer, farTarget], 100000);
 
-    handler.command.handler(firer, ['90', '0'], ctx);
+    await handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     const misses = emitted.filter((e) => e.event === COMBAT_MISS);
@@ -111,7 +111,7 @@ describe('PhaserHandlerService — C-001 range gate', () => {
     expect(misses).toHaveLength(1);
   });
 
-  it('still hits a target inside scanRange at the same bearing', () => {
+  it('still hits a target inside scanRange at the same bearing', async () => {
     // 5 sectors east = cdistance 5 → 50000 units (well within 100000 scan range).
     const firer = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20 });
     const nearTarget = makeShip({
@@ -120,13 +120,13 @@ describe('PhaserHandlerService — C-001 range gate', () => {
     });
     const { handler, emitted } = makeHarness([firer, nearTarget], 100000);
 
-    handler.command.handler(firer, ['90', '0'], ctx);
+    await handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     expect(hits).toHaveLength(1);
   });
 
-  it('does not hit a target exactly at the scan-range boundary (strict >)', () => {
+  it('does not hit a target exactly at the scan-range boundary (strict >)', async () => {
     // scanRange = 100000 ⇒ exactly 10 sectors. cdistance*10000 must be STRICTLY
     // less than scanRange to count, matching find-ship.ts: `dist*10000 > scanRange`
     // is the rejection threshold.
@@ -137,7 +137,7 @@ describe('PhaserHandlerService — C-001 range gate', () => {
     });
     const { handler, emitted } = makeHarness([firer, boundary], 100000);
 
-    handler.command.handler(firer, ['90', '0'], ctx);
+    await handler.command.handler(firer, ['90', '0'], ctx);
 
     const hits = emitted.filter((e) => e.event === COMBAT_HIT);
     expect(hits).toHaveLength(0);

@@ -69,7 +69,7 @@ function seededRng(seed: number): () => number {
  * from "nothing happened" is not a conservation test.
  */
 describe('transfer conservation across 100 randomized transfers (SC-003)', () => {
-  it('total items[i] invariant across 100 successful + failing transfers', () => {
+  it('total items[i] invariant across 100 successful + failing transfers', async () => {
     const rng = seededRng(0xdeadbeef);
 
     // Start with 1000 units of every transferable item in each ship
@@ -97,7 +97,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
       const amt = Math.floor(rng() * 200) + 1;
 
       // Execute — handler will reject if insufficient inventory; that's fine
-      handler.command.handler(sender, [String(amt), itemName.toLowerCase(), receiver.shipname], {});
+      await handler.command.handler(sender, [String(amt), itemName.toLowerCase(), receiver.shipname], {});
     }
 
     // Cargo must actually have moved, or the invariant below proves nothing.
@@ -111,7 +111,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
     }
   });
 
-  it('total gold invariant: 100 gold-only transfers between two ships', () => {
+  it('total gold invariant: 100 gold-only transfers between two ships', async () => {
     const rng = seededRng(0xcafebabe);
     // 5,000 gold is 2,500 tons (ITMWT13: 0.5 t/unit), over the 1,000-ton default.
     const HOLD = 1_000_000;
@@ -123,7 +123,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
     for (let i = 0; i < 100; i++) {
       const [sender, receiver] = rng() < 0.5 ? [alice, bob] : [bob, alice];
       const amt = Math.floor(rng() * 500) + 1;
-      handler.command.handler(sender, [String(amt), 'gold', receiver.shipname], {});
+      await handler.command.handler(sender, [String(amt), 'gold', receiver.shipname], {});
     }
 
     // Same guard: prove gold moved before asserting none was created or lost.

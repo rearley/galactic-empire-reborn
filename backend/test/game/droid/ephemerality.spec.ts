@@ -409,10 +409,16 @@ describe('T037 — two simultaneous kills in one tick', () => {
       scoreAwarded: 50,
     });
 
-    await expect(async () => {
+    // `expect(asyncFn).not.toThrow()` asserts nothing: an async function
+    // REJECTS rather than throws, so the matcher saw a function that returned a
+    // promise and passed. Awaiting the call and asserting it resolves is what
+    // actually proves two kills in one tick do not blow up. @see issue #28
+    const resolveBothKills = async (): Promise<void> => {
       svc.onShipDestroyed(makePayload(droid1));
       svc.onShipDestroyed(makePayload(droid2));
       await new Promise((r) => setImmediate(r));
-    }).not.toThrow();
+    };
+
+    await expect(resolveBothKills()).resolves.toBeUndefined();
   });
 });

@@ -56,7 +56,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     };
   });
 
-  it('emits galaxy-wide via server.emit (no room filter)', () => {
+  it('emits galaxy-wide via server.emit (no room filter)', async () => {
     const event: CombatShipDestroyedEvent = {
       victimId: 'b:2',
       attackerId: 'a:7',
@@ -71,7 +71,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       loot: [],
       scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     // `attackerName` is added by the gateway: it names the planet when a kill
     // has no attacking ship (an ion-cannon kill), and is null otherwise.
     // Four fields, not the whole internal event. The spread used to publish
@@ -90,7 +90,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     expect(toMock).toHaveBeenCalledWith('user:b');
   });
 
-  it('carries the four rendered fields and nothing internal', () => {
+  it('carries the four rendered fields and nothing internal', async () => {
     const tickAt = new Date('2026-01-01T00:00:00Z');
     const event: CombatShipDestroyedEvent = {
       victimId: 'x:1',
@@ -106,7 +106,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       loot: [],
       scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledTimes(1);
     expect(serverEmitMock.mock.calls[0][1]).toStrictEqual({
       victimId: 'x:1', attackerId: null, weapon: null, attackerName: null,
@@ -121,7 +121,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
    * unknown". The gateway is the only layer that sees both the ion hit (which
    * knows the planet) and the kill, so it carries the name across.
    */
-  it('names the planet that killed a besieging ship', () => {
+  it('names the planet that killed a besieging ship', async () => {
     gateway.handlePlanetIonFired({
       shipId: 'raider:2',
       plnum: 1,
@@ -145,7 +145,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       loot: [],
       scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
 
     expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
       weapon: 'ion',
@@ -153,7 +153,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     });
   });
 
-  it('does not carry a stale planet name onto the next ship that dies', () => {
+  it('does not carry a stale planet name onto the next ship that dies', async () => {
     gateway.handlePlanetIonFired({
       shipId: 'raider:2', plnum: 1, planetName: 'Aurelia-Landing',
       hullDamage: 40, shieldKnock: 0, shieldsUp: false,
@@ -165,10 +165,10 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       attackerChannel: -1, weapon: 'ion', sector: { x: 1, y: 1 },
       tickAt: new Date(), loot: [], scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(base);
+    await gateway.handleCombatShipDestroyed(base);
     // Same ship key dying again (respawned hull) with no fresh ion hit must
     // not inherit the previous kill's planet.
-    gateway.handleCombatShipDestroyed(base);
+    await gateway.handleCombatShipDestroyed(base);
 
     expect(serverEmitMock.mock.calls[1][1]).toMatchObject({ attackerName: null });
   });
@@ -180,7 +180,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
    * firer leaves the game. Inferring "a planet did this" from the channel
    * alone would blame a colony every time a killer disconnected.
    */
-  it('does not blame a planet when the attacker merely disconnected', () => {
+  it('does not blame a planet when the attacker merely disconnected', async () => {
     const event: CombatShipDestroyedEvent = {
       victimId: 'drifter:1',
       attackerId: null,
@@ -196,7 +196,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       loot: [],
       scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
 
     expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
       weapon: null,
@@ -218,7 +218,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
    * The hit path already resolves names this way (COMBAT_HIT carries
    * attackerName/victimName); the kill path did not.
    */
-  it('names the ship that made a kill, including an AI one', () => {
+  it('names the ship that made a kill, including an AI one', async () => {
     const gw = gateway as unknown as {
       shipStateService: { get: Mock };
     };
@@ -238,7 +238,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       loot: [],
       scoreAwarded: 0,
     };
-    gateway.handleCombatShipDestroyed(event);
+    await gateway.handleCombatShipDestroyed(event);
 
     expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
       attackerName: 'Cybrg-49326',

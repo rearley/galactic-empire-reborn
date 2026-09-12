@@ -147,11 +147,11 @@ describe('GameGateway player.joined / player.left', () => {
     expect(serverEmitMock).toHaveBeenCalledWith('player.left', { shipId: 'user1:1' });
   });
 
-  it('does NOT emit player.left if socket was never registered (no spurious events)', () => {
+  it('does NOT emit player.left if socket was never registered (no spurious events)', async () => {
     const socket = makeSocket('unknown-sock');
     // Connect and disconnect a socket that never resolved (no valid userid)
     // Directly call handleDisconnect without a prior handleConnection
-    gateway.handleDisconnect(socket as never);
+    await gateway.handleDisconnect(socket as never);
     expect(serverEmitMock).not.toHaveBeenCalledWith('player.left', expect.anything());
   });
 });

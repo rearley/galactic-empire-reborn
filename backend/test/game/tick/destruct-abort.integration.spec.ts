@@ -26,7 +26,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 }
 
 describe('destruct abort integration — abort clears countdown, tick is no-op (SC-005)', () => {
-  it('after abort, destructTick does not destroy the ship', () => {
+  it('after abort, destructTick does not destroy the ship', async () => {
     const state = makeShip({ destruct: 5 });
 
     const mockShipState = {
@@ -54,7 +54,7 @@ describe('destruct abort integration — abort clears countdown, tick is no-op (
     expect(state.destruct).toBe(1);
 
     // Abort before the final tick
-    abortHandler.command.handler(state, [], {});
+    await abortHandler.command.handler(state, [], {});
     expect(state.destruct).toBe(0);
 
     // Next tick should be a no-op
@@ -67,7 +67,7 @@ describe('destruct abort integration — abort clears countdown, tick is no-op (
     expect(state.destruct).toBe(0);
   });
 
-  it('abort at destruct=5 allows ship to continue existing through multiple subsequent ticks', () => {
+  it('abort at destruct=5 allows ship to continue existing through multiple subsequent ticks', async () => {
     const state = makeShip({ destruct: 5 });
 
     const mockShipState = {
@@ -87,7 +87,7 @@ describe('destruct abort integration — abort clears countdown, tick is no-op (
     const tickService = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);
     const abortHandler = new AbortHandlerService(mockShipState);
 
-    abortHandler.command.handler(state, [], {});
+    await abortHandler.command.handler(state, [], {});
     expect(state.destruct).toBe(0);
 
     // 20 subsequent ticks — ship must survive all of them

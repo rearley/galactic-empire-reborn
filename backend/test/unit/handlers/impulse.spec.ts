@@ -33,9 +33,9 @@ describe('impulseCommand', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.ENGFIRE, 270));
   });
 
-  it('success path sets dirty=true', () => {
+  it('success path sets dirty=true', async () => {
     const ship = makeShip();
-    impulseCommand.handler(ship, ['50'], ctx);
+    await impulseCommand.handler(ship, ['50'], ctx);
     expect(ship.dirty).toBe(true);
   });
 
@@ -85,9 +85,9 @@ describe('impulseCommand', () => {
     expect(impulseCommand.argMissingMessage).toBe(formatMessage(MessageId.IMPFMT));
   });
 
-  it('speed2b is 1000 * (value / 100)', () => {
+  it('speed2b is 1000 * (value / 100)', async () => {
     const ship = makeShip();
-    impulseCommand.handler(ship, ['75'], ctx);
+    await impulseCommand.handler(ship, ['75'], ctx);
     expect(ship.speed2b).toBeCloseTo(750.0);
   });
 });

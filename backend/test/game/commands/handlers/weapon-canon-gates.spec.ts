@@ -101,11 +101,11 @@ describe('mis — MISSHRT flux-pile gate (GECMDS.C:1278-1285)', () => {
     expect(result.lines.some((l) => l.text === MISSHRT)).toBe(false);
   });
 
-  it('debits the TRUNCATED flux cost, not the fractional one', () => {
+  it('debits the TRUNCATED flux cost, not the fractional one', async () => {
     const alice = makeShip({ energy: 100000, xcoord: 1, ycoord: 0 });
     const bob = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob', xcoord: 1, ycoord: 1 });
     const h = makeMissileHandler([alice, bob]);
-    h.command.handler(alice, ['Bob', '199'], ctx);
+    await h.command.handler(alice, ['Bob', '199'], ctx);
     // 199/100 truncates to 1 in C, not 1.99
     expect(alice.energy).toBe(100000 - 1);
     expect(MISENGFC).toBe(100);

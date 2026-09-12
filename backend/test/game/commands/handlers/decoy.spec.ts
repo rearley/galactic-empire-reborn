@@ -53,10 +53,10 @@ describe('DecoyHandlerService — `dec`', () => {
     expect(alice.items[I_DECOY]).toBe(2n);
   });
 
-  it('fills lowest zero slot when earlier slots in use', () => {
+  it('fills lowest zero slot when earlier slots in use', async () => {
     const alice = makeShip({ decout: [DECOYTIME, 0, DECOYTIME] });
     const handler = makeHarness([alice]);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(alice.decout[1]).toBe(DECOYTIME);
   });
 

@@ -160,14 +160,14 @@ describe('TransferHandlerService — rejection paths', () => {
     expect(mockShipState.mutate).not.toHaveBeenCalled();
   });
 
-  it('atomicity: on rejection, NEITHER ship state changes', () => {
+  it('atomicity: on rejection, NEITHER ship state changes', async () => {
     const src = makeShip({ userid: 'u1', shipno: 1, xcoord: 5, ycoord: 5, items: Object.assign(Array(14).fill(0n) as bigint[], { [I_FOOD]: 5n }) });
     const tgt = makeShip({ userid: 'u2', shipno: 2, shipname: 'Bob', xcoord: 5, ycoord: 5 });
     const srcBefore = src.items[I_FOOD];
     const tgtBefore = tgt.items[I_FOOD];
     const { handler } = makeService(src, tgt);
 
-    handler.command.handler(src, ['100', 'food', 'Bob'], {}); // insufficient cargo
+    await handler.command.handler(src, ['100', 'food', 'Bob'], {}); // insufficient cargo
     expect(src.items[I_FOOD]).toBe(srcBefore); // source unchanged
     expect(tgt.items[I_FOOD]).toBe(tgtBefore); // target unchanged
   });

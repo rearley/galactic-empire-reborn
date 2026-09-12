@@ -53,24 +53,24 @@ describe('JettisonHandlerService — happy path (numeric amount)', () => {
     expect(result.lines[0].category).toBe('success');
   });
 
-  it('reduces items[I_FOOD] by the jettisoned amount', () => {
+  it('reduces items[I_FOOD] by the jettisoned amount', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 50n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['10', 'food'], {});
+    await handler.command.handler(ship, ['10', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(40n);
   });
 
-  it('jettison exactly all cargo (amt == qty)', () => {
+  it('jettison exactly all cargo (amt == qty)', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 50n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['50', 'food'], {});
+    await handler.command.handler(ship, ['50', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(0n);
   });
 
-  it('non-recovery: jettisoned items are permanently lost (no planet/sector inventory change)', () => {
+  it('non-recovery: jettisoned items are permanently lost (no planet/sector inventory change)', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 100n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['50', 'gold'], {});
+    await handler.command.handler(ship, ['50', 'gold'], {});
     // Gold is now 50 — it just disappears, no external state changes
     expect(ship.items[I_GOLD]).toBe(50n);
   });
@@ -85,10 +85,10 @@ describe('JettisonHandlerService — happy path (ALL keyword)', () => {
     expect(result.lines[0].text).toContain('73');
   });
 
-  it('ALL keyword is case-insensitive (accepts "all")', () => {
+  it('ALL keyword is case-insensitive (accepts "all")', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 20n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['all', 'food'], {});
+    await handler.command.handler(ship, ['all', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(0n);
   });
 

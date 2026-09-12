@@ -40,7 +40,7 @@ function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: numb
   });
 }
 
-function buildHarness(seed = 42) {
+async function buildHarness(seed = 42) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -94,7 +94,7 @@ function buildHarness(seed = 42) {
     events,
     rand,
   );
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -123,7 +123,7 @@ function buildHarness(seed = 42) {
 
 describe('T019 — neutral-zone: player inside sector (0,0) is never targeted', () => {
   it('zero target-acquired events when player is inside NZ (xcoord ∈ [0,1), ycoord ∈ [0,1))', async () => {
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     // Cybertron outside NZ — tick=1 so it activates on next tick
     const cyb = makeShip({
@@ -152,7 +152,7 @@ describe('T019 — neutral-zone: player inside sector (0,0) is never targeted', 
   });
 
   it('Cybertron DOES acquire player once player leaves NZ', async () => {
-    const { shipMap, events, fireTick } = buildHarness(99);
+    const { shipMap, events, fireTick } = await buildHarness(99);
 
     const cyb = makeShip({
       userid: 'Cybrg-201', shipno: 201, shpclass: 21, status: 2,

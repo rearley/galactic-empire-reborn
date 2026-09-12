@@ -167,7 +167,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect(alice.dirty).toBe(false);
   });
 
-  it('firer at warp fires the HYPER-phaser (hyper=true) — C-009 true separation', () => {
+  it('firer at warp fires the HYPER-phaser (hyper=true) — C-009 true separation', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, phasr: 100, energy: 50000,
@@ -179,7 +179,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
 
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
     expect(fired).toBeDefined();
@@ -189,21 +189,21 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect(hit).toBeDefined();
   });
 
-  it('friendly fire allowed — same userid hit if in arc', () => {
+  it('friendly fire allowed — same userid hit if in arc', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const ally = makeShip({
       userid: 'a', shipno: 2, shipname: 'Ally',
       xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, ally]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(ally.shield).toBeLessThan(5000);
     expect(ally.dirty).toBe(true);
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
   });
 
-  it('PHABIAS arc-widening — target outside `focus` but within `focus + PHABIAS` is a hit', () => {
+  it('PHABIAS arc-widening — target outside `focus` but within `focus + PHABIAS` is a hit', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     // Target 4.5° off bearing 0 (compass north), range 1. The arc half-angle
     // is `focus + PHABIAS` (GECMDS.C:954). With focus=3 the half-angle is
@@ -218,25 +218,25 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0', '3'], ctx);
+    await h.handler.command.handler(alice, ['0', '3'], ctx);
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
     expect((hit!.payload as CombatHitEvent).victimId).toBe(shipKey('b', 2));
   });
 
-  it('sets cantexit = FIRETICKS on firer and on every hit victim', () => {
+  it('sets cantexit = FIRETICKS on firer and on every hit victim', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, cantexit: 0 });
     const bob = makeShip({
       userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
       shield: 5000, shieldstat: 1, cantexit: 0,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(alice.cantexit).toBe(FIRETICKS);
     expect(bob.cantexit).toBe(FIRETICKS);
   });
 
-  it('emits COMBAT_MISS when no targets in arc', () => {
+  it('emits COMBAT_MISS when no targets in arc', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     // Bob due south at range 1. Fire degree 0 (north) — bob is at 180° from
     // the firing direction, well outside any arc. y decreases northward, +y = south.
@@ -245,16 +245,16 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '5'], ctx);
+    await h.handler.command.handler(alice, ['0', '5'], ctx);
     const miss = h.emitted.find((e) => e.event === COMBAT_MISS);
     expect(miss).toBeDefined();
     expect((miss!.payload as CombatMissEvent).attackerId).toBe(shipKey('a', 1));
   });
 
-  it('emits COMBAT_PHASER_FIRED with hyper=false carrying degree/focus', () => {
+  it('emits COMBAT_PHASER_FIRED with hyper=false carrying degree/focus', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, speed: 100 });
     const h = makeHarness([alice]);
-    h.handler.command.handler(alice, ['90', '5'], ctx);
+    await h.handler.command.handler(alice, ['90', '5'], ctx);
     const fired = h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED);
     expect(fired).toBeDefined();
     expect((fired!.payload as CombatPhaserFiredEvent).hyper).toBe(false);
@@ -262,13 +262,13 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect((fired!.payload as CombatPhaserFiredEvent).percent).toBe(5);
   });
 
-  it('keyword is "pha" with alias "phasor"', () => {
+  it('keyword is "pha" with alias "phasor"', async () => {
     const h = makeHarness([makeShip()]);
     expect(h.handler.command.keyword).toBe('pha');
   });
 
   // C-008: firer's shields drop for the battle-lock window (mirrors C `shielddn` before fire)
-  it('C-008: firer shields-up (shieldstat=1) ends with shieldstat=0 AND cantexit=FIRETICKS after firing', () => {
+  it('C-008: firer shields-up (shieldstat=1) ends with shieldstat=0 AND cantexit=FIRETICKS after firing', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, shipname: 'Alice',
       xcoord: 5, ycoord: 5,
@@ -280,12 +280,12 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
       shield: 5000, shieldstat: 1,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(alice.shieldstat).toBe(0);
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 
-  it('C-008: firer already shields-down (shieldstat=0) stays 0 after firing (no crash)', () => {
+  it('C-008: firer already shields-down (shieldstat=0) stays 0 after firing (no crash)', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, shipname: 'Alice',
       xcoord: 5, ycoord: 5,
@@ -296,17 +296,17 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
       xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(alice.shieldstat).toBe(0);
     expect(alice.cantexit).toBe(FIRETICKS);
   });
 });
 
-describe('pha command semantics (Plan 1 T5)', () => {
+describe('pha command semantics (Plan 1 T5)', async () => {
   const getShip = (h: Harness, s: ShipState): ShipState =>
     h.shipMap.get(shipKey(s.userid, s.shipno))!;
 
-  it('accepts `pha <degree>` with focus defaulting to 1', () => {
+  it('accepts `pha <degree>` with focus defaulting to 1', async () => {
     // firer phasrtype>=1, phasr>=PMINFIRE, not cloaked, not in NZ, not at warp.
     const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const h = makeHarness([firer]);
@@ -314,21 +314,21 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(res.lines.some((l) => /no targets|hit/i.test(l.text))).toBe(true);
   });
 
-  it('rejects degree outside −180..180', () => {
+  it('rejects degree outside −180..180', async () => {
     const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['200', '0'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/-180|180/);
   });
 
-  it('rejects focus outside 0..5', () => {
+  it('rejects focus outside 0..5', async () => {
     const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5 });
     const h = makeHarness([firer]);
     const res = h.handler.command.handler(firer, ['0', '6'], ctx) as CommandResult;
     expect(res.lines[0].text).toMatch(/0.*5|5/);
   });
 
-  it('refuses to fire while cloaked', () => {
+  it('refuses to fire while cloaked', async () => {
     const cloaked = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, cloak: 10 });
     const h = makeHarness([cloaked]);
     const res = h.handler.command.handler(cloaked, ['0', '0'], ctx) as CommandResult;
@@ -336,12 +336,12 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(getShip(h, cloaked).phasr).toBe(100); // not discharged
   });
 
-  it('firing inside the neutral zone self-zaps and deals no outgoing damage', () => {
+  it('firing inside the neutral zone self-zaps and deals no outgoing damage', async () => {
     const firerInNZ = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0, phasr: 100, phasrtype: 1 });
     // Victim due north at range 1 (would be a clean in-arc hit if we fired normally).
     const victim = makeShip({ userid: 'b', shipno: 2, xcoord: 0, ycoord: -1, damage: 0 });
     const h = makeHarness([firerInNZ, victim]);
-    h.handler.command.handler(firerInNZ, ['0', '0'], ctx);
+    await h.handler.command.handler(firerInNZ, ['0', '0'], ctx);
     expect(getShip(h, firerInNZ).damage).toBeGreaterThanOrEqual(SE100DAM);
     // The charge is NOT spent. C returns at GECMDS.C:940, before `phasr = 0`
     // (:1006) and before `cantexit = FIRETICKS` (:945), so the neutral branch
@@ -355,14 +355,14 @@ describe('pha command semantics (Plan 1 T5)', () => {
     expect(fired).toBeUndefined();
   });
 
-  it('fully discharges phasr to 0 after firing', () => {
+  it('fully discharges phasr to 0 after firing', async () => {
     const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100 });
     const h = makeHarness([firer]);
-    h.handler.command.handler(firer, ['0', '0'], ctx);
+    await h.handler.command.handler(firer, ['0', '0'], ctx);
     expect(getShip(h, firer).phasr).toBe(0);
   });
 
-  describe('victim-at-warp gate (PHATOWRP, GECMDS.C:949)', () => {
+  describe('victim-at-warp gate (PHATOWRP, GECMDS.C:949)', async () => {
     // This was a single test asserting that ANY phaser reaches a warping
     // victim, valid only because the port ran PHATOWRP=0 -- the numopt FLOOR,
     // which makes the guard vacuous. Canon ships 5, so the gate is real and
@@ -380,18 +380,18 @@ describe('pha command semantics (Plan 1 T5)', () => {
     const warpVictimAt = (dist: number) =>
       makeShip({ userid: 'b', shipno: 2, xcoord: 5, ycoord: 5 - dist, speed: 2000, where: 1, damage: 0 });
 
-    it('a below-threshold phaser cannot touch a victim at warp', () => {
+    it('a below-threshold phaser cannot touch a victim at warp', async () => {
       expect(PHATOWRP).toBeGreaterThan(1);
       const firer = makeShip({ userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: 1 });
       const victim = warpVictimAt(ENGAGEMENT_DIST);
       const h = makeHarness([firer, victim]);
-      h.handler.command.handler(firer, ['0', '0'], ctx);
+      await h.handler.command.handler(firer, ['0', '0'], ctx);
       expect(getShip(h, victim).damage).toBe(0);
       // The charge is still spent -- the shot was fired and simply did not connect.
       expect(getShip(h, firer).phasr).toBe(0);
     });
 
-    it('a phaser at or above the threshold still lands, for halved damage', () => {
+    it('a phaser at or above the threshold still lands, for halved damage', async () => {
       const firer = makeShip({
         userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: PHATOWRP,
       });
@@ -403,8 +403,8 @@ describe('pha command semantics (Plan 1 T5)', () => {
       expect(getShip(h, firer).phasr).toBe(0);
     });
 
-    it('the same phaser does MORE damage to a victim that is not at warp', () => {
-      const shoot = (speed: number) => {
+    it('the same phaser does MORE damage to a victim that is not at warp', async () => {
+      const shoot = async (speed: number) => {
         const firer = makeShip({
           userid: 'a', shipno: 1, xcoord: 5, ycoord: 5, phasr: 100, phasrtype: PHATOWRP,
         });
@@ -415,14 +415,14 @@ describe('pha command semantics (Plan 1 T5)', () => {
           damage: 0,
         });
         const h = makeHarness([firer, victim]);
-        h.handler.command.handler(firer, ['0', '0'], ctx);
+        await h.handler.command.handler(firer, ['0', '0'], ctx);
         return getShip(h, victim).damage;
       };
-      expect(shoot(2000)).toBeLessThan(shoot(0));
+      expect(await shoot(2000)).toBeLessThan(await shoot(0));
     });
   });
 
-  it('phaser fires even when firer has jammer active (phasers do not lock)', () => {
+  it('phaser fires even when firer has jammer active (phasers do not lock)', async () => {
     // GECMDS.C:firep has no jammer check. Jammers block weapon LOCKING
     // (torpedoes, missiles), not firing. Phasers don't lock so are unaffected.
     const firer = makeShip({
@@ -436,7 +436,7 @@ describe('pha command semantics (Plan 1 T5)', () => {
     });
     const h = makeHarness([firer, victim]);
 
-    h.handler.command.handler(firer, ['0', '0'], ctx);
+    await h.handler.command.handler(firer, ['0', '0'], ctx);
 
     // Phaser must fire and hit despite jammer.
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
@@ -454,11 +454,11 @@ describe('pha command semantics (Plan 1 T5)', () => {
  * path. `where: 1` goes WITH the speed — the same point the block at line ~381
  * already makes for victims.
  */
-describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', () => {
+describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', async () => {
   const getShip = (h: Harness, s: ShipState): ShipState =>
     h.shipMap.get(shipKey(s.userid, s.shipno))!;
 
-  it('firer at warp with energy < HPMINFIR → HP_NOPOW, no fire, no energy debit', () => {
+  it('firer at warp with energy < HPMINFIR → HP_NOPOW, no fire, no energy debit', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: HPMINFIR - 1,
@@ -476,7 +476,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
   });
 
-  it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hull hit + energy -= HPFIRAMT', () => {
+  it('firer at warp with energy ≥ HPMINFIR firing a WARP victim in-arc/in-range → hull hit + energy -= HPFIRAMT', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: 50000, phasr: 100,
@@ -487,7 +487,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0'], ctx);
+    await h.handler.command.handler(alice, ['0'], ctx);
 
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
@@ -501,7 +501,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(getShip(h, alice).cantexit).toBe(FIRETICKS);
   });
 
-  it('a NON-warp victim is NOT hit by the hyper-phaser', () => {
+  it('a NON-warp victim is NOT hit by the hyper-phaser', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: 50000,
@@ -513,7 +513,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0'], ctx);
+    await h.handler.command.handler(alice, ['0'], ctx);
 
     expect(h.emitted.find((e) => e.event === COMBAT_HIT)).toBeUndefined();
     expect(getShip(h, bob).shield).toBe(5000);
@@ -521,7 +521,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(getShip(h, alice).energy).toBe(50000 - HPFIRAMT);
   });
 
-  it('firing the hyper-phaser inside the neutral zone self-zaps (WPN_ZAP, damage += SE100DAM)', () => {
+  it('firing the hyper-phaser inside the neutral zone self-zaps (WPN_ZAP, damage += SE100DAM)', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 0, ycoord: 0,
       speed: WARP_THRESHOLD, where: 1, energy: 50000, damage: 0,
@@ -542,7 +542,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
 
   // C-009 Fix 1 (RED): hyperphaser BYPASSES shields — damage goes straight to hull.
   // C `firehp` (GECMDS.C:1078) does `wptr->damage += damage` with NO shieldhit call.
-  it('Fix1-RED: hyper-phaser hit on shields-up victim goes straight to HULL — shield unchanged, damageShield=0', () => {
+  it('Fix1-RED: hyper-phaser hit on shields-up victim goes straight to HULL — shield unchanged, damageShield=0', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: 50000, phasr: 100,
@@ -553,7 +553,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0'], ctx);
+    await h.handler.command.handler(alice, ['0'], ctx);
 
     const hit = h.emitted.find((e) => e.event === COMBAT_HIT);
     expect(hit).toBeDefined();
@@ -568,7 +568,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
 
   // C-009 Fix 2 (RED): hypha cooldown gate — fire sets hypha=1; re-fire returns HP_WAIT.
   // C `firehp` sets ptr->hypha=1 (GECMDS.C:1040); cmd_phas blocks re-fire while hypha!=0.
-  it('Fix2a-RED: successful hyper fire sets firer hypha = 1', () => {
+  it('Fix2a-RED: successful hyper fire sets firer hypha = 1', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: 50000, hypha: 0,
@@ -579,12 +579,12 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     });
     const h = makeHarness([alice, bob]);
 
-    h.handler.command.handler(alice, ['0'], ctx);
+    await h.handler.command.handler(alice, ['0'], ctx);
 
     expect(getShip(h, alice).hypha).toBe(1);
   });
 
-  it('Fix2b-RED: second hyper fire while hypha !== 0 → HP_WAIT, no energy debit, no hit', () => {
+  it('Fix2b-RED: second hyper fire while hypha !== 0 → HP_WAIT, no energy debit, no hit', async () => {
     const alice = makeShip({
       userid: 'a', shipno: 1, xcoord: 5, ycoord: 5,
       speed: WARP_THRESHOLD, where: 1, energy: 50000, hypha: 1,
@@ -606,7 +606,7 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
   });
 });
 
-describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => {
+describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', async () => {
   const getShip = (h: Harness, s: ShipState): ShipState =>
     h.shipMap.get(shipKey(s.userid, s.shipno))!;
 
@@ -617,7 +617,7 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
   // rand #1: roll check = floor(0.0117 * (31/1.5)) = 0 → proceed.
   // rand #2: which = 4 → tactical.
   // rand #3: magnitude = -floor(v3 * 80).
-  it('C-010: normal phaser hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and tactical mutated', () => {
+  it('C-010: normal phaser hit pushes damage > 20 — COMBAT_SUBSYSTEM_DAMAGED emitted and tactical mutated', async () => {
     // Subsystem damage needs a hit in the 20..99 band: above 20 to trigger the
     // roll, below the 100 kill threshold so there is a surviving ship whose
     // `tactical` field can be observed. Under canon falloff a Mark-10 deals 205
@@ -652,13 +652,13 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     cache.setForTest(1, { maxAcceleration: 1000, maxWarp: 10, maxPhaser: 1000, scanRange: 100000, maxTons: 5000 } as never);
     const events = new EventEmitter2();
     const emitted: Array<{ event: string; payload: unknown }> = [];
-    events.onAny((event: string | string[], payload: unknown) => {
+    events.onAny(async (event: string | string[], payload: unknown) => {
       const ev = Array.isArray(event) ? event.join('.') : event;
       emitted.push({ event: ev, payload });
     });
     const handler = new PhaserHandlerService(shipState, cache, events, random);
 
-    handler.command.handler(alice, ['0', '0'], ctx);
+    await handler.command.handler(alice, ['0', '0'], ctx);
 
     // Bob must have been hit (damage > 0) and subsystem event emitted
     expect(getShip({ handler, shipMap, events, emitted, cache }, bob).damage).toBeGreaterThan(0);
@@ -669,7 +669,7 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
     expect(getShip({ handler, shipMap, events, emitted, cache }, bob).tactical).not.toBe(0);
   });
 
-  it('normal phaser vs raised shields: hull fully deflected, shield charge spent', () => {
+  it('normal phaser vs raised shields: hull fully deflected, shield charge spent', async () => {
     // Phasers are the ONE weapon where raised shields do confer full hull
     // immunity. GECMDS.C:982-995 applies `wptr->damage += damage` only in the
     // `shieldstat != SHIELDUP` branch; otherwise it calls
@@ -682,7 +682,7 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
       shield: 9999, shieldstat: 1, shieldtype: 1, damage: 0,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
 
     expect(bob.damage).toBe(0);              // hull untouched — PDEFLECT
     expect(bob.shield).toBeLessThan(9999);   // but charge WAS spent
@@ -706,7 +706,7 @@ describe('PhaserHandlerService — C-010 subsystem damage on phaser hit', () => 
  * teammate, and one you shot in the back simply ignored you.
  */
 describe('a phaser hit claims a Cybertron for the firer', () => {
-  it('sets the AI ship\'s cybmine to the firer\'s channel', () => {
+  it('sets the AI ship\'s cybmine to the firer\'s channel', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const cyb = makeShip({
       userid: 'cyb', shipno: 1, channel: 12, shipname: 'Cybrg-1',
@@ -714,31 +714,31 @@ describe('a phaser hit claims a Cybertron for the firer', () => {
     });
     const h = makeHarness([alice, cyb]);
 
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
 
     expect(cyb.damage).toBeGreaterThan(0);
     expect(cyb.cybmine).toBe(7);
   });
 
-  it('overrides a claim the Cybertron already held on someone else', () => {
+  it('overrides a claim the Cybertron already held on someone else', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const cyb = makeShip({
       userid: 'cyb', shipno: 1, channel: 12,
       xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, status: 2, cybmine: 3, shieldstat: 0,
     });
     const h = makeHarness([alice, cyb]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(cyb.cybmine).toBe(7);
   });
 
-  it('leaves a human victim\'s cybmine alone', () => {
+  it('leaves a human victim\'s cybmine alone', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, channel: 7, xcoord: 5, ycoord: 5 });
     const bob = makeShip({
       userid: 'b', shipno: 1, channel: 12,
       xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, status: 1, cybmine: 42, shieldstat: 0,
     });
     const h = makeHarness([alice, bob]);
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
     expect(bob.cybmine).toBe(42);
   });
 });

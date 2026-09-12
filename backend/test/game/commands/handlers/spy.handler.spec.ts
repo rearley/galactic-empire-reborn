@@ -189,7 +189,7 @@ describe('SpyHandlerService — success path', () => {
     expect(firstLineText(result)).toBe(formatMessage(MessageId.SPYM1, 'Outpost'));
   });
 
-  it('SPYM1 — overwrite: existing spyowner replaced with new owner', () => {
+  it('SPYM1 — overwrite: existing spyowner replaced with new owner', async () => {
     const items = Array(NUMITEMS).fill(0n) as bigint[];
     items[I_SPY] = 2n;
     const ship = makeShip({ userid: 'alice', items, where: 10 });
@@ -197,7 +197,7 @@ describe('SpyHandlerService — success path', () => {
     const planet = makePlanet({ userid: 'bob', name: 'Frontier', spyowner: 'carol' });
     const { handler, ctx } = makeHandler(planet);
 
-    handler.command.handler(ship, [], ctx);
+    await handler.command.handler(ship, [], ctx);
 
     expect(planet.spyowner).toBe('alice');
     expect(ship.items[I_SPY]).toBe(1n);
