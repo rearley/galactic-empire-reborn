@@ -83,6 +83,23 @@ const DELIBERATELY_UNHANDLED: Record<string, string> = {
     'canon tells only the firer, and it already arrives on command:result as '
     + '"Phasers fired - no targets in arc". Canon prints nothing to bystanders '
     + 'for a miss (GECMDS.C:942-943 sends PFIRED to the firer alone).',
+  'combat.hit':
+    'every line canon has about a hit is sent by the SERVER as event.log text: '
+    + 'PHITHIM/PDEFLECT to a phaser firer, MTACC1/MTACC2 to a torpedo or missile '
+    + 'firer (GEFUNCS.C:1738-1743 acctm), PHITYOU/PHITDEF/THIT/MHIT/MINE4 to the '
+    + 'victim, and nothing to a bystander or to a mine\'s layer. The client used '
+    + 'to add its own "Sensors confirm a <weapon> strike" line for ordnance, '
+    + 'written when acctm was read as scoring rather than as a message; it '
+    + 'prints, so a pilot got both tellings (issue #8). The structured event '
+    + 'stays for a future UI that wants the numbers; nothing renders it today.',
+  'combat.phaser-fired':
+    'addressed to the firer alone, as canon addresses PFIRED '
+    + '(outprfge(FILTER, usrn), GECMDS.C:943-944), and canon narrates the '
+    + 'OUTCOME rather than the discharge: PHITHIM on a hit, PDEFLECT on a '
+    + 'deflection, and "no targets in arc" on a miss, all relayed as text. A '
+    + 'line for the shot itself would arrive before its own result, because the '
+    + 'broadcast leaves the server inside the command handler while '
+    + 'command:result is written only after it returns.',
   'combat.mine-detonation':
     'canon MINE5 is "Sensors indicate a large neutron explosion bearing %d, Sir!" '
     + 'and the payload carries no bearing, so it cannot be rendered faithfully '

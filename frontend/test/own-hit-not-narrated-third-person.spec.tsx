@@ -40,39 +40,37 @@ vi.mock('../src/socket/useSocket', () => ({
 import { App } from '../src/App';
 
 /**
- * A pilot is in their own sector room, so the sector-wide COMBAT_HIT broadcast
- * comes back to the ship that fired it. The phaser-fired path never narrated a
- * thing to anyone — not the firer, not a bystander — because canon shows a
- * bystander NOTHING about someone else's weapons fire; see the canon note on
- * `phaserFiredLine` in `src/features/combat/combatNarration.ts`.
- * `handleCombatHit` had no such silence, so a player watched themselves in the
- * third person:
+ * The client says NOTHING about weapons fire. The server says all of it.
  *
- *     QuiteCat hits Cybertron 43319 (phaser, hull -24%)
- *     Shields are now down, Sir!
- *     Phasers fired at 100 percent power - focus 1
- *     Sensors indicate we caused light damage to Commander ...'s ship!
+ * This file used to police a set of client-side combat lines, removing them one
+ * by one as each turned out to duplicate canon's own text. The last one
+ * standing was `Sensors confirm a <weapon> strike on <ship>.`, kept for
+ * torpedoes and missiles on the belief that canon tells a firer nothing after
+ * launch — the 2026-09-07 decision says so in as many words, and states that no
+ * string for a firer-side impact exists in MBMGEMSG.MSG.
  *
- * — the kill-feed line, then canon's own narration of the same shot, in that
- * order, because the broadcast leaves the server inside the command handler
- * while `command:result` is written only after it returns.
+ * Two strings do: MTACC1 and MTACC2, and `acctm` prints one of them to the
+ * firer's own channel on every torpedo or missile hit —
+ * GEFUNCS.C:1738-1743 `	prfmsg(MTACC1+mt,shpltr(channel,usrn),ptr->shipname);`
+ * followed by `outprfge(ALWAYS,channel)`. The port wired that relay later
+ * without revisiting the decision it disproved, so a pilot got both tellings at
+ * once, which is the log in issue #8.
  *
- * Canon narrates a phaser hit to the FIRER itself (PHIT1/PHIT2, GECMDS.C:987-996)
- * and the port relays that, so the feed line is a duplicate there and goes.
+ * Canon's words win. Both socket subscriptions are gone, so what remains is:
+ * the server relays PHITHIM/PDEFLECT to a phaser's firer, MTACC1/MTACC2 to a
+ * torpedo or missile firer, PHITYOU/PHITDEF/THIT/MHIT/MINE4 to the victim, and
+ * nothing to anyone else — a bystander is shown no part of someone else's
+ * fight, and a mine's layer is told nothing at all.
  *
- * It does NOT go for torpedoes and missiles. Canon tells the firer nothing at
- * all — `checktm` prints THIT/MHIT to the victim's channel only
- * (GEFUNCS.C:1560, :1644) and credits the shooter through `acctm`, which is
- * scoring, not a message. This line is the only confirmation our players get
- * that a torpedo landed, and "nothing acknowledged the shot" is exactly the
- * complaint that made missiles feel broken. Information stays; the duplicated
- * voice goes.
+ * @see docs/DECISIONS.md 2026-09-07, corrected 2026-09-12
  */
 function fire(event: string, payload: unknown): void {
   const handler = handlers.get(event);
-  expect(handler, `no client listener for '${event}'`).toBeDefined();
-  act(() => handler!(payload));
+  act(() => handler?.(payload));
 }
+
+/** Whether the client registered a listener for an event at all. */
+const listening = (event: string): boolean => handlers.has(event);
 
 const hit = (over: Record<string, unknown> = {}) => ({
   attackerId: LOCAL,
@@ -85,131 +83,53 @@ const hit = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe('a pilot is not told about their own shot in the third person', () => {
+describe('the client narrates no weapons fire of its own', () => {
   beforeEach(() => {
     handlers.clear();
     render(<App />);
   });
 
-  it('drops the kill-feed line for the firer when canon already narrates it', () => {
-    fire('combat.hit', hit());
-    expect(screen.queryByText(/QuiteCat hits/)).toBeNull();
+  it('subscribes to neither combat.hit nor combat.phaser-fired', () => {
+    expect(listening('combat.hit')).toBe(false);
+    expect(listening('combat.phaser-fired')).toBe(false);
   });
 
-  it('drops it for the hyper-phaser too — canon narrates that one as well', () => {
-    fire('combat.hit', hit({ weapon: 'hyper-phaser' }));
-    expect(screen.queryByText(/QuiteCat hits/)).toBeNull();
+  it('still subscribes to the events it does render', () => {
+    // The guard against deleting too much: deaths and decoy saves are client
+    // narration by design, and event.log carries the server's canon text.
+    expect(listening('combat.ship-destroyed')).toBe(true);
+    expect(listening('combat.decoy-intercept')).toBe(true);
+    expect(listening('event.log')).toBe(true);
   });
 
-  /**
-   * REVISED by design decision, not by defect. This case previously asserted
-   * that the firer keeps the full third-person feed line WITH its hull
-   * percentage, on the grounds that canon leaves them with nothing at all.
-   *
-   * Canon's silence turns out to be deliberate rather than an omission: every
-   * message about a torpedo after launch goes to the TARGET — the tracking
-   * alert (TORP1), the decoy intercept (TORDEST, `outprfge(FILTER, usrn)` where
-   * usrn is the carrier, GEFUNCS.C:1587-1588) and the impact (THIT1/THIT2). The
-   * firer is meant to `sca sh <name>` and read `Damage: severe damage` off the
-   * target. That is what the scan's damage line is FOR, and handing the shooter
-   * a percentage removed the reason to type it.
-   *
-   * So: confirm the strike, report nothing about it. Sensors know something
-   * connected; assessing it still costs a scan.
-   *
-   * @see docs/DECISIONS.md 2026-09-07 — firer-side ordnance confirmation
-   */
-  it('confirms a torpedo strike to the firer WITHOUT any damage figure', () => {
+  it('renders nothing if a combat.hit arrives anyway', () => {
     fire('combat.hit', hit({ weapon: 'torpedo', damageHull: 23 }));
 
-    const line = screen.getByText(/Sensors confirm a torpedo strike/);
-    // Asserted whole, not by pattern: the ship's own NAME carries digits
-    // ("Cybertron 43319"), so a /\d/ guard against "no numbers" matches the
-    // target rather than the damage and passes for the wrong reason.
-    expect(line.textContent).toBe('Sensors confirm a torpedo strike on Cybertron 43319.');
-    expect(line.textContent).not.toContain('%');
+    expect(screen.queryByText(/Sensors confirm/)).toBeNull();
     expect(screen.queryByText(/QuiteCat hits/)).toBeNull();
+    expect(screen.queryByText(/hull -/i)).toBeNull();
   });
 
-  it('does the same for a missile', () => {
-    fire('combat.hit', hit({ weapon: 'missile', damageHull: 40 }));
-
-    const line = screen.getByText(/Sensors confirm a missile strike/);
-    expect(line.textContent).toBe('Sensors confirm a missile strike on Cybertron 43319.');
-    expect(line.textContent).not.toContain('%');
-  });
-
-  /**
-   * REVISED by design decision — the last of the three. This asserted that a
-   * bystander watching two other ships fight sees `X hits Y (phaser, hull -24%)`.
-   *
-   * Canon shows a bystander NOTHING about someone else's weapons fire. `PFIRED`
-   * goes `outprfge(FILTER, usrn)` — to the firer alone (GECMDS.C:943-944) — and
-   * every hit message is addressed to the firer or the victim. The sector-wide
-   * broadcasts canon does make are cloak collapse (GEFUNCS.C:1380), the
-   * self-destruct countdown (:1836), sector entry/exit (:717-722), radio
-   * traffic and the destruction energy burst. Combat is not among them: if you
-   * want to know whether the two ships off your bow are fighting, you scan
-   * them and read their damage.
-   *
-   * Both port lines go — the hit line here and `X fires phasers!` — leaving the
-   * energy burst on a kill as the only thing a third party is told, which is
-   * canon's own (`outrange(ALWAYS, ...)`).
-   *
-   * @see docs/DECISIONS.md 2026-09-07
-   */
-  it('says nothing to a bystander about a fight between two other ships', () => {
-    fire('combat.hit', hit({ attackerId: 'Cybrg-208:1', attackerName: 'Cybertron 43319',
-      victimId: 'other:1', victimName: 'Wanderer' }));
-
-    expect(screen.queryByText(/Cybertron 43319 hits Wanderer/)).toBeNull();
-    expect(screen.queryByText(/hull -/)).toBeNull();
-  });
-
-  it('says nothing to a bystander when another ship fires phasers', () => {
-    fire('combat.phaser-fired', { shipId: 'Cybrg-208:1' });
+  it('renders nothing if a combat.phaser-fired arrives anyway', () => {
+    fire('combat.phaser-fired', { shipId: LOCAL, bearing: 0, percent: 100, hyper: false });
 
     expect(screen.queryByText(/fires phasers/)).toBeNull();
   });
 
   /**
-   * REVISED by design decision, not by defect — the victim half of the same
-   * call. This asserted that a pilot taking a hit sees
-   *
-   *     ** INCOMING TORPEDO! Hull -6% shields -15% from Cybertron 43319 **
-   *
-   * on top of canon's own `THIT2`, which the gateway already relays to the
-   * victim's user room. Two departures in one line: canon reports hull damage
-   * as a NUMBER nowhere in the game — not to the attacker (PHITHIM), not to the
-   * victim (THIT2 gives no magnitude at all), not even to you about your own
-   * ship (REP14 passes the damstr word, GECMDS.C:2037-2040) — and canon names
-   * the attacker at LAUNCH (TFIRE2, by scan letter) but deliberately not at
-   * impact.
-   *
-   * So the banner goes and canon's text stands alone: you are told you were
-   * hit and by what weapon, and `rep` tells you your condition in words.
-   *
-   * @see docs/DECISIONS.md 2026-09-07
+   * What the firer DOES see, and where it comes from: the server's relay of
+   * canon's MTACC2, arriving as an ordinary event.log line. The `?` is canon's
+   * own — `shpltr` returns it when the target is not in your scan table
+   * (GEFUNCS.C:2591), which is the state a pilot is in after `sca sh` alone,
+   * because only the range, local and data scans assign letters.
    */
-  it('renders no extra banner when the local ship is the victim — canon THIT2 stands alone', () => {
-    fire('combat.hit', hit({ attackerId: 'Cybrg-208:1', attackerName: 'Cybertron 43319',
-      victimId: LOCAL, weapon: 'torpedo', damageHull: 6, damageShield: 15 }));
-
-    expect(screen.queryByText(/INCOMING/)).toBeNull();
-    expect(screen.queryByText(/Hull -/)).toBeNull();
-  });
-
-  /**
-   * The line the player actually reads on being hit arrives on `event.log`,
-   * emitted by the gateway to the victim's user room with canon's own text.
-   * Pinned here so removing the banner cannot be mistaken for removing the
-   * notification.
-   */
-  it('canon THIT2 still reaches the victim over event.log', () => {
+  it('shows the server the canon hit line, verbatim', () => {
     fire('event.log', {
       category: 'combat',
-      text: 'We have taken a hit from a torpedo, Sir! Damage control has been notified.',
+      text: 'Sensors indicate our hyper-missile has hit ship ?, The Cyberquad 42066.',
     });
-    expect(screen.getByText(/We have taken a hit from a torpedo/)).toBeTruthy();
+
+    expect(screen.getByTestId('event-log').textContent)
+      .toContain('Sensors indicate our hyper-missile has hit ship ?, The Cyberquad 42066.');
   });
 });

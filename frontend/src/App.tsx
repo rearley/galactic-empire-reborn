@@ -1,7 +1,5 @@
 import { useEffect, useCallback } from 'react';
 import { destructionLine } from './features/combat/destructionLine';
-import { combatHitLine, phaserFiredLine } from './features/combat/combatNarration';
-import type { CombatHitNarrationEvent, NarrationContext } from './features/combat/combatNarration';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
@@ -84,20 +82,21 @@ function Terminal(): React.JSX.Element {
   const fkeys = useFkeys();
 
   useEffect(() => {
-    // Whether either of these says anything at all is a canon decision, and
-    // usually the answer is no. @see features/combat/combatNarration.ts
-    const ctx: NarrationContext = { localShipId, shipName };
-
-    const handlePhaserFired = (event: { shipId: string }) => {
-      const line = phaserFiredLine(event, ctx);
-      if (line) appendLines([line]);
-    };
-
-    const handleCombatHit = (event: CombatHitNarrationEvent) => {
-      const line = combatHitLine(event, ctx);
-      if (line) appendLines([line]);
-    };
-
+    // NOTHING is rendered for `combat.phaser-fired` or `combat.hit`.
+    //
+    // Every line canon has about a weapon landing is sent by the SERVER as
+    // event.log text: PHITHIM/PDEFLECT to a phaser's firer, PHITYOU/PHITDEF and
+    // THIT/MHIT/MINE4 to the victim, and — the one that closes this out —
+    // MTACC1/MTACC2 to the firer of a torpedo or missile, which is what `acctm`
+    // exists to print (GEFUNCS.C:1738-1743 `outprfge(ALWAYS,channel)`).
+    //
+    // The client used to add "Sensors confirm a <weapon> strike on <ship>." for
+    // torpedoes and missiles, a port-original string written when acctm was read
+    // as scoring rather than as a message. It is not: it prints. So a pilot got
+    // both tellings, which is what the playtest log in issue #8 shows. Canon's
+    // words win and the invention goes. A mine's layer is told nothing at all,
+    // which is also canon — MINE4 goes to the victim and MINE5 to bystanders.
+    // @see docs/DECISIONS.md 2026-09-07, CORRECTED 2026-09-12
     const handleShipDestroyed = (event: CombatShipDestroyedPayload) => {
       // The server narrates deaths in canon's words now — KILLEDBY for a kill,
       // DIED for a death nothing caused, YOURDEAD to the pilot who died — and
@@ -115,8 +114,6 @@ function Terminal(): React.JSX.Element {
       }
     };
 
-    socket.on('combat.phaser-fired', handlePhaserFired);
-    socket.on('combat.hit', handleCombatHit);
     socket.on('combat.ship-destroyed', handleShipDestroyed);
     // Your decoy ate an incoming torpedo or missile. Canon tells the DEFENDER:
     // the `ltorps` being walked in checktm are the weapons locked ONTO you, and
@@ -134,8 +131,6 @@ function Terminal(): React.JSX.Element {
 
     socket.on('combat.decoy-intercept', handleDecoyIntercept);
     return () => {
-      socket.off('combat.phaser-fired', handlePhaserFired);
-      socket.off('combat.hit', handleCombatHit);
       socket.off('combat.ship-destroyed', handleShipDestroyed);
       socket.off('combat.decoy-intercept', handleDecoyIntercept);
     };

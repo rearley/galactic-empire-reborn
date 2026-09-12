@@ -314,7 +314,12 @@ describe('a quoted citation says what the original says', () => {
     // Raised 3561 → the measured total on 2026-09-12 (issue #22): the frontend
     // and wire trees joined the scan, so their citations are protected from
     // silent deletion like the rest. Same safe direction as the raise above.
-    const TOTAL_FLOOR = 3634;
+    // Lowered 3634 → 3629 on 2026-09-12: five citations went with
+    // frontend/src/features/combat/combatNarration.ts, deleted whole when the
+    // client stopped narrating weapons fire — canon's own MTACC1/MTACC2 reach
+    // the firer from the server, so the module's only job was justifying a
+    // duplicate. Dead code removed, its citations with it. @see issue #8
+    const TOTAL_FLOOR = 3629;
     expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
   });
 });

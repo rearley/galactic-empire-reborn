@@ -288,13 +288,44 @@ describe('PriceHandlerService — bare "pri" listing (T039)', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.PRICE_NONE));
   });
 
+  /**
+   * The two-price rule, said out loud.
+   *
+   * Canon charges the OWNER `baseprice[item]` and everyone else the planet's
+   * `markup2a` — `price()` at GECMDS.C:4437 branches on
+   * `sameas(plptr->userid, warsptr->userid)`. So a captain who sets their own
+   * planet's missile price to 10 and then buys one is charged 20, the base
+   * price, and the port is right. It was reported as a bug (#1) because
+   * nothing anywhere says so: the original's own BUY and PRICE help pages
+   * describe buying "from one of your own planets" and never mention that the
+   * price you set is the price OTHERS pay.
+   */
+  it('tells the owner these are base prices, not the price they set', async () => {
+    const planet = makePlanet({ userid: 'owner' });
+    const { handler } = makeHandler({ planet });
+    const ship = makeShip({ where: 10, userid: 'owner' });
+    const result = await handler.command.handler(ship, [], {}) as Lines;
+    const text = result.lines.map((l) => l.text).join('\n');
+    expect(text).toMatch(/base price/i);
+    expect(text).toMatch(/adm markup/);
+  });
+
+  it('says nothing of the sort to a visitor, who pays the set price', async () => {
+    const planet = makePlanet({ userid: 'owner' });
+    const { handler } = makeHandler({ planet });
+    const ship = makeShip({ where: 10, userid: 'buyer' });
+    const result = await handler.command.handler(ship, [], {}) as Lines;
+    expect(result.lines.map((l) => l.text).join('\n')).not.toMatch(/base price/i);
+  });
+
   it('owner sees all items including non-sellable', async () => {
     const planet = makePlanet({ userid: 'owner' });
     const { handler } = makeHandler({ planet });
     const ship = makeShip({ where: 10, userid: 'owner' });
     const result = await handler.command.handler(ship, [], {}) as Lines;
-    // Owner sees all NUMITEMS items
-    expect(result.lines.length).toBe(NUMITEMS);
+    // Owner sees all NUMITEMS items, plus the base-price note. @see issue #1
+    expect(result.lines.length).toBe(NUMITEMS + 1);
+    expect(result.lines.slice(0, NUMITEMS).every((l) => /\d+ cr$/.test(l.text))).toBe(true);
   });
 });
 
