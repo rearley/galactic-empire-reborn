@@ -2,15 +2,12 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { needsDatabase, selectedSpecs } from "./needs-database";
+import { loadDotenv } from "../../helpers/load-dotenv";
 
-// Load .env before globalSetup so TEST_DATABASE_URL is available without manual env injection
-const envPath = path.resolve(__dirname, "../../../.env");
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const match = line.match(/^([^#=]+)=(.*)$/);
-    if (match) process.env[match[1].trim()] ??= match[2].trim().replace(/^"|"$/g, "");
-  }
-}
+// Load .env before globalSetup so TEST_DATABASE_URL is available without manual
+// env injection. The loader is shared with the manual suite's config, which
+// needs the same env and none of this file's database reset. @see issue #37
+loadDotenv();
 
 /**
  * The two runner shapes this file has to understand.

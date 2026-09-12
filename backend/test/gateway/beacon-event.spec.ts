@@ -1,10 +1,11 @@
 /**
- * T043 — Beacon socket event smoke test (manual).
+ * Beacon socket event wiring — the contract the gateway emits on.
  *
- * Verifies that the beacon event infrastructure is wired correctly by
- * inspecting the gateway handler directly (no live WebSocket needed).
- *
- * Run with: npm run test:manual
+ * Was `test/manual/T043.manual.spec.ts`, and nothing about it is manual: it
+ * reads constants and computes an encoding, with no live stack and no database.
+ * It sat in a suite that CI never ran and that failed on invocation for
+ * unrelated reasons, so a passing test was invisible. Moved into the suite that
+ * actually runs. @see issue #37
  *
  * This test encodes the QA validation scenario from feature 020 (US4):
  *  - The gateway responds to sector transition events.

@@ -72,6 +72,61 @@ describe('ShipStateService flush failure escalation', () => {
     expect(errors.filter((e) => e.includes(FLUSH_FAILURE_ALARM)).length).toBe(1);
   });
 
+  /**
+   * Louder once, then quieter — not louder forever.
+   *
+   * The per-ship line is right while a fault looks transient. Once the alarm has
+   * fired, the fault is known and every further line is noise: a dev backend
+   * left running against a migrated database wrote the same line every second
+   * for three days, 5,220,711 of them, 2.4 GB, on a box that also serves
+   * production and reached 82% full. The information content of line 5,220,711
+   * is zero; what a reader needs is that it is still happening and how often.
+   * @see issue #36
+   */
+  it('stops logging every individual failure once the alarm has fired', async () => {
+    const update = vi.fn().mockRejectedValue(new Error('Unknown arg `autoShield`'));
+    const { svc, errors } = build(update);
+    svc.loadShip(makeShip());
+
+    await runFlush(svc, 12);
+    const atAlarm = errors.length;
+
+    // 200 more sweeps of the same persistent fault.
+    await runFlush(svc, 200);
+
+    // A handful of periodic summaries, not 200 more per-ship lines.
+    expect(errors.length - atAlarm).toBeLessThan(10);
+  });
+
+  it('says how many it suppressed, so the fault is still visibly live', async () => {
+    const update = vi.fn().mockRejectedValue(new Error('Unknown arg `autoShield`'));
+    const { svc, errors } = build(update);
+    svc.loadShip(makeShip());
+
+    await runFlush(svc, 12 + 300);
+
+    const summaries = errors.filter((e) => /still failing/i.test(e));
+    expect(summaries.length).toBeGreaterThan(0);
+    expect(summaries[0]).toMatch(/\d+/);
+  });
+
+  it('goes back to per-ship detail after a recovery, because the next fault is new', async () => {
+    const update = vi.fn().mockRejectedValue(new Error('Unknown arg `autoShield`'));
+    const { svc, errors } = build(update);
+    svc.loadShip(makeShip());
+
+    await runFlush(svc, 12);
+    update.mockResolvedValue({});
+    await runFlush(svc, 1);              // recovered — counter resets
+    const afterRecovery = errors.length;
+
+    update.mockRejectedValue(new Error('deadlock'));
+    svc.loadShip(makeShip());            // dirty again
+    await runFlush(svc, 1);
+
+    expect(errors.length).toBeGreaterThan(afterRecovery);
+  });
+
   it('names the persistence risk, not just the error', async () => {
     const update = vi.fn().mockRejectedValue(new Error('Unknown arg `channel`'));
     const { svc, errors } = build(update);

@@ -19,6 +19,20 @@ The entrypoint runs `./node_modules/.bin/prisma migrate deploy`, not `npx`: npx
 wants a writable cache under `$HOME` and the container runs as `node`. The
 binary is already in the image.
 
+- **Restart every running backend after a migration.** A Node process holds its
+  Prisma client in memory; rebuilding `dist` does not replace a module that is
+  already loaded, and the database has moved under it. A dev backend started on
+  8 September 2026 ran for three days against a migration applied on the 9th
+  that dropped a column it still wrote — 5,220,711 failed flushes, a 2.4 GB log,
+  and `/health` saying `{"status":"ok","database":"up"}` the whole time, because
+  connectivity was never the problem.
+
+  `/health` now compares the applied migrations against the list it snapshotted
+  at boot and answers 503 with `schema: "moved"` when they differ, so the
+  omission is visible rather than silent. Production is unaffected: the
+  entrypoint migrates before the app starts, so the snapshot is taken after.
+  @see issue #36, `src/health/health.controller.ts`
+
 ## Seeds are generated, not transcribed
 
 **Do not hand-transcribe canon into the codebase.** Generate it, and pin it with
