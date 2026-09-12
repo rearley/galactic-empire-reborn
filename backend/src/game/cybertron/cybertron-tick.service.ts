@@ -1052,7 +1052,7 @@ export class CybertronTickService implements OnModuleInit {
     // into the brake or close band became `where = 0` while still moving at
     // 3,200 units, and the next activation read that as normal space and raised
     // its shields. A player at the same speed has theirs forced down, so the AI
-    // fought at warp behind shields nothing could strip. @see issue #42
+    // fought at warp behind shields nothing could strip. @see issue #43
     if (band.where !== undefined) ship.where = band.where;
     if (band.shield !== undefined) {
       ship.shield = band.shield;
