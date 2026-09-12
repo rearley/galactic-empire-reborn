@@ -44,6 +44,24 @@ COPY backend/src ./src
 COPY backend/config ./config
 RUN npm run build
 
+# The linter does not go to production.
+#
+# The runtime stage copies this whole tree, because `docker-entrypoint.sh` runs
+# `prisma migrate deploy` at container start and the Prisma CLI is a
+# devDependency. `oxlint` and `oxlint-tsgolint` ride along on that decision,
+# bringing their platform binaries — about 52 MB of an 822 MB image, in a
+# runtime that will never lint anything. Watchtower pulls a new `:latest` on
+# every merge, so that is bandwidth and disk on every deploy.
+#
+# Removed by name rather than by an `--omit=dev` install, which cannot work
+# until the runtime's own dependencies are classified as such: `@prisma/client`,
+# `prisma` and `ts-node` all sit in devDependencies today, and the app requires
+# the first at runtime. That reclassification is the larger fix.
+# @see issue #7  @see test/unit/dockerfile-no-linters.spec.ts
+RUN rm -rf /app/node_modules/oxlint /app/node_modules/oxlint-tsgolint \
+           /app/node_modules/@oxlint /app/node_modules/@oxlint-tsgolint \
+           /app/node_modules/.bin/oxlint /app/node_modules/.bin/oxlint-tsgolint
+
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 FROM node:24-alpine
 
