@@ -17,9 +17,30 @@ import type { CybertronClassConfig } from './cybertron.config';
 export interface PursuitBand {
   desiredSpeed: number;
   /** 1 = enter/stay in hyperspace; 0 = normal space */
-  where: number;
-  /** Shield value to set (0 in hyperwarp, class max on drop-out, undefined = no change) */
-  shield: number | undefined;
+  /**
+   * Set ONLY when the band enters hyperwarp — canon writes `ptr->where` in that
+   * one band and nowhere else (GECYBS.C:749 `		ptr->where = 1;`). Leaving hyperspace belongs to the
+   * movement code, which calls `hyperspace(ptr,usrn,0)` when a decelerating
+   * ship crosses back under warp 1 (GEFUNCS.C:538 `	if ((ptr->speed2b < 1000) && (ptr->speed/1000 >=1) && ((ptr->speed-decelrate)/1000 <1))`). Writing 0 here yanked
+   * an AI out of hyperspace at 3,200 units of speed and let the next band raise
+   * its shields at warp. @see issue #42
+   */
+  where?: number;
+  /**
+   * Shield CHARGE to set. Only the hyperwarp band sets one, and it sets 0 —
+   * canon drops the shields on entry (GEFUNCS.C:590 `	if (ptr->shieldstat == SHIELDUP)`).
+   *
+   * The lower bands used to restore it to the class maximum on the way out of
+   * hyperspace, which canon does nowhere: its bands never touch `ptr->shield`,
+   * and `shieldup()` raises the screen without granting any charge
+   * (GEFUNCS.C:2420-2427). An AI therefore came out of every hyperwarp run with
+   * a full screen, for free, while a player's charge only ever comes back at
+   * `shieldtype * 3` per six-second tick through `shieldchg`. The AI regenerates
+   * through that same path — the tick loop filters on nothing — so removing the
+   * gift leaves it on equal terms rather than leaving it defenceless.
+   * @see issue #43
+   */
+  shield?: number;
   /** True when Cybertron is dropping from hyperwarp back to normal space */
   raiseShields: boolean;
   /** Instantaneous `ptr->speed = ptr->speed2b` (hyperwarp band only). */
@@ -99,7 +120,6 @@ export function pickPursuitBand(
   hyperdist1: number,
   hyperdist2: number,
   currentWhere: number,
-  classMaxShields: number,
   topSpeed: number,
   rand: Random,
   /**
@@ -123,13 +143,12 @@ export function pickPursuitBand(
   }
   if (distance >= hyperdist2) {
     // Brake band — `if (ptr->speed > 20000.0) ptr->speed = 20000.0`, then head
-    // toward the target at top speed. C raises no shields in this band.
-    // @see GECYBS.C:756-769
+    // toward the target at top speed. C raises no shields in this band, and
+    // writes no `where`: leaving hyperspace is the movement code's job, when
+    // the ship decelerates back under warp 1. @see GECYBS.C:759 `		/* BRAKE!!!!!! */`
     return {
       desiredSpeed: topSpeed,
       speedClamp: 20000,
-      where: 0,
-      shield: currentWhere === 1 ? classMaxShields : undefined,
       raiseShields: false,
     };
   }
@@ -142,8 +161,6 @@ export function pickPursuitBand(
     return {
       desiredSpeed: topSpeed,
       speedClamp: topSpeed,
-      where: 0,
-      shield: currentWhere === 1 ? classMaxShields : undefined,
       raiseShields: currentWhere === 0,
     };
   }
@@ -168,8 +185,6 @@ export function pickPursuitBand(
   return {
     desiredSpeed,
     speedClamp: topSpeed,
-    where: 0,
-    shield: currentWhere === 1 ? classMaxShields : undefined,
     raiseShields: currentWhere === 0,
   };
 }

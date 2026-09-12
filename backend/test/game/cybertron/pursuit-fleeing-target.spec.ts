@@ -28,7 +28,7 @@ import { Random } from '../../../src/game/combat/random.port';
 
 const rand: Random = { next: () => 0 };
 const band = (dist: number, target: { where: number; speed2b: number }, topSpeed = 20000) =>
-  pickPursuitBand(dist, 25, 10, 0, 2, topSpeed, rand, target);
+  pickPursuitBand(dist, 25, 10, 0, topSpeed, rand, target);
 
 describe('combat-band pursuit of a target that runs', () => {
   it('matches a fleeing target at 1.25x its speed, not a flat 990', () => {
