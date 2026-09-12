@@ -7,6 +7,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import type { CombatHitPayload, CombatPhaserFiredPayload } from '@ge/wire';
 import { PLANET_ION_FIRED, PlanetIonFiredEvent } from '../game/planet/ion-cannon';
 import {
   PHYSICS_GRAVITY,
@@ -694,21 +695,37 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   @OnEvent(COMBAT_PHASER_FIRED)
   handleCombatPhaserFired(event: CombatPhaserFiredEvent): void {
-    const enriched: CombatPhaserFiredEvent = {
-      ...event,
+    // Built field by field, NOT spread from the event: `sector` and `tickAt`
+    // are engine internals the client never reads. @see issue #4
+    const payload: CombatPhaserFiredPayload = {
+      shipId: event.shipId,
       shipName: shipNameOf(this.shipStateService, event.shipId),
+      bearing: event.bearing,
+      percent: event.percent,
+      hyper: event.hyper,
     };
-    this.server.to(`user:${useridOf(event.shipId)}`).emit(COMBAT_PHASER_FIRED, enriched);
+    this.server.to(`user:${useridOf(event.shipId)}`).emit(COMBAT_PHASER_FIRED, payload);
   }
 
   @OnEvent(COMBAT_HIT)
   handleCombatHit(event: CombatHitEvent): void {
     // Name the attacking SHIP, not its userid — `sca sh` takes the ship name,
     // and AI ships are absent from the roster the client resolves names from.
-    const enriched: CombatHitEvent = {
-      ...event,
+    //
+    // Built field by field, NOT spread from the event. This goes to a whole
+    // sector room and, further down, straight to an out-of-sector victim, so a
+    // spread published the firing ship's exact sector to everyone who fights —
+    // and to a pilot with no other way to learn where the shot came from. Same
+    // disclosure `combat.ship-destroyed` was narrowed to close.
+    // @see issue #4  @see test/gateway/hit-payload-scoping.spec.ts
+    const enriched: CombatHitPayload = {
+      attackerId: event.attackerId,
       attackerName: shipNameOf(this.shipStateService, event.attackerId),
+      victimId: event.victimId,
       victimName: shipNameOf(this.shipStateService, event.victimId),
+      weapon: event.weapon,
+      damageHull: event.damageHull,
+      damageShield: event.damageShield,
     };
     const room = `sector:${event.sector.x}:${event.sector.y}`;
     this.server.to(room).emit(COMBAT_HIT, enriched);

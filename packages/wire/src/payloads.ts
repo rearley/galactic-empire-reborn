@@ -332,6 +332,47 @@ export interface CombatHitEvent {
   tickAt: Date;
 }
 
+/**
+ * Payload actually put on the wire for `combat.phaser-fired`, built field by
+ * field in `backend/src/gateway/game.gateway.ts` — NOT spread from the event.
+ *
+ * Narrower than `CombatPhaserFiredEvent` above, which is the internal domain
+ * event. It goes to the firer's own user room, so the fields here are that
+ * pilot's own instrument readings; `sector` and `tickAt` are engine internals
+ * the client never reads. @see issue #4
+ */
+export interface CombatPhaserFiredPayload {
+  shipId: string;
+  shipName?: string | null;
+  bearing: number;
+  percent: number;
+  hyper: boolean;
+}
+
+/**
+ * Payload actually put on the wire for `combat.hit`, built field by field in
+ * `backend/src/gateway/game.gateway.ts` — NOT spread from the event.
+ *
+ * Narrower than `CombatHitEvent` above for the reason
+ * `CombatShipDestroyedPayload` is narrower than its event: this one goes to a
+ * whole sector room, and to an out-of-sector victim directly, so spreading it
+ * published the firing ship's exact sector to anyone who fights — and to a
+ * pilot who had no other way to learn where the shot came from. The client
+ * renders seven fields; this is the seven it receives.
+ *
+ * @see backend/test/gateway/hit-payload-scoping.spec.ts
+ * @see frontend/src/features/combat/combatNarration.ts
+ */
+export interface CombatHitPayload {
+  attackerId: string;
+  attackerName?: string;
+  victimId: string;
+  victimName?: string;
+  weapon: 'phaser' | 'hyper-phaser' | 'torpedo' | 'missile' | 'mine';
+  damageHull: number;
+  damageShield: number;
+}
+
 export interface CombatMissEvent {
   attackerId: string;
   weapon: 'phaser';

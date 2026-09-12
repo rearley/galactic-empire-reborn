@@ -98,8 +98,19 @@ describe('GameGateway combat broadcasts', () => {
     gateway.handleCombatHit(event);
     expect(toMock).toHaveBeenCalledWith('sector:12:3');
     // The gateway adds `attackerName` — the identifier `sca sh` accepts — so
-    // the client need not fall back to the userid for AI ships.
-    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, { ...event, attackerName: undefined });
+    // the client need not fall back to the userid for AI ships. It also builds
+    // the payload field by field rather than spreading the internal event, so
+    // `sector` and `tickAt` do not ride along.
+    // @see issue #4, test/gateway/hit-payload-scoping.spec.ts
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, {
+      attackerId: 'a:1',
+      attackerName: undefined,
+      victimId: 'b:2',
+      victimName: undefined,
+      weapon: 'phaser',
+      damageHull: 5,
+      damageShield: 100,
+    });
   });
 
   it('broadcasts COMBAT_DECOY_INTERCEPT to sector room', () => {

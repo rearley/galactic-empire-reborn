@@ -68,9 +68,23 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Every tree that cites canon, not just the backend's.
+ *
+ * `frontend/` was outside this list, so 45 citations there were invisible to
+ * all three assertions below — the total floor, the unquoted ceiling and the
+ * quote verification. They are not decoration: `App.tsx` and
+ * `features/combat/destructionLine.ts` carry the derivations explaining what a
+ * player is deliberately NOT shown, and those comments are the reason several
+ * handlers correctly do nothing. Any one of them could have pointed at the
+ * wrong line and nothing would have noticed. @see issue #22
+ */
 const SOURCE_FILES = [
   ...walk(join(REPO, 'backend/src')),
   ...walk(join(REPO, 'backend/test')),
+  ...walk(join(REPO, 'frontend/src')),
+  ...walk(join(REPO, 'frontend/test')),
+  ...walk(join(REPO, 'packages/wire/src')),
 ];
 
 const rel = (f: string) => f.replace(`${REPO}/`, '');
@@ -189,7 +203,12 @@ describe('a quoted citation says what the original says', () => {
     // 84 → 92 when `scanLine` replaced the long-form-only regex (issue #11):
     // five of the shorthand continuations already carried a quote and were
     // simply not being counted. Floor keeps the same six of slack it had at 84.
-    const BASELINE = 86;
+    //
+    // 86 → 91 on 2026-09-12 (issue #22): the frontend and wire trees joined the
+    // scan and brought quoted citations with them — 97 verified pairs now, so
+    // the floor keeps its same six of slack. Every one of the new pairs passed
+    // verification against the vendored original on its first run.
+    const BASELINE = 91;
     expect(pairs.length).toBeGreaterThanOrEqual(BASELINE);
   });
 
@@ -230,7 +249,15 @@ describe('a quoted citation says what the original says', () => {
     // 201 citations that were always here became visible to the count for the
     // first time. Every one of them is a citation that existed before this
     // commit and that no ratchet was watching. Re-measured, not chosen.
-    const BASELINE = 3469;
+    //
+    // Raised 3469 → 3537 on 2026-09-12 (issue #22), and this is the same kind
+    // of raise: the CORPUS did not change, the SCOPE did. `frontend/` and
+    // `packages/wire/src` are walked now, so 68 citations that were always
+    // there became visible to the count for the first time. Every quoted one
+    // among them passed verification against the vendored original on the first
+    // run, which is the evidence that they are real citations rather than
+    // wishful line numbers.
+    const BASELINE = 3537;
     expect(unquoted).toBeLessThanOrEqual(BASELINE);
   });
 
@@ -284,7 +311,10 @@ describe('a quoted citation says what the original says', () => {
     // ever moves UP on a re-measurement like this, which is the safe direction —
     // the 201 newly visible citations are now protected from silent deletion
     // exactly like the rest.
-    const TOTAL_FLOOR = 3561;
+    // Raised 3561 → the measured total on 2026-09-12 (issue #22): the frontend
+    // and wire trees joined the scan, so their citations are protected from
+    // silent deletion like the rest. Same safe direction as the raise above.
+    const TOTAL_FLOOR = 3634;
     expect(total).toBeGreaterThanOrEqual(TOTAL_FLOOR);
   });
 });
