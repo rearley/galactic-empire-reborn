@@ -13,8 +13,8 @@ import type {
   FkeysSnapshotPayload,
   PhysicsSectorTransitionPayload,
   SectorShipTransitPayload,
-  CombatPhaserFiredEvent,
-  CombatHitEvent,
+  CombatPhaserFiredPayload,
+  CombatHitPayload,
   CombatMissEvent,
   CombatDecoyInterceptEvent,
   CombatMineDetonationEvent,
@@ -56,8 +56,8 @@ export interface ServerToClientEvents {
   'physics.sector-transition': (payload: PhysicsSectorTransitionPayload) => void;
   'sector:ship-left': (payload: SectorShipTransitPayload) => void;
   'sector:ship-entered': (payload: SectorShipTransitPayload) => void;
-  'combat.phaser-fired': (payload: CombatPhaserFiredEvent) => void;
-  'combat.hit': (payload: CombatHitEvent) => void;
+  'combat.phaser-fired': (payload: CombatPhaserFiredPayload) => void;
+  'combat.hit': (payload: CombatHitPayload) => void;
   'combat.miss': (payload: CombatMissEvent) => void;
   'combat.decoy-intercept': (payload: CombatDecoyInterceptEvent) => void;
   'combat.mine-detonation': (payload: CombatMineDetonationEvent) => void;
