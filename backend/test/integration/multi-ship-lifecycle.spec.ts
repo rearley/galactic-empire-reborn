@@ -304,6 +304,37 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
     socket.disconnect();
   });
 
+  /**
+   * A refused selection has to say why.
+   *
+   * The client has rendered an error banner on this screen since the fleet menu
+   * landed and the server never sent one, so the two ways to be refused — a
+   * number outside the list, and a hull destroyed between the prompt and the
+   * reply — both came back as the same silent re-list. @see issue #6
+   */
+  it('an out-of-range choice re-lists the fleet AND says what is wrong', async () => {
+    const socket = makeClient(port);
+    await waitForEvent(socket, 'prompt:ship-select');
+
+    const [again] = await Promise.all([
+      waitForEvent<{ ships: unknown[]; error?: string }>(socket, 'prompt:ship-select'),
+      Promise.resolve().then(() => socket.emit('prompt:reply', { value: '9' })),
+    ]);
+
+    expect(again.ships).toHaveLength(2);
+    expect(again.error).toBe('Enter a number from 1 to 2.');
+    expect(boardMock).not.toHaveBeenCalled();
+
+    socket.disconnect();
+  });
+
+  it('the first prompt carries no error — nothing has been refused yet', async () => {
+    const socket = makeClient(port);
+    const first = await waitForEvent<{ error?: string }>(socket, 'prompt:ship-select');
+    expect(first.error).toBeUndefined();
+    socket.disconnect();
+  });
+
   it('select #2 → boards ship #2, emits welcome + snapshot', async () => {
     const socket = makeClient(port);
 

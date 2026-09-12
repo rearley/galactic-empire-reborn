@@ -623,6 +623,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const isValidIndex =
       Number.isInteger(indexNum) && indexNum >= 1 && indexNum <= pending.length;
 
+    // Why the menu is coming back. The client has always had a banner for this
+    // and the server never filled it, so a captain who typed 9 of 2 — or chose
+    // a hull destroyed between the prompt and the reply — got the same list
+    // again with no explanation. @see issue #6
+    let error: string;
+
     if (isValidIndex) {
       const chosen = pending[indexNum - 1];
       // Reload from DB to ensure the hull row still exists (could have been destroyed mid-select).
@@ -632,12 +638,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.data.pendingShipSelect = undefined;
         return;
       }
-      // Ship no longer exists — fall through to re-emit menu
+      // The two refusals are not the same event and must not read the same: one
+      // is a typo, the other is a hull that no longer exists.
+      error = `${chosen.shipname} is no longer in service, Sir.`;
+    } else {
+      error = `Enter a number from 1 to ${pending.length}.`;
     }
 
     // Invalid index or ship gone — re-emit the selection menu with the stored fleet list.
     client.emit('prompt:ship-select', {
       step: 'SHIP_SELECT',
+      error,
       ships: pending.map(e => ({
         index: e.index,
         shipno: e.shipno,

@@ -292,7 +292,7 @@ export class PlanetStateService implements OnModuleInit {
       // who had just claimed their first world was told "Planets: none." by
       // `rep acc` while `pla` listed it — the counter only came right at
       // midnight, when it is rebuilt from actual ownership.
-      await this.users.incrementPlanetsIfPresent(userid);
+      await this.users.incrementPlanets(userid);
 
       return { ok: true as const };
     });

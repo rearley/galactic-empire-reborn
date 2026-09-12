@@ -36,9 +36,11 @@ export interface OnboardingGrant {
  *  - `auth/auth.service.ts` — account lifecycle: register, login, username.
  *
  * Each method issues exactly the statement the call site it replaced issued —
- * same `where`, same `select`, same verb. Two methods differ only in `update`
- * vs `updateMany` (`incrementPlanets` / `incrementPlanetsIfPresent`) and that is
- * deliberate: the callers differ in whether a missing row is an error.
+ * same `where`, same `select`, same verb. The one exception is deliberate:
+ * `incrementPlanets` used to have an `updateMany` twin for the claim path, so
+ * the same counter threw on one route and went silent on the other. Canon has
+ * one routine for both (GECMDS.C:4001 `++waruptr->planets`), and the loud verb
+ * is the one that survived. @see issue #15
  *
  * ## This class must stay stateless and constructible from `(prisma)` alone
  *
@@ -341,28 +343,17 @@ export class UserRepository {
   }
 
   /**
-   * `++waruptr->planets` after a successful invasion. Uses `update`, so a
-   * missing row is an error: the caller is the attacking pilot, whose row must
-   * exist. @see GECMDS.C cmd_attack — troop and fighter branches, cited by
-   * line at the two call sites in planet-attack.service.ts.
+   * `++waruptr->planets` after winning a world — by invasion or by claim.
+   *
+   * `update`, so a missing row throws P2025. The caller is always the pilot who
+   * just took the planet, and their row must exist; if it does not, something
+   * upstream is broken and the tick should say so rather than quietly
+   * disagreeing with `pla`. The claim path used `updateMany` and swallowed it.
+   * @see GECMDS.C:4001 wonplnt — called from cmd_attack's troop and fighter
+   *   branches and from the claim path alike.  @see issue #15
    */
   async incrementPlanets(userid: string): Promise<void> {
     await this.prisma.user.update({
-      where: { userid },
-      data: { planets: { increment: 1 } },
-    });
-  }
-
-  /**
-   * The same counter after `cla`, but tolerant of a missing row.
-   *
-   * Without this the pilot who had just claimed their first world was told
-   * "Planets: none." by `rep acc` while `pla` listed it — the counter only came
-   * right at midnight, when it is rebuilt from actual ownership.
-   * @see GECMDS.C wonplnt
-   */
-  async incrementPlanetsIfPresent(userid: string): Promise<void> {
-    await this.prisma.user.updateMany({
       where: { userid },
       data: { planets: { increment: 1 } },
     });

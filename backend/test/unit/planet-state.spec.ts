@@ -55,7 +55,10 @@ function makePrisma(planets: PlanetState[]) {
       findFirst: vi.fn().mockResolvedValue(null),
     },
     // claim/abandon keep the owner's planet counter in step (C: wonplnt()).
-    user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    // claim() increments the counter with `update` now: a world won by an
+    // account that does not exist is an error, not something to absorb.
+    // @see issue #15
+    user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }), update: vi.fn().mockResolvedValue({}) },
   };
 }
 
