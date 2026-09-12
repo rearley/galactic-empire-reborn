@@ -83,4 +83,23 @@ describe('register maps a unique violation to EMAIL_TAKEN', () => {
     const svc = serviceRejecting(adapterP2002('User_username_lower_idx'));
     await expect(svc.register(CREDENTIALS)).rejects.not.toBeInstanceOf(ConflictException);
   });
+
+  /**
+   * A candidate that is not a string must be ignored, not stringified.
+   *
+   * The matcher ran every candidate through `String(c)`, and `String({})` is
+   * `'[object Object]'` — a value that can never match a marker but is compared
+   * against every one of them, so the intent ("did this constraint name our
+   * email index?") was answered by accident rather than by rule. It is also the
+   * shape a future Prisma release could hand us: `constraint.fields` as an
+   * object rather than an array of names. @see issue #29
+   */
+  it('ignores a candidate that is not a string or an array of them', async () => {
+    const err = Object.assign(new Error('unique violation'), {
+      code: 'P2002',
+      meta: { driverAdapterError: { cause: { constraint: { fields: { 0: 'email' } } } } },
+    });
+    const svc = serviceRejecting(err);
+    await expect(svc.register(CREDENTIALS)).rejects.not.toBeInstanceOf(ConflictException);
+  });
 });

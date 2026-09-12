@@ -9,6 +9,29 @@ import { Invariant, Violation } from './invariants.types';
  */
 const FLUSH_SETTLE_MS = 30_000;
 
+/**
+ * Renders a persisted value for the violation text.
+ *
+ * `String(v)` on anything structured is `[object Object]`, and `cargo` is
+ * structured. This reporter exists to say WHICH value drifted, so a detail line
+ * that names the field and then hides both sides is the diagnostic failing at
+ * the one moment it is read. BigInt has no JSON representation either, and
+ * every quantity on a ship is a bigint. @see issue #29
+ */
+function describe(v: unknown): string {
+  if (typeof v === 'bigint') return `${v}n`;
+  if (v === null || typeof v !== 'object') return String(v);
+  try {
+    const json = JSON.stringify(v, (_k, val: unknown) => (typeof val === 'bigint' ? `${val}n` : val));
+    // `undefined` back from JSON.stringify means the value has no JSON form at
+    // all (a function, a symbol); say so rather than falling back to String().
+    return json ?? `[no JSON form: ${Object.prototype.toString.call(v)}]`;
+  } catch {
+    // A cycle or a throwing getter must not take the invariant harness down.
+    return `[unserialisable ${Object.prototype.toString.call(v)}]`;
+  }
+}
+
 /** Fields we compare between in-memory ship state and the DB row. */
 const PERSISTED_FIELDS = [
   'xcoord',
@@ -76,7 +99,7 @@ export const inMemoryShipMatchesDb: Invariant = {
             rule: 'inMemoryShipMatchesDb',
             sourceRef: 'ShipStateService flush + P-019 finding',
             severity: 'HIGH',
-            detail: `ship ${s.shipId} field ${field} mem=${String(memVal)} db=${String(dbVal)}`,
+            detail: `ship ${s.shipId} field ${field} mem=${describe(memVal)} db=${describe(dbVal)}`,
           });
         }
       }
