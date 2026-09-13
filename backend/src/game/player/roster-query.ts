@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../prisma/client';
 
 /**
  * Canon's roster selection, shared by the in-game `ros` command and the public

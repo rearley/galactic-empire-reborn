@@ -3,6 +3,7 @@ import { rollRandamage } from '../../../src/game/combat/combat-math';
 import { applyRandamage } from '../../../src/game/combat/randamage.apply';
 import { SHIELDDM } from '../../../src/game/constants';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /** Returns a Random that yields the given sequence of values. */
 function seq(...values: number[]): Random {
@@ -11,24 +12,21 @@ function seq(...values: number[]): Random {
 }
 
 function makeVictim(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 50, energy: 5000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 1, shield: 100, cloak: 5,
-    degrees: 0, percent: 0, tactical: 5, helm: 5, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 5, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Test',
+    damage: 50,
+    energy: 5000,
+    phasr: 100,
+    phasrtype: 1,
+    shieldtype: 1,
+    shieldstat: 1,
+    shield: 100,
+    cloak: 5,
+    tactical: 5,
+    helm: 5,
+    firecntl: 5,
     ...overrides,
-  };
+  });
 }
 
 const ALL_CAPS = { hasShields: true, hasPhasers: true, hasTorpOrMissile: true, hasCloak: true };

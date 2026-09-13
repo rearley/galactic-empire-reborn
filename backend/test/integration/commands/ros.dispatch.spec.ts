@@ -4,37 +4,25 @@ import { TeamRepository } from '../../../src/game/team/team.repository';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { UserRepository } from '../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
-const emptyTeamRepo = { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as TeamRepository;
+const emptyTeamRepo = { findTeamsByCodes: vi.fn().mockResolvedValue([]) } as unknown as TeamRepository;
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha',
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
     ...overrides,
-  };
+  });
 }
 
 const ctx: CommandContext = {};
 
 function buildRouter(users: Array<{ userid: string; score: bigint; kills: number; planets: number; population: bigint }>): CommandRouterService {
   const prismaMock = {
-    user: { findMany: jest.fn().mockResolvedValue(users) },
+    user: { findMany: vi.fn().mockResolvedValue(users) },
   } as unknown as PrismaService;
-  const handler = new RosHandlerService(prismaMock);
+  const handler = new RosHandlerService(new UserRepository(prismaMock));
   const router = new CommandRouterService();
   router.register(handler.command);
   return router;
@@ -58,12 +46,12 @@ describe('ros dispatch integration', () => {
   });
 
   it('ros all passes to Prisma with all cap', async () => {
-    const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-    const handler = new RosHandlerService(prismaMock);
+    const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+    const handler = new RosHandlerService(new UserRepository(prismaMock));
     const router = new CommandRouterService();
     router.register(handler.command);
     await router.dispatch('ros all', makeShip(), ctx);
-    expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
+    expect((prismaMock.user.findMany as Mock).mock.calls[0][0].take).toBe(200);
   });
 
   it('ros with empty result returns only header', async () => {

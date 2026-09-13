@@ -18,16 +18,10 @@
 
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { CommandResult, ScanRenderEvent, ScanCell } from '../../src/game/commands/command.types';
-import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
-import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
-import { mockRandom } from '../fixtures/mock-random';
 import { Socket } from 'socket.io';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway as makeTestGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /** Minimal mock socket that records emitted events. */
 interface EmittedCall {
@@ -38,7 +32,7 @@ interface EmittedCall {
 function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
   const calls: EmittedCall[] = [];
   const socket = {
-    emit: jest.fn((event: string, payload: unknown) => {
+    emit: vi.fn((event: string, payload: unknown) => {
       calls.push({ event, payload });
     }),
     id: 'test-socket-id',
@@ -49,26 +43,8 @@ function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
 
 /** Build a minimal GameGateway with all dependencies mocked out. */
 function makeGateway(): GameGateway {
-  const shipStateService = {} as unknown as ShipStateService;
-  const commandRouter = {} as unknown as CommandRouterService;
-  const registry = {} as unknown as ConnectedShipsRegistry;
-  const wsAuthGuard = {} as unknown as WsAuthGuard;
-  const prisma = {} as unknown as PrismaService;
-  const onboardingService = {} as unknown as OnboardingService;
-  const scanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
-
-  return new GameGateway(
-    shipStateService,
-    commandRouter,
-    registry,
-    wsAuthGuard,
-    prisma,
-    onboardingService,
-    scanHandler,
-    { getTypeName: jest.fn() } as never,
-    mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const scanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
+  return makeTestGateway({ scanHandler });
 }
 
 /** Minimal ScanCell for test payloads. */
@@ -277,8 +253,8 @@ describe('GameGateway.emitCommandResult — scan:render event routing', () => {
   describe('no room broadcasts', () => {
     it('emitCommandResult never calls server.to().emit() for scan events', () => {
       // Attach a mock server that spies on `to` — it must NOT be called.
-      const toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
-      (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+      const toMock = vi.fn().mockReturnValue({ emit: vi.fn() });
+      (gateway as unknown as { server: { to: Mock } }).server = { to: toMock };
 
       const scanRender: ScanRenderEvent = {
         kind: 'lo-full',
@@ -294,8 +270,8 @@ describe('GameGateway.emitCommandResult — scan:render event routing', () => {
     });
 
     it('failure path also never calls server.to().emit()', () => {
-      const toMock = jest.fn().mockReturnValue({ emit: jest.fn() });
-      (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+      const toMock = vi.fn().mockReturnValue({ emit: vi.fn() });
+      (gateway as unknown as { server: { to: Mock } }).server = { to: toMock };
 
       const { socket } = makeMockSocket();
       (gateway as unknown as { emitCommandResult: (s: Socket, r: CommandResult) => void })

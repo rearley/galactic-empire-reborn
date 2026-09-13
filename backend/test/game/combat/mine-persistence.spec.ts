@@ -3,9 +3,10 @@ import 'reflect-metadata';
 if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 }
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../src/prisma/client';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { MineRepository } from '../../../src/game/combat/mine.repository';
+import { makePrismaClient } from '../../helpers/make-prisma-client';
 
 const HAS_TEST_DB = !!process.env.TEST_DATABASE_URL;
 const describeIfDb = HAS_TEST_DB ? describe : describe.skip;
@@ -16,7 +17,7 @@ describeIfDb('MineRepository — integration (real Prisma)', () => {
   let seedPrisma: PrismaClient;
 
   beforeAll(async () => {
-    seedPrisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+    seedPrisma = makePrismaClient(process.env.DATABASE_URL);
     prisma = new PrismaService();
     await prisma.onModuleInit();
     repo = new MineRepository(prisma);

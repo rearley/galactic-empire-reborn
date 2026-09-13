@@ -3,3 +3,9 @@ dist/
 .env
 coverage/
 *.tsbuildinfo
+
+# Prisma 7 generates the client as TypeScript source. It is a build artifact:
+# `prisma generate` runs in CI, in the Dockerfile, and in the test global
+# setup. Committing it would put thousands of generated files in front of
+# every reviewer and inside every repo-wide guard.
+/generated/

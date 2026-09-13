@@ -1,8 +1,9 @@
 import { DatHandlerService } from '../../../src/game/commands/handlers/dat.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
-import { PrismaService } from '../../../src/prisma/prisma.service';
+import { TeamRepository } from '../../../src/game/team/team.repository';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext, CommandResult } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /**
  * `dat` reports YOUR OWN ship. It never reported anyone else's.
@@ -27,33 +28,25 @@ import { CommandContext, CommandResult } from '../../../src/game/commands/comman
  * else's ship is what `sca sh` shows — range-gated, and it announces itself.
  */
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha',
-    shpclass: 1, heading: 45, head2b: 0, speed: 5, speed2b: 0,
-    xcoord: 5, ycoord: 3, damage: 10, energy: 800,
-    phasr: 0, phasrtype: 0, kills: 3, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    heading: 45,
+    speed: 5,
+    xcoord: 5,
+    ycoord: 3,
+    damage: 10,
+    energy: 800,
+    kills: 3,
     items: [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 11n, 12n, 13n, 14n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeHandler(ships: ShipState[], teamname?: string): DatHandlerService {
   const shipSvc = { findAllShips: () => ships } as unknown as ShipStateService;
-  const prismaMock = {
-    team: { findFirst: jest.fn().mockResolvedValue(teamname ? { teamname } : null) },
-  } as unknown as PrismaService;
-  return new DatHandlerService(shipSvc, prismaMock);
+  const teamsMock = {
+    findNameByCode: vi.fn().mockResolvedValue(teamname ? { teamname } : null),
+  } as unknown as TeamRepository;
+  return new DatHandlerService(shipSvc, teamsMock);
 }
 
 const ctx: CommandContext = {};

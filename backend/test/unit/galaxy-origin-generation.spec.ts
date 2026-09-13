@@ -27,9 +27,9 @@ function makeTx() {
   return {
     rows: { sectors, planets, wormholes },
     tx: {
-      sector: { create: jest.fn(async ({ data }: { data: Row }) => { sectors.push(data); }) },
-      planet: { create: jest.fn(async ({ data }: { data: Row }) => { planets.push(data); }) },
-      wormhole: { create: jest.fn(async ({ data }: { data: Row }) => { wormholes.push(data); }) },
+      sector: { create: vi.fn(async ({ data }: { data: Row }) => { sectors.push(data); }) },
+      planet: { create: vi.fn(async ({ data }: { data: Row }) => { planets.push(data); }) },
+      wormhole: { create: vi.fn(async ({ data }: { data: Row }) => { wormholes.push(data); }) },
     },
   };
 }
@@ -79,17 +79,33 @@ describe('origin sector generation dispatches on s00 type', () => {
     }
   });
 
-  it('Zygor (type 1) stocks every item; Tahanian Station (type 2) stocks three', async () => {
+  /**
+   * REVISED: Zygor opens as the WEAPONS hub, not as a general store.
+   *
+   * This asserted `zSell.every(v => v === 1)` — all fourteen items for sale on
+   * day one, which is the state the GE22e MIDNIGHT patch leaves behind
+   * (GEMAIN.C:2147-2160), not the state `build_plan_1` builds. Canon's build
+   * sells nine lines of ordnance and stocks men WITHOUT marking them for sale
+   * (GEPLANET.C:678-714), which is what makes Tahanian Station the only place
+   * to buy men, food or troops until the first midnight. @see issue #16
+   */
+  it('Zygor (type 1) opens as the weapons hub; Tahanian Station (type 2) sells three', async () => {
     const rows = await generate();
     const zygor = rows.planets.find((p) => p.plnum === 1)!;
     const tahanian = rows.planets.find((p) => p.plnum === 2)!;
     expect(S00[0].type).toBe(1);
     expect(S00[1].type).toBe(2);
-    const zSell = zygor.itemsSell as number[];
-    const tSell = tahanian.itemsSell as number[];
-    expect(zSell.every((v) => v === 1)).toBe(true);
+    const sellable = (row: Row) =>
+      (row.itemsSell as number[]).map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+
+    // I_MISSL=1 I_TORP=2 I_ION=3 I_FLUX=4 I_FIGHTER=6 I_DECOY=7
+    // I_ZIPPER=9 I_JAMMER=10 I_MINE=11 — GEPLANET.C:680-714
+    expect(sellable(zygor)).toEqual([1, 2, 3, 4, 6, 7, 9, 10, 11]);
+    // Stocked but unsellable: `planet.items[I_MEN].qty = 32000;` and no `sell`.
+    expect((zygor.itemsQty as bigint[])[0]).toBe(32_000n);
+
     // I_MEN=0, I_FOOD=5, I_TROOPS=8 — GEPLANET.C:740-752
-    expect(tSell.map((v, i) => (v ? i : -1)).filter((i) => i >= 0)).toEqual([0, 5, 8]);
+    expect(sellable(tahanian)).toEqual([0, 5, 8]);
   });
 
   it('the Enforcer Planet (type 0) is built bare — build_other sets no items', async () => {

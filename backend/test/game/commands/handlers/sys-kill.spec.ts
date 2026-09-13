@@ -27,29 +27,19 @@ import { CommandResult, CommandContext } from '../../../../src/game/commands/com
 import { SysHandlerService } from '../../../../src/game/commands/handlers/sys.handler';
 import { ShipState, shipKey } from '../../../../src/game/ship/ship-state.types';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 100000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
-    items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+  return baseMakeShip({
+    shipname: 'Test',
+    energy: 100000,
+    topspeed: 10,
     username: 'Sysop',
-    dirty: false, ...over,
-  };
+    ...over,
+  });
 }
 
 function makeHarness(ships: ShipState[]) {
@@ -67,7 +57,7 @@ function makeHarness(ships: ShipState[]) {
   } as unknown as ShipStateService;
   return new SysHandlerService(
     shipState,
-    { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    { user: { update: vi.fn() } } as unknown as PrismaService,
     new CybertronControlService(),
   );
 }
@@ -115,10 +105,14 @@ describe('SysHandlerService — `sys class` reaches the sparse high numbers', ()
         fn(s); return s;
       },
     } as unknown as ShipStateService;
+    const shipClassCache = new ShipClassCacheService({} as never);
+    for (const c of TABLE) shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, maxWarp: c.maxWarp });
     return new SysHandlerService(
       shipState,
-      { user: { update: jest.fn() }, shipClass: { findMany: jest.fn().mockResolvedValue(TABLE) } } as unknown as PrismaService,
+      { user: { update: vi.fn() } } as unknown as PrismaService,
       new CybertronControlService(),
+      undefined,
+      shipClassCache,
     );
   }
 

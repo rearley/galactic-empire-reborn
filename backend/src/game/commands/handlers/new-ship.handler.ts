@@ -1,6 +1,8 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { buildPurchasedShipName } from './purchased-ship-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../../combat/random.port';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { ShipStateService } from '../../ship/ship-state.service';
@@ -9,6 +11,7 @@ import { ShipState } from '../../ship/ship-state.types';
 import { ENGYMAX, MAXSHIPS, GESTAT_AVAIL } from '../../constants';
 import { START_FLUX_PODS } from '../../constants/onboarding';
 import { formatMessage, MessageId } from '../messages';
+import { FIRST_CPU_CLASS, isPlayerBuyableClass } from '../../ship/buyable-class';
 
 /**
  * Phaser/shield prices indexed by type-1 (type 1 = index 0).
@@ -26,11 +29,12 @@ import { formatMessage, MessageId } from '../messages';
  * @see GEMAIN.C:575-591, reference/ge-upstream/PROVENANCE.md
  */
 /**
- * cyb_class — the index of the first CYBORG entry, which bounds what `new ship`
- * may list or sell. GEMAIN.C:881-882 computes it; in the shipped table the
- * first CYBORG is class 21.
+ * cyb_class — re-exported so the importers that already read it from here keep
+ * working. The value and the predicate that uses it live in
+ * `src/game/ship/buyable-class.ts`, because this bound had drifted into two
+ * definitions and onboarding held the one without it. @see issue #21
  */
-export const FIRST_CPU_CLASS = 21;
+export { FIRST_CPU_CLASS };
 
 export const PHASER_PRICE = [5_000n, 10_000n, 40_000n, 100_000n, 220_000n, 400_000n, 650_000n, 900_000n,
   1_200_000n, 2_000_000n, 3_800_000n, 5_000_000n, 7_000_000n, 9_000_000n,
@@ -147,6 +151,28 @@ export class NewShipHandlerService {
     private readonly shipStateService: ShipStateService,
     private readonly planetState: PlanetStateService,
     @Inject(RANDOM) private readonly random: Random,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new NewShipHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Ship-class fields (price, category, weapon caps, warp) come from the
+     * boot-time cache rather than a per-call `prisma.shipClass` query — the
+     * table is static seed data. `@Optional()` so the direct
+     * `new NewShipHandlerService(...)` test constructions keep compiling;
+     * without it every class lookup below misses and the command answers
+     * "Invalid ship class", same as it always has for an unrecognised one.
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
   ) {}
 
   /**
@@ -224,25 +250,28 @@ export class NewShipHandlerService {
     return this.purchaseShip(ship, classArg);
   }
 
-  private async listClasses(): Promise<CommandResult> {
-    const classes = await this.prisma.shipClass.findMany({
-      // C bounds BOTH the listing and the purchase at cyb_class — the index of
-      // the first CYBORG class, which is 21 (GECMDS.C:378 `for (i=0;i<cyb_class;++i)`
-      // and :4562-4566 `type >= 0 && type < cyb_class && ... == CLASSTYPE_USER`).
-      // Filtering on category alone let the Sysopian Death Star (class 41,
-      // 32M credits, warp 255, 100M tons) be advertised to every pilot from day
-      // one and bought by anyone rich enough. It is admin-only in the original
-      // and unreachable through this command.
-      where: { category: 'PLAYER', classNumber: { lt: FIRST_CPU_CLASS } },
-      orderBy: { classNumber: 'asc' },
+  private listClasses(): CommandResult {
+    // C bounds BOTH the listing and the purchase at cyb_class — the index of
+    // the first CYBORG class, which is 21 (GECMDS.C:378 `for (i=0;i<cyb_class;++i)`
+    // and :4562-4566 `type >= 0 && type < cyb_class && ... == CLASSTYPE_USER`).
+    // Filtering on category alone let the Sysopian Death Star (class 41,
+    // 32M credits, warp 255, 100M tons) be advertised to every pilot from day
+    // one and bought by anyone rich enough. It is admin-only in the original
+    // and unreachable through this command.
+    const cache = this.shipClassCache;
+    const classNumbers = cache?.getClassNumbers() ?? [];
+    const rows = classNumbers.flatMap((classNumber) => {
+      const c = cache?.get(classNumber);
+      if (!c || !isPlayerBuyableClass({ classNumber, category: c.category })) return [];
+      return [{
+        text: `  ${classNumber.toString().padEnd(3)} ${c.typeName.padEnd(20)}  ${c.maxPrice.toLocaleString()} cr`,
+        category: 'system' as const,
+      }];
     });
 
     const lines = [
       { text: 'Available ships at Zygor station:', category: 'system' as const },
-      ...classes.map((c) => ({
-        text: `  ${c.classNumber.toString().padEnd(3)} ${c.typeName.padEnd(20)}  ${c.maxPrice.toLocaleString()} cr`,
-        category: 'system' as const,
-      })),
+      ...rows,
     ];
 
     return { lines };
@@ -296,21 +325,16 @@ export class NewShipHandlerService {
     }
 
     // Validate: class must exist and be PLAYER category
-    const shipClass = await this.prisma.shipClass.findFirst({
-      where: { classNumber },
-    });
+    const shipClass = this.shipClassCache?.get(classNumber);
 
-    if (!shipClass || shipClass.category !== 'PLAYER' || shipClass.classNumber >= FIRST_CPU_CLASS) {
+    if (!shipClass || !isPlayerBuyableClass({ classNumber, category: shipClass.category })) {
       return {
         lines: [{ text: "Invalid ship class. Type 'new ship' to see available classes.", category: 'system' }],
       };
     }
 
     // Fetch user state (cash + fleet counters)
-    const userRow = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true, noships: true, topshipno: true },
-    });
+    const userRow = await this.users.getCashAndFleet(ship.userid);
 
     const cash = userRow?.cash ?? 0n;
     const noships = userRow?.noships ?? 0;
@@ -416,7 +440,7 @@ export class NewShipHandlerService {
     const priceTable = kind === 'phaser' ? PHASER_PRICE : SHIELD_PRICE;
     const currentType = kind === 'phaser' ? ship.phasrtype : ship.shieldtype;
 
-    const shipClass = await this.prisma.shipClass.findFirst({ where: { classNumber: ship.shpclass } });
+    const shipClass = this.shipClassCache?.get(ship.shpclass);
     const classMax = kind === 'phaser' ? (shipClass?.maxPhaser ?? 0) : (shipClass?.maxShields ?? 0);
 
     // No type arg — show price list
@@ -451,8 +475,7 @@ export class NewShipHandlerService {
     }
 
 
-    const userRow = await this.prisma.user.findUnique({ where: { userid: ship.userid }, select: { cash: true } });
-    const cash = userRow?.cash ?? 0n;
+    const cash = (await this.users.getCash(ship.userid)) ?? 0n;
 
     const quote = quoteUpgrade(priceTable, currentType, newType);
     const lines: CommandResult['lines'] = [];
@@ -507,10 +530,7 @@ export class NewShipHandlerService {
 
     // Apply — update DB and mutate in-memory state
     if (quote.cost > 0n || quote.credit > 0n) {
-      await this.prisma.user.update({
-        where: { userid: ship.userid },
-        data: { cash: quote.cost > 0n ? { decrement: quote.cost } : { increment: quote.credit } },
-      });
+      await this.users.applyUpgradeCharge(ship.userid, quote.cost, quote.credit);
     }
 
     this.shipStateService.mutate(ship.userid, ship.shipno, (s) => {

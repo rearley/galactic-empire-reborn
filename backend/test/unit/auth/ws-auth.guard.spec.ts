@@ -1,24 +1,25 @@
 import { Socket } from 'socket.io';
 import { AuthService } from '../../../src/auth/auth.service';
 import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
+import type { Mocked } from 'vitest';
 
-function makeSocket(token?: string): jest.Mocked<Socket> {
+function makeSocket(token?: string): Mocked<Socket> {
   return {
     handshake: { auth: token ? { token } : {} },
-    emit: jest.fn(),
-    disconnect: jest.fn(),
-  } as unknown as jest.Mocked<Socket>;
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+  } as unknown as Mocked<Socket>;
 }
 
 const mockAuthService = {
-  verifyJwt: jest.fn(),
+  verifyJwt: vi.fn(),
 };
 
 describe('WsAuthGuard', () => {
   let guard: WsAuthGuard;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     guard = new WsAuthGuard(mockAuthService as unknown as AuthService);
   });
 

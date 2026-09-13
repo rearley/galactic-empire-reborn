@@ -10,7 +10,7 @@
  * @see GE/REL/MBMGEMSG.MSG:4079-4176
  */
 
-import { MailStat } from '@prisma/client';
+import { MailStat } from '../../src/prisma/client';
 import { MailInboxService } from '../../src/game/mail/mail-inbox.service';
 import { MailInboxRepository } from '../../src/game/mail/mail-inbox.repository';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
@@ -31,8 +31,8 @@ function makeRow(overrides: Partial<MailStat> = {}): MailStat {
 }
 
 function makeService(rows: MailStat[]) {
-  const repo = { findByUserid: jest.fn().mockResolvedValue(rows) } as unknown as MailInboxRepository;
-  const ships = { findByUserid: jest.fn().mockReturnValue([]) } as unknown as ShipStateService;
+  const repo = { findByUserid: vi.fn().mockResolvedValue(rows) } as unknown as MailInboxRepository;
+  const ships = { findByUserid: vi.fn().mockReturnValue([]) } as unknown as ShipStateService;
   return new MailInboxService(repo, ships, {} as unknown as PrismaService);
 }
 

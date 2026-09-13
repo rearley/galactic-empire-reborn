@@ -25,7 +25,7 @@ describe('MineRegistry', () => {
       reg.hydrate([mine({ id: 1 }), mine({ id: 2 })]);
       const all = reg.getAll();
       expect(all).toHaveLength(2);
-      expect(all.map((m) => m.id).sort()).toEqual([1, 2]);
+      expect(all.map((m) => m.id).sort((a, b) => a - b)).toEqual([1, 2]);
     });
 
     it('clears the map when given an empty array', () => {
@@ -71,7 +71,7 @@ describe('MineRegistry', () => {
         mine({ id: 4, timer: 7 }),
         mine({ id: 5, timer: 10 }),
       ]);
-      const ids = reg.sweepCandidates().map((m) => m.id).sort();
+      const ids = reg.sweepCandidates().map((m) => m.id).sort((a, b) => a - b);
       expect(ids).toEqual([1, 3, 5]);
     });
 

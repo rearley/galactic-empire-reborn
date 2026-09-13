@@ -9,37 +9,28 @@ import { PrismaService } from '../../../../src/prisma/prisma.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { NUMITEMS } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------
 
 function makeShip(userid = 'player1'): ShipState {
-  return {
-    userid, shipno: 1, shipname: 'Scout', shpclass: 5,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 5.5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: userid,
+    shipname: 'Scout',
+    shpclass: 5,
+    xcoord: 5.5,
+    ycoord: 5.5,
+    energy: 10000,
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  });
 }
 
 function makeHandler(planets: { name: string; xsect: number; ysect: number; plnum: number }[]) {
   const mockPrisma = {
     planet: {
-      findMany: jest.fn().mockResolvedValue(planets),
+      findMany: vi.fn().mockResolvedValue(planets),
     },
   } as unknown as PrismaService;
 
@@ -131,10 +122,10 @@ describe('PlnHandlerService — read-only (FR-014-041)', () => {
   it('never calls any write method on Prisma', async () => {
     const mockPrisma = {
       planet: {
-        findMany: jest.fn().mockResolvedValue([]),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
       },
     } as unknown as PrismaService;
 

@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import {
@@ -10,14 +9,16 @@ import {
   SpawnSectorMissingError,
 } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
 import {
   COMBAT_HIT,
   CombatHitEvent,
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { ShipOverspeedEvent } from '../../src/game/ship/overspeed-events';
+import type { Mock } from 'vitest';
 
 /**
  * Round 3 — the command-dispatch surface of GameGateway: which branch answers a
@@ -33,14 +34,16 @@ import { ShipOverspeedEvent } from '../../src/game/ship/overspeed-events';
  * onboarding joins by `onboarding-room-join.spec.ts` — none of that is repeated.
  *
  * Deliberately NOT covered here, with reasons (see docs/TEST_STRATEGY.md):
- *   - `shipLossManifest`'s `Number.isFinite(shipno)` guard (game.gateway.ts:1276)
- *     and `shipNameOf`'s copy (:1317), and `handleOf`'s `idx < 0` guard (:1494).
+ *   - `shipLossManifest`'s `Number.isFinite(shipno)` guard
+ *     (ship-destroyed.service.ts) and `shipNameOf`'s copy of it, and
+ *     `handleOf`'s `idx < 0` guard (both ship-identity.ts).
  *     Both arms of each converge on the same observable output — with the guard
  *     removed the lookup is simply a miss and returns undefined/null anyway — so
  *     no assertion can distinguish them. A test that cannot fail is not a test.
- *   - `handleCombatHit`'s `if (victimSocketId)` (:1387) for the same reason:
- *     with the guard gone the socket lookup misses and nothing is emitted. The
- *     INNER guard (:1389) is the one that changes behaviour, and it is covered.
+ *   - `handleCombatHit`'s outer `if (victimSocketId)` (game.gateway.ts) for the
+ *     same reason: with the guard gone the socket lookup misses and nothing is
+ *     emitted. The INNER guard is the one that changes behaviour, and it is
+ *     covered.
  */
 
 type ShipRow = {
@@ -56,33 +59,33 @@ interface SocketDouble {
   id: string;
   connected: boolean;
   data: Record<string, unknown>;
-  emit: jest.Mock;
-  join: jest.Mock;
-  leave: jest.Mock;
-  on: jest.Mock;
-  disconnect: jest.Mock;
+  emit: Mock;
+  join: Mock;
+  leave: Mock;
+  on: Mock;
+  disconnect: Mock;
   broadcast: {
-    emit: jest.Mock;
-    to: (room: string) => { emit: jest.Mock };
-    except: (room: string | string[]) => { emit: jest.Mock };
+    emit: Mock;
+    to: (room: string) => { emit: Mock };
+    except: (room: string | string[]) => { emit: Mock };
   };
 }
 
 const USERID = 'usr_pilot';
 
 function makeSocket(id: string, data: Record<string, unknown>): SocketDouble {
-  const roomEmit = jest.fn();
+  const roomEmit = vi.fn();
   return {
     id,
     connected: true,
     data,
-    emit: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
+    emit: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
     broadcast: {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: () => ({ emit: roomEmit }),
       except: () => ({ emit: roomEmit }),
     },
@@ -105,9 +108,9 @@ describe('GameGateway — prompt replies: which branch answers, and with what', 
   interface Harness {
     gateway: GameGateway;
     registry: ConnectedShipsRegistry;
-    finalize: jest.Mock;
-    validateNameReply: jest.Mock;
-    findFirst: jest.Mock;
+    finalize: Mock;
+    validateNameReply: Mock;
+    findFirst: Mock;
     globalEmits: Array<{ event: string; payload: unknown }>;
     sockets: Map<string, SocketDouble>;
   }
@@ -119,45 +122,42 @@ describe('GameGateway — prompt replies: which branch answers, and with what', 
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn().mockReturnValue(undefined),
-      removeFromGame: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      removeFromGame: vi.fn(),
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
 
-    const finalize = jest.fn();
-    const validateNameReply = jest.fn().mockReturnValue(opts.validName ?? true);
+    const finalize = vi.fn();
+    const validateNameReply = vi.fn().mockReturnValue(opts.validName ?? true);
     const onboardingService = {
       finalize,
       validateNameReply,
     } as unknown as OnboardingService;
 
-    const findFirst = jest.fn().mockResolvedValue(null);
+    const findFirst = vi.fn().mockResolvedValue(null);
     const prisma = {
-      ship: { findFirst, findMany: jest.fn().mockResolvedValue([]) },
-      planet: { findMany: jest.fn().mockResolvedValue([]) },
+      ship: { findFirst, findMany: vi.fn().mockResolvedValue([]) },
+      planet: { findMany: vi.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       prisma,
       onboardingService,
-      { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn().mockReturnValue('Interceptor') } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: vi.fn().mockReturnValue('Interceptor') } as unknown as ShipClassCacheService,
+      random: mockRandom,
+    });
 
     (gateway as unknown as { server: unknown }).server = {
       emit: (event: string, payload: unknown) => {
         globalEmits.push({ event, payload });
       },
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
-      except: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets, adapter: { rooms: new Map<string, Set<string>>() } },
     };
 
@@ -527,29 +527,23 @@ describe('GameGateway — a hit reaches its victim exactly once', () => {
 
     const registry = new ConnectedShipsRegistry(shipStateService);
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      {} as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
 
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => {
           roomEmits.push({ room, event, payload });
         },
-        except: () => ({ emit: jest.fn() }),
+        except: () => ({ emit: vi.fn() }),
       }),
-      except: () => ({ emit: jest.fn() }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets, adapter: { rooms: new Map<string, Set<string>>() } },
     };
 
@@ -628,31 +622,24 @@ describe('GameGateway — routing a per-captain notice', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn().mockReturnValue(undefined),
+      get: vi.fn().mockReturnValue(undefined),
     } as unknown as ShipStateService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      {} as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => {
           roomEmits.push({ room, event, payload });
         },
-        except: () => ({ emit: jest.fn() }),
+        except: () => ({ emit: vi.fn() }),
       }),
-      except: () => ({ emit: jest.fn() }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map<string, Set<string>>() } },
     };
     return { gateway, roomEmits };
@@ -711,8 +698,9 @@ describe('GameGateway — routing a per-captain notice', () => {
 
 describe('GameGateway — KILLEDBY names the killer by their handle', () => {
   /**
-   * `handleOf` — game.gateway.ts:1491-1497, called at :1697 for the KILLEDBY
-   * label. Canon's `username()` names a player by their HANDLE (GEFUNCS.C:2596);
+   * `handleOf` — ship-identity.ts, called by `ShipDestroyedService.handle` for
+   * the KILLEDBY label. Canon's `username()` names a player by their HANDLE
+   * (GEFUNCS.C:2596);
    * ours caches it on ShipState. Without the lookup the galaxy-wide kill notice
    * reads "destroyed by usr_27523ed6401c4e990dd98be2" — the internal account key
    * `username()` exists to hide, and the name nobody can act on.
@@ -740,7 +728,7 @@ describe('GameGateway — KILLEDBY names the killer by their handle', () => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: (userid: string, shipno: number) => {
         if (userid === 'usr_kil' && shipno === 1) {
           return { userid, shipno, shipname: 'Marauder', username: 'rick', status: 1 } as never;
@@ -752,29 +740,23 @@ describe('GameGateway — KILLEDBY names the killer by their handle', () => {
       },
     } as unknown as ShipStateService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      {
-        $transaction: jest.fn().mockResolvedValue(undefined),
-        planet: { findMany: jest.fn().mockResolvedValue([]) },
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: {
+        $transaction: vi.fn().mockResolvedValue(undefined),
+        planet: { findMany: vi.fn().mockResolvedValue([]) },
       } as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+      scanHandler: { clearScantab: vi.fn(), lettersFor: () => [] } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     const record = (evt: string, payload: unknown): void => {
       if (evt === 'event.log') lines.push((payload as { text: string }).text);
     };
     (gateway as unknown as { server: unknown }).server = {
       emit: record,
       except: () => ({ emit: record }),
-      to: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map<string, Set<string>>() } },
     };
     void gateway.handleCombatShipDestroyed(event);

@@ -1014,7 +1014,7 @@ export class CybertronTickService implements OnModuleInit {
     // The target's own motion decides the combat band: canon matches a runner
     // that has gone to hyperspace rather than crawling at 990. @see GECYBS.C:793-796
     const band = pickPursuitBand(
-      dist, hyperdist1, hyperdist2, prevWhere, classMaxShields, topSpeed, this.random,
+      dist, hyperdist1, hyperdist2, prevWhere, topSpeed, this.random,
       { where: target.where, speed2b: target.speed2b },
     );
 
@@ -1042,7 +1042,18 @@ export class CybertronTickService implements OnModuleInit {
     if (band.speedClamp !== undefined && ship.speed > band.speedClamp) {
       ship.speed = band.speedClamp;
     }
-    ship.where = band.where;
+    // Written only when the band ENTERS hyperwarp. Canon writes `ptr->where` in
+    // that one band (GECYBS.C:749 `		ptr->where = 1;`) and never writes it back: a ship leaves
+    // hyperspace by decelerating under warp 1, which `accel()` detects and
+    // reports through `hyperspace(ptr,usrn,0)` — the same routine that took the
+    // shields down on the way in.
+    //
+    // Writing `0` here was an exit by fiat. A Cybertron dropping from hyperwarp
+    // into the brake or close band became `where = 0` while still moving at
+    // 3,200 units, and the next activation read that as normal space and raised
+    // its shields. A player at the same speed has theirs forced down, so the AI
+    // fought at warp behind shields nothing could strip. @see issue #43
+    if (band.where !== undefined) ship.where = band.where;
     if (band.shield !== undefined) {
       ship.shield = band.shield;
     }

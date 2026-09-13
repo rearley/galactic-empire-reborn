@@ -25,42 +25,32 @@ import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { CommandContext, CommandResult } from '../../src/game/commands/command.types';
 import { NUMITEMS } from '../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 const ZYGOR = 1;
 const TAHANIAN = 2;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'S', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0.5, ycoord: 0.5, damage: 0, energy: 50_000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 10 + ZYGOR, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'S',
+    xcoord: 0.5,
+    ycoord: 0.5,
+    energy: 50_000,
+    phasrtype: 1,
+    shieldtype: 1,
+    where: 10 + ZYGOR,
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  } as ShipState;
+    ...over,
+  });
 }
 
 function service() {
   const prisma = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
-    user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n, noships: 1, topshipno: 1 }), update: jest.fn() },
-    ship: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-    $transaction: jest.fn(),
+    user: { findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n, noships: 1, topshipno: 1 }), update: vi.fn() },
+    ship: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    $transaction: vi.fn(),
   } as unknown as PrismaService;
-  const ships = { mutate: jest.fn(), findAllShips: () => [] } as unknown as ShipStateService;
+  const ships = { mutate: vi.fn(), findAllShips: () => [] } as unknown as ShipStateService;
   return new NewShipHandlerService(prisma, ships, { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
 }
 

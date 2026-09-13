@@ -7,18 +7,13 @@
  * never the arrival, so there was no way to know you were actually at warp
  * short of polling `rep nav`.
  */
-import { GameGateway } from '../../src/gateway/game.gateway';
 import type { ShipSpeedReportEvent } from '../../src/game/physics/speed-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 function build() {
   const sent: Array<{ room: string; text: string }> = [];
-  const gateway = new GameGateway(
-    {} as never, {} as never, {} as never, {} as never, {} as never,
-    {} as never, {} as never, {} as never, mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({ random: mockRandom });
   (gateway as unknown as { server: unknown }).server = {
     to: (room: string) => ({
       emit: (_e: string, p: { text: string }) => { sent.push({ room, text: p.text }); },

@@ -10,36 +10,26 @@ import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { I_FOOD, I_GOLD, NUMITEMS } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Test',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 10000,
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeService(ship: ShipState) {
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(ship);
         return ship;
@@ -63,24 +53,24 @@ describe('JettisonHandlerService — happy path (numeric amount)', () => {
     expect(result.lines[0].category).toBe('success');
   });
 
-  it('reduces items[I_FOOD] by the jettisoned amount', () => {
+  it('reduces items[I_FOOD] by the jettisoned amount', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 50n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['10', 'food'], {});
+    await handler.command.handler(ship, ['10', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(40n);
   });
 
-  it('jettison exactly all cargo (amt == qty)', () => {
+  it('jettison exactly all cargo (amt == qty)', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 50n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['50', 'food'], {});
+    await handler.command.handler(ship, ['50', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(0n);
   });
 
-  it('non-recovery: jettisoned items are permanently lost (no planet/sector inventory change)', () => {
+  it('non-recovery: jettisoned items are permanently lost (no planet/sector inventory change)', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_GOLD]: 100n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['50', 'gold'], {});
+    await handler.command.handler(ship, ['50', 'gold'], {});
     // Gold is now 50 — it just disappears, no external state changes
     expect(ship.items[I_GOLD]).toBe(50n);
   });
@@ -95,10 +85,10 @@ describe('JettisonHandlerService — happy path (ALL keyword)', () => {
     expect(result.lines[0].text).toContain('73');
   });
 
-  it('ALL keyword is case-insensitive (accepts "all")', () => {
+  it('ALL keyword is case-insensitive (accepts "all")', async () => {
     const ship = makeShip({ items: Object.assign(Array(NUMITEMS).fill(0n), { [I_FOOD]: 20n }) as bigint[] });
     const { handler } = makeService(ship);
-    handler.command.handler(ship, ['all', 'food'], {});
+    await handler.command.handler(ship, ['all', 'food'], {});
     expect(ship.items[I_FOOD]).toBe(0n);
   });
 

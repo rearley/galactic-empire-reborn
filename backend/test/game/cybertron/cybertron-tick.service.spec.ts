@@ -18,67 +18,42 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CYBERTRON_EVENT, CybertronTargetAcquiredPayload } from '../../../src/game/cybertron/cybertron-events';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
+import { cybwhoops as cw } from '../../../src/game/cybertron/cyb-decisions';
+import { Mulberry32Adapter as M32 } from '../../../src/game/combat/random.port';
+import { CYB_BREAKOFF } from '../../../src/game/constants';
 
-// Build a minimal ShipState for tests
+// Build a minimal ShipState for tests, on the shared factory. `userid`,
+// `shipno` and `shpclass` stay required here (rather than falling back to the
+// factory's defaults) because every call site in this suite means to stand up
+// a specific, identifiable ship or Cybertron and it is easy to forget one.
 function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: number; shpclass: number }): ShipState {
-  return {
+  return buildShip({
     shipname: 'Test',
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5,
     ycoord: 5,
-    damage: 0,
     energy: 50000,
     phasr: 100,
     phasrtype: 2,
-    kills: 0,
     lastfired: 255,
     shieldtype: 2,
     shieldstat: 1,
     shield: 2,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
     helm: 1,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
     decout: [0, 0, 0, 0, 0],
-    jammer: 0,
     freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
-    status: 1,
     cybmine: 255,
     cybskill: 10,
     cybupdate: 50,
     tick: 1,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
     topspeed: 8,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
     // Firer identity is the unique `channel` (this port's usrnum), not
     // `shipno`. These fixtures give each ship a distinct shipno, so mirror it.
     channel: overrides.channel ?? overrides.shipno ?? 1,
-  };
+  });
 }
 
 /** Build a minimal test harness with mocked dependencies. */
@@ -114,14 +89,14 @@ async function buildHarness(seed = 42) {
 
   const createdSpawns: unknown[] = [];
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(async (slot) => {
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockImplementation(async (slot) => {
       createdSpawns.push(slot);
       const s = makeShip({ userid: slot.userid, shipno: slot.shipno, shpclass: slot.classNumber, status: 2, tick: slot.tick });
       shipMap.set(`${slot.userid}:${slot.shipno}`, s);
     }),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 
@@ -178,6 +153,15 @@ async function buildHarness(seed = 42) {
     maxAcceleration: 5000, maxWarp: 10, maxPhaser: 3, maxShields: 3,
     scanRange: 1_000_000, maxTons: 12500, hasTorpedo: true, hasMissile: false,
     hasJammer: true, hasMine: true, hasZipper: false, noClaim: 3, tough: 1, cybLowestClassAttacks: 2,
+  });
+  // Class 1 (Interceptor) is what the player fixtures in this file fly, and it
+  // was the one class nobody registered — so `getMaxTons(1)` threw, production's
+  // per-ship fault isolation caught it, and a real ERROR line was printed during
+  // a green run. Values from the canon table. @see issue #12
+  (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(1, {
+    maxAcceleration: 5000, maxWarp: 10, maxPhaser: 10, maxShields: 10,
+    scanRange: 100_000, maxTons: 1000, hasTorpedo: true, hasMissile: false,
+    hasJammer: true, hasMine: true, hasZipper: true, noClaim: 1, tough: 0, cybLowestClassAttacks: 0,
   });
   (shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass(3, {
     maxAcceleration: 1000, maxWarp: 5, maxPhaser: 1, maxShields: 1,
@@ -281,15 +265,34 @@ describe('T017 — hyperwarp: Cybertron enters hyperwarp for distant target', ()
 
 // ─── T018: hyperwarp shield restore ───────────────────────────────────────
 
-describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
-  it('Cybertron dropping from hyperwarp (where=1 → brake band) restores shield to class max', async () => {
+/**
+ * REVISED: the brake band does not end hyperspace, and does not raise shields.
+ *
+ * This asserted `where === 0` and `shieldstat === 1` after one brake-band tick
+ * from hyperwarp — the port's behaviour, not canon's. GECYBS.C's brake band
+ * (:756-769) contains no `shieldup` call and no `where` write; the exit comes
+ * from `accel()` when the ship decelerates back under warp 1
+ * (GEFUNCS.C:538 `	if ((ptr->speed2b < 1000) && (ptr->speed/1000 >=1) && ((ptr->speed-decelrate)/1000 <1))`), and only then does `if (ptr->where == 0) shieldup(...)`
+ * fire in the two close bands.
+ *
+ * Keeping the old assertions meant an AI fought at warp behind shields a player
+ * at the same speed cannot have. @see issue #43
+ *
+ * The CHARGE restore is left as it was: it is the port's own R-9 decision
+ * rather than canon, and it is filed separately rather than changed here.
+ */
+describe('T018 — hyperwarp: the brake band neither leaves hyperspace nor grants charge', () => {
+  it('keeps where=1, shields down, and the charge where combat left it', async () => {
     const { shipMap, fireTick } = await buildHarness(42);
 
     // Place Cybertron outside NZ in hyperwarp (where=1), distance 15 = brake band (hyperdist2=10 < 15 < hyperdist1=25)
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
       xcoord: 5, ycoord: 5, cybmine: 255, tick: 1, cybupdate: 100, holdcourse: 0,
-      where: 1, shield: 0, // currently in hyperwarp with shields down
+      // In hyperwarp, which by definition means shields down: canon drops them
+      // on entry (GEFUNCS.C:590 `	if (ptr->shieldstat == SHIELDUP)`) and the fixture's default of `up` is a
+      // state this ship cannot be in.
+      where: 1, shield: 0, shieldstat: 0,
     });
     shipMap.set('Cybrg-200:200', cyb);
 
@@ -302,9 +305,17 @@ describe('T018 — hyperwarp exit: shields restored on where 1→0', () => {
     fireTick(1);
     await new Promise((r) => setImmediate(r));
 
-    expect(cyb.where).toBe(0); // dropped from hyperwarp
-    expect(cyb.shield).toBe(2); // class 21 maxShields=2 restored
-    expect(cyb.shieldstat).toBe(1); // shields raised
+    // Still in hyperspace: only deceleration under warp 1 ends that, and the
+    // physics tick is what applies it.
+    expect(cyb.where).toBe(1);
+    // Shields stay DOWN while in hyperspace — canon drops them on entry and
+    // nothing in the brake band puts them back.
+    expect(cyb.shieldstat).toBe(0);
+    // No free charge. Canon's bands never touch `ptr->shield`; it comes back
+    // through `shieldchg` at shieldtype*3 per six-second tick, the same path a
+    // player's does — and the tick loop that runs it filters on nothing, so the
+    // AI is on the same terms rather than defenceless. @see issue #44
+    expect(cyb.shield).toBe(0);
   });
 });
 
@@ -388,8 +399,6 @@ describe('T037 — cybwhoops: skill error rate verifiable from unit test', () =>
     // cybwhoops = floor(rand * cybskill) === 1
     // With cybskill=1: floor(rand * 1) = floor(rand) = 0 for rand∈[0,1), so 0===1 = false always
     // This verifies the edge case; integration via gebemean/rollTorpedoCount tests in T033-T034
-    const { cybwhoops: cw } = require('../../../src/game/cybertron/cyb-decisions');
-    const { Mulberry32Adapter: M32 } = require('../../../src/game/combat/random.port');
     for (let seed = 0; seed < 200; seed++) {
       const rand = new M32(seed);
       expect(cw(1, rand)).toBe(false);
@@ -401,7 +410,6 @@ describe('T037 — cybwhoops: skill error rate verifiable from unit test', () =>
 
 describe('T038 — breakoff roll: non-quad fires cybertron.broke-off at 1/CYB_BREAKOFF', () => {
   it('CYB_BREAKOFF constant is 500', () => {
-    const { CYB_BREAKOFF } = require('../../../src/game/constants');
     expect(CYB_BREAKOFF).toBe(500);
   });
 
@@ -633,7 +641,7 @@ describe('T064 — Sartern class 24: spawns via same code path with Cybrg- prefi
     });
 
     // Override configs to only allow class 24
-    const svcAny = repository as unknown as { createSpawn: jest.Mock };
+    const svcAny = repository as unknown as { createSpawn: Mock };
     fireTick(30);
     await new Promise((r) => setImmediate(r));
 
@@ -725,5 +733,57 @@ describe('a Cybertron engaging a player deploys decoys', () => {
     await new Promise((r) => setImmediate(r));
 
     expect(cyb.decout.filter((t) => t > 0).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * One bad Cybertron must not take down the AI tick for every other ship.
+ *
+ * `onAiTick` wraps each ship's `cybLives` in a per-ship try/catch and logs and
+ * continues, deliberately. That boundary had no test — it was exercised only by
+ * accident, because a player fixture flew a class this file's cache mock did not
+ * register, so a real ERROR line appeared in a green run and taught everyone
+ * reading CI output to skim ERROR lines from this file. The accident is fixed
+ * (class 1 is registered); the boundary is asserted here instead, where the log
+ * is the expected output of a test that means to produce it. @see issue #12
+ */
+describe('a faulting Cybertron does not stop the others', () => {
+  it('logs the fault, names the ship, and keeps going', async () => {
+    const h = await buildHarness();
+
+    // A per-field cache lookup that throws is the real fault shape — the
+    // original instance was `getMaxTons` throwing for a class this file's mock
+    // had never registered. Class 99 is registered so `selectAiShips` picks the
+    // hull up (it filters on getCategory), and the field lookup throws, which
+    // is what puts execution inside the production catch.
+    const setClass = (h.shipClassCache as unknown as { setClass: (n: number, e: unknown) => void }).setClass;
+    setClass(99, {
+      maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2,
+      scanRange: 50_000, maxTons: 900, hasTorpedo: true, hasMissile: false,
+      hasJammer: true, hasMine: true, hasZipper: true, noClaim: 3, tough: 0, cybLowestClassAttacks: 1,
+    });
+    const cache = h.shipClassCache as unknown as { get: (n: number) => unknown };
+    const realGet = cache.get.bind(cache);
+    cache.get = (n: number) => {
+      if (n === 99) throw new Error(`Class ${n} not found`);
+      return realGet(n);
+    };
+
+    // domain-ok: no such class — that is the fault being injected
+    const broken = makeShip({ userid: '@cybX', shipno: 9, shpclass: 99, status: 2, tick: 0, cybupdate: 100, jammer: 1 });
+    const healthy = makeShip({ userid: '@cyb1', shipno: 1, shpclass: 21, status: 2, tick: 0, cybupdate: 100 });
+    h.shipMap.set('@cybX:9', broken);
+    h.shipMap.set('@cyb1:1', healthy);
+
+    const errors: string[] = [];
+    const logger = (h.svc as unknown as { logger: { error: (m: string) => void } }).logger;
+    const spy = vi.spyOn(logger, 'error').mockImplementation((m: unknown) => { errors.push(String(m)); });
+
+    expect(() => h.fireAiTick()).not.toThrow();
+
+    expect(errors.join('\n')).toContain('cybLives fault for @cybX:9');
+    // The healthy ship still ran: cybLives sets cybupdate on every activation.
+    expect(healthy.cybupdate).not.toBe(100);
+    spy.mockRestore();
   });
 });

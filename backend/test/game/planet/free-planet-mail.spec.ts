@@ -55,7 +55,7 @@ function makePlanet(over: Partial<PlanetState> = {}): PlanetState {
 function build() {
   const created: Array<{ userid: string }> = [];
   const prisma = {
-    mailStat: { create: jest.fn((args: { data: { userid: string } }) => {
+    mailStat: { create: vi.fn((args: { data: { userid: string } }) => {
       created.push(args.data);
       return Promise.resolve({});
     }) },

@@ -15,32 +15,23 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { CommandContext } from '../../../../src/game/commands/command.types';
 import { NUMITEMS } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'alice', shipno: 1, shipname: 'Scout', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 10.5, ycoord: 7.5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, // in-flight
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'alice',
+    shipname: 'Scout',
+    xcoord: 10.5,
+    ycoord: 7.5,
+    energy: 50000,
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 0,
     ...overrides,
-  };
+  });
 }
 
 function makePlanetState(overrides: Partial<PlanetState> = {}): PlanetState {
@@ -72,7 +63,7 @@ function makePrismaPlanet(xsect = 10, ysect = 7) {
     userid: 'bob', name: 'Recon Base',
     enviorn: 0, resource: 2,
     visible: 1,
-  } as unknown as import('@prisma/client').Planet;
+  } as unknown as import('../../../../src/prisma/client').Planet;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,30 +79,30 @@ function makeService(opts: {
   const prismaPlane = makePrismaPlanet();
 
   const mockShipService = {
-    findAllShips: jest.fn().mockReturnValue([]),
-    findByName: jest.fn().mockReturnValue(undefined),
+    findAllShips: vi.fn().mockReturnValue([]),
+    findByName: vi.fn().mockReturnValue(undefined),
   } as unknown as ShipStateService;
 
   const mockGalaxyService = {
-    findPlanetByName: jest.fn().mockReturnValue(prismaPlane),
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(prismaPlane),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
   } as unknown as GalaxyService;
 
   const planetState = makePlanetState({ spyowner });
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planetState),
+    get: vi.fn().mockReturnValue(planetState),
     // scanPl resolves the planet from the LIVE state now — GalaxyService's
     // read-model hydrates once at boot and goes stale on the first claim.
-    bySector: jest.fn().mockReturnValue([]),
-    byName: jest.fn().mockReturnValue(prismaPlane),
+    bySector: vi.fn().mockReturnValue([]),
+    byName: vi.fn().mockReturnValue(prismaPlane),
   } as unknown as PlanetStateService;
 
-  // PrismaService — shipClass.findMany for onModuleInit, user.findUnique for scanPl owner resolution.
+  // PrismaService — user.findUnique for scanPl owner resolution. Ship-class
+  // fields come from the boot-time ShipClassCacheService now, not a query.
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-    user: { findUnique: jest.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
 
   const service = new ScanHandlerService(

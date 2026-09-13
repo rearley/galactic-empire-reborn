@@ -12,6 +12,8 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { I_TROOPS, I_FOOD, I_GOLD, NUMITEMS, BASEPRICE, ITEM_NAMES } from '../../../../src/game/constants/items';
+import { UserRepository } from '../../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -44,26 +46,17 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 }
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'buyer', shipno: 1, shipname: 'Merchant', shpclass: 5,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 5.5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    userid: 'buyer',
+    shipname: 'Merchant',
+    shpclass: 5,
+    xcoord: 5.5,
+    ycoord: 5.5,
+    energy: 10000,
     where: 10, // in orbit of planet 0
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeHandler(opts: {
@@ -73,23 +66,23 @@ function makeHandler(opts: {
   const { planet = makePlanet(), cash = 1_000_000n } = opts;
 
   const mockPlanetService = {
-    get: jest.fn().mockReturnValue(planet),
+    get: vi.fn().mockReturnValue(planet),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash }),
-      create: jest.fn(),
-      update: jest.fn(),
+      findUnique: vi.fn().mockResolvedValue({ cash }),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     planet: {
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   } as unknown as PrismaService;
 
-  const handler = new PriceHandlerService(mockPlanetService, mockPrisma);
+  const handler = new PriceHandlerService(mockPlanetService, new UserRepository(mockPrisma));
   return { handler, mockPlanetService, mockPrisma };
 }
 
@@ -295,13 +288,44 @@ describe('PriceHandlerService — bare "pri" listing (T039)', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.PRICE_NONE));
   });
 
+  /**
+   * The two-price rule, said out loud.
+   *
+   * Canon charges the OWNER `baseprice[item]` and everyone else the planet's
+   * `markup2a` — `price()` at GECMDS.C:4437 branches on
+   * `sameas(plptr->userid, warsptr->userid)`. So a captain who sets their own
+   * planet's missile price to 10 and then buys one is charged 20, the base
+   * price, and the port is right. It was reported as a bug (#1) because
+   * nothing anywhere says so: the original's own BUY and PRICE help pages
+   * describe buying "from one of your own planets" and never mention that the
+   * price you set is the price OTHERS pay.
+   */
+  it('tells the owner these are base prices, not the price they set', async () => {
+    const planet = makePlanet({ userid: 'owner' });
+    const { handler } = makeHandler({ planet });
+    const ship = makeShip({ where: 10, userid: 'owner' });
+    const result = await handler.command.handler(ship, [], {}) as Lines;
+    const text = result.lines.map((l) => l.text).join('\n');
+    expect(text).toMatch(/base price/i);
+    expect(text).toMatch(/adm markup/);
+  });
+
+  it('says nothing of the sort to a visitor, who pays the set price', async () => {
+    const planet = makePlanet({ userid: 'owner' });
+    const { handler } = makeHandler({ planet });
+    const ship = makeShip({ where: 10, userid: 'buyer' });
+    const result = await handler.command.handler(ship, [], {}) as Lines;
+    expect(result.lines.map((l) => l.text).join('\n')).not.toMatch(/base price/i);
+  });
+
   it('owner sees all items including non-sellable', async () => {
     const planet = makePlanet({ userid: 'owner' });
     const { handler } = makeHandler({ planet });
     const ship = makeShip({ where: 10, userid: 'owner' });
     const result = await handler.command.handler(ship, [], {}) as Lines;
-    // Owner sees all NUMITEMS items
-    expect(result.lines.length).toBe(NUMITEMS);
+    // Owner sees all NUMITEMS items, plus the base-price note. @see issue #1
+    expect(result.lines.length).toBe(NUMITEMS + 1);
+    expect(result.lines.slice(0, NUMITEMS).every((l) => /\d+ cr$/.test(l.text))).toBe(true);
   });
 });
 

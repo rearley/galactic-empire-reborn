@@ -3,6 +3,7 @@ import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { Random } from '../../../src/game/combat/random.port';
 import { I_FOOD, I_MEN, I_TROOPS, NUMITEMS } from '../../../src/game/constants/items';
 import { MAIL_CLASS_DISTRESS } from '../../../src/game/constants';
+import type { Mock } from 'vitest';
 
 /**
  * GEPLANET.C:205-254 — when a colony runs out of food it loses an eighth of its
@@ -32,9 +33,9 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 
 const noRevolt: Random = { next: () => 0.99 };
 
-function makeService(): { svc: PlanetEconomyService; create: jest.Mock } {
-  const create = jest.fn().mockResolvedValue({});
-  const prisma = { mailStat: { create }, mail: { create: jest.fn() } } as never;
+function makeService(): { svc: PlanetEconomyService; create: Mock } {
+  const create = vi.fn().mockResolvedValue({});
+  const prisma = { mailStat: { create }, mail: { create: vi.fn() } } as never;
   return { svc: new PlanetEconomyService(noRevolt, prisma), create };
 }
 

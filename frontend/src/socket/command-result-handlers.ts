@@ -1,4 +1,4 @@
-import type { CommandResultPayload, EventLogLine } from '../types/contracts';
+import type { CommandResultPayload, EventLogLine } from '@ge/wire';
 
 /**
  * Handles a `command:result` payload by either appending lines to the log

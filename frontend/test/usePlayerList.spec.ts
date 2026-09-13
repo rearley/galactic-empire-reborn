@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlayerList } from '../src/state/usePlayerList';
-import type { ConnectedPlayer, PlayerSnapshotPayload, PlayerJoinedPayload, PlayerLeftPayload, PhysicsSectorTransitionPayload } from '../src/types/contracts';
+import type { ConnectedPlayer, PlayerSnapshotPayload, PlayerJoinedPayload, PlayerLeftPayload, PhysicsSectorTransitionPayload } from '@ge/wire';
 
 /**
  * Tests for the usePlayerList reducer hook (data-model.md §B.3, FR-016..FR-018).

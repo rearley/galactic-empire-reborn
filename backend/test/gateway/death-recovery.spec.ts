@@ -18,6 +18,7 @@
  */
 
 import { GameGateway } from '../../src/gateway/game.gateway';
+import type { Mock } from 'vitest';
 
 describe('recovery after death', () => {
   function build() {
@@ -31,8 +32,8 @@ describe('recovery after death', () => {
         sockets: new Map([['s1', socket]]),
       },
     };
-    gw.logger = { error: jest.fn() };
-    gw.presentShipEntry = jest.fn().mockResolvedValue(undefined);
+    gw.logger = { error: vi.fn() };
+    gw.presentShipEntry = vi.fn().mockResolvedValue(undefined);
     return { gw, socket };
   }
 
@@ -44,7 +45,7 @@ describe('recovery after death', () => {
     expect(socket.data.activeShipNo).toBeUndefined();
     // A captain who was online for the death has already had YOURDEAD, so
     // re-entry suppresses the "destroyed while you were away" notice.
-    expect(gw.presentShipEntry as jest.Mock).toHaveBeenCalledWith(socket, 'alice', {
+    expect(gw.presentShipEntry as Mock).toHaveBeenCalledWith(socket, 'alice', {
       noticeShipLoss: false,
     });
   });
@@ -53,14 +54,14 @@ describe('recovery after death', () => {
     const { gw } = build();
     await (gw as unknown as { recoverAfterDeath: (u: string) => Promise<void> })
       .recoverAfterDeath('nobody');
-    expect(gw.presentShipEntry as jest.Mock).not.toHaveBeenCalled();
+    expect(gw.presentShipEntry as Mock).not.toHaveBeenCalled();
   });
 
   it('never throws when the server double is minimal', async () => {
     // Death runs inside the combat tick; a failure here must not disturb it,
     // and many unit tests supply a server with only emit()/to().
     const gw = Object.create(GameGateway.prototype) as Record<string, unknown>;
-    gw.server = { emit: jest.fn(), to: jest.fn() };
+    gw.server = { emit: vi.fn(), to: vi.fn() };
     await expect(
       (gw as unknown as { recoverAfterDeath: (u: string) => Promise<void> }).recoverAfterDeath('alice'),
     ).resolves.toBeUndefined();
@@ -68,10 +69,10 @@ describe('recovery after death', () => {
 
   it('logs and continues when re-entry itself fails', async () => {
     const { gw } = build();
-    gw.presentShipEntry = jest.fn().mockRejectedValue(new Error('db down'));
+    gw.presentShipEntry = vi.fn().mockRejectedValue(new Error('db down'));
     await expect(
       (gw as unknown as { recoverAfterDeath: (u: string) => Promise<void> }).recoverAfterDeath('alice'),
     ).resolves.toBeUndefined();
-    expect((gw.logger as { error: jest.Mock }).error).toHaveBeenCalled();
+    expect((gw.logger as { error: Mock }).error).toHaveBeenCalled();
   });
 });

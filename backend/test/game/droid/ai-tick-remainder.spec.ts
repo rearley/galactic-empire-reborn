@@ -109,6 +109,7 @@ import {
   GESTAT_USER,
   TOOCLOSE,
 } from '../../../src/game/constants';
+import { makeShip as buildShip } from '../../helpers/make-ship';
 
 /** One sector, in the raw coordinate units every range constant is stored in. */
 const SECTOR = 10_000;
@@ -116,27 +117,35 @@ const SECTOR = 10_000;
 /** Canon's Vakory scanner: `S33SRNG {Scan Range: 25000}` (GE/REL/MBMGESHP.MSG:7482). */
 const VAKORY_SCAN_RANGE = 25_000;
 
+// Local defaults layered on the shared factory: this suite's victim is a
+// player-controlled hull (GESTAT_USER) that has never been fired on
+// (`lastfired: -1`, distinct from channel 0), with a full weapons rack of
+// empty slots (channel 255) and a full item table.
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'p1', shipno: 1, shipname: 'Victim', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    phasr: 100, phasrtype: 2, kills: 0, userKills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 100, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return buildShip({
+    userid: 'p1',
+    shipname: 'Victim',
+    energy: 50_000,
+    phasr: 100,
+    phasrtype: 2,
+    userKills: 0,
+    lastfired: -1,
+    shieldtype: 2,
+    shield: 100,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: Array.from({ length: NUMITEMS }, () => 0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_USER, cybmine: 255, cybskill: 5,
-    cybupdate: 0, tick: 6, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: GESTAT_USER,
+    cybmine: 255,
+    cybskill: 5,
+    tick: 6,
+    topspeed: 8,
     ...over,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+  });
 }
 
 /** A Random that always returns the same draw — every roll becomes arithmetic. */
@@ -166,7 +175,7 @@ function shipStateStub(ships: ShipState[]): ShipStateService {
       return s;
     },
     loadShip: (s: ShipState) => { ships.push(s); },
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     size: () => ships.length,
   } as unknown as ShipStateService;
 }
@@ -176,6 +185,7 @@ function shipStateStub(ships: ShipState[]): ShipStateService {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const VAKORY_CLASS: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 4, maxPhaser: 1, maxShields: 1,
   scanRange: VAKORY_SCAN_RANGE, maxTons: 100, hasTorpedo: true, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false,
@@ -220,11 +230,11 @@ function droidHarness(rand: Random, droidOver: Partial<ShipState>, target: ShipS
   } as unknown as ShipClassCacheService;
 
   const svc = new DroidTickService(
-    { subscribe: jest.fn() } as unknown as TickService,
+    { subscribe: vi.fn() } as unknown as TickService,
     shipState, classCache,
     new DroidSpawner(shipState, classCache, rand),
-    { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry,
-    { create: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
+    { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry,
+    { create: vi.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
     new EventEmitter2(), rand,
   );
   return { svc, droid };
@@ -411,10 +421,10 @@ function cybHarness(
     shipState,
     classCache,
     {
-      hydrateAll: jest.fn().mockResolvedValue(undefined),
+      hydrateAll: vi.fn().mockResolvedValue(undefined),
       clampCybertronCash: (n: bigint) => n,
-      flushShipsImmediate: jest.fn(),
-      incrementKills: jest.fn(),
+      flushShipsImmediate: vi.fn(),
+      incrementKills: vi.fn(),
     } as unknown as CybertronRepository,
     new EventEmitter2(),
     rand,
@@ -595,7 +605,7 @@ describe('the Zipper clears only the mines it can see (GECMDS.C:1690-1712)', () 
 
     scan(svc, cyb);
 
-    expect(mines.getAll().map((m) => m.id).sort()).toEqual([2, 3]);
+    expect(mines.getAll().map((m) => m.id).sort((a, b) => a - b)).toEqual([2, 3]);
     expect(deletedMineIds).toEqual([1]);
     // `minesnear` is cleared on the same roll that fires the sweep.
     expect(cyb.minesnear).toBe(0);

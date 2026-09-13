@@ -21,6 +21,8 @@ import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../../src/game/onboarding/onboarding.service';
 import { RenameService } from '../../../src/game/onboarding/rename.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Test constants
@@ -30,24 +32,16 @@ const TEST_SHIPNO = 1;
 const INITIAL_NAME = 'OldFalcon';
 
 function makeShipState(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: TEST_USERID, shipno: TEST_SHIPNO, shipname: INITIAL_NAME,
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 3, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    userid: TEST_USERID,
+    shipno: TEST_SHIPNO,
+    shipname: INITIAL_NAME,
+    xcoord: 5,
+    ycoord: 3,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T> {
@@ -69,21 +63,21 @@ function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 3000): Promi
 async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<{
   app: INestApplication;
   port: number;
-  mutateSpy: jest.Mock;
+  mutateSpy: Mock;
 }> {
-  const mutateSpy = jest.fn();
+  const mutateSpy = vi.fn();
   const testShip = makeShipState();
 
   const shipStateServiceMock = {
-    get: jest.fn().mockReturnValue(testShip),
+    get: vi.fn().mockReturnValue(testShip),
     mutate: mutateSpy,
-    loadShip: jest.fn(),
-    size: jest.fn().mockReturnValue(1),
-    findAllShips: jest.fn().mockReturnValue([testShip]),
-    findByUserid: jest.fn().mockReturnValue([testShip]),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    unboard: jest.fn().mockResolvedValue(undefined),
-    board: jest.fn(),
+    loadShip: vi.fn(),
+    size: vi.fn().mockReturnValue(1),
+    findAllShips: vi.fn().mockReturnValue([testShip]),
+    findByUserid: vi.fn().mockReturnValue([testShip]),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    unboard: vi.fn().mockResolvedValue(undefined),
+    board: vi.fn(),
   };
 
   const module: TestingModule = await Test.createTestingModule({
@@ -93,22 +87,22 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
     .useValue(shipStateServiceMock)
     .overrideProvider(PrismaService)
     .useValue({
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-      mine: { findMany: jest.fn().mockResolvedValue([]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+      mine: { findMany: vi.fn().mockResolvedValue([]) },
       ship: {
-        findMany: jest.fn().mockResolvedValue([{
+        findMany: vi.fn().mockResolvedValue([{
           userid: TEST_USERID,
           shipno: TEST_SHIPNO,
           shipname: INITIAL_NAME,
         }]),
-        update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
-      user: { findUnique: jest.fn().mockResolvedValue(null) }, // scanPl owner lookup
+      user: { findUnique: vi.fn().mockResolvedValue(null) }, // scanPl owner lookup
     })
     .overrideProvider(WsAuthGuard)
     .useValue({
-      validate: jest.fn().mockImplementation(
+      validate: vi.fn().mockImplementation(
         async (client: import('socket.io').Socket) => {
           client.data.userid = TEST_USERID;
           client.data.username = 'TestPilot';
@@ -117,23 +111,23 @@ async function buildApp(renameServiceOverride: Partial<RenameService>): Promise<
       ),
     })
     .overrideProvider(OnboardingService)
-    .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+    .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
     .overrideProvider(RenameService)
     .useValue(renameServiceOverride)
     .overrideProvider(GalaxyService)
     .useValue({
-      onModuleInit: jest.fn(),
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
+      onModuleInit: vi.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
     })
     .overrideProvider(PlanetStateService)
     .useValue({
-      get: jest.fn().mockReturnValue(undefined),
-      all: jest.fn().mockReturnValue([]),
-      size: jest.fn().mockReturnValue(0),
-      claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      all: vi.fn().mockReturnValue([]),
+      size: vi.fn().mockReturnValue(0),
+      claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
     })
     .compile();
 
@@ -162,7 +156,7 @@ describe('cmd rename — happy path (T054)', () => {
 
   beforeAll(async () => {
     const setup = await buildApp({
-      rename: jest.fn().mockResolvedValue({
+      rename: vi.fn().mockResolvedValue({
         ok: true,
         oldName: 'OldFalcon',
         newName: 'NewFalcon',
@@ -221,7 +215,7 @@ describe('cmd rename — name taken (T055)', () => {
 
   beforeAll(async () => {
     const setup = await buildApp({
-      rename: jest.fn().mockResolvedValue({ ok: false, reason: 'NAME_TAKEN' }),
+      rename: vi.fn().mockResolvedValue({ ok: false, reason: 'NAME_TAKEN' }),
     });
     app = setup.app;
     port = setup.port;
@@ -256,7 +250,7 @@ describe('cmd rename — byte-identical no-op (T056)', () => {
 
   beforeAll(async () => {
     const setup = await buildApp({
-      rename: jest.fn().mockResolvedValue({
+      rename: vi.fn().mockResolvedValue({
         ok: true,
         oldName: 'OldFalcon',
         newName: 'OldFalcon',
@@ -302,7 +296,7 @@ describe('cmd rename — casing-only change triggers broadcast (T057)', () => {
 
   beforeAll(async () => {
     const setup = await buildApp({
-      rename: jest.fn().mockResolvedValue({
+      rename: vi.fn().mockResolvedValue({
         ok: true,
         oldName: 'oldfalcon',
         newName: 'Oldfalcon',
@@ -343,40 +337,40 @@ describe('cmd rename — unbound socket (T058)', () => {
   let port: number;
 
   beforeAll(async () => {
-    const renameSpy = jest.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' });
-    const mutateSpy = jest.fn();
+    const renameSpy = vi.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' });
+    const mutateSpy = vi.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [GatewayModule],
     })
       .overrideProvider(ShipStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined), // no ship in memory
+        get: vi.fn().mockReturnValue(undefined), // no ship in memory
         mutate: mutateSpy,
-        loadShip: jest.fn(),
-        size: jest.fn().mockReturnValue(0),
-        findByUserid: jest.fn().mockReturnValue([]),
-        findAllShips: jest.fn().mockReturnValue([]), // ticks iterate all ships
-        flushAndUnload: jest.fn().mockResolvedValue(undefined),
-        unboard: jest.fn().mockResolvedValue(undefined),
-        board: jest.fn(),
+        loadShip: vi.fn(),
+        size: vi.fn().mockReturnValue(0),
+        findByUserid: vi.fn().mockReturnValue([]),
+        findAllShips: vi.fn().mockReturnValue([]), // ticks iterate all ships
+        flushAndUnload: vi.fn().mockResolvedValue(undefined),
+        unboard: vi.fn().mockResolvedValue(undefined),
+        board: vi.fn(),
       })
       .overrideProvider(PrismaService)
       .useValue({
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-        mine: { findMany: jest.fn().mockResolvedValue([]) },
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+        mine: { findMany: vi.fn().mockResolvedValue([]) },
         ship: {
-          findMany: jest.fn().mockResolvedValue([]), // no DB ships → goes to onboarding
-          update: jest.fn().mockResolvedValue({}),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findMany: vi.fn().mockResolvedValue([]), // no DB ships → goes to onboarding
+          update: vi.fn().mockResolvedValue({}),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         // scanPl owner lookup + onboarding User-exists guard: a live User row
         // must resolve so the gateway emits prompt:ship-name (not auth:logout).
-        user: { findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }) },
+        user: { findUnique: vi.fn().mockResolvedValue({ userid: TEST_USERID }) },
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(
+        validate: vi.fn().mockImplementation(
           async (client: import('socket.io').Socket) => {
             client.data.userid = TEST_USERID;
             client.data.username = 'TestPilot';
@@ -385,23 +379,23 @@ describe('cmd rename — unbound socket (T058)', () => {
         ),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .overrideProvider(RenameService)
       .useValue({ rename: renameSpy })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .compile();
 

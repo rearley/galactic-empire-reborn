@@ -63,12 +63,26 @@ describe('userKills is hydrated everywhere teamcode is', () => {
 
   it.each([
     ['src/game/ship/ship-state.service.ts', 'boot hydration'],
-    ['src/gateway/game.gateway.ts', 'boarding a ship'],
+    ['src/gateway/connection-lifecycle.service.ts', 'boarding a ship'],
   ])('%s populates it (%s)', (path) => {
-    const text = src(path);
-    // Wherever the User row is read for teamcode, kills must come with it.
-    expect(text).toMatch(/kills: true/);
-    expect(text).toMatch(/state\.userKills = /);
+    expect(src(path)).toMatch(/state\.userKills = /);
+  });
+
+  it('the boot-hydration include still carries kills', () => {
+    // This half did NOT move. `ship-state.service.ts` joins the User row onto
+    // every ship it loads at boot; trim `kills: true` out of that include and
+    // every returning captain hydrates with userKills 0, so Cybertron
+    // escalation resets for exactly the veterans it is meant to punish.
+    expect(src('src/game/ship/ship-state.service.ts')).toMatch(/kills: true/);
+  });
+
+  it('the session-profile read carries kills alongside teamcode', () => {
+    // The `select` itself moved behind `UserRepository` when the persistence
+    // boundary went in; the invariant did not. Wherever the User row is read
+    // for teamcode on boarding, kills must come with it.
+    expect(src('src/game/player/user.repository.ts')).toMatch(
+      /teamcode: true, options: true, kills: true/,
+    );
   });
 
   it('the escalation gates read it rather than the hull count', () => {

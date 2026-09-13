@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -17,7 +17,7 @@ import { resolveItemKeyword, parseUint32 } from '../validators';
 export class SellHandlerService {
   constructor(
     private readonly planetService: PlanetStateService,
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   get command(): Command {
@@ -69,10 +69,7 @@ export class SellHandlerService {
     }
 
     // User cash credit — handler's responsibility (ship cargo already decremented by service)
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { increment: result.proceeds } },
-    });
+    await this.users.addCash(ship.userid, result.proceeds);
 
     return {
       lines: [

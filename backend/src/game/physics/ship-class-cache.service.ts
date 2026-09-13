@@ -44,6 +44,14 @@ export interface ShipClassEntry {
   category: string;
   /** Canon SNAME: the display-name PREFIX for automatons. @see MBMGESHP.MSG SxxSNAME */
   shipNameTemplate: string;
+  /**
+   * Wiki "Price" — player purchase price in credits; 0 for CPU ships.
+   * Added to the cache for Task 3 of the persistence-boundary restructure so
+   * `new ship`'s listing and purchase flow (new-ship.handler.ts) can read the
+   * hull price without a per-call `prisma.shipClass` query. Static seed data,
+   * same as every other field here — never written at runtime.
+   */
+  maxPrice: bigint;
 }
 
 @Injectable()
@@ -63,6 +71,7 @@ export class ShipClassCacheService implements OnModuleInit {
         maxShields: true,
         scanRange: true,
         maxTons: true,
+        maxPrice: true,
         hasTorpedo: true,
         hasMissile: true,
         hasJammer: true,
@@ -90,6 +99,7 @@ export class ShipClassCacheService implements OnModuleInit {
         maxShields: row.maxShields,
         scanRange: row.scanRange,
         maxTons: row.maxTons,
+        maxPrice: row.maxPrice,
         hasTorpedo: row.hasTorpedo,
         hasMissile: row.hasMissile,
         hasJammer: row.hasJammer,
@@ -119,6 +129,20 @@ export class ShipClassCacheService implements OnModuleInit {
    */
   get(classNumber: number): ShipClassEntry | undefined {
     return this.cache.get(classNumber);
+  }
+
+  /**
+   * Every cached class number, ascending. The command layer used this to
+   * validate `sys class <n>` and to enumerate `sys classlist` / `new ship`
+   * against the full table — previously done with a fresh
+   * `prisma.shipClass.findMany`, now served from the boot-time cache.
+   */
+  getClassNumbers(): number[] {
+    // `Array.from` already returns a fresh array with no other references, so
+    // sorting it in place — rather than `.toSorted()`, unavailable at this
+    // project's `lib` target — mutates nothing a caller could observe.
+    // eslint-disable-next-line unicorn/no-array-sort
+    return Array.from(this.cache.keys()).sort((a, b) => a - b);
   }
 
   /** Synchronous lookup. Throws if the class is not in the cache. */
@@ -235,6 +259,7 @@ export class ShipClassCacheService implements OnModuleInit {
       maxShields: 3,
       scanRange: 100000,
       maxTons: 5000,
+      maxPrice: 0n,
       hasTorpedo: true,
       hasMissile: true,
       hasJammer: false,

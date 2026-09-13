@@ -8,27 +8,18 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CLOAK_ENERGY_USE_DEFAULT } from '../../../src/game/commands/cloak.config';
 import { CLOAK_RAMP_FULL } from '../../../src/game/commands/_ship-management-constants';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: CLOAK_RAMP_FULL,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Test',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    cloak: CLOAK_RAMP_FULL,
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeTickService(shipOverrides: Partial<ShipState> = {}): {
@@ -39,17 +30,17 @@ function makeTickService(shipOverrides: Partial<ShipState> = {}): {
   const state = makeShip(shipOverrides);
 
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([state]),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue([state]),
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         return state;
       },
     ),
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
   } as unknown as ShipStateService;
 
-  const mockTickService = { subscribe: jest.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
+  const mockTickService = { subscribe: vi.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
   const events = new EventEmitter2();
 
   const service = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);
@@ -75,7 +66,7 @@ describe('cloakTick — per-tick drain and auto-decloak (GEFUNCS.C:1374, :1384)'
   it('emits cloak-collapsed event on auto-decloak', () => {
     const lowEnergy = CLOAK_ENERGY_USE_DEFAULT - 1;
     const { service, state, events } = makeTickService({ cloak: CLOAK_RAMP_FULL, energy: lowEnergy });
-    const listener = jest.fn();
+    const listener = vi.fn();
     events.on('ship-management.cloak-collapsed', listener);
     service.cloakTick(state);
     expect(listener).toHaveBeenCalledTimes(1);
@@ -100,7 +91,7 @@ describe('cloakTick — per-tick drain and auto-decloak (GEFUNCS.C:1374, :1384)'
 
   it('does not emit cloak-collapsed when energy is sufficient', () => {
     const { service, state, events } = makeTickService({ cloak: CLOAK_RAMP_FULL, energy: 50000 });
-    const listener = jest.fn();
+    const listener = vi.fn();
     events.on('ship-management.cloak-collapsed', listener);
     service.cloakTick(state);
     expect(listener).not.toHaveBeenCalled();

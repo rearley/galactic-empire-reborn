@@ -13,14 +13,13 @@
  * TEST_DATABASE_URL, schema pushed once by the shared jest globalSetup) since
  * there is no existing repository-level DB test elsewhere in the suite.
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../src/prisma/client';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { MidnightRepository } from '../../../src/game/midnight/midnight.repository';
 import { ABANDONED_SIGNUP_DAYS } from '../../../src/game/midnight/midnight.constants';
+import { makePrismaClient } from '../../helpers/make-prisma-client';
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.TEST_DATABASE_URL } },
-});
+const prisma = makePrismaClient(process.env.TEST_DATABASE_URL);
 
 // Unmistakably synthetic identifiers, scoped to this spec so cleanup can
 // target them precisely without relying on another file's truncateAll().

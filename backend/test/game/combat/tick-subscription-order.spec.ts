@@ -9,26 +9,18 @@ import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { MineRepository } from '../../../src/game/combat/mine.repository';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   const heading = over.heading ?? 0;
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading, head2b: heading, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  };
+  return baseMakeShip({
+    shipname: 'T',
+    heading: heading,
+    head2b: heading,
+    energy: 50000,
+    topspeed: 10,
+    ...over,
+  });
 }
 
 /**
@@ -52,12 +44,12 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
     const handlers: Array<{ kind: TickKind; fn: (c: TickContext) => void }> = [];
 
     const tickStub: Pick<TickService, 'subscribe' | 'registerSnapshotProvider'> = {
-      subscribe: jest.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
+      subscribe: vi.fn().mockImplementation((kind: TickKind, fn: (c: TickContext) => void) => {
         subscriptions.push({ kind });
         handlers.push({ kind, fn });
         return () => undefined;
       }),
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     };
 
     // Build a fake ship map.
@@ -90,7 +82,7 @@ describe('Combat tick — subscription order vs PhysicsTickService', () => {
     const physicsHandlers = handlers.length;
 
     // Stand up CombatTickService manually with a stub MineRepository.
-    const mineRepo = { findAllActive: jest.fn().mockResolvedValue([]) } as unknown as MineRepository;
+    const mineRepo = { findAllActive: vi.fn().mockResolvedValue([]) } as unknown as MineRepository;
     const { MineRegistry } = await import('../../../src/game/combat/mine.registry');
     const { Mulberry32Adapter } = await import('../../../src/game/combat/random.port');
     const { Logger } = await import('@nestjs/common');

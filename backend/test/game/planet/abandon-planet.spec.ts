@@ -1,6 +1,7 @@
 import { PlanetStateService } from '../../../src/game/planet/planet-state.service';
 import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { NUMITEMS, I_MEN, I_FOOD } from '../../../src/game/constants/items';
+import type { Mock } from 'vitest';
 
 /**
  * GECMDS.C:3420 cmd_abandon — the canonical `aba`. In orbit over a planet you
@@ -26,20 +27,25 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 
 function makeService(planet: PlanetState | null): {
   svc: PlanetStateService;
-  update: jest.Mock;
-  userUpdate: jest.Mock;
+  update: Mock;
+  userUpdate: Mock;
+  userUpdateOne: Mock;
 } {
-  const update = jest.fn().mockResolvedValue({});
-  const userUpdate = jest.fn().mockResolvedValue({});
+  const update = vi.fn().mockResolvedValue({});
+  const userUpdate = vi.fn().mockResolvedValue({});
+  // The counter uses two verbs by design now: `update` when a missing row is an
+  // error (winning a world), `updateMany` for the floored decrement's
+  // `planets: { gt: 0 }` predicate. @see issue #15
+  const userUpdateOne = vi.fn().mockResolvedValue({});
   const prisma = {
-    planet: { update, findMany: jest.fn().mockResolvedValue([]) },
-    user: { updateMany: userUpdate },
+    planet: { update, findMany: vi.fn().mockResolvedValue([]) },
+    user: { updateMany: userUpdate, update: userUpdateOne },
   } as never;
   const svc = new PlanetStateService(prisma, { get: () => undefined } as never);
   if (planet) {
     (svc as unknown as { map: Map<string, PlanetState> }).map.set('4:2:1', planet);
   }
-  return { svc, update, userUpdate };
+  return { svc, update, userUpdate, userUpdateOne };
 }
 
 describe('PlanetStateService.abandonPlanet — GECMDS.C:3420', () => {
@@ -127,22 +133,25 @@ describe('PlanetStateService.abandonPlanet — GECMDS.C:3420', () => {
    * right at midnight, when it is rebuilt from actual ownership.
    */
   it('claiming increments the owner\'s planet counter', async () => {
-    const { svc, userUpdate } = makeService(makePlanet({ userid: null, name: '' }));
+    const { svc, userUpdateOne } = makeService(makePlanet({ userid: null, name: '' }));
 
     await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
 
-    expect(userUpdate).toHaveBeenCalledWith({
+    // `update`, not `updateMany`: a claim by an account that does not exist is
+    // an error, not something to absorb. @see issue #15
+    expect(userUpdateOne).toHaveBeenCalledWith({
       where: { userid: 'newowner' },
       data: { planets: { increment: 1 } },
     });
   });
 
   it('a refused claim does not touch the counter', async () => {
-    const { svc, userUpdate } = makeService(makePlanet({ userid: 'someone_else' }));
+    const { svc, userUpdate, userUpdateOne } = makeService(makePlanet({ userid: 'someone_else' }));
 
     await svc.claim(4, 2, 1, 'newowner', 'Havenrock');
 
     expect(userUpdate).not.toHaveBeenCalled();
+    expect(userUpdateOne).not.toHaveBeenCalled();
   });
 
   /**

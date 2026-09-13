@@ -1,4 +1,5 @@
 import { parseRotation } from '../../src/game/commands/handlers/helpers/rotation';
+import { resultingHeading } from '../../src/game/commands/handlers/helpers/rotation';
 
 /**
  * C's `cmd_rotate` takes TWO forms (GECMDS.C:643):
@@ -46,7 +47,6 @@ describe('parseRotation', () => {
  * the one it did not show.
  */
 describe('resulting heading', () => {
-  const { resultingHeading } = require('../../src/game/commands/handlers/helpers/rotation');
 
   it('is the sum for a relative turn, normalised', () => {
     expect(resultingHeading(101, { absolute: false, deg: 90 })).toBe(191);

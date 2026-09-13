@@ -14,21 +14,17 @@
  * and where to read the rest.
  */
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { MESG_SHIPLOSS } from '../../src/game/player/ship-loss-mail.service';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 describe('GameGateway — SHIP LOST notice on re-entry', () => {
   const build = (mailRow: unknown, ships: unknown[] = []) => {
-    const mailFindFirst = jest.fn().mockResolvedValue(mailRow);
+    const mailFindFirst = vi.fn().mockResolvedValue(mailRow);
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
@@ -36,25 +32,20 @@ describe('GameGateway — SHIP LOST notice on re-entry', () => {
     } as unknown as ShipStateService;
 
     const prisma = {
-      ship: { findMany: jest.fn().mockResolvedValue(ships) },
-      user: { findUnique: jest.fn().mockResolvedValue({ userid: 'usr_abc' }) },
+      ship: { findMany: vi.fn().mockResolvedValue(ships) },
+      user: { findUnique: vi.fn().mockResolvedValue({ userid: 'usr_abc' }) },
       mailStat: { findFirst: mailFindFirst },
     } as unknown as PrismaService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
       prisma,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: () => ({ emit: () => undefined }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
@@ -64,9 +55,9 @@ describe('GameGateway — SHIP LOST notice on re-entry', () => {
       id: 'sock-1',
       data: { userid: 'usr_abc' } as Record<string, unknown>,
       emit: (event: string, payload: unknown) => { emitted.push({ event, payload }); },
-      join: jest.fn(),
-      disconnect: jest.fn(),
-      broadcast: { emit: jest.fn() },
+      join: vi.fn(),
+      disconnect: vi.fn(),
+      broadcast: { emit: vi.fn() },
     };
     const present = (gateway as unknown as {
       presentShipEntry: (c: unknown, u: string) => Promise<void>;

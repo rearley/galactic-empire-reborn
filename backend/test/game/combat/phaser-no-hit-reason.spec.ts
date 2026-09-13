@@ -19,27 +19,24 @@
 import { selectPhaserVictims } from '../../../src/game/combat/firep';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, PHATOWRP } from '../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50_000,
-    phasr: 500, phasrtype: 2, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 1, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'S',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50_000,
+    phasr: 500,
+    phasrtype: 2,
+    percent: 1,
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+    topspeed: canonMaxWarp(over.shpclass ?? 1),
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 const sweep = (firer: ShipState, ships: ShipState[]) =>

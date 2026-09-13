@@ -22,32 +22,24 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { CLOAK_ENERGY_USE_DEFAULT } from '../../../src/game/commands/cloak.config';
 import { MAINT_COST_NORMAL } from '../../../src/game/commands/_ship-management-constants';
+import { UserRepository } from '../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Ship factory
 // ---------------------------------------------------------------------------
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 10, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    shipname: 'Test',
+    xcoord: 5,
+    ycoord: 5,
+    damage: 10,
+    energy: 50000,
     where: 10, // in orbit (needed for maint)
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -59,30 +51,30 @@ function buildRouter() {
 
   // Common mocks
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue([ship]),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue([ship]),
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(ship);
         return ship;
       },
     ),
-    removeFromGame: jest.fn(),
-    abandon: jest.fn().mockResolvedValue(undefined),
+    removeFromGame: vi.fn(),
+    abandon: vi.fn().mockResolvedValue(undefined),
   } as unknown as ShipStateService;
 
   const mockPlanet = {
-    get: jest.fn().mockReturnValue({ items: [{ qty: 50_000n }] }),
+    get: vi.fn().mockReturnValue({ items: [{ qty: 50_000n }] }),
   } as unknown as PlanetStateService;
 
   const mockPrisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({ cash: 100_000n }),
-      update: jest.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({ cash: 100_000n }),
+      update: vi.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
 
   const mockMaintService = {
-    runMaintenance: jest.fn().mockResolvedValue({
+    runMaintenance: vi.fn().mockResolvedValue({
       ok: true,
       price: BigInt(MAINT_COST_NORMAL),
       repairAmt: 4,
@@ -95,10 +87,10 @@ function buildRouter() {
   router.register(new MaintHandlerService(mockMaintService).command);
   router.register(new TransferHandlerService(mockShipState, {} as any).command);
   router.register(new JettisonHandlerService(mockShipState).command);
-  router.register(new SetHandlerService(mockShipState, mockPrisma).command);
+  router.register(new SetHandlerService(mockShipState, new UserRepository(mockPrisma)).command);
   router.register(new DestructHandlerService(mockShipState).command);
   router.register(new AbortHandlerService(mockShipState).command);
-  router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);
+  router.register(new AbandonHandlerService(mockShipState, { abandonPlanet: vi.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService).command);
 
   return { router, ship };
 }

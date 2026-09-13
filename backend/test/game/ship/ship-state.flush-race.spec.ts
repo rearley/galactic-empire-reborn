@@ -18,41 +18,43 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeState(overrides: Partial<ShipState>): ShipState {
-  return {
-    userid: 'player-1', shipno: 1, shipname: 'Drifter', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 2, kills: 0, lastfired: 255,
-    shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
+  return baseMakeShip({
+    userid: 'player-1',
+    shipname: 'Drifter',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 2,
+    lastfired: 255,
+    shieldtype: 2,
+    shieldstat: 1,
+    shield: 2,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
     items: Array(16).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    topspeed: 8,
     ...overrides,
-  };
+  });
 }
 
-function harness(update: jest.Mock) {
+function harness(update: Mock) {
   let capturedFlush: (() => void | Promise<void>) | null = null;
   const prisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-    ship: { findMany: jest.fn().mockResolvedValue([]), update },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+    ship: { findMany: vi.fn().mockResolvedValue([]), update },
   } as unknown as PrismaService;
   const ticks = {
     subscribe: (kind: TickKind, fn: () => void | Promise<void>) => {
       if (kind === TickKind.SHIP_UPDATE) capturedFlush = fn;
       return () => {};
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
   const svc = new ShipStateService(prisma, ticks);
   return { svc, ticks, flush: () => capturedFlush!() };
@@ -65,7 +67,7 @@ describe('ShipStateService.flush — mutations landing mid-flush', () => {
     // The write resolves only after we have moved the ship — i.e. the physics
     // tick fired between the Prisma call and its completion.
     let moved = false;
-    const update = jest.fn().mockImplementation(async () => {
+    const update = vi.fn().mockImplementation(async () => {
       if (!moved) {
         moved = true;
         ship.xcoord = 6;
@@ -93,7 +95,7 @@ describe('ShipStateService.flush — mutations landing mid-flush', () => {
 
   it('re-queues a ship whose write failed', async () => {
     const ship = makeState({ dirty: true });
-    const update = jest.fn().mockRejectedValue(new Error('connection reset'));
+    const update = vi.fn().mockRejectedValue(new Error('connection reset'));
     const h = harness(update);
     await h.svc.onModuleInit();
     h.svc.loadShip(ship);

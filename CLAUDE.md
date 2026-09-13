@@ -15,10 +15,12 @@ running as a modern 24/7 persistent web game.
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS
 - **Database**: PostgreSQL 16+
 - **Real-time**: Socket.io via @nestjs/platform-socket.io
-- **Scheduling**: raw `setInterval` in `TickService` lifecycle hooks for the two
-  game heartbeats; @nestjs/schedule (`@Cron`) for midnight only. See
+- **Scheduling**: raw `setInterval` in `TickService` for the three game
+  heartbeats — two opened in lifecycle hooks, the planet sweep started by
+  `PlanetTickService`; @nestjs/schedule (`@Cron`) for midnight only. See
   `docs/DECISIONS.md` 2026-05-01.
-- **Testing**: Jest (backend), Vitest (frontend)
+- **Testing**: Vitest (backend and frontend). The backend ran Jest until Phase 5
+  of the restructure; see `docs/DECISIONS.md` 2026-09-11
 - **Deployment**: Docker + Docker Compose (Hetzner CPX32)
 - **Dev methodology**: Spec-Driven Development via spec-kit (github/spec-kit)
 
@@ -57,7 +59,7 @@ touch files in its directory:
 | File | Covers |
 |---|---|
 | `reference/CLAUDE.md` | **Read before opening anything under `/reference/`.** Maps every file in the vendored distribution and says which copy of each data file is the real one |
-| `backend/src/game/CLAUDE.md` | The two tick timers, `UNIVMAX` vs the scan viewport, the droid combat table, the module map |
+| `backend/src/game/CLAUDE.md` | The three tick timers, `UNIVMAX` vs the scan viewport, the droid combat table, the module map |
 | `backend/prisma/CLAUDE.md` | Migration rules, generated seeds, columns that were dropped and why |
 | `backend/src/public/CLAUDE.md` | The generated player guide, deviations and corrections, the landing page's accepted limits |
 | `docs/CLAUDE.md` | What each living doc is for, its format, and where open work is tracked |
@@ -70,13 +72,16 @@ once.
 
 **State**: see `### State Management` above. No Redis, no external cache layer.
 
-**Ticks**: two heartbeats. The **1-second** tick moves ships — rotate,
+**Ticks**: three heartbeats. The **1-second** tick moves ships — rotate,
 accelerate, move, self-destruct countdown, energy regen, DB flush. The
 **6-second** tick runs everything else — shields, cloak, mines, projectile
-flight, phaser recharge, damage control. **Movement is on the fast tick and
-shields are on the slow one**; this file once had them backwards and every ship
-in the game flew at half speed. Before moving anything between the two, find it
-in `GEMAIN.C`. Derivation in `backend/src/game/CLAUDE.md`.
+flight, phaser recharge, damage control. The **55-second** tick
+(`PLANTIME`, `GEMAIN.H:136`) runs the planet economy sweep, and is the one that
+does NOT start in `onModuleInit` — `PlanetTickService` starts it. **Movement is
+on the fast tick and shields are on the slow one**; this file once had them
+backwards and every ship in the game flew at half speed. Before moving anything
+between them, find it in `GEMAIN.C`. Derivation in
+`backend/src/game/CLAUDE.md`.
 
 **Galaxy**: `MAXX=30` / `MAXY=15` are the character dimensions of the ASCII scan
 map. They are **not** the size of the galaxy. The galaxy runs

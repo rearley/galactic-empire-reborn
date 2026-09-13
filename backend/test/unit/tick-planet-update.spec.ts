@@ -11,7 +11,7 @@ describe('TickService — PLANET_UPDATE timer', () => {
   let app: TestingModule;
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     app = await Test.createTestingModule({ providers: [TickService, { provide: InvariantRegistry, useValue: new InvariantRegistry() }] }).compile();
     service = app.get(TickService);
     await app.init();
@@ -19,7 +19,7 @@ describe('TickService — PLANET_UPDATE timer', () => {
 
   afterEach(async () => {
     await app.close();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('startPlanetUpdateTimer fires PLANET_UPDATE subscribers on the given interval', () => {
@@ -27,7 +27,7 @@ describe('TickService — PLANET_UPDATE timer', () => {
     service.subscribe(TickKind.PLANET_UPDATE, (ctx) => { calls.push(ctx.tickNumber); });
 
     service.startPlanetUpdateTimer(500);
-    jest.advanceTimersByTime(1500);
+    vi.advanceTimersByTime(1500);
 
     expect(calls).toEqual([1, 2, 3]);
   });
@@ -37,10 +37,10 @@ describe('TickService — PLANET_UPDATE timer', () => {
     service.subscribe(TickKind.PLANET_UPDATE, () => { calls.push(1); });
 
     service.startPlanetUpdateTimer(200);
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
     // Before any firing, replace with a new interval
     service.startPlanetUpdateTimer(500);
-    jest.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500);
 
     // First timer (200ms) would have fired at 200ms but was replaced;
     // second timer (500ms) fires once at t=600ms total.
@@ -52,7 +52,7 @@ describe('TickService — PLANET_UPDATE timer', () => {
     service.subscribe(TickKind.PLANET_UPDATE, (ctx) => { kinds.push(ctx.kind); });
 
     service.startPlanetUpdateTimer(1000);
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     expect(kinds).toEqual([TickKind.PLANET_UPDATE]);
   });
@@ -62,12 +62,12 @@ describe('TickService — PLANET_UPDATE timer', () => {
     service.subscribe(TickKind.PLANET_UPDATE, () => { calls.push(1); });
 
     service.startPlanetUpdateTimer(1000);
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(calls).toHaveLength(1);
 
     await app.close();
-    jest.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000);
     expect(calls).toHaveLength(1);
-    expect(jest.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

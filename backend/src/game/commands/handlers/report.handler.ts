@@ -1,7 +1,10 @@
 import { damstr } from '../../combat/combat-math';
 import { SHIELDDM } from '../../constants';
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ShipClassCacheService, ShipClassEntry } from '../../physics/ship-class-cache.service';
+import { UserRepository } from '../../player/user.repository';
+import { TeamRepository } from '../../team/team.repository';
 import { Command, CommandContext, CommandResult, CommandResultLine } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { PMINFIRE } from '../../constants';
@@ -17,38 +20,44 @@ import { coord1, coord2 } from '../../physics/coord';
  * @see GECMDS.C:1946 cmd_report
  */
 @Injectable()
-export class ReportHandlerService implements OnModuleInit {
-  private readonly logger = new Logger(ReportHandlerService.name);
-  private readonly classCache = new Map<number, {
-    typeName: string;
-    maxPhaser: number;
-    maxShields: number;
-    hasTorpedo: boolean;
-    hasMissile: boolean;
-    hasDecoy: boolean;
-    hasJammer: boolean;
-    hasZipper: boolean;
-    hasMine: boolean;
-    hasCloak: boolean;
-    maxTons: number;
-    maxWarp: number;
-  }>();
+export class ReportHandlerService {
+  constructor(
+    private readonly prisma: PrismaService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ReportHandlerService(...)` sites keep compiling — and keep asserting on the very
+     * same `prisma.user.*` calls, which is what proves the queries did not
+     * change when they moved behind it. Nest injects the shared provider in
+     * production. Safe ONLY because `UserRepository` is stateless and
+     * constructible from `(prisma)` alone — see the statelessness note on that
+     * class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Ship-class fields (typeName, weapon fit, tonnage, warp) come from the
+     * boot-time cache — the table is static seed data — rather than a
+     * per-`onModuleInit` `prisma.shipClass.findMany`. `@Optional()` so the
+     * many direct `new ReportHandlerService(prisma, users)` test
+     * constructions keep compiling; a missing cache falls back to the same
+     * `cls?.field ?? …` placeholders an unrecognised class number always hit.
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
+    /**
+     * The team repository, `@Optional()` for the same reason as `users`
+     * above: constructible from `(prisma)` alone, so the suite's direct
+     * `new ReportHandlerService(...)` sites keep compiling and keep
+     * asserting on the same `prisma.team.findUnique` call, now made
+     * through it.
+     */
+    @Optional()
+    private readonly teams: TeamRepository = new TeamRepository(prisma),
+  ) {}
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit(): Promise<void> {
-    const classes = await this.prisma.shipClass.findMany({
-      select: {
-        classNumber: true, typeName: true,
-        maxPhaser: true, maxShields: true, hasTorpedo: true, hasMissile: true,
-        hasDecoy: true, hasJammer: true, hasZipper: true,
-        hasMine: true, hasCloak: true, maxTons: true, maxWarp: true,
-      },
-    });
-    for (const cls of classes) {
-      this.classCache.set(cls.classNumber, cls);
-    }
-    this.logger.log(`Cached ${this.classCache.size} ship class type names`);
+  private classOf(classNumber: number): ShipClassEntry | undefined {
+    return this.shipClassCache?.get(classNumber);
   }
 
   get command(): Command {
@@ -64,7 +73,7 @@ export class ReportHandlerService implements OnModuleInit {
 
   private async handle(ship: ShipState, args: string[], _ctx: CommandContext): Promise<CommandResult> {
     const sub = args[0]?.toLowerCase() ?? '';
-    const cls = this.classCache.get(ship.shpclass);
+    const cls = this.classOf(ship.shpclass);
     const typeName = cls?.typeName ?? `Class ${ship.shpclass}`;
 
     const lines: CommandResultLine[] = [];
@@ -277,10 +286,7 @@ export class ReportHandlerService implements OnModuleInit {
     const lines: CommandResultLine[] = [];
     lines.push({ text: formatMessage(MessageId.REP25), category: 'system' });
 
-    const user = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true, score: true, kills: true, planets: true, teamcode: true },
-    });
+    const user = await this.users.getAccountSummary(ship.userid);
 
     if (!user) return lines;
 
@@ -298,10 +304,7 @@ export class ReportHandlerService implements OnModuleInit {
     lines.push({ text: formatMessage(MessageId.REP31, user.kills), category: 'info' });
 
     if (user.teamcode && user.teamcode > 0n) {
-      const team = await this.prisma.team.findUnique({
-        where: { teamcode: user.teamcode },
-        select: { teamname: true },
-      });
+      const team = await this.teams.getName(user.teamcode);
       if (team) {
         lines.push({ text: formatMessage(MessageId.REP31A, team.teamname), category: 'info' });
       }

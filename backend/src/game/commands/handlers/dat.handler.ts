@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { TeamRepository } from '../../team/team.repository';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
@@ -38,7 +38,7 @@ const CARGO_LABELS = [
 export class DatHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
-    private readonly prisma: PrismaService,
+    private readonly teams: TeamRepository,
   ) {}
 
   get command(): Command {
@@ -67,13 +67,10 @@ export class DatHandlerService {
 
     const target = ship;
 
-    // Resolve team name and score via Prisma (single call covers both)
+    // Resolve team name and score via the team repository (single call covers both)
     let teamname = '—';
     if (target.teamcode != null) {
-      const team = await this.prisma.team.findFirst({
-        where: { teamcode: target.teamcode },
-        select: { teamname: true },
-      });
+      const team = await this.teams.findNameByCode(target.teamcode);
       if (team) teamname = team.teamname;
     }
 

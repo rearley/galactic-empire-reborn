@@ -28,23 +28,31 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CYBERTRON_EVENT, CybertronTauntPayload } from '../../../src/game/cybertron/cybertron-events';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CYB_TAUNTS } from '../../../src/game/cybertron/cyb-taunt-catalog.generated';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(
   o: Partial<ShipState> & { userid: string; shipno: number; shpclass: number },
 ): ShipState {
-  return {
-    shipname: 'Test', heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000, phasr: 100, phasrtype: 2,
-    kills: 0, lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [], lmisslDistance: [],
-    lmisslEnergy: [], decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
+  return baseMakeShip({
+    shipname: 'Test',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 2,
+    lastfired: 255,
+    shieldtype: 2,
+    shieldstat: 1,
+    shield: 2,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, status: 1, channel: 1,
-    cybmine: 255, cybskill: 5, cybupdate: 0, tick: 0, holdcourse: 0,
-    minesnear: 0, warpspeed: 0, warpdest: 0, emulate: 0, dirty: false,
+    channel: 1,
+    cybmine: 255,
+    cybskill: 5,
     ...o,
-  } as unknown as ShipState;
+  });
 }
 
 async function harness(seed: number) {
@@ -88,10 +96,10 @@ async function harness(seed: number) {
   });
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockResolvedValue(undefined),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n,
   } as unknown as CybertronRepository;
 

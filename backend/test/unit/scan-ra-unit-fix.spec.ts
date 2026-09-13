@@ -15,49 +15,38 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeService(ships: ShipState[], scanRange = 100_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    get: jest.fn(),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    get: vi.fn(),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   return new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
@@ -65,6 +54,8 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
 }
 
@@ -81,7 +72,6 @@ describe('S-003 — scan ra projection uses sector units, not raw units', () => 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
     const east = makeShip({ userid: 'east', shipno: 1, xcoord: 5, ycoord: 0 });
     const svc = makeService([self, east], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['ra', '9'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
@@ -97,7 +87,6 @@ describe('S-003 — scan ra projection uses sector units, not raw units', () => 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 10, ycoord: 5 });
     const west = makeShip({ userid: 'west', shipno: 1, xcoord: 5, ycoord: 5 });
     const svc = makeService([self, west], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['ra', '9'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
@@ -113,7 +102,6 @@ describe('S-003 — scan ra projection uses sector units, not raw units', () => 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const close = makeShip({ userid: 'close', shipno: 1, xcoord: 5.05, ycoord: 5 });
     const svc = makeService([self, close], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['ra', '1'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
@@ -127,7 +115,6 @@ describe('S-003 — scan ra projection uses sector units, not raw units', () => 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const far = makeShip({ userid: 'far', shipno: 1, xcoord: 10, ycoord: 5 });
     const svc = makeService([self, far], 100_000);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['ra', '1'], {}) as CommandResult;
     const shipCells = result.scanRender!.cells.filter((c) => c.type === 'ship');
@@ -140,7 +127,6 @@ describe('S-003 — scan ra projection uses sector units, not raw units', () => 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5, ycoord: 5 });
     const target = makeShip({ userid: 't', shipno: 1, xcoord: 8, ycoord: 5 });
     const svc = makeService([self, target], 100_000);
-    await svc.onModuleInit();
 
     const r9 = await svc.command.handler(self, ['ra', '9'], {}) as CommandResult;
     const r1 = await svc.command.handler(self, ['ra', '1'], {}) as CommandResult;

@@ -7,6 +7,7 @@ import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { JAMTIME } from '../../../../src/game/constants';
 import { I_JAMMER } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 import {
   COMBAT_TARGET_WARNING,
   CombatTargetWarningEvent,
@@ -20,24 +21,13 @@ function itemsWith(map: Record<number, bigint>): bigint[] {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 100000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Test',
+    energy: 100000,
     items: itemsWith({ [I_JAMMER]: 3n }),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  };
+    topspeed: 10,
+    ...over,
+  });
 }
 
 function makeHarness(ships: ShipState[], scanRange = 10000, events?: EventEmitter2) {
@@ -88,33 +78,33 @@ describe('JammerHandlerService — `jam`', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.JAM_NOAMMO));
   });
 
-  it('distance scaling — ship at scanrange/2 gets floor(JAMTIME * 0.5); self gets JAMTIME', () => {
+  it('distance scaling — ship at scanrange/2 gets floor(JAMTIME * 0.5); self gets JAMTIME', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 0.5, ycoord: 0 });
     const carol = makeShip({ userid: 'c', shipno: 3, xcoord: 2, ycoord: 0 }); // outside
     const handler = makeHarness([alice, bob, carol], 10000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(alice.jammer).toBe(JAMTIME);
     expect(bob.jammer).toBe(Math.floor(JAMTIME * 0.5));
     expect(carol.jammer).toBe(0); // out of range
   });
 
-  it('does not jam a ship on the far side of the galaxy', () => {
+  it('does not jam a ship on the far side of the galaxy', async () => {
     // scanRange 15_000 = 1.5 sectors. Bob is 10 sectors away.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 2, ycoord: 3 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 12, ycoord: 3 });
     const handler = makeHarness([alice, bob], 15000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(bob.jammer).toBe(0);
   });
 
-  it('leaves an out-of-range ship\'s existing jammer counter alone', () => {
+  it('leaves an out-of-range ship\'s existing jammer counter alone', async () => {
     // C only writes wptr->jammer inside the in-range branch, so a jammer
     // already running on a distant ship must not be reset to 0.
     const alice = makeShip({ userid: 'a', shipno: 1, xcoord: 0, ycoord: 0 });
     const bob = makeShip({ userid: 'b', shipno: 2, xcoord: 9, ycoord: 0, jammer: 7 });
     const handler = makeHarness([alice, bob], 15000);
-    handler.command.handler(alice, [], ctx);
+    await handler.command.handler(alice, [], ctx);
     expect(bob.jammer).toBe(7);
   });
 });

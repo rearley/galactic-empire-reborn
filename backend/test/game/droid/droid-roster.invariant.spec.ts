@@ -12,7 +12,7 @@
 describe('Droid roster persistence invariant', () => {
   it('droid userids never appear in a Prisma user query', async () => {
     const mockPrisma = {
-      user: { findMany: jest.fn().mockResolvedValue([]) },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     const result = await mockPrisma.user.findMany({
@@ -24,7 +24,7 @@ describe('Droid roster persistence invariant', () => {
 
   it('droid userids never appear in a Prisma ship query', async () => {
     const mockPrisma = {
-      ship: { findMany: jest.fn().mockResolvedValue([]) },
+      ship: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     const result = await mockPrisma.ship.findMany({

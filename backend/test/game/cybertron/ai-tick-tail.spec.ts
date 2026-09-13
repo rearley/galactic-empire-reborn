@@ -83,6 +83,7 @@ import { TickContext, TickHandler, TickKind } from '../../../src/game/tick/tick.
 import { Random } from '../../../src/game/combat/random.port';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import { GESTAT_AUTO, GESTAT_USER, TOOCLOSE, CYB_BE_NICE,
   HPMINFIR,
 } from '../../../src/game/constants';
@@ -102,26 +103,32 @@ class FixedRandom implements Random {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1,
-    heading: 0, head2b: 0, speed: 25_000, speed2b: 25_000,
-    xcoord: 20, ycoord: 20, damage: 0, energy: 500_000,
-    phasr: 500, phasrtype: 5, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: HYPER, ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'S',
+    speed: 25_000,
+    speed2b: 25_000,
+    xcoord: 20,
+    ycoord: 20,
+    energy: 500_000,
+    phasr: 500,
+    phasrtype: 5,
+    where: HYPER,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_USER, cybmine: 255,
-    cybskill: 10, cybupdate: 50, tick: 1, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 30, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...over,
+    status: GESTAT_USER,
+    cybmine: 255,
+    cybskill: 10,
+    cybupdate: 50,
+    tick: 1,
+    topspeed: 30,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 interface Scenario {
@@ -219,12 +226,12 @@ async function runOneAiTick(over: Partial<Scenario> = {}): Promise<{ cyb: ShipSt
   } as unknown as ShipClassCacheService;
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn(),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
-    creditAllowances: jest.fn().mockResolvedValue(undefined),
-    incrementKills: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn(),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
+    creditAllowances: vi.fn().mockResolvedValue(undefined),
+    incrementKills: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n,
   } as unknown as CybertronRepository;
 
@@ -249,7 +256,7 @@ async function runOneAiTick(over: Partial<Scenario> = {}): Promise<{ cyb: ShipSt
     tickNumber: 1,
     firedAt: new Date('2026-09-10T00:00:00Z'),
   };
-  for (const fn of handlers.get(TickKind.SHIP_UPDATE) ?? []) fn(ctx);
+  for (const fn of handlers.get(TickKind.SHIP_UPDATE) ?? []) await fn(ctx);
 
   return { cyb, prey };
 }

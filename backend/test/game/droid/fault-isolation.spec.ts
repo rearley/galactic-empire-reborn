@@ -26,10 +26,13 @@ import {
   GESTAT_AUTO,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 // ─── Class entry stubs ────────────────────────────────────────────────────────
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 4, maxPhaser: 1, maxShields: 1,
   scanRange: 20_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
@@ -39,47 +42,35 @@ const BASE_CLASS_ENTRY: ShipClassEntry = {
 // ─── Minimal ShipState builder ────────────────────────────────────────────────
 
 function makeDroidState(overrides: Partial<ShipState> & { userid: string; shpclass: number }): ShipState {
-  const base: ShipState = {
-    userid: overrides.userid,
-    shipno: 1,
+  return baseMakeShip({
     shipname: `Droid-${overrides.userid}`,
-    shpclass: overrides.shpclass,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50_000,
-    phasr: 1, phasrtype: 1, kills: 0, lastfired: 255,
-    shieldtype: 1, shieldstat: 0, shield: 1, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0,
-    where: 0, ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
+    xcoord: 5, ycoord: 5, energy: 50_000,
+    phasr: 1, phasrtype: 1, lastfired: 255,
+    shieldtype: 1, shield: 1,
+    helm: 1,
+    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
     lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [],
-    items: Array(14).fill(0n), titem: 0, hostile: 0,
-    cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
-    status: GESTAT_AUTO, cybmine: 255, cybskill: 0, cybupdate: 0,
-    tick: 0, emulate: 0, minesnear: 0, lock: 0, holdcourse: 0,
-    topspeed: 4_000, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    freq: [],
+    items: Array(14).fill(0n),
+    status: GESTAT_AUTO, cybmine: 255,
+    topspeed: canonMaxWarp(overrides.shpclass),
     isEphemeral: true,
-  };
-  return { ...base, ...overrides };
+    ...overrides,
+  });
 }
 
 function makePlayerState(): ShipState {
-  return {
-    userid: 'human-1', shipno: 1, shipname: 'HumanShip', shpclass: 5,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0, xcoord: 1, ycoord: 1,
-    damage: 0, energy: 50_000, phasr: 100, phasrtype: 3, kills: 0,
-    lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [],
-    lmisslDistance: [], lmisslEnergy: [], decout: [], jammer: 0, freq: [],
-    items: Array(14).fill(0n), titem: 0, hostile: 0, cantexit: 0,
-    repair: 0, hypha: 0, firecntl: 0, destruct: 0, status: GESTAT_USER,
-    cybmine: 255, cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8_000, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  return baseMakeShip({
+    userid: 'human-1', shipname: 'HumanShip', shpclass: 5,
+    xcoord: 1, ycoord: 1,
+    energy: 50_000, phasr: 100, phasrtype: 3,
+    lastfired: 255, shieldtype: 2, shieldstat: 1, shield: 2,
+    helm: 1,
+    freq: [],
+    items: Array(14).fill(0n),
+    status: GESTAT_USER, cybmine: 255,
+    topspeed: canonMaxWarp(5),
+  });
 }
 
 // ─── Harness ──────────────────────────────────────────────────────────────────
@@ -104,7 +95,7 @@ function buildHarness() {
 
   const shipState: ShipStateService = {
     findAllShips: () => allShips,
-    get: jest.fn().mockImplementation((uid: string, no: number) => {
+    get: vi.fn().mockImplementation((uid: string, no: number) => {
       if (uid === '@Droid-99') {
         throw new Error('Simulated fault: bad droid state read');
       }
@@ -133,9 +124,9 @@ function buildHarness() {
     getMaxShields: (n: number) => (n === DROID_CLASS_TRANSPORT ? 2 : 1),
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];

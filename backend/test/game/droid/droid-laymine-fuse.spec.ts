@@ -15,6 +15,7 @@ import { MineRefusedError } from '../../../src/game/combat/mine.repository';
 import { AI_MINE_TIMER } from '../../../src/game/constants';
 import { I_MINE } from '../../../src/game/constants/items';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import type { Mock } from 'vitest';
 
 const droid = (over: Partial<ShipState> = {}): ShipState => {
   const items = Array(14).fill(0n) as bigint[];
@@ -26,13 +27,13 @@ const droid = (over: Partial<ShipState> = {}): ShipState => {
   } as ShipState;
 };
 
-function build(create: jest.Mock) {
+function build(create: Mock) {
   const svc = Object.create(DroidTickService.prototype) as object;
   const added: unknown[] = [];
   Object.assign(svc, {
     mineRepo: { create },
     mineRegistry: { add: (m: unknown) => added.push(m) },
-    logger: { error: jest.fn() },
+    logger: { error: vi.fn() },
   });
   return {
     added,
@@ -45,7 +46,7 @@ function build(create: jest.Mock) {
 
 describe('droid mine laying', () => {
   it('sets canon\'s fuse of 10, not 100', async () => {
-    const create = jest.fn().mockResolvedValue({ id: 1, channel: 4, timer: 10, xcoord: -8.5, ycoord: 2.25 });
+    const create = vi.fn().mockResolvedValue({ id: 1, channel: 4, timer: 10, xcoord: -8.5, ycoord: 2.25 });
     const h = build(create);
     await h.lay(droid());
 
@@ -59,7 +60,7 @@ describe('droid mine laying', () => {
   it('spends nothing when laymine is refused', async () => {
     // Either refusal — table full or this droid at its USRMINES cap.
     const ship = droid();
-    const h = build(jest.fn().mockRejectedValue(new MineRefusedError('refused')));
+    const h = build(vi.fn().mockRejectedValue(new MineRefusedError('refused')));
     await h.lay(ship);
 
     expect(ship.items[I_MINE]).toBe(2n);

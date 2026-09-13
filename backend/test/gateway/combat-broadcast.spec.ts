@@ -1,13 +1,12 @@
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
-import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -23,6 +22,7 @@ import {
   CombatSubsystemDamagedEvent,
 } from '../../src/game/combat/combat-events';
 import { PresenceService } from '../../src/public/presence.service';
+import type { Mock } from 'vitest';
 
 /**
  * Verifies that the GameGateway forwards combat events to the firer/victim's
@@ -32,31 +32,27 @@ import { PresenceService } from '../../src/public/presence.service';
  */
 describe('GameGateway combat broadcasts', () => {
   let gateway: GameGateway;
-  let toMock: jest.Mock;
-  let emitMock: jest.Mock;
+  let toMock: Mock;
+  let emitMock: Mock;
 
   beforeEach(() => {
-    emitMock = jest.fn();
-    toMock = jest.fn().mockReturnValue({ emit: emitMock });
+    emitMock = vi.fn();
+    toMock = vi.fn().mockReturnValue({ emit: emitMock });
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
-    const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService;
-    gateway = new GameGateway(
-      {} as ShipStateService,
-      {} as CommandRouterService,
-      { getSocketId: jest.fn().mockReturnValue(undefined) } as unknown as ConnectedShipsRegistry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
+    const mockPrisma = { ship: { findFirst: vi.fn() } } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: vi.fn(), lettersFor: vi.fn(() => []) } as unknown as ScanHandlerService;
+    gateway = makeGateway({
+      registry: { getSocketId: vi.fn().mockReturnValue(undefined) } as unknown as ConnectedShipsRegistry,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
     // Inject the mock io Server.
-    (gateway as unknown as { server: { to: jest.Mock } }).server = { to: toMock };
+    (gateway as unknown as { server: { to: Mock } }).server = { to: toMock };
   });
 
   /**
@@ -102,8 +98,19 @@ describe('GameGateway combat broadcasts', () => {
     gateway.handleCombatHit(event);
     expect(toMock).toHaveBeenCalledWith('sector:12:3');
     // The gateway adds `attackerName` — the identifier `sca sh` accepts — so
-    // the client need not fall back to the userid for AI ships.
-    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, { ...event, attackerName: undefined });
+    // the client need not fall back to the userid for AI ships. It also builds
+    // the payload field by field rather than spreading the internal event, so
+    // `sector` and `tickAt` do not ride along.
+    // @see issue #4, test/gateway/hit-payload-scoping.spec.ts
+    expect(emitMock).toHaveBeenCalledWith(COMBAT_HIT, {
+      attackerId: 'a:1',
+      attackerName: undefined,
+      victimId: 'b:2',
+      victimName: undefined,
+      weapon: 'phaser',
+      damageHull: 5,
+      damageShield: 100,
+    });
   });
 
   it('broadcasts COMBAT_DECOY_INTERCEPT to sector room', () => {
@@ -147,38 +154,34 @@ describe('GameGateway combat broadcasts', () => {
 // Fix 3 — COMBAT_SUBSYSTEM_DAMAGED routed to victim's socket
 describe('GameGateway — COMBAT_SUBSYSTEM_DAMAGED broadcast (Fix 3)', () => {
   it('delivers per-subsystem event.log notice to the victim socket', () => {
-    const victimEmit = jest.fn();
+    const victimEmit = vi.fn();
     const mockSocket = { emit: victimEmit };
     const mockSockets = new Map<string, typeof mockSocket>();
     mockSockets.set('victim-socket-id', mockSocket);
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
-    const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn(), lettersFor: jest.fn(() => []) } as unknown as ScanHandlerService;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
+    const mockPrisma = { ship: { findFirst: vi.fn() } } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: vi.fn(), lettersFor: vi.fn(() => []) } as unknown as ScanHandlerService;
 
     // Registry returns a socket ID for the victim
     const mockRegistry = {
-      getSocketId: jest.fn().mockImplementation((id: string) =>
+      getSocketId: vi.fn().mockImplementation((id: string) =>
         id === 'b:2' ? 'victim-socket-id' : undefined,
       ),
     } as unknown as ConnectedShipsRegistry;
 
-    const gw = new GameGateway(
-      {} as ShipStateService,
-      {} as CommandRouterService,
-      mockRegistry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    const gw = makeGateway({
+      registry: mockRegistry,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
 
-    const emitMock2 = jest.fn();
-    const toMock2 = jest.fn().mockReturnValue({ emit: emitMock2 });
+    const emitMock2 = vi.fn();
+    const toMock2 = vi.fn().mockReturnValue({ emit: emitMock2 });
     (gw as unknown as { server: unknown }).server = {
       to: toMock2,
       sockets: { sockets: mockSockets },

@@ -1,5 +1,5 @@
-import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Injectable, Optional } from '@nestjs/common';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { ShipState } from '../../ship/ship-state.types';
@@ -25,19 +25,19 @@ const SECTOR_HIDDEN = '(  -,  -)';
 const KILLS_W = 5;
 
 @Injectable()
-export class WhoHandlerService implements OnModuleInit {
-  private readonly classNames = new Map<number, string>();
-
+export class WhoHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
-    @Optional() private readonly prisma?: PrismaService,
+    /**
+     * Class names come from the boot-time cache — the table is static seed
+     * data (see ShipClassCacheService), so there is nothing here to hydrate
+     * on module init any more. `@Optional()` so the many direct
+     * `new WhoHandlerService(shipService)` test constructions keep compiling;
+     * a missing cache falls back to the "Class n" placeholder below, same as
+     * an unrecognised class number always has.
+     */
+    @Optional() private readonly shipClassCache?: ShipClassCacheService,
   ) {}
-
-  async onModuleInit(): Promise<void> {
-    if (!this.prisma) return;
-    const rows = await this.prisma.shipClass.findMany({ select: { classNumber: true, typeName: true } });
-    for (const r of rows) this.classNames.set(r.classNumber, r.typeName);
-  }
 
   get command(): Command {
     return {
@@ -76,7 +76,7 @@ export class WhoHandlerService implements OnModuleInit {
 
     for (const s of active) {
       const name = s.shipname.padEnd(NAME_W).slice(0, NAME_W);
-      const cls = (this.classNames.get(s.shpclass) ?? `Class ${s.shpclass}`).padEnd(CLASS_W).slice(0, CLASS_W);
+      const cls = (this.shipClassCache?.getTypeName(s.shpclass) ?? `Class ${s.shpclass}`).padEnd(CLASS_W).slice(0, CLASS_W);
       // Position only for a ship in YOUR sector — canon gives a player's
       // position to `sca` alone, and `sca` announces itself to the target.
       const subject = sectorOf(s);

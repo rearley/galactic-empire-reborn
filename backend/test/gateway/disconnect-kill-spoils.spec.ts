@@ -13,25 +13,25 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { Random } from '../../src/game/combat/random.port';
 import { COMBAT_SHIP_DESTROYED } from '../../src/game/combat/combat-events';
 import { I_MEN, I_TROOPS, NUMITEMS } from '../../src/game/constants/items';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 const I_FOOD = 1;
 
 describe('GameGateway — disconnect kill awards spoils (canon killem)', () => {
   let gateway: GameGateway;
   let registry: ConnectedShipsRegistry;
-  let eventsEmitMock: jest.Mock;
-  let mutateMock: jest.Mock;
-  let findAllShipsMock: jest.Mock;
-  let getSvcMock: jest.Mock;
+  let eventsEmitMock: Mock;
+  let mutateMock: Mock;
+  let findAllShipsMock: Mock;
+  let getSvcMock: Mock;
 
   const items = (over: Record<number, bigint> = {}): bigint[] => {
     const arr = new Array<bigint>(NUMITEMS).fill(0n);
@@ -70,62 +70,60 @@ describe('GameGateway — disconnect kill awards spoils (canon killem)', () => {
     id: 'sock-1',
     connected: true,
     data: { userid: 'user1', activeShipNo: 1, disconnectReason: 'transport close' },
-    emit: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    broadcast: { emit: jest.fn() },
+    emit: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    broadcast: { emit: vi.fn() },
     handshake: { query: { userid: 'user1' } },
   });
 
   beforeEach(() => {
-    eventsEmitMock = jest.fn();
-    mutateMock = jest.fn();
-    getSvcMock = jest.fn().mockReturnValue(victim());
-    findAllShipsMock = jest.fn().mockReturnValue([attacker()]);
+    eventsEmitMock = vi.fn();
+    mutateMock = vi.fn();
+    getSvcMock = vi.fn().mockReturnValue(victim());
+    findAllShipsMock = vi.fn().mockReturnValue([attacker()]);
 
     const mockShipStateSvc: Partial<ShipStateService> = {
       get: getSvcMock,
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      removeFromGame: jest.fn(),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      removeFromGame: vi.fn(),
       findAllShips: findAllShipsMock,
-      findByUserid: jest.fn().mockReturnValue([]),
+      findByUserid: vi.fn().mockReturnValue([]),
       mutate: mutateMock as never,
     };
 
     registry = new ConnectedShipsRegistry(mockShipStateSvc as ShipStateService);
 
     const mockPrisma = {
-      ship: { findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
-      shipClass: { findFirst: jest.fn().mockResolvedValue({ points: 500 }) },
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
-      mailStat: { findFirst: jest.fn().mockResolvedValue(null) },
+      ship: { findFirst: vi.fn().mockResolvedValue(null), updateMany: vi.fn() },
+      shipClass: { findFirst: vi.fn().mockResolvedValue({ points: 500 }) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      mailStat: { findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
 
     const mockClassCache = {
-      getTypeName: jest.fn(),
-      getMaxTons: jest.fn().mockReturnValue(5000),
-      getPoints: jest.fn().mockReturnValue(500),
+      getTypeName: vi.fn(),
+      getMaxTons: vi.fn().mockReturnValue(5000),
+      getPoints: vi.fn().mockReturnValue(500),
     } as unknown as ShipClassCacheService;
 
-    gateway = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
+    gateway = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      mockPrisma,
-      {} as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      mockClassCache,
-      { next: () => 0 },
-      { emit: eventsEmitMock, on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: mockPrisma,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: mockClassCache,
+      random: { next: () => 0 } as unknown as Random,
+      events: { emit: eventsEmitMock, on: vi.fn() } as never,
+    });
     (gateway as unknown as { server: unknown }).server = {
       to: () => ({ emit: () => undefined }),
-      emit: jest.fn(),
-      sockets: { sockets: { get: jest.fn() }, adapter: { rooms: new Map() } },
+      emit: vi.fn(),
+      sockets: { sockets: { get: vi.fn() }, adapter: { rooms: new Map() } },
     };
     registry.upsert('user1:1', 'sock-1');
   });

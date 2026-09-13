@@ -8,7 +8,7 @@
 
 // Must mock score.config BEFORE importing the repository, since config is a
 // module-level side-effectful constant.
-jest.mock('../../../src/game/player/score.config', () => ({ scoreF2: 100 }));
+vi.mock('../../../src/game/player/score.config', () => ({ scoreF2: 100 }));
 
 import { killScoreAward, killScoreDeduction } from '../../../src/game/player/kill-score';
 import { PlayerScoreRepository } from '../../../src/game/player/player-score.repository';
@@ -33,8 +33,8 @@ function makePrisma(
     klscore: overrides.victimKlscore ?? 1000n,
   };
 
-  const updateMock = jest.fn().mockResolvedValue({});
-  const findUniqueMock = jest.fn((args: { where: { userid: string } }) => {
+  const updateMock = vi.fn().mockResolvedValue({});
+  const findUniqueMock = vi.fn((args: { where: { userid: string } }) => {
     if (args.where.userid === attackerUserid) return Promise.resolve(attacker);
     if (args.where.userid === 'victim') return Promise.resolve(victim);
     return Promise.resolve(null);
@@ -48,7 +48,7 @@ function makePrisma(
   };
 
   const prisma = {
-    $transaction: jest.fn((fn: (tx: typeof txMock) => Promise<void>) => fn(txMock)),
+    $transaction: vi.fn((fn: (tx: typeof txMock) => Promise<void>) => fn(txMock)),
   };
 
   return { prisma, updateMock, findUniqueMock, attacker, victim };
@@ -79,22 +79,53 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       );
     });
 
-    it('scales only the victim\'s deduction by scoreF2, never the award', async () => {
+    // WAS: "scales only the victim's deduction by scoreF2, never the award",
+    // with a nested `vi.mock` of score.config re-registering scoreF2 as 3 and a
+    // local re-import to pick it up. The nested registration never did anything
+    // — a module mock is HOISTED above the whole file in both Jest and Vitest,
+    // so the file-level `scoreF2: 100` on line 11 was always what ran. Vitest
+    // refuses the nested call outright, which is how this surfaced.
+    //
+    // The assertion below is untouched and still holds, because it only ever
+    // checked the ATTACKER'S AWARD — which the test's own comment says scoreF2
+    // never touches. So it could not have failed whatever scoreF2 was, and the
+    // victim's deduction, the thing the old name claimed to cover, is not
+    // asserted here at all. Renamed to what it actually verifies. @see issue #33
+    it('leaves the attacker award unscaled — scoreF2 applies to the deduction only', async () => {
       // The attacker's award is `amt` and is never touched by score_f2
       // (GEFUNCS.C:1183). Only the deduction is `(amt/100)*score_f2`.
-      jest.resetModules();
-      jest.mock('../../../src/game/player/score.config', () => ({ scoreF2: 3 }));
-      // Use a local re-import for this override
-      const { PlayerScoreRepository: Repo2 } =
-        await import('../../../src/game/player/player-score.repository');
       const { prisma, updateMock } = makePrisma({});
-      const repo = new Repo2(prisma as never);
-      // scr=100, scoreF2=3 → deduction (100/100)*3 = 3; award stays 100.
+      const repo = new PlayerScoreRepository(prisma as never);
       await repo.transferKillScore('attacker', 'victim', 100, false, false);
       expect(updateMock).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userid: 'attacker' },
           data: expect.objectContaining({ score: { increment: 100n } }),
+        }),
+      );
+    });
+
+    /**
+     * The deduction is the half scoreF2 DOES scale, and nothing in this file
+     * asserted it: the test above is named for the deduction and reads the
+     * award, behind a nested `vi.mock` that was hoisted above the file and
+     * never applied. Vitest refuses that mock outright, which is how it
+     * surfaced. @see issue #33
+     *
+     * At the file-wide scoreF2 of 100, amt 100 deducts 100 — the victim's
+     * 1000 becomes 900. `player-score-scoref2.spec.ts` carries the case that
+     * proves it is the KNOB doing the work and not the arithmetic coinciding,
+     * because a module mock is necessarily file-wide.
+     */
+    it('deducts floor(amt / 100) * scoreF2 from the victim', async () => {
+      const { prisma, updateMock } = makePrisma({ victimScore: 1000n, victimKlscore: 1000n });
+      const repo = new PlayerScoreRepository(prisma as never);
+      await repo.transferKillScore('attacker', 'victim', 100, false, false);
+      expect(killScoreDeduction(100, 100, false)).toBe(100);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userid: 'victim' },
+          data: { score: 900n, klscore: 900n },
         }),
       );
     });
@@ -183,8 +214,9 @@ describe('PlayerScoreRepository.transferKillScore', () => {
       await repo.transferKillScore('Cybrg-1', 'victim', 1000, false, true);
 
       const attackerCalls = updateMock.mock.calls.filter(
-        (call: [{ where: { userid: string }; data: Record<string, unknown> }]) =>
-          call[0].where.userid === 'Cybrg-1',
+        (call) =>
+          (call[0] as { where: { userid: string }; data: Record<string, unknown> }).where.userid ===
+          'Cybrg-1',
       );
       for (const [args] of attackerCalls) {
         expect((args as { data: Record<string, unknown> }).data).not.toHaveProperty('kills');
@@ -201,7 +233,7 @@ describe('PlayerScoreRepository.transferKillScore', () => {
 
       // Only the attacker update, not the victim update
       const victimUpdates = updateMock.mock.calls.filter(
-        (call: [{ where: { userid: string } }]) => call[0].where.userid === 'Cybrg-1',
+        (call) => (call[0] as { where: { userid: string } }).where.userid === 'Cybrg-1',
       );
       expect(victimUpdates).toHaveLength(0);
     });

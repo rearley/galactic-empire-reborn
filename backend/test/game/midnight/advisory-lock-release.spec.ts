@@ -46,7 +46,7 @@ beforeAll(async () => {
     providers: [
       MidnightService,
       MidnightRepository,
-      { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn() } },
+      { provide: EventEmitter2, useValue: { emit: vi.fn(), on: vi.fn() } },
     ],
   }).compile();
   prisma = app.get(PrismaService);

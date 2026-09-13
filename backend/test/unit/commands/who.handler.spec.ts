@@ -1,27 +1,16 @@
 import { WhoHandlerService } from '../../../src/game/commands/handlers/who.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha',
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 3, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    xcoord: 5,
+    ycoord: 3,
     ...overrides,
-  };
+  });
 }
 
 const ctx: CommandContext = {};
@@ -270,5 +259,29 @@ describe('`who` — position is scoped to your own sector', () => {
     const out = rows(svc.command.handler(me, [], ctx) as never);
 
     expect(new Set(out.map((t) => t.length)).size).toBe(1);
+  });
+});
+
+describe('class labels come from the boot-time cache, not the database', () => {
+  const rows = (r: import('../../../src/game/commands/command.types').CommandResult) =>
+    r.lines.filter((l) => l.category === 'info').map((l) => l.text);
+
+  it('reads the type name from ShipClassCacheService', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', shpclass: 3 });
+    const shipClassCache = new ShipClassCacheService({} as never);
+    shipClassCache.setForTest(3, { maxAcceleration: 0, maxWarp: 0, typeName: 'Star Cruiser' });
+    const svc = new WhoHandlerService({ findAllShips: () => [me] } as unknown as ShipStateService, shipClassCache);
+    const line = rows(svc.command.handler(me, [], ctx) as never)[0] ?? '';
+
+    expect(line).toContain('Star Cruiser');
+  });
+
+  it('falls back to "Class n" when the cache has no entry — never queries prisma', () => {
+    const me = makeShip({ userid: 'u1', shipno: 1, shipname: 'Alpha', shpclass: 9 });
+    const shipClassCache = new ShipClassCacheService({} as never);
+    const svc = new WhoHandlerService({ findAllShips: () => [me] } as unknown as ShipStateService, shipClassCache);
+    const line = rows(svc.command.handler(me, [], ctx) as never)[0] ?? '';
+
+    expect(line).toContain('Class 9');
   });
 });

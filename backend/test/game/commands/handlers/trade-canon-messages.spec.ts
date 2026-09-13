@@ -32,28 +32,20 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { computeBuyOutcome } from '../../../../src/game/planet/planet-trade';
 import { BASEPRICE, ITEM_NAMES, I_FOOD, I_SPY, NUMITEMS } from '../../../../src/game/constants/items';
+import { UserRepository } from '../../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Ship1', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0.5, ycoord: 0.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    shipname: 'Ship1',
+    xcoord: 0.5,
+    ycoord: 0.5,
     where: 11,
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: Array(NUMITEMS).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
@@ -73,15 +65,15 @@ function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
 }
 
 function makeBuy(buyResult: Awaited<ReturnType<PlanetStateService['buy']>>) {
-  const planetMock = { get: jest.fn().mockReturnValue(makePlanet()), buy: jest.fn().mockResolvedValue(buyResult) };
-  const shipMock = { mutate: jest.fn() };
+  const planetMock = { get: vi.fn().mockReturnValue(makePlanet()), buy: vi.fn().mockResolvedValue(buyResult) };
+  const shipMock = { mutate: vi.fn() };
   const prismaMock = {
-    user: { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }) },
+    user: { update: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n }) },
   };
   return new BuyHandlerService(
     planetMock as unknown as PlanetStateService,
     shipMock as unknown as ShipStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
 }
 
@@ -112,11 +104,11 @@ describe('buy — canon messages', () => {
 
 describe('pri — canon messages', () => {
   function makePrice(planet: PlanetState) {
-    const planetMock = { get: jest.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
+    const planetMock = { get: vi.fn().mockReturnValue(planet) } as unknown as PlanetStateService;
     const prismaMock = {
-      user: { findUnique: jest.fn().mockResolvedValue({ cash: 1_000_000n }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ cash: 1_000_000n }) },
     } as unknown as PrismaService;
-    return new PriceHandlerService(planetMock, prismaMock);
+    return new PriceHandlerService(planetMock, new UserRepository(prismaMock));
   }
 
   it('quotes BUY3 with the available count', async () => {
@@ -141,10 +133,10 @@ describe('pri — canon messages', () => {
 describe('sell — canon messages', () => {
   it('leads SELL2 with the transfer tax, as canon does', async () => {
     const planetMock = {
-      sell: jest.fn().mockResolvedValue({ ok: true, transferred: 10, proceeds: 19n, fee: 1n }),
+      sell: vi.fn().mockResolvedValue({ ok: true, transferred: 10, proceeds: 19n, fee: 1n }),
     } as unknown as PlanetStateService;
-    const prismaMock = { user: { update: jest.fn().mockResolvedValue({}) } } as unknown as PrismaService;
-    const svc = new SellHandlerService(planetMock, prismaMock);
+    const prismaMock = { user: { update: vi.fn().mockResolvedValue({}) } } as unknown as PrismaService;
+    const svc = new SellHandlerService(planetMock, new UserRepository(prismaMock));
 
     const text = (await svc.command.handler(makeShip(), ['10', 'food'], {})).lines[0].text;
     expect(text).toBe(`After the Transfer Tax of 1 we have netted 19 C's for our 10 ${ITEM_NAMES[I_FOOD]}, Sir!`);

@@ -63,6 +63,7 @@ import {
   CybertronScoredKillEvent,
 } from '../../../src/game/player/player-score.service';
 import { CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-won';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const CLASS_INTERCEPTOR = 1;
 const CLASS_SCOUT = 21;
@@ -75,25 +76,24 @@ const TOP_SPEED = TOPSPEED_WARP * 1000;
 const SCAN_RANGE = 100_000;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'S', shpclass: CLASS_INTERCEPTOR,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 20, ycoord: 20, damage: 0, energy: 50_000,
-    phasr: 100, phasrtype: 2, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'S',
+    shpclass: CLASS_INTERCEPTOR,
+    xcoord: 20,
+    ycoord: 20,
+    energy: 50_000,
+    phasr: 100,
+    phasrtype: 2,
+    shieldtype: 1,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
     items: Array.from({ length: NUMITEMS }, () => 0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 255,
-    cybskill: 5, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: TOPSPEED_WARP, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, userKills: 0,
+    cybmine: 255,
+    cybskill: 5,
+    topspeed: TOPSPEED_WARP,
+    userKills: 0,
     ...over,
-  } as ShipState;
+  });
 }
 
 function player(channel: number, over: Partial<ShipState> = {}): ShipState {
@@ -190,12 +190,12 @@ function harness(ships: ShipState[], rand: Random): Harness {
   // production (see the boot-seed note in onModuleInit) — the population cap
   // is only correct because the next count sees it, so the fake does the same.
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n,
-    flushShipsImmediate: jest.fn(),
-    incrementKills: jest.fn().mockResolvedValue(undefined),
-    creditAllowances: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn(async (slot: {
+    flushShipsImmediate: vi.fn(),
+    incrementKills: vi.fn().mockResolvedValue(undefined),
+    creditAllowances: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn(async (slot: {
       userid: string; shipno: number; classNumber: number;
       xcoord: number; ycoord: number; topspeed: number;
     }) => {
@@ -212,12 +212,12 @@ function harness(ships: ShipState[], rand: Random): Harness {
   } as unknown as CybertronRepository;
 
   const mineRepo = {
-    create: jest.fn(async (input: { channel: number; xcoord: number; ycoord: number }) => {
+    create: vi.fn(async (input: { channel: number; xcoord: number; ycoord: number }) => {
       const mine = { id: nextMineId++, timer: 10, ...input };
       mines.push({ xcoord: input.xcoord, ycoord: input.ycoord, channel: input.channel });
       return mine;
     }),
-    delete: jest.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
   } as unknown as MineRepository;
 
   const mineRegistry = {

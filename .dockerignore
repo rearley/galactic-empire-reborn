@@ -1,0 +1,32 @@
+# Repo-root build context for both backend/Dockerfile and frontend/Dockerfile.
+# Widening the context from ./backend and ./frontend to "." (needed so both
+# images can COPY packages/wire) means a careless build sends node_modules,
+# .git, and both dist/ trees to the daemon. Keep this list in sync with
+# backend/.dockerignore and frontend/.dockerignore — those still apply if
+# either Dockerfile is ever built with its own directory as context again.
+
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.env
+.env.*
+*.log
+coverage
+**/coverage
+test
+**/*.spec.ts
+**/*.test.ts
+jest*.config.*
+
+# Not needed inside either image and large/irrelevant to the build
+reference
+docs
+specs
+.superpowers
+.specify
+.playwright-mcp
+frontend/test-results
+frontend/playwright-report
+frontend/blob-report

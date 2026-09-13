@@ -26,10 +26,13 @@ import {
   GESTAT_AUTO,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { canonMaxWarp } from '../../helpers/canon-max-warp';
 
 // ─── Shared class entry for all droid classes ──────────────────────────────
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200,
   maxWarp: 4,
   maxPhaser: 1,
@@ -70,27 +73,19 @@ function buildHarness(seed = 42) {
   const events = new EventEmitter2();
 
   // One human player always online
-  const playerShip: ShipState = {
+  const playerShip: ShipState = baseMakeShip({
     userid: 'player1',
-    shipno: 1,
     shipname: 'PlayerShip',
     shpclass: 5,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    phasr: 100, phasrtype: 3, kills: 0, lastfired: 255,
-    shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [],
-    items: Array(14).fill(0n), titem: 0, hostile: 0,
-    cantexit: 0, repair: 0, hypha: 0, firecntl: 0, destruct: 0,
-    status: GESTAT_USER, cybmine: 255, cybskill: 0, cybupdate: 0,
-    tick: 0, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8_000, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+    energy: 50_000,
+    phasr: 100, phasrtype: 3, lastfired: 255,
+    shieldtype: 2, shieldstat: 1, shield: 2,
+    helm: 1,
+    freq: [],
+    items: Array(14).fill(0n),
+    status: GESTAT_USER, cybmine: 255,
+    topspeed: canonMaxWarp(5),
+  });
 
   const shipMap = new Map<string, ShipState>();
   shipMap.set(`${playerShip.userid}:${playerShip.shipno}`, playerShip);
@@ -130,8 +125,8 @@ function buildHarness(seed = 42) {
     },
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
-  const mineRepo = { create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }) } as unknown as MineRepository;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
+  const mineRepo = { create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }) } as unknown as MineRepository;
 
   const subscribed: Array<(ctx: unknown) => void> = [];
   const tickService = {
@@ -240,13 +235,13 @@ describe('MAXDROID — total droid population cap', () => {
   it('stops spawning once the total population reaches the cap', async () => {
     // The guard cannot be exercised via the environment: constants.ts captures
     // MAXDROID at import, and DroidTickService closes over that module, so
-    // jest.resetModules() cannot reach the already-constructed service. Nor can
+    // vi.resetModules() cannot reach the already-constructed service. Nor can
     // the population map be pre-seeded — the tick reconciles it against real
     // ships each pass and drops placeholder ids.
     //
     // Forcing the counter is what actually exercises the branch.
     const { svc, fireTick } = buildHarness(11);
-    jest
+    vi
       .spyOn(svc as unknown as { totalDroidPopulation: () => number }, 'totalDroidPopulation')
       .mockReturnValue(MAXDROID);
 

@@ -21,31 +21,38 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
 import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 // ─── helpers (mirrors cybertron-tick.service.spec.ts harness) ────────────────
 
 function makeShip(
   overrides: Partial<ShipState> & { userid: string; shipno: number; shpclass: number },
 ): ShipState {
-  return {
+  return baseMakeShip({
     shipname: 'Test',
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 2, kills: 0, lastfired: 255,
-    shieldtype: 2, shieldstat: 1, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [0, 0, 0, 0, 0], jammer: 0, freq: [],
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 2,
+    lastfired: 255,
+    shieldtype: 2,
+    shieldstat: 1,
+    shield: 2,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0,
-    destruct: 0, status: 1, cybmine: 255, cybskill: 10, cybupdate: 50, tick: 1,
-    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false, dirty: false,
+    cybmine: 255,
+    cybskill: 10,
+    cybupdate: 50,
+    tick: 1,
+    topspeed: 8,
     ...overrides,
-  };
+  });
 }
 
-function buildHarness(seed: number) {
+async function buildHarness(seed: number) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
   const shipMap = new Map<string, ShipState>();
@@ -76,10 +83,10 @@ function buildHarness(seed: number) {
   } as unknown as ShipClassCacheService & { setClass: (n: number, e: unknown) => void };
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockResolvedValue(undefined),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => (n > 2_000_000n ? 2_000_000n : n),
   } as unknown as CybertronRepository;
 
@@ -94,7 +101,7 @@ function buildHarness(seed: number) {
   const svc = new CybertronTickService(
     tickService, shipStateService, shipClassCache, repository, events, rand,
   );
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -145,7 +152,7 @@ describe('A-003 — gebemean gate: GECYBS.C:514 phaser blocked when gebemean ret
      *   - gebemean (r3=0.527): floor(0.527*3)=1 ≠ 0 → false
      * Result: mean=false → phaser gate blocks fire even though phasr=100 >= PMINFIRE=60
      */
-    const { shipMap, events, fireTick } = buildHarness(5);
+    const { shipMap, events, fireTick } = await buildHarness(5);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,
@@ -185,7 +192,7 @@ describe('A-003 — gebemean gate: phaser fires when gebemean is true and cybwho
      * seed=42: breakoff=false, cybwhoops r3=0.852 → floor(0.852*10)=8 ≠ 1 → whoops=false.
      * Result: mean=true, !cybwhoops=true, phasr=100 >= PMINFIRE=60 → phaser fires.
      */
-    const { shipMap, events, fireTick } = buildHarness(42);
+    const { shipMap, events, fireTick } = await buildHarness(42);
 
     const cyb = makeShip({
       userid: 'Cybrg-200', shipno: 200, shpclass: 21, status: 2,

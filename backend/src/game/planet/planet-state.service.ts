@@ -1,10 +1,11 @@
 import { I_MEN, I_FOOD } from '../constants/items';
 import { clampRateToBudget, RateClampResult } from './rate-budget';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { NEUTRAL_ZONE_SECTOR } from '../combat/neutral-zone';
 import { MAXPLNTS } from '../constants';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ShipStateService } from '../ship/ship-state.service';
+import { UserRepository } from '../player/user.repository';
+import { SHIP_STATE_PORT, type ShipStatePort } from '../ship/ship-state.port';
 import { AdminChange, PlanetState, planetKey } from './planet-state.types';
 import { prismaPlanetToState, stateToPrismaUpdate } from './planet-state.mappers';
 import { applyEconomyTick, applyNeutralZoneRestock, isNeutralZoneRestockPlanet } from './planet-economy';
@@ -57,7 +58,7 @@ export class PlanetStateService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ships: ShipStateService,
+    @Inject(SHIP_STATE_PORT) private readonly ships: ShipStatePort,
     /**
      * Optional — when omitted (legacy unit-test wiring) the pure
      * `applyEconomyTick` formula is used directly with no revolt branch.
@@ -65,6 +66,18 @@ export class PlanetStateService implements OnModuleInit {
      * the revolt branch (FR-028) fires.
      */
     private readonly economy?: PlanetEconomyService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new PlanetStateService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -279,10 +292,7 @@ export class PlanetStateService implements OnModuleInit {
       // who had just claimed their first world was told "Planets: none." by
       // `rep acc` while `pla` listed it — the counter only came right at
       // midnight, when it is rebuilt from actual ownership.
-      await this.prisma.user.updateMany({
-        where: { userid },
-        data: { planets: { increment: 1 } },
-      });
+      await this.users.incrementPlanets(userid);
 
       return { ok: true as const };
     });
@@ -325,10 +335,7 @@ export class PlanetStateService implements OnModuleInit {
       // C: `if (--waruptr->planets < 0) waruptr->planets = 0;`. The live cap
       // reads countOwnedBy(), so this counter is only what the roster shows
       // until midnight rebuilds it — but leaving it stale overstates the player.
-      await this.prisma.user.updateMany({
-        where: { userid, planets: { gt: 0 } },
-        data: { planets: { decrement: 1 } },
-      });
+      await this.users.decrementPlanetsIfPositive(userid);
 
       return { ok: true as const, name };
     });

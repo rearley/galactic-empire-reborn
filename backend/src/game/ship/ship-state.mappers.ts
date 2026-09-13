@@ -1,4 +1,4 @@
-import { Ship, Prisma } from '@prisma/client';
+import { Ship, Prisma } from '../../prisma/client';
 import { ShipState } from './ship-state.types';
 
 /**

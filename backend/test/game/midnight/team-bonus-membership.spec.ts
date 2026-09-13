@@ -40,7 +40,7 @@ beforeEach(async () => {
 
 async function repoWithBonus(bonus: string) {
   process.env['TEAMBONU'] = bonus;
-  jest.resetModules();
+  vi.resetModules();
   const { MidnightRepository } = await import('../../../src/game/midnight/midnight.repository');
   const { TEAMBONU } = await import('../../../src/game/midnight/midnight.constants');
   return { repo: new MidnightRepository(prisma), TEAMBONU };

@@ -8,28 +8,18 @@ import { TransferHandlerService } from '../../../../src/game/commands/handlers/t
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { I_GOLD, ITEM_NAMES, NUMITEMS } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   const items = Array(NUMITEMS).fill(0n) as bigint[];
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alice', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
-    items,
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Alice',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 10000,
+    items: items,
     ...overrides,
-  };
+  });
 }
 
 function buildService(alice: ShipState, bob: ShipState) {
@@ -39,8 +29,8 @@ function buildService(alice: ShipState, bob: ShipState) {
     [`${bob.userid}:${bob.shipno}`, bob],
   ]);
   const mockShipState = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    mutate: jest.fn().mockImplementation(
+    findAllShips: vi.fn().mockReturnValue(ships),
+    mutate: vi.fn().mockImplementation(
       (uid: string, no: number, fn: (s: ShipState) => void) => {
         const s = shipMap.get(`${uid}:${no}`);
         if (s) fn(s);
@@ -79,7 +69,7 @@ function seededRng(seed: number): () => number {
  * from "nothing happened" is not a conservation test.
  */
 describe('transfer conservation across 100 randomized transfers (SC-003)', () => {
-  it('total items[i] invariant across 100 successful + failing transfers', () => {
+  it('total items[i] invariant across 100 successful + failing transfers', async () => {
     const rng = seededRng(0xdeadbeef);
 
     // Start with 1000 units of every transferable item in each ship
@@ -107,7 +97,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
       const amt = Math.floor(rng() * 200) + 1;
 
       // Execute — handler will reject if insufficient inventory; that's fine
-      handler.command.handler(sender, [String(amt), itemName.toLowerCase(), receiver.shipname], {});
+      await handler.command.handler(sender, [String(amt), itemName.toLowerCase(), receiver.shipname], {});
     }
 
     // Cargo must actually have moved, or the invariant below proves nothing.
@@ -121,7 +111,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
     }
   });
 
-  it('total gold invariant: 100 gold-only transfers between two ships', () => {
+  it('total gold invariant: 100 gold-only transfers between two ships', async () => {
     const rng = seededRng(0xcafebabe);
     // 5,000 gold is 2,500 tons (ITMWT13: 0.5 t/unit), over the 1,000-ton default.
     const HOLD = 1_000_000;
@@ -133,7 +123,7 @@ describe('transfer conservation across 100 randomized transfers (SC-003)', () =>
     for (let i = 0; i < 100; i++) {
       const [sender, receiver] = rng() < 0.5 ? [alice, bob] : [bob, alice];
       const amt = Math.floor(rng() * 500) + 1;
-      handler.command.handler(sender, [String(amt), 'gold', receiver.shipname], {});
+      await handler.command.handler(sender, [String(amt), 'gold', receiver.shipname], {});
     }
 
     // Same guard: prove gold moved before asserting none was created or lost.

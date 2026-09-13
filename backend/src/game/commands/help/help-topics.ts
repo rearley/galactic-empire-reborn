@@ -3,7 +3,8 @@
  *
  * @see GECMDS.C cmd_help
  */
-import { PHASER_PRICE, SHIELD_PRICE, FIRST_CPU_CLASS } from '../handlers/new-ship.handler';
+import { PHASER_PRICE, SHIELD_PRICE } from '../handlers/new-ship.handler';
+import { isPlayerBuyableClass } from '../../ship/buyable-class';
 import { SHIP_CLASSES } from '../../../../prisma/seed/ship-classes';
 import { CANON_HELP } from './canon-help.generated';
 
@@ -272,7 +273,7 @@ const CLASS_TABLE_BODY: string[] = (() => {
     '## --Class Name---     d--r--p-l-y-r-r-e-k-k-Acc-Warp-Tons----Price--Scan--Pts',
   ];
   for (const c of SHIP_CLASSES) {
-    if (c.category !== 'PLAYER' || c.classNumber >= FIRST_CPU_CLASS) continue;
+    if (!isPlayerBuyableClass(c)) continue;
     rows.push(
       `${String(c.classNumber).padStart(2)} ${c.typeName.padEnd(20)}` +
       `${String(c.maxShields).padEnd(3)}${String(c.maxPhaser).padEnd(3)}` +
@@ -327,7 +328,8 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  nav <x> <y>    — course + range to a sector (then set speed)',
       '  rot <deg>      — turn, relative to your heading (-180 to 180)',
       '  rot @<deg>     — turn to an absolute compass heading (0-359)',
-      '  (scan bearings are RELATIVE to your heading: rot <bearing> aims at it)',
+      '  (scan and nav bearings are RELATIVE to your heading — rot <bearing>',
+      '   Aims at it, and the bearing falls to 0 as you come onto course)',
       '  imp <pct> [deg] — impulse 0-99, optional relative course',
       '  war <warp> [deg] — warp factor, optional relative course',
       '  sca pl [n]     — planets here, or detail on one',
@@ -357,6 +359,13 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  fre <A|B|C> <n|hail>   — tune a radio channel',
       '  sen <A|B|C> <message>  — transmit on a channel',
       '  att <amount> <troops|fighters> — attack the planet you orbit',
+      '',
+      'HIT REPORTS',
+      'A torpedo or missile that lands reports back as "hit ship A, The <name>".',
+      'That letter is the one YOUR last local, range or data scan gave the',
+      'target, so it reads "?" when the target is not on your scan table - which',
+      'is what "sca sh <name>" alone leaves you with, since a named scan assigns',
+      'no letter. Scan the sector or the range first and the letter is there.',
       '',
       'PHASERS',
       'focus is 0-5; bare "pha <deg>" fires at focus 1. Focus widens the beam',

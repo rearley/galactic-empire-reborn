@@ -8,26 +8,32 @@ import { Mulberry32Adapter } from '../../../src/game/combat/random.port';
 import { droidActClass10 } from '../../../src/game/droid/droid-act-class-10';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { GESTAT_USER } from '../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState>): ShipState {
-  return {
-    userid: 'test-1', shipno: 1, shipname: 'Test', shpclass: 31,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 5, kills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [], items: new Array(14).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 2, cybmine: 255, cybskill: 0,
-    cybupdate: 0, tick: 6, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    userid: 'test-1',
+    shipname: 'Test',
+    shpclass: 31,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 5,
+    lastfired: -1,
+    shieldtype: 2,
+    shield: 2,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    freq: [],
+    items: new Array(14).fill(0n),
+    status: 2,
+    cybmine: 255,
+    tick: 6,
+    topspeed: 8,
     ...overrides,
-  };
+  });
 }
 
 const SCAN_RANGE = 25_000;

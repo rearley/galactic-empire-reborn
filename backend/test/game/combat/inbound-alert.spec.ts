@@ -29,6 +29,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import {
   COMBAT_TARGET_WARNING,
   CombatTargetWarningEvent,
@@ -38,26 +39,23 @@ import {
 const FAR = 90_000;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 20, ycoord: 20, damage: 0, energy: 50_000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'S',
+    xcoord: 20,
+    ycoord: 20,
+    energy: 50_000,
+    phasrtype: 1,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+    topspeed: 10,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 async function harness(ships: ShipState[]) {
@@ -76,7 +74,7 @@ async function harness(ships: ShipState[]) {
   const subscribers: Array<(c: TickContext) => void> = [];
   const tickService = {
     subscribe: (_kind: TickKind, h: (c: TickContext) => void) => { subscribers.push(h); return () => {}; },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const classCache = new ShipClassCacheService({} as never);
@@ -90,11 +88,11 @@ async function harness(ships: ShipState[]) {
   events.on(COMBAT_TARGET_WARNING, (e: CombatTargetWarningEvent) => warnings.push(e));
 
   const logger = new Logger('inbound-alert-spec');
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const service = new CombatTickService(
     tickService, shipState,
-    { findAllActive: jest.fn().mockResolvedValue([]), create: jest.fn(), delete: jest.fn() } as unknown as MineRepository,
+    { findAllActive: vi.fn().mockResolvedValue([]), create: vi.fn(), delete: vi.fn() } as unknown as MineRepository,
     new MineRegistry(), new Mulberry32Adapter(1), events, logger, classCache,
   );
   await service.onModuleInit();

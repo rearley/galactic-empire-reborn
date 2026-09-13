@@ -11,45 +11,36 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CLOAK_ENERGY_USE_DEFAULT } from '../../../src/game/commands/cloak.config';
 import { COMBAT_SHIP_DESTROYED } from '../../../src/game/combat/combat-events';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'USS Survivor', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'USS Survivor',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 5, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    destruct: 5,
     ...overrides,
-  };
+  });
 }
 
 describe('destruct abort integration — abort clears countdown, tick is no-op (SC-005)', () => {
-  it('after abort, destructTick does not destroy the ship', () => {
+  it('after abort, destructTick does not destroy the ship', async () => {
     const state = makeShip({ destruct: 5 });
 
     const mockShipState = {
-      findAllShips: jest.fn().mockReturnValue([state]),
-      mutate: jest.fn().mockImplementation(
+      findAllShips: vi.fn().mockReturnValue([state]),
+      mutate: vi.fn().mockImplementation(
         (_uid: string, _no: number, fn: (s: ShipState) => void) => {
           fn(state);
           return state;
         },
       ),
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
     } as unknown as ShipStateService;
 
-    const mockTickService = { subscribe: jest.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
+    const mockTickService = { subscribe: vi.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
     const events = new EventEmitter2();
 
     const tickService = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);
@@ -63,7 +54,7 @@ describe('destruct abort integration — abort clears countdown, tick is no-op (
     expect(state.destruct).toBe(1);
 
     // Abort before the final tick
-    abortHandler.command.handler(state, [], {});
+    await abortHandler.command.handler(state, [], {});
     expect(state.destruct).toBe(0);
 
     // Next tick should be a no-op
@@ -76,27 +67,27 @@ describe('destruct abort integration — abort clears countdown, tick is no-op (
     expect(state.destruct).toBe(0);
   });
 
-  it('abort at destruct=5 allows ship to continue existing through multiple subsequent ticks', () => {
+  it('abort at destruct=5 allows ship to continue existing through multiple subsequent ticks', async () => {
     const state = makeShip({ destruct: 5 });
 
     const mockShipState = {
-      findAllShips: jest.fn().mockReturnValue([state]),
-      mutate: jest.fn().mockImplementation(
+      findAllShips: vi.fn().mockReturnValue([state]),
+      mutate: vi.fn().mockImplementation(
         (_uid: string, _no: number, fn: (s: ShipState) => void) => {
           fn(state);
           return state;
         },
       ),
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
     } as unknown as ShipStateService;
 
-    const mockTickService = { subscribe: jest.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
+    const mockTickService = { subscribe: vi.fn() } as unknown as import('../../../src/game/tick/tick.service').TickService;
     const events = new EventEmitter2();
 
     const tickService = new ShipManagementTickService(mockShipState, mockTickService, events, CLOAK_ENERGY_USE_DEFAULT);
     const abortHandler = new AbortHandlerService(mockShipState);
 
-    abortHandler.command.handler(state, [], {});
+    await abortHandler.command.handler(state, [], {});
     expect(state.destruct).toBe(0);
 
     // 20 subsequent ticks — ship must survive all of them

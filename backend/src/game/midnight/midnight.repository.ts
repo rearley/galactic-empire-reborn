@@ -9,7 +9,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { valuePlanet } from './value-pl';
 import { buildProductionMailStat, productionMailMsgno } from './mailstat-builder';
@@ -17,8 +17,11 @@ import { PLTVCASH, PLTVDIV, TEAMBONU } from './midnight.constants';
 import { PLTYPE_PLNT } from '../constants';
 import { BASEPRICE, ITEM_VALUE, NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../constants/items';
 import { NEUTRAL_ZONE_OWNER } from '../combat/neutral-zone';
+import type { TxClient } from '../../prisma/tx-client';
 
-type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+// One declaration of the transaction client, shared with every repository that
+// composes inside a caller's transaction. @see src/prisma/tx-client.ts
+export type { TxClient };
 
 const KEY_USERID = 'KEY';
 

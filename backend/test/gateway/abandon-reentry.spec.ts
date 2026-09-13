@@ -1,15 +1,14 @@
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { SHIP_STATUS_ABANDONED } from '../../src/game/commands/_ship-management-constants';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * FR-704: after `abandon` the captain stays authenticated but shipless and must
@@ -43,60 +42,57 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
     connected: true,
     handshake: { query: { userid: USERID } },
     data: {} as Record<string, unknown>,
-    emit: jest.fn(),
-    on: jest.fn(),
-    disconnect: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    broadcast: { emit: jest.fn(), to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }) },
+    emit: vi.fn(),
+    on: vi.fn(),
+    disconnect: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    broadcast: { emit: vi.fn(), to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }) },
   });
 
   const build = (rows: ReturnType<typeof makeRow>[]) => {
     const shipStateService = {
       findAllShips: () => [],
       findByUserid: () => [],
-      get: jest.fn().mockReturnValue({ userid: USERID, shipno: 1, shipname: 'Ship1', shpclass: 1, xcoord: 5.5, ycoord: 3.5 }),
-      hydrate: jest.fn(),
-      board: jest.fn(),
+      get: vi.fn().mockReturnValue({ userid: USERID, shipno: 1, shipname: 'Ship1', shpclass: 1, xcoord: 5.5, ycoord: 3.5 }),
+      hydrate: vi.fn(),
+      board: vi.fn(),
     } as unknown as ShipStateService;
 
     const prisma = {
-      user: { findUnique: jest.fn().mockResolvedValue({ userid: USERID }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ userid: USERID }) },
       ship: {
-        findMany: jest.fn().mockResolvedValue(rows),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue(rows),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     } as unknown as PrismaService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      {
-        validate: jest.fn().mockImplementation((sock: { data: Record<string, unknown> }) => {
+      wsAuthGuard: {
+        validate: vi.fn().mockImplementation((sock: { data: Record<string, unknown> }) => {
           sock.data.userid = USERID;
           return Promise.resolve({ sub: USERID, username: USERID });
         }),
       } as unknown as WsAuthGuard,
       prisma,
-      { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn().mockReturnValue('Interceptor') } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      onboardingService: { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: vi.fn().mockReturnValue('Interceptor') } as unknown as ShipClassCacheService,
+      random: mockRandom,
+    });
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       // .except() is part of the real Socket.io chain — WARHUP uses it.
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
       // ANNOUN is a top-level server.except(...) broadcast.
-      except: () => ({ emit: jest.fn(), to: () => ({ emit: jest.fn() }) }),
+      except: () => ({ emit: vi.fn(), to: () => ({ emit: vi.fn() }) }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, prisma };
   };
 
-  const events = (sock: { emit: jest.Mock }): string[] =>
+  const events = (sock: { emit: Mock }): string[] =>
     sock.emit.mock.calls.map((c) => c[0] as string);
 
   it('a captain whose only ship is abandoned lands in onboarding, not aboard the hull', async () => {
@@ -136,7 +132,7 @@ describe('GameGateway — re-entry after abandon (FR-704)', () => {
     sock.data.userid = USERID;
     sock.data.activeShipNo = 1;
 
-    const router = (gateway as unknown as { commandRouter: { dispatch: jest.Mock } }).commandRouter;
+    const router = (gateway as unknown as { commandRouter: { dispatch: Mock } }).commandRouter;
     router.dispatch.mockReturnValue({
       lines: [{ text: 'You have abandoned ship Ship1.', category: 'success' }],
       reenterShipEntry: true,

@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
+import { WormholeRepository } from '../../src/game/galaxy/wormhole.repository';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { Planet } from '@prisma/client';
+import { Planet } from '../../src/prisma/client';
 import { S00, S00_PLNUM } from '../../src/game/galaxy/s00';
 
 // ── Minimal Planet factory ────────────────────────────────────────────────────
@@ -40,10 +41,10 @@ function makePlanet(overrides: Partial<Planet> & Pick<Planet, 'xsect' | 'ysect' 
 // ── Mock PrismaService ────────────────────────────────────────────────────────
 
 const prismaMock = {
-  planet: { findMany: jest.fn().mockResolvedValue([]) },
-  wormhole: { findMany: jest.fn().mockResolvedValue([]) },
-  galaxyMeta: { findFirst: jest.fn().mockResolvedValue(null) },
-  $transaction: jest.fn(),
+  planet: { findMany: vi.fn().mockResolvedValue([]) },
+  wormhole: { findMany: vi.fn().mockResolvedValue([]) },
+  galaxyMeta: { findFirst: vi.fn().mockResolvedValue(null) },
+  $transaction: vi.fn(),
 };
 
 // ── Shared test state ─────────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ beforeAll(async () => {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       GalaxyService,
+      WormholeRepository,
       { provide: PrismaService, useValue: prismaMock },
     ],
   }).compile();

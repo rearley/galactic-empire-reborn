@@ -1,10 +1,9 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ShipStateService } from './ship-state.service';
-import { ShipChannelRegistry } from './ship-channel.registry';
 import { ShipTickService } from './ship-tick.service';
 import { MaintenanceService } from './maintenance.service';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { ShipStateModule } from './ship-state.module';
+import { PlayerModule } from '../player/player.module';
 import { PlanetModule } from '../planet/planet.module';
 import { ShipDebugController } from './ship.debug.controller';
 import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
@@ -14,18 +13,23 @@ import { debugEndpointsEnabled } from '../../debug/debug-endpoints';
 const devOnlyControllers = debugEndpointsEnabled() ? [ShipDebugController] : [];
 
 /**
- * ShipModule owns in-memory ship state and the 1-second ship-update tick.
- * PlanetModule is imported via forwardRef to break the mutual dependency
- * (PlanetModule imports ShipModule for ShipStateService).
+ * ShipModule owns the 1-second ship-update tick and maintenance, and
+ * re-exports the leaf `ShipStateModule` so importers still get
+ * `ShipStateService`, `ShipChannelRegistry` and `ShipRepository` from here.
+ *
+ * `PlanetModule` is a plain import: its own dependency on ship state goes
+ * through `ShipStateModule` and the `SHIP_STATE_PORT` seam, so there is no
+ * longer a cycle for `forwardRef` to defer.
  */
 @Module({
   imports: [
-    PrismaModule,
+    PlayerModule,
     EventEmitterModule,
-    forwardRef(() => PlanetModule),
+    ShipStateModule,
+    PlanetModule,
   ],
   controllers: [...devOnlyControllers],
-  providers: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
-  exports: [ShipChannelRegistry, ShipStateService, MaintenanceService, ShipTickService],
+  providers: [MaintenanceService, ShipTickService],
+  exports: [ShipStateModule, MaintenanceService, ShipTickService],
 })
 export class ShipModule {}

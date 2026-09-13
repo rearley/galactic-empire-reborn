@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
+import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
 import { CybertronControlService } from '../../cybertron/cybertron-control.service';
 import { UNIVMAX } from '../../constants';
 import { ITEM_KEYWORDS, ITEM_NAMES } from '../../constants/items';
@@ -64,6 +66,27 @@ export class SysHandlerService {
     private readonly shipState: ShipStateService,
     private readonly prisma: PrismaService,
     private readonly cybControl: CybertronControlService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new SysHandlerService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * `sys class` / `sys classlist` read the class table from the boot-time
+     * cache rather than a fresh `prisma.shipClass.findMany` per call — the
+     * table is static seed data. `@Optional()` so the direct
+     * `new SysHandlerService(...)` test constructions that never exercise
+     * these two subcommands keep compiling.
+     */
+    @Optional()
+    private readonly shipClassCache?: ShipClassCacheService,
   ) {}
 
   readonly command: Command = {
@@ -226,10 +249,7 @@ export class SysHandlerService {
    */
   private async giveCash(ship: ShipState, amt: number | null, rest: readonly string[]): Promise<CommandResult> {
     if (amt === null) return SysHandlerService.huh();
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { increment: BigInt(amt) } },
-    });
+    await this.users.addCash(ship.userid, BigInt(amt));
     this.audit(ship, 'cash', rest, `cash ${amt >= 0 ? '+' : ''}${amt}`);
     return SysHandlerService.say(`Cash adjusted by ${amt}.`);
   }
@@ -249,10 +269,9 @@ export class SysHandlerService {
 
   /** `sys class nnn` — GECMDS.C:4880. Canon also resets topspeed to the hull's max. */
   private async setClass(ship: ShipState, n: number | null, rest: readonly string[]): Promise<CommandResult> {
-    if (n === null) return SysHandlerService.huh();
-    const classes = await this.prisma.shipClass.findMany({ select: { classNumber: true, maxWarp: true } });
-    const target = classes.find((c) => c.classNumber === n);
-    if (!target || !sysClassIsValid(n, classes.map((c) => c.classNumber))) {
+    if (n === null || !this.shipClassCache) return SysHandlerService.huh();
+    const target = this.shipClassCache.get(n);
+    if (!target || !sysClassIsValid(n, this.shipClassCache.getClassNumbers())) {
       return SysHandlerService.huh();
     }
 
@@ -317,17 +336,19 @@ export class SysHandlerService {
   }
 
   /** `sys classlist` — GECMDS.C:4956. */
-  private async classList(): Promise<CommandResult> {
-    const classes = await this.prisma.shipClass.findMany({
-      select: { classNumber: true, typeName: true, cybCanAttack: true, noClaim: true },
-      orderBy: { classNumber: 'asc' },
-    });
-    return SysHandlerService.say(
-      'Class Sname                          cybs_can_attk No_to_chase',
-      ...classes.map((c) =>
-        `${String(c.classNumber).padStart(3)} ${c.typeName.padEnd(30)} ` +
-        `${String(c.cybCanAttack ? 1 : 0).padStart(5)} ${String(c.noClaim).padStart(5)}`),
-    );
+  private classList(): CommandResult {
+    const cache = this.shipClassCache;
+    const rows = cache === undefined
+      ? []
+      : cache.getClassNumbers().flatMap((n) => {
+        const c = cache.get(n);
+        if (!c) return [];
+        return [
+          `${String(n).padStart(3)} ${c.typeName.padEnd(30)} ` +
+          `${String(c.cybCanAttack ? 1 : 0).padStart(5)} ${String(c.noClaim).padStart(5)}`,
+        ];
+      });
+    return SysHandlerService.say('Class Sname                          cybs_can_attk No_to_chase', ...rows);
   }
 
   /** `sys list [nn]` — GECMDS.C:4926. Fifty at a time, skipping AVAIL hulls. */

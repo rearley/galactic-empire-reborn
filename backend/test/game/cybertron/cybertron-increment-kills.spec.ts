@@ -10,24 +10,24 @@ import { CybertronRepository } from '../../../src/game/cybertron/cybertron.repos
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 
 function makeRepo() {
-  const shipUpdateMock = jest.fn().mockResolvedValue({});
+  const shipUpdateMock = vi.fn().mockResolvedValue({});
 
   // Two-step construction avoids implicit-any circular reference.
-  const transactionFn = jest.fn();
+  const transactionFn = vi.fn();
   const prisma = {
     ship: { update: shipUpdateMock },
     user: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findUnique: jest.fn().mockResolvedValue(null),
-      update: jest.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue({}),
     },
     $transaction: transactionFn,
   };
   transactionFn.mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
 
   const shipState = {
-    findByUserid: jest.fn().mockReturnValue([]),
-    loadShip: jest.fn(),
+    findByUserid: vi.fn().mockReturnValue([]),
+    loadShip: vi.fn(),
   } as unknown as ShipStateService;
 
   const repo = new CybertronRepository(prisma as never, shipState);

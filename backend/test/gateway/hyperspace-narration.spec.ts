@@ -17,6 +17,7 @@
  */
 
 import { CANON_MESSAGES } from '../../src/game/commands/canon-messages.generated';
+import { GameGateway } from '../../src/gateway/game.gateway';
 
 type Emit = { rooms: string[]; event: string; payload: unknown; excepted?: string[] };
 
@@ -46,8 +47,6 @@ const textsFor = (emits: Emit[], room: string) => emits
   .map((e) => String((e.payload as { text?: string }).text ?? ''));
 
 describe('hyperspace narration (GEFUNCS.C:588-606)', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { GameGateway } = require('../../src/gateway/game.gateway');
 
   function gateway() {
     const { server, emits } = build();

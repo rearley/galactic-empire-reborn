@@ -72,7 +72,7 @@ describe('NUMMINES — galaxy-wide mine budget', () => {
 });
 
 describe('MineRepository — the budget is enforced before anything is spent', () => {
-  const prisma = { mine: { create: jest.fn() } };
+  const prisma = { mine: { create: vi.fn() } };
 
   beforeEach(() => prisma.mine.create.mockReset());
 

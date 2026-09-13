@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PlanetStateService } from '../../planet/planet-state.service';
 import { ShipStateService } from '../../ship/ship-state.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -19,7 +19,7 @@ export class BuyHandlerService {
   constructor(
     private readonly planetService: PlanetStateService,
     private readonly shipService: ShipStateService,
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   get command(): Command {
@@ -87,14 +87,10 @@ export class BuyHandlerService {
 
     // C clamps a negative balance to zero on entry to cmd_buy, then gates the
     // transfer on `price(item,amt) <= waruptr->cash`. @see GECMDS.C:4207-4209, 4333
-    const buyer = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true },
-    });
-    let buyerCash = buyer?.cash ?? 0n;
+    let buyerCash = (await this.users.getCash(ship.userid)) ?? 0n;
     if (buyerCash < 0n) {
       buyerCash = 0n;
-      await this.prisma.user.update({ where: { userid: ship.userid }, data: { cash: 0n } });
+      await this.users.setCash(ship.userid, 0n);
     }
 
     const key = planetKey(xsect, ysect, plnum);
@@ -187,11 +183,7 @@ export class BuyHandlerService {
    * @see test/integration/economy-race-cash.spec.ts
    */
   private async debitBuyer(userid: string, totalCost: bigint): Promise<boolean> {
-    const { count } = await this.prisma.user.updateMany({
-      where: { userid, cash: { gte: totalCost } },
-      data: { cash: { decrement: totalCost } },
-    });
-    return count > 0;
+    return this.users.debitIfAffordable(userid, totalCost);
   }
 
 }

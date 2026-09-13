@@ -53,16 +53,43 @@ const USERNAME_INDEX_MARKERS = ['User_username_lower_idx', 'lower(username)'];
 
 /**
  * Prisma reports every unique violation as P2002 and names the offending
- * constraint (or, for an expression index, the expression itself) in
- * meta.target. Two unique indexes now live on User, so this is the only way
- * to tell which field the player must fix.
+ * constraint (or, for an expression index, the expression itself). Two unique
+ * indexes live on User, so this is the only way to tell which field the player
+ * must fix.
+ *
+ * TWO SHAPES, because Prisma 7 moved where the name lives:
+ *
+ *   pre-7   meta.target = ['user_email_lower_key']
+ *   7       meta.driverAdapterError.cause.constraint.index = 'user_email_lower_key'
+ *           (and no `target` at all)
+ *
+ * Reading only `target` stopped matching on the Prisma 7 upgrade, and the
+ * symptom was not a crash — `register` rethrew and Nest turned it into a 500
+ * where the player should have seen "an account with that email already
+ * exists". Both shapes are pinned by
+ * `test/unit/auth/unique-violation-shape.spec.ts`.
  */
 function isUniqueViolation(err: unknown, markers: readonly string[]): boolean {
   if (typeof err !== 'object' || err === null) return false;
-  const e = err as { code?: string; meta?: { target?: unknown } };
+  const e = err as {
+    code?: string;
+    meta?: {
+      target?: unknown;
+      driverAdapterError?: { cause?: { constraint?: { index?: unknown; fields?: unknown } } };
+    };
+  };
   if (e.code !== 'P2002') return false;
-  const target = e.meta?.target;
-  const names = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+
+  const constraint = e.meta?.driverAdapterError?.cause?.constraint;
+  const candidates: unknown[] = [e.meta?.target, constraint?.index, constraint?.fields];
+
+  // Strings only. `String(c)` on an object is `[object Object]`, which is then
+  // compared against every marker — a question answered by accident rather than
+  // by rule, and the shape a future Prisma could hand us for `fields`.
+  // @see issue #29
+  const names = candidates.flatMap((c) =>
+    typeof c === 'string' ? [c] : Array.isArray(c) ? c.filter((x) => typeof x === 'string') : [],
+  );
   return names.some((n) => markers.some((marker) => n.toLowerCase().includes(marker.toLowerCase())));
 }
 

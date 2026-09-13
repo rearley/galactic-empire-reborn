@@ -82,7 +82,7 @@ describe('collision cause survives the whole mail chain', () => {
   const build = () => {
     const created: Array<Record<string, unknown>> = [];
     const prisma = { mailStat: { create: (a: { data: Record<string, unknown> }) => { created.push(a.data); return Promise.resolve({}); } } } as never;
-    const svc = new ShipLossMailService({ on: jest.fn() } as never, prisma);
+    const svc = new ShipLossMailService({ on: vi.fn() } as never, prisma);
     return { svc, created };
   };
 

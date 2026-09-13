@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { WormholeRepository } from '../../galaxy/wormhole.repository';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
@@ -16,16 +16,12 @@ export class OrbitHandlerService {
   constructor(
     private readonly shipService: ShipStateService,
     private readonly planetService: PlanetStateService,
-    private readonly prisma: PrismaService,
+    private readonly wormholes: WormholeRepository,
   ) {}
 
   /** Does `plnum` name a wormhole in this sector? @see GECMDS.C:791-793 */
   private async isSectorWormhole(xsect: number, ysect: number, plnum: number): Promise<boolean> {
-    const row = await this.prisma.wormhole.findFirst({
-      where: { xsect, ysect, plnum },
-      select: { plnum: true },
-    });
-    return row !== null;
+    return this.wormholes.existsInSector(xsect, ysect, plnum);
   }
 
   get command(): Command {

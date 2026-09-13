@@ -11,11 +11,12 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { START_CASH, START_FLUX_PODS, START_CLASS } from '../../src/game/constants/onboarding';
 import { ENGYMAX } from '../../src/game/constants';
+import type { Mock, Mocked } from 'vitest';
 
 describe('OnboardingService.finalize() — starting state (T004)', () => {
   let service: OnboardingService;
-  let prismaMock: jest.Mocked<Pick<PrismaService, 'sector' | 'shipClass' | 'ship' | 'user' | 'planet'>>;
-  let shipStateServiceMock: { loadShip: jest.Mock };
+  let prismaMock: Mocked<Pick<PrismaService, 'sector' | 'shipClass' | 'ship' | 'user' | 'planet'>>;
+  let shipStateServiceMock: { loadShip: Mock };
 
   const USERID = 'test-user-onboard-001';
   const SHIPNAME = 'StarFalcon';
@@ -100,29 +101,29 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
 
     prismaMock = {
       sector: {
-        findUnique: jest.fn().mockResolvedValue(mockSector),
+        findUnique: vi.fn().mockResolvedValue(mockSector),
       } as unknown as PrismaService['sector'],
       // Spawn placement reads the neutral sector's planets so it can drop the
       // new ship clear of them (GEFUNCS.C:205-213).
       planet: {
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: vi.fn().mockResolvedValue([]),
       } as unknown as PrismaService['planet'],
       shipClass: {
         // OnboardingService.finalize now calls findUnique (not findUniqueOrThrow).
-        findUnique: jest.fn().mockResolvedValue(mockShipClass),
-        findUniqueOrThrow: jest.fn().mockResolvedValue(mockShipClass),
+        findUnique: vi.fn().mockResolvedValue(mockShipClass),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(mockShipClass),
       } as unknown as PrismaService['shipClass'],
       ship: {
-        create: jest.fn().mockResolvedValue(createdShip),
+        create: vi.fn().mockResolvedValue(createdShip),
       } as unknown as PrismaService['ship'],
       user: {
         // Brand-new player by default: topshipno 0 → first ship gets shipno/topshipno 1.
-        findUnique: jest.fn().mockResolvedValue({ topshipno: 0 }),
-        update: jest.fn().mockResolvedValue({ userid: USERID, cash: START_CASH }),
+        findUnique: vi.fn().mockResolvedValue({ topshipno: 0 }),
+        update: vi.fn().mockResolvedValue({ userid: USERID, cash: START_CASH }),
       } as unknown as PrismaService['user'],
     };
 
-    shipStateServiceMock = { loadShip: jest.fn() };
+    shipStateServiceMock = { loadShip: vi.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -131,7 +132,7 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
         { provide: ShipStateService, useValue: shipStateServiceMock },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockImplementation((key: string, def: number) => def) },
+          useValue: { get: vi.fn().mockImplementation((key: string, def: number) => def) },
         },
       ],
     }).compile();
@@ -142,14 +143,14 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
   it('creates Ship with shpclass=1 (START_CLASS)', async () => {
     await service.finalize(USERID, SHIPNAME);
 
-    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    const call = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data['shpclass']).toBe(START_CLASS);
   });
 
   it('creates Ship with 14 items, items[4]=3n (START_FLUX_PODS), all others 0n', async () => {
     await service.finalize(USERID, SHIPNAME);
 
-    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    const call = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
     const items = call.data['items'] as bigint[];
     expect(items).toHaveLength(14);
     expect(items[4]).toBe(BigInt(START_FLUX_PODS));
@@ -188,7 +189,7 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
   it('creates Ship with status=1 (GESTAT_USER) explicitly', async () => {
     await service.finalize(USERID, SHIPNAME);
 
-    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    const call = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data['status']).toBe(1);
   });
 
@@ -196,11 +197,11 @@ describe('OnboardingService.finalize() — starting state (T004)', () => {
   // monotonic never-reuse invariant — a wiped player (topshipno=5) who claims a
   // free starter must get shipno/topshipno 6, NOT a reset to 1.
   it('allocates topshipno+1 for a wiped player (does NOT reset to 1)', async () => {
-    (prismaMock.user.findUnique as jest.Mock).mockResolvedValue({ topshipno: 5 });
+    (prismaMock.user.findUnique as Mock).mockResolvedValue({ topshipno: 5 });
 
     await service.finalize(USERID, SHIPNAME);
 
-    const call = (prismaMock.ship.create as jest.Mock).mock.calls[0][0] as { data: Record<string, unknown> };
+    const call = (prismaMock.ship.create as Mock).mock.calls[0][0] as { data: Record<string, unknown> };
     expect(call.data['shipno']).toBe(6);
 
     expect(prismaMock.user.update).toHaveBeenCalledWith(

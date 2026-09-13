@@ -2,26 +2,14 @@ import { RosHandlerService } from '../../../src/game/commands/handlers/ros.handl
 import { PrismaService } from '../../../src/prisma/prisma.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { UserRepository } from '../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha',
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
     ...overrides,
-  };
+  });
 }
 
 type UserRow = { userid: string; score: bigint; kills: number; planets: number; population: bigint };
@@ -39,10 +27,10 @@ function makeUserRows(count: number, prefix = 'user'): UserRow[] {
 function makeHandler(rows: UserRow[], rosterMax = 20): RosHandlerService {
   process.env['ROSTER_MAX'] = rosterMax.toString();
   const prismaMock = {
-    user: { findMany: jest.fn().mockResolvedValue(rows) },
+    user: { findMany: vi.fn().mockResolvedValue(rows) },
   } as unknown as PrismaService;
-  const repoMock = { findTeamsByCodes: jest.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository;
-  return new RosHandlerService(prismaMock);
+  const repoMock = { findTeamsByCodes: vi.fn().mockResolvedValue([]) } as unknown as import('../../../src/game/team/team.repository').TeamRepository;
+  return new RosHandlerService(new UserRepository(prismaMock));
 }
 
 const ctx: CommandContext = {};
@@ -54,10 +42,10 @@ describe('RosHandlerService', () => {
     });
 
   it('lists only players who have actually scored (GECMDS.C:4038)', async () => {
-    const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-    const handler = new RosHandlerService(prismaMock);
+    const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+    const handler = new RosHandlerService(new UserRepository(prismaMock));
     await handler.command.handler(makeShip(), [], ctx);
-    const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
+    const query = (prismaMock.user.findMany as Mock).mock.calls[0][0];
     expect(query.where.score).toEqual({ gt: 0n });
   });
 
@@ -88,46 +76,46 @@ describe('RosHandlerService', () => {
 
   describe('FR-010: ros all cap is 200', () => {
     it('passes take=200 to Prisma when "all" argument given', async () => {
-      const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+      const handler = new RosHandlerService(new UserRepository(prismaMock));
       await handler.command.handler(makeShip(), ['all'], ctx);
-      expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
+      expect((prismaMock.user.findMany as Mock).mock.calls[0][0].take).toBe(200);
     });
 
     it('"ALL" is case-insensitive', async () => {
-      const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+      const handler = new RosHandlerService(new UserRepository(prismaMock));
       await handler.command.handler(makeShip(), ['ALL'], ctx);
-      expect((prismaMock.user.findMany as jest.Mock).mock.calls[0][0].take).toBe(200);
+      expect((prismaMock.user.findMany as Mock).mock.calls[0][0].take).toBe(200);
     });
   });
 
   describe('FR-011: AI prefix exclusion', () => {
     it('excludes Cybrg- rows from the query', async () => {
-      const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+      const handler = new RosHandlerService(new UserRepository(prismaMock));
       await handler.command.handler(makeShip(), [], ctx);
-      const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
+      const query = (prismaMock.user.findMany as Mock).mock.calls[0][0];
       // Inspect the clause rather than stringifying it — the score gate holds
       // a BigInt and JSON.stringify throws on those.
       expect(query.where.AND).toContainEqual({ NOT: { userid: { startsWith: 'Cybrg-' } } });
     });
 
     it('excludes @Droid- rows from the query', async () => {
-      const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+      const handler = new RosHandlerService(new UserRepository(prismaMock));
       await handler.command.handler(makeShip(), [], ctx);
-      const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
+      const query = (prismaMock.user.findMany as Mock).mock.calls[0][0];
       expect(query.where.AND).toContainEqual({ NOT: { userid: { startsWith: '@Droid-' } } });
     });
   });
 
   describe('sort order', () => {
     it('passes score DESC, kills DESC, userid ASC orderBy to Prisma', async () => {
-      const prismaMock = { user: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService;
-      const handler = new RosHandlerService(prismaMock);
+      const prismaMock = { user: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService;
+      const handler = new RosHandlerService(new UserRepository(prismaMock));
       await handler.command.handler(makeShip(), [], ctx);
-      const query = (prismaMock.user.findMany as jest.Mock).mock.calls[0][0];
+      const query = (prismaMock.user.findMany as Mock).mock.calls[0][0];
       expect(query.orderBy).toEqual([{ score: 'desc' }, { kills: 'desc' }, { userid: 'asc' }]);
     });
   });

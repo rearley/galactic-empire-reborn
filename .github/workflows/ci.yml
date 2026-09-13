@@ -63,7 +63,7 @@ permissions:
 
 jobs:
   backend:
-    name: Backend — Jest
+    name: Backend — Vitest
     runs-on: ubuntu-latest
     # 605 suites / 6,141 tests measured at 100s on a developer machine and 240s
     # on a hosted runner. This is headroom, not a prediction; it exists so a
@@ -111,14 +111,21 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # 20 to match both Dockerfiles. Testing on a newer major than production
+      # 24 to match both Dockerfiles. Testing on a newer major than production
       # runs would let a runtime difference through in the direction that
       # matters least.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          # Points at the root lockfile, not backend/'s: `npm ci` run from
+          # backend/ discovers the ancestor npm workspace declared at the repo
+          # root and installs against ITS lockfile, not a per-app one — a
+          # side effect of adding packages/wire in Phase 1. The two per-app
+          # package-lock.json files were removed for the same reason; keeping
+          # them around would have been actively misleading, since npm no
+          # longer reads them.
+          cache-dependency-path: package-lock.json
 
       # global-setup.ts shells out to `psql` for three LOWER() unique indexes
       # that Prisma cannot express in schema.prisma. An assumption that fails
@@ -130,15 +137,44 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      # @ge/wire ships as a dual CJS/ESM build under packages/wire/dist. `npm
+      # ci` only symlinks the workspace package into node_modules — it does
+      # not build it — so nothing importing `@ge/wire` resolves at runtime
+      # until this runs.
+      - name: Build @ge/wire
+        working-directory: backend
+        run: npm run build --workspace @ge/wire
+
+      # The contract's own suite. It runs HERE rather than in a third job
+      # because it needs nothing this job has not already done, and because
+      # the alternative was what shipped for the whole restructure: both jobs
+      # built @ge/wire and neither checked it, so the one package whose change
+      # breaks two applications at once was the only one with no gate.
+      - name: Test @ge/wire
+        working-directory: backend
+        run: npm test --workspace @ge/wire
+
+      # DATABASE_URL is scoped to this step and is a placeholder. `prisma
+      # generate` never opens a connection — it reads the schema and writes
+      # TypeScript — but prisma.config.ts resolves the variable eagerly and
+      # fails loudly when it is unset, which is the behaviour wanted everywhere
+      # else. The suite connects through TEST_DATABASE_URL in the job env above.
       - name: Generate Prisma client
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql://generate-only:generate-only@127.0.0.1:1/generate-only
         run: npx prisma generate
 
-      # Jest transpiles per file and does not type-check the project as a whole,
-      # so a type error in code no test imports would otherwise reach master.
+      # Vitest transpiles per file and does not type-check the project as a
+      # whole, so a type error in code no test imports would otherwise reach
+      # master.
       - name: Type-check
         working-directory: backend
         run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
 
       - name: Test
         working-directory: backend
@@ -155,13 +191,23 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          # See the backend job's identical comment: `npm ci` from frontend/
+          # resolves against the root lockfile once packages/wire exists.
+          cache-dependency-path: package-lock.json
 
       - name: Install
         working-directory: frontend
         run: npm ci
+
+      - name: Build @ge/wire
+        working-directory: frontend
+        run: npm run build --workspace @ge/wire
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
 
       - name: Test
         working-directory: frontend
@@ -278,9 +324,11 @@ jobs:
       matrix:
         include:
           - name: ge-backend
-            context: ./backend
+            context: .
+            dockerfile: ./backend/Dockerfile
           - name: ge-frontend
-            context: ./frontend
+            context: .
+            dockerfile: ./frontend/Dockerfile
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -304,6 +352,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           # Baked into the image so the running app can say which commit it is.
           # Same value as the :sha tag below, so a version on screen names a

@@ -8,9 +8,10 @@ import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { INestApplication } from '@nestjs/common';
 import { io as ioc, Socket } from 'socket.io-client';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../src/prisma/client';
 import { sign } from 'jsonwebtoken';
 import { AppModule } from '../../src/app.module';
+import { makePrismaClient } from '../helpers/make-prisma-client';
 
 const BOOT_TEST_USERID = 'boot-e2e-user';
 const BOOT_TEST_SHIPNO = 1;
@@ -35,7 +36,7 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
   // G1: boot must complete in < 5000ms
   beforeAll(async () => {
     // Seed User + Ship before app boots so ShipStateService.onModuleInit hydrates it.
-    const seedPrisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+    const seedPrisma = makePrismaClient(process.env.DATABASE_URL);
     try {
       await seedPrisma.user.upsert({
         where: { userid: BOOT_TEST_USERID },
@@ -97,20 +98,25 @@ describe('Boot e2e — AppModule boots and accepts Socket.io connections', () =>
     socket.disconnect();
   });
 
-  it('no leaked Socket.io connections after disconnect', (done) => {
+  // Vitest 5 removed the `done` callback, so the same wait is expressed as a
+  // promise the test returns. Identical shape: resolve on the timeout that
+  // follows the disconnect, and let the suite timeout catch a welcome that
+  // never arrives.
+  it('no leaked Socket.io connections after disconnect', async () => {
     const socket: Socket = ioc(`http://localhost:${port}`, {
       transports: ['websocket'],
       auth: { token: testToken },
     });
-    socket.on('command:result', () => {
-      // Welcome received; now disconnect and verify no leaked connections
-      socket.disconnect();
-      setTimeout(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-        const count: number = (app.getHttpServer() as any)?.io?.engine?.clientsCount ?? 0;
-        expect(count).toBe(0);
-        done();
-      }, 100);
+    const settled = new Promise<number>((resolve) => {
+      socket.on('command:result', () => {
+        // Welcome received; now disconnect and verify no leaked connections
+        socket.disconnect();
+        setTimeout(() => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+          resolve((app.getHttpServer() as any)?.io?.engine?.clientsCount ?? 0);
+        }, 100);
+      });
     });
+    expect(await settled).toBe(0);
   });
 });

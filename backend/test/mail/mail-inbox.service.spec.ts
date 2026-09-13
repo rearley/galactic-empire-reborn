@@ -7,7 +7,8 @@ import { MailInboxService } from '../../src/game/mail/mail-inbox.service';
 import { MailInboxRepository } from '../../src/game/mail/mail-inbox.repository';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { MailStat } from '@prisma/client';
+import { MailStat } from '../../src/prisma/client';
+import type { Mock } from 'vitest';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,12 +34,12 @@ function makeRow(overrides: Partial<MailStat> = {}): MailStat {
 
 function makeService(rows: MailStat[] = [], shipnames: Map<string, string> = new Map()) {
   const mockRepo = {
-    findByUserid: jest.fn().mockResolvedValue(rows),
-    deleteOne: jest.fn().mockResolvedValue(true),
+    findByUserid: vi.fn().mockResolvedValue(rows),
+    deleteOne: vi.fn().mockResolvedValue(true),
   } as unknown as MailInboxRepository;
 
   const mockShipState = {
-    findByUserid: jest.fn().mockImplementation((userid: string) => {
+    findByUserid: vi.fn().mockImplementation((userid: string) => {
       const name = shipnames.get(userid);
       if (!name) return [];
       return [{ shipname: name }];
@@ -146,7 +147,7 @@ describe('MailInboxService.resolveIndex()', () => {
 describe('MailInboxService.deleteByIndex()', () => {
   it('returns true when delete succeeds', async () => {
     const { service, mockRepo } = makeService([makeRow({ msgno: 1n, class: 1 })]);
-    (mockRepo.deleteOne as jest.Mock).mockResolvedValue(true);
+    (mockRepo.deleteOne as Mock).mockResolvedValue(true);
     const result = await service.deleteByIndex('alice', 1);
     expect(result).toBe(true);
     expect(mockRepo.deleteOne).toHaveBeenCalledWith('alice', 1, 1n);
@@ -161,7 +162,7 @@ describe('MailInboxService.deleteByIndex()', () => {
 
   it('returns false on P2025 (repository returns false)', async () => {
     const { service, mockRepo } = makeService([makeRow({ msgno: 1n })]);
-    (mockRepo.deleteOne as jest.Mock).mockResolvedValue(false);
+    (mockRepo.deleteOne as Mock).mockResolvedValue(false);
     const result = await service.deleteByIndex('alice', 1);
     expect(result).toBe(false);
   });

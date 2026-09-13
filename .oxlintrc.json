@@ -1,0 +1,148 @@
+{
+  // Comments in this file must be on their own line (`//` starting a fresh
+  // line, nothing else on it before or after). `backend/test/unit/lint-gate.spec.ts`
+  // parses this file with a helper that only strips whole-line `//` comments;
+  // a trailing comment survives that strip and breaks `JSON.parse`.
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "reference/**",
+    "**/*.generated.ts",
+    "backend/prisma/seed/**"
+  ],
+  "rules": {
+    // Disabled repo-wide, not just in tests. `new Array(n).fill(x)` is a
+    // deliberate, correct fixed-length idiom this codebase uses consistently
+    // (27 sites in backend/src/**: galaxy.service.ts, midnight.repository.ts,
+    // planet-seed.ts, droid-decisions.ts, plus test fixtures). The rule's
+    // preference for `Array.from({length: n}, ...)` is a style opinion, not a
+    // correctness issue — it only reached the correctness category because
+    // oxlint bundles it there.
+    "unicorn/no-new-array": "off",
+    // ─── React ───────────────────────────────────────────────────────────
+    // The `react` plugin is loaded so `react-hooks/exhaustive-deps` and
+    // `rules-of-hooks` are enforced: an unchecked dependency array is one of
+    // the most common React defects and one of the hardest to see by eye —
+    // the code looks right, the tests pass, and the symptom is a stale
+    // closure that only appears in one interaction order. Enabling it found
+    // two real missing dependencies, three state mirrors kept in sync by an
+    // effect, a ref written during render, and two unstable list keys.
+    // @see issue #25
+    //
+    // WRONG FOR THIS CODEBASE. 250 hits, all of them this rule not knowing
+    // about the automatic JSX runtime: `tsconfig.json` sets
+    // `"jsx": "react-jsx"`, so the compiler emits `_jsx(...)` from
+    // `react/jsx-runtime` and `React` does not need to be in scope. Obeying it
+    // would mean adding an unused import to every component.
+    "react/react-in-jsx-scope": "off",
+    "eslint/no-unused-vars": "warn",
+    // ─── Type-aware rules ────────────────────────────────────────────────
+    // Backend oxlint ran syntax-only until Phase 5 moved it off
+    // moduleResolution node10, so the first --type-aware run is also the
+    // first time any of these have been evaluated. It reported 3,441
+    // findings. What follows is the triage, and every entry says which of
+    // the two buckets it is in: a rule that is wrong for this codebase, or
+    // a real finding parked behind an issue.
+    //
+    // WRONG FOR THIS CODEBASE.
+    // 2,934 hits, essentially all of them typed test doubles:
+    // `{} as never`, `as PrismaService`, `as Mock<any, any, any>`. Narrowing
+    // a stub to the interface under test is how this suite builds doubles
+    // without dragging a real service graph into a unit test, and the
+    // project has already ruled that those casts are the cost of concrete
+    // constructor parameters (docs/DECISIONS.md 2026-09-11, the Phase 3
+    // `as never` correction). At this volume the rule does not surface a
+    // problem, it hides every other rule's output.
+    "typescript/no-unsafe-type-assertion": "off",
+    //
+    // REAL FINDINGS, PARKED. Downgraded to warn so the lint gate can go
+    // type-aware now rather than after the backlog clears. Each is pinned
+    // to an issue and goes back to "error" when that issue closes. Do not
+    // delete one of these lines to quiet the output — that is the move that
+    // makes the whole exercise pointless.
+    //
+    // Issue #28 CLOSED — all 137 sites await now, so this is back at "error" as
+    // that entry promised. They were calls to async handlers whose result was
+    // dropped with an assertion on the very next line: the assertion could be
+    // reading the synchronous prefix only, and a rejection left the test green.
+    // Awaiting them turned two tests red, both of which were measuring one PRNG
+    // sequence rather than the property they named.
+    "typescript/no-floating-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/require-array-sort-compare": "error",
+    //
+    // Issue #29 CLOSED — the five findings in backend/src are fixed, so these
+    // three are back at "error" as that entry promised. Three of the five were
+    // stringification in error and invariant reporting paths, where the failure
+    // mode is a diagnostic that reads `[object Object]` exactly when someone
+    // needs it.
+    "typescript/no-base-to-string": "error",
+    "typescript/unbound-method": "error",
+    "typescript/restrict-template-expressions": "error"
+  },
+  // eslint/no-unused-vars is `warn` everywhere (backend/src/**,
+  // frontend/src/**, test/**, tools/**), not disabled and not `error`.
+  //
+  // Silencing it entirely would hide 41 real dead imports in production code
+  // (cybertron-tick.service.ts x10, phaser.handler.ts x8, scan.handler.ts x5,
+  // droid-tick.service.ts x4, physics-tick.service.ts x3,
+  // transfer.handler.ts x2, combat-tick.service.ts x2, and one each in
+  // midnight.service.ts, cybertron.repository.ts, game-config.ts,
+  // torpedo.handler.ts, mine.handler.ts, engine-course.ts, lock-outcome.ts) —
+  // precisely the "AI slop" signal a public repo's lint gate exists to catch.
+  // Promoting it to `error` in src would force source edits, which phase 0's
+  // contract forbids: nothing in this phase may change what the game does.
+  //
+  // It is intentionally `warn`, not `error`, in test/** and tools/** as well
+  // — not just src. An `error` severity there was tried and reverted: it
+  // surfaces 70 more dead imports/declarations across 46 backend test files
+  // (none in tools/**) that were not visible in the audit this rule's
+  // treatment was originally decided from, because the prior draft of this
+  // config had the rule fully disabled for tests, which hid them too. Fixing
+  // 46 test files is a materially different, larger change than this task's
+  // scope, and editing them under gate pressure risks the same source-edit
+  // problem in spirit even though test/** isn't covered by the letter of the
+  // "no source edits" rule. `warn` keeps all 111 dead-import sites (41 src +
+  // 70 test) visible in every CI run without failing the gate or requiring
+  // any file edit. Phases 2 and 3 open the src files listed above and will
+  // remove the dead imports there; a later pass can do the same for tests and
+  // promote this rule to `error` everywhere.
+  "overrides": [
+    {
+      "files": [
+        "backend/test/**",
+        "backend/tools/**",
+        "frontend/test/**",
+        "frontend/tests/**",
+        "frontend/e2e/**",
+        "**/__tests__/**"
+      ],
+      "rules": {
+        "eslint/no-control-regex": "off",
+        "unicorn/prefer-string-starts-ends-with": "off",
+        "oxc/erasing-op": "off",
+        "typescript/unbound-method": "off",
+        "unicorn/no-useless-spread": "off"
+      }
+    },
+    {
+      "files": ["backend/src/game/tick/tick.service.ts"],
+      "rules": {
+        "unicorn/no-useless-spread": "off"
+      }
+    },
+    {
+      "files": ["frontend/src/onboarding/index.ts", "frontend/src/auth/index.ts"],
+      "rules": {
+        "unicorn/no-empty-file": "off"
+      }
+    }
+  ]
+}

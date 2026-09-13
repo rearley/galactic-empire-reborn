@@ -1,17 +1,91 @@
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { needsDatabase, selectedSpecs } from "./needs-database";
+import { loadDotenv } from "../../helpers/load-dotenv";
 
-// Load .env before globalSetup so TEST_DATABASE_URL is available without manual env injection
-const envPath = path.resolve(__dirname, "../../../.env");
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const match = line.match(/^([^#=]+)=(.*)$/);
-    if (match) process.env[match[1].trim()] ??= match[2].trim().replace(/^"|"$/g, "");
-  }
+// Load .env before globalSetup so TEST_DATABASE_URL is available without manual
+// env injection. The loader is shared with the manual suite's config, which
+// needs the same env and none of this file's database reset. @see issue #37
+loadDotenv();
+
+/**
+ * The two runner shapes this file has to understand.
+ *
+ * Jest calls `globalSetup(globalConfig, projectConfig)`; Vitest calls
+ * `globalSetup(project)`. Both are supported because the Jest -> Vitest
+ * migration is staged, and because a signature change here is silent — it does
+ * not throw, it just stops matching and falls through to "reset every time".
+ * That is safe but it quietly undoes issue #23, so both shapes are named
+ * explicitly and a test asserts each one still resolves.
+ *
+ * Only the fields actually read are declared, so a runner upgrade that adds or
+ * renames anything else cannot break the signature.
+ */
+interface JestGlobalConfigLike {
+  testPathPatterns?: { patterns?: string[] };
+}
+interface JestProjectConfigLike {
+  roots?: string[];
+}
+/** Vitest's `TestProject`. `filenamePattern` is its positional file filter. */
+interface VitestProjectLike {
+  config?: { root?: string };
+  vitest?: { filenamePattern?: string[] };
 }
 
-export default async function globalSetup(): Promise<void> {
+/** The spec roots and path patterns a run selected, whichever runner called us. */
+export function readSelection(
+  first?: JestGlobalConfigLike | VitestProjectLike,
+  second?: JestProjectConfigLike
+): { roots: string[]; patterns: string[] } | null {
+  const vitest = first as VitestProjectLike | undefined;
+  if (vitest?.vitest || vitest?.config?.root) {
+    const root = vitest.config?.root;
+    if (!root) return null;
+    return { roots: [path.join(root, "test")], patterns: vitest.vitest?.filenamePattern ?? [] };
+  }
+
+  const jest = first as JestGlobalConfigLike | undefined;
+  const roots = second?.roots;
+  if (!roots || roots.length === 0) return null;
+  return { roots, patterns: jest?.testPathPatterns?.patterns ?? [] };
+}
+
+/**
+ * Is a reset warranted, or did someone ask for specs that never open a
+ * connection?
+ *
+ * Skipping is only ever safe when the walk is CERTAIN, so every uncertainty
+ * here means reset: an unrecognised runner shape, no selection, an empty
+ * selection, a spec whose imports will not resolve. @see issue #23, and
+ * `needs-database.ts` for why this is an import walk rather than a directory
+ * list.
+ */
+export function runTouchesDatabase(
+  first?: JestGlobalConfigLike | VitestProjectLike,
+  second?: JestProjectConfigLike
+): boolean {
+  const selection = readSelection(first, second);
+  if (!selection) return true;
+  if (selection.patterns.length === 0) return true;
+  const specs = selectedSpecs(selection.roots, selection.patterns);
+  if (specs.length === 0) return true;
+  return specs.some(needsDatabase);
+}
+
+export default async function globalSetup(
+  first?: JestGlobalConfigLike | VitestProjectLike,
+  second?: JestProjectConfigLike
+): Promise<void> {
+  if (!runTouchesDatabase(first, second)) {
+    // Say so. A silent skip is how someone concludes the reset is broken.
+    console.log(
+      "[global-setup] selected specs reach no database — skipping the ge_test reset"
+    );
+    return;
+  }
+
   const url = process.env.TEST_DATABASE_URL;
   if (!url) {
     throw new Error(

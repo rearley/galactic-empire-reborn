@@ -122,9 +122,9 @@ describe('PlanetStateService.runEconomicTickFor — the hub never runs dry', () 
   it('leaves Zygor-3 fully stocked after a production tick', async () => {
     const state = hubPlanet(1);
     const row = { ...stateToPrismaUpdate(state), ...state, ...toRowArrays(state) };
-    const update = jest.fn().mockResolvedValue({});
+    const update = vi.fn().mockResolvedValue({});
     const prisma = {
-      planet: { findMany: jest.fn().mockResolvedValue([row]), update },
+      planet: { findMany: vi.fn().mockResolvedValue([row]), update },
     } as unknown as PrismaService;
     const ships = { get: () => undefined, mutate: () => undefined } as unknown as ShipStateService;
 

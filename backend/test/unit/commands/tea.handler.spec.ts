@@ -4,35 +4,21 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { TEAMNOT } from '../../../src/game/team/team-messages';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Alpha',
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
     ...overrides,
-  };
+  });
 }
 
 function makeHandler(
   foundTeam: { teamcode: bigint; teamname: string } | null,
-  userUpdateMock = jest.fn().mockResolvedValue({}),
+  userUpdateMock = vi.fn().mockResolvedValue({}),
 ): TeaHandlerService {
   const prismaMock = {
     team: {
-      findFirst: jest.fn().mockResolvedValue(foundTeam),
+      findFirst: vi.fn().mockResolvedValue(foundTeam),
     },
     user: {
       update: userUpdateMock,
@@ -40,9 +26,9 @@ function makeHandler(
   } as unknown as PrismaService;
   const shipStateSvcMock = {} as unknown as ShipStateService;
   const teamSvcMock = {
-    create: jest.fn(),
-    joinByPassword: jest.fn(),
-    list: jest.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    joinByPassword: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
   } as unknown as import('../../../src/game/team/team.service').TeamService;
   return new TeaHandlerService(prismaMock, shipStateSvcMock, teamSvcMock);
 }

@@ -17,19 +17,14 @@
  * (GECYBS.C:401-403, GEDROIDS.C:241-243). The sector copy is a port addition
  * and is kept, but it must not double up on the addressee.
  */
-import { GameGateway } from '../../src/gateway/game.gateway';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 type Emit = { rooms: string[]; event: string };
 
 function build() {
   const emits: Emit[] = [];
-  const gateway = new GameGateway(
-    {} as never, {} as never, {} as never, {} as never, {} as never,
-    {} as never, {} as never, {} as never, mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({ random: mockRandom });
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),
     emit: (event: string) => { emits.push({ rooms, event }); },

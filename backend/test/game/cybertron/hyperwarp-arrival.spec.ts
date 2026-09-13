@@ -46,9 +46,11 @@ function simulatePursuit(
     let nextWhere: number;
 
     if (useHyperwarp) {
-      const band = pickPursuitBand(distance, hyperdist1, hyperdist2, where, classMaxShields, topSpeed, rand, { where: 0, speed2b: 0 });
+      const band = pickPursuitBand(distance, hyperdist1, hyperdist2, where, topSpeed, rand, { where: 0, speed2b: 0 });
       desiredSpeed = band.desiredSpeed;
-      nextWhere = band.where;
+      // `where` is written only when the band enters hyperwarp; anything else
+      // leaves the ship where it was, and deceleration takes it out. @see #43
+      nextWhere = band.where ?? where;
     } else {
       desiredSpeed = topSpeed;
       nextWhere = 0;

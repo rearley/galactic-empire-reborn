@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { TickKind } from '../tick/tick.types';
 import { TickService } from '../tick/tick.service';
 import { ShipState, shipKey } from './ship-state.types';
@@ -31,11 +32,20 @@ export const FLUSH_FAILURE_ALARM = 'SHIP FLUSH FAILING';
 /** Consecutive sweeps containing at least one failure before alarming once. */
 export const FLUSH_FAILURE_THRESHOLD = 10;
 
+/**
+ * How many sweeps between the periodic "still failing" summaries that replace
+ * the per-ship lines once the alarm has fired. At one sweep a second that is a
+ * line roughly every five minutes. @see issue #36
+ */
+export const FLUSH_SUMMARY_SWEEPS = 300;
+
 @Injectable()
 export class ShipStateService implements OnModuleInit {
   private readonly logger = new Logger(ShipStateService.name);
   /** Consecutive sweeps in which at least one dirty ship failed to flush. */
   private consecutiveFlushFailures = 0;
+  /** Per-ship errors swallowed since the alarm fired. @see issue #36 */
+  private suppressedFlushErrors = 0;
   private readonly map = new Map<string, ShipState>();
   /**
    * Timestamp (ms) of the most recent successful flush per ship. Used by the
@@ -52,6 +62,18 @@ export class ShipStateService implements OnModuleInit {
     // working; Nest injects the shared singleton when ShipModule is in play.
     @Optional()
     private readonly channels: ShipChannelRegistry = new ShipChannelRegistry(),
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new ShipStateService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /** Put a ship in the map and give it a channel. */
@@ -453,10 +475,7 @@ export class ShipStateService implements OnModuleInit {
       Array.from(this.map.values()).map((s) => s.userid),
     ));
 
-    const rows = await this.prisma.user.findMany({
-      where: { userid: { in: allUserids } },
-      select: { userid: true, teamcode: true },
-    });
+    const rows = await this.users.findTeamcodesFor(allUserids);
 
     const teamcodeByUserid = new Map<string, bigint | null>();
     for (const row of rows) {
@@ -521,10 +540,20 @@ export class ShipStateService implements OnModuleInit {
       } catch (err: unknown) {
         failed++;
         state.dirty = true;
-        this.logger.error(
-          `Flush failed for ${shipKey(state.userid, state.shipno)}:`,
-          err,
-        );
+        // Per-ship detail while the fault still looks transient. Once the alarm
+        // below has fired the cause is known, and every further line is noise:
+        // a dev backend left running against a migrated database wrote this
+        // same line every second for three days — 5,220,711 of them, 2.4 GB, on
+        // a box that also serves production and reached 82% full. The
+        // information in line 5,220,711 is zero. @see issue #36
+        if (this.consecutiveFlushFailures < FLUSH_FAILURE_THRESHOLD) {
+          this.logger.error(
+            `Flush failed for ${shipKey(state.userid, state.shipno)}:`,
+            err,
+          );
+        } else {
+          this.suppressedFlushErrors++;
+        }
       }
     }
 
@@ -549,8 +578,24 @@ export class ShipStateService implements OnModuleInit {
             'and will be lost on restart.',
         );
       }
+      // Still failing, and quiet by now — say so on a cadence, so the fault
+      // stays visibly live without writing a line per ship per sweep. One line
+      // every FLUSH_SUMMARY_SWEEPS sweeps carries what a reader needs: it has
+      // not recovered, and this is how much has been swallowed since.
+      if (
+        this.consecutiveFlushFailures > FLUSH_FAILURE_THRESHOLD &&
+        (this.consecutiveFlushFailures - FLUSH_FAILURE_THRESHOLD) % FLUSH_SUMMARY_SWEEPS === 0
+      ) {
+        this.logger.error(
+          `${FLUSH_FAILURE_ALARM}: still failing after ${this.consecutiveFlushFailures} sweeps — ` +
+            `${this.suppressedFlushErrors} per-ship errors suppressed since the alarm. ` +
+            'Ship state is NOT being persisted.',
+        );
+        this.suppressedFlushErrors = 0;
+      }
     } else if (attempted > 0) {
       this.consecutiveFlushFailures = 0;
+      this.suppressedFlushErrors = 0;
     }
   }
 }

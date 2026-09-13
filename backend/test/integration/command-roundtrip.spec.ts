@@ -17,6 +17,8 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ScanCell } from '../../src/game/commands/command.types';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -29,31 +31,18 @@ function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 2000): Promi
 }
 
 function makeShipState(overrides: { userid: string; shipno: number; shipname: string; topspeed?: number }): ShipState {
-  return {
+  return baseMakeShip({
     userid: overrides.userid,
     shipno: overrides.shipno,
     shipname: overrides.shipname,
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
     // phasrtype:1, shieldtype:1 (not 0). ShipStateService.onModuleInit
     // self-heals phasrtype/shieldtype 0 → 1 and marks the ship dirty, which
     // would falsely fail "no ship.update calls" assertions.
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0,
+    phasrtype: 1,
+    shieldtype: 1,
+    status: 0,
     topspeed: overrides.topspeed ?? 5,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  });
 }
 
 describe('command round-trip integration (US1)', () => {
@@ -61,9 +50,9 @@ describe('command round-trip integration (US1)', () => {
   let port: number;
   let shipServiceFake: ShipStateService;
   let prismaMock: {
-    ship: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
-    shipClass: { findMany: jest.Mock };
-    mine: { findMany: jest.Mock };
+    ship: { findMany: Mock; findFirst: Mock; update: Mock; updateMany: Mock };
+    shipClass: { findMany: Mock };
+    mine: { findMany: Mock };
   };
   let flushTick: (() => Promise<void>) | undefined;
 
@@ -76,27 +65,27 @@ describe('command round-trip integration (US1)', () => {
 
     prismaMock = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([ship]),
-        findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
-        update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([ship]),
+        findFirst: vi.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       shipClass: {
-        findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false }]),
+        findMany: vi.fn().mockResolvedValue([{ classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false }]),
       },
       mine: {
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: vi.fn().mockResolvedValue([]),
       },
     };
 
     const tickServiceMock = {
-      subscribe: jest.fn().mockImplementation(
+      subscribe: vi.fn().mockImplementation(
         (_kind: TickKind, handler: () => Promise<void>) => {
           if (_kind === TickKind.SHIP_UPDATE) flushTick = handler;
           return () => {};
         },
       ),
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     };
 
     // Construct a real ShipStateService using the mocked deps, then initialise it manually
@@ -108,11 +97,11 @@ describe('command round-trip integration (US1)', () => {
     await shipServiceFake.onModuleInit();
 
     const galaxyServiceMock = {
-      onModuleInit: jest.fn(),
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
+      onModuleInit: vi.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -126,21 +115,21 @@ describe('command round-trip integration (US1)', () => {
       .useValue(galaxyServiceMock)
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = USERID;
           client.data.username = SHIPNAME;
           return { sub: USERID, username: SHIPNAME };
         }),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .compile();
 
     app = module.createNestApplication();
@@ -287,7 +276,7 @@ describe('command round-trip integration (US1)', () => {
 
     // Mock GalaxyService returning one planet and one wormhole in sector (0,0)
     const galaxyServiceMock = {
-      getSectorPlanets: jest.fn().mockReturnValue([
+      getSectorPlanets: vi.fn().mockReturnValue([
         {
           xsect: 0, ysect: 0, plnum: 1, type: 2,
           xcoord: 0.3, ycoord: 0.3,
@@ -301,7 +290,7 @@ describe('command round-trip integration (US1)', () => {
           itemsReserve: [], itemsMarkup2a: [], itemsSold2a: [],
         },
       ]),
-      getSectorWormholes: jest.fn().mockReturnValue([
+      getSectorWormholes: vi.fn().mockReturnValue([
         {
           xsect: 0, ysect: 0, plnum: 6, type: 3,
           xcoord: 0.6, ycoord: 0.6,
@@ -310,8 +299,8 @@ describe('command round-trip integration (US1)', () => {
           name: '',
         },
       ]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn().mockReturnValue({
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn().mockReturnValue({
         id: 1,
         seed: BigInt(12648430),
         plodds: 4,
@@ -319,7 +308,7 @@ describe('command round-trip integration (US1)', () => {
         maxplanets: 5,
         generatedAt: new Date(),
       }),
-      onModuleInit: jest.fn(),
+      onModuleInit: vi.fn(),
     };
 
     const ship = makeShipState({ userid: USERID, shipno: SHIPNO, shipname: SHIPNAME, topspeed: 5 });
@@ -329,27 +318,27 @@ describe('command round-trip integration (US1)', () => {
 
     const localPrismaMock = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([ship]),
-        findFirst: jest.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
-        update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([ship]),
+        findFirst: vi.fn().mockResolvedValue({ userid: USERID, shipno: SHIPNO }),
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       shipClass: {
-        findMany: jest.fn().mockResolvedValue([
+        findMany: vi.fn().mockResolvedValue([
           { classNumber: 1, scanRange: 10000, typeName: 'Scout', hasCloak: false },
         ]),
       },
-      mine: { findMany: jest.fn().mockResolvedValue([]) },
+      mine: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     const localTickMock = {
-      subscribe: jest.fn().mockImplementation(
+      subscribe: vi.fn().mockImplementation(
         (_kind: TickKind, handler: () => Promise<void>) => {
           if (_kind === TickKind.SHIP_UPDATE) flushTick = handler;
           return () => {};
         },
       ),
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     };
 
     const localShipService = new ShipStateService(
@@ -369,21 +358,21 @@ describe('command round-trip integration (US1)', () => {
       .useValue(galaxyServiceMock)
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = USERID;
           client.data.username = SHIPNAME;
           return { sub: USERID, username: SHIPNAME };
         }),
       })
       .overrideProvider(OnboardingService)
-      .useValue({ buildClassListPayload: jest.fn().mockResolvedValue([]) })
+      .useValue({ buildClassListPayload: vi.fn().mockResolvedValue([]) })
       .compile();
 
     const galaxyApp = galaxyModule.createNestApplication();

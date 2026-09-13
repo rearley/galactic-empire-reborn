@@ -1,8 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Planet, Prisma, Wormhole, GalaxyMeta } from '@prisma/client';
+import { Planet, Prisma, Wormhole, GalaxyMeta } from '../../prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { WormholeRepository } from './wormhole.repository';
 import { UNIVMAX, SECTYPE_NORMAL, PLTYPE_PLNT, PLTYPE_WORM } from '../constants';
-import { BASEPRICE, NUMITEMS } from '../constants/items';
+import {
+  BASEPRICE, NUMITEMS,
+  I_MEN, I_MISSL, I_TORP, I_ION, I_FLUX, I_FIGHTER, I_DECOY, I_ZIPPER, I_JAMMER, I_MINE,
+} from '../constants/items';
 import { loadGalaxyConfig } from './galaxy.config';
 import { Rng } from './rng';
 import { rollPlanetInventory } from './planet-seed';
@@ -54,7 +58,10 @@ export class GalaxyService implements OnModuleInit {
   private planetsByName = new Map<string, Planet>();
   private _meta: GalaxyMeta | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly wormholes: WormholeRepository,
+  ) {}
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -245,17 +252,41 @@ export class GalaxyService implements OnModuleInit {
   }
 
   /**
-   * Build item arrays for Zygor (s00 type 1) — all items available (GE22e patch).
-   * @see GEMAIN.C:2147-2160 GE22e "Updating Zygor" midnight patch
+   * Build item arrays for Zygor (s00 type 1) — the WEAPONS hub, as built.
+   *
+   * `build_plan_1` stocks 32 000 men and never marks them for sale, and offers
+   * nine lines of ordnance at `baseprice*2`: missiles, torpedoes, ion cannons,
+   * flux pods, fighters, decoys, mines, jammers, zippers. Food, troops, gold
+   * and spies are not sold here at all (GEPLANET.C:665-726).
+   *
+   * This used to open with all fourteen items for sale at 1 032 000 apiece,
+   * which is the state the GE22e MIDNIGHT patch leaves behind, not the state
+   * the galaxy is built in. Applying it at build time erased the one thing
+   * that makes the two neutral-zone posts different on day one: Tahanian
+   * Station is where men, food and troops come from until the first midnight.
+   * @see issue #16  @see midnight.repository.ts refreshNeutralZone
    */
   private static s00ItemsPlan1(): {
     itemsQty: bigint[]; itemsSell: number[]; itemsMarkup2a: number[];
     itemsRate: number[]; itemsReserve: number[]; itemsSold2a: bigint[];
   } {
+    // The nine `sell = 'Y'` lines of GEPLANET.C:680-714, in item order.
+    const forSale = [I_MISSL, I_TORP, I_ION, I_FLUX, I_FIGHTER, I_DECOY, I_ZIPPER, I_JAMMER, I_MINE];
+    const itemsQty = new Array<bigint>(NUMITEMS).fill(0n);
+    const itemsSell = new Array<number>(NUMITEMS).fill(0);
+    const itemsMarkup2a = new Array<number>(NUMITEMS).fill(0);
+    for (const i of forSale) {
+      itemsQty[i] = 32_000n;
+      itemsSell[i] = 1;
+      itemsMarkup2a[i] = BASEPRICE[i] * 2;
+    }
+    // Stocked, deliberately unsellable: `planet.items[I_MEN].qty = 32000;` with
+    // no `sell` and no markup beside it. GEPLANET.C:678.
+    itemsQty[I_MEN] = 32_000n;
     return {
-      itemsQty: new Array<bigint>(NUMITEMS).fill(1032000n),
-      itemsSell: new Array<number>(NUMITEMS).fill(1),
-      itemsMarkup2a: Array.from({ length: NUMITEMS }, (_, i) => BASEPRICE[i] * 2),
+      itemsQty,
+      itemsSell,
+      itemsMarkup2a,
       itemsRate: new Array(NUMITEMS).fill(0),
       itemsReserve: new Array(NUMITEMS).fill(0),
       itemsSold2a: new Array(NUMITEMS).fill(0n),
@@ -550,7 +581,7 @@ export class GalaxyService implements OnModuleInit {
   private async hydrate(): Promise<void> {
     const [planets, wormholes] = await Promise.all([
       this.prisma.planet.findMany(),
-      this.prisma.wormhole.findMany(),
+      this.wormholes.findAll(),
     ]);
 
     this.planetsBySector.clear();

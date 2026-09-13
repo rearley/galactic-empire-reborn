@@ -22,35 +22,30 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
-import { Planet, Wormhole } from '@prisma/client';
+import { Planet, Wormhole } from '../../src/prisma/client';
+import { makeShip as buildShip } from '../helpers/make-ship';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', sit at a fixed sub-sector position, stationary (topspeed 0) and not
+// yet boarded (status 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 7.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return buildShip({
+    shipname: 'Test',
+    xcoord: 5.5,
+    ycoord: 7.5,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 /** Build a planet at a known sector-relative position within sector (xsect, ysect). */
@@ -105,23 +100,21 @@ function makeService(
   scanRange = 100_000,
 ) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue(planets),
-    getSectorWormholes: jest.fn().mockReturnValue(wormholes),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    getSectorPlanets: vi.fn().mockReturnValue(planets),
+    getSectorWormholes: vi.fn().mockReturnValue(wormholes),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
@@ -129,6 +122,8 @@ function makeService(
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return { service, shipServiceMock, galaxyMock };
 }
@@ -141,7 +136,6 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     // Other ship in the SAME sector (5,7)
     const other = makeShip({ userid: 'other', shipno: 1, xcoord: 5.2, ycoord: 7.8, status: 0 });
     const { service } = makeService([self, other]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -154,7 +148,6 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     // Other ship in sector (6,7) — different sector
     const other = makeShip({ userid: 'other', shipno: 1, xcoord: 6.5, ycoord: 7.5, status: 0 });
     const { service } = makeService([self, other]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
@@ -166,7 +159,6 @@ describe('T022 SE-001 — sector-bounded projection: no entities outside the sec
     // Ship at boundary-edge of sector (exactly at xsect+1.0 edge — should clamp)
     const other = makeShip({ userid: 'other', shipno: 1, xcoord: 5.9999, ycoord: 7.9999, status: 0 });
     const { service } = makeService([self, other]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     for (const cell of result.scanRender!.cells) {
@@ -184,7 +176,6 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
   test('self-cell has colour "self"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const selfCell = result.scanRender!.cells.find(c => c.type === 'self');
@@ -196,7 +187,6 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const human = makeShip({ userid: 'human1', shipno: 1, xcoord: 5.2, ycoord: 7.2, status: 0 });
     const { service } = makeService([self, human]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const humanCells = result.scanRender!.cells.filter(c => c.colour === 'human');
@@ -207,7 +197,6 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 5.3, ycoord: 7.3, status: 2 });
     const { service } = makeService([self, ai]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const aiCells = result.scanRender!.cells.filter(c => c.colour === 'ai');
@@ -218,7 +207,6 @@ describe('T022 SE-002 — 4-category colour channel (self/human/ai/planet)', () 
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const planet = makePlanet(5, 7, 1, 0.3, 0.3);
     const { service } = makeService([self], [planet]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     const planetCells = result.scanRender!.cells.filter(c => c.type === 'planet');
@@ -235,7 +223,6 @@ describe('T022 SE-003 — planet digit matches GEPLANET indexing (plnum % 10)', 
       const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
       const planet = makePlanet(5, 7, plnum, 0.3, 0.8);
       const { service } = makeService([self], [planet]);
-      await service.onModuleInit();
 
       const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
       const planetCells = result.scanRender!.cells.filter(c => c.type === 'planet');
@@ -251,7 +238,6 @@ describe('T022 SE-004 — empty sector returns only self-cell `*`', () => {
   test('empty sector: only self-cell present', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -269,7 +255,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
     // Place another ship at the exact same coords as self
     const other = makeShip({ userid: 'other', shipno: 1, xcoord: 5.5, ycoord: 7.5, status: 0 });
     const { service } = makeService([self, other]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     // Centre cell should be self, not ship
@@ -293,7 +278,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
     const other = makeShip({ userid: 'other', shipno: 1, xcoord: xsect + relX, ycoord: ysect + relY, status: 0 });
     const planet = makePlanet(xsect, ysect, 1, relX, relY); // same position
     const { service } = makeService([self, other], [planet]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     // At the collision cell, type should be 'ship' (ship wins over planet)
@@ -321,7 +305,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
   test('kind is "se"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.kind).toBe('se');
@@ -330,7 +313,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
   test('header is "Sector <x>,<y>"', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.7, ycoord: 7.3 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     // SCAN25 — the sector scan is always 1x and carries no range.
@@ -341,7 +323,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
   test('mode is "overwrite" when scanHome=true', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, scanHome: true });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('overwrite');
@@ -350,7 +331,6 @@ describe('T022 SE-006 — cell collision precedence: planet > self > ship > mine
   test('mode is "append" when scanHome=false', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, scanHome: false });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender!.mode).toBe('append');
@@ -369,7 +349,6 @@ describe('T023 FE-001 — sca se: grid scans work in orbit and docked (where >= 
   test('where=10 (in orbit): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, where: 10 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -378,7 +357,6 @@ describe('T023 FE-001 — sca se: grid scans work in orbit and docked (where >= 
   test('where=15 (docked): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, where: 15 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -387,7 +365,6 @@ describe('T023 FE-001 — sca se: grid scans work in orbit and docked (where >= 
   test('where=0 (in flight): succeeds and has scanRender', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5, where: 0 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -402,7 +379,6 @@ describe('T025 ST-001 — cross-mode letter stickiness: sca ra letter survives f
     // Other ship in same sector — will appear in both ra and se
     const other = makeShip({ userid: 'other1', shipno: 1, xcoord: 5.3, ycoord: 7.3, status: 0 });
     const { service } = makeService([self, other], [], [], 100_000);
-    await service.onModuleInit();
 
     // First: run sca ra to assign a letter
     const raResult = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
@@ -423,7 +399,6 @@ describe('T025 ST-001 — cross-mode letter stickiness: sca ra letter survives f
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 5.5, ycoord: 7.5 });
     const other = makeShip({ userid: 'other1', shipno: 1, xcoord: 5.3, ycoord: 7.3, status: 0 });
     const { service } = makeService([self, other], [], [], 100_000);
-    await service.onModuleInit();
 
     // First: run sca se
     const seResult = await (service.command.handler(self, ['se'], {}) as Promise<CommandResult>);

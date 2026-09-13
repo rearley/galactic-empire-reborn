@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Inject, Injectable } from '@nestjs/common';
+import { UserRepository } from '../player/user.repository';
 import { ShipStateService } from './ship-state.service';
 import { ShipState } from './ship-state.types';
-import { PlanetStateService } from '../planet/planet-state.service';
+import { PLANET_STATE_PORT, type PlanetStatePort } from '../planet/planet-state.port';
 import { MAINT_COST_NORMAL, MAINT_COST_NEUTRAL } from '../commands/_ship-management-constants';
 
 /** Planet index of the Zygor galactic market in the neutral zone (sector 0,0). */
@@ -37,8 +37,8 @@ export type GateResult =
 export class MaintenanceService {
   constructor(
     private readonly shipState: ShipStateService,
-    private readonly planetService: PlanetStateService,
-    private readonly prisma: PrismaService,
+    @Inject(PLANET_STATE_PORT) private readonly planetService: PlanetStatePort,
+    private readonly users: UserRepository,
   ) {}
 
   /**
@@ -100,11 +100,7 @@ export class MaintenanceService {
 
 
     const price = BigInt(isZygor ? MAINT_COST_NEUTRAL : MAINT_COST_NORMAL);
-    const userRow = await this.prisma.user.findUnique({
-      where: { userid: ship.userid },
-      select: { cash: true },
-    });
-    const cash = userRow?.cash ?? 0n;
+    const cash = (await this.users.getCash(ship.userid)) ?? 0n;
     if (cash < price) return { ok: false, reason: 'insufficient-cash' };
 
     const repairAmt = Math.floor(ship.damage / 3) + 1;
@@ -124,11 +120,8 @@ export class MaintenanceService {
     // spends, which is the only place it cannot be raced. The repair is queued
     // only if the money actually moved.
     // @see docs/audits/2026-09-09-security-review.md M1
-    const { count } = await this.prisma.user.updateMany({
-      where: { userid: ship.userid, cash: { gte: price } },
-      data: { cash: { decrement: price } },
-    });
-    if (count === 0) return false;
+    const paid = await this.users.debitIfAffordable(ship.userid, price);
+    if (!paid) return false;
 
     this.shipState.mutate(ship.userid, ship.shipno, (s) => {
       s.repair = repairAmt;

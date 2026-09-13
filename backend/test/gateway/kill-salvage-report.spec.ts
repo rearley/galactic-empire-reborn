@@ -24,21 +24,20 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { MessageId, formatMessage } from '../../src/game/commands/messages';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
 import { I_TORP, I_GOLD } from '../../src/game/constants/items';
-import { PresenceService } from '../../src/public/presence.service';
+import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 interface Emit { rooms: string[]; event: string; payload: unknown }
 
 function build() {
   const emits: Emit[] = [];
-  const gateway = new GameGateway(
-    {} as never, {} as never,
-    { getSocketId: () => undefined } as never,
-    {} as never, {} as never, {} as never,
-    { lettersFor: () => [] } as never,
-    { getTypeName: () => 'Interceptor' } as never,
-    {} as never,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({
+    registry: { getSocketId: () => undefined } as unknown as ConnectedShipsRegistry,
+    scanHandler: { lettersFor: () => [] } as unknown as ScanHandlerService,
+    shipClassCache: { getTypeName: () => 'Interceptor' } as unknown as ShipClassCacheService,
+  });
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),
     emit: (event: string, payload: unknown) => { emits.push({ rooms, event, payload }); },

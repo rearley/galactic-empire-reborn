@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > combat topic body matches snapshot 1`] = `
 [
   "Combat",
   "  pha <deg> [focus]      — fire phasers along a relative bearing",
@@ -18,6 +18,13 @@ exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
   "  fre <A|B|C> <n|hail>   — tune a radio channel",
   "  sen <A|B|C> <message>  — transmit on a channel",
   "  att <amount> <troops|fighters> — attack the planet you orbit",
+  "",
+  "HIT REPORTS",
+  "A torpedo or missile that lands reports back as "hit ship A, The <name>".",
+  "That letter is the one YOUR last local, range or data scan gave the",
+  "target, so it reads "?" when the target is not on your scan table - which",
+  "is what "sca sh <name>" alone leaves you with, since a named scan assigns",
+  "no letter. Scan the sector or the range first and the letter is there.",
   "",
   "PHASERS",
   "focus is 0-5; bare "pha <deg>" fires at focus 1. Focus widens the beam",
@@ -63,7 +70,7 @@ exports[`Help topic snapshots combat topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots comms topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > comms topic body matches snapshot 1`] = `
 [
   "Comms & Fleet",
   "  hel [topic]            — this help; bare "hel" lists every topic",
@@ -84,7 +91,7 @@ exports[`Help topic snapshots comms topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
+exports[`Help topic snapshots > full HELP_TOPICS catalog matches snapshot 1`] = `
 {
   "class": {
     "body": [
@@ -147,6 +154,13 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  fre <A|B|C> <n|hail>   — tune a radio channel",
       "  sen <A|B|C> <message>  — transmit on a channel",
       "  att <amount> <troops|fighters> — attack the planet you orbit",
+      "",
+      "HIT REPORTS",
+      "A torpedo or missile that lands reports back as "hit ship A, The <name>".",
+      "That letter is the one YOUR last local, range or data scan gave the",
+      "target, so it reads "?" when the target is not on your scan table - which",
+      "is what "sca sh <name>" alone leaves you with, since a named scan assigns",
+      "no letter. Scan the sector or the range first and the letter is there.",
       "",
       "PHASERS",
       "focus is 0-5; bare "pha <deg>" fires at focus 1. Focus widens the beam",
@@ -275,7 +289,8 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
       "  nav <x> <y>    — course + range to a sector (then set speed)",
       "  rot <deg>      — turn, relative to your heading (-180 to 180)",
       "  rot @<deg>     — turn to an absolute compass heading (0-359)",
-      "  (scan bearings are RELATIVE to your heading: rot <bearing> aims at it)",
+      "  (scan and nav bearings are RELATIVE to your heading — rot <bearing>",
+      "   Aims at it, and the bearing falls to 0 as you come onto course)",
       "  imp <pct> [deg] — impulse 0-99, optional relative course",
       "  war <warp> [deg] — warp factor, optional relative course",
       "  sca pl [n]     — planets here, or detail on one",
@@ -388,7 +403,7 @@ exports[`Help topic snapshots full HELP_TOPICS catalog matches snapshot 1`] = `
 }
 `;
 
-exports[`Help topic snapshots mail topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > mail topic body matches snapshot 1`] = `
 [
   "Mail",
   "  rea                — list your messages (reports, attack notices)",
@@ -399,7 +414,7 @@ exports[`Help topic snapshots mail topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots maintenance topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > maintenance topic body matches snapshot 1`] = `
 [
   "Maintenance & Repair",
   "  mai [password]     — hire a repair crew at the planet you are orbiting",
@@ -419,13 +434,14 @@ exports[`Help topic snapshots maintenance topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > navigation topic body matches snapshot 1`] = `
 [
   "Navigation",
   "  nav <x> <y>    — course + range to a sector (then set speed)",
   "  rot <deg>      — turn, relative to your heading (-180 to 180)",
   "  rot @<deg>     — turn to an absolute compass heading (0-359)",
-  "  (scan bearings are RELATIVE to your heading: rot <bearing> aims at it)",
+  "  (scan and nav bearings are RELATIVE to your heading — rot <bearing>",
+  "   Aims at it, and the bearing falls to 0 as you come onto course)",
   "  imp <pct> [deg] — impulse 0-99, optional relative course",
   "  war <warp> [deg] — warp factor, optional relative course",
   "  sca pl [n]     — planets here, or detail on one",
@@ -437,7 +453,7 @@ exports[`Help topic snapshots navigation topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > planet topic body matches snapshot 1`] = `
 [
   "Planet",
   "  orb                    — orbit nearest planet",
@@ -469,7 +485,7 @@ exports[`Help topic snapshots planet topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > ship topic body matches snapshot 1`] = `
 [
   "Ship",
   "  rep <nav|sys|inv|cargo|wpns|acc>  — ship status report",
@@ -487,7 +503,7 @@ exports[`Help topic snapshots ship topic body matches snapshot 1`] = `
 ]
 `;
 
-exports[`Help topic snapshots trade topic body matches snapshot 1`] = `
+exports[`Help topic snapshots > trade topic body matches snapshot 1`] = `
 [
   "Trade  (quantity first, then the item — e.g. "buy 100 men")",
   "  buy <qty> <item>       — purchase items (from orbit)",

@@ -22,33 +22,25 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult, ScanCell } from '../../src/game/commands/command.types';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
+import { makeShip as buildShip } from '../helpers/make-ship';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', not yet boarded (status 0), stationary (topspeed 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return buildShip({
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 /**
@@ -59,23 +51,21 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
  */
 function makeService(ships: ShipState[], scanRange = 100_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
@@ -83,6 +73,8 @@ function makeService(ships: ShipState[], scanRange = 100_000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return { service, shipServiceMock };
 }
@@ -127,7 +119,6 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
   beforeEach(async () => {
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 10, ycoord: 5 });
     ({ service } = makeService([self]));
-    await service.onModuleInit();
   });
 
   test('SC-001: effective_range strictly increases from level 1 to 9', () => {
@@ -195,7 +186,6 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
     const ai = makeShip({ userid: 'ai1', shipno: 1, xcoord: 0.01, ycoord: 0, status: 2 });
     const { service: svc } = makeService([self, ai], SCAN_RANGE);
-    await svc.onModuleInit();
 
     const result = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
@@ -207,7 +197,6 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
     const human = makeShip({ userid: 'h1', shipno: 1, xcoord: 0.01, ycoord: 0, status: 0 });
     const { service: svc } = makeService([self, human], SCAN_RANGE);
-    await svc.onModuleInit();
 
     const result = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     const shipCells = result.scanRender!.cells.filter(c => c.type === 'ship');
@@ -237,7 +226,6 @@ describe('T016 — sca ra unit: SC-001 projection, coercion, colour, header', ()
     const self = makeShip({ userid: 'self', shipno: 1, xcoord: 0, ycoord: 0 });
     const other = makeShip({ userid: 'other1', shipno: 1, xcoord: 0.01, ycoord: 0 });
     const { service: svc } = makeService([self, other], SCAN_RANGE);
-    await svc.onModuleInit();
 
     // First call — ship gets letter A
     const r1 = await (svc.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
@@ -278,7 +266,6 @@ describe('T017 — sca ra unit: SC-002 projection accuracy across all 9 zoom lev
       const allShips = [self, ...others];
 
       const { service } = makeService(allShips, SCAN_RANGE);
-      await service.onModuleInit();
 
       const result = await (service.command.handler(self, ['ra', String(level)], {}) as Promise<CommandResult>);
       expect(result.scanRender).toBeDefined();
@@ -314,7 +301,6 @@ describe('T018 — sca ra: grid scans work in orbit and docked', () => {
   test('where=10 (in orbit): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, where: 10 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -323,7 +309,6 @@ describe('T018 — sca ra: grid scans work in orbit and docked', () => {
   test('where=15 (docked): still renders a scan', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, where: 15 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();
@@ -332,7 +317,6 @@ describe('T018 — sca ra: grid scans work in orbit and docked', () => {
   test('where=0 (in flight): succeeds and has scanRender', async () => {
     const self = makeShip({ userid: 'self', shipno: 1, where: 0 });
     const { service } = makeService([self]);
-    await service.onModuleInit();
 
     const result = await (service.command.handler(self, ['ra', '5'], {}) as Promise<CommandResult>);
     expect(result.scanRender).toBeDefined();

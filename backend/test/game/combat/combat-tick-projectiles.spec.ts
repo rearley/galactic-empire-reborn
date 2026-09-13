@@ -40,6 +40,7 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import {
   COMBAT_DECOY_INTERCEPT,
   COMBAT_HIT,
@@ -65,29 +66,28 @@ function fixedRandom(value: number): Random {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50_000,
-    // phasrtype 0 keeps the reload block — and its energy debit — out of every
-    // fixture, so the only PRNG draws in a tick are the ones under test.
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [0, 0, 0], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    // phasrtype 0 (the factory default) keeps the reload block — and its
+    // energy debit — out of every fixture, so the only PRNG draws in a tick
+    // are the ones under test.
+    shipname: 'T',
+    energy: 50_000,
+    lastfired: -1,
+    shieldtype: 2,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    decout: [0, 0, 0],
     items: new Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_USER, cybmine: 255, cybskill: 0,
-    cybupdate: 0, tick: 0, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...over,
+    status: GESTAT_USER,
+    cybmine: 255,
+    topspeed: 8,
     // Attribution reads `channel` (this port's usrnum), never `shipno`.
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 interface Harness {
@@ -122,14 +122,14 @@ async function makeHarness(ships: ShipState[], random: Random): Promise<Harness>
       handler = h;
       return () => undefined;
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const deletedMines: number[] = [];
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    delete: jest.fn((id: number) => { deletedMines.push(id); return Promise.resolve(); }),
+    findAllActive: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    delete: vi.fn((id: number) => { deletedMines.push(id); return Promise.resolve(); }),
   } as unknown as MineRepository;
 
   // damageFactor 100 makes damageScale exactly 1, so every expectation below
@@ -147,7 +147,7 @@ async function makeHarness(ships: ShipState[], random: Random): Promise<Harness>
 
   const mines = new MineRegistry();
   const events = new EventEmitter2();
-  const logger = { log: jest.fn(), error: jest.fn(), warn: jest.fn() } as unknown as Logger;
+  const logger = { log: vi.fn(), error: vi.fn(), warn: vi.fn() } as unknown as Logger;
 
   const service = new CombatTickService(
     tickService, shipState, mineRepo, mines, random, events, logger, classCache,

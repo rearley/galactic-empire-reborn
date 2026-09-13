@@ -1,14 +1,27 @@
 /**
  * Chooses which Postgres database the Prisma client connects to.
  *
- * Under Jest, specs build Nest testing modules around PrismaModule and then
- * truncate tables. Without this guard PrismaService resolved `DATABASE_URL`
- * (the dev database), so running the suite destroyed dev game state. Test runs
- * must therefore bind to `TEST_DATABASE_URL`, and must fail loudly rather than
- * silently fall back to the dev database when it is missing.
+ * Under the test runner, specs build Nest testing modules around PrismaModule
+ * and then truncate tables. Without this guard PrismaService resolved
+ * `DATABASE_URL` (the dev database), so running the suite destroyed dev game
+ * state. Test runs must therefore bind to `TEST_DATABASE_URL`, and must fail
+ * loudly rather than silently fall back to the dev database when it is missing.
+ *
+ * BOTH runners are recognised. Vitest sets `VITEST_WORKER_ID` and `VITEST`,
+ * never `JEST_WORKER_ID`, so the Jest-only check silently stopped matching the
+ * moment the suite moved — leaving `NODE_ENV === 'test'` as the only thing
+ * standing between a test run and the development database. Vitest does set
+ * `NODE_ENV=test` by default, so nothing broke, but the protection would then
+ * rest entirely on a runner default that is free to change. `JEST_WORKER_ID`
+ * stays because `test:manual` and any future Jest-based tooling would
+ * otherwise lose the same protection.
  */
 export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const isTest = Boolean(env['JEST_WORKER_ID']) || env['NODE_ENV'] === 'test';
+  const isTest =
+    Boolean(env['JEST_WORKER_ID']) ||
+    Boolean(env['VITEST_WORKER_ID']) ||
+    Boolean(env['VITEST']) ||
+    env['NODE_ENV'] === 'test';
 
   if (!isTest) return env['DATABASE_URL'];
 

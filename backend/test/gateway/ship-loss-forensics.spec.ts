@@ -1,6 +1,10 @@
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * A destroyed hull is DELETED, canon's `gepdb(GEDELETE)`, and nothing recorded
@@ -20,6 +24,111 @@ import { PresenceService } from '../../src/public/presence.service';
  * This pins the manifest, because a deploy, a flaky connection or (Rick's
  * words) call waiting should be recoverable.
  */
+/**
+ * The manifest line is WARNed by `ShipDestroyedService`'s own logger — the
+ * gateway's `@OnEvent` handler is a one-line delegate and prints nothing of its
+ * own. Both loggers are captured: `logger.log` still belongs to the gateway.
+ */
+function captureLogs(gateway: GameGateway, logs: string[]): void {
+  const gatewayLogger = (gateway as unknown as { logger: { log: (m: string) => void } }).logger;
+  gatewayLogger.log = (m: string) => { logs.push(m); };
+  const service = (gateway as unknown as { shipDestroyed: { logger: { warn: (m: string) => void } } }).shipDestroyed;
+  service.logger.warn = (m: string) => { logs.push(m); };
+}
+
+/**
+ * An unattributed kill must say WHY it was unattributed.
+ *
+ * A player put two hyper-missiles into a Cyberquad, watched it die, and got the
+ * DIED announcement — "has been destroyed!!!" — with no credit and no points.
+ * The manifest recorded `attacker=none` and nothing else, and there are at least
+ * three ways to reach that state, all of which canon can also reach:
+ *
+ *   • `lastfired = -1` — a colony's ion cannons hit last, which canon sets
+ *     explicitly (GEFUNCS.C:1797) precisely so the planet's kill credits nobody;
+ *   • `lastfired` = a channel whose holder has since left, which this port
+ *     scrubs to NO_CHANNEL on leave so a recycled channel cannot inherit a
+ *     grudge (PORT-ORIGINAL, see ShipStateService.leave);
+ *   • `lastfired` = a live channel that the lookup rejected.
+ *
+ * The three are indistinguishable in the log, so the first question after a
+ * player says "I did not get that kill" is unanswerable. The channel and the
+ * recorded name are both already on the event; they just were not printed.
+ * @see issue #42
+ */
+describe('an unattributed kill records the evidence that explains it', () => {
+  const VICTIM_SHIP = {
+    userid: 'Cybrg-211', shipno: 211, shipname: 'Cyberquad 44576', shpclass: 22,
+    status: 2, items: [], xcoord: 1.5, ycoord: 1.5,
+    phasrtype: 3, shieldtype: 3,
+  };
+
+  function destroyWith(extra: Record<string, unknown>): string[] {
+    const logs: string[] = [];
+    const gateway = makeGateway({
+      shipStateService: {
+        get: () => VICTIM_SHIP,
+        findAllShips: () => [VICTIM_SHIP],
+        removeFromGame: vi.fn(),
+      } as never,
+      prisma: {
+        ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined),
+      } as never,
+      scanHandler: { clearScantab: vi.fn() } as never,
+      shipClassCache: { getTypeName: () => 'Cybertron Battle Cruiser' } as never,
+    });
+    captureLogs(gateway, logs);
+    (gateway as unknown as { server: unknown }).server = {
+      emit: vi.fn(),
+      to: () => ({ emit: vi.fn() }),
+      except: () => ({ emit: vi.fn() }),
+      sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
+    };
+    void (gateway as unknown as {
+      handleCombatShipDestroyed: (e: unknown) => unknown;
+    }).handleCombatShipDestroyed({
+      victimId: 'Cybrg-211:211', victimShipKey: 'Cybrg-211:211',
+      attackerId: null, attackerShipKey: null,
+      victimUserid: 'Cybrg-211', attackerUserid: null,
+      victimShipname: 'Cyberquad 44576', victimClass: 22,
+      weapon: null, sector: { x: 1, y: 1 }, tickAt: new Date(),
+      loot: [], scoreAwarded: 0,
+      ...extra,
+    });
+    return logs;
+  }
+
+  const manifest = (logs: string[]) => logs.find((l) => l.includes('ship destroyed:')) ?? '';
+
+  it('prints the channel the victim was last hit by', () => {
+    const line = manifest(destroyWith({ attackerChannel: 7 }));
+    expect(line).toContain('lastfired=7');
+  });
+
+  it('says the credit was scrubbed when no channel was recorded at all', () => {
+    // -1 is both "a planet did it" and "the firer left and we scrubbed it".
+    // Printing the value is what lets the next reader tell which.
+    const line = manifest(destroyWith({ attackerChannel: -1 }));
+    expect(line).toContain('lastfired=none');
+  });
+
+  it('prints the name recorded when the damage landed, which survives a scrub', () => {
+    const line = manifest(destroyWith({ attackerChannel: -1, attackerName: 'rick' }));
+    expect(line).toContain("lastfiredBy='rick'");
+  });
+
+  it('still names the attacker when there is one', () => {
+    const line = manifest(destroyWith({
+      attackerChannel: 3, attackerShipKey: 'usr_rick:1', attackerId: 'usr_rick:1',
+      attackerUserid: 'usr_rick', attackerName: 'rick',
+    }));
+    expect(line).toContain('attacker=usr_rick:1');
+    expect(line).toContain('lastfired=3');
+  });
+});
+
 describe('ship-loss forensics — the log must be enough to restore from', () => {
   const VICTIM = {
     userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8,
@@ -30,29 +139,22 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
 
   function build() {
     const logs: string[] = [];
-    const gateway = new GameGateway(
-      {
+    const gateway = makeGateway({
+      shipStateService: {
         get: (userid: string, shipno: number) =>
           userid === VICTIM.userid && shipno === VICTIM.shipno ? VICTIM : undefined,
         findAllShips: () => [VICTIM],
-        removeFromGame: jest.fn(),
-      } as never,
-      {} as never, {} as never, {} as never,
-      { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as never,
-      {} as never,
-      { clearScantab: jest.fn() } as never,
-      { getTypeName: () => 'Dreadnought' } as never,
-      {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
-    const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
-    logger.log = (m: string) => { logs.push(m); };
-    logger.warn = (m: string) => { logs.push(m); };
+        removeFromGame: vi.fn(),
+      } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    });
+    captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, logs };
@@ -114,21 +216,17 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
   it('still logs a usable line when the hull is already out of memory', () => {
     // Races and AI victims: never throw, and never lose the identity.
     const logs: string[] = [];
-    const gateway = new GameGateway(
-      { get: () => undefined, findAllShips: () => [], removeFromGame: jest.fn() } as never,
-      {} as never, {} as never, {} as never,
-      { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as never,
-      {} as never, { clearScantab: jest.fn() } as never,
-      { getTypeName: () => undefined } as never, {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
-    const logger = (gateway as unknown as { logger: { log: (m: string) => void; warn: (m: string) => void } }).logger;
-    logger.log = (m: string) => { logs.push(m); };
-    logger.warn = (m: string) => { logs.push(m); };
+    const gateway = makeGateway({
+      shipStateService: { get: () => undefined, findAllShips: () => [], removeFromGame: vi.fn() } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => undefined } as unknown as ShipClassCacheService,
+    });
+    captureLogs(gateway, logs);
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     destroy(gateway);
@@ -156,30 +254,25 @@ describe('handleCombatShipDestroyed — awaitable by the shutdown drain', () => 
     let finished = false;
 
     const prisma = {
-      $transaction: jest.fn().mockImplementation(async () => {
+      $transaction: vi.fn().mockImplementation(async () => {
         await txDone;
         finished = true;
       }),
-      shipClass: { findFirst: jest.fn() },
+      shipClass: { findFirst: vi.fn() },
     };
 
-    const gateway = new GameGateway(
-      {
+    const gateway = makeGateway({
+      shipStateService: {
         get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
         findAllShips: () => [],
-        removeFromGame: jest.fn(),
-      } as never,
-      {} as never, {} as never, {} as never,
-      prisma as never,
-      {} as never,
-      { clearScantab: jest.fn() } as never,
-      { getTypeName: () => 'Dreadnought' } as never,
-      {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+        removeFromGame: vi.fn(),
+      } as unknown as ShipStateService,
+      prisma: prisma as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    });
     (gateway as unknown as { server: unknown }).server = {
-      to: () => ({ emit: jest.fn() }), except: () => ({ emit: jest.fn() }), emit: jest.fn(),
+      to: () => ({ emit: vi.fn() }), except: () => ({ emit: vi.fn() }), emit: vi.fn(),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     const returned = (gateway as unknown as {

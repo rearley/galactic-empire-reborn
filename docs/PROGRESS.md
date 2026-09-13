@@ -1,13 +1,22 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 88 entries.
+Append-only, **newest at the bottom**. 94 entries.
 
 <!-- INDEX -->
 ## Most recent first
 
-The 15 latest entries, reversed — the log itself reads oldest-first, which makes
-"what is the current state" the hardest thing to find in it.
+Recent entries, reversed — the log itself reads oldest-first, which makes
+"what is the current state" the hardest thing to find in it. This list is not
+every entry; it is the recent ones, and it carries no count on purpose, because
+a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible](#2026-09-11--correction-to-the-phase-4-close-out-the-roster-claim-was-wrong-for-two-of-four-handlers-and-the-hook-count-metric-was-not-reproducible)
+- [2026-09-11 — Phase 4 close-out: the frontend, verified](#2026-09-11--phase-4-close-out-the-frontend-verified)
+- [2026-09-11 — Phase 3 close-out: the persistence boundary, verified](#2026-09-11--phase-3-close-out-the-persistence-boundary-verified)
+- [2026-09-11 — phase 2 final review: the mover's own sector came back null](#2026-09-11--phase-2-final-review-the-movers-own-sector-came-back-null)
+- [2026-09-11 — restructure phase 2: the gateway split](#2026-09-11--restructure-phase-2-the-gateway-split)
+- [2026-09-11 — restructure phase 1: one typed wire contract](#2026-09-11--restructure-phase-1-one-typed-wire-contract)
+- [2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change](#2026-09-10--restructure-phase-0-toolchain-and-runtime-zero-gameplay-change)
 - [2026-09-10 — a new citation now has to carry its quote](#2026-09-10--a-new-citation-now-has-to-carry-its-quote)
 - [2026-09-10 — a torpedo volley now tells you it hit](#2026-09-10--a-torpedo-volley-now-tells-you-it-hit)
 - [2026-09-10 — the re-audit that asked whether the tests were RIGHT](#2026-09-10--the-re-audit-that-asked-whether-the-tests-were-right)
@@ -21,8 +30,6 @@ The 15 latest entries, reversed — the log itself reads oldest-first, which mak
 - [2026-09-10 — Tier 1 branch coverage, five agents in parallel](#2026-09-10--tier-1-branch-coverage-five-agents-in-parallel)
 - [2026-09-10 — test strategy written, and the first gap it found was one of ours](#2026-09-10--test-strategy-written-and-the-first-gap-it-found-was-one-of-ours)
 - [2026-09-10 — `sys class` refused every hull above class 9](#2026-09-10--sys-class-refused-every-hull-above-class-9)
-- [2026-09-10 — auto-flux can never sustain a cloak, and the dead band is wider than stated](#2026-09-10--auto-flux-can-never-sustain-a-cloak-and-the-dead-band-is-wider-than-stated)
-- [2026-09-09 — the cloak died at zero power with fifteen pods aboard](#2026-09-09--the-cloak-died-at-zero-power-with-fifteen-pods-aboard)
 - [2026-09-09 — `loc B` answered "That would be foolish Sir!" for a ship two sectors away](#2026-09-09--loc-b-answered-that-would-be-foolish-sir-for-a-ship-two-sectors-away)
 - [2026-09-09 — `ren BigCat II` produced a ship called BigCat](#2026-09-09--ren-bigcat-ii-produced-a-ship-called-bigcat)
 - [2026-09-09 — a docs-only push restarted the game mid-battle](#2026-09-09--a-docs-only-push-restarted-the-game-mid-battle)
@@ -4206,9 +4213,20 @@ Remaining sub-choice, to be made after reviewing the tree:
    requests, and uses only the auto-provisioned token. But on a public
    repository the *run logs* become world-readable, and existing history
    carries over. Secrets are masked; hostnames and deploy output are not.
-6. **Note the remote spelling.** The private remote is
-   `rearley/galatic-empire-reborn`; `SOURCE_URL` assumes a corrected
-   `galactic-empire-reborn`. One of the two has to move.
+6. **Remote spelling — resolved 2026-09-10.** The private remote was
+   `rearley/galatic-empire-reborn`; `SOURCE_URL` in
+   `frontend/src/content/provenance-notes.ts` already used the corrected
+   `galactic-empire-reborn`. The GitHub repository was renamed to
+   `rearley/galactic-empire-reborn` rather than changing the constant, because
+   the misspelling would otherwise become permanent in a public URL and in an
+   AGPL source offer — a constant is easy to fix later, a URL people have
+   linked to is not. GitHub redirects the old spelling, so nothing that
+   already points at it breaks. The deploy path was checked and is unaffected:
+   the container images are named `ghcr.io/<owner>/<app>` from the repository
+   owner and a matrix build name, never from the repository name itself.
+   **This does not close item 1** — the repository is still private, so
+   `/provenance` still links to a repo that does not exist and that page must
+   not ship until it does. The spelling was the smaller of the two problems.
 
 ### Not reasons to delay
 
@@ -5387,3 +5405,728 @@ of it.
 
 **Known issues:** none.
 
+## 2026-09-10 — restructure phase 0: toolchain and runtime, zero gameplay change
+
+**Completed:** all four phase-0 tasks of the restructure
+(`docs/superpowers/specs/2026-09-10-restructure-design.md`), on the
+`restructure` branch, master untouched:
+
+- **Node 20 → 24** in both Dockerfiles and both CI jobs, `engines.node`
+  (`>=24`) added to both `package.json` files, pinned by a new repo-invariant
+  test, `backend/test/unit/node-runtime-version.spec.ts`. Both images verified
+  to build; the backend image boots and runs `node v24.21.0`. (`66e53b1`)
+- **Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (29.4.12).** Two
+  `backend/tsconfig.json` additions were required —
+  `"ignoreDeprecations": "6.0"` and `"types": ["jest", "node"]` — both
+  compile-time-only, no `src/**` behaviour change. See
+  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`84ccc49`)
+- **Frontend: React 19, Vite 8, Vitest 5, Tailwind 4, TypeScript 6.0.3, in one
+  batch.** Tailwind's config moved from `tailwind.config.ts` (deleted) into
+  `src/styles.css`'s `@theme` block. Two Vitest-5-driven test-infrastructure
+  fixes (`@testing-library/jest-dom/vitest` import path, `vi.mocked()` in
+  place of a cast-and-call) and six mechanical Tailwind-4 utility-class
+  renames (`flex-shrink-0`→`shrink-0`, `outline-none`→`outline-hidden`) across
+  frontend `src/`, all behaviour-identical. No React-19-specific migration was
+  needed — the codebase already used `createRoot` and current
+  `@testing-library/react` idioms. (`0e3d4d0`)
+- **oxlint, both apps, wired into CI**, backed by
+  `backend/test/unit/lint-gate.spec.ts` (7 tests after a fix round). Frontend
+  runs `--type-aware`; backend runs syntax-only because `oxlint-tsgolint`
+  rejects `backend/tsconfig.json`'s deprecated `moduleResolution: "node"`. See
+  `docs/DECISIONS.md` 2026-09-10 ("oxlint, not ESLint") for the full rule
+  table and rationale, and the restructure spec's "Blockers and constraints
+  discovered" section for why that one tsconfig setting blocks both TS7 and
+  backend type-aware linting. (`1050298`, fix round `30f9975`)
+
+**Tests:** measured at the end of phase 0 — backend 607 suites / 6,154 tests
+(up from the 605/6,141 pre-phase baseline: +1 suite/+6 tests from the runtime
+pin, +1 suite/+7 tests from the lint gate), ~117s local. Frontend unchanged at
+39 files / 310 tests, ~15s. Both `npm run lint` exit 0 in both apps.
+(Amended after initial entry: figure revised from 6,153 to 6,154 during phase 0 before branch push when one assertion was added to `node-runtime-version.spec.ts` to tie `@types/node` to the runtime major version.)
+
+**Decisions made:** the three recorded in `docs/DECISIONS.md` 2026-09-10 —
+TypeScript pinned at 6.0.3 until Vitest replaces Jest in phase 5, oxlint over
+ESLint, Node 24 over 22 — plus the `moduleResolution` finding folded into the
+oxlint decision and into the restructure spec's blockers section.
+
+**Next:** phase 1 — one typed wire contract (root npm workspace, a shared
+types-and-event-names package, retiring the duplicated `contracts.ts`). See
+the restructure spec for the full phase list.
+
+**Known issues:** `eslint/no-unused-vars` is set to `warn` repo-wide rather
+than `error`, because it currently reports 111 genuine dead-import findings
+(41 in `backend/src/**`, 70 across 46 backend test files, 6 in frontend
+`e2e/**`) that phase 0 was not permitted to fix by editing source. Phases 2
+and 3 already plan to open every `backend/src/**` file with a finding
+(`cybertron-tick.service.ts`, `phaser.handler.ts`, `physics-tick.service.ts`,
+`droid-tick.service.ts`, the combat and galaxy modules, and others) — clear
+the dead imports there and in the 46 test files as part of that work, then
+promote the rule to `error` repo-wide. Tracked here and in the oxlint
+decision in `docs/DECISIONS.md`.
+
+
+## 2026-09-11 — restructure phase 1: one typed wire contract
+
+**Completed:** all four phase-1 tasks of the restructure
+(`docs/superpowers/specs/2026-09-10-restructure-design.md`), on the
+`restructure` branch, master untouched:
+
+- **`packages/wire`** — a new npm workspace holding every Socket.io event
+  name (30 server-to-client, 2 client-to-server, `as const` and frozen) and
+  every payload interface, built dual CJS/ESM so the CommonJS backend
+  (Jest/ts-jest) and the ESM frontend (Vite) can both import it, proven by a
+  probe symbol resolved from a spec on each side. The repo root gained its
+  first `package.json` (`workspaces: ["packages/*", "backend", "frontend"]`)
+  and a single root `package-lock.json`, replacing the two per-app lockfiles.
+  (Task 1, `84da4b3`.)
+- **The backend's `Server`/`Socket` are now typed with Socket.io's
+  `ServerToClientEvents`/`ClientToServerEvents` generics, throughout
+  `game.gateway.ts` and `ws-auth.guard.ts`.** A wrong payload at an emit site
+  is now a compile error, not a runtime surprise — the phase's actual point.
+  `CommandResult.broadcasts` became `CommandBroadcast[]`, a discriminated
+  union on `event`, so the dynamic broadcast-dispatch path (`sca sh`,
+  `sen`, `ren`, `tea`) narrows `payload` per event with zero casts, backed by
+  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `64495c2`
+  and `9e1812d`.)
+- **The frontend imports the same declaration.** `frontend/src/types/contracts.ts`
+  and the parity test that kept it in sync with the backend's shadow copy
+  (`frontend/test/contracts-parity.spec.ts`) are deleted; 14 importers
+  repointed at `@ge/wire`; `specs/003-ship-commands/contracts/shared-types.ts`
+  kept with a SUPERSEDED note rather than deleted, per the keep-the-reasoning
+  rule in `docs/CLAUDE.md`. (Task 4, `f6121d0`.)
+
+**Five real defects the typing surfaced** — this phase's actual justification,
+not a side effect of it. Full detail and the reasoning behind each fix in
+`docs/DECISIONS.md` 2026-09-11:
+
+1. `combat.ship-destroyed` was declared against an 11-field internal type
+   when the gateway only ever sends 4 fields — the declaration had not kept
+   up with a 2026-09-09 security fix.
+2. `EventLogCategory` was missing `'alert'`, silently discarding canon's
+   unfilterable engine-shutdown notice's own visual distinction.
+3. A frontend listener declared a `victimUserid` field the backend never
+   sends and nothing ever read.
+4. `reconnect_attempt` was registered on `socket` instead of the Manager
+   (`socket.io`) and had been dead code since it was written.
+5. `prompt:ship-select`'s frontend type carried an `error` field that event
+   never sends — copied from the sibling `prompt:ship-name` prompt, which
+   does have one.
+
+**One accepted behaviour change:** fixing defect 4 makes a previously-dead
+reconnect handler live — during a dropped connection the status banner can
+now show "Reconnecting…" where before it only ever showed "Disconnected."
+This phase's rule is "type what is sent, don't change behaviour," so this
+needed a deliberate ruling rather than a silent fix; see
+`docs/DECISIONS.md` 2026-09-11 for why it was accepted over deleting the
+handler (which would have discarded working FR-019/FR-020 behaviour) or
+casting past the type error (forbidden outright by this phase's own rule).
+
+**Tests:** backend 609 suites / 6,161 tests (up from the phase-0 baseline of
+607/6,154 — `packages/wire`'s own parity spec plus growth in two gateway
+broadcast specs during Task 3's fix rounds), ~118s local. Frontend **down**
+to 39 files / 299 tests from 40/311 — the only reduction of this restructure
+so far, entirely `contracts-parity.spec.ts` (1 file, 12 tests) going away with
+the duplication it existed to guard. `packages/wire` carries its own small
+Jest run (1 suite / 3 tests) outside both app counts. Both `tsc --noEmit`
+clean, both `npm run lint` exit 0.
+
+**Decisions made:** recorded in full in `docs/DECISIONS.md` 2026-09-11 —
+event name strings frozen (mixed dot/colon convention kept, not tidied);
+five server-to-client events recorded as emitted-with-no-listener rather
+than removed (`combat.miss`, `combat.mine-detonation`, `cybertron.broke-off`,
+`beacon`, `command.notice`); the dual CJS/ESM build kept for this phase,
+collapsing to single-ESM in phase 5; and the `reconnect_attempt` behaviour
+change above.
+
+**Next:** phase 2 — split `game.gateway.ts` (2,681 lines, 11 injected
+dependencies) into per-concern collaborators, and split `scan.handler.ts`
+(1,258 lines). See the restructure spec for the full phase list. Before any
+Docker image is rebuilt from this branch, the known issue immediately below
+must be resolved.
+
+**Known issues:**
+
+- **Neither Docker image builds on this branch, right now.** Found verifying
+  this close-out, not by any of the four phase-1 tasks: `backend/package.json`
+  and `frontend/package.json` both depend on `@ge/wire` via
+  `file:../packages/wire`, but neither Dockerfile's build context was moved
+  to the repo root (or given a `packages/wire` build stage) to make that
+  resolvable — both still `COPY package*.json ./` and `RUN npm ci` from
+  inside their own per-app directory. `docker build -f backend/Dockerfile
+  backend/` and the frontend equivalent both fail at `npm ci`. Task 1's own
+  brief named this exact failure as an expected step to fix before
+  proceeding; nothing in the ledger shows that step having run against Task
+  1's actual (recovered, post-session-disconnect) execution. Full detail in
+  `docs/DECISIONS.md` 2026-09-11. Must be fixed — repo-root build context or
+  a `packages/wire` Docker stage, per Task 1's own brief — before phase 2
+  work or any deploy-adjacent testing of this branch.
+- **(#2) `command.notice` reaches no frontend listener.** Confirmed during
+  Task 3's review, not a coverage artifact: canon's SCAN1/SCAN2/SCAN3 "you
+  have been scanned" notice is built and sent (`scan.handler.ts`'s `sca sh`)
+  and never rendered. A real gameplay gap, out of this phase's scope (typing
+  what crosses the wire, not adding what should).
+- **(#4) `combat.hit` and `combat.phaser-fired` still spread internal domain
+  event fields onto the wire** rather than building a narrow payload by hand
+  the way `combat.ship-destroyed` now does (defect 1 above) — sector and
+  internal ids cross the wire on these two events. Noted by Task 3's
+  reviewer, out of scope for this phase.
+- **(#5) An unidentified flaky test.** Surfaced twice this phase (once in
+  Task 1, once in Task 3) as a burst of failures — 22 spurious failures the
+  second time, traced to two concurrent `jest` processes racing the same
+  `ge_test` Postgres database, cleared immediately by rerunning serially. The
+  original failing test's name from the first occurrence was lost to a
+  `tail`-piped run and was never recovered, so this is a plausible shared
+  cause rather than a proven one. The harness has no guard against two
+  `jest` invocations sharing one test database — a lockfile or per-worker
+  schema would turn this into an immediate, legible error instead of a
+  baffling one. **Always run one jest/vitest process at a time on this repo
+  until that guard exists.**
+- **(#6) `ShipSelectPrompt` carries a dead `error` prop.** Surfaced fixing
+  defect 5 above: `prompt:ship-select` never sent an `error` field, so the
+  prop was always `undefined` in practice; `App.tsx` now passes `error={null}`
+  explicitly with a comment, but the component itself still declares and
+  never meaningfully uses the prop. Cosmetic, deferred — not fixed in this
+  phase because it is component cleanup, not a wire-contract question.
+
+## 2026-09-11 — restructure phase 2: the gateway split
+
+**Completed:** Broke `game.gateway.ts` into per-concern collaborators
+(transport-focused) and split `scan.handler.ts` by rendering concern. Eight
+tasks total, on branch `restructure`, verified against baseline commit
+`fadb7a2`.
+
+Before/after (measured directly, not copied from an intermediate claim):
+
+| | baseline (`fadb7a2`) | now |
+|---|---|---|
+| `backend/src/gateway/game.gateway.ts` | 2,743 | 1,482 |
+| `backend/src/game/commands/handlers/scan.handler.ts` | 1,258 | 488 |
+| `this.prisma` sites in `game.gateway.ts` | 10 | 2 |
+| backend suite | 609 suites / 6,161 tests | 617 suites / 6,291 tests, all passing |
+
+New modules, all under `backend/src/gateway/` unless noted:
+`broadcast-dispatch.ts` (82 lines), `narration.ts` (298), `sector-transition.ts`
+(235), `ship-destroyed.service.ts` (451), `ship-identity.ts` (41),
+`connection-lifecycle.service.ts` (764), `types.ts` (48), and under
+`backend/src/game/commands/handlers/scan/`: `scan-strings.ts` (125),
+`scan-render.ts` (461), `scan-planet.ts` (309).
+
+**Tests:** Full backend suite green at close-out: 617 suites, 6,291 tests, 9
+snapshots, exit 0. `npx tsc --noEmit` clean. `npm run lint` exit 0 (see known
+issues below — it was exit 1 at phase start on a pre-existing, unrelated
+error, fixed in this close-out session). Both `docker build -f
+backend/Dockerfile .` and `docker build -f frontend/Dockerfile .` succeed
+from repo root; `require.resolve('@ge/wire')` resolves inside the running
+backend image (`docker run --rm --entrypoint node ge-backend-p2 -e
+"require.resolve('@ge/wire')"`). Deploy gate confirmed untouched:
+`.github/workflows/ci.yml`'s `on.push.branches` is still `[master]` and the
+image job is still gated `if: github.event_name == 'push'` — the diff against
+master touches Node version, workspace lockfile paths, and the Dockerfile
+build-context fix from the Phase 1 close-out, none of which are this phase's
+work and none of which touch the gate. `VERSION` unchanged (still not bumped,
+per the restructure ground rules).
+
+**Decisions made:** recorded in full in `docs/DECISIONS.md` 2026-09-11 — the
+test-factory seam built before any extraction task touched the 11-argument
+constructor; `recoverVictim` staying on `DestroyedEmitter` as accepted debt
+(it needs the live `Server`, which no extracted service holds); the `sca ra`
+scan renderer pulled into a second follow-up commit rather than left as a
+documented gap in the initial split.
+
+**Next:** Phase 3 — persistence boundary. Per-feature repositories so
+`PrismaService` appears once per feature instead of in ~40 files; retire the
+7 `forwardRef` calls; narrow injection-seam interfaces. This phase should
+also close the 2 remaining `this.prisma` sites in `game.gateway.ts` (both in
+onboarding — `finalizeOnboarding`'s P2002 race-recovery read and
+`handleShipSelectReply`'s reload-before-board), which no Phase 2 task was
+assigned to touch.
+
+**Known issues:**
+
+- **Gateway `this.prisma` count is 2, not 0.** The phase-2 plan's own
+  close-out step expected the count to reach zero; Tasks 2-6 covered
+  broadcast dispatch, narration, sector transition, the death path and
+  connection lifecycle, and none of them was scoped to onboarding, where both
+  remaining sites live. Not a regression — a real, tracked gap against the
+  phase's stated goal, closed by Phase 3's persistence-boundary work per
+  the restructure spec. See `docs/DECISIONS.md` 2026-09-11 for detail.
+- **(carried from 2026-09-10) #2 `command.notice` reaches no frontend
+  listener** — unchanged this phase, still open.
+- **(carried from 2026-09-10) #4 `combat.hit` / `combat.phaser-fired` still
+  spread internal fields onto the wire** — unchanged this phase, still open.
+- **(carried from 2026-09-10) #6 `ShipSelectPrompt`'s dead `error` prop** —
+  unchanged this phase, still open.
+- **oxlint's `no-useless-empty-export` fired on a pre-existing empty
+  `export {}`** in `backend/test/gateway/wire-typing.type-check.ts` (a
+  compile-time-only fixture full of `@ts-expect-error` assertions, never
+  executed by Jest, type-checked by `tsc --noEmit` on every run). Predated
+  this phase and made `npm run lint` exit 1. Fixed in this close-out session:
+  the `export {}` was redundant (the file's `import type` statements already
+  make it a module) and removing it does not change what makes the file a
+  module or which `@ts-expect-error` lines fire — `tsc --noEmit` stayed clean
+  after the edit, meaning every flagged mistake in the fixture still resolves
+  the way the file exists to prove. `npm run lint` now exits 0.
+
+
+## 2026-09-11 — phase 2 final review: the mover's own sector came back null
+
+**Completed:** three findings from the whole-branch review of the gateway
+split.
+
+- **C-1 (critical, gameplay regression).** Extracting `handleSectorTransition`
+  into a `TransitionPlan` collapsed three separately-positioned mover emits
+  into one `moverEmits` array, and the executor sent all of it before any room
+  emit. That put the mover's repairing `player.sector` in FRONT of the
+  departure broadcast `{ shipId, sector: null }` — which the mover still
+  receives, because its socket has not yet left `sector:from`. `usePlayerList`
+  is last-write-wins on `sector`, so a player's own row in their own player
+  list blanked to an em dash after every boundary crossing and stayed blank
+  until the next `player.snapshot`. `TransitionPlan` now has three mover
+  buckets (`moverEmitsBeforeRoomEmits`, `moverEmitsAfterRoomEmits`,
+  `moverEmitsAfterMove`) whose declared field order IS the execution order,
+  and both the interface docblock and the handler docblock write that
+  sequence out. Restores the pre-split behaviour exactly; no other behaviour
+  changed.
+- **I-1.** Restored two canon citations (`GECMDS.C:2529` scan_ra,
+  `GECMDS.C:2598` scan_se) deleted from the no-mine-loop comment when the scan
+  handler was split into `scan/scan-render.ts`. Restored verbatim from
+  `fadb7a2`, not re-derived.
+- **M-2 (operational).** Commit `b22b935` moved the ship-loss forensics
+  warnings out of the `[GameGateway]` logging context and into
+  `[ShipDestroyedService]` — a production-log grep for gateway warnings on a
+  ship loss now finds nothing, and must search the new context instead.
+
+**Tests:** `backend/test/gateway/sector-transition.spec.ts` grew a suite that
+records BOTH delivery channels — room emits and mover-socket emits — into ONE
+ordered timeline, which is the hole that hid C-1: room emits went to a shared
+array while mover emits went to a separate `jest.fn()`, so the two were never
+compared for order. Two new cases: one replays `usePlayerList`'s
+last-write-wins reducer over everything the mover actually receives and
+asserts the final believed sector is `toSector`, the other pins the full
+seven-emit interleaved sequence. Mutation-checked: reapplying the wrong order
+fails the first with `Received: null`, which is the reported bug exactly.
+
+**Decisions made:** three named buckets rather than interleaving markers — the
+plan stays a plain data object and the field order is the contract, which is
+what a reader checks against the pre-split source.
+
+**Next:** Phase 3 — persistence boundary, unchanged.
+
+**Known issues:** none new. The phase-2 known issues above (gateway
+`this.prisma` count of 2, and the four carried frontend/wire items) are
+untouched by this session.
+
+## 2026-09-11 — Phase 3 close-out: the persistence boundary, verified
+
+**Completed:** independent verification of Phase 3 (persistence boundary) —
+per-feature repositories, `forwardRef` retirement, ship-class boot cache,
+and the shared `ShipState` test factory. Task 7 only; no new feature code.
+
+Measured directly against `8af4ed2` (phase start) and `1ff4bea` (phase end):
+
+| Metric | Phase start | Now |
+|---|---|---|
+| files injecting `PrismaService` | 46 | 34 |
+| `forwardRef(` actual calls | 3 | 0 |
+| `this.prisma.user.*` outside a repository | 36 | 4 (all `auth.service.ts`) |
+| `this.prisma` in `game.gateway.ts` | 2 | 0 |
+| inline `ShipState` fixtures (`cybskill:` in `test/`) | 260 | 37 |
+| `as never` in `backend/test/` | 509 | 551 |
+| backend suite | 617 suites / 6,295 tests | 623 suites / 6,356 tests |
+
+Full derivation, the repository map, and the per-commit `as never` breakdown
+are in `docs/DECISIONS.md` 2026-09-11 ("Phase 3 close-out: the persistence
+boundary, measured").
+
+**Tests:** ran the full backend suite as one tracked `npx jest` process
+(never backgrounded, never piped through `head`/`tail` mid-run — the shared
+`ge_test` database corrupts under two concurrent runs, which is exactly what
+happened once earlier in this phase). `Ran all test suites.` printed exactly
+once. Result: 623 suites / 6,356 tests, all passing, 9 snapshots passing,
+122.67s. Both `backend/Dockerfile` and `frontend/Dockerfile` build clean from
+the repo root; `require.resolve('@ge/wire')` resolves inside the running
+backend image. Deploy gate unchanged in this phase's own range
+(`8af4ed2..HEAD`): `.github/` untouched, `branches: [master]` and
+`if: github.event_name == 'push'` intact. `VERSION` unchanged from master, as
+expected — restructure phases bump once, at merge.
+
+**Decisions made:** none new; one ruling recorded in `docs/DECISIONS.md`
+2026-09-11 — the `as never` count rising 509 → 551 is a real cost of the
+service-seam design (narrowed ports make hand-rolled test doubles harder to
+satisfy structurally), not noise, and it applies only to the service seam —
+the fixture seam (Tasks 1 and 6) behaved exactly as the spec predicted
+(71 `as ShipState` casts removed for +2 `as never`).
+
+**Next:** Phase 4 — frontend restructure (3,521 lines / 43 files). Can start
+any time; independent of Phase 5.
+
+**Known issues:**
+- `ShipRepository` covers 2 of 15 live `this.prisma.ship.*` call sites — a
+  beachhead, not a boundary. See `docs/DECISIONS.md` 2026-09-11 for the full
+  list of the other 13 and which service/repository each lives in.
+- `auth/auth.service.ts` has 4 `prisma.user.*` call sites with no repository
+  of its own — out of scope for every Phase 3 task, real gap for a future
+  `AuthRepository`.
+- Nine issues were filed during Phase 3; #9 and #10 were fixed in this phase
+  and are closed. Eight remain open, unrelated to Task 7's scope:
+  #11 (88 canon citations invisible to the ratchet), #12 (cybertron spec logs
+  a real ERROR during a passing test), #13 (`fixture-domains` scans
+  comments), #14 (team-creation `$transaction` never receives `tx`), #15
+  (planet counter `update` vs `updateMany`), #18 (`SectorTransitionSubscriber`
+  is in no module and would break sector transitions if wired), #19
+  (`fixture-domains` reads `topspeed: 8_000` as `8` and validates it), #20 (a
+  fixture sets two fields that exist nowhere).
+
+## 2026-09-11 — Phase 4 close-out: the frontend, verified
+
+**Completed:** independent verification of Phase 4 (frontend restructure) —
+`App.tsx` decomposed into three new hook/feature modules
+(`hooks/useEventLog.ts`, `hooks/useFkeys.ts`, `hooks/useScanMap.ts`,
+`features/combat/combatNarration.ts`); Task 4 only, no new feature code.
+
+This is the one phase in the restructure whose scope was derived from the
+code, not the spec: Phase 4's own spec entry states no goal, only an
+observation — "3,521 lines across 43 files. `App.tsx` at 388 is the largest."
+The 12 `socket.on` subscriptions and 15 hook calls found by reading the file
+are what Tasks 1-3 actually addressed.
+
+Measured directly against `1d76d70` (phase start, the plan commit) and `HEAD`
+(phase end):
+
+| Metric | Phase start | Now |
+|---|---|---|
+| `frontend/src/App.tsx` lines | 388 | 221 (43% reduction) |
+| `socket.on` calls in `App.tsx` | 12 | 4 |
+| hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in `App.tsx` | 15 | 3 |
+| `frontend/src` files (`.ts`/`.tsx`) | 42 | 46 |
+| frontend suite | 39 files / 299 tests | 43 files / 336 tests |
+
+`App.tsx` shrank meaningfully (43%) but did not lose its socket-subscription
+role entirely. Four `socket.on` calls remain, deliberately:
+`combat.phaser-fired`, `combat.hit`, `combat.ship-destroyed`,
+`combat.decoy-intercept`. All four need the live player roster that only
+`App.tsx` holds; extracting them would mean threading that roster into a new
+hook for no simplification. Phase 4 moved eight of twelve subscriptions out,
+it did not eliminate the pattern.
+
+**Tests:** frontend suite run via `npm test`, exit 0: 43 test files / 336
+tests, all passing — matches the phase's own claim exactly. Backend suite run
+as a regression check (this phase touched no backend code) in one tracked
+`npx jest` process, never backgrounded: `Ran all test suites.` printed
+exactly once, 623 suites / 6,356 tests, all passing — unchanged from Phase
+3's close-out numbers, as expected. Both `backend/Dockerfile` and
+`frontend/Dockerfile` build clean from the repo root. Deploy gate unchanged
+in this phase's own range (`1d76d70..HEAD`): `git diff --name-only
+1d76d70..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
+on `branches: [master]` and `if: github.event_name == 'push'`; `git diff
+master -- VERSION` is empty.
+
+**Decisions made:** none new by this close-out; one correction made mid-phase
+and recorded in `docs/DECISIONS.md` 2026-09-11 ("Phase 4 plan corrected —
+the canon-citation ratchet does not scan `frontend/`") — the plan originally
+claimed `backend/test/balance/canon-citations.balance.spec.ts` scans the
+whole repo and would fail on a dropped frontend citation. It does not;
+`SOURCE_FILES` walks only `backend/src` and `backend/test`. The 45 canon
+citations in `frontend/` are checked by nothing, and every one moved in this
+phase was verified by hand rather than by a guard. Corrected in the plan at
+commit `dcdb521`. Filed as issue #22.
+
+**Next:** Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky). Can start any
+time.
+
+**Known issues:**
+- Issue #22 — 45 canon citations in `frontend/` are invisible to the
+  citation ratchet (see above).
+- Issue #23 — backend Jest global setup resets the shared `ge_test` database
+  on any invocation, including a single read-only spec.
+- Issue #24 — a test docblock cites a guard that has never existed.
+
+## 2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible
+
+**Completed:** nothing new. This is a correction to the 2026-09-11 "Phase 4
+close-out: the frontend, verified" entry above, found during the final
+whole-branch review of Phase 4. Two claims in that entry do not hold up
+against the code as it stands at `HEAD`.
+
+**Correction one — the roster claim.** That entry said the four surviving
+`socket.on` calls in `App.tsx` — `combat.phaser-fired`, `combat.hit`,
+`combat.ship-destroyed`, `combat.decoy-intercept` — "All four need the live
+player roster that only `App.tsx` holds." That is false for two of the four,
+checked directly against the handlers:
+
+| handler | reads the roster (`players`)? |
+|---|---|
+| `combat.hit` (`App.tsx:88-91`) | yes — `ctx.shipName` → `players.find` |
+| `combat.ship-destroyed` (`App.tsx:93-108`) | yes — `players.find` directly |
+| `combat.phaser-fired` (`App.tsx:83-86`) | no — `phaserFiredLine` ignores both its parameters and returns `null` unconditionally (`combatNarration.ts:42-47`) |
+| `combat.decoy-intercept` (`App.tsx:118-125`) | no — reads only `event` and `localShipId` |
+
+The honest reason all four stayed in `App.tsx` is cohesion: they are combat
+narration, and two of them do need the roster, so splitting the other two
+into their own hook would separate siblings for no gain. Cohesion is a fine
+reason. It is not the reason the close-out entry gave. This sentence
+originated in the close-out brief, not in independent verification, and the
+close-out repeated it without checking. `docs/superpowers/specs/2026-09-10-restructure-design.md`
+carried the same claim in its Phase 4 checklist line and has been corrected
+in place (it is not append-only).
+
+**Correction two — the hook-count metric.** That entry's table reported
+"hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in
+`App.tsx`: 15 → 3." No definition of "hook calls in `App.tsx`" reproduces a
+3. Measured directly against `1d76d70` (phase start) and `HEAD` (phase end)
+with `grep -noE '\b(use[A-Z][A-Za-z]*)(<[^>]*>)?\('`, filtered by hand to the
+relevant set:
+
+| reading | start | now |
+|---|---|---|
+| the five primitives, whole file | 14 | 2 |
+| the five primitives, `Terminal` only | 13 | 1 |
+| every hook call (primitives + custom hooks: `usePlayerList`, `useSocket`, `useEventLog`, `useScanMap`, `useFkeys`), `Terminal` only | 15 | 6 |
+
+The third reading is the only one that reproduces the "15" baseline the
+entry itself claims (`Terminal` is where every hook call in the file already
+lived, even at phase start — `App`'s own body has never held one but a
+single `useEffect`). Under that same reading the end-state figure is 6, not
+3: `usePlayerList`, `useEventLog`, `useSocket`, `useScanMap`, `useFkeys`, and
+one remaining `useEffect` (the combat-subscription effect). No reading in
+the table above produces a 3. The honest figure for this metric is **15 →
+6**, counting every hook call — primitive or custom — in the `Terminal`
+component, the only place in the file that calls hooks at all.
+
+**Tests:** none — no code changed. `npx tsc --noEmit` and the frontend Jest
+suite were re-run after adding one code comment as a separate item on the
+same branch (see the entry, if any, immediately following this one); both
+passed.
+
+**Decisions made:** none new. This is a correction of record, not a design
+change — the four `socket.on` calls stay together in `App.tsx` for
+cohesion, as before.
+
+**Next:** nothing — closes the two findings this entry addresses out of the
+final whole-branch review of Phase 4.
+
+**Known issues:** none new.
+
+**AMENDED, same day.** The handler-attribution table above cited line ranges
+(`App.tsx:83-86`, `App.tsx:88-91`, `App.tsx:93-108`, `App.tsx:118-125`,
+`combatNarration.ts:42-47`) that went stale within the same commit that added
+them — an 8-line comment added to `App.tsx` in that commit shifted every line
+after it, so the citations pointed at the wrong handlers by the time the
+commit landed. The table is restated here with the handlers named by symbol
+instead of by line, since a symbol survives the next edit and a line number
+does not:
+
+| handler | reads the roster (`players`)? |
+|---|---|
+| `handleCombatHit` (registers `combat.hit`) | yes — `ctx.shipName` → `players.find` |
+| `handleShipDestroyed` (registers `combat.ship-destroyed`) | yes — `players.find` directly |
+| `handlePhaserFired` (registers `combat.phaser-fired`) | no — calls `phaserFiredLine`, which ignores both its parameters and returns `null` unconditionally |
+| `handleDecoyIntercept` (registers `combat.decoy-intercept`) | no — reads only its event argument and `localShipId` |
+
+All four handlers and `phaserFiredLine` are unchanged from the original
+correction; only the pointers to them were wrong. Caught by the coordinator's
+review of this fix, not by any guard — the same defect class as issue #22
+(citations nothing verifies) and #24 (a citation to something that never
+existed), this time self-inflicted inside a correction commit. No new issue
+filed: the fix is in this same amendment, not deferred.
+
+---
+
+## 2026-09-11 — Test-guard issues #11, #13 and #23 closed, ahead of Phase 5
+
+The agreed order put the outstanding test-guard findings before Phase 5,
+because Phase 5's own justification in the restructure spec is that it needs
+the test suite as an unambiguous oracle, and all three findings say a guard
+does less than its name claims. #23 was added to the set because Phase 5 runs
+the backend suite on every change.
+
+**#11 — the citation guards could not see the shorthand.** Both
+`canon-citations.balance.spec.ts` and `docs-truth.balance.spec.ts` required the
+filename on every line number. This codebase names the file once and continues
+bare, in at least five separators (`, :NNN`, `and :NNN`, `then :NNN`, `/ :NNN`,
+and after a parenthesised symbol). **201 citations** across `backend/src` and
+`backend/test` were written that way. None was counted, none was bounds-checked,
+none could ever be quote-verified. `backend/test/balance/citation-scan.ts` now
+owns one rule covering every form. All 201 pass the bounds check on first run;
+five already carried a quote and verify against the vendored original.
+
+Baselines re-measured in the same commit, with the reason written beside each:
+
+| baseline | was | now |
+|---|---|---|
+| `unquoted` ceiling | 3268 | 3469 |
+| `TOTAL_FLOOR` | 3355 | 3561 |
+| quoted-pair floor | 78 | 86 |
+
+The scanner rule was validated against the whole corpus before it shipped:
+197 hits under the pre-existing file set, hand-checked, zero false positives,
+14 of them in `describe` titles rather than comments.
+
+**#13 — the fixture guard read prose as a fixture.**
+`backend/test/invariants/mask-comments.ts` blanks comments before the scan,
+length-preservingly, because the guard resolves a value's type by walking
+outward through enclosing object literals by character offset. The
+self-exemption is gone and the guard now scans itself. Verified by mutation,
+not by the suite going green: a temporary spec holding a real `topspeed: 8000`
+fixture alongside the same value in a line comment and a docblock was reported
+for the fixture and for neither comment.
+
+**#23 — a single read-only spec no longer resets the shared database.** Jest
+global setup classifies the selected specs with a transitive import walk
+(`backend/test/prisma-schema/helpers/needs-database.ts`) and skips
+`prisma db push --force-reset` when none of them reach Prisma. It is a walk
+rather than a directory list because the signal is not local — an integration
+spec that never writes the word Prisma still reaches the database through the
+service graph it imports. Both directions were verified by running one spec of
+each kind and reading global setup's output.
+
+**Suite:** 626 suites / 6385 tests green, up from 623 / 6356. `tsc --noEmit`
+clean. No production code was touched; every change is in `backend/test`,
+Jest's global setup, and `backend/prisma/CLAUDE.md`.
+
+**Known issues:** none new. Open backlog is unchanged apart from these three
+closing. The `ge_test` "one Jest process at a time" rule still stands — this
+fix removes one hazard (a narrow run with a wide side effect) and not the
+other (two runs racing).
+
+**Not done, deliberately:** the 45 canon citations in `frontend/` remain
+unguarded. That is issue #22, and it is a scope question — the citation guards
+are backend Jest specs and the frontend runs Vitest — which Phase 5 will be in
+a position to answer once the runners converge.
+
+---
+
+## 2026-09-11 — Phase 5 closed: Vitest and Prisma 7 landed, Nest 12 and TypeScript 7 are waiting on upstream
+
+Seven commits on `restructure`, `6a066a8..d5b1754`. Master untouched.
+
+| item | state |
+|---|---|
+| `moduleResolution` node10 → bundler | done, `39e9c74` |
+| oxlint `--type-aware` on the backend | done, `e0b3f41` |
+| boot-order oracle | done, `d589804` |
+| Jest → Vitest | done, `a048856` |
+| Prisma 5 → 7 | done, `d5b1754` |
+| NestJS 10 → 12 | **blocked**, issue #34 |
+| TypeScript 6 → 7 | **deferred to 7.1**, issue #35 |
+| CommonJS → ESM | **struck** — the premise was false |
+
+**Verified at close-out, by running it rather than recalling it:**
+
+| check | result |
+|---|---|
+| backend suite | 631 files / 6,408 tests green |
+| frontend suite | 43 files / 336 tests green |
+| `tsc --noEmit` | clean |
+| `npm run lint` | clean, and now type-aware |
+| both Docker images | build |
+| backend image | loads the Prisma client and the whole app module |
+| `prisma migrate deploy` in the image | reaches the schema, fails only on the connection |
+| deploy gate, `6a066a8..HEAD` | unchanged |
+| `VERSION` | unchanged |
+
+Backend suite was 626 / 6,385 at the start of the phase. The 23 extra tests are
+all new guards, not new features.
+
+**Dependency movement against master:** TypeScript 5.7 → 6.0.3, Jest 29 →
+removed, Vitest → 5.0.0, Prisma 5.22 → 7.10.0, NestJS unchanged at 10.4.15.
+
+### What the phase found that no one was looking for
+
+Eight issues, all pre-existing or upstream, none fixed in-phase per the standing
+rule:
+
+- **#27** — both `CLAUDE.md` files say "the two tick timers"; `TickService`
+  drives three.
+- **#28** — 136 test call sites drop a Promise and assert on the next line, so
+  they may be testing only the synchronous prefix of an async handler, and an
+  async rejection leaves the test green. None in `src`. This one matters beyond
+  its count: the phase's own justification is that it needs the suite as an
+  unambiguous oracle.
+- **#29** — five type-aware correctness findings in `backend/src`, three of them
+  stringification in error and invariant reporting paths, where the failure mode
+  is a diagnostic that reads `[object Object]` exactly when someone needs it.
+- **#30** — the heartbeats start before the galaxy exists and before the
+  ship-class cache is warm. Found because the boot-order test was written
+  expecting the opposite, and failed.
+- **#31** — the Node version guard checks four files and never the runtime
+  running the tests. This machine ran 6,387 tests on Node 22 while every
+  Dockerfile, CI job and `engines` field said 24.
+- **#32** — two `nav.handler` suites carry a docblock and no assertions. Jest
+  reports an empty `describe` as a passing suite.
+- **#33** — a `scoreF2` test asserted the one value `scoreF2` cannot affect,
+  behind a module mock that was hoisted above the file and never applied.
+- **#34, #35** — the two upstream blockers above.
+
+### Honest notes
+
+**The phase's premise was wrong and the plan argued from it.** "Prisma 7
+requires ESM" is false, and so is the chain that made ESM the first task. It was
+caught by testing the claim before planning, which is the only reason the phase
+did not spend its largest effort on work nothing needed.
+
+**The task order changed mid-execution**, on evidence rather than preference:
+Jest cannot load Nest 12, so Vitest moved ahead of it. That ruling is recorded
+in the plan document with the reproduction.
+
+**A causal claim was wrong twice before it was right.** The built image would
+not start; the cause was attributed first to the Dockerfile's `COPY` order, then
+to the generator inspecting `tsconfig.json`. Both were disproved by experiment,
+and a Dockerfile change made on the strength of the first was reverted. The
+third answer was confirmed by removing the fix and watching the container break
+again. The stale local file that produced both wrong answers is the lesson: a
+generated artifact is not evidence about what generation does now.
+
+**Known issue, carried forward:** the backend CI job does not build, so no test
+can inspect `dist/`, and CI has no Docker daemon. Two guards therefore assert
+directives in files and leave the boot to a human — the same split
+`node-runtime-version.spec.ts` has always used. An image that compiles and
+cannot start remains possible, and was possible this evening.
+
+**Next:** the remaining issue backlog, then playtests on local dev AND on
+`restructure`, then the merge conversation. `VERSION` gets its single bump at
+merge.
+
+## 2026-09-12 — Review of the restructure pull request (#45)
+
+`VERSION` took its single bump for the whole restructure: **0.15.0**. The branch
+opened as a pull request against master and CI ran on it for the first time —
+both suites green, the image build correctly skipped for a pull request. That
+closes **#40**.
+
+A read of the 117 production files in the diff produced six findings. Five are
+fixed here; the sixth is recorded below as deliberate.
+
+- **The `@ge/wire` suite ran nowhere.** Both CI jobs built the package and
+  neither tested it, so the one package whose change breaks two applications at
+  once was the only one with no gate. The backend job now runs it.
+  `test/unit/ci-runs-wire-tests.spec.ts` pins the step.
+- **Three command handlers took the ship-class cache `@Optional()`.** Absent it,
+  a scan finds nothing, `new ship` refuses every purchase and `rep` prints a
+  class number where a type name belongs — all silently, and invisibly to a
+  suite whose doubles supply the cache the container might not. The wiring was
+  correct; nothing asserted it. `test/integration/optional-deps-resolve.spec.ts`
+  boots the real container and does. Verified by unwiring `PhysicsModule` and
+  watching it go red.
+- **Two copies of the ship-key parser.** `useridOf` was defined in
+  `game.gateway.ts` and again in `narration.ts`, routing every private narration
+  line. `ship-identity.ts` exists for exactly this and says so. The stated reason
+  for the copy — a cycle with the gateway — does not apply to that module. Both
+  moved there, pinned by
+  `test/invariants/ship-key-parser-single-definition.spec.ts`.
+- **The `FIRST_CPU_CLASS` guard could not fail.** It filtered the class table
+  using the constant and then asserted the result was below it, which holds for
+  any value. It now derives the bound from the first non-PLAYER entry in the
+  generated table, the way GEMAIN.C:882 `cyb_class = i;` does.
+- **The frontend image installed the backend workspace.** An unscoped `npm ci`
+  pulled Nest, Prisma and Vitest in to run `tsc && vite build`. Scoped to
+  `frontend` and `packages/wire`, as the backend image already was. Guarded by
+  `test/unit/dockerfile-workspace-scope.spec.ts` and verified by building the
+  image and reading the bundle out of it.
+
+**Not fixed, deliberately:** `backend/package.json` and `frontend/package.json`
+still read `"version": "0.0.1"`. Neither is read by anything — the root `VERSION`
+is what the build bakes into both images — and giving them real numbers would
+create a second place for a release number to be wrong. The root `CLAUDE.md`
+cites that field's history for a reason; the answer is that it is not a version,
+not that it needs maintaining.

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../prisma/client';
 
 /**
  * Composite key for the in-memory ship state Map.

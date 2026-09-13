@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import type { ScanCell, PhysicsSectorTransitionPayload } from '../types/contracts';
-import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, PHYSICS_SECTOR_TRANSITION } from '../types/contracts';
+import type { ScanCell, PhysicsSectorTransitionPayload } from '@ge/wire';
+import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT, WIRE_EVENTS } from '@ge/wire';
 import { socket } from '../socket/socketClient';
+
+const PHYSICS_SECTOR_TRANSITION = WIRE_EVENTS.SERVER_TO_CLIENT.PHYSICS_SECTOR_TRANSITION;
 
 /**
  * Overlap priority for cells at the same grid position (FR-015, research.md R7).
@@ -52,12 +54,18 @@ interface ScanMapProps {
  * @see specs/010-react-frontend/data-model.md §B.4 ScanMapState
  */
 export function ScanMap({ cells, shipId = null, kind = null }: ScanMapProps): React.JSX.Element {
-  // Internal display state — cleared on sector transition, refreshed when cells prop changes
-  const [displayCells, setDisplayCells] = useState<ScanCell[] | null>(cells);
-
-  useEffect(() => {
-    setDisplayCells(cells);
-  }, [cells]);
+  /**
+   * What the map is showing: the `cells` prop, unless a sector crossing has
+   * blanked THAT grid.
+   *
+   * Blanking is remembered as the grid it applied to rather than as a flag, so
+   * a freshly arrived grid un-blanks the map during render. The previous shape
+   * mirrored the prop into state and re-synced it in an effect, which is a
+   * render-then-render-again for every scan and the thing
+   * `no-deriving-state-in-effects` exists to catch. @see issue #25
+   */
+  const [blankedGrid, setBlankedGrid] = useState<ScanCell[] | null>(null);
+  const displayCells = cells !== null && cells === blankedGrid ? null : cells;
 
   useEffect(() => {
     if (!shipId) return;
@@ -79,14 +87,14 @@ export function ScanMap({ cells, shipId = null, kind = null }: ScanMapProps): Re
      * @see docs/DECISIONS.md 2026-09-06 — only the sector scan clears on transit
      */
     const handleTransition = (payload: PhysicsSectorTransitionPayload) => {
-      if (payload.shipId === shipId && kind === 'se') setDisplayCells(null);
+      if (payload.shipId === shipId && kind === 'se') setBlankedGrid(cells);
     };
 
     socket.on(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
     return () => {
       socket.off(PHYSICS_SECTOR_TRANSITION, handleTransition as (...args: unknown[]) => void);
     };
-  }, [shipId, kind]);
+  }, [shipId, kind, cells]);
 
   // Build priority-resolved cell lookup: "x:y" → highest-priority ScanCell
   const cellMap = new Map<string, ScanCell>();
@@ -126,7 +134,7 @@ export function ScanMap({ cells, shipId = null, kind = null }: ScanMapProps): Re
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Sector Map</span>
       </div>
       <div

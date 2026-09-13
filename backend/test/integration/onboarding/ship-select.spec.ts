@@ -16,31 +16,21 @@ import { WsAuthGuard } from '../../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../../src/game/onboarding/onboarding.service';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const TEST_USERID = 'u-ship-select-test';
 
 function makeShipState(overrides: { userid: string; shipno: number; shipname: string; xcoord?: number; ycoord?: number }): ShipState {
-  return {
+  return baseMakeShip({
     userid: overrides.userid,
     shipno: overrides.shipno,
     shipname: overrides.shipname,
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: overrides.xcoord ?? 5, ycoord: overrides.ycoord ?? 3,
-    damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+    xcoord: overrides.xcoord ?? 5,
+    ycoord: overrides.ycoord ?? 3,
+    status: 0,
+    topspeed: 0,
+  });
 }
 
 /** Minimal Prisma-shaped ship row for use in findMany mocks. */
@@ -86,32 +76,32 @@ function makeClient(port: number): Socket {
 function makeBaseModule(
   shipMany: object[],
   findFirstResult: object | null = null,
-  boardMock: jest.Mock = jest.fn(),
-  getMock: jest.Mock = jest.fn().mockReturnValue(undefined),
-  shipClassCacheMock: object = { getTypeName: jest.fn().mockReturnValue('Scout'), onModuleInit: jest.fn() },
+  boardMock: Mock = vi.fn(),
+  getMock: Mock = vi.fn().mockReturnValue(undefined),
+  shipClassCacheMock: object = { getTypeName: vi.fn().mockReturnValue('Scout'), onModuleInit: vi.fn() },
 ) {
   const shipStateServiceMock = {
-    findByUserid: jest.fn().mockReturnValue([]),
-    findAllShips: jest.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue([]),
     get: getMock,
-    loadShip: jest.fn(),
-    mutate: jest.fn(),
-    size: jest.fn().mockReturnValue(0),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    unboard: jest.fn().mockResolvedValue(undefined),
+    loadShip: vi.fn(),
+    mutate: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    unboard: vi.fn().mockResolvedValue(undefined),
     board: boardMock,
   };
 
   const prismaMock = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-    mine: { findMany: jest.fn().mockResolvedValue([]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+    mine: { findMany: vi.fn().mockResolvedValue([]) },
     ship: {
-      findMany: jest.fn().mockResolvedValue(shipMany),
-      findFirst: jest.fn().mockResolvedValue(findFirstResult),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: vi.fn().mockResolvedValue(shipMany),
+      findFirst: vi.fn().mockResolvedValue(findFirstResult),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }),
+      findUnique: vi.fn().mockResolvedValue({ userid: TEST_USERID }),
     },
   };
 
@@ -121,14 +111,14 @@ function makeBaseModule(
     .overrideProvider(ShipStateService)
     .useValue(shipStateServiceMock)
     .overrideProvider(CommandRouterService)
-    .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+    .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
     .overrideProvider(PrismaService)
     .useValue(prismaMock)
     .overrideProvider(ShipClassCacheService)
     .useValue(shipClassCacheMock)
     .overrideProvider(WsAuthGuard)
     .useValue({
-      validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+      validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
         client.data.userid = TEST_USERID;
         client.data.username = 'TestPilot';
         return { sub: TEST_USERID, username: 'TestPilot' };
@@ -136,24 +126,24 @@ function makeBaseModule(
     })
     .overrideProvider(OnboardingService)
     .useValue({
-      buildClassListPayload: jest.fn().mockResolvedValue([]),
-      validateNameReply: jest.fn().mockReturnValue(false),
-      finalize: jest.fn(),
+      buildClassListPayload: vi.fn().mockResolvedValue([]),
+      validateNameReply: vi.fn().mockReturnValue(false),
+      finalize: vi.fn(),
     })
     .overrideProvider(GalaxyService)
     .useValue({
-      onModuleInit: jest.fn(),
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
+      onModuleInit: vi.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
     })
     .overrideProvider(PlanetStateService)
     .useValue({
-      get: jest.fn().mockReturnValue(undefined),
-      all: jest.fn().mockReturnValue([]),
-      size: jest.fn().mockReturnValue(0),
-      claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      all: vi.fn().mockReturnValue([]),
+      size: vi.fn().mockReturnValue(0),
+      claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
     });
 }
 
@@ -199,13 +189,13 @@ describe('Ship-select T7-A: 0 ships → onboarding free-starter path', () => {
 describe('Ship-select T7-B: 1 ship → auto-boards without selection menu', () => {
   let app: INestApplication;
   let port: number;
-  let boardMock: jest.Mock;
-  let getMock: jest.Mock;
+  let boardMock: Mock;
+  let getMock: Mock;
 
   beforeAll(async () => {
-    boardMock = jest.fn();
+    boardMock = vi.fn();
     const shipState = makeShipState({ userid: TEST_USERID, shipno: 1, shipname: 'Solo' });
-    getMock = jest.fn().mockReturnValue(shipState);
+    getMock = vi.fn().mockReturnValue(shipState);
 
     const module: TestingModule = await makeBaseModule(
       [makePrismaShip(1, 'Solo')],
@@ -258,11 +248,11 @@ describe('Ship-select T7-B: 1 ship → auto-boards without selection menu', () =
 describe('Ship-select T7-C: >1 ships → emits selection menu without boarding', () => {
   let app: INestApplication;
   let port: number;
-  let boardMock: jest.Mock;
+  let boardMock: Mock;
 
   beforeAll(async () => {
-    boardMock = jest.fn();
-    const getMock = jest.fn().mockReturnValue(undefined); // no warm cache
+    boardMock = vi.fn();
+    const getMock = vi.fn().mockReturnValue(undefined); // no warm cache
 
     const module: TestingModule = await makeBaseModule(
       [
@@ -326,8 +316,8 @@ describe('Ship-select T7-C: >1 ships → emits selection menu without boarding',
 describe('Ship-select T7-D: prompt:reply handling', () => {
   let app: INestApplication;
   let port: number;
-  let boardMock: jest.Mock;
-  let prismaMock: { ship: { findMany: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock }; shipClass: { findMany: jest.Mock }; mine: { findMany: jest.Mock }; user: { findUnique: jest.Mock } };
+  let boardMock: Mock;
+  let prismaMock: { ship: { findMany: Mock; findFirst: Mock; updateMany: Mock }; shipClass: { findMany: Mock }; mine: { findMany: Mock }; user: { findUnique: Mock } };
 
   // shipno 1 and 4: index 1 = shipno 1, index 2 = shipno 4 — makes index ≠ shipno for index 2
   const ship1 = makePrismaShip(1, 'Falcon', 1, 5.5, 3.5);
@@ -338,16 +328,16 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
 
     // Simulate in-memory map: board() stores the state, get() retrieves it.
     const inMemoryMap = new Map<string, ShipState>();
-    boardMock = jest.fn().mockImplementation((state: ShipState) => {
+    boardMock = vi.fn().mockImplementation((state: ShipState) => {
       inMemoryMap.set(`${state.userid}:${state.shipno}`, state);
     });
-    const getMock = jest.fn().mockImplementation((userid: string, shipno: number) => {
+    const getMock = vi.fn().mockImplementation((userid: string, shipno: number) => {
       return inMemoryMap.get(`${userid}:${shipno}`);
     });
 
     // findFirst honors the where-clause so an off-by-one or always-index-1 bug would fail.
     const makeFindFirstImpl = () =>
-      jest.fn().mockImplementation((args: { where: { userid: string; shipno: number } }) => {
+      vi.fn().mockImplementation((args: { where: { userid: string; shipno: number } }) => {
         const shipno = args?.where?.shipno;
         if (shipno === 1) return Promise.resolve(ship1);
         if (shipno === 4) return Promise.resolve(ship2);
@@ -355,29 +345,29 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
       });
 
     prismaMock = {
-      shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-      mine: { findMany: jest.fn().mockResolvedValue([]) },
+      shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+      mine: { findMany: vi.fn().mockResolvedValue([]) },
       ship: {
-        findMany: jest.fn().mockResolvedValue([ship1, ship2]),
+        findMany: vi.fn().mockResolvedValue([ship1, ship2]),
         findFirst: makeFindFirstImpl(),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
-        findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }),
+        findUnique: vi.fn().mockResolvedValue({ userid: TEST_USERID }),
       },
     };
 
     void shipState2; // used implicitly via inMemoryMap after boarding
 
     const shipStateServiceMock = {
-      findByUserid: jest.fn().mockReturnValue([]),
-      findAllShips: jest.fn().mockReturnValue([]),
+      findByUserid: vi.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue([]),
       get: getMock,
-      loadShip: jest.fn(),
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(0),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
+      loadShip: vi.fn(),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(0),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
       board: boardMock,
     };
 
@@ -387,14 +377,14 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
       .overrideProvider(ShipStateService)
       .useValue(shipStateServiceMock)
       .overrideProvider(CommandRouterService)
-      .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+      .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .overrideProvider(ShipClassCacheService)
-      .useValue({ getTypeName: jest.fn().mockReturnValue('Scout'), onModuleInit: jest.fn() })
+      .useValue({ getTypeName: vi.fn().mockReturnValue('Scout'), onModuleInit: vi.fn() })
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           client.data.userid = TEST_USERID;
           client.data.username = 'TestPilot';
           return { sub: TEST_USERID, username: 'TestPilot' };
@@ -402,24 +392,24 @@ describe('Ship-select T7-D: prompt:reply handling', () => {
       })
       .overrideProvider(OnboardingService)
       .useValue({
-        buildClassListPayload: jest.fn().mockResolvedValue([]),
-        validateNameReply: jest.fn().mockReturnValue(false),
-        finalize: jest.fn(),
+        buildClassListPayload: vi.fn().mockResolvedValue([]),
+        validateNameReply: vi.fn().mockReturnValue(false),
+        finalize: vi.fn(),
       })
       .overrideProvider(GalaxyService)
       .useValue({
-        onModuleInit: jest.fn(),
-        getSectorPlanets: jest.fn().mockReturnValue([]),
-        getSectorWormholes: jest.fn().mockReturnValue([]),
-        findPlanetByName: jest.fn().mockReturnValue(null),
-        getMeta: jest.fn(),
+        onModuleInit: vi.fn(),
+        getSectorPlanets: vi.fn().mockReturnValue([]),
+        getSectorWormholes: vi.fn().mockReturnValue([]),
+        findPlanetByName: vi.fn().mockReturnValue(null),
+        getMeta: vi.fn(),
       })
       .overrideProvider(PlanetStateService)
       .useValue({
-        get: jest.fn().mockReturnValue(undefined),
-        all: jest.fn().mockReturnValue([]),
-        size: jest.fn().mockReturnValue(0),
-        claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+        get: vi.fn().mockReturnValue(undefined),
+        all: vi.fn().mockReturnValue([]),
+        size: vi.fn().mockReturnValue(0),
+        claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
       })
       .compile();
 

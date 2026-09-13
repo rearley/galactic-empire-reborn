@@ -2,26 +2,15 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { Command, CommandContext, CommandResult } from '../../src/game/commands/command.types';
 import { MessageId, formatMessage } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeCmd(overrides: Partial<Command> & { keyword: string }): Command {
@@ -30,7 +19,7 @@ function makeCmd(overrides: Partial<Command> & { keyword: string }): Command {
     aliases: overrides.aliases ?? [],
     minArgs: overrides.minArgs ?? 0,
     argMissingMessage: overrides.argMissingMessage ?? 'missing arg',
-    handler: overrides.handler ?? jest.fn().mockReturnValue({ lines: [{ text: 'ok', category: 'success' }] }),
+    handler: overrides.handler ?? vi.fn().mockReturnValue({ lines: [{ text: 'ok', category: 'success' }] }),
   };
 }
 
@@ -46,51 +35,51 @@ describe('CommandRouterService', () => {
   });
 
   describe('tokenisation', () => {
-    it('leading/trailing whitespace is stripped', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('leading/trailing whitespace is stripped', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      router.dispatch('   rotate 90   ', ship, ctx);
+      await router.dispatch('   rotate 90   ', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['90'], ctx);
     });
 
-    it('internal whitespace is collapsed', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('internal whitespace is collapsed', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      router.dispatch('rotate     90', ship, ctx);
+      await router.dispatch('rotate     90', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['90'], ctx);
     });
 
-    it('mixed-case keyword "ROT" matches "rotate"', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('mixed-case keyword "ROT" matches "rotate"', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
       // The original matches on the first 3 characters (GECMDS.C:249 gesearch),
       // and its table entry is {"rot", cmd_rotate} — so ROT resolves, and so
       // would ROTATE. This previously asserted UNKNOWN_CMD under the port's
       // exact-match lookup, which is the behaviour the prefix match replaces.
-      router.dispatch('ROT 45', ship, ctx);
+      await router.dispatch('ROT 45', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['45'], ctx);
     });
 
-    it('lower-cased keyword "rotate" matches', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('lower-cased keyword "rotate" matches', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      router.dispatch('rotate 90', ship, ctx);
+      await router.dispatch('rotate 90', ship, ctx);
       expect(handler).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('alias resolution', () => {
-    it('alias dispatches to the canonical handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('alias dispatches to the canonical handler', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'impulse', aliases: ['imp'], minArgs: 1, handler, argMissingMessage: 'IMPFMT' }));
-      router.dispatch('imp 50', ship, ctx);
+      await router.dispatch('imp 50', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['50'], ctx);
     });
 
-    it('alias args are passed correctly', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('alias args are passed correctly', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', aliases: ['rot'], minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      router.dispatch('rot 45', ship, ctx);
+      await router.dispatch('rot 45', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['45'], ctx);
     });
   });
@@ -120,9 +109,9 @@ describe('CommandRouterService', () => {
       expect(result.lines[0].category).toBe('system');
     });
 
-    it('unknown keyword does not mutate ship state', () => {
+    it('unknown keyword does not mutate ship state', async () => {
       const before = { ...ship };
-      router.dispatch('flarp', ship, ctx);
+      await router.dispatch('flarp', ship, ctx);
       expect(ship.dirty).toBe(before.dirty);
     });
   });
@@ -139,50 +128,50 @@ describe('CommandRouterService', () => {
       expect(result.lines[0].text).toBe(formatMessage(MessageId.ROTFMT));
     });
 
-    it('arg array passed to handler is post-trim post-split', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('arg array passed to handler is post-trim post-split', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
-      router.dispatch('warp  5  ', ship, ctx);
+      await router.dispatch('warp  5  ', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
     });
   });
 
   describe('case-insensitive keyword dispatch', () => {
-    it('mixed-case keyword "RoTaTe" dispatches correctly', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('mixed-case keyword "RoTaTe" dispatches correctly', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'rotate', minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));
-      router.dispatch('RoTaTe 90', ship, ctx);
+      await router.dispatch('RoTaTe 90', ship, ctx);
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it('mixed-case alias "IMP" dispatches to impulse handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('mixed-case alias "IMP" dispatches to impulse handler', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'impulse', aliases: ['imp'], minArgs: 1, handler, argMissingMessage: 'IMPFMT' }));
-      router.dispatch('IMP 50', ship, ctx);
+      await router.dispatch('IMP 50', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['50'], ctx);
     });
   });
 
   // T039: additional forgiving-input coverage (US3)
   describe('US3 — forgiving input and safe error handling', () => {
-    it('WARP (all-caps) dispatches to warp handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('WARP (all-caps) dispatches to warp handler', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', aliases: ['war'], minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
-      router.dispatch('WARP 5', ship, ctx);
+      await router.dispatch('WARP 5', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
     });
 
-    it('WAR (upper-case alias) dispatches to warp handler', () => {
-      const handler = jest.fn().mockReturnValue({ lines: [] });
+    it('WAR (upper-case alias) dispatches to warp handler', async () => {
+      const handler = vi.fn().mockReturnValue({ lines: [] });
       router.register(makeCmd({ keyword: 'warp', aliases: ['war'], minArgs: 1, handler, argMissingMessage: 'WARPFMT' }));
-      router.dispatch('WAR 5', ship, ctx);
+      await router.dispatch('WAR 5', ship, ctx);
       expect(handler).toHaveBeenCalledWith(ship, ['5'], ctx);
     });
 
     it('rotate with invalid arg passes through to handler — validator failure, not router failure', () => {
       // The router dispatches the call; the handler's validator returns NUMOOR.
       // This verifies the router does NOT intercept validator failures.
-      const handler = jest.fn().mockReturnValue({
+      const handler = vi.fn().mockReturnValue({
         lines: [{ text: formatMessage(MessageId.NUMOOR, -180, 180), category: 'system' }],
       });
       router.register(makeCmd({ keyword: 'rotate', aliases: ['rot'], minArgs: 1, handler, argMissingMessage: 'ROTFMT' }));

@@ -4,43 +4,35 @@
 import { CommandResult } from '../../../src/game/commands/command.types';
 import { ReportHandlerService } from '../../../src/game/commands/handlers/report.handler';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_FOOD, I_MEN, ITEM_NAMES, ITEM_TONS, capitaliseItem } from '../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const MAX_TONS = 500;
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'USS Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 3.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'USS Test',
+    xcoord: 5.5,
+    ycoord: 3.5,
     items: Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeService(maxTons = MAX_TONS) {
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([
-        { classNumber: 1, typeName: 'Interceptor', hasCloak: false, maxTons },
-      ]),
-    },
-  };
-  const service = new ReportHandlerService(prismaMock as unknown as PrismaService);
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, typeName: 'Interceptor', hasCloak: false, maxTons });
+  const service = new ReportHandlerService(
+    prismaMock as unknown as PrismaService,
+    undefined,
+    shipClassCache,
+  );
   return { service };
 }
 
@@ -53,21 +45,18 @@ function makeService(maxTons = MAX_TONS) {
 describe('ReportHandlerService — cargo sub-command', () => {
   it('empty cargo shows REP_CARGO_NONE', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text === formatMessage(MessageId.REP_CARGO_NONE))).toBe(true);
   });
 
   it('always includes REP_CARGO_TOTAL line', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines.some(l => l.text.includes('Total:'))).toBe(true);
   });
 
   it('REP_CARGO_TOTAL shows capacity from ship class', async () => {
     const { service } = makeService(250);
-    await service.onModuleInit();
     const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     const totalLine = result.lines.find(l => l.text.includes('Total:'));
     expect(totalLine?.text).toContain('250');
@@ -75,7 +64,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('non-zero item shows REP_CARGO_LINE with item name', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
@@ -84,7 +72,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('non-zero item does not show REP_CARGO_NONE', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 5n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
@@ -93,7 +80,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('REP_CARGO_TOTAL reflects correct tonnage for loaded cargo', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n; // 10 * ITEM_TONS[I_FOOD] tons
     const expectedTons = Math.round(10 * ITEM_TONS[I_FOOD]);
@@ -104,7 +90,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('multiple items each show a REP_CARGO_LINE', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
     items[I_MEN] = 5n;
@@ -117,7 +102,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('zero-quantity items are not listed', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const items = Array(NUMITEMS).fill(0n);
     items[I_FOOD] = 10n;
     const result = await (service.command.handler(makeShip({ items }), ['cargo'], {}) as Promise<CommandResult>);
@@ -127,7 +111,6 @@ describe('ReportHandlerService — cargo sub-command', () => {
 
   it('header contains REP01 with ship name', async () => {
     const { service } = makeService();
-    await service.onModuleInit();
     const result = await (service.command.handler(makeShip(), ['cargo'], {}) as Promise<CommandResult>);
     expect(result.lines[0].text).toContain('USS Test');
   });

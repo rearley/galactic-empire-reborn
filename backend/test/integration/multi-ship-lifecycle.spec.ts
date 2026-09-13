@@ -44,15 +44,15 @@ import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 
@@ -67,27 +67,15 @@ function makeShipState(overrides: {
   xcoord?: number;
   ycoord?: number;
 }): ShipState {
-  return {
+  return baseMakeShip({
     userid: overrides.userid,
     shipno: overrides.shipno,
     shipname: overrides.shipname,
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: overrides.xcoord ?? 5, ycoord: overrides.ycoord ?? 3,
-    damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+    xcoord: overrides.xcoord ?? 5,
+    ycoord: overrides.ycoord ?? 3,
+    status: 0,
+    topspeed: 0,
+  });
 }
 
 /** Minimal Prisma-shaped ship row for use in findMany mocks. */
@@ -142,31 +130,31 @@ function makeClient(port: number): Socket {
 function makeGatewayApp(
   shipManyRows: object[],
   findFirstResult: object | null,
-  boardMock: jest.Mock,
-  getMock: jest.Mock,
+  boardMock: Mock,
+  getMock: Mock,
 ) {
   const shipStateServiceMock = {
-    findByUserid: jest.fn().mockReturnValue([]),
-    findAllShips: jest.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue([]),
     get: getMock,
-    loadShip: jest.fn(),
-    mutate: jest.fn(),
-    size: jest.fn().mockReturnValue(0),
-    flushAndUnload: jest.fn().mockResolvedValue(undefined),
-    unboard: jest.fn().mockResolvedValue(undefined),
+    loadShip: vi.fn(),
+    mutate: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    flushAndUnload: vi.fn().mockResolvedValue(undefined),
+    unboard: vi.fn().mockResolvedValue(undefined),
     board: boardMock,
   };
 
   const prismaMock = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
-    mine: { findMany: jest.fn().mockResolvedValue([]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
+    mine: { findMany: vi.fn().mockResolvedValue([]) },
     ship: {
-      findMany: jest.fn().mockResolvedValue(shipManyRows),
-      findFirst: jest.fn().mockResolvedValue(findFirstResult),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: vi.fn().mockResolvedValue(shipManyRows),
+      findFirst: vi.fn().mockResolvedValue(findFirstResult),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({ userid: TEST_USERID }),
+      findUnique: vi.fn().mockResolvedValue({ userid: TEST_USERID }),
     },
   };
 
@@ -174,14 +162,14 @@ function makeGatewayApp(
     .overrideProvider(ShipStateService)
     .useValue(shipStateServiceMock)
     .overrideProvider(CommandRouterService)
-    .useValue({ register: jest.fn(), dispatch: jest.fn().mockReturnValue({ lines: [] }) })
+    .useValue({ register: vi.fn(), dispatch: vi.fn().mockReturnValue({ lines: [] }) })
     .overrideProvider(PrismaService)
     .useValue(prismaMock)
     .overrideProvider(ShipClassCacheService)
-    .useValue({ getTypeName: jest.fn().mockReturnValue('Interceptor'), onModuleInit: jest.fn() })
+    .useValue({ getTypeName: vi.fn().mockReturnValue('Interceptor'), onModuleInit: vi.fn() })
     .overrideProvider(WsAuthGuard)
     .useValue({
-      validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+      validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
         client.data.userid = TEST_USERID;
         client.data.username = 'MultiShipPilot';
         return { sub: TEST_USERID, username: 'MultiShipPilot' };
@@ -189,24 +177,24 @@ function makeGatewayApp(
     })
     .overrideProvider(OnboardingService)
     .useValue({
-      buildClassListPayload: jest.fn().mockResolvedValue([]),
-      validateNameReply: jest.fn().mockReturnValue(false),
-      finalize: jest.fn(),
+      buildClassListPayload: vi.fn().mockResolvedValue([]),
+      validateNameReply: vi.fn().mockReturnValue(false),
+      finalize: vi.fn(),
     })
     .overrideProvider(GalaxyService)
     .useValue({
-      onModuleInit: jest.fn(),
-      getSectorPlanets: jest.fn().mockReturnValue([]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
+      onModuleInit: vi.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
     })
     .overrideProvider(PlanetStateService)
     .useValue({
-      get: jest.fn().mockReturnValue(undefined),
-      all: jest.fn().mockReturnValue([]),
-      size: jest.fn().mockReturnValue(0),
-      claim: jest.fn(), buy: jest.fn(), sell: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      all: vi.fn().mockReturnValue([]),
+      size: vi.fn().mockReturnValue(0),
+      claim: vi.fn(), buy: vi.fn(), sell: vi.fn(),
     });
 }
 
@@ -237,7 +225,7 @@ const makeDestroyedEvent = (
 describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', () => {
   let app: INestApplication;
   let port: number;
-  let boardMock: jest.Mock;
+  let boardMock: Mock;
   let inMemoryMap: Map<string, ShipState>;
 
   const ship1 = makePrismaShip(1, 'Falcon', 5.5, 3.5);
@@ -249,15 +237,15 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
     // beforeEach clears it so each test starts with a cold cache —
     // guaranteeing board() fires and the warm-cache path is not hit.
     inMemoryMap = new Map<string, ShipState>();
-    boardMock = jest.fn();
+    boardMock = vi.fn();
     boardMock.mockImplementation((state: ShipState) => {
       inMemoryMap.set(`${state.userid}:${state.shipno}`, state);
     });
-    const getMock = jest.fn().mockImplementation((userid: string, shipno: number) => {
+    const getMock = vi.fn().mockImplementation((userid: string, shipno: number) => {
       return inMemoryMap.get(`${userid}:${shipno}`);
     });
 
-    const findFirstImpl = jest.fn().mockImplementation(
+    const findFirstImpl = vi.fn().mockImplementation(
       (args: { where: { userid: string; shipno: number } }) => {
         const { shipno } = args?.where ?? {};
         if (shipno === 1) return Promise.resolve(ship1);
@@ -278,7 +266,7 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
 
     // Patch findFirst on the prisma mock
     const prisma = module.get(PrismaService) as unknown as {
-      ship: { findMany: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
+      ship: { findMany: Mock; findFirst: Mock; updateMany: Mock };
     };
     prisma.ship.findFirst = findFirstImpl;
 
@@ -313,6 +301,37 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
     // Second entry = ship #2 (Hawk, sector 12,7)
     expect(payload.ships[1]).toMatchObject({ index: 2, shipno: 2, shipname: 'Hawk', sector: { x: 12, y: 7 } });
 
+    socket.disconnect();
+  });
+
+  /**
+   * A refused selection has to say why.
+   *
+   * The client has rendered an error banner on this screen since the fleet menu
+   * landed and the server never sent one, so the two ways to be refused — a
+   * number outside the list, and a hull destroyed between the prompt and the
+   * reply — both came back as the same silent re-list. @see issue #6
+   */
+  it('an out-of-range choice re-lists the fleet AND says what is wrong', async () => {
+    const socket = makeClient(port);
+    await waitForEvent(socket, 'prompt:ship-select');
+
+    const [again] = await Promise.all([
+      waitForEvent<{ ships: unknown[]; error?: string }>(socket, 'prompt:ship-select'),
+      Promise.resolve().then(() => socket.emit('prompt:reply', { value: '9' })),
+    ]);
+
+    expect(again.ships).toHaveLength(2);
+    expect(again.error).toBe('Enter a number from 1 to 2.');
+    expect(boardMock).not.toHaveBeenCalled();
+
+    socket.disconnect();
+  });
+
+  it('the first prompt carries no error — nothing has been refused yet', async () => {
+    const socket = makeClient(port);
+    const first = await waitForEvent<{ error?: string }>(socket, 'prompt:ship-select');
+    expect(first.error).toBeUndefined();
     socket.disconnect();
   });
 
@@ -353,7 +372,7 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
 
     // board() must NOT have been called for ship #1 — it is dormant (DB-only)
     const boardedWithShip1 = boardMock.mock.calls.some(
-      ([state]: [ShipState]) => state.shipno === 1,
+      ([state]) => (state as ShipState).shipno === 1,
     );
     expect(boardedWithShip1).toBe(false);
 
@@ -372,18 +391,18 @@ describe('Lifecycle T8-A: fleet purchase simulation + ship-select + dormancy', (
 describe('Lifecycle T8-B: post-death reconnect → survivor auto-board (no selection menu)', () => {
   let app: INestApplication;
   let port: number;
-  let boardMock: jest.Mock;
+  let boardMock: Mock;
   let inMemoryMap: Map<string, ShipState>;
 
   const ship1 = makePrismaShip(1, 'Falcon', 5.5, 3.5);
 
   beforeAll(async () => {
     inMemoryMap = new Map<string, ShipState>();
-    boardMock = jest.fn();
+    boardMock = vi.fn();
     boardMock.mockImplementation((state: ShipState) => {
       inMemoryMap.set(`${state.userid}:${state.shipno}`, state);
     });
-    const getMock = jest.fn().mockImplementation((userid: string, shipno: number) => {
+    const getMock = vi.fn().mockImplementation((userid: string, shipno: number) => {
       return inMemoryMap.get(`${userid}:${shipno}`);
     });
 
@@ -460,8 +479,8 @@ describe('Lifecycle T8-C: zero-fleet reconnect → free-starter onboarding path'
   let port: number;
 
   beforeAll(async () => {
-    const boardMock = jest.fn();
-    const getMock = jest.fn().mockReturnValue(undefined);
+    const boardMock = vi.fn();
+    const getMock = vi.fn().mockReturnValue(undefined);
 
     const module: TestingModule = await makeGatewayApp(
       [], // DB has 0 ships — both hulls deleted
@@ -532,72 +551,64 @@ describe('Lifecycle T8-C: zero-fleet reconnect → free-starter onboarding path'
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + noships decrement', () => {
-  let deleteManyMock: jest.Mock;
-  let userFindUniqueMock: jest.Mock;
-  let userUpdateMock: jest.Mock;
-  let transactionMock: jest.Mock;
-  let removeFromGameMock: jest.Mock;
-  let serverEmitMock: jest.Mock;
+  let deleteManyMock: Mock;
+  let userFindUniqueMock: Mock;
+  let userUpdateMock: Mock;
+  let transactionMock: Mock;
+  let removeFromGameMock: Mock;
+  let serverEmitMock: Mock;
 
   const buildGateway = (noships: number, deletedCount = 1) => {
-    serverEmitMock = jest.fn();
-    deleteManyMock = jest.fn().mockResolvedValue({ count: deletedCount });
-    userFindUniqueMock = jest.fn().mockResolvedValue({ noships });
-    userUpdateMock = jest.fn().mockResolvedValue(undefined);
-    removeFromGameMock = jest.fn();
+    serverEmitMock = vi.fn();
+    deleteManyMock = vi.fn().mockResolvedValue({ count: deletedCount });
+    userFindUniqueMock = vi.fn().mockResolvedValue({ noships });
+    userUpdateMock = vi.fn().mockResolvedValue(undefined);
+    removeFromGameMock = vi.fn();
 
     const txMock = {
       // findFirst is the in-transaction AI-status fallback used when the victim is
       // not in memory (get → undefined here). status 1 = PLAYER → delete proceeds.
-      ship: { deleteMany: deleteManyMock, findFirst: jest.fn().mockResolvedValue({ status: 1 }) },
+      ship: { deleteMany: deleteManyMock, findFirst: vi.fn().mockResolvedValue({ status: 1 }) },
       user: { findUnique: userFindUniqueMock, update: userUpdateMock },
     };
-    transactionMock = jest.fn().mockImplementation(
+    transactionMock = vi.fn().mockImplementation(
       (fn: (tx: typeof txMock) => Promise<void>) => fn(txMock),
     );
 
     const mockPrisma = {
       ship: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        updateMany: jest.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn(),
       },
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: transactionMock,
     } as unknown as PrismaService;
 
     const mockShipStateSvc: Partial<ShipStateService> = {
-      get: jest.fn().mockReturnValue(undefined),
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      get: vi.fn().mockReturnValue(undefined),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
       removeFromGame: removeFromGameMock,
-      findAllShips: jest.fn().mockReturnValue([]),
-      findByUserid: jest.fn().mockReturnValue([]),
+      findAllShips: vi.fn().mockReturnValue([]),
+      findByUserid: vi.fn().mockReturnValue([]),
     };
 
-    const registry = new ConnectedShipsRegistry(
-      mockShipStateSvc as ShipStateService,
-    );
-
-    const gw = new GameGateway(
-      mockShipStateSvc as ShipStateService,
-      {} as CommandRouterService,
-      registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      mockPrisma,
-      { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+    const gw = makeGateway({
+      shipStateService: mockShipStateSvc as ShipStateService,
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: mockPrisma,
+      onboardingService: { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
     (gw as unknown as { server: unknown }).server = {
       // handleCombatShipDestroyed also sends YOURDEAD to the victim's own room
       // (GEFUNCS.C:978-987), so the double needs a to().
-      to: jest.fn(() => ({ emit: jest.fn() })),
-      except: jest.fn(() => ({ emit: jest.fn() })),
+      to: vi.fn(() => ({ emit: vi.fn() })),
+      except: vi.fn(() => ({ emit: vi.fn() })),
       emit: serverEmitMock,
-      sockets: { sockets: { get: jest.fn().mockReturnValue(undefined) } },
+      sockets: { sockets: { get: vi.fn().mockReturnValue(undefined) } },
     };
     return gw;
   };
@@ -606,7 +617,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('killing ship #2 (of 2) — deleteMany targets shipno:2 only, noships 2 → 1', async () => {
     const gw = buildGateway(2);
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // Only ship #2 deleted — ship #1 untouched
@@ -629,7 +640,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('killing ship #2 does NOT evict ship #1 from memory', async () => {
     const gw = buildGateway(2);
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     // removeFromGame must have been called exactly once with shipno:2
@@ -641,7 +652,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('killing last ship (noships 1 → 0) — decrements to 0 (triggers free-starter path on reconnect)', async () => {
     const gw = buildGateway(1);
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(deleteManyMock).toHaveBeenCalledWith({
@@ -656,7 +667,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('noships underflow guard — does NOT decrement when noships already 0', async () => {
     const gw = buildGateway(0); // stale/raced state: noships already 0
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 1));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(userUpdateMock).not.toHaveBeenCalled();
@@ -667,7 +678,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('row already gone (deleteMany count=0) → no noships decrement (race safety)', async () => {
     const gw = buildGateway(2, 0); // deletedCount=0 → already deleted
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(deleteManyMock).toHaveBeenCalledTimes(1);
@@ -680,7 +691,7 @@ describe('Lifecycle T8-D: handleCombatShipDestroyed — multi-ship delete + nosh
 
   it('broadcasts COMBAT_SHIP_DESTROYED galaxy-wide after the delete transaction', async () => {
     const gw = buildGateway(2);
-    gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
+    await gw.handleCombatShipDestroyed(makeDestroyedEvent(TEST_USERID, 2));
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(serverEmitMock).toHaveBeenCalledWith(

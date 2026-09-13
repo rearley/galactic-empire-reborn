@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PlanetStateService } from '../../planet/planet-state.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRepository } from '../../player/user.repository';
 import { planetKey } from '../../planet/planet-state.types';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
@@ -15,7 +15,7 @@ import { parseWithdrawAmount } from './helpers/withdraw-amount';
 export class WithdrawHandlerService {
   constructor(
     private readonly planetService: PlanetStateService,
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
   ) {}
 
   get command(): Command {
@@ -65,10 +65,7 @@ export class WithdrawHandlerService {
     }
 
     // Credit the user's cash account
-    await this.prisma.user.update({
-      where: { userid: ship.userid },
-      data: { cash: { increment: result.amount } },
-    });
+    await this.users.addCash(ship.userid, result.amount);
 
     return {
       lines: [

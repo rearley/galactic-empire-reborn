@@ -34,30 +34,22 @@ import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { PhaserHandlerService } from '../../../src/game/commands/handlers/phaser.handler';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../../../src/game/combat/combat-events';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+  return baseMakeShip({
+    shipname: 'T',
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    topspeed: 10,
     channel: over.channel ?? over.shipno ?? 1,
-  };
+    ...over,
+  });
 }
 
 function makeShipMapService(ships: ShipState[]) {
@@ -94,14 +86,14 @@ async function makeCombatHarness(ships: ShipState[]) {
   const subscribers: Array<(c: TickContext) => void> = [];
   const tickService = {
     subscribe: (_k: TickKind, h: (c: TickContext) => void) => { subscribers.push(h); return () => {}; },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]), create: jest.fn(), delete: jest.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]), create: vi.fn(), delete: vi.fn(),
   } as unknown as MineRepository;
   const events = new EventEmitter2();
   const logger = new Logger('KillerLogoffSpec');
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const service = new CombatTickService(
     tickService, svc, mineRepo, new MineRegistry(),
@@ -124,7 +116,7 @@ async function makeCombatHarness(ships: ShipState[]) {
 const ctx: CommandContext = {};
 
 describe('attacker name survives a channel scrub', () => {
-  it('a phaser hit records the firer NAME alongside lastfired on the victim', () => {
+  it('a phaser hit records the firer NAME alongside lastfired on the victim', async () => {
     const firer = makeShip({
       userid: 'usr_kil', shipno: 1, channel: 7, shipname: 'Marauder',
       xcoord: 0, ycoord: 5, heading: 0, phasrtype: 20,
@@ -138,7 +130,7 @@ describe('attacker name survives a channel scrub', () => {
       svc, makeClassCache(), new EventEmitter2(), new Mulberry32Adapter(42),
     );
 
-    handler.command.handler(firer, ['90', '0'], ctx);
+    await handler.command.handler(firer, ['90', '0'], ctx);
 
     expect(victim.lastfired).toBe(7);
     expect(victim.lastfiredBy).toEqual({ channel: 7, name: 'Marauder' });

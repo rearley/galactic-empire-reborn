@@ -164,7 +164,7 @@ describe('GalaxyService idempotency (G4)', () => {
  */
 function patchTransactionToFailOnMetaInsert(localPrisma: PrismaService): void {
   const realTxFn = localPrisma.$transaction.bind(localPrisma);
-  jest.spyOn(localPrisma, '$transaction').mockImplementation((fn: any, opts?: any) => {
+  vi.spyOn(localPrisma, '$transaction').mockImplementation((fn: any, opts?: any) => {
     if (typeof fn !== 'function') {
       // Batch transaction — leave untouched (used in test cleanup)
       return realTxFn(fn, opts);

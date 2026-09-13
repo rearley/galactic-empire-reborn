@@ -12,66 +12,34 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
 import { TickService } from '../../../src/game/tick/tick.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: number; shpclass: number }): ShipState {
-  return {
+  return baseMakeShip({
     shipname: 'Test',
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5,
     ycoord: 5,
-    damage: 0,
     energy: 50000,
     phasr: 100,
     phasrtype: 2,
-    kills: 0,
     lastfired: 255,
     shieldtype: 2,
     shieldstat: 1,
     shield: 2,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
     helm: 1,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
     decout: [0, 0, 0, 0, 0],
-    jammer: 0,
     freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
-    status: 1,
     cybmine: 255,
     cybskill: 10,
     cybupdate: 50,
     tick: 1,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
     topspeed: 8,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
-function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
+async function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
   const rand = new Mulberry32Adapter(seed);
   const events = new EventEmitter2();
 
@@ -102,10 +70,10 @@ function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
   } as unknown as ShipClassCacheService & { setClass: (n: number, e: unknown) => void };
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockResolvedValue(undefined),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 
@@ -125,7 +93,7 @@ function buildHarness(noClaim: number, numCybertrons: number, seed = 42) {
     events,
     rand,
   );
-  svc.onModuleInit();
+  await svc.onModuleInit();
 
   function fireTick(n = 1): void {
     for (let i = 0; i < n; i++) {
@@ -177,7 +145,7 @@ describe('T020 — noClaim cap: at most noClaim Cybertrons claim a player at onc
   it('with noClaim=3, N+1=4 Cybertrons: at most 3 hold cybmine=playerShipno after many ticks', async () => {
     const noClaim = 3;
     const numCybertrons = noClaim + 1; // 4 Cybertrons competing for noClaim=3 slots
-    const { shipMap, fireTick } = buildHarness(noClaim, numCybertrons, 42);
+    const { shipMap, fireTick } = await buildHarness(noClaim, numCybertrons, 42);
 
     // Drive enough ticks that all Cybertrons have had a chance to activate
     // Each Cybertron starts with tick=1 so first activation is next tick.
@@ -198,7 +166,7 @@ describe('T020 — noClaim cap: at most noClaim Cybertrons claim a player at onc
   it('with noClaim=1, exactly at most 1 Cybertron can claim a player', async () => {
     const noClaim = 1;
     const numCybertrons = 3; // 3 Cybertrons, only 1 can claim
-    const { shipMap, fireTick } = buildHarness(noClaim, numCybertrons, 77);
+    const { shipMap, fireTick } = await buildHarness(noClaim, numCybertrons, 77);
 
     fireTick(10);
     await new Promise((r) => setImmediate(r));

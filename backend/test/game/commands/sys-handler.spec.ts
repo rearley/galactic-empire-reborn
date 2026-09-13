@@ -1,46 +1,43 @@
 import { SysHandlerService } from '../../../src/game/commands/handlers/sys.handler';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { CybertronControlService } from '../../../src/game/cybertron/cybertron-control.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(o: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'usr_sysop', shipno: 1, shipname: 'Nemesis', shpclass: 1, username: 'rick',
-    heading: 0, head2b: 0, speed: 0, speed2b: 0, xcoord: 0.5, ycoord: 0.5,
-    damage: 0, energy: 1000, phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0, degrees: 0, percent: 0,
-    tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [], ltorpsDistance: [], lmisslChannel: [], lmisslDistance: [],
-    lmisslEnergy: [], decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'usr_sysop',
+    shipname: 'Nemesis',
+    username: 'rick',
+    xcoord: 0.5,
+    ycoord: 0.5,
     items: new Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0, firecntl: 0,
-    destruct: 0, status: 0, cybmine: 0, cybskill: 0, cybupdate: 0, tick: 0,
-    emulate: 0, minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...o,
-  } as ShipState;
+    status: 0,
+    topspeed: 0,
+    ...o,
+  });
 }
 
 function makeService(opts: { ships?: ShipState[] } = {}) {
-  const mutate = jest.fn((_u: string, _s: number, fn: (s: ShipState) => void) => {
+  const mutate = vi.fn((_u: string, _s: number, fn: (s: ShipState) => void) => {
     fn(state);
   });
   const state = opts.ships?.[0] ?? makeShip();
   const shipState = {
     mutate,
-    findAllShips: jest.fn().mockReturnValue(opts.ships ?? [state]),
+    findAllShips: vi.fn().mockReturnValue(opts.ships ?? [state]),
   } as unknown as ShipStateService;
   const prisma = {
-    user: { update: jest.fn().mockResolvedValue({}) },
-    shipClass: { findMany: jest.fn().mockResolvedValue([
-      { classNumber: 1, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 },
-      { classNumber: 2, typeName: 'Star Cruiser', cybCanAttack: true, noClaim: 2 },
-    ]) },
+    user: { update: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
-  const svc = new SysHandlerService(shipState, prisma, new CybertronControlService());
-  return { svc, state, mutate, prisma };
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 5, typeName: 'Interceptor', cybCanAttack: false, noClaim: 1 });
+  shipClassCache.setForTest(2, { maxAcceleration: 0, maxWarp: 9, typeName: 'Star Cruiser', cybCanAttack: true, noClaim: 2 });
+  const svc = new SysHandlerService(shipState, prisma, new CybertronControlService(), undefined, shipClassCache);
+  return { svc, state, mutate, prisma, shipClassCache };
 }
 
 async function run(svc: SysHandlerService, ship: ShipState, args: string[]): Promise<CommandResult> {
@@ -168,7 +165,7 @@ describe('audit trail', () => {
     // actions available, and "who gave themselves a million credits" is not a
     // question anyone should have to answer from memory.
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['cash', '1000000']);
     expect(spy).toHaveBeenCalled();
     // Inspect the arguments directly: ShipState carries BigInt item counts, so
@@ -181,7 +178,7 @@ describe('audit trail', () => {
 
   it('does NOT log read-only commands, which would be noise', async () => {
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['help']);
     await run(svc, makeShip(), ['classlist']);
     expect(spy).not.toHaveBeenCalled();
@@ -191,9 +188,34 @@ describe('audit trail', () => {
   it('does not log a REFUSED attempt as though it succeeded', async () => {
     delete process.env.GE_SYSOP_USERNAME;
     const { svc } = makeService();
-    const spy = jest.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
+    const spy = vi.spyOn(SysHandlerService.prototype as unknown as { audit: (...a: unknown[]) => void }, 'audit');
     await run(svc, makeShip(), ['cash', '999']);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('`sys class` / `sys classlist` read the boot-time cache, not the table', () => {
+  beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'rick'; });
+  afterEach(() => { delete process.env.GE_SYSOP_USERNAME; });
+
+  it('sys class resolves the target class through ShipClassCacheService.get/getClassNumbers', async () => {
+    const { svc, state, shipClassCache } = makeService();
+    const getSpy = vi.spyOn(shipClassCache, 'get');
+    const listSpy = vi.spyOn(shipClassCache, 'getClassNumbers');
+
+    await run(svc, state, ['class', '2']);
+
+    expect(getSpy).toHaveBeenCalledWith(2);
+    expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('sys classlist enumerates classes through ShipClassCacheService.getClassNumbers', async () => {
+    const { svc, shipClassCache } = makeService();
+    const listSpy = vi.spyOn(shipClassCache, 'getClassNumbers');
+
+    await run(svc, makeShip(), ['classlist']);
+
+    expect(listSpy).toHaveBeenCalled();
   });
 });

@@ -23,17 +23,13 @@
  * ignored it, broadcasting the kill to every connected client.
  */
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
   const build = (ships: Array<{ userid: string; msgFilter: boolean }>) => {
@@ -41,22 +37,17 @@ describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
     const shipStateService = {
       findAllShips: () => ships.map((s) => ({ ...s, shipno: 1 })),
       findByUserid: () => [],
-      removeFromGame: jest.fn(),
+      removeFromGame: vi.fn(),
       get: () => undefined,
     } as unknown as ShipStateService;
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
-      new ConnectedShipsRegistry(shipStateService),
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      { $transaction: jest.fn().mockResolvedValue(undefined), shipClass: { findFirst: jest.fn() } } as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      prisma: { $transaction: vi.fn().mockResolvedValue(undefined), shipClass: { findFirst: vi.fn() } } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
 
     let pendingExcept: string[] = [];
     (gateway as unknown as { server: unknown }).server = {

@@ -18,19 +18,16 @@ import { GameGateway } from '../../src/gateway/game.gateway';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
-import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
-import { mockRandom } from '../fixtures/mock-random';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult, ScanRenderEvent } from '../../src/game/commands/command.types';
 import { Socket } from 'socket.io';
 import { SCAN_GRID_WIDTH, SCAN_GRID_HEIGHT } from '../../src/game/constants';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway as makeTestGateway } from '../helpers/make-gateway';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +39,7 @@ interface EmittedCall {
 function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
   const calls: EmittedCall[] = [];
   const socket = {
-    emit: jest.fn((event: string, payload: unknown) => {
+    emit: vi.fn((event: string, payload: unknown) => {
       calls.push({ event, payload });
     }),
     id: 'test-socket-id',
@@ -52,43 +49,32 @@ function makeMockSocket(): { socket: Socket; calls: EmittedCall[] } {
 }
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'TestShip', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 10.5, ycoord: 7.5, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'TestShip',
+    xcoord: 10.5,
+    ycoord: 7.5,
+    energy: 50000,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 async function makeScanService(ships: ShipState[], scanRange = 50_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
@@ -96,24 +82,14 @@ async function makeScanService(ships: ShipState[], scanRange = 50_000) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 
 function makeGateway(scanHandler: ScanHandlerService): GameGateway {
-  return new GameGateway(
-    {} as unknown as ShipStateService,
-    {} as unknown as CommandRouterService,
-    {} as unknown as ConnectedShipsRegistry,
-    {} as unknown as WsAuthGuard,
-    {} as unknown as PrismaService,
-    {} as unknown as OnboardingService,
-    scanHandler,
-    { getTypeName: jest.fn() } as never,
-    mockRandom,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  return makeTestGateway({ scanHandler });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

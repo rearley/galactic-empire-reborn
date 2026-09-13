@@ -10,10 +10,11 @@
  * rather than layout and is documented below.
  */
 import { RosHandlerService } from '../../src/game/commands/handlers/ros.handler';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 function makeHandler(rows: unknown[]): RosHandlerService {
-  const prisma = { user: { findMany: jest.fn().mockResolvedValue(rows) } };
-  return new RosHandlerService(prisma as never);
+  const prisma = { user: { findMany: vi.fn().mockResolvedValue(rows) } };
+  return new RosHandlerService(new UserRepository(prisma as never));
 }
 
 async function render(handler: RosHandlerService): Promise<string[]> {

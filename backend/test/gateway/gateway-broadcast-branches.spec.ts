@@ -1,18 +1,17 @@
 import 'reflect-metadata';
-import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { BEACON_EVENT } from '../../src/gateway/events/beacon.event';
 import { CYBERTRON_EVENT } from '../../src/game/cybertron/cybertron-events';
 import { GESTAT_AVAIL, GESTAT_USER, GESTAT_AUTO, UNIVMAX } from '../../src/game/constants';
 import { Random } from '../../src/game/combat/random.port';
 import { mockRandom } from '../fixtures/mock-random';
+import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 /**
  * The gateway's BROADCAST AND SCOPING decisions — who is addressed, and in
@@ -63,9 +62,9 @@ interface FakeShip {
 interface FakeSocket {
   id: string;
   data: Record<string, unknown>;
-  emit: jest.Mock;
-  join: jest.Mock;
-  leave: jest.Mock;
+  emit: Mock;
+  join: Mock;
+  leave: Mock;
 }
 
 interface RoomEmit {
@@ -96,30 +95,26 @@ const build = (random: Random = mockRandom) => {
   const shipStateService = {
     findAllShips: () => [...ships.values()],
     findByUserid: () => [],
-    removeFromGame: jest.fn(),
+    removeFromGame: vi.fn(),
     get: (userid: string, shipno: number) => ships.get(`${userid}:${shipno}`),
   } as unknown as ShipStateService;
 
   const registry = new ConnectedShipsRegistry(shipStateService);
 
-  const gateway = new GameGateway(
+  const gateway = makeGateway({
     shipStateService,
-    { dispatch: jest.fn() } as unknown as CommandRouterService,
     registry,
-    { validate: jest.fn() } as unknown as WsAuthGuard,
-    {
-      $transaction: jest.fn().mockResolvedValue(undefined),
-      shipClass: { findFirst: jest.fn() },
-      ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      user: { update: jest.fn() },
+    wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+    prisma: {
+      $transaction: vi.fn().mockResolvedValue(undefined),
+      shipClass: { findFirst: vi.fn() },
+      ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      user: { update: vi.fn() },
     } as unknown as PrismaService,
-    {} as unknown as OnboardingService,
-    { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-    { getTypeName: () => 'Interceptor' } as never,
+    scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+    shipClassCache: { getTypeName: () => 'Interceptor' } as unknown as ShipClassCacheService,
     random,
-    { emit: jest.fn(), on: jest.fn() } as never,
-    new PresenceService(),
-  );
+  });
 
   const target = (room: string): Record<string, unknown> => ({
     emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },
@@ -152,9 +147,9 @@ const build = (random: Random = mockRandom) => {
     const sock: FakeSocket = {
       id,
       data: { userid, activeShipNo: shipno },
-      emit: jest.fn(),
-      join: jest.fn(),
-      leave: jest.fn(),
+      emit: vi.fn(),
+      join: vi.fn(),
+      leave: vi.fn(),
     };
     sockets.set(id, sock);
     return sock;
@@ -555,11 +550,16 @@ describe('processBroadcasts — the room prefixes that are not Socket.io rooms',
     const sameCaptainOtherHull = h.addSocket('sock-other-hull', 'usr_scanned', 1);
     const bystander = h.addSocket('sock-bystander', 'usr_other', 1);
 
-    send(h, { room: 'ship:usr_scanned:2', event: 'scan.notice', payload: { by: 'Rick' } });
+    // 'command.notice' is the real event this address type carries in
+    // production — scan.handler.ts's `sca sh` uses exactly this room shape
+    // (`ship:<userid>:<shipno>`) with this event to tell one hull it has been
+    // scanned, per the `sca sh` citation in this describe block's own doc
+    // comment above.
+    send(h, { room: 'ship:usr_scanned:2', event: 'command.notice', payload: { lines: [] } });
 
-    expect(received(wanted, 'scan.notice')).toEqual([{ by: 'Rick' }]);
-    expect(received(sameCaptainOtherHull, 'scan.notice')).toEqual([]);
-    expect(received(bystander, 'scan.notice')).toEqual([]);
+    expect(received(wanted, 'command.notice')).toEqual([{ lines: [] }]);
+    expect(received(sameCaptainOtherHull, 'command.notice')).toEqual([]);
+    expect(received(bystander, 'command.notice')).toEqual([]);
   });
 
   /**
@@ -573,7 +573,7 @@ describe('processBroadcasts — the room prefixes that are not Socket.io rooms',
    */
   it('an untagged galaxy broadcast goes out unfiltered, payload intact', () => {
     const h = build();
-    const onboarding: FakeSocket = { id: 'sock-new', data: {}, emit: jest.fn(), join: jest.fn(), leave: jest.fn() };
+    const onboarding: FakeSocket = { id: 'sock-new', data: {}, emit: vi.fn(), join: vi.fn(), leave: vi.fn() };
     h.sockets.set(onboarding.id, onboarding);
 
     send(h, { room: 'galaxy', event: 'message.send', payload: { text: 'all hands' } });

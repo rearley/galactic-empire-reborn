@@ -26,9 +26,11 @@ import { PlanetStateService } from '../../../../src/game/planet/planet-state.ser
 import type { Random } from '../../../../src/game/combat/random.port';
 import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { CybertronControlService } from '../../../../src/game/cybertron/cybertron-control.service';
 import { MAXSHIPS, UNIVMAX } from '../../../../src/game/constants';
 import { NUMITEMS, I_TORP } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 const ctx: CommandContext = {};
 
@@ -36,25 +38,22 @@ const ctx: CommandContext = {};
 const AT_ZYGOR = 11;
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'usr_buyer', shipno: 1, shipname: 'Test', shpclass: 4,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0.5, ycoord: 0.5, damage: 0, energy: 65000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: AT_ZYGOR, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'usr_buyer',
+    shipname: 'Test',
+    shpclass: 4,
+    xcoord: 0.5,
+    ycoord: 0.5,
+    energy: 65000,
+    phasr: 100,
+    phasrtype: 1,
+    shieldtype: 1,
+    where: AT_ZYGOR,
     items: new Array<bigint>(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 7, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
+    topspeed: 7,
     username: 'Sysop',
-    dirty: false, ...over,
-  } as ShipState;
+    ...over,
+  });
 }
 
 interface FakeClass {
@@ -135,6 +134,15 @@ function makePrisma(db: FakeDb, classes: FakeClass[] = [DESTROYER, SCOW]): Prism
   return prisma as unknown as PrismaService;
 }
 
+/** The boot-time cache, seeded the same way makePrisma's fake table is. */
+function makeShipClassCache(classes: FakeClass[] = [DESTROYER, SCOW]): ShipClassCacheService {
+  const cache = new ShipClassCacheService({} as never);
+  for (const c of classes) {
+    cache.setForTest(c.classNumber, { maxAcceleration: 0, ...c });
+  }
+  return cache;
+}
+
 /** A ShipStateService stand-in whose `mutate` really mutates. */
 function makeShipState(ships: ShipState[]): ShipStateService {
   const map = new Map<string, ShipState>();
@@ -159,7 +167,11 @@ const textOf = (r: CommandResult): string => r.lines.map((l) => l.text).join('\n
 
 describe('NewShipHandlerService — purchase refusals that protect the wallet', () => {
   function harness(db: FakeDb, ship: ShipState, classes?: FakeClass[]) {
-    const service = new NewShipHandlerService(makePrisma(db, classes), makeShipState([ship]), { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
+    const service = new NewShipHandlerService(
+      makePrisma(db, classes), makeShipState([ship]),
+      { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random,
+      undefined, makeShipClassCache(classes),
+    );
     return (args: string[]) => service.command.handler(ship, args, ctx) as Promise<CommandResult>;
   }
 
@@ -297,7 +309,11 @@ describe('NewShipHandlerService — purchase refusals that protect the wallet', 
 
 describe('NewShipHandlerService — upgrade gates and the arithmetic behind them', () => {
   function harness(db: FakeDb, ship: ShipState) {
-    const service = new NewShipHandlerService(makePrisma(db), makeShipState([ship]), { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random);
+    const service = new NewShipHandlerService(
+      makePrisma(db), makeShipState([ship]),
+      { bySector: () => [] } as unknown as PlanetStateService, { next: () => 0.5 } as Random,
+      undefined, makeShipClassCache(),
+    );
     return (args: string[]) => service.command.handler(ship, args, ctx) as Promise<CommandResult>;
   }
 
@@ -489,7 +505,7 @@ describe('SysHandlerService — the subcommands that mint, move and destroy', ()
   });
 
   function harness(ships: ShipState[], db: FakeDb = makeDb(), cyb = new CybertronControlService()) {
-    const service = new SysHandlerService(makeShipState(ships), makePrisma(db), cyb);
+    const service = new SysHandlerService(makeShipState(ships), makePrisma(db), cyb, undefined, makeShipClassCache());
     return {
       /** The caller defaults to the first ship — the sysop issuing the command. */
       run: (args: string[], ship: ShipState = ships[0]) =>

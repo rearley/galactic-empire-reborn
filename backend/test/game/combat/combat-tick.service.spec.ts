@@ -25,29 +25,22 @@ import {
   PRELOAD,
   TORPSPED,
 } from '../../../src/game/constants';
+import { makeShip as buildShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
+// Local defaults layered on the shared factory: this suite's ships run hot
+// (50000 energy) at warp-capable topspeed so combat resolves in one tick.
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+  return buildShip({
+    shipname: 'T',
+    energy: 50000,
+    topspeed: 10,
+    ...over,
     // A ship in the game holds a unique `channel` (this port's usrnum) and
     // attribution reads it, not `shipno`. These fixtures stage firer and victim
     // by giving each a distinct shipno, so mirror it into channel.
     channel: over.channel ?? over.shipno ?? 1,
-  };
+  });
 }
 
 interface Harness {
@@ -80,20 +73,20 @@ async function makeHarness(ships: ShipState[] = []): Promise<Harness> {
       subscribers.push(h);
       return () => {};
     },
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
   const mineRepo = {
-    findAllActive: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    delete: jest.fn(),
+    findAllActive: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    delete: vi.fn(),
   } as unknown as MineRepository;
 
   const mineRegistry = new MineRegistry();
   const events = new EventEmitter2();
   const logger = new Logger('CombatTickServiceSpec');
   // Suppress error noise from fault-isolation case.
-  jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+  vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const classCache = new ShipClassCacheService({} as never);
   classCache.setForTest(1, {
@@ -236,19 +229,19 @@ describe('CombatTickService — projectile travel pass (T029)', () => {
         subscribers.push(h);
         return () => {};
       },
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
     const mineRepo = {
-      findAllActive: jest.fn().mockResolvedValue([]),
-      create: jest.fn(),
-      delete: jest.fn(),
+      findAllActive: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      delete: vi.fn(),
     } as unknown as MineRepository;
 
     const mineRegistry = new MineRegistry();
     const events = new EventEmitter2();
     const logger = new Logger('CombatTickServiceProjectileSpec');
-    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
     const classCache = new ShipClassCacheService({} as never);
     classCache.setForTest(1, {
@@ -555,7 +548,7 @@ describe('CombatTickService — mine sweep (T036)', () => {
     fire: () => Promise<void>;
     events: EventEmitter2;
     shipMap: Map<string, ShipState>;
-    deleteSpy: jest.Mock;
+    deleteSpy: Mock;
     registry: MineRegistry;
   }> {
     const shipMap = new Map<string, ShipState>();
@@ -577,20 +570,20 @@ describe('CombatTickService — mine sweep (T036)', () => {
         subscribers.push(h);
         return () => {};
       },
-      registerSnapshotProvider: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
     } as unknown as import('../../../src/game/tick/tick.service').TickService;
 
-    const deleteSpy = jest.fn().mockResolvedValue(undefined);
+    const deleteSpy = vi.fn().mockResolvedValue(undefined);
     const mineRepo = {
-      findAllActive: jest.fn().mockResolvedValue(mines),
-      create: jest.fn(),
+      findAllActive: vi.fn().mockResolvedValue(mines),
+      create: vi.fn(),
       delete: deleteSpy,
     } as unknown as MineRepository;
 
     const registry = new MineRegistry();
     const events = new EventEmitter2();
     const logger = new Logger('MineSweepSpec');
-    jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
     const classCache = new ShipClassCacheService({} as never);
     classCache.setForTest(1, {

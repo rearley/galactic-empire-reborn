@@ -1,10 +1,10 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PlanetStateService } from '../planet/planet-state.service';
+import { PLANET_STATE_PORT, type PlanetStatePort } from '../planet/planet-state.port';
 import { resolveIonCannonHit, PLANET_ION_FIRED } from '../planet/ion-cannon';
 import { cdistance, shieldhit } from '../combat/combat-math';
 import { I_ION } from '../constants/items';
 import { I_FLUX } from '../constants/items';
-import { Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TickService } from '../tick/tick.service';
 import { TickOrder } from '../tick/tick-order';
 import { TickContext, TickKind, Unsubscribe } from '../tick/tick.types';
@@ -83,7 +83,7 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
     private readonly maintenanceService: MaintenanceService,
     // Optional: a planet's ion cannons need the live planet map, and the many
     // hand-built test harnesses construct this service without one.
-    @Optional() private readonly planets?: PlanetStateService,
+    @Optional() @Inject(PLANET_STATE_PORT) private readonly planets?: PlanetStatePort,
     @Optional() private readonly events?: EventEmitter2,
   ) {}
 

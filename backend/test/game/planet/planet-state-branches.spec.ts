@@ -51,6 +51,7 @@ import type { ShipStateService } from '../../../src/game/ship/ship-state.service
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_MEN, I_FOOD, I_TROOPS } from '../../../src/game/constants/items';
 import { NEUTRAL_RESTOCK_QTY } from '../../../src/game/planet/planet-economy';
+import type { Mock } from 'vitest';
 
 /** The two fields of a hull these paths touch. */
 interface Hold {
@@ -85,7 +86,7 @@ interface Harness {
   svc: PlanetStateService;
   planet: PlanetState;
   hold: Hold;
-  update: jest.Mock;
+  update: Mock;
 }
 
 /**
@@ -97,10 +98,10 @@ function makeHarness(
   planet: PlanetState = makePlanet(),
   hold: Hold = makeHold({ [I_FOOD]: 1_000n }),
 ): Harness {
-  const update = jest.fn().mockResolvedValue({});
+  const update = vi.fn().mockResolvedValue({});
   const prisma = {
-    planet: { update, findMany: jest.fn().mockResolvedValue([]) },
-    user: { updateMany: jest.fn().mockResolvedValue({}) },
+    planet: { update, findMany: vi.fn().mockResolvedValue([]) },
+    user: { updateMany: vi.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
 
   const ships = {

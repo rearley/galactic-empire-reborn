@@ -30,28 +30,20 @@ import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry, MineState } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Probe', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 5.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Probe',
+    xcoord: 5.5,
+    ycoord: 5.5,
+    phasrtype: 1,
+    shieldtype: 1,
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...over,
+    topspeed: 8,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
 function makeMine(over: Partial<MineState> = {}): MineState {
@@ -64,21 +56,21 @@ function makeMine(over: Partial<MineState> = {}): MineState {
 
 async function makeService(ships: ShipState[], mines: MineState[], scanRange = 100_000) {
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    findByUserid: jest.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
   const prismaMock = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange }]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([{ classNumber: 1, scanRange }]) },
   };
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
-    getMeta: jest.fn(),
-    onModuleInit: jest.fn(),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
+    getMeta: vi.fn(),
+    onModuleInit: vi.fn(),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
   const registry = new MineRegistry();
   registry.hydrate(mines);
 
@@ -89,7 +81,6 @@ async function makeService(ships: ShipState[], mines: MineState[], scanRange = 1
     planetServiceMock as unknown as PlanetStateService,
     registry,
   );
-  await service.onModuleInit();
   return service;
 }
 
@@ -100,7 +91,7 @@ async function makeServiceWithPlanet(ship: ShipState) {
   const planet = {
     id: 1, xsect: 5, ysect: 5, plnum: 1,
     xcoord: ship.xcoord, ycoord: ship.ycoord, name: 'Zygor',
-  } as unknown as import('@prisma/client').Planet;
+  } as unknown as import('../../src/prisma/client').Planet;
   const service = new ScanHandlerService(
     { findAllShips: () => [ship], findByName: () => undefined, findByUserid: () => [] } as unknown as ShipStateService,
     { shipClass: { findMany: async () => [{ classNumber: 1, scanRange: 100_000 }] } } as unknown as PrismaService,
@@ -111,7 +102,6 @@ async function makeServiceWithPlanet(ship: ShipState) {
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
   );
-  await service.onModuleInit();
   return service;
 }
 

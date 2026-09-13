@@ -41,6 +41,42 @@ describe('inMemoryShipMatchesDb', () => {
     expect(violations[0].detail).toContain('energy');
   });
 
+  /**
+   * The whole job of this reporter is to say WHICH value drifted. `String(v)`
+   * on an object renders `[object Object]`, so for a structured field — cargo
+   * is the one in the list — the report named the field and then told you
+   * nothing about either side, which is most of its usefulness. It is also the
+   * failure mode where the diagnostic disappears exactly when it is needed.
+   * @see issue #29
+   */
+  it('names both values for a structured field, never [object Object]', () => {
+    const world = {
+      ships: [
+        {
+          shipId: 'A',
+          lastFlushedAt: FAR_PAST,
+          xcoord: 5, ycoord: 5, energy: 1000, damage: 0, shieldsUp: true,
+          cargo: { food: 10n, men: 2n },
+        },
+      ],
+      dbShips: {
+        A: {
+          xcoord: 5, ycoord: 5, energy: 1000, damage: 0, shieldsUp: true,
+          cargo: { food: 9n, men: 2n },
+          userExists: true,
+        },
+      },
+    };
+
+    const violations = inMemoryShipMatchesDb.run(world);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).not.toContain('[object Object]');
+    expect(violations[0].detail).toContain('food');
+    expect(violations[0].detail).toContain('10');
+    expect(violations[0].detail).toContain('9');
+  });
+
   it('passes when every field matches', () => {
     const world = {
       ships: [

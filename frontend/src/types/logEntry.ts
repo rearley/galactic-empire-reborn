@@ -1,4 +1,4 @@
-import type { EventLogLine } from './contracts';
+import type { EventLogLine } from '@ge/wire';
 
 /**
  * A log line as the UI holds it: the wire line plus a stable React key.

@@ -3,6 +3,7 @@ import { WarpHandlerService } from '../../../src/game/commands/handlers/warp.han
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 /**
  * Five-outcome (six counting WARPSPD2) gate test for the `warp` command.
@@ -13,24 +14,11 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
  */
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 6, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Test',
+    topspeed: 6,
     ...overrides,
-  };
+  });
 }
 
 function build(maxWarpByClass: Record<number, number>) {
@@ -115,35 +103,35 @@ describe('warp gate sequence (FR-012)', () => {
  * `imp` already handled this (impulse.handler.ts:44); warp did not.
  */
 describe('warp course argument — GECMDS.C:cmd_warp', () => {
-  it('turns to a relative course given alongside the speed', () => {
+  it('turns to a relative course given alongside the speed', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 100, head2b: 100 });
-    h.command.handler(ship, ['6', '45'], {});
+    await h.command.handler(ship, ['6', '45'], {});
     expect(ship.head2b).toBe(145);
   });
 
-  it('wraps past 360', () => {
+  it('wraps past 360', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 350, head2b: 350 });
-    h.command.handler(ship, ['6', '30'], {});
+    await h.command.handler(ship, ['6', '30'], {});
     expect(ship.head2b).toBe(20);
   });
 
-  it('accepts a negative relative course', () => {
+  it('accepts a negative relative course', async () => {
     const h = build({ 1: 10 });
     const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 10, head2b: 10 });
-    h.command.handler(ship, ['6', '-30'], {});
+    await h.command.handler(ship, ['6', '-30'], {});
     expect(ship.head2b).toBe(340);
   });
 
-  it('holds the current heading when no course is given', () => {
+  it('holds the current heading when no course is given', async () => {
     // C defaults the argument to "0", so a bare `war` means straight ahead.
     const h = build({ 1: 10 });
     // head2b == heading: this ship is flying straight, not mid-turn. A bare
   // `war` holds a turn already ordered (head2b != heading), so a fixture that
   // disagreed with itself would exercise that path instead of this one.
   const ship = makeShip({ shpclass: 1, topspeed: 10, heading: 174, head2b: 174 });
-    h.command.handler(ship, ['6'], {});
+    await h.command.handler(ship, ['6'], {});
     expect(ship.head2b).toBe(174);
   });
 

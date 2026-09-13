@@ -20,33 +20,26 @@ import { GalaxyService } from '../../../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../../../src/game/combat/mine.registry';
 import { PrismaService } from '../../../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../../src/game/planet/planet-state.types';
 import { CommandContext, CommandResult } from '../../../../src/game/commands/command.types';
 import { NUMITEMS } from '../../../../src/game/constants/items';
 import { NEUTRAL_ZONE_OWNER, NEUTRAL_ZONE_OWNER_DISPLAY } from '../../../../src/game/combat/neutral-zone';
+import { makeShip as buildShip } from '../../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 const ctx: CommandContext = {};
 
+// Local defaults layered on the shared factory: this suite's ships are named
+// 'Test', not yet boarded (status 0), stationary (topspeed 0).
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return buildShip({
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makePlanet(overrides: Partial<PlanetState> = {}): PlanetState {
@@ -74,44 +67,46 @@ const SHIP_CLASSES = [
 interface Harness {
   service: ScanHandlerService;
   shipService: {
-    findAllShips: jest.Mock;
-    findByName: jest.Mock;
-    get: jest.Mock;
+    findAllShips: Mock;
+    findByName: Mock;
+    get: Mock;
   };
   prisma: {
-    shipClass: { findMany: jest.Mock };
-    user: { findUnique: jest.Mock };
-    wormhole: { findMany: jest.Mock; findFirst: jest.Mock };
+    user: { findUnique: Mock };
+    wormhole: { findMany: Mock; findFirst: Mock };
   };
-  planetService: { get: jest.Mock; bySector: jest.Mock; byName: jest.Mock };
+  planetService: { get: Mock; bySector: Mock; byName: Mock };
   mines: MineRegistry;
 }
 
 function build(ships: ShipState[] = [], planets: PlanetState[] = []): Harness {
   const shipService = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn().mockReturnValue(undefined),
-    get: jest.fn().mockReturnValue(undefined),
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn().mockReturnValue(undefined),
+    get: vi.fn().mockReturnValue(undefined),
   };
   const prisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue(SHIP_CLASSES) },
-    user: { findUnique: jest.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
     wormhole: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
   };
+  const shipClassCache = new ShipClassCacheService({} as never);
+  for (const c of SHIP_CLASSES) {
+    shipClassCache.setForTest(c.classNumber, { maxAcceleration: 0, maxWarp: 0, ...c });
+  }
   const galaxy = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
   const planetService = {
-    get: jest.fn((x: number, y: number, n: number) =>
+    get: vi.fn((x: number, y: number, n: number) =>
       planets.find((p) => p.xsect === x && p.ysect === y && p.plnum === n)),
-    bySector: jest.fn((x: number, y: number) =>
+    bySector: vi.fn((x: number, y: number) =>
       planets.filter((p) => p.xsect === x && p.ysect === y)),
-    byName: jest.fn().mockReturnValue(undefined),
+    byName: vi.fn().mockReturnValue(undefined),
   };
   const mines = new MineRegistry();
 
@@ -121,6 +116,8 @@ function build(ships: ShipState[] = [], planets: PlanetState[] = []): Harness {
     galaxy as unknown as GalaxyService,
     planetService as unknown as PlanetStateService,
     mines,
+    undefined,
+    shipClassCache,
   );
   return { service, shipService, prisma, planetService, mines };
 }
@@ -148,7 +145,6 @@ describe('sca sh <letter> — resolving a contact through the scan letter table'
   it('refuses a letter when no scan has been run — there is no table to read', async () => {
     const { me, them } = twoShips();
     const { service } = build([me, them]);
-    await service.onModuleInit();
 
     // No `sca lo` first, so the scantab slot for this pilot is empty.
     const res = await run(service, me, ['sh', 'a']);
@@ -160,7 +156,6 @@ describe('sca sh <letter> — resolving a contact through the scan letter table'
   it('refuses a letter that the current table does not assign', async () => {
     const { me, them } = twoShips();
     const { service } = build([me, them]);
-    await service.onModuleInit();
     await run(service, me, ['lo']);   // assigns 'A' to Marauder, nothing else
 
     const res = await run(service, me, ['sh', 'q']);
@@ -172,7 +167,6 @@ describe('sca sh <letter> — resolving a contact through the scan letter table'
   it('reports a letter whose ship has left the game rather than scanning nothing', async () => {
     const { me, them } = twoShips();
     const { service, shipService } = build([me, them]);
-    await service.onModuleInit();
     await run(service, me, ['lo']);
     // The table still holds 'A', but the ship behind it is gone from state.
     shipService.get.mockReturnValue(undefined);
@@ -186,7 +180,6 @@ describe('sca sh <letter> — resolving a contact through the scan letter table'
   it('scans the ship the letter names, not a name-substring match', async () => {
     const { me, them } = twoShips();
     const { service, shipService } = build([me, them]);
-    await service.onModuleInit();
     await run(service, me, ['lo']);
     shipService.get.mockImplementation((userid: string, shipno: number) =>
       userid === 'u2' && shipno === 4 ? them : undefined);
@@ -212,7 +205,6 @@ describe('sca sh <letter> — resolving a contact through the scan letter table'
     them.userid = 'acct-9f2c';
     them.status = 0;
     const { service, shipService } = build([me, them]);
-    await service.onModuleInit();
     await run(service, me, ['lo']);
     shipService.get.mockReturnValue(them);
 
@@ -236,7 +228,6 @@ describe('sca sh — the scanner range gate (GECMDS.C:2220)', () => {
       xcoord: 12, ycoord: 0, damage: 40, kills: 7, username: 'eve',
     });
     const { service, shipService } = build([me, far]);
-    await service.onModuleInit();
     shipService.findByName.mockReturnValue(far);
 
     const res = await run(service, me, ['sh', 'Ghost']);
@@ -256,7 +247,6 @@ describe('sca sh — the scanner range gate (GECMDS.C:2220)', () => {
       xcoord: 3, ycoord: 0, username: 'eve',
     });
     const { service, shipService } = build([me, near]);
-    await service.onModuleInit();
     shipService.findByName.mockReturnValue(near);
 
     const res = await run(service, me, ['sh', 'Ghost']);
@@ -278,7 +268,6 @@ describe('sca sh — what the scanned ship is told', () => {
     const scanner = me();
     const target = makeShip({ userid: 'u2', shipno: 3, shipname: 'Ghost', shpclass: 1, xcoord: 3, ycoord: 0 });
     const { service, shipService } = build([scanner, target]);
-    await service.onModuleInit();
     shipService.findByName.mockReturnValue(target);
 
     const res = await run(service, scanner, ['sh', 'Ghost']);
@@ -293,7 +282,6 @@ describe('sca sh — what the scanned ship is told', () => {
     // the contact is outside their own envelope.
     const target = makeShip({ userid: 'u2', shipno: 3, shipname: 'Ghost', shpclass: 2, xcoord: 3, ycoord: 0 });
     const { service, shipService } = build([scanner, target]);
-    await service.onModuleInit();
     shipService.findByName.mockReturnValue(target);
 
     const res = await run(service, scanner, ['sh', 'Ghost']);
@@ -307,7 +295,6 @@ describe('sca sh — what the scanned ship is told', () => {
     const scanner = me();
     const target = makeShip({ userid: 'u2', shipno: 3, shipname: 'Ghost', shpclass: 1, xcoord: 3, ycoord: 0 });
     const { service, shipService } = build([scanner, target]);
-    await service.onModuleInit();
     shipService.findByName.mockReturnValue(target);
 
     const res = await run(service, scanner, ['sh', 'Ghost']);
@@ -322,7 +309,6 @@ describe('sca sh — what the scanned ship is told', () => {
     const scanner = me();
     const target = makeShip({ userid: 'u2', shipno: 3, shipname: 'Ghost', shpclass: 1, xcoord: 3, ycoord: 0 });
     const { service, shipService } = build([scanner, target]);
-    await service.onModuleInit();
     // The target runs its own local scan first: that is what puts a real letter
     // (not '?') against the scanner in the target's scantab.
     await run(service, target, ['lo']);
@@ -346,7 +332,6 @@ describe('sca pl <n> — the ownership line', () => {
   it('names the Neutral Zone Authority without a user lookup for the sentinel owner', async () => {
     const planet = makePlanet({ userid: NEUTRAL_ZONE_OWNER, name: 'Haven' });
     const { service, prisma } = build([], [planet]);
-    await service.onModuleInit();
 
     const res = await run(service, pilot(), ['pl', '1']);
 
@@ -361,7 +346,6 @@ describe('sca pl <n> — the ownership line', () => {
     const planet = makePlanet({ userid: 'acct-77', name: 'Haven' });
     const { service, prisma } = build([], [planet]);
     prisma.user.findUnique.mockResolvedValue({ username: 'Bob The Bold' });
-    await service.onModuleInit();
 
     const res = await run(service, pilot(), ['pl', '1']);
 
@@ -382,7 +366,6 @@ describe('sca ra — the mine table gate', () => {
   it('plots the live mine and not the freed slot beside it', async () => {
     const me = makeShip({ userid: 'u1', shipno: 1, xcoord: 0, ycoord: 0 });
     const { service, mines } = build([me]);
-    await service.onModuleInit();
     mines.hydrate([
       { id: 1, channel: 3, timer: 10, xcoord: 0.001, ycoord: 0.001, deployedBy: 'u2' },
       // channel 255 — the slot canon skips everywhere it walks the table.

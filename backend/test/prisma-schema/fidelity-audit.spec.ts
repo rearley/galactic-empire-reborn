@@ -1,9 +1,10 @@
+import { schemaModels } from "../helpers/schema-model";
 /**
  * Schema fidelity audit — SC-001, SC-002, SC-006
  * Loads Prisma DMMF and asserts every field from data-model.md is present
  * with the correct scalar type and list-ness.
  */
-import { Prisma } from "@prisma/client";
+
 
 // Map: modelName → required fields with type and isList
 const REQUIRED_FIELDS: Record<string, { name: string; type: string; isList: boolean }[]> = {
@@ -209,7 +210,7 @@ const REQUIRED_FIELDS: Record<string, { name: string; type: string; isList: bool
 };
 
 describe("Schema fidelity audit (SC-001, SC-002, SC-006)", () => {
-  const models = Prisma.dmmf.datamodel.models;
+  const models = schemaModels();
   const modelMap = new Map(models.map((m) => [m.name, m]));
 
   for (const [modelName, requiredFields] of Object.entries(REQUIRED_FIELDS)) {

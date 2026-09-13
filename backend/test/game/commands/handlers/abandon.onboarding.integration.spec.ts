@@ -11,27 +11,17 @@ import { ShipStateService } from '../../../../src/game/ship/ship-state.service';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { SHIP_STATUS_ABANDONED } from '../../../../src/game/commands/_ship-management-constants';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'USS Departing', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 10000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'USS Departing',
+    xcoord: 5,
+    ycoord: 5,
+    energy: 10000,
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function buildHarness() {
@@ -40,16 +30,16 @@ function buildHarness() {
   const mockShipState = {
     // abandon() persists status as well as setting it — the tick flush strips
     // `status`, so the handler cannot go through mutate().
-    abandon: jest.fn().mockImplementation((_uid: string, _no: number) => {
+    abandon: vi.fn().mockImplementation((_uid: string, _no: number) => {
       ship.status = SHIP_STATUS_ABANDONED;
       ship.destruct = 0;
       return Promise.resolve();
     }),
-    findShip: jest.fn().mockReturnValue(ship),
+    findShip: vi.fn().mockReturnValue(ship),
   } as unknown as ShipStateService;
 
   const router = new CommandRouterService();
-  const abandonHandler = new AbandonHandlerService(mockShipState, { abandonPlanet: jest.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService);
+  const abandonHandler = new AbandonHandlerService(mockShipState, { abandonPlanet: vi.fn().mockResolvedValue({ ok: true, name: 'Aurora' }) } as unknown as PlanetStateService);
 
   // Register only the abandon command + a test command to exercise the FR-803 gate
   router.register(abandonHandler.command);
@@ -85,11 +75,11 @@ describe('FR-803 — post-abandon router gate rejects all commands', () => {
     expect(result.lines[0].text).toBe(formatMessage(MessageId.SHIP_ABANDONED));
   });
 
-  it('abandon handler → sets status=3 → subsequent dispatch blocked', () => {
+  it('abandon handler → sets status=3 → subsequent dispatch blocked', async () => {
     const { router, ship, abandonHandler } = buildHarness();
 
     // Execute abandon via the handler
-    abandonHandler.command.handler(ship, ['ship', 'yes'], {});
+    await abandonHandler.command.handler(ship, ['ship', 'yes'], {});
     expect(ship.status).toBe(SHIP_STATUS_ABANDONED);
 
     // Next command via router is blocked

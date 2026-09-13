@@ -50,6 +50,6 @@ describe('AI tick dispatch is by class, not by status', () => {
     const selected = (svc as { selectAiShips: () => Array<{ shpclass: number }> })
       .selectAiShips();
 
-    expect(selected.map((s) => s.shpclass).sort()).toEqual([21, 25]);
+    expect(selected.map((s) => s.shpclass).sort((a, b) => a - b)).toEqual([21, 25]);
   });
 });

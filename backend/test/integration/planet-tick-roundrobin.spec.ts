@@ -21,8 +21,8 @@ function buildMocks(
   const tickedKeys: string[] = [];
 
   const planetServiceMock = {
-    all: jest.fn().mockReturnValue(fakePlanets),
-    runEconomicTickFor: jest.fn().mockImplementation((k: string) => {
+    all: vi.fn().mockReturnValue(fakePlanets),
+    runEconomicTickFor: vi.fn().mockImplementation((k: string) => {
       tickedKeys.push(k);
       return Promise.resolve();
     }),
@@ -30,11 +30,11 @@ function buildMocks(
 
   let capturedHandler: (() => Promise<void>) | undefined;
   const tickServiceMock = {
-    subscribe: jest.fn().mockImplementation((kind: TickKind, handler: () => Promise<void>) => {
+    subscribe: vi.fn().mockImplementation((kind: TickKind, handler: () => Promise<void>) => {
       if (kind === TickKind.PLANET_UPDATE) capturedHandler = handler;
       return () => {};
     }),
-    startPlanetUpdateTimer: jest.fn(),
+    startPlanetUpdateTimer: vi.fn(),
   } as unknown as TickService;
 
   return {

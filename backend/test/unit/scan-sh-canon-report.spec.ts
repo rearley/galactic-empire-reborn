@@ -27,36 +27,33 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
 import { NUMITEMS } from '../../src/game/constants';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'WildCat', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.0, ycoord: 5.0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 2, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'WildCat',
+    xcoord: 5.0,
+    ycoord: 5.0,
+    phasrtype: 2,
+    shieldtype: 1,
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+    topspeed: 8,
     channel: over.channel ?? over.shipno ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
-async function makeService(ships: ShipState[]) {
+function makeService(ships: ShipState[]) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000, typeName: 'Interceptor', maxTons: 1_000 });
+  shipClassCache.setForTest(24, { maxAcceleration: 0, maxWarp: 0, scanRange: 20_000, typeName: 'Sarten Attack Drone', maxTons: 9_600 });
   const service = new ScanHandlerService(
     {
       findAllShips: () => ships,
@@ -64,22 +61,16 @@ async function makeService(ships: ShipState[]) {
       findByUserid: () => [],
       get: (u: string, n: number) => ships.find((s) => s.userid === u && s.shipno === n),
     } as unknown as ShipStateService,
-    {
-      shipClass: {
-        findMany: async () => [
-          { classNumber: 1, scanRange: 100_000, typeName: 'Interceptor', maxTons: 1_000 },
-          { classNumber: 24, scanRange: 20_000, typeName: 'Sarten Attack Drone', maxTons: 9_600 },
-        ],
-      },
-    } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
       findPlanetByName: () => null, getMeta: () => undefined, onModuleInit: () => undefined,
     } as unknown as GalaxyService,
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 
@@ -96,14 +87,14 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('reports the target SPEED — the field that decides if a fight is possible', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Speed: Warp 5.20');
   });
 
   it('names the ship class rather than printing a bare number', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Ship Class: Sarten Attack Drone');
     expect(out).not.toMatch(/class 24/);
@@ -111,21 +102,21 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('gives bearing, heading and distance on one line, as SCAN03 does', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toMatch(/Bearing: -?\d+ Heading: -?\d+ Dist: \d+/);
   });
 
   it('gives the galactic heading and the sector it is in', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).toContain('Galactic Heading: 90 Sect: 6 5');
   });
 
   it('gives the hull size, max_tons/32 by max_tons/96', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     // 9600/32 = 300, 9600/96 = 100
     expect(out).toContain('Size: 300m long by 100m wide');
@@ -133,7 +124,7 @@ describe('`sca sh` reports what canon reports', () => {
 
   it('withholds damage, shields and kills while the target is in hyperspace', async () => {
     const me = makeShip();
-    const out = await scan(await makeService([me, target()]), me, 'SADx348871');
+    const out = await scan(makeService([me, target()]), me, 'SADx348871');
 
     expect(out).not.toContain('Damage:');
     expect(out).not.toContain('Shields:');
@@ -146,7 +137,7 @@ describe('`sca sh` reports what canon reports', () => {
     slow.speed = 224;
     slow.where = 0;
     slow.kills = 3;
-    const out = await scan(await makeService([me, slow]), me, 'SADx348871');
+    const out = await scan(makeService([me, slow]), me, 'SADx348871');
 
     // showarp gives the bare figure; 224 raw is warp 0.22 — plainly sub-warp.
     expect(out).toContain('Speed: Warp 0.22');
@@ -176,7 +167,7 @@ describe('`sca sh` — Commanded by', () => {
       userid: 'usr_11aaf162ae9b2af979259bbd', shipno: 3, shipname: 'The AngryGoatBoy',
       username: 'AngryGoatBoy', status: 1, xcoord: 6.7, ycoord: 5.0, channel: 3,
     });
-    const out = await scan(await makeService([me, friend]), me, 'The AngryGoatBoy');
+    const out = await scan(makeService([me, friend]), me, 'The AngryGoatBoy');
 
     expect(out).toContain('Commanded by: AngryGoatBoy');
     expect(out).not.toContain('usr_11aaf162ae9b2af979259bbd');
@@ -188,7 +179,7 @@ describe('`sca sh` — Commanded by', () => {
       userid: 'Cybrg-222', shipno: 2, shipname: 'Cyberquad 44135', shpclass: 24,
       status: 2, xcoord: 6.7, ycoord: 5.0, channel: 2,
     });
-    const out = await scan(await makeService([me, cyb]), me, 'Cyberquad 44135');
+    const out = await scan(makeService([me, cyb]), me, 'Cyberquad 44135');
 
     expect(out).toContain('Commanded by: Cyberquad 44135');
     expect(out).not.toContain('Cybrg-222');

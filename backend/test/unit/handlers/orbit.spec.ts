@@ -7,26 +7,17 @@ import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Falcon', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 3.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'Falcon',
+    xcoord: 5.5,
+    ycoord: 3.5,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 const makePlanet = (plnum: number, name = '') => ({
@@ -38,24 +29,24 @@ const makePlanet = (plnum: number, name = '') => ({
 function makeService(planets: ReturnType<typeof makePlanet>[]) {
   const mutated: { where?: number; speed?: number; speed2b?: number } = {};
   const shipMock = {
-    mutate: jest.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
+    mutate: vi.fn().mockImplementation((_u: string, _n: number, fn: (s: ShipState) => void) => {
       const fake = { where: 0, speed: 0, speed2b: 0 } as ShipState;
       fn(fake);
       Object.assign(mutated, { where: fake.where, speed: fake.speed, speed2b: fake.speed2b });
     }),
-    get: jest.fn(),
+    get: vi.fn(),
   };
   // `orb` reads the LIVE planet map now, not GalaxyService's boot snapshot --
   // that snapshot never sees a planet named after startup, so orbiting a colony
   // claimed this session printed "(unnamed)".
   const planetMock = {
-    bySector: jest.fn().mockReturnValue(planets),
+    bySector: vi.fn().mockReturnValue(planets),
   };
   const svc = new OrbitHandlerService(
     shipMock as unknown as ShipStateService,
     planetMock as unknown as PlanetStateService,
     // No wormhole in these fixtures' sectors.
-    { wormhole: { findFirst: async () => null } } as never,
+    { existsInSector: async () => false } as never,
   );
   return { svc, shipMock, planetMock, mutated };
 }
@@ -132,13 +123,11 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
   ];
 
   const build = (wormholePlnums: number[]) => new OrbitHandlerService(
-    { get: () => undefined, mutate: jest.fn() } as unknown as ShipStateService,
+    { get: () => undefined, mutate: vi.fn() } as unknown as ShipStateService,
     { bySector: () => twoPlanets } as unknown as PlanetStateService,
     {
-      wormhole: {
-        findFirst: async ({ where }: { where: { plnum: number } }) =>
-          (wormholePlnums.includes(where.plnum) ? { plnum: where.plnum } : null),
-      },
+      existsInSector: async (_xsect: number, _ysect: number, plnum: number) =>
+        wormholePlnums.includes(plnum),
     } as never,
   );
 
@@ -185,16 +174,14 @@ describe('OrbitHandlerService — orbiting a wormhole', () => {
  */
 describe('orb <n> honours the slot even when the sector holds one planet', () => {
   function serviceWithWormhole(planets: ReturnType<typeof makePlanet>[], wormPlnum: number) {
-    const shipMock = { mutate: jest.fn(), get: jest.fn() };
-    const planetMock = { bySector: jest.fn().mockReturnValue(planets) };
+    const shipMock = { mutate: vi.fn(), get: vi.fn() };
+    const planetMock = { bySector: vi.fn().mockReturnValue(planets) };
     return new OrbitHandlerService(
       shipMock as unknown as ShipStateService,
       planetMock as unknown as PlanetStateService,
       {
-        wormhole: {
-          findFirst: async ({ where }: { where: { plnum: number } }) =>
-            where.plnum === wormPlnum ? { plnum: wormPlnum } : null,
-        },
+        existsInSector: async (_xsect: number, _ysect: number, plnum: number) =>
+          plnum === wormPlnum,
       } as never,
     );
   }

@@ -33,6 +33,7 @@ import { FIRETICKS } from '../../../src/game/constants';
 import { CybertronTickService } from '../../../src/game/cybertron/cybertron-tick.service';
 import { MineTableFullError } from '../../../src/game/combat/mine.repository';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import type { Mock } from 'vitest';
 
 const cyb = (over: Partial<ShipState> = {}): ShipState => {
   const items = Array(14).fill(0n) as bigint[];
@@ -45,7 +46,7 @@ const cyb = (over: Partial<ShipState> = {}): ShipState => {
 };
 
 /** Bare service with only what layMine touches. */
-function build(create: jest.Mock) {
+function build(create: Mock) {
   const svc = Object.create(CybertronTickService.prototype) as object;
   const added: unknown[] = [];
   Object.assign(svc, {
@@ -54,7 +55,7 @@ function build(create: jest.Mock) {
     shipState: {
       mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => { fn(current); return current; },
     },
-    logger: { error: jest.fn() },
+    logger: { error: vi.fn() },
   });
   let current: ShipState;
   return {
@@ -71,7 +72,7 @@ describe('Cybertron mine laying', () => {
   it('creates a real mine at the ship, with the LAYER\'s channel', async () => {
     // The channel is how a mine kill names who left it: the victim's
     // `lastfired` is set to it. @see GECMDS.C:1810
-    const create = jest.fn().mockResolvedValue({ id: 1, channel: 7, timer: 10, xcoord: 4.25, ycoord: -1.5 });
+    const create = vi.fn().mockResolvedValue({ id: 1, channel: 7, timer: 10, xcoord: 4.25, ycoord: -1.5 });
     const h = build(create);
     await h.lay(cyb());
 
@@ -83,7 +84,7 @@ describe('Cybertron mine laying', () => {
 
   it('spends the mine and takes the combat lock, but only on success', async () => {
     const ship = cyb();
-    const h = build(jest.fn().mockResolvedValue({ id: 1, channel: 7, timer: 10, xcoord: 0, ycoord: 0 }));
+    const h = build(vi.fn().mockResolvedValue({ id: 1, channel: 7, timer: 10, xcoord: 0, ycoord: 0 }));
     await h.lay(ship);
 
     expect(ship.items[I_MINE]).toBe(2n);
@@ -93,7 +94,7 @@ describe('Cybertron mine laying', () => {
   it('spends nothing when the galaxy mine table is full', async () => {
     // C reaches `--ptr->items[I_MINE]` only inside the free-slot branch.
     const ship = cyb();
-    const h = build(jest.fn().mockRejectedValue(new MineTableFullError(12)));
+    const h = build(vi.fn().mockRejectedValue(new MineTableFullError(12)));
     await h.lay(ship);
 
     expect(ship.items[I_MINE]).toBe(3n);

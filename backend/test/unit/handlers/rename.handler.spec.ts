@@ -2,30 +2,21 @@ import { RenameHandlerService } from '../../../src/game/commands/handlers/rename
 import { RenameService, RenameResult } from '../../../src/game/onboarding/rename.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'OldName',
-    shpclass: 1, heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 3, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    shipname: 'OldName',
+    xcoord: 5,
+    ycoord: 3,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeHandler(renameResult: RenameResult): RenameHandlerService {
-  const renameSvc = { rename: jest.fn().mockResolvedValue(renameResult) } as unknown as RenameService;
+  const renameSvc = { rename: vi.fn().mockResolvedValue(renameResult) } as unknown as RenameService;
   return new RenameHandlerService(renameSvc);
 }
 
@@ -141,7 +132,7 @@ describe('RenameHandlerService', () => {
 
     it('passes the first arg as the new name (casing preserved)', async () => {
       const ship = makeShip();
-      const renameSvc = { rename: jest.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' }) } as unknown as RenameService;
+      const renameSvc = { rename: vi.fn().mockResolvedValue({ ok: false, reason: 'SHIP_NOT_FOUND' }) } as unknown as RenameService;
       const handler = new RenameHandlerService(renameSvc);
       await handler.command.handler(ship, ['StarFalcon'], ctx);
       expect(renameSvc.rename).toHaveBeenCalledWith('u1', 1, 'StarFalcon');

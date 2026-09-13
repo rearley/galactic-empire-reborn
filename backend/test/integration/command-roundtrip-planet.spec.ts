@@ -23,70 +23,21 @@ import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
 import { NUMITEMS } from '../../src/game/constants/items';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeShipState(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1',
-    shipno: 1,
+  return baseMakeShip({
     shipname: 'Enterprise',
-    shpclass: 1,
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5.5,
     ycoord: 3.5,
-    damage: 0,
-    energy: 1000,
-    phasr: 0,
-    phasrtype: 0,
-    kills: 0,
-    lastfired: 0,
-    shieldtype: 0,
-    shieldstat: 0,
-    shield: 0,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
-    helm: 0,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
-    decout: [],
-    jammer: 0,
-    freq: [0, 0, 0],
     items: Array<bigint>(NUMITEMS).fill(0n),
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
     status: 0,
-    cybmine: 0,
-    cybskill: 0,
-    cybupdate: 0,
-    tick: 0,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
-    topspeed: 5,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makePlanetState(overrides: Partial<PlanetState> = {}): PlanetState {
@@ -140,21 +91,21 @@ describe('command round-trip (planet) integration (T066)', () => {
     // Build a real ShipStateService backed by a minimal Prisma mock.
     // We initialise it manually so the in-memory map is populated before compile().
     const tickServiceMock = {
-      subscribe: jest.fn().mockImplementation(
+      subscribe: vi.fn().mockImplementation(
         (_kind: TickKind, _handler: () => Promise<void>) => () => {},
       ),
-      registerSnapshotProvider: jest.fn(),
-      startPlanetUpdateTimer: jest.fn(),
-      onModuleInit: jest.fn(),
+      registerSnapshotProvider: vi.fn(),
+      startPlanetUpdateTimer: vi.fn(),
+      onModuleInit: vi.fn(),
     };
 
     const prismaMockForShip = {
       ship: {
-        findMany: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({}),
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue({}),
       },
       shipClass: {
-        findMany: jest.fn().mockResolvedValue([
+        findMany: vi.fn().mockResolvedValue([
           {
             classNumber: 1,
             scanRange: 5000,
@@ -165,8 +116,8 @@ describe('command round-trip (planet) integration (T066)', () => {
           },
         ]),
       },
-      user: { update: jest.fn().mockResolvedValue({}) },
-      mine: { findMany: jest.fn().mockResolvedValue([]) },
+      user: { update: vi.fn().mockResolvedValue({}) },
+      mine: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     // Construct a real ShipStateService and inject the test ship manually.
@@ -186,23 +137,23 @@ describe('command round-trip (planet) integration (T066)', () => {
     const planet = makePlanetState();
 
     const galaxyMock = {
-      getSectorPlanets: jest.fn().mockReturnValue([planet]),
-      getSectorWormholes: jest.fn().mockReturnValue([]),
-      findPlanetByName: jest.fn().mockReturnValue(null),
-      getMeta: jest.fn(),
-      onModuleInit: jest.fn(),
+      getSectorPlanets: vi.fn().mockReturnValue([planet]),
+      getSectorWormholes: vi.fn().mockReturnValue([]),
+      findPlanetByName: vi.fn().mockReturnValue(null),
+      getMeta: vi.fn(),
+      onModuleInit: vi.fn(),
     };
 
     const planetServiceMock = {
-      get: jest.fn().mockReturnValue(planet),
+      get: vi.fn().mockReturnValue(planet),
       // `orb` reads the live planet map now, not the boot-time galaxy snapshot
       // (a planet named this session used to orbit as "(unnamed)").
-      bySector: jest.fn().mockReturnValue([planet]),
-      claim: jest.fn().mockResolvedValue({ ok: true }),
-      buy: jest.fn().mockResolvedValue({ ok: true, transferred: 10, unitPrice: 2, totalCost: 20n }),
-      sell: jest.fn().mockResolvedValue({ ok: true, transferred: 5, proceeds: 9n, fee: 1n }),
-      all: jest.fn().mockReturnValue([]),
-      onModuleInit: jest.fn(),
+      bySector: vi.fn().mockReturnValue([planet]),
+      claim: vi.fn().mockResolvedValue({ ok: true }),
+      buy: vi.fn().mockResolvedValue({ ok: true, transferred: 10, unitPrice: 2, totalCost: 20n }),
+      sell: vi.fn().mockResolvedValue({ ok: true, transferred: 5, proceeds: 9n, fee: 1n }),
+      all: vi.fn().mockReturnValue([]),
+      onModuleInit: vi.fn(),
     };
 
     module = await Test.createTestingModule({

@@ -14,6 +14,12 @@ vi.mock('socket.io-client', () => {
     emit: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
+    // `reconnect_attempt` is a Manager event, exposed on the real client as
+    // `socket.io` — see docs/superpowers/plans/2026-09-10-restructure-phase-1-wire-contract.md.
+    io: {
+      on: vi.fn(),
+      off: vi.fn(),
+    },
   };
   return {
     io: vi.fn(() => mockSocket),
@@ -25,10 +31,12 @@ describe('socketClient', () => {
   beforeEach(async () => {
     vi.resetModules();
     const { io } = await import('socket.io-client');
-    const ms = (io as ReturnType<typeof vi.fn>)();
+    const ms = vi.mocked(io)();
     ms.emit = vi.fn();
     ms.on = vi.fn();
     ms.off = vi.fn();
+    ms.io.on = vi.fn();
+    ms.io.off = vi.fn();
   });
 
   afterEach(() => {
@@ -121,8 +129,11 @@ describe('ConnectionStatus event mapping (FR-019, FR-021)', () => {
 
   it('reconnect_attempt event → reconnecting status', async () => {
     const { socket } = await import('../src/socket/socketClient');
+    // `reconnect_attempt` is a Manager event, not a Socket event — it is
+    // registered on `socket.io` (the Manager), not `socket` itself.
+    // @see src/socket/useSocket.ts
     const registeredEvents: string[] = [];
-    (socket.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
+    (socket.io.on as ReturnType<typeof vi.fn>).mockImplementation((ev: string) => {
       registeredEvents.push(ev);
     });
 

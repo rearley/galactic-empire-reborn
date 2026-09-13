@@ -17,30 +17,30 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { GESTAT_AVAIL, GESTAT_USER, GESTAT_AUTO } from '../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /** Minimal in-memory ShipState for seeding the map directly. */
 function makeState(overrides: Partial<ShipState> & { userid: string; shipno: number }): ShipState {
-  return {
+  return baseMakeShip({
     shipname: 'TestShip',
-    shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 1, kills: 0, lastfired: 255,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 1, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [0, 0, 0, 0, 0], jammer: 0, freq: [], items: Array(16).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: GESTAT_AVAIL, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    xcoord: 5,
+    ycoord: 5,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 1,
+    lastfired: 255,
+    shieldtype: 1,
+    helm: 1,
+    decout: [0, 0, 0, 0, 0],
+    freq: [],
+    items: Array(16).fill(0n),
+    status: GESTAT_AVAIL,
+    topspeed: 8,
     ...overrides,
-  };
+  });
 }
 
 /** Minimal Prisma Ship row (enough for prismaShipToState). */
@@ -68,13 +68,13 @@ function makeShipRow(overrides: { userid: string; shipno: number; status: number
 
 /** Build a ShipStateService with the given Prisma ship rows. */
 async function buildSvc(rows: ReturnType<typeof makeShipRow>[]) {
-  const updateMock = jest.fn().mockResolvedValue({});
-  const updateManyMock = jest.fn().mockResolvedValue({ count: 1 });
+  const updateMock = vi.fn().mockResolvedValue({});
+  const updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
 
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     ship: {
-      findMany: jest.fn().mockResolvedValue(rows),
+      findMany: vi.fn().mockResolvedValue(rows),
       update: updateMock,
       updateMany: updateManyMock,
     },
@@ -82,7 +82,7 @@ async function buildSvc(rows: ReturnType<typeof makeShipRow>[]) {
 
   const mockTickService = {
     subscribe: (_kind: TickKind, _fn: () => void) => () => {},
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   const svc = new ShipStateService(mockPrisma, mockTickService);
@@ -126,7 +126,7 @@ describe('Dormancy — onModuleInit loads only AI (GESTAT_AUTO) ships', () => {
   it('findMany where clause includes { status: GESTAT_AUTO }', async () => {
     const { mockPrisma } = await buildSvc([]);
 
-    const call = (mockPrisma.ship.findMany as jest.Mock).mock.calls[0][0] as {
+    const call = (mockPrisma.ship.findMany as Mock).mock.calls[0][0] as {
       where?: { status?: number };
     };
     expect(call.where?.status).toBe(GESTAT_AUTO);

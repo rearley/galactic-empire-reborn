@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { ShipStateService } from '../ship/ship-state.service';
 import { rollSpawnPosition } from './spawn-placement';
 import { isValidShipName } from './name-validator';
@@ -9,6 +10,7 @@ import { ShipState } from '../ship/ship-state.types';
 import { ENGYMAX, GESTAT_USER } from '../constants';
 import { START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
 import { onboardingUserUpdate } from './onboarding-cash';
+import { FIRST_CPU_CLASS, isPlayerBuyableClass } from '../ship/buyable-class';
 
 export interface ClassListEntry {
   classNumber: number;
@@ -40,15 +42,30 @@ export class OnboardingService {
     private readonly prisma: PrismaService,
     private readonly shipStateService: ShipStateService,
     private readonly config: ConfigService,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new OnboardingService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
    * Builds the class list payload for prompt:class-list.
-   * Only PLAYER category ship classes are included.
+   *
+   * PLAYER category AND below cyb_class — both halves of the rule, from the
+   * one predicate `new ship` uses. Category alone is what advertised the
+   * Sysopian Death Star to every pilot. @see src/game/ship/buyable-class.ts
    */
   async buildClassListPayload(): Promise<ClassListEntry[]> {
     const classes = await this.prisma.shipClass.findMany({
-      where: { category: 'PLAYER' },
+      where: { category: 'PLAYER', classNumber: { lt: FIRST_CPU_CLASS } },
       orderBy: { classNumber: 'asc' },
     });
     return classes.map((c) => ({
@@ -66,12 +83,17 @@ export class OnboardingService {
     }));
   }
 
-  /** Returns true if classNumber is a valid PLAYER ship class. */
+  /**
+   * Returns true if classNumber is one a player may actually buy.
+   * @see src/game/ship/buyable-class.ts — the bound, and why it is not
+   *   category alone.
+   */
   async validateClassReply(classNumber: number): Promise<boolean> {
     const cls = await this.prisma.shipClass.findFirst({
-      where: { classNumber, category: 'PLAYER' },
+      where: { classNumber },
+      select: { classNumber: true, category: true },
     });
-    return cls !== null;
+    return isPlayerBuyableClass(cls);
   }
 
   /**
@@ -126,11 +148,8 @@ export class OnboardingService {
     // serves the empty-fleet rebuild (a player who lost their whole fleet claiming a
     // free starter): a wiped player with topshipno=5 must get shipno 6, NOT a reset
     // to 1, preserving the never-reuse invariant. Brand-new player (topshipno 0) → 1.
-    const userRow = await this.prisma.user.findUnique({
-      where: { userid },
-      select: { topshipno: true },
-    });
-    const newShipno = (userRow?.topshipno ?? 0) + 1;
+    const topshipno = (await this.users.getTopshipno(userid)) ?? 0;
+    const newShipno = topshipno + 1;
 
     const ship = await this.prisma.ship.create({
       data: {
@@ -165,10 +184,7 @@ export class OnboardingService {
     // balance down to the stipend when someone lost their last ship — and
     // topped a bankrupt captain back up to it. C leaves the bank alone here
     // (GEFUNCS.C:106-113). @see onboarding-cash.ts
-    await this.prisma.user.update({
-      where: { userid },
-      data: onboardingUserUpdate(userRow?.topshipno ?? 0, newShipno),
-    });
+    await this.users.applyOnboardingGrant(userid, onboardingUserUpdate(topshipno, newShipno));
 
     const state = prismaShipToState(ship);
     this.shipStateService.loadShip(state);

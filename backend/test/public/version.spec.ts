@@ -2,6 +2,7 @@ import { StatsService } from '../../src/public/stats.service';
 import { PresenceService } from '../../src/public/presence.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { buildVersion } from '../../src/public/build-version';
+import { UserRepository } from '../../src/game/player/user.repository';
 
 /**
  * The UI header shows the FRONTEND's build. The two images are built by the
@@ -26,11 +27,11 @@ describe('/public/stats carries the backend build', () => {
   function makeService() {
     const prisma = {
       user: {
-        count: jest.fn().mockResolvedValue(1),
-        findMany: jest.fn().mockResolvedValue([]),
+        count: vi.fn().mockResolvedValue(1),
+        findMany: vi.fn().mockResolvedValue([]),
       },
     } as unknown as PrismaService;
-    return new StatsService(prisma, new PresenceService());
+    return new StatsService(new UserRepository(prisma), new PresenceService());
   }
 
   it('includes a version field', async () => {

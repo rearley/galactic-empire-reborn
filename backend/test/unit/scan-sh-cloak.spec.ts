@@ -14,53 +14,42 @@ import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handle
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { CommandResult } from '../../src/game/commands/command.types';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 function makeService(self: ShipState, target: ShipState | null) {
   const ships = target ? [self, target] : [self];
   const shipServiceMock = {
-    findAllShips: jest.fn().mockReturnValue(ships),
-    findByName: jest.fn((name: string) => {
+    findAllShips: vi.fn().mockReturnValue(ships),
+    findByName: vi.fn((name: string) => {
       const lower = name.toLowerCase();
       return ships.find((s) => s.shipname.toLowerCase() === lower);
     }),
-    get: jest.fn(),
+    get: vi.fn(),
   };
-  const prismaMock = {
-    shipClass: {
-      findMany: jest.fn().mockResolvedValue([{ classNumber: 1, scanRange: 100_000 }]),
-    },
-  };
+  const prismaMock = {};
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange: 100_000 });
   const galaxyMock = {
-    getSectorPlanets: jest.fn().mockReturnValue([]),
-    getSectorWormholes: jest.fn().mockReturnValue([]),
-    findPlanetByName: jest.fn().mockReturnValue(null),
+    getSectorPlanets: vi.fn().mockReturnValue([]),
+    getSectorWormholes: vi.fn().mockReturnValue([]),
+    findPlanetByName: vi.fn().mockReturnValue(null),
   };
-  const planetServiceMock = { get: jest.fn().mockReturnValue(undefined) };
+  const planetServiceMock = { get: vi.fn().mockReturnValue(undefined) };
 
   const service = new ScanHandlerService(
     shipServiceMock as unknown as ShipStateService,
@@ -68,6 +57,8 @@ function makeService(self: ShipState, target: ShipState | null) {
     galaxyMock as unknown as GalaxyService,
     planetServiceMock as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
   return service;
 }
@@ -80,7 +71,6 @@ describe('S-004 — scan sh <name> refuses fully-cloaked targets', () => {
       xcoord: 0.01, ycoord: 0, cloak: 10,
     });
     const svc = makeService(self, cloaked);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'CloakedTarget'], {}) as CommandResult;
     // Must not reveal ship details — should be "No ship named …" or out-of-range
@@ -97,7 +87,6 @@ describe('S-004 — scan sh <name> refuses fully-cloaked targets', () => {
       xcoord: 0.01, ycoord: 0, cloak: 0,
     });
     const svc = makeService(self, visible);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'VisibleTarget'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join(' ');
@@ -111,7 +100,6 @@ describe('S-004 — scan sh <name> refuses fully-cloaked targets', () => {
       xcoord: 0.01, ycoord: 0, cloak: 9,  // 9 < 10 → still scannable
     });
     const svc = makeService(self, partial);
-    await svc.onModuleInit();
 
     const result = await svc.command.handler(self, ['sh', 'PartialCloak'], {}) as CommandResult;
     const text = result.lines.map((l) => l.text).join(' ');

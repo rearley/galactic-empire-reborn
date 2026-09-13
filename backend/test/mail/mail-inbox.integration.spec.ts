@@ -31,7 +31,7 @@ async function truncate() {
 
 beforeAll(async () => {
   const mockShipState = {
-    findByUserid: jest.fn().mockReturnValue([]),
+    findByUserid: vi.fn().mockReturnValue([]),
   };
 
   app = await Test.createTestingModule({

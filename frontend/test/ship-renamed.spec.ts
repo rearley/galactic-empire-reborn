@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlayerList } from '../src/state/usePlayerList';
-import type { ConnectedPlayer, ShipRenamedPayload } from '../src/types/contracts';
+import type { ConnectedPlayer, ShipRenamedPayload } from '@ge/wire';
 
 /**
  * Tests for the RENAMED action in usePlayerList (T063, US3).

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { handleCommandResult } from '../command-result-handlers';
-import type { CommandResultPayload, EventLogLine } from '../../types/contracts';
+import type { CommandResultPayload, EventLogLine } from '@ge/wire';
 
 function makeLine(text: string): EventLogLine {
   return { text, category: 'info' };

@@ -48,8 +48,8 @@ function buildMocks(foodQty: bigint) {
 
   const prismaMock = {
     planet: {
-      findMany: jest.fn().mockImplementation(() => Promise.resolve([storedRow])),
-      update: jest.fn().mockImplementation(({ data }: { data: Partial<typeof storedRow> }) => {
+      findMany: vi.fn().mockImplementation(() => Promise.resolve([storedRow])),
+      update: vi.fn().mockImplementation(({ data }: { data: Partial<typeof storedRow> }) => {
         storedRow = { ...storedRow, ...data };
         return Promise.resolve({});
       }),
@@ -57,8 +57,8 @@ function buildMocks(foodQty: bigint) {
   } as unknown as PrismaService;
 
   const shipsMock = {
-    get: jest.fn(),
-    mutate: jest.fn(),
+    get: vi.fn(),
+    mutate: vi.fn(),
   } as unknown as ShipStateService;
 
   return { prismaMock, shipsMock, getStoredRow: () => storedRow };

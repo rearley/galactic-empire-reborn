@@ -1,7 +1,11 @@
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { CombatShipDestroyedEvent } from '../../src/game/combat/combat-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { ShipStateService } from '../../src/game/ship/ship-state.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * The galaxy-wide death announcement must carry what the client renders, and
@@ -33,27 +37,22 @@ import { PresenceService } from '../../src/public/presence.service';
 describe('combat.ship-destroyed carries only what the client renders', () => {
   const build = () => {
     const emitted: Array<{ event: string; payload: Record<string, unknown> }> = [];
-    const gateway = new GameGateway(
-      {
+    const gateway = makeGateway({
+      shipStateService: {
         get: () => ({ userid: 'usr_victim', shipno: 2, shipname: 'WildCat', shpclass: 8, status: 1, items: [] }),
         findAllShips: () => [],
-        removeFromGame: jest.fn(),
-      } as never,
-      {} as never, {} as never, {} as never,
-      { ship: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-        user: { update: jest.fn() },
-        $transaction: jest.fn().mockResolvedValue(undefined) } as never,
-      {} as never,
-      { clearScantab: jest.fn() } as never,
-      { getTypeName: () => 'Dreadnought' } as never,
-      {} as never,
-      { emit: jest.fn(), on: jest.fn() } as never,
-      new PresenceService(),
-    );
+        removeFromGame: vi.fn(),
+      } as unknown as ShipStateService,
+      prisma: { ship: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: vi.fn() },
+        $transaction: vi.fn().mockResolvedValue(undefined) } as unknown as PrismaService,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      shipClassCache: { getTypeName: () => 'Dreadnought' } as unknown as ShipClassCacheService,
+    });
     (gateway as unknown as { server: unknown }).server = {
       emit: (event: string, payload: Record<string, unknown>) => { emitted.push({ event, payload }); },
-      to: () => ({ emit: jest.fn(), except: () => ({ emit: jest.fn() }) }),
-      except: () => ({ emit: jest.fn() }),
+      to: () => ({ emit: vi.fn(), except: () => ({ emit: vi.fn() }) }),
+      except: () => ({ emit: vi.fn() }),
       sockets: { sockets: new Map(), adapter: { rooms: new Map() } },
     };
     return { gateway, emitted };

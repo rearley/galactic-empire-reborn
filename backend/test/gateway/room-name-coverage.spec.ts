@@ -10,18 +10,25 @@
  * joins. It cannot catch a wrong userid, but it catches an entire address space
  * that does not exist, which is the failure that actually happened.
  *
+ * It reads the whole of `src/gateway/`, not `game.gateway.ts` alone: the
+ * restructure moved the `join` calls into `connection-lifecycle.service.ts` and
+ * the emits into several collaborators, and a check that read one file would
+ * have compared a file that only builds rooms against a file that only joins
+ * them — passing or failing for reasons unrelated to the invariant.
+ *
  * It scans every `\`prefix:...\`` template in the file rather than only the ones
  * written inline in a `.to(...)` call. The first version did the latter and
  * missed the very bug it was written for, because the dead room was assigned to
  * a `const targetRoom` first.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const SRC = readFileSync(
-  resolve(__dirname, '../../src/gateway/game.gateway.ts'),
-  'utf8',
-);
+const DIR = resolve(__dirname, '../../src/gateway');
+const SRC = readdirSync(DIR)
+  .filter((f) => f.endsWith('.ts'))
+  .map((f) => readFileSync(resolve(DIR, f), 'utf8'))
+  .join('\n');
 
 /** `foo:${...}` / `foo:` template-literal room names, reduced to their prefix. */
 function roomPrefixes(re: RegExp): Set<string> {

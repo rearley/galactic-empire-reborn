@@ -89,7 +89,7 @@ export function CommandInput({ onSubmit }: CommandInputProps): React.JSX.Element
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="flex-1 bg-transparent font-mono text-sm text-gray-100 outline-none"
+        className="flex-1 bg-transparent font-mono text-sm text-gray-100 outline-hidden"
         placeholder="enter command"
         data-testid="command-input"
         autoFocus

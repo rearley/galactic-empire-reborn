@@ -79,6 +79,47 @@ describe('server notices reach the event log', () => {
     expect(screen.getByTestId('event-log').textContent).toContain('no category here');
   });
 
+  /**
+   * Being scanned is a tactical signal, and the client was deaf to it.
+   *
+   * The backend has emitted canon's SCAN1/2/3 on `command.notice` to the
+   * scanned ship's own room since scan modes landed, and `frontend/src` had
+   * zero listeners for that event — so a player never learned someone was
+   * sizing them up before closing. Scan ranges are asymmetric (an Obliterator
+   * sees six sectors, a starter Interceptor one and a half), which is what
+   * makes the notice the only warning the game gives.
+   *
+   * The payload is `{ lines: EventLogLine[] }`, not the single `{ text }` shape
+   * `event.log` uses — it is a different contract and needs its own handler.
+   * @see issue #2  @see GE/REL/MBMGEMSG.MSG SCAN1
+   */
+  it('renders a command.notice — being scanned reaches the log', () => {
+    render(<App />);
+    fire('command.notice', {
+      lines: [{ text: 'Sir! We are being scanned by Ship A, The Ranger.', category: 'combat' }],
+    });
+    expect(screen.getByTestId('event-log').textContent).toContain('We are being scanned');
+  });
+
+  it('renders every line of a multi-line notice', () => {
+    render(<App />);
+    fire('command.notice', {
+      lines: [
+        { text: 'first notice', category: 'combat' },
+        { text: 'second notice', category: 'system' },
+      ],
+    });
+    const text = screen.getByTestId('event-log').textContent ?? '';
+    expect(text).toContain('first notice');
+    expect(text).toContain('second notice');
+  });
+
+  it('ignores a malformed notice rather than rendering "undefined"', () => {
+    render(<App />);
+    expect(() => fire('command.notice', { lines: [{ category: 'combat' }] })).not.toThrow();
+    expect(screen.getByTestId('event-log').textContent).not.toContain('undefined');
+  });
+
   it('renders a radio transmission with its sender and channel', () => {
     render(<App />);
     fire('message.send', { from: 'Ranger', channel: 'A', text: 'anyone out there?' });

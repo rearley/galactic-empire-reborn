@@ -7,28 +7,21 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { formatMessage, MessageId } from '../../../src/game/commands/messages';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
+import { UserRepository } from '../../../src/game/player/user.repository';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'owner', shipno: 1, shipname: 'Ship1', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 3.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
+  return baseMakeShip({
+    userid: 'owner',
+    shipname: 'Ship1',
+    xcoord: 5.5,
+    ycoord: 3.5,
     where: 15, // plnum = 5, xsect = 5, ysect = 3
-    ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
     items: Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 0,
+    topspeed: 0,
     ...overrides,
-  };
+  });
 }
 
 type WithdrawResult =
@@ -39,18 +32,18 @@ function makeService(
   planetState: { userid: string } | null = { userid: 'owner' },
   withdrawResult: WithdrawResult = { ok: true, amount: 500n },
 ) {
-  const withdrawTaxMock = jest.fn().mockResolvedValue(withdrawResult);
-  const prismaUpdateMock = jest.fn().mockResolvedValue({});
+  const withdrawTaxMock = vi.fn().mockResolvedValue(withdrawResult);
+  const prismaUpdateMock = vi.fn().mockResolvedValue({});
 
   const planetMock = {
-    get: jest.fn().mockReturnValue(planetState),
+    get: vi.fn().mockReturnValue(planetState),
     withdrawTax: withdrawTaxMock,
   };
   const prismaMock = { user: { update: prismaUpdateMock } };
 
   const svc = new WithdrawHandlerService(
     planetMock as unknown as PlanetStateService,
-    prismaMock as unknown as PrismaService,
+    new UserRepository(prismaMock as unknown as PrismaService),
   );
   return { svc, withdrawTaxMock, prismaUpdateMock };
 }

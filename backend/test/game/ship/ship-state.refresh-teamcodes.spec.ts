@@ -15,79 +15,38 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { TickKind } from '../../../src/game/tick/tick.types';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function makeState(overrides: Partial<ShipState>): ShipState {
-  return {
-    userid: 'u1',
-    shipno: 1,
+  return baseMakeShip({
     shipname: 'TestShip',
-    shpclass: 1,
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5,
     ycoord: 5,
-    damage: 0,
     energy: 50000,
     phasr: 100,
     phasrtype: 1,
-    kills: 0,
     lastfired: 255,
     shieldtype: 1,
     shieldstat: 1,
     shield: 2,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
     helm: 1,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
     decout: [0, 0, 0, 0, 0],
-    jammer: 0,
     freq: [],
     items: Array(16).fill(0n),
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
-    status: 1,
-    cybmine: 0,
-    cybskill: 0,
-    cybupdate: 0,
-    tick: 0,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
     topspeed: 8,
-    warncntr: 0,
-    scanNames: false,
-    scanHome: false,
-    scanFull: false,
-    msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
-function makeService(userFindManyMock: jest.Mock): ShipStateService {
+function makeService(userFindManyMock: Mock): ShipStateService {
   const mockPrisma = {
-    shipClass: { findMany: jest.fn().mockResolvedValue([]) },
+    shipClass: { findMany: vi.fn().mockResolvedValue([]) },
     ship: {
-      findMany: jest.fn().mockResolvedValue([]),
-      update: jest.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
     },
     user: {
       findMany: userFindManyMock,
@@ -96,7 +55,7 @@ function makeService(userFindManyMock: jest.Mock): ShipStateService {
 
   const mockTickService = {
     subscribe: (_kind: TickKind, _fn: () => void) => () => {},
-    registerSnapshotProvider: jest.fn(),
+    registerSnapshotProvider: vi.fn(),
   } as unknown as TickService;
 
   return new ShipStateService(mockPrisma, mockTickService);
@@ -106,7 +65,7 @@ function makeService(userFindManyMock: jest.Mock): ShipStateService {
 
 describe('T-P016 — ShipStateService.refreshTeamcodes()', () => {
   it('updates in-memory teamcode when DB returns a different value (orphan reset to 0)', async () => {
-    const userFindMany = jest.fn().mockResolvedValue([
+    const userFindMany = vi.fn().mockResolvedValue([
       { userid: 'u1', teamcode: 0n }, // midnight reset this to 0
     ]);
     const svc = makeService(userFindMany);
@@ -123,7 +82,7 @@ describe('T-P016 — ShipStateService.refreshTeamcodes()', () => {
   });
 
   it('leaves teamcode unchanged when DB value matches in-memory value', async () => {
-    const userFindMany = jest.fn().mockResolvedValue([
+    const userFindMany = vi.fn().mockResolvedValue([
       { userid: 'u2', teamcode: 42n }, // no change
     ]);
     const svc = makeService(userFindMany);
@@ -138,7 +97,7 @@ describe('T-P016 — ShipStateService.refreshTeamcodes()', () => {
   });
 
   it('is a no-op when the in-memory map is empty (no DB call needed)', async () => {
-    const userFindMany = jest.fn();
+    const userFindMany = vi.fn();
     const svc = makeService(userFindMany);
     await svc.onModuleInit();
 
@@ -150,7 +109,7 @@ describe('T-P016 — ShipStateService.refreshTeamcodes()', () => {
   });
 
   it('sets teamcode to undefined when DB returns null (user lost team after null reset)', async () => {
-    const userFindMany = jest.fn().mockResolvedValue([
+    const userFindMany = vi.fn().mockResolvedValue([
       { userid: 'u3', teamcode: null },
     ]);
     const svc = makeService(userFindMany);
@@ -165,7 +124,7 @@ describe('T-P016 — ShipStateService.refreshTeamcodes()', () => {
   });
 
   it('updates multiple ships across different users in one pass', async () => {
-    const userFindMany = jest.fn().mockResolvedValue([
+    const userFindMany = vi.fn().mockResolvedValue([
       { userid: 'ua', teamcode: 0n },
       { userid: 'ub', teamcode: 99n },
     ]);

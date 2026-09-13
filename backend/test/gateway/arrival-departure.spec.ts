@@ -35,7 +35,7 @@ import { formatMessage, MessageId } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 interface Emit { rooms: string[]; except: string[]; event: string; payload: unknown }
 
@@ -59,11 +59,10 @@ function build(others: ShipState[] = []) {
   const cache = new ShipClassCacheService({} as never);
   cache.setForTest(1, { typeName: 'Interceptor' } as never);
 
-  const gateway = new GameGateway(
-    shipState, {} as never, {} as never, {} as never, {} as never,
-    {} as never, {} as never, cache, {} as never,
-    { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-  );
+  const gateway = makeGateway({
+    shipStateService: shipState,
+    shipClassCache: cache,
+  });
   (gateway as unknown as { server: unknown }).server = {
     to: (r: string) => chain([r], []),
     except: (e: string[]) => chain([], e),

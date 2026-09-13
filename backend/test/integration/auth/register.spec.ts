@@ -2,17 +2,16 @@ import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const request = require('supertest') as (app: unknown) => import('supertest').SuperTest<import('supertest').Test>;
 import { AppModule } from '../../../src/app.module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../src/prisma/client';
+import request from 'supertest';
+import { makePrismaClient } from '../../helpers/make-prisma-client';
 
 // Must be set BEFORE AppModule is imported/instantiated so ConfigModule picks it up.
 process.env['JWT_SECRET'] = 'test-secret-123';
 process.env['DATABASE_URL'] = process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'];
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: process.env['TEST_DATABASE_URL'] } },
-});
+const prisma = makePrismaClient(process.env['TEST_DATABASE_URL']);
 
 describe('POST /auth/register', () => {
   let app: INestApplication;

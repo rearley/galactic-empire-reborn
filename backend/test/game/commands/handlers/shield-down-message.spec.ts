@@ -27,23 +27,16 @@ import { ShieldHandlerService } from '../../../../src/game/commands/handlers/shi
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { ShipClassCacheService } from '../../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 3, shieldstat: 1, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
+  return baseMakeShip({
+    shipname: 'T',
+    energy: 50000,
+    shieldtype: 3,
+    shieldstat: 1,
     ...over,
-  } as ShipState;
+  });
 }
 
 function makeHandler(maxShields = 10): ShieldHandlerService {

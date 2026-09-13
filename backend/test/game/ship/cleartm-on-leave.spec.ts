@@ -25,34 +25,32 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { TickService } from '../../../src/game/tick/tick.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u', shipno: 1, shipname: 'S', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5, ycoord: 5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    userid: 'u',
+    shipname: 'S',
+    xcoord: 5,
+    ycoord: 5,
+    phasrtype: 1,
+    shieldtype: 1,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  } as ShipState;
+    topspeed: 8,
+    ...over,
+  });
 }
 
 function build() {
   const channels = new ShipChannelRegistry();
   const svc = new ShipStateService(
-    { ship: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }), delete: jest.fn().mockResolvedValue({}) }, shipClass: { findMany: jest.fn().mockResolvedValue([]) } } as unknown as PrismaService,
-    { subscribe: jest.fn(() => jest.fn()) } as unknown as TickService,
+    { ship: { update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }), delete: vi.fn().mockResolvedValue({}) }, shipClass: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaService,
+    { subscribe: vi.fn(() => vi.fn()) } as unknown as TickService,
     channels,
   );
   return { svc, channels };

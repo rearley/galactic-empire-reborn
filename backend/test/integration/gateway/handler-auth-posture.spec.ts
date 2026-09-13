@@ -50,48 +50,48 @@ describe('GameGateway handler auth posture (T020b)', () => {
   /** Resolves once the gateway emits prompt:ship-name for the current client. */
   let onboardingReady: Promise<void>;
 
-  const dispatchMock = jest.fn().mockReturnValue({ lines: [] });
+  const dispatchMock = vi.fn().mockReturnValue({ lines: [] });
 
   beforeAll(async () => {
     const shipServiceMock = {
-      findByUserid: jest.fn().mockReturnValue([]),
-      get: jest.fn().mockReturnValue(undefined),
-      mutate: jest.fn(),
-      size: jest.fn().mockReturnValue(0),
+      findByUserid: vi.fn().mockReturnValue([]),
+      get: vi.fn().mockReturnValue(undefined),
+      mutate: vi.fn(),
+      size: vi.fn().mockReturnValue(0),
       // Combat/ship ticks call findAllShips on the service every tick.
-      findAllShips: jest.fn().mockReturnValue([]),
-      loadShip: jest.fn(),
+      findAllShips: vi.fn().mockReturnValue([]),
+      loadShip: vi.fn(),
       // Gateway calls flushAndUnload during disconnect for bound sockets.
-      flushAndUnload: jest.fn().mockResolvedValue(undefined),
-      unboard: jest.fn().mockResolvedValue(undefined),
-      board: jest.fn(),
+      flushAndUnload: vi.fn().mockResolvedValue(undefined),
+      unboard: vi.fn().mockResolvedValue(undefined),
+      board: vi.fn(),
     };
     const registryMock = {
-      upsert: jest.fn(),
-      remove: jest.fn(),
-      list: jest.fn().mockReturnValue([]),
-      isBound: jest.fn().mockReturnValue(false), // key: all sockets are treated as unbound
+      upsert: vi.fn(),
+      remove: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+      isBound: vi.fn().mockReturnValue(false), // key: all sockets are treated as unbound
     };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [GatewayModule],
     })
       .overrideProvider(ShipStateService).useValue(shipServiceMock)
-      .overrideProvider(CommandRouterService).useValue({ register: jest.fn(), dispatch: dispatchMock })
+      .overrideProvider(CommandRouterService).useValue({ register: vi.fn(), dispatch: dispatchMock })
       .overrideProvider(PrismaService).useValue({
-        ship: { findMany: jest.fn().mockResolvedValue([]) }, // no ships → onboarding
-        shipClass: { findMany: jest.fn().mockResolvedValue([]) }, // ShipClassCacheService.onModuleInit
-        mine: { findMany: jest.fn().mockResolvedValue([]) },     // CombatTickService.onModuleInit
+        ship: { findMany: vi.fn().mockResolvedValue([]) }, // no ships → onboarding
+        shipClass: { findMany: vi.fn().mockResolvedValue([]) }, // ShipClassCacheService.onModuleInit
+        mine: { findMany: vi.fn().mockResolvedValue([]) },     // CombatTickService.onModuleInit
         // scanPl owner resolution + onboarding User-exists guard: a live User
         // row must resolve so the gateway emits prompt:ship-name (not auth:logout).
-        user: { findUnique: jest.fn().mockResolvedValue({ userid: 'onboarding-user-unbound' }) },
+        user: { findUnique: vi.fn().mockResolvedValue({ userid: 'onboarding-user-unbound' }) },
       })
       .overrideProvider(GalaxyService).useValue({})
-      .overrideProvider(PlanetStateService).useValue({ all: jest.fn().mockReturnValue([]) })
+      .overrideProvider(PlanetStateService).useValue({ all: vi.fn().mockReturnValue([]) })
       .overrideProvider(ConnectedShipsRegistry).useValue(registryMock)
       .overrideProvider(WsAuthGuard)
       .useValue({
-        validate: jest.fn().mockImplementation(async (client: import('socket.io').Socket) => {
+        validate: vi.fn().mockImplementation(async (client: import('socket.io').Socket) => {
           // Simulate a valid JWT user with no ship
           client.data.userid = 'onboarding-user-unbound';
           client.data.username = 'OnboardingUser';
@@ -100,10 +100,10 @@ describe('GameGateway handler auth posture (T020b)', () => {
       })
       .overrideProvider(OnboardingService)
       .useValue({
-        buildClassListPayload: jest.fn().mockResolvedValue([]),
-        validateClassReply: jest.fn().mockResolvedValue(true),
-        validateNameReply: jest.fn().mockReturnValue(true),
-        finalize: jest.fn().mockResolvedValue(null),
+        buildClassListPayload: vi.fn().mockResolvedValue([]),
+        validateClassReply: vi.fn().mockResolvedValue(true),
+        validateNameReply: vi.fn().mockReturnValue(true),
+        finalize: vi.fn().mockResolvedValue(null),
       })
       .compile();
 
@@ -119,14 +119,17 @@ describe('GameGateway handler auth posture (T020b)', () => {
     await app.close();
   });
 
-  beforeEach((done) => {
+  // Vitest 5 removed the `done` callback; awaiting the connect event is the
+  // same wait. The listener registration order below is unchanged and is the
+  // part that matters.
+  beforeEach(async () => {
     client = makeUnboundClient(port);
     // Register the prompt:ship-name listener BEFORE the connect fires so we
     // never miss the event that handleConnection emits immediately on connect.
     onboardingReady = new Promise<void>((resolve) => {
       client.once('prompt:ship-name', () => resolve());
     });
-    client.on('connect', done);
+    await new Promise<void>((resolve) => client.on('connect', () => resolve()));
   });
 
   afterEach(() => {

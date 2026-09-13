@@ -3,7 +3,7 @@ import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cach
 describe('ShipClassCacheService', () => {
   function makeService(rows: Array<{ classNumber: number; maxAcceleration: number; maxWarp: number }>): ShipClassCacheService {
     const prisma = {
-      shipClass: { findMany: jest.fn().mockResolvedValue(rows) },
+      shipClass: { findMany: vi.fn().mockResolvedValue(rows) },
     } as any;
     return new ShipClassCacheService(prisma);
   }

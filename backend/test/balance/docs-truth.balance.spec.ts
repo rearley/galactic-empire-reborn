@@ -27,6 +27,7 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { scanLine } from './citation-scan';
 import { SYSOP_OPTIONS } from '../../src/game/config/game-config';
 
 const REPO = resolve(__dirname, '../../..');
@@ -99,17 +100,20 @@ describe('docs cite a real original', () => {
    * "cited a file we do not vendor" and "cited past the end".
    */
   it('points every citation in the SOURCE at a line that exists', () => {
+    // `scanLine` rather than a local regex, so the `FILE.C:123, :456` shorthand
+    // is bounds-checked too. Before 2026-09-11 the continuation numbers were
+    // invisible here: 201 citations across backend/ could have pointed past the
+    // end of the file, or at a file we do not vendor, and this test would have
+    // stayed green. @see issue #11
     const files = [...walk(join(REPO, 'backend/src')), ...walk(join(REPO, 'backend/test'))];
     const bad: string[] = [];
     for (const f of files) {
       readFileSync(f, 'utf8').split('\n').forEach((line, idx) => {
-        for (const m of line.matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)) {
-          const file = m[1].toUpperCase();
-          const n = Number(m[2]);
-          const len = lineCounts.get(file);
+        for (const c of scanLine(line)) {
+          const len = lineCounts.get(c.file);
           const where = `${f.replace(REPO + '/', '')}:${idx + 1}`;
-          if (len === undefined) bad.push(`${where} → ${m[0]} (no such vendored file)`);
-          else if (n > len) bad.push(`${where} → ${m[0]} (file has ${len} lines)`);
+          if (len === undefined) bad.push(`${where} → ${c.file}:${c.line} (no such vendored file)`);
+          else if (c.line > len) bad.push(`${where} → ${c.file}:${c.line} (file has ${len} lines)`);
         }
       });
     }
@@ -120,12 +124,10 @@ describe('docs cite a real original', () => {
     const bad: string[] = [];
     for (const doc of [...CURRENT_STATE_DOCS, ...LOG_DOCS]) {
       read(doc).forEach((line, idx) => {
-        for (const m of line.matchAll(/\b(GE[A-Z]+\.[CH]):(\d+)/g)) {
-          const file = m[1].toUpperCase();
-          const n = Number(m[2]);
-          const len = lineCounts.get(file);
-          if (len === undefined) bad.push(`${doc}:${idx + 1} → ${m[0]} (no such file)`);
-          else if (n > len) bad.push(`${doc}:${idx + 1} → ${m[0]} (file has ${len} lines)`);
+        for (const c of scanLine(line)) {
+          const len = lineCounts.get(c.file);
+          if (len === undefined) bad.push(`${doc}:${idx + 1} → ${c.file}:${c.line} (no such file)`);
+          else if (c.line > len) bad.push(`${doc}:${idx + 1} → ${c.file}:${c.line} (file has ${len} lines)`);
         }
       });
     }

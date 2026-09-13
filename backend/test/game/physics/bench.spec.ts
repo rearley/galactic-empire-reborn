@@ -3,26 +3,24 @@ import { PhysicsTickService } from '../../../src/game/physics/physics-tick.servi
 import { ShipClassCacheService } from '../../../src/game/physics/ship-class-cache.service';
 import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 function makeShip(userid: string, shipno: number): ShipState {
-  return {
-    userid, shipno, shipname: `S${userid}${shipno}`, shpclass: 1,
-    heading: 90, head2b: 90, speed: 1500, speed2b: 1500,
-    xcoord: 5 + (shipno % 10) * 0.1, ycoord: 5 + (shipno % 5) * 0.1,
-    damage: 0, energy: 100000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 5, repair: 0, hypha: 5,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  };
+  return baseMakeShip({
+    userid: userid,
+    shipno: shipno,
+    shipname: `S${userid}${shipno}`,
+    heading: 90,
+    head2b: 90,
+    speed: 1500,
+    speed2b: 1500,
+    xcoord: 5 + (shipno % 10) * 0.1,
+    ycoord: 5 + (shipno % 5) * 0.1,
+    energy: 100000,
+    cantexit: 5,
+    hypha: 5,
+    topspeed: 10,
+  });
 }
 
 /**

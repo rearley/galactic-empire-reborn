@@ -27,33 +27,40 @@ import {
   DROID_USERID_PREFIX,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import type { Mock } from 'vitest';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'test', shipno: 1, shipname: 'Test', shpclass: 32,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 50000,
-    phasr: 100, phasrtype: 5, kills: 0, lastfired: -1,
-    shieldtype: 2, shieldstat: 0, shield: 2, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0, where: 0,
-    ltorpsChannel: [255, 255, 255], ltorpsDistance: [0, 0, 0],
-    lmisslChannel: [255, 255, 255], lmisslDistance: [0, 0, 0], lmisslEnergy: [0, 0, 0],
-    decout: [], jammer: 0, freq: [],
+  return baseMakeShip({
+    userid: 'test',
+    shipname: 'Test',
+    shpclass: 32,
+    energy: 50000,
+    phasr: 100,
+    phasrtype: 5,
+    lastfired: -1,
+    shieldtype: 2,
+    shield: 2,
+    ltorpsChannel: [255, 255, 255],
+    ltorpsDistance: [0, 0, 0],
+    lmisslChannel: [255, 255, 255],
+    lmisslDistance: [0, 0, 0],
+    lmisslEnergy: [0, 0, 0],
+    freq: [],
     items: new Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 2, cybmine: 255, cybskill: 0,
-    cybupdate: 0, tick: 6, emulate: 0, minesnear: 0, lock: 0,
-    holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
+    status: 2,
+    cybmine: 255,
+    tick: 6,
+    topspeed: 8,
     isEphemeral: true,
     ...overrides,
-  };
+  });
 }
 
 const BASE_CLASS_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 8, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
@@ -66,8 +73,8 @@ interface Harness {
   svc: DroidTickService;
   events: EventEmitter2;
   shipMap: Map<string, ShipState>;
-  prismaShipDeleteMock: jest.Mock;
-  removeFromGameSpy: jest.Mock;
+  prismaShipDeleteMock: Mock;
+  removeFromGameSpy: Mock;
 }
 
 function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harness {
@@ -81,9 +88,9 @@ function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harn
     shipMap.set(`${d.userid}:1`, s);
   }
 
-  const prismaShipDeleteMock = jest.fn();
+  const prismaShipDeleteMock = vi.fn();
 
-  const removeFromGameSpy = jest.fn((s: { userid: string; shipno: number }) => {
+  const removeFromGameSpy = vi.fn((s: { userid: string; shipno: number }) => {
     shipMap.delete(`${s.userid}:${s.shipno}`);
   });
 
@@ -108,13 +115,13 @@ function buildHarness(droids: Array<{ userid: string; shpclass: number }>): Harn
     getMaxShields: (_n: number) => 2,
   } as unknown as ShipClassCacheService;
 
-  const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
+  const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
   const mineRepo = {
-    create: jest.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
+    create: vi.fn().mockResolvedValue({ id: 1, channel: 1, timer: 100, xcoord: 0, ycoord: 0, deployedBy: '' }),
   } as unknown as MineRepository;
 
   const tickService = {
-    subscribe: jest.fn(),
+    subscribe: vi.fn(),
   } as unknown as TickService;
 
   const spawner = new DroidSpawner(shipState, classCache, rand);
@@ -136,8 +143,8 @@ describe('T035 — ephemerality invariants', () => {
       // We verify indirectly: creating a mock ShipStateService with a flush subscriber,
       // populating it with an ephemeral state, and confirming prisma.ship.update is never called.
 
-      const prismaUpdateMock = jest.fn();
-      const prismaShipMock = { update: prismaUpdateMock } as unknown as { update: jest.Mock };
+      const prismaUpdateMock = vi.fn();
+      const prismaShipMock = { update: prismaUpdateMock } as unknown as { update: Mock };
 
       // Simulate the flush logic from ShipStateService as described in ship-state.service.ts:128-145
       const map = new Map<string, ShipState>();
@@ -164,7 +171,7 @@ describe('T035 — ephemerality invariants', () => {
     });
 
     it('a non-ephemeral dirty state IS flushed (control: flush runs for normal ships)', async () => {
-      const prismaUpdateMock = jest.fn().mockResolvedValue({});
+      const prismaUpdateMock = vi.fn().mockResolvedValue({});
       const map = new Map<string, ShipState>();
       const normalShip = makeShip({
         userid: 'player1',
@@ -242,9 +249,9 @@ describe('T035 — ephemerality invariants', () => {
         getMaxShields: () => 2,
       } as unknown as ShipClassCacheService;
 
-      const mineRegistry = { add: jest.fn(), hydrate: jest.fn() } as unknown as MineRegistry;
-      const mineRepo = { create: jest.fn() } as unknown as MineRepository;
-      const tickService = { subscribe: jest.fn() } as unknown as TickService;
+      const mineRegistry = { add: vi.fn(), hydrate: vi.fn() } as unknown as MineRegistry;
+      const mineRepo = { create: vi.fn() } as unknown as MineRepository;
+      const tickService = { subscribe: vi.fn() } as unknown as TickService;
       const spawner = new DroidSpawner(shipState, classCache, rand);
       const svc = new DroidTickService(
         tickService, shipState, classCache, spawner, mineRegistry, mineRepo, events, rand,
@@ -402,10 +409,16 @@ describe('T037 — two simultaneous kills in one tick', () => {
       scoreAwarded: 50,
     });
 
-    await expect(async () => {
+    // `expect(asyncFn).not.toThrow()` asserts nothing: an async function
+    // REJECTS rather than throws, so the matcher saw a function that returned a
+    // promise and passed. Awaiting the call and asserting it resolves is what
+    // actually proves two kills in one tick do not blow up. @see issue #28
+    const resolveBothKills = async (): Promise<void> => {
       svc.onShipDestroyed(makePayload(droid1));
       svc.onShipDestroyed(makePayload(droid2));
       await new Promise((r) => setImmediate(r));
-    }).not.toThrow();
+    };
+
+    await expect(resolveBothKills()).resolves.toBeUndefined();
   });
 });

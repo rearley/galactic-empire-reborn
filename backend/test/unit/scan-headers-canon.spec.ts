@@ -20,46 +20,43 @@
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ShipClassCacheService } from '../../src/game/physics/ship-class-cache.service';
 import { GalaxyService } from '../../src/game/galaxy/galaxy.service';
 import { PlanetStateService } from '../../src/game/planet/planet-state.service';
 import { MineRegistry } from '../../src/game/combat/mine.registry';
 import { ShipState } from '../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../src/game/constants';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Probe', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.5, ycoord: 5.5, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 1, kills: 0, lastfired: 0,
-    shieldtype: 1, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Probe',
+    xcoord: 5.5,
+    ycoord: 5.5,
+    phasrtype: 1,
+    shieldtype: 1,
     items: new Array(NUMITEMS).fill(0n),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 8, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
+    topspeed: 8,
     channel: over.channel ?? 1,
-  } as ShipState;
+    ...over,
+  });
 }
 
-async function makeService(scanRange = 100_000) {
+function makeService(scanRange = 100_000) {
+  const shipClassCache = new ShipClassCacheService({} as never);
+  shipClassCache.setForTest(1, { maxAcceleration: 0, maxWarp: 0, scanRange });
   const service = new ScanHandlerService(
     { findAllShips: () => [], findByName: () => undefined, findByUserid: () => [] } as unknown as ShipStateService,
-    { shipClass: { findMany: async () => [{ classNumber: 1, scanRange }] } } as unknown as PrismaService,
+    {} as unknown as PrismaService,
     {
       getSectorPlanets: () => [], getSectorWormholes: () => [],
       findPlanetByName: () => null, getMeta: () => undefined, onModuleInit: () => undefined,
     } as unknown as GalaxyService,
     { get: () => undefined } as unknown as PlanetStateService,
     new MineRegistry(),
+    undefined,
+    shipClassCache,
   );
-  await service.onModuleInit();
   return service;
 }
 
@@ -72,7 +69,7 @@ const header = async (service: ScanHandlerService, ship: ShipState, args: string
 
 describe('scan headers follow SCAN24 / SCAN25', () => {
   it('`sca se` says mag:1x and carries NO range — SCAN25', async () => {
-    const service = await makeService();
+    const service = makeService();
     const h = await header(service, makeShip(), ['se']);
 
     expect(h).toBe('   Sector Scan mag:1x (s:5 5)');
@@ -80,7 +77,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('`sca lo` prints the RAW range under SCAN24, not range/10000', async () => {
-    const service = await makeService(100_000);
+    const service = makeService(100_000);
     const h = await header(service, makeShip(), ['lo']);
 
     // 100 000 scanRange x SCAN_LO_PROJECTION_MULTIPLIER (3) = 300 000 raw.
@@ -88,7 +85,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('`sca ra` uses the same SCAN24 shape, so the two agree', async () => {
-    const service = await makeService(100_000);
+    const service = makeService(100_000);
     const lo = await header(service, makeShip(), ['lo']);
     const ra = await header(service, makeShip(), ['ra']);
 
@@ -97,7 +94,7 @@ describe('scan headers follow SCAN24 / SCAN25', () => {
   });
 
   it('never says "pc" — canon has no such unit anywhere', async () => {
-    const service = await makeService();
+    const service = makeService();
     for (const mode of [['se'], ['lo'], ['ra'], ['lo', 'full']]) {
       expect(await header(service, makeShip(), mode)).not.toMatch(/pc/);
     }

@@ -21,66 +21,34 @@ import { CYBERTRON_EVENT, CybertronTargetAcquiredPayload } from '../../../../src
 import { COMBAT_PHASER_FIRED, COMBAT_SHIP_DESTROYED } from '../../../../src/game/combat/combat-events';
 import type { CombatPhaserFiredEvent, CombatShipDestroyedEvent } from '../../../../src/game/combat/combat-events';
 import type { ShipState } from '../../../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> & { userid: string; shipno: number; shpclass: number }): ShipState {
-  return {
+  return baseMakeShip({
     shipname: 'Ship',
-    heading: 0,
-    head2b: 0,
-    speed: 0,
-    speed2b: 0,
     xcoord: 5,
     ycoord: 5,
-    damage: 0,
     energy: 50000,
     phasr: 100,
     phasrtype: 2,
-    kills: 0,
     lastfired: 255,
     shieldtype: 2,
     shieldstat: 1,
     shield: 2,
-    cloak: 0,
-    degrees: 0,
-    percent: 0,
-    tactical: 0,
     helm: 1,
-    train: 0,
-    where: 0,
-    ltorpsChannel: [],
-    ltorpsDistance: [],
-    lmisslChannel: [],
-    lmisslDistance: [],
-    lmisslEnergy: [],
     decout: [0, 0, 0, 0, 0],
-    jammer: 0,
     freq: [],
     items: [0n, 0n, 0n, 0n, 0n, 0n, 10n, 10n, 0n, 0n, 0n, 10n, 0n, 5n, 0n, 0n],
-    titem: 0,
-    hostile: 0,
-    cantexit: 0,
-    repair: 0,
-    hypha: 0,
-    firecntl: 0,
-    destruct: 0,
-    status: 1,
     cybmine: 255,
     cybskill: 10,
     cybupdate: 50,
     tick: 1,
-    emulate: 0,
-    minesnear: 0,
-    lock: 0,
-    holdcourse: 0,
     topspeed: 8,
-    warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-    ...overrides,
     // Firer identity is the unique `channel` (this port's usrnum), not
     // `shipno`. These fixtures give each ship a distinct shipno, so mirror it.
     channel: overrides.channel ?? overrides.shipno ?? 1,
-  };
+    ...overrides,
+  });
 }
 
 async function buildHarness(seed = 77) {
@@ -138,14 +106,14 @@ async function buildHarness(seed = 77) {
   const createdSpawns: unknown[] = [];
 
   const repository = {
-    hydrateAll: jest.fn().mockResolvedValue(undefined),
-    createSpawn: jest.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
+    hydrateAll: vi.fn().mockResolvedValue(undefined),
+    createSpawn: vi.fn().mockImplementation(async (slot: { userid: string; shipno: number; classNumber: number; tick: number }) => {
       createdSpawns.push(slot);
       const s = makeShip({ userid: slot.userid, shipno: slot.shipno, shpclass: slot.classNumber, status: 2, tick: slot.tick });
       shipMap.set(`${slot.userid}:${slot.shipno}`, s);
     }),
-    flushShipsImmediate: jest.fn().mockResolvedValue(undefined),
-    flushUsersImmediate: jest.fn().mockResolvedValue(undefined),
+    flushShipsImmediate: vi.fn().mockResolvedValue(undefined),
+    flushUsersImmediate: vi.fn().mockResolvedValue(undefined),
     clampCybertronCash: (n: bigint) => n > 2_000_000n ? 2_000_000n : n,
   } as unknown as CybertronRepository;
 

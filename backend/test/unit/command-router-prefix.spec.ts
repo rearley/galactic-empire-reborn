@@ -25,31 +25,20 @@ import { CommandRouterService } from '../../src/game/commands/command-router.ser
 import { Command, CommandContext, CommandResult } from '../../src/game/commands/command.types';
 import { MessageId, formatMessage } from '../../src/game/commands/messages';
 import { ShipState } from '../../src/game/ship/ship-state.types';
+import { makeShip as baseMakeShip } from '../helpers/make-ship';
 
 function makeShip(): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 1000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0], items: [],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 0, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 0, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
-  } as ShipState;
+  return baseMakeShip({
+    shipname: 'Test',
+    status: 0,
+    topspeed: 0,
+  });
 }
 
 const ctx = {} as CommandContext;
 const UNKNOWN = formatMessage(MessageId.UNKNOWN_CMD);
 
-function makeRouter(keyword: string, handler = jest.fn().mockReturnValue({ lines: [] })) {
+function makeRouter(keyword: string, handler = vi.fn().mockReturnValue({ lines: [] })) {
   const router = new CommandRouterService();
   const cmd: Command = { keyword, aliases: [], minArgs: 0, argMissingMessage: 'missing', handler };
   router.register(cmd);
@@ -62,15 +51,15 @@ function textOf(result: CommandResult): string {
 
 describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)', () => {
   describe('longer input resolves on its first 3 characters', () => {
-    it.each(['sca', 'scan', 'scanner', 'scandalous'])('%s resolves to the sca command', (input) => {
+    it.each(['sca', 'scan', 'scanner', 'scandalous'])('%s resolves to the sca command', async (input) => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch(input, makeShip(), ctx);
+      await router.dispatch(input, makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
 
-    it('passes the remaining tokens through as args, unaffected by verb length', () => {
+    it('passes the remaining tokens through as args, unaffected by verb length', async () => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch('scan lo', makeShip(), ctx);
+      await router.dispatch('scan lo', makeShip(), ctx);
       expect(handler).toHaveBeenCalledWith(expect.anything(), ['lo'], ctx);
     });
   });
@@ -85,23 +74,23 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   });
 
   describe('a differing 3rd character is a different command', () => {
-    it('sel and sen do not collide', () => {
+    it('sel and sen do not collide', async () => {
       const router = new CommandRouterService();
-      const sell = jest.fn().mockReturnValue({ lines: [] });
-      const send = jest.fn().mockReturnValue({ lines: [] });
+      const sell = vi.fn().mockReturnValue({ lines: [] });
+      const send = vi.fn().mockReturnValue({ lines: [] });
       router.register({ keyword: 'sel', aliases: [], minArgs: 0, argMissingMessage: '', handler: sell });
       router.register({ keyword: 'sen', aliases: [], minArgs: 0, argMissingMessage: '', handler: send });
 
-      router.dispatch('sell', makeShip(), ctx);
+      await router.dispatch('sell', makeShip(), ctx);
       expect(sell).toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
     });
   });
 
   describe('short table entries keep exact-match semantics', () => {
-    it('? resolves to the help command', () => {
+    it('? resolves to the help command', async () => {
       const { router, handler } = makeRouter('?');
-      router.dispatch('?', makeShip(), ctx);
+      await router.dispatch('?', makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
 
@@ -114,9 +103,9 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   });
 
   describe('case insensitivity is preserved', () => {
-    it.each(['SCAN', 'Sca', 'ScAnNeR'])('%s resolves', (input) => {
+    it.each(['SCAN', 'Sca', 'ScAnNeR'])('%s resolves', async (input) => {
       const { router, handler } = makeRouter('sca');
-      router.dispatch(input, makeShip(), ctx);
+      await router.dispatch(input, makeShip(), ctx);
       expect(handler).toHaveBeenCalled();
     });
   });
@@ -124,15 +113,15 @@ describe('command router — 3-character prefix matching (GECMDS.C:249 gesearch)
   describe('registration guards against silently shadowing a command', () => {
     it('throws when two different commands share a 3-char prefix', () => {
       const router = new CommandRouterService();
-      router.register({ keyword: 'mai', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() });
+      router.register({ keyword: 'mai', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() });
       expect(() =>
-        router.register({ keyword: 'maint', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() }),
+        router.register({ keyword: 'maint', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() }),
       ).toThrow(/prefix/i);
     });
 
     it('re-registering the same command object is not a collision', () => {
       const router = new CommandRouterService();
-      const cmd: Command = { keyword: 'sca', aliases: [], minArgs: 0, argMissingMessage: '', handler: jest.fn() };
+      const cmd: Command = { keyword: 'sca', aliases: [], minArgs: 0, argMissingMessage: '', handler: vi.fn() };
       router.register(cmd);
       expect(() => router.register(cmd)).not.toThrow();
     });

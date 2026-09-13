@@ -19,10 +19,12 @@ import {
   GESTAT_AUTO,
 } from '../../../src/game/constants';
 import type { ShipClassEntry } from '../../../src/game/physics/ship-class-cache.service';
+import type { Mock } from 'vitest';
 
 // ─── Class entry stubs ────────────────────────────────────────────────────────
 
 const SCOW_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 1, maxPhaser: 1, maxShields: 1,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
@@ -30,6 +32,7 @@ const SCOW_ENTRY: ShipClassEntry = {
 };
 
 const MURDONIAN_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 8, maxPhaser: 5, maxShields: 2,
   scanRange: 25_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
@@ -37,6 +40,7 @@ const MURDONIAN_ENTRY: ShipClassEntry = {
 };
 
 const VAKORY_ENTRY: ShipClassEntry = {
+  maxPrice: 0n,
   maxAcceleration: 1200, maxWarp: 4, maxPhaser: 1, maxShields: 1,
   scanRange: 20_000, maxTons: 100, hasTorpedo: false, hasMissile: false,
   hasJammer: true, hasMine: true, hasZipper: false, hasCloak: false, hasDecoy: false, noClaim: 0,
@@ -52,10 +56,10 @@ function entryFor(classNumber: number): ShipClassEntry | undefined {
 
 // ─── Spawner factory ──────────────────────────────────────────────────────────
 
-function buildSpawner(seed: number): { spawner: DroidSpawner; loadShipSpy: jest.Mock } {
+function buildSpawner(seed: number): { spawner: DroidSpawner; loadShipSpy: Mock } {
   const rand = new Mulberry32Adapter(seed);
 
-  const loadShipSpy = jest.fn();
+  const loadShipSpy = vi.fn();
   const shipState = {
     loadShip: loadShipSpy,
     findAllShips: () => [],

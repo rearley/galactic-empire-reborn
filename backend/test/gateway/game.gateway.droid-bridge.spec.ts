@@ -13,8 +13,6 @@
 import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
-import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
@@ -25,43 +23,40 @@ import {
   DroidSpawnedEvent,
   DroidKilledEvent,
 } from '../../src/game/droid/droid-events';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
+import type { Mock } from 'vitest';
 
 describe('GameGateway — droid event bridge', () => {
   let gateway: GameGateway;
-  let emitMock: jest.Mock;
-  let toMock: jest.Mock;
+  let emitMock: Mock;
+  let toMock: Mock;
 
   beforeEach(() => {
-    emitMock = jest.fn();
-    toMock = jest.fn().mockReturnValue({ emit: emitMock, to: jest.fn().mockReturnValue({ emit: emitMock }) });
+    emitMock = vi.fn();
+    toMock = vi.fn().mockReturnValue({ emit: emitMock, to: vi.fn().mockReturnValue({ emit: emitMock }) });
 
-    const mockWsGuard = { validate: jest.fn() } as unknown as WsAuthGuard;
-    const mockPrisma = { ship: { findFirst: jest.fn() } } as unknown as PrismaService;
-    const mockOnboarding = { buildClassListPayload: jest.fn().mockResolvedValue([]) } as unknown as OnboardingService;
-    const mockScanHandler = { clearScantab: jest.fn() } as unknown as ScanHandlerService;
+    const mockWsGuard = { validate: vi.fn() } as unknown as WsAuthGuard;
+    const mockPrisma = { ship: { findFirst: vi.fn() } } as unknown as PrismaService;
+    const mockOnboarding = { buildClassListPayload: vi.fn().mockResolvedValue([]) } as unknown as OnboardingService;
+    const mockScanHandler = { clearScantab: vi.fn() } as unknown as ScanHandlerService;
 
-    gateway = new GameGateway(
+    gateway = makeGateway({
       // DROIDNEW is a galaxy broadcast that skips filtered pilots, so the
       // bridge now reads the ship map. @see GEDROIDS.C:173
-      { findAllShips: () => [] } as unknown as ShipStateService,
-      {} as CommandRouterService,
-      {} as ConnectedShipsRegistry,
-      mockWsGuard,
-      mockPrisma,
-      mockOnboarding,
-      mockScanHandler,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      shipStateService: { findAllShips: () => [] } as unknown as ShipStateService,
+      wsAuthGuard: mockWsGuard,
+      prisma: mockPrisma,
+      onboardingService: mockOnboarding,
+      scanHandler: mockScanHandler,
+      random: mockRandom,
+    });
 
     // Inject the mock socket.io Server
     // `except` is the top-level Socket.io broadcast the CYBNEW/DROIDNEW line
     // uses; the roster emit still goes through `to`.
     (gateway as unknown as { server: unknown }).server = {
       to: toMock,
-      except: jest.fn().mockReturnValue({ emit: jest.fn() }),
+      except: vi.fn().mockReturnValue({ emit: vi.fn() }),
     };
   });
 

@@ -1,10 +1,12 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PlayerModule } from '../player/player.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
-import { ShipModule } from '../ship/ship.module';
+import { ShipStateModule } from '../ship/ship-state.module';
 import { TickModule } from '../tick/tick.module';
 import { MathRandomAdapter, RANDOM } from '../combat/random.port';
 import { PlanetStateService } from './planet-state.service';
+import { PLANET_STATE_PORT } from './planet-state.port';
 import { PlanetTickService } from './planet-tick.service';
 import { PlanetEconomyService } from './planet-economy.service';
 import { PlanetAttackService } from './planet-attack.service';
@@ -26,12 +28,13 @@ const devOnlyControllers = debugEndpointsEnabled() ? [PlanetDebugController] : [
 
 @Module({
   controllers: devOnlyControllers,
-  imports: [PrismaModule, GalaxyModule, forwardRef(() => ShipModule), forwardRef(() => TickModule)],
+  imports: [PrismaModule, PlayerModule, GalaxyModule, ShipStateModule, TickModule],
   providers: [
     PlanetStateService,
     PlanetTickService,
     PlanetEconomyService,
     PlanetAttackService,
+    { provide: PLANET_STATE_PORT, useExisting: PlanetStateService },
     { provide: RANDOM, useClass: MathRandomAdapter },
     { provide: PLATTRT1, useFactory: () => loadPlattrt1() },
     { provide: PLATTRT2, useFactory: () => loadPlattrt2() },
@@ -40,6 +43,6 @@ const devOnlyControllers = debugEndpointsEnabled() ? [PlanetDebugController] : [
     { provide: PLATTRF3, useFactory: () => loadPlattrf3() },
     { provide: FIRETICKS, useFactory: () => loadFireticks() },
   ],
-  exports: [PlanetStateService, PlanetEconomyService, PlanetAttackService, PlanetTickService],
+  exports: [PlanetStateService, PlanetEconomyService, PlanetAttackService, PlanetTickService, PLANET_STATE_PORT],
 })
 export class PlanetModule {}

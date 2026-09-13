@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogEntry } from '../types/logEntry';
 
 const MAX_ENTRIES = 500;
@@ -66,11 +66,16 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
   const readerMoved = useRef(false);
   const noteIntent = () => { readerMoved.current = true; };
 
-  /** Scroll to the bottom and remember where that landed. */
-  const scrollToBottom = (el: HTMLDivElement) => {
+  /**
+   * Scroll to the bottom and remember where that landed.
+   *
+   * `useCallback` with no dependencies: it touches only its argument and a ref,
+   * both stable, so the effect below can list it without re-running.
+   */
+  const scrollToBottom = useCallback((el: HTMLDivElement) => {
     el.scrollTop = el.scrollHeight;
     writtenTop.current = el.scrollTop;
-  };
+  }, []);
 
   const capped = lines.slice(-MAX_ENTRIES);
 
@@ -119,11 +124,18 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
       if (el) scrollToBottom(el);
     });
     return () => cancelAnimationFrame(raf);
-  }, [lines, stickyBottom]);
+    // `lines` is not read in here — it is the TRIGGER. A new line has just
+    // been rendered and the log has to follow it to the bottom, so the effect
+    // must run when the list changes even though the effect body only touches
+    // the container. The rule cannot see the difference between a dependency
+    // read and a dependency that means "something happened"; this is the
+    // second kind. @see issue #25
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+  }, [lines, stickyBottom, scrollToBottom]);
 
   return (
     <>
-      <div className="border-b border-gray-800 px-3 py-1 flex-shrink-0 flex items-center justify-between">
+      <div className="border-b border-gray-800 px-3 py-1 shrink-0 flex items-center justify-between">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Event Log</span>
         {/*
           * Auto-scroll is a MODE, and it used to be invisible: once it

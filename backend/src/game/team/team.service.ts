@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../player/user.repository';
 import { TeamRepository } from './team.repository';
 import { ShipState } from '../ship/ship-state.types';
 import {
@@ -31,6 +32,15 @@ import { TEAMMAX } from '../constants';
  * @see GEMAIN.H:221 #define MAIL_CLASS_MAXOUT 2
  */
 const TEAM_KICK_MAIL_CLASS = 2;
+
+/**
+ * Postgres advisory lock key serialising teamcode allocation.
+ *
+ * ASCII "GEteam\0\0" — chosen not to collide with the midnight pass's
+ * `ADVISORY_LOCK_KEY` ("GMnight\0"). Transaction-scoped, so it is released by
+ * commit or rollback and never outlives the connection.
+ */
+const TEAM_ALLOC_LOCK_KEY = 0x47457465616D0000n;
 
 /** Founder-password alphabet — no I/O/0/1, which get misread off a screen. */
 const SECRET_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -64,6 +74,18 @@ export class TeamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repo: TeamRepository,
+    /**
+     * The `User` repository. `@Optional()` with a default built over the same
+     * client this class already holds, so the suite's direct
+     * `new TeamService(...)` sites keep compiling — and keep asserting
+     * on the very same `prisma.user.*` calls, which is what proves the queries
+     * did not change when they moved behind it. Nest injects the shared
+     * provider in production. Safe ONLY because `UserRepository` is stateless
+     * and constructible from `(prisma)` alone — see the statelessness note on
+     * that class before adding a field or a constructor parameter to it.
+     */
+    @Optional()
+    private readonly users: UserRepository = new UserRepository(prisma),
   ) {}
 
   /**
@@ -93,14 +115,22 @@ export class TeamService {
     while (attempts < 3) {
       attempts++;
       try {
-        const teamcode = await this.prisma.$transaction(async () => {
-          const max = await this.repo.getMaxTeamcode();
+        // Both writes go through `tx`. Prisma's interactive transaction covers
+        // only operations issued on the client it hands the callback, so a
+        // callback that ignores it — which this one used to — leaves the insert
+        // and the founder's teamcode unlinked: the team could exist with no
+        // members and its name taken. @see issue #14
+        //
+        // The advisory lock is taken FIRST, and is transaction-scoped, so
+        // allocation of the next teamcode is serialised rather than raced and
+        // then absorbed by the P2002 retry below. Same instrument the midnight
+        // job uses, on its own key.
+        const teamcode = await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${TEAM_ALLOC_LOCK_KEY})`;
+          const max = await this.repo.getMaxTeamcode(tx);
           const code = max + 1n;
-          await this.repo.insertTeam({ teamcode: code, teamname: name, password, secret });
-          await this.prisma.user.update({
-            where: { userid: ship.userid },
-            data: { teamcode: code },
-          });
+          await this.repo.insertTeam({ teamcode: code, teamname: name, password, secret }, tx);
+          await this.users.setTeamcode(ship.userid, code, tx);
           return code;
         });
 
@@ -237,14 +267,9 @@ export class TeamService {
     const team = await this.currentTeam(ship);
     if (!team) return { error: 'not_on_team' };
 
-    const rows = await this.prisma.user.findMany({
-      where: { teamcode: team.teamcode },
-      select: { userid: true },
-      orderBy: { userid: 'asc' },
-      take: TEAMMAX,
-    });
+    const members = await this.users.listTeamMemberIds(team.teamcode, TEAMMAX);
 
-    return { ok: true, teamname: team.teamname, members: rows.map((r) => r.userid) };
+    return { ok: true, teamname: team.teamname, members };
   }
 
   /**
@@ -262,17 +287,11 @@ export class TeamService {
     if ('error' in gate) return gate;
     const { team } = gate;
 
-    const target = await this.prisma.user.findUnique({
-      where: { userid: args.userid },
-      select: { userid: true, teamcode: true },
-    });
+    const target = await this.users.findTeamMembership(args.userid);
     if (!target) return { error: 'user_not_found' };
     if (target.teamcode !== team.teamcode) return { error: 'not_on_your_team' };
 
-    await this.prisma.user.update({
-      where: { userid: target.userid },
-      data: { teamcode: null },
-    });
+    await this.users.setTeamcode(target.userid, null);
 
     // TEAMKYOU. The body text ("...revoked by X") has no payload shape in the
     // inbox renderer, so the team name rides in name1 and the kicker in dtime,

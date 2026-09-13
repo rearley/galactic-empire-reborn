@@ -7,16 +7,29 @@
  * Module-level `controllers` arrays are evaluated at import time, so each case
  * resets the module registry and re-imports under a fresh environment.
  */
-const MODULES: Array<{ path: string; controller: string }> = [
-  { path: '../../../src/game/ship/ship.module', controller: 'ShipDebugController' },
-  { path: '../../../src/game/droid/droid.module', controller: 'DroidDebugController' },
-  { path: '../../../src/game/cybertron/cybertron.module', controller: 'CybertronDebugController' },
-  { path: '../../../src/app.module', controller: 'DebugController' },
+/**
+ * Each entry carries a LOADER rather than a path string.
+ *
+ * The specifier has to be a literal so the bundler can see it: a
+ * `require(variable)` is not statically analysable, and under Vitest it fails
+ * at run time with "Cannot find module" even though the path is correct. A
+ * thunk per module keeps the table readable and keeps every specifier literal.
+ */
+const MODULES: Array<{ load: () => Promise<Record<string, unknown>>; controller: string }> = [
+  { load: () => import('../../../src/game/ship/ship.module'), controller: 'ShipDebugController' },
+  { load: () => import('../../../src/game/droid/droid.module'), controller: 'DroidDebugController' },
+  {
+    load: () => import('../../../src/game/cybertron/cybertron.module'),
+    controller: 'CybertronDebugController',
+  },
+  { load: () => import('../../../src/app.module'), controller: 'DebugController' },
 ];
 
-function controllersOf(modulePath: string, className: string): string[] {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-  const mod = require(modulePath) as Record<string, unknown>;
+async function controllersOf(
+  load: () => Promise<Record<string, unknown>>,
+  className: string,
+): Promise<string[]> {
+  const mod = await load();
   const exported = Object.values(mod).find(
     (v) => typeof v === 'function' && Reflect.getMetadata('controllers', v as object) !== undefined,
   );
@@ -29,7 +42,7 @@ describe('debug controllers are mounted only when explicitly enabled', () => {
   const original = { ...process.env };
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...original };
     delete process.env['GE_DEBUG_ENDPOINTS'];
   });
@@ -38,25 +51,33 @@ describe('debug controllers are mounted only when explicitly enabled', () => {
     process.env = original;
   });
 
-  it.each(MODULES)('$controller is absent with no configuration', ({ path, controller }) => {
+  it.each(MODULES)('$controller is absent with no configuration', async ({ load, controller }) => {
     process.env['NODE_ENV'] = 'development';
-    expect(controllersOf(path, controller)).not.toContain(controller);
+    expect(await controllersOf(load, controller)).not.toContain(controller);
   });
 
-  it.each(MODULES)('$controller is absent in production even when switched on', ({ path, controller }) => {
+  it.each(MODULES)(
+    '$controller is absent in production even when switched on',
+    async ({ load, controller }) => {
+      process.env['NODE_ENV'] = 'production';
+      process.env['GE_DEBUG_ENDPOINTS'] = '1';
+      expect(await controllersOf(load, controller)).not.toContain(controller);
+    },
+  );
+
+  it.each(MODULES)(
+    '$controller is present when switched on outside production',
+    async ({ load, controller }) => {
+      process.env['NODE_ENV'] = 'development';
+      process.env['GE_DEBUG_ENDPOINTS'] = '1';
+      expect(await controllersOf(load, controller)).toContain(controller);
+    },
+  );
+
+  it('leaves the health check mounted regardless — it is not a debug route', async () => {
     process.env['NODE_ENV'] = 'production';
-    process.env['GE_DEBUG_ENDPOINTS'] = '1';
-    expect(controllersOf(path, controller)).not.toContain(controller);
-  });
-
-  it.each(MODULES)('$controller is present when switched on outside production', ({ path, controller }) => {
-    process.env['NODE_ENV'] = 'development';
-    process.env['GE_DEBUG_ENDPOINTS'] = '1';
-    expect(controllersOf(path, controller)).toContain(controller);
-  });
-
-  it('leaves the health check mounted regardless — it is not a debug route', () => {
-    process.env['NODE_ENV'] = 'production';
-    expect(controllersOf('../../../src/app.module', 'HealthController')).toContain('HealthController');
+    expect(
+      await controllersOf(() => import('../../../src/app.module'), 'HealthController'),
+    ).toContain('HealthController');
   });
 });

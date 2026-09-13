@@ -14,13 +14,14 @@ import { PrismaService } from '../../../src/prisma/prisma.service';
 import { CybertronRepository } from '../../../src/game/cybertron/cybertron.repository';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import { CYB_MAXCASH } from '../../../src/game/constants';
+import type { Mock } from 'vitest';
 
 async function buildRepo(prisma: PrismaService): Promise<{ repo: CybertronRepository; shipState: ShipStateService }> {
   const shipState = {
-    loadShip: jest.fn(),
-    findByUserid: jest.fn().mockReturnValue([]),
-    findAllShips: jest.fn().mockReturnValue([]),
-    get: jest.fn().mockReturnValue(undefined),
+    loadShip: vi.fn(),
+    findByUserid: vi.fn().mockReturnValue([]),
+    findAllShips: vi.fn().mockReturnValue([]),
+    get: vi.fn().mockReturnValue(undefined),
   } as unknown as ShipStateService;
 
   const repo = new CybertronRepository(prisma, shipState);
@@ -132,10 +133,10 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
     it('calls loadShip with the new ship after createSpawn so the ship is visible without restart', async () => {
       const loadedShips: { userid: string; shipno: number }[] = [];
       const shipState = {
-        loadShip: jest.fn((s: { userid: string; shipno: number }) => loadedShips.push(s)),
-        findByUserid: jest.fn().mockReturnValue([]),
-        findAllShips: jest.fn().mockReturnValue([]),
-        get: jest.fn().mockImplementation(
+        loadShip: vi.fn((s: { userid: string; shipno: number }) => loadedShips.push(s)),
+        findByUserid: vi.fn().mockReturnValue([]),
+        findAllShips: vi.fn().mockReturnValue([]),
+        get: vi.fn().mockImplementation(
           (userid: string, shipno: number) =>
             loadedShips.find((s) => s.userid === userid && s.shipno === shipno) ?? undefined,
         ),
@@ -202,10 +203,10 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
 
       const loaded: { userid: string }[] = [];
       const shipState = {
-        loadShip: jest.fn((s: { userid: string }) => loaded.push(s)),
-        findByUserid: jest.fn().mockReturnValue([]),
-        findAllShips: jest.fn().mockReturnValue([]),
-        get: jest.fn().mockReturnValue(undefined),
+        loadShip: vi.fn((s: { userid: string }) => loaded.push(s)),
+        findByUserid: vi.fn().mockReturnValue([]),
+        findAllShips: vi.fn().mockReturnValue([]),
+        get: vi.fn().mockReturnValue(undefined),
       } as unknown as ShipStateService;
 
       const repo = new CybertronRepository(prisma, shipState);
@@ -301,10 +302,10 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
 
       const loadedShips: unknown[] = [];
       const shipState = {
-        loadShip: jest.fn((s: unknown) => loadedShips.push(s)),
-        findByUserid: jest.fn().mockReturnValue([]),
-        findAllShips: jest.fn().mockReturnValue([]),
-        get: jest.fn().mockReturnValue(undefined),
+        loadShip: vi.fn((s: unknown) => loadedShips.push(s)),
+        findByUserid: vi.fn().mockReturnValue([]),
+        findAllShips: vi.fn().mockReturnValue([]),
+        get: vi.fn().mockReturnValue(undefined),
       } as unknown as ShipStateService;
 
       const repo = new CybertronRepository(prisma, shipState);
@@ -312,8 +313,8 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
 
       // All 3 (+ possibly leftovers from T057) should be loaded
       // Filter to just our test ships
-      const testLoads = (shipState.loadShip as jest.Mock).mock.calls
-        .map(([s]: [{ userid: string }]) => s)
+      const testLoads = (shipState.loadShip as Mock).mock.calls
+        .map(([s]) => s as { userid: string })
         .filter((s) => (s as { userid: string }).userid?.startsWith('Cybrg-test-'));
       expect(testLoads.length).toBeGreaterThanOrEqual(3);
 

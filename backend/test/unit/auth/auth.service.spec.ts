@@ -5,26 +5,27 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from '../../../src/auth/auth.service';
 import { DUMMY_BCRYPT_HASH } from '../../../src/auth/auth.constants';
 import { PrismaService } from '../../../src/prisma/prisma.service';
+import type { Mock } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(),
-  compare: jest.fn(),
+vi.mock('bcrypt', () => ({
+  hash: vi.fn(),
+  compare: vi.fn(),
 }));
 
 const mockPrisma = {
   user: {
-    create: jest.fn(),
-    findFirst: jest.fn(),
+    create: vi.fn(),
+    findFirst: vi.fn(),
   },
 };
 
 const mockJwt = {
-  sign: jest.fn(),
-  verifyAsync: jest.fn(),
+  sign: vi.fn(),
+  verifyAsync: vi.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -57,7 +58,7 @@ describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     service = await makeService();
   });
 
@@ -65,7 +66,7 @@ describe('AuthService', () => {
 
   describe('register()', () => {
     it('happy path — returns token and user with username: null', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-pw');
+      (bcrypt.hash as Mock).mockResolvedValue('hashed-pw');
       mockPrisma.user.create.mockResolvedValue({});
       mockJwt.sign.mockReturnValue('signed-token');
 
@@ -102,7 +103,7 @@ describe('AuthService', () => {
     });
 
     it('P2002 on the email index → ConflictException EMAIL_TAKEN', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-pw');
+      (bcrypt.hash as Mock).mockResolvedValue('hashed-pw');
       const p2002 = Object.assign(new Error('Unique constraint'), {
         code: 'P2002',
         meta: { target: 'user_email_lower_key' },
@@ -121,7 +122,7 @@ describe('AuthService', () => {
     });
 
     it('non-P2002 error is re-thrown as-is', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-pw');
+      (bcrypt.hash as Mock).mockResolvedValue('hashed-pw');
       const dbErr = new Error('connection error');
       mockPrisma.user.create.mockRejectedValue(dbErr);
 
@@ -131,7 +132,7 @@ describe('AuthService', () => {
     });
 
     it('a P2002 on an unrelated index is re-thrown as-is, not swallowed as EMAIL_TAKEN', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-pw');
+      (bcrypt.hash as Mock).mockResolvedValue('hashed-pw');
       const p2002 = Object.assign(new Error('Unique constraint'), {
         code: 'P2002',
         meta: { target: 'User_username_lower_idx' },
@@ -156,7 +157,7 @@ describe('AuthService', () => {
 
     it('happy path — correct password returns token and user', async () => {
       mockPrisma.user.findFirst.mockResolvedValue(storedUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.compare as Mock).mockResolvedValue(true);
       mockJwt.sign.mockReturnValue('login-token');
 
       const result = await service.login({ email: 'pilot@example.com', password: 'correctPass1' });
@@ -170,7 +171,7 @@ describe('AuthService', () => {
 
     it('wrong password → UnauthorizedException INVALID_CREDENTIALS', async () => {
       mockPrisma.user.findFirst.mockResolvedValue(storedUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (bcrypt.compare as Mock).mockResolvedValue(false);
 
       await expect(
         service.login({ email: 'pilot@example.com', password: 'wrongPass1' }),
@@ -185,14 +186,14 @@ describe('AuthService', () => {
 
     it('user not found → bcrypt.compare called with DUMMY_BCRYPT_HASH (constant-time), then UnauthorizedException', async () => {
       mockPrisma.user.findFirst.mockResolvedValue(null);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (bcrypt.compare as Mock).mockResolvedValue(false);
 
       await expect(
         service.login({ email: 'ghost@example.com', password: 'password123' }),
       ).rejects.toThrow(UnauthorizedException);
 
       expect(bcrypt.compare).toHaveBeenCalledTimes(1);
-      expect((bcrypt.compare as jest.Mock).mock.calls[0][1]).toBe(DUMMY_BCRYPT_HASH);
+      expect((bcrypt.compare as Mock).mock.calls[0][1]).toBe(DUMMY_BCRYPT_HASH);
     });
 
     it('user found but passwordHash is null → bcrypt.compare called with DUMMY_BCRYPT_HASH, then UnauthorizedException', async () => {
@@ -200,14 +201,14 @@ describe('AuthService', () => {
         ...storedUser,
         passwordHash: null,
       });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (bcrypt.compare as Mock).mockResolvedValue(false);
 
       await expect(
         service.login({ email: 'pilot@example.com', password: 'password123' }),
       ).rejects.toThrow(UnauthorizedException);
 
       expect(bcrypt.compare).toHaveBeenCalledTimes(1);
-      expect((bcrypt.compare as jest.Mock).mock.calls[0][1]).toBe(DUMMY_BCRYPT_HASH);
+      expect((bcrypt.compare as Mock).mock.calls[0][1]).toBe(DUMMY_BCRYPT_HASH);
     });
   });
 

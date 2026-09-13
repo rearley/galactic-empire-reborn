@@ -4,6 +4,7 @@ import { formatMessage, MessageId } from '../../../../src/game/commands/messages
 import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { ENGYMAX } from '../../../../src/game/constants';
 import { I_FLUX } from '../../../../src/game/constants/items';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function itemsWith(map: Record<number, bigint>): bigint[] {
   const arr: bigint[] = [];
@@ -13,24 +14,14 @@ function itemsWith(map: Record<number, bigint>): bigint[] {
 }
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'T', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 0, ycoord: 0, damage: 0, energy: 100,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'T',
+    energy: 100,
     items: itemsWith({ [I_FLUX]: 2n }),
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: -1, holdcourse: 0, topspeed: 10, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false, ...over,
-  };
+    lock: -1,
+    topspeed: 10,
+    ...over,
+  });
 }
 
 const ctx: CommandContext = {};
@@ -74,9 +65,9 @@ describe('fluxCommand — `flux`', () => {
     expect(result.lines).toHaveLength(1);
   });
 
-  it('still consumes pod even if energy already at max (no short-circuit)', () => {
+  it('still consumes pod even if energy already at max (no short-circuit)', async () => {
     const s = makeShip({ energy: ENGYMAX, items: itemsWith({ [I_FLUX]: 3n }) });
-    fluxCommand.handler(s, [], ctx);
+    await fluxCommand.handler(s, [], ctx);
     expect(s.items[I_FLUX]).toBe(2n);
     expect(s.energy).toBe(ENGYMAX);
   });

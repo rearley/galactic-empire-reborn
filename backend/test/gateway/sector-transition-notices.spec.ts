@@ -2,13 +2,10 @@ import 'reflect-metadata';
 import { GameGateway } from '../../src/gateway/game.gateway';
 import { ConnectedShipsRegistry } from '../../src/gateway/connected-ships.registry';
 import { ShipStateService } from '../../src/game/ship/ship-state.service';
-import { CommandRouterService } from '../../src/game/commands/command-router.service';
 import { WsAuthGuard } from '../../src/auth/ws-auth.guard';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { OnboardingService } from '../../src/game/onboarding/onboarding.service';
 import { ScanHandlerService } from '../../src/game/commands/handlers/scan.handler';
 import { mockRandom } from '../fixtures/mock-random';
-import { PresenceService } from '../../src/public/presence.service';
+import { makeGateway } from '../helpers/make-gateway';
 
 /**
  * Crossing a sector boundary, per GEFUNCS.C:709-723:
@@ -30,12 +27,12 @@ describe('GameGateway — sector transition notices', () => {
     id,
     connected: true,
     data: { userid: 'u1', activeShipNo: 1 } as Record<string, unknown>,
-    emit: jest.fn(),
-    on: jest.fn(),
-    join: jest.fn(),
-    leave: jest.fn(),
-    disconnect: jest.fn(),
-    broadcast: { emit: jest.fn() },
+    emit: vi.fn(),
+    on: vi.fn(),
+    join: vi.fn(),
+    leave: vi.fn(),
+    disconnect: vi.fn(),
+    broadcast: { emit: vi.fn() },
   });
 
   const build = (speed = 100) => {
@@ -49,27 +46,22 @@ describe('GameGateway — sector transition notices', () => {
     const shipStateService = {
       findAllShips: () => [mover],
       findByUserid: () => [mover],
-      get: jest.fn().mockReturnValue(mover),
+      get: vi.fn().mockReturnValue(mover),
     } as unknown as ShipStateService;
 
     const registry = new ConnectedShipsRegistry(shipStateService);
-    jest.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
+    vi.spyOn(registry, 'getSocketId').mockReturnValue(moverSocket.id);
 
-    const gateway = new GameGateway(
+    const gateway = makeGateway({
       shipStateService,
-      { dispatch: jest.fn() } as unknown as CommandRouterService,
       registry,
-      { validate: jest.fn() } as unknown as WsAuthGuard,
-      {} as unknown as PrismaService,
-      {} as unknown as OnboardingService,
-      { clearScantab: jest.fn() } as unknown as ScanHandlerService,
-      { getTypeName: jest.fn() } as never,
-      mockRandom,
-      { emit: jest.fn(), on: jest.fn() } as never, new PresenceService(),
-    );
+      wsAuthGuard: { validate: vi.fn() } as unknown as WsAuthGuard,
+      scanHandler: { clearScantab: vi.fn() } as unknown as ScanHandlerService,
+      random: mockRandom,
+    });
 
     (gateway as unknown as { server: unknown }).server = {
-      emit: jest.fn(),
+      emit: vi.fn(),
       to: (room: string) => ({
         emit: (event: string, payload: unknown) => { roomEmits.push({ room, event, payload }); },
         except: (_id: string) => ({

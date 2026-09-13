@@ -11,34 +11,24 @@ import { ShipState } from '../../../../src/game/ship/ship-state.types';
 import { CommandContext } from '../../../../src/game/commands/command.types';
 import { formatMessage, MessageId } from '../../../../src/game/commands/messages';
 import { UNIVMAX } from '../../../../src/game/constants';
+import { makeShip as baseMakeShip } from '../../../helpers/make-ship';
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
-  return {
-    userid: 'u1', shipno: 1, shipname: 'Test', shpclass: 1,
-    heading: 0, head2b: 0, speed: 0, speed2b: 0,
-    xcoord: 5.0, ycoord: 5.0, damage: 0, energy: 50000,
-    phasr: 0, phasrtype: 0, kills: 0, lastfired: 0,
-    shieldtype: 0, shieldstat: 0, shield: 0, cloak: 0,
-    degrees: 0, percent: 0, tactical: 0, helm: 0, train: 0,
-    where: 0, ltorpsChannel: [], ltorpsDistance: [],
-    lmisslChannel: [], lmisslDistance: [], lmisslEnergy: [],
-    decout: [], jammer: 0, freq: [0, 0, 0],
+  return baseMakeShip({
+    shipname: 'Test',
+    xcoord: 5.0,
+    ycoord: 5.0,
+    energy: 50000,
     items: Array(14).fill(0n) as bigint[],
-    titem: 0, hostile: 0, cantexit: 0, repair: 0, hypha: 0,
-    firecntl: 0, destruct: 0, status: 1, cybmine: 0,
-    cybskill: 0, cybupdate: 0, tick: 0, emulate: 0,
-    minesnear: 0, lock: 0, holdcourse: 0, topspeed: 5, warncntr: 0,
-    scanNames: false, scanHome: false, scanFull: false, msgFilter: false,
-    dirty: false,
     ...overrides,
-  };
+  });
 }
 
 function makeService(shipOverrides: Partial<ShipState> = {}) {
   const state = makeShip(shipOverrides);
 
   const mockShipState = {
-    mutate: jest.fn().mockImplementation(
+    mutate: vi.fn().mockImplementation(
       (_uid: string, _no: number, fn: (s: ShipState) => void) => {
         fn(state);
         return state;
@@ -55,8 +45,36 @@ function makeService(shipOverrides: Partial<ShipState> = {}) {
 // Status form — nav with no args
 // ---------------------------------------------------------------------------
 
+/**
+ * There is no status form, and that is the point worth pinning.
+ *
+ * `nav` declares `minArgs: 0`, which reads like a bare form exists; canon's
+ * `cmd_navigate` validates the argument count and returns NAVFMT, because there
+ * is no autopilot in the original to report the status of (GECMDS.C:5109-5157).
+ * The suite that used to stand here named this behaviour and asserted nothing,
+ * which Jest reported as a passing suite. @see issue #32
+ */
 describe('NavHandlerService — status form (no args)', () => {
+  it('answers NAVFMT rather than a status line', () => {
+    const { handler, state, ctx } = makeService();
+    const result = handler.command.handler(state, [], ctx) as { lines: unknown[] };
+    expect(result.lines).toEqual([
+      { text: formatMessage(MessageId.NAVFMT), category: 'system' },
+    ]);
+  });
 
+  it('carries NAVFMT as its own argMissingMessage, so the router says the same thing', () => {
+    const { handler } = makeService();
+    expect(handler.command.argMissingMessage).toBe(formatMessage(MessageId.NAVFMT));
+  });
+
+  it('changes nothing about the ship — a rejected nav is not a manoeuvre', async () => {
+    const { handler, state, ctx, mockShipState } = makeService({ heading: 90, where: 3 });
+    await handler.command.handler(state, [], ctx);
+    expect(mockShipState.mutate).not.toHaveBeenCalled();
+    expect(state.heading).toBe(90);
+    expect(state.where).toBe(3);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -178,7 +196,7 @@ describe('NavHandlerService — target inside the current sector', () => {
 
 describe('NavHandlerService — engagement happy path', () => {
 
-  it('writes NOTHING to the ship — it is a read-only report', () => {
+  it('writes NOTHING to the ship — it is a read-only report', async () => {
     // cmd_navigate computes and prints. It touches no field, which is why
     // asking for a bearing can no longer undock you, cancel a turn, or leave a
     // course behind for the tick to fly. @see GECMDS.C:5109-5156
@@ -186,7 +204,7 @@ describe('NavHandlerService — engagement happy path', () => {
     const snap = (o: object) =>
       JSON.stringify(o, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
     const before = snap(state);
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(snap(state)).toBe(before);
   });
 
@@ -221,11 +239,11 @@ describe('NavHandlerService — nav never breaks orbit', () => {
    * autopilot course itself is a documented deviation (docs/DECISIONS.md,
    * feature 016 D1) and stays; the undocking does not.
    */
-  it('in orbit (where >= 10) → orbit and repair progress are preserved', () => {
+  it('in orbit (where >= 10) → orbit and repair progress are preserved', async () => {
     const { handler, state, ctx } = makeService({
       where: 13, repair: 42, xcoord: 5.0, ycoord: 5.0,
     });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(13);
     expect(state.repair).toBe(42);
   });
@@ -239,15 +257,15 @@ describe('NavHandlerService — nav never breaks orbit', () => {
     expect(res.lines.some((l) => l.text === leaveorb)).toBe(false);
   });
 
-  it('where === 10 → still in orbit afterwards', () => {
+  it('where === 10 → still in orbit afterwards', async () => {
     const { handler, state, ctx } = makeService({ where: 10 });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(10);
   });
 
-  it('where < 10 → where unchanged', () => {
+  it('where < 10 → where unchanged', async () => {
     const { handler, state, ctx } = makeService({ where: 0 });
-    handler.command.handler(state, ['10', '8'], ctx);
+    await handler.command.handler(state, ['10', '8'], ctx);
     expect(state.where).toBe(0);
   });
 });
@@ -256,16 +274,61 @@ describe('NavHandlerService — nav never breaks orbit', () => {
 // The bearing is heading-relative — say so, or it looks like a random number
 // ---------------------------------------------------------------------------
 
+/**
+ * NAV01 prints cbearing(from, to, heading) — a bearing RELATIVE to the hull's
+ * present heading (GECMDS.C:5142-5155). Our physics tick steers head2b onto
+ * course every tick, so an identical `nav 0 0` from a standing start reported
+ * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
+ * arithmetic was right both times; nothing told the pilot why.
+ *
+ * The assertions were never written; they are below now. @see issue #32
+ *
+ * What they pin is that the number is heading-relative, which is canon and is
+ * the whole explanation: the bearing shrinks to 0 as the hull comes onto
+ * course, from the same position, with no rotate issued. NAV01's text is
+ * canon verbatim ("Sector %d %d is bearing %d, distance %s.") and does not get
+ * a sentence added to it; the port's own help carries the explanation instead.
+ */
 describe('NavHandlerService — explains the shrinking bearing', () => {
-  /**
-   * NAV01 prints cbearing(from, to, heading) — a bearing RELATIVE to the hull's
-   * present heading (GECMDS.C:5142-5155). Our physics tick steers head2b onto
-   * course every tick, so an identical `nav 0 0` from a standing start reported
-   * bearing 131 and then, seconds later with no rotate issued, bearing 0. The
-   * arithmetic was right both times; nothing told the pilot why.
-   */
+  /** The bearing NAV01 printed, parsed back out of the canon sentence. */
+  function bearingOf(ship: ShipState, handler: NavHandlerService, ctx: CommandContext): number {
+    const result = handler.command.handler(ship, ['0', '0'], ctx) as { lines: { text: string }[] };
+    const text = result.lines[0].text;
+    const m = /bearing (-?\d+)/.exec(text);
+    expect(m).not.toBeNull();
+    return Number(m![1]);
+  }
 
+  it('reports a different bearing from the same spot once the hull turns', () => {
+    const { handler, ctx } = makeService();
+    const standingStart = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
+    const onCourse = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
 
+    const before = bearingOf(standingStart, handler, ctx);
+    expect(before).not.toBe(0);
+
+    // The physics tick steers head2b onto course; nothing else moved.
+    onCourse.heading = (onCourse.heading + before + 360) % 360;
+    expect(bearingOf(onCourse, handler, ctx)).toBe(0);
+  });
+
+  it('is zero exactly when the hull already points at the target', () => {
+    const { handler, ctx } = makeService();
+    // (0.5, 0.5) from (5.5, 5.5) is astern-left; heading 0 is y-decreasing.
+    const ship = makeShip({ xcoord: 5, ycoord: 5, heading: 0 });
+    const bearing = bearingOf(ship, handler, ctx);
+    const aimed = makeShip({ xcoord: 5, ycoord: 5, heading: bearing });
+    expect(bearingOf(aimed, handler, ctx)).toBe(0);
+  });
+
+  it('the distance does NOT move when only the heading does', () => {
+    const { handler, ctx } = makeService();
+    type Lines = { lines: { text: string }[] };
+    const a = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 0 }), ['0', '0'], ctx) as Lines;
+    const b = handler.command.handler(makeShip({ xcoord: 5, ycoord: 5, heading: 137 }), ['0', '0'], ctx) as Lines;
+    const dist = (r: Lines) => /distance (\S+)\./.exec(r.lines[0].text)![1];
+    expect(dist(a)).toBe(dist(b));
+  });
 });
 
 // ---------------------------------------------------------------------------
