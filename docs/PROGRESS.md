@@ -6234,3 +6234,45 @@ the repository. It contains every identifier this pass removed, so it does not
 belong anywhere near a public tree, and it should be deleted once the rewrite is
 confirmed good.
 
+## 2026-09-13 — The build attestation, and two wrong turns getting there
+
+**CORRECTION to the entry above.** That entry said the history rewrite closed
+the author-email exposure. It did not close all of it. The first build after the
+rewrite still carried `1328538+rearley@users.noreply.github.com`, four times, and the chase turned
+up something the file and history audits both missed.
+
+**Where it comes from.** `pusher.email` in the GitHub event payload, which is
+read from the account's email setting and has nothing to do with git. No rewrite
+can reach it. BuildKit's Actions integration copies the whole payload into the
+build provenance at `invocation.environment.github_event_payload`, and
+`docker/build-push-action` defaults to attaching that predicate to the pushed
+image. So the address was riding on the images in ghcr, which go public with the
+repository, where nobody would think to look for it.
+
+**Wrong turn 1: `provenance: mode=min`.** Shipped as 8ac5743 on the assumption
+that min mode drops the build context. It does not — it trims build detail and
+leaves `invocation.environment` untouched. The build that shipped that very
+setting still exported an attestation manifest and still carried the payload.
+Corrected by 28bb040 with `provenance: false`, which removes the attestation
+outright. The guard now fails on `mode=min` as well as on the action default, so
+the wrong fix cannot come back quietly.
+
+**Wrong turn 2: the verification grep.** The check for `exporting attestation
+manifest` kept reporting four hits after the fix. They were the phrase appearing
+inside 28bb040's own commit message, quoted back by the event payload in the
+log. A verification string that also appears in the thing being verified proves
+nothing; the honest check was the BuildKit step numbers, which show
+`#37 exporting manifest` alone on the fixed build against
+`#25/#36 exporting attestation manifest sha256:...` on the broken one.
+
+**Where it stands.** Images are clean — no attestation, verified by the absence
+of the export step, not by a text search. Production is live on v0.15.3 ·
+28bb040. The run log still prints the payload, because buildx resolves
+provenance for its local metadata file whether or not the attestation is
+attached, and the action echoes that file.
+
+**Still open, and only fixable outside the repository:** "Keep my email address
+private" on the GitHub account. Until that is set, `pusher.email` is the real
+address and every run log picks it up again. `provenance: false` keeps it out of
+the images; nothing in this repository can keep it out of the logs.
+
