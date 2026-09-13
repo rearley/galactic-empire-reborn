@@ -370,7 +370,7 @@ jobs:
           #
           # mode=min was tried first and does NOT fix it: it trims the build
           # detail and leaves invocation.environment intact. Read the provenance
-          # out of the build log of 8ac5743 -- the commit that set mode=min --
+          # out of the build log of b6691b4 -- the commit that set mode=min --
           # and the payload is still there. Only `false` drops the attestation,
           # and the payload with it.
           #

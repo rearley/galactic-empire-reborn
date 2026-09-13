@@ -4292,7 +4292,7 @@ copy edit. Written failing first. Frontend 255 across 36 files.
 ## 2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise
 
 **Completed:** rewrote the `SysHandlerService` doc comment, which still claimed
-the handler supported only `sys unjam`. The other twelve landed in `fcb2eda`,
+the handler supported only `sys unjam`. The other twelve landed in `580487d`,
 the commit before this session started.
 
 **What the check turned up.** Canon's `sys` is often described from the header
@@ -5415,12 +5415,12 @@ of it.
 - **Node 20 → 24** in both Dockerfiles and both CI jobs, `engines.node`
   (`>=24`) added to both `package.json` files, pinned by a new repo-invariant
   test, `backend/test/unit/node-runtime-version.spec.ts`. Both images verified
-  to build; the backend image boots and runs `node v24.21.0`. (`4dd0e0d`)
+  to build; the backend image boots and runs `node v24.21.0`. (`79d9d29`)
 - **Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (29.4.12).** Two
   `backend/tsconfig.json` additions were required —
   `"ignoreDeprecations": "6.0"` and `"types": ["jest", "node"]` — both
   compile-time-only, no `src/**` behaviour change. See
-  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`d36f310`)
+  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`1bd87ad`)
 - **Frontend: React 19, Vite 8, Vitest 5, Tailwind 4, TypeScript 6.0.3, in one
   batch.** Tailwind's config moved from `tailwind.config.ts` (deleted) into
   `src/styles.css`'s `@theme` block. Two Vitest-5-driven test-infrastructure
@@ -5429,7 +5429,7 @@ of it.
   renames (`flex-shrink-0`→`shrink-0`, `outline-none`→`outline-hidden`) across
   frontend `src/`, all behaviour-identical. No React-19-specific migration was
   needed — the codebase already used `createRoot` and current
-  `@testing-library/react` idioms. (`b24ba4f`)
+  `@testing-library/react` idioms. (`78af71d`)
 - **oxlint, both apps, wired into CI**, backed by
   `backend/test/unit/lint-gate.spec.ts` (7 tests after a fix round). Frontend
   runs `--type-aware`; backend runs syntax-only because `oxlint-tsgolint`
@@ -5437,7 +5437,7 @@ of it.
   `docs/DECISIONS.md` 2026-09-10 ("oxlint, not ESLint") for the full rule
   table and rationale, and the restructure spec's "Blockers and constraints
   discovered" section for why that one tsconfig setting blocks both TS7 and
-  backend type-aware linting. (`3f100cc`, fix round `cee7271`)
+  backend type-aware linting. (`d14f4c3`, fix round `c55808f`)
 
 **Tests:** measured at the end of phase 0 — backend 607 suites / 6,154 tests
 (up from the 605/6,141 pre-phase baseline: +1 suite/+6 tests from the runtime
@@ -5479,7 +5479,7 @@ decision in `docs/DECISIONS.md`.
   probe symbol resolved from a spec on each side. The repo root gained its
   first `package.json` (`workspaces: ["packages/*", "backend", "frontend"]`)
   and a single root `package-lock.json`, replacing the two per-app lockfiles.
-  (Task 1, `69b991d`.)
+  (Task 1, `4bdd804`.)
 - **The backend's `Server`/`Socket` are now typed with Socket.io's
   `ServerToClientEvents`/`ClientToServerEvents` generics, throughout
   `game.gateway.ts` and `ws-auth.guard.ts`.** A wrong payload at an emit site
@@ -5487,14 +5487,14 @@ decision in `docs/DECISIONS.md`.
   `CommandResult.broadcasts` became `CommandBroadcast[]`, a discriminated
   union on `event`, so the dynamic broadcast-dispatch path (`sca sh`,
   `sen`, `ren`, `tea`) narrows `payload` per event with zero casts, backed by
-  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `2166b39`
-  and `585be7a`.)
+  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `97f6cc8`
+  and `f42cbad`.)
 - **The frontend imports the same declaration.** `frontend/src/types/contracts.ts`
   and the parity test that kept it in sync with the backend's shadow copy
   (`frontend/test/contracts-parity.spec.ts`) are deleted; 14 importers
   repointed at `@ge/wire`; `specs/003-ship-commands/contracts/shared-types.ts`
   kept with a SUPERSEDED note rather than deleted, per the keep-the-reasoning
-  rule in `docs/CLAUDE.md`. (Task 4, `246ed5e`.)
+  rule in `docs/CLAUDE.md`. (Task 4, `f9beba9`.)
 
 **Five real defects the typing surfaced** — this phase's actual justification,
 not a side effect of it. Full detail and the reasoning behind each fix in
@@ -5594,11 +5594,11 @@ must be resolved.
 **Completed:** Broke `game.gateway.ts` into per-concern collaborators
 (transport-focused) and split `scan.handler.ts` by rendering concern. Eight
 tasks total, on branch `restructure`, verified against baseline commit
-`5510faf`.
+`e30a963`.
 
 Before/after (measured directly, not copied from an intermediate claim):
 
-| | baseline (`5510faf`) | now |
+| | baseline (`e30a963`) | now |
 |---|---|---|
 | `backend/src/gateway/game.gateway.ts` | 2,743 | 1,482 |
 | `backend/src/game/commands/handlers/scan.handler.ts` | 1,258 | 488 |
@@ -5691,8 +5691,8 @@ split.
 - **I-1.** Restored two canon citations (`GECMDS.C:2529` scan_ra,
   `GECMDS.C:2598` scan_se) deleted from the no-mine-loop comment when the scan
   handler was split into `scan/scan-render.ts`. Restored verbatim from
-  `5510faf`, not re-derived.
-- **M-2 (operational).** Commit `658be67` moved the ship-loss forensics
+  `e30a963`, not re-derived.
+- **M-2 (operational).** Commit `9390447` moved the ship-loss forensics
   warnings out of the `[GameGateway]` logging context and into
   `[ShipDestroyedService]` — a production-log grep for gateway warnings on a
   ship loss now finds nothing, and must search the new context instead.
@@ -5723,7 +5723,7 @@ untouched by this session.
 per-feature repositories, `forwardRef` retirement, ship-class boot cache,
 and the shared `ShipState` test factory. Task 7 only; no new feature code.
 
-Measured directly against `569d793` (phase start) and `5ae6e80` (phase end):
+Measured directly against `d1ef6d1` (phase start) and `1c6b9dc` (phase end):
 
 | Metric | Phase start | Now |
 |---|---|---|
@@ -5747,7 +5747,7 @@ once. Result: 623 suites / 6,356 tests, all passing, 9 snapshots passing,
 122.67s. Both `backend/Dockerfile` and `frontend/Dockerfile` build clean from
 the repo root; `require.resolve('@ge/wire')` resolves inside the running
 backend image. Deploy gate unchanged in this phase's own range
-(`569d793..HEAD`): `.github/` untouched, `branches: [master]` and
+(`d1ef6d1..HEAD`): `.github/` untouched, `branches: [master]` and
 `if: github.event_name == 'push'` intact. `VERSION` unchanged from master, as
 expected — restructure phases bump once, at merge.
 
@@ -5791,7 +5791,7 @@ observation — "3,521 lines across 43 files. `App.tsx` at 388 is the largest."
 The 12 `socket.on` subscriptions and 15 hook calls found by reading the file
 are what Tasks 1-3 actually addressed.
 
-Measured directly against `37a9914` (phase start, the plan commit) and `HEAD`
+Measured directly against `b449052` (phase start, the plan commit) and `HEAD`
 (phase end):
 
 | Metric | Phase start | Now |
@@ -5817,8 +5817,8 @@ as a regression check (this phase touched no backend code) in one tracked
 exactly once, 623 suites / 6,356 tests, all passing — unchanged from Phase
 3's close-out numbers, as expected. Both `backend/Dockerfile` and
 `frontend/Dockerfile` build clean from the repo root. Deploy gate unchanged
-in this phase's own range (`37a9914..HEAD`): `git diff --name-only
-37a9914..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
+in this phase's own range (`b449052..HEAD`): `git diff --name-only
+b449052..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
 on `branches: [master]` and `if: github.event_name == 'push'`; `git diff
 master -- VERSION` is empty.
 
@@ -5830,7 +5830,7 @@ whole repo and would fail on a dropped frontend citation. It does not;
 `SOURCE_FILES` walks only `backend/src` and `backend/test`. The 45 canon
 citations in `frontend/` are checked by nothing, and every one moved in this
 phase was verified by hand rather than by a guard. Corrected in the plan at
-commit `8a16f23`. Filed as issue #22.
+commit `60fff48`. Filed as issue #22.
 
 **Next:** Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky). Can start any
 time.
@@ -5874,7 +5874,7 @@ in place (it is not append-only).
 **Correction two — the hook-count metric.** That entry's table reported
 "hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in
 `App.tsx`: 15 → 3." No definition of "hook calls in `App.tsx`" reproduces a
-3. Measured directly against `37a9914` (phase start) and `HEAD` (phase end)
+3. Measured directly against `b449052` (phase start) and `HEAD` (phase end)
 with `grep -noE '\b(use[A-Z][A-Za-z]*)(<[^>]*>)?\('`, filtered by hand to the
 relevant set:
 
@@ -5999,15 +5999,15 @@ a position to answer once the runners converge.
 
 ## 2026-09-11 — Phase 5 closed: Vitest and Prisma 7 landed, Nest 12 and TypeScript 7 are waiting on upstream
 
-Seven commits on `restructure`, `c5429a1..79e909e`. Master untouched.
+Seven commits on `restructure`, `85f032e..2f7b2e2`. Master untouched.
 
 | item | state |
 |---|---|
-| `moduleResolution` node10 → bundler | done, `89836c8` |
-| oxlint `--type-aware` on the backend | done, `c667575` |
-| boot-order oracle | done, `6ef4a78` |
-| Jest → Vitest | done, `137533a` |
-| Prisma 5 → 7 | done, `79e909e` |
+| `moduleResolution` node10 → bundler | done, `8e57f89` |
+| oxlint `--type-aware` on the backend | done, `242e999` |
+| boot-order oracle | done, `bcbf1a7` |
+| Jest → Vitest | done, `4e0f9e8` |
+| Prisma 5 → 7 | done, `2f7b2e2` |
 | NestJS 10 → 12 | **blocked**, issue #34 |
 | TypeScript 6 → 7 | **deferred to 7.1**, issue #35 |
 | CommonJS → ESM | **struck** — the premise was false |
@@ -6023,7 +6023,7 @@ Seven commits on `restructure`, `c5429a1..79e909e`. Master untouched.
 | both Docker images | build |
 | backend image | loads the Prisma client and the whole app module |
 | `prisma migrate deploy` in the image | reaches the schema, fails only on the connection |
-| deploy gate, `c5429a1..HEAD` | unchanged |
+| deploy gate, `85f032e..HEAD` | unchanged |
 | `VERSION` | unchanged |
 
 Backend suite was 626 / 6,385 at the start of the phase. The 23 extra tests are
@@ -6249,17 +6249,17 @@ build provenance at `invocation.environment.github_event_payload`, and
 image. So the address was riding on the images in ghcr, which go public with the
 repository, where nobody would think to look for it.
 
-**Wrong turn 1: `provenance: mode=min`.** Shipped as 8ac5743 on the assumption
+**Wrong turn 1: `provenance: mode=min`.** Shipped as b6691b4 on the assumption
 that min mode drops the build context. It does not — it trims build detail and
 leaves `invocation.environment` untouched. The build that shipped that very
 setting still exported an attestation manifest and still carried the payload.
-Corrected by 28bb040 with `provenance: false`, which removes the attestation
+Corrected by 47dc279 with `provenance: false`, which removes the attestation
 outright. The guard now fails on `mode=min` as well as on the action default, so
 the wrong fix cannot come back quietly.
 
 **Wrong turn 2: the verification grep.** The check for `exporting attestation
 manifest` kept reporting four hits after the fix. They were the phrase appearing
-inside 28bb040's own commit message, quoted back by the event payload in the
+inside 47dc279's own commit message, quoted back by the event payload in the
 log. A verification string that also appears in the thing being verified proves
 nothing; the honest check was the BuildKit step numbers, which show
 `#37 exporting manifest` alone on the fixed build against
@@ -6267,7 +6267,7 @@ nothing; the honest check was the BuildKit step numbers, which show
 
 **Where it stands.** Images are clean — no attestation, verified by the absence
 of the export step, not by a text search. Production is live on v0.15.3 ·
-28bb040. The run log still prints the payload, because buildx resolves
+47dc279. The run log still prints the payload, because buildx resolves
 provenance for its local metadata file whether or not the attestation is
 attached, and the action echoes that file.
 
@@ -6293,4 +6293,45 @@ The account setting was changed the same day, so `pusher.email` now resolves to
 the noreply address. That closes the last surface. It is unverified end to end,
 because the address only appears in a build job's provenance metadata and no
 build has run since — the next deploy will show it.
+
+## 2026-09-13 — The rewrite missed the blobs, which is most of the point
+
+**CORRECTION to both entries above.** They reported the history clean. It was
+not, and the verification that said so was checking the wrong thing.
+
+`filter-repo --email-callback --message-callback` rewrites commit metadata and
+commit messages. **It does not touch file contents.** The redaction pass removed
+the identifiers from the tip of the tree, so `git grep` on a fresh clone came
+back clean — and that is exactly what was checked, twice. Every pre-redaction
+version of `DEPLOYMENT.md` and the security audit was still sitting in history,
+one `git log -p` away, on a repository about to be made public.
+
+What was still reachable: the deploy hostname, three databases belonging to
+unrelated applications, the literal path to the file holding `DATABASE_URL` and
+`JWT_SECRET`, exact point releases, and the host's firewall inventory — the
+entire list the redaction pass was written to remove.
+
+**How it surfaced.** Not from a checklist. Reading issue #41 to see what a public
+reader would make of it, a stray `git log --all -p | grep` for connection strings
+printed `<dbuser>` alongside its un-redacted predecessor. The audit that was
+supposed to be finished had been finished against the tree, never against the
+history.
+
+**Fixed with a second and third pass:** `--replace-text` across every blob in
+history, then `--replace-message` for one commit body that named the PostgreSQL
+point release. Verified the only way that means anything: `git log --all -p`
+piped through the full pattern list, count zero, against a fresh clone of what is
+actually published.
+
+SHA citations were repaired again — 178 across 21 files — from a map rebuilt by
+matching (author timestamp, subject) between the backup bundle and the new
+history, because the second and third passes each overwrite `commit-map` and the
+first map was gone. The fixture guard that was missing the first time is in from
+the start this time, and it correctly skipped both copies of `version.spec.ts`.
+
+**The lesson, stated plainly because it cost two false all-clears:** a history
+audit has three surfaces — commit metadata, commit messages, and blob contents —
+and `git grep` sees none of them. Only `git log --all -p` sees all three. Every
+clean verdict in the entries above was produced by a command that could not have
+found what was there.
 

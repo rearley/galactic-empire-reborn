@@ -15,7 +15,7 @@ import { join } from 'node:path';
  *
  * **`mode=min` does not fix this, and was tried first.** It trims the build
  * detail and leaves `invocation.environment` intact — verified by reading the
- * provenance out of the build log of 8ac5743, the very commit that set it. Only
+ * provenance out of the build log of b6691b4, the very commit that set it. Only
  * `false` removes the attestation, and with it the payload.
  *
  * The cost is the SLSA attestation itself, which is worth little here: the

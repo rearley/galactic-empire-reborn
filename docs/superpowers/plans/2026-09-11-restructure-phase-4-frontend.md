@@ -45,7 +45,7 @@ That is an observation. Every other phase names what to change and what done loo
 
 ## Baseline — measure before you start
 
-Recorded 2026-09-11 on `restructure` at `f1899a9`:
+Recorded 2026-09-11 on `restructure` at `498e0c0`:
 
 | | value |
 |---|---|

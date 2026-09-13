@@ -124,7 +124,7 @@ Every task's requirements implicitly include this section.
       Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
       Claude-Session: https://claude.ai/code/session_015pWKHSJJ3wvC1bwwAHFwtz
 
-- **Baseline to hold, measured 2026-09-11 at `c5429a1`:** 626 suites / 6385
+- **Baseline to hold, measured 2026-09-11 at `85f032e`:** 626 suites / 6385
   tests green, `npx tsc --noEmit` clean, `npm run lint` clean, both Docker
   images build.
 
@@ -1170,15 +1170,15 @@ cd backend && npx vitest run 2>&1 | tail -5
 cd backend && npx tsc --noEmit && npm run lint && npm run build
 docker build -f backend/Dockerfile -t ge-backend:phase5 . && \
 docker build -f frontend/Dockerfile -t ge-frontend:phase5 .
-git log --oneline c5429a1..HEAD
+git log --oneline 85f032e..HEAD
 ```
 
-`c5429a1` is this phase's base — the commit that closed issues #11, #13 and #23.
+`85f032e` is this phase's base — the commit that closed issues #11, #13 and #23.
 
 - [ ] **Step 2: Check the deploy gate did not move, in this phase's own range**
 
 ```bash
-git diff c5429a1..HEAD -- .github/workflows/ci.yml | grep -E "^[-+].*(branches|github.event_name)"
+git diff 85f032e..HEAD -- .github/workflows/ci.yml | grep -E "^[-+].*(branches|github.event_name)"
 ```
 
 Expected: no output. Compare against **this phase's base**, never against
@@ -1187,7 +1187,7 @@ master — master's `.github/` legitimately differs by every earlier phase.
 - [ ] **Step 3: Confirm `VERSION` did not move**
 
 ```bash
-git diff c5429a1..HEAD -- VERSION
+git diff 85f032e..HEAD -- VERSION
 ```
 Expected: no output.
 
