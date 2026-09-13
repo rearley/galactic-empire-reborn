@@ -1,6 +1,6 @@
 # Deployment
 
-> **DEPLOYED 2026-09-08.** The stack is live at https://<game-domain>.
+> **DEPLOYED 2026-09-08.** The stack is live at `https://<game-domain>`.
 > What follows is what actually worked, including the four things that did not
 > work first — see **Things that bit** at the end.
 >
@@ -15,19 +15,39 @@
 > published ports. Three of those assumptions were wrong for this server, and
 > each is noted where it applies.
 
+## A note on the placeholders
+
+**REDACTED 2026-09-13, before this repository was made public.** Host names,
+domain names, database role names, point release numbers and the names of
+unrelated applications sharing the server have been replaced with angle-bracket
+placeholders. They are consistent throughout the file:
+
+| Placeholder | Is |
+|---|---|
+| `<game-domain>` | the subdomain the game is served from |
+| `<deploy-host>` | the server the stack runs on |
+| `<other-domain>` | an unrelated application on the same host, referenced as a config example |
+| `<dbuser>` | the Postgres role, which is also the database name |
+
+The real values live in a private operations note, not here. Nothing else was
+removed: every procedure, failure mode and verification command below is intact,
+because those are the parts worth reading. Anyone deploying their own instance
+substitutes their own values and the document works unchanged.
+
 ## Target environment — observed, not assumed
 
-Checked on `<deploy-host>` on 2026-09-08.
+Checked against the real host on 2026-09-08. Exact versions and hostnames are
+deliberately not recorded here — see the redaction note at the end of this file.
 
 | | |
 |---|---|
-| Host | Ubuntu 24.04, <panel> |
-| Docker | Engine + Compose plugin |
+| Host | Ubuntu LTS, <panel> |
+| Docker | Engine + Compose plugin, both current |
 | Node on host | **none** — everything runs in containers |
-| PostgreSQL | **16.15, native on the host**, already running |
-| Subdomain | `<game-domain>`, exists, docroot holds a placeholder `index.html` |
+| PostgreSQL | **16.x, native on the host**, already running |
+| Subdomain | exists, docroot holds a placeholder `index.html` |
 | Custom nginx | none yet — no `vhost_nginx.conf` for this domain |
-| Database | **not created yet.** Existing: `<db-other-3>`, `<db-other-1>`, `<db-other-2>` |
+| Database | **not created yet.** The host already carries databases for unrelated applications, so the name has to be specific to this one |
 
 ### Three corrections to the blind draft
 
@@ -86,7 +106,7 @@ proxying to it — and it is what makes the `try_files` rule below apply, since
 <panel> owns `nginx.conf` and regenerates it; custom rules go in
 `vhost_nginx.conf`, which <panel> includes inside the server block. The existing
 apps do exactly this — see
-`/var/www/vhosts/system/<other-app>.com/conf/vhost_nginx.conf` for a working
+`/var/www/vhosts/system/<other-domain>/conf/vhost_nginx.conf` for a working
 example on this server.
 
 For `<game-domain>`, create
@@ -161,16 +181,14 @@ DATABASE_URL=postgresql://<dbuser>:<password>@localhost:5432/<dbuser>?schema=pub
 **Where that value actually lives — read this before an incident, not during
 one.** The section above says secrets belong in `/opt/<app>/.env`, which is the
 pattern the other apps on this host follow. **GE does not follow it.** This
-stack is managed by the <panel> Docker extension, so there is no `/opt/ge` at all
-and no `.env`; `DATABASE_URL` and `JWT_SECRET` are written inline in
+stack is managed by the <panel> Docker extension, which keeps its own compose
+file under `/opt/<panel-path>/`, owned by root and mode 600; there is no `/opt/ge` and
+no `.env`, and `DATABASE_URL` and `JWT_SECRET` are written inline in that
+compose file.
 
-```
-/opt/<panel-path>/<redacted-stack-path>   # mode 600, root
-```
-
-This file said `/opt/ge/.env` until 2026-09-09, and that path has never
-existed. Find the file from the container rather than trusting any documented
-path, including this one:
+An earlier version of this document named `/opt/ge/.env`, a path that has never
+existed. **Do not trust a written path for this — including this one.** Ask the
+container where its config lives:
 
 ```bash
 docker inspect --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' ge-backend
@@ -364,11 +382,11 @@ are committed, versioned artifacts that are never edited after creation.
 
 Recorded because each cost a cycle and none was guessable from the codebase.
 
-**1. Port 3000 was already taken.** A node process serving MCP is bound to
-`*:3000`, and <other-app>'s nginx proxies `/mcp` to it. With
-`network_mode: host` the backend would have collided silently. GE runs on
-**3100**. Check `ss -lnt` before choosing a port on this host — host networking
-means every app shares one port space.
+**1. Port 3000 was already taken.** An unrelated application on the host was
+already bound to it. With `network_mode: host` the backend would have collided
+silently. GE runs on **3100** instead. Check `ss -lnt` before choosing a port on
+a shared host — host networking means every app shares one port space, and the
+default in `main.ts` is exactly the port most likely to be occupied.
 
 **2. `duplicate location "/"`.** <panel>'s generated `nginx.conf` already defines
 `location /` (proxying to Apache on `:7081`), so a prefix `location /` in
@@ -404,3 +422,31 @@ tuning file it loaded and how many options it holds, or that it found none and
 is running on canon defaults. The second case is not an error and will not fail
 a health check — it is how a container once ran a 601x601 galaxy while everyone
 believed it was 201x201.
+
+## What was redacted, and why it did not cost anything
+
+This file was written as an operations runbook for one server and then published
+with the rest of the repository. Those two purposes pull in opposite directions:
+a runbook wants to name exactly where things are, and a public document should
+not hand a stranger a map of a machine.
+
+The resolution was to keep every *procedure* and drop every *identifier*. What
+came out:
+
+- the host and domain names, and the name of an unrelated application that was
+  cited as a working nginx example
+- exact point releases of the operating system, Docker and PostgreSQL, which are
+  a CVE shopping list and go stale the week they are patched
+- the names of databases belonging to other applications on the host
+- the literal path to the compose file holding `DATABASE_URL` and `JWT_SECRET`
+
+That last one cost the least, because the document already said not to trust it.
+The `docker inspect` recipe above finds the file on any host, was already the
+recommended procedure, and had already been wrong once — it named `/opt/ge/.env`
+for a day, a path that never existed. Deleting the literal path removes a
+reconnaissance detail and makes the document more correct at the same time.
+
+Ports were deliberately kept. `3100` is discoverable from the compose file and
+the Dockerfile in this repository regardless, it is useless without knowing the
+host, and it appears in enough verification commands that genericising it would
+have made them uncopyable for no security gain.

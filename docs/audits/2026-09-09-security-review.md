@@ -22,9 +22,15 @@ alone.
 
 ### Database password — ROTATED 2026-09-09
 
-The old value was exposed twice: committed to this repo at `522774f` (private,
-but permanent in history), and later a fragment of it landed in a session
-transcript via a `psql` error. Rotated the same day.
+**CORRECTION 2026-09-13.** This paragraph originally said the old value had
+been "committed to this repo at `522774f`, private but permanent in history."
+That is wrong, and it was checked before the repository was made public: `522774f`
+is an unrelated commit, and every `DATABASE_URL` that has ever appeared in this
+history is either the local development pair or a `<password>` placeholder. The
+password never entered the repository. The single exposure was a fragment of it
+landing in a session transcript via a `psql` error. It was rotated the same day
+regardless, which was the right call — but the claim above would have sent a
+reader digging through git history for a secret that is not there.
 
 Verified by proving the **old** password no longer authenticates, rather than by
 watching the new one work — a backend that never reconnected would also report
@@ -41,8 +47,8 @@ deleted afterwards.
 **The rotation corrected a documentation error worth knowing about.**
 `docs/DEPLOYMENT.md` said the secret lived in `/opt/ge/.env`. That path has
 never existed. GE is managed by the <panel> Docker extension, so `DATABASE_URL`
-and `JWT_SECRET` sit inline in
-`/opt/<panel-path>/<redacted-stack-path>`. Anyone following the doc
+and `JWT_SECRET` sit inline in the compose file that extension maintains under
+`/opt/<panel-path>/`, not in an `.env` at all. Anyone following the doc
 during an incident would have searched the wrong filesystem. The doc now says
 where the value is and, more usefully, how to ask the container instead of
 trusting a written path.
@@ -55,17 +61,20 @@ Procedure, verification commands and the URL-encoding trap are recorded under
 The review could not probe this and correctly refused to guess. Answered from
 both sides:
 
-- **On the host:** `<default-deny input policy>`, <no rule opens the port>
-  (nearest is `<high-port range>`). <other firewall frontends inactive>.
+- **On the host:** the packet filter's default input policy is DROP, and no
+  rule opens the backend's port. (The rule inventory this section originally
+  carried was removed on 2026-09-13, before the repository was made public —
+  publishing a live host's firewall state is the one finding in this file whose
+  value to an attacker exceeds its value to a reader.)
 - **From outside:** unreachable from two independent machines on two networks,
   each with `:443` as a control so a false negative from a broken path would
-  show up. nginx reaches the app at `proxy_pass http://127.0.0.1:3100`.
+  show up. nginx reaches the app on loopback.
 
 **Still worth hardening, and not done.** The container runs `network_mode: host`
-and the app listens on `*:3100` — every interface — where `ge-frontend` binds
-`127.0.0.1:<frontend-port>`. It is safe today by ONE mechanism: the <host-firewall> default
-policy. One broad ACCEPT rule, or a <panel> firewall regeneration, and the game's
-API is on the public internet with no TLS and no nginx in front of it.
+and the app listens on every interface rather than loopback. It is safe today by
+ONE mechanism — the default-deny policy. Lose that to a broad ACCEPT rule or a
+control-panel firewall regeneration, and the game's API is on the public
+internet with no TLS and no nginx in front of it.
 `app.listen(port, '127.0.0.1')` would cost nothing — nginx already reaches it on
 loopback — and would make it two independent mechanisms instead of one. Deploy
 risk is real (bind it wrong and the site 502s), so it wants building and booting

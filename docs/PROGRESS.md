@@ -4206,8 +4206,9 @@ Remaining sub-choice, to be made after reviewing the tree:
    where its config lives, which is already the better procedure. The compose
    path and container names move to a local file outside the repository.
 4. **Decide on the commit author email.** Every commit carries
-   `1328538+rearley@users.noreply.github.com`, and squashing to one commit still leaves it on that
-   commit. GitHub's noreply address is the alternative.
+   a personal-domain address that is the same domain the game is served from,
+   and squashing to one commit still leaves it on that commit. GitHub's noreply
+   address is the alternative. **Still open — see the 2026-09-13 entry.**
 5. **Check the Actions run history.** Workflow *files* are harmless here —
    `deploy.yml` triggers on push and manual dispatch only, never on pull
    requests, and uses only the auto-provisioned token. But on a public
@@ -6130,3 +6131,56 @@ is what the build bakes into both images — and giving them real numbers would
 create a second place for a release number to be wrong. The root `CLAUDE.md`
 cites that field's history for a reason; the answer is that it is not a version,
 not that it needs maintaining.
+
+## 2026-09-13 — Redaction pass before making the repository public
+
+Item 3 of the "Must be true before publishing" list above, done. An audit of the
+working tree and of all 600-odd commits on every branch, looking for anything
+that should not be world-readable.
+
+**No credentials were found, anywhere.** Every `DATABASE_URL` in history is
+either the local development pair or a `<password>` placeholder; `JWT_SECRET`
+only ever appears as `change-me-in-production`. No `.env` was ever committed,
+only `.env.example`. No API tokens, no keys, no player data, no database dumps.
+`.claude/`, `backend/.env` and `.superpowers/` are ignored and untracked.
+
+**That produced one correction.** `docs/audits/2026-09-09-security-review.md`
+claimed the rotated database password had been "committed to this repo at
+`522774f`, permanent in history." It had not. `522774f` is an unrelated commit
+and the password is in no commit at all — the exposure was a session transcript
+only. The audit has been annotated in place. The rotation was still correct; the
+claim about where the secret had been was not, and left in place it would have
+pointed readers of a public repository at a secret that does not exist.
+
+**The real exposure was operational, not cryptographic.** Three documents
+between them described the deployment host precisely enough to be useful to
+someone attacking it: its hostname, the unrelated applications and databases
+sharing it, exact point releases of the OS, Docker and PostgreSQL, the literal
+path to the file holding `DATABASE_URL` and `JWT_SECRET`, and — in the security
+audit — an inventory of the host's firewall rules together with the observation
+that the game's port is protected by exactly one of them.
+
+All of it is now placeholdered or removed. `docs/DEPLOYMENT.md` carries a legend
+mapping the placeholders and a closing section recording what came out and why.
+Every procedure, failure mode and verification command survives: the redaction
+removed identifiers, not knowledge, and the document works unchanged for anyone
+deploying their own instance.
+
+**Ports were deliberately kept.** `3100` is derivable from the compose file and
+the Dockerfile in this repository no matter what the prose says, it is worthless
+without the hostname, and genericising it would have made a dozen verification
+commands uncopyable in exchange for nothing.
+
+### Still open, and not fixable by editing files
+
+- **Commit author email** (item 4 above). Every commit carries an address on the
+  same domain the game is served from, so the domain survives the redaction in
+  the metadata even though it is gone from the prose. Only a history rewrite or
+  a fresh repository removes it — which is the sub-choice under "one repository
+  or two", now forced rather than optional.
+- **Actions run logs** (item 5 above). Unchanged and unexamined: secrets are
+  masked in them, hostnames and deploy output are not, and the existing run
+  history becomes world-readable the moment the repository does.
+- **The loopback bind** (item 2 above). Still not done. The audit sentence that
+  made it urgent has been softened by the redaction, which makes the finding
+  less legible to a stranger but no less true.
