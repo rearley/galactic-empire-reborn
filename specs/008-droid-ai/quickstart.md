@@ -172,7 +172,7 @@ GET /debug/cybertron/in-memory?userid=Cybrg-1
 
 The Cybertron MUST be present in the same logical operation — not
 after a server restart. (This was the defect addressed in commit
-e2c8c9a; the regression test pins it.)
+b01c009; the regression test pins it.)
 
 ## Pass criteria
 

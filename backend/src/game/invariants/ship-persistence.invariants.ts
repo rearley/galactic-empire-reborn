@@ -111,15 +111,15 @@ export const inMemoryShipMatchesDb: Invariant = {
 /**
  * Asserts every in-memory ship has a backing User row.
  *
- * Commit `618c1dc` ("kick clients with valid JWT but missing User row") guarantees
+ * Commit `44ff93a` ("kick clients with valid JWT but missing User row") guarantees
  * that an orphaned in-memory ship at observation time is a bug — the connection
  * should already have been kicked.
  *
- * @see commit 618c1dc
+ * @see commit 44ff93a
  */
 export const noOrphanShipState: Invariant = {
   name: 'noOrphanShipState',
-  sourceRef: 'commit 618c1dc — ghost-user kick',
+  sourceRef: 'commit 44ff93a — ghost-user kick',
   run: (world): Violation[] => {
     const dbMap = asDbShipMap(world.dbShips);
     if (!dbMap) return [];
@@ -132,7 +132,7 @@ export const noOrphanShipState: Invariant = {
       if (!userExists) {
         out.push({
           rule: 'noOrphanShipState',
-          sourceRef: 'commit 618c1dc — ghost-user kick',
+          sourceRef: 'commit 44ff93a — ghost-user kick',
           severity: 'HIGH',
           detail: `in-memory ship ${s.shipId} has no backing User row`,
         });

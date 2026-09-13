@@ -15,9 +15,9 @@ the reasoning; do not read it for current status.
 ## CLOSED — 2026-09-06
 
 Every actionable item in this file is now either implemented or recorded below
-as a deliberate non-implementation. Commits `e7bc7b2`, `f4949a6`, `870a5e8`,
-`d0e598e`, `4869689`, `f3cd81b`, `8c00b11`, `667b9a2`, `63d6e5b`, plus the
-earlier round in `ac4e034` and before.
+as a deliberate non-implementation. Commits `095e4ec`, `7a286db`, `47bcac6`,
+`1d932cd`, `756b01c`, `f4bd957`, `865b7bf`, `9e25b1e`, `49df112`, plus the
+earlier round in `e008f0d` and before.
 
 **Three entries in this file were WRONG and are withdrawn**, all for the same
 reason — they were verified by grepping the canon token (`ORBIT4`, `TRANSOPT`,

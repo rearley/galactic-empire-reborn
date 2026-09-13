@@ -3,7 +3,7 @@
  * After CybertronRepository.createSpawn(...), the spawned ship must be present
  * in ShipStateService in-memory map synchronously (without server restart).
  *
- * This tests the production code fix from commit e2c8c9a where CybertronRepository.createSpawn
+ * This tests the production code fix from commit b01c009 where CybertronRepository.createSpawn
  * was updated to call ShipStateService.loadShip after the Prisma create so the ship is
  * immediately visible in-memory.
  *

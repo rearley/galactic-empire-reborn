@@ -220,7 +220,7 @@ volley size of 0 is intended.
 
 **Decision**: The fix is already in code at
 `backend/src/game/cybertron/cybertron.repository.ts:141-151` (commit
-e2c8c9a). After `prisma.ship.create`, the row is re-fetched and
+b01c009). After `prisma.ship.create`, the row is re-fetched and
 `ShipStateService.loadShip(state)` is called in the same logical
 operation. This feature adds only a regression test at
 `test/game/cybertron/createSpawn-visibility.spec.ts` to pin the

@@ -23,8 +23,8 @@ alone.
 ### Database password — ROTATED 2026-09-09
 
 **CORRECTION 2026-09-13.** This paragraph originally said the old value had
-been "committed to this repo at `522774f`, private but permanent in history."
-That is wrong, and it was checked before the repository was made public: `522774f`
+been "committed to this repo at `5575f77`, private but permanent in history."
+That is wrong, and it was checked before the repository was made public: `5575f77`
 is an unrelated commit, and every `DATABASE_URL` that has ever appeared in this
 history is either the local development pair or a `<password>` placeholder. The
 password never entered the repository. The single exposure was a fragment of it
@@ -189,7 +189,7 @@ Secondary: `buy.handler.ts:81-86` and `transfer.handler.ts:117-121` both compute
 if (broadcast.event === 'player.snapshot') {
   this.server.emit('player.snapshot', { players: this.registry.list() });
 ```
-`ConnectedShipsRegistry.list()` (`connected-ships.registry.ts:86-101`) unconditionally fills `sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) }` for every registered ship — its own doc comment says `scopePlayers()` is what blanks it. `scopePlayers` has exactly **one** call site, `game.gateway.ts:384` (the connect/welcome path). This branch has none. The scoping work in 51c2b9c missed `processBroadcasts`.
+`ConnectedShipsRegistry.list()` (`connected-ships.registry.ts:86-101`) unconditionally fills `sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) }` for every registered ship — its own doc comment says `scopePlayers()` is what blanks it. `scopePlayers` has exactly **one** call site, `game.gateway.ts:384` (the connect/welcome path). This branch has none. The scoping work in ed13c0d missed `processBroadcasts`.
 
 **Attack.** Log in as any ordinary player. Type `ren Foo1`, then `ren Foo2`, alternating. Each successful rename returns the `__player_snapshot__` sentinel (`rename.handler.ts:81-86`; a byte-identical name short-circuits at `:52-57`, hence the alternation) and the gateway broadcasts the full unscoped roster to every socket including the attacker's: `{shipId, name, sector:{x,y}, shipClass}` for every connected pilot, cloaked ships included, at unlimited range, with no scan notice to targets. `RenameService.rename` (`rename.service.ts:34-88`) has no gold cost, no cooldown and no per-session limit. Poll it every few seconds for a live position tracker of the whole roster — pick the richest target off `ros`, watch their sector, intercept. All five `tea` subcommands fire the same sentinel (`tea.handler.ts:143,182,229,270,303`), so a player who never renames leaks everyone's position to everyone whenever they touch a team command.
 

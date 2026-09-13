@@ -239,7 +239,7 @@ export function planTransition(
   //   (a) at least one OBSERVER ship is in the destination sector
   //       (status === GESTAT_USER (1) or GESTAT_AUTO (2), excluding mover)
   //   (b) gernd()%10 === 0 (1-in-10 probability gate from C source)
-  // Restores audit 020 F-005 which regressed in commit d75d337.
+  // Restores audit 020 F-005 which regressed in commit 481961e.
   //
   // `hasObserver` and `roll` are supplied by the caller (see `BeaconRoll`
   // above) — this planner stays deterministic and never touches the RNG.

@@ -348,16 +348,16 @@ order to playtest. Detection belongs at the single place every consumer goes thr
 Throwing rather than falling back is deliberate: the silent fallback is what caused the data loss.
 
 **History**: This was never previously fixed, despite appearing to be. `src/prisma/prisma.service.ts` has
-one commit in its entire history (`36a1d33`, feature 002); no commit on any branch has added a
+one commit in its entire history (`9627405`, feature 002); no commit on any branch has added a
 `datasources` override under `backend/src/`, and `jest.config.ts` never had `setupFiles`. The bug dates
-from feature 002. Commit `109e27a` (2026-06-26) addressed only the symptom — it added
+from feature 002. Commit `2e57148` (2026-06-26) addressed only the symptom — it added
 `neutral-zone.fixture.ts` and seeded Zygor/Nexus Prime after `truncateAll()` in 9 midnight specs, making
 those specs green again while the truncation of the dev database continued. That removed the last visible
 signal. Treating the failing test rather than the data loss is the trap to avoid repeating here.
 
 **Alternatives rejected**:
 - *Fix the ~20 offending specs to use the test client* — leaves the trap armed for every future spec.
-- *Re-seed dev data after each destructive spec (what `109e27a` effectively did)* — hides the loss instead
+- *Re-seed dev data after each destructive spec (what `2e57148` effectively did)* — hides the loss instead
   of preventing it, and silences the only signal that the isolation is broken.
 - *Point `DATABASE_URL` at `ge_test` in a Jest setup file* — mutating a process-wide variable that the dev
   server also reads is fragile, and offers no protection when a spec constructs its own client.
@@ -5223,7 +5223,7 @@ installed in both apps but wired into neither backend lint script (see above —
 kept for phase 5 rather than churning an uninstall/reinstall commit).
 `frontend/src/styles.css` has no explicit `@source` directive after the
 Tailwind 4 migration landed in the same phase (frontend dependency batch,
-`0e3d4d0`); it relies on automatic content detection, which works today but
+`b24ba4f`); it relies on automatic content detection, which works today but
 would be more resilient made explicit — not urgent, just unfinished.
 
 **Alternatives rejected:** ESLint + typescript-eslint (slower, and the whole
@@ -5334,7 +5334,7 @@ error instead of a runtime surprise. It found five real defects while doing
 exactly that, none of them known before this phase, and one of the five
 fixes changes what a player can see.
 
-**Defects found (backend side, Task 3, commit `9e1812d`):**
+**Defects found (backend side, Task 3, commit `585be7a`):**
 
 1. `combat.ship-destroyed` was declared against its 11-field *internal*
    domain-event type (`CombatShipDestroyedEvent`), 8 of those fields
@@ -5356,7 +5356,7 @@ fixes changes what a player can see.
    category-to-style lookup falls back to a default for any unrecognised
    key. Widened to 7 members.
 
-**Defects found (frontend side, Task 4, commit `f6121d0`):**
+**Defects found (frontend side, Task 4, commit `246ed5e`):**
 
 3. `App.tsx`'s hand-written `combat.ship-destroyed` listener type declared a
    required `victimUserid: string` field the backend never sends (stripped
@@ -5419,11 +5419,11 @@ exists to catch).
 **Cost if wrong:** a connection-status banner flickers between two states
 during a drop, rather than showing only one. No data loss, no incorrect game
 state — a display-only change, confirmed reviewed and accepted (Task 4 fix
-round, `f6121d0`).
+round, `246ed5e`).
 
 ## 2026-09-11 — restructure phase 1: dual CJS/ESM build kept for one phase, and the Docker build gap it leaves open
 
-**Context:** `packages/wire` (Task 1, commit `84da4b3`) ships both a CommonJS
+**Context:** `packages/wire` (Task 1, commit `69b991d`) ships both a CommonJS
 build (`dist/cjs`) and an ESM build (`dist/esm`), with an `exports` map
 routing `require` at the CJS output and `import` at the ESM output. This
 exists because the backend is CommonJS under Jest/`ts-jest` and the frontend
@@ -5458,7 +5458,7 @@ touch anyway).
 **A related gap, found verifying this close-out (2026-09-11), not by any of
 the four tasks:** neither Docker image builds on this branch as it stands.
 `backend/package.json` and `frontend/package.json` both declare
-`"@ge/wire": "file:../packages/wire"` (added in `84da4b3`), but neither
+`"@ge/wire": "file:../packages/wire"` (added in `69b991d`), but neither
 Dockerfile's build context or `COPY` list changed to bring `packages/wire`
 or the root manifest into the image — both still `COPY package*.json ./`
 from inside their own per-app directory and `RUN npm ci` from there, exactly
@@ -5483,7 +5483,7 @@ checklist.
 
 ## 2026-09-11 — restructure phase 2: three rulings taken splitting the gateway
 
-**Context:** Phase 2 broke `game.gateway.ts` (2,743 lines at the `fadb7a2`
+**Context:** Phase 2 broke `game.gateway.ts` (2,743 lines at the `5510faf`
 baseline) into per-concern collaborators and split `scan.handler.ts` (1,258
 lines). Three calls made mid-execution are worth keeping past the tasks that
 made them.
@@ -5506,12 +5506,12 @@ it is. Recorded so a later phase doesn't "fix" this into a needless
 indirection.
 
 **Decision 3 — the scan handler's `sca ra` renderer was pulled out in a
-follow-up commit, not the initial split.** The first split (`9eea0f9`)
+follow-up commit, not the initial split.** The first split (`b84a683`)
 carved scan into `scan-strings.ts`, `scan-render.ts` and `scan-planet.ts` but
 left one of the four scan modes (`sca ra`) inline in `scan.handler.ts`.
 Leaving it meant the same category of rendering code existed in two places —
 some in the new `scan-render.ts`, some still in the handler — which is worse
-than not splitting at all, so a second commit (`c0305d1`) finished the
+than not splitting at all, so a second commit (`0fe84b0`) finished the
 extraction rather than leaving it as a documented gap.
 
 **Alternatives rejected:** for Decision 1, converting the 43 call sites
@@ -5545,16 +5545,16 @@ Full Phase 3 measurement in the entry below.
 
 ## 2026-09-11 — Phase 3 close-out: the persistence boundary, measured
 
-**Context:** Phase 3 (`8af4ed2`..`1ff4bea`) built per-feature repositories,
+**Context:** Phase 3 (`569d793`..`5ae6e80`) built per-feature repositories,
 retired the `forwardRef` cycles between `ship`/`planet`/`tick`, cached the
 boot-time ship-class table, and moved 334 inline `ShipState` fixtures onto a
 shared factory. This entry is Task 7's independent verification, measured
-directly against the `8af4ed2` and `1ff4bea` trees rather than copied from
+directly against the `569d793` and `5ae6e80` trees rather than copied from
 any task's own report.
 
 **Measured before/after** (`backend/`, commands run against both commits):
 
-| Metric | `8af4ed2` (phase start) | `1ff4bea` (now) |
+| Metric | `569d793` (phase start) | `5ae6e80` (now) |
 |---|---|---|
 | files injecting `PrismaService` | 46 | 34 |
 | `forwardRef(` actual calls | 3 | 0 |
@@ -5567,17 +5567,17 @@ any task's own report.
 
 Note on the `forwardRef` row: the brief's own grep (`grep -rn 'forwardRef'`)
 counts the bare string and returns 7 at both ends of the phase, which reads as
-"unchanged" at a glance. It is not — at `8af4ed2` those 7 lines include 3 real
+"unchanged" at a glance. It is not — at `569d793` those 7 lines include 3 real
 `forwardRef(` calls (`planet.module.ts` x2, `ship.module.ts` x1, plus
 `tick.module.ts` x1 caught by a second grep) wiring the ship/planet/tick
-cycle; at `1ff4bea` all 7 are prose in `CLAUDE.md`/docblocks describing the
+cycle; at `5ae6e80` all 7 are prose in `CLAUDE.md`/docblocks describing the
 now-retired pattern. Task 5's ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`)
 removed every live call. Grepping for `forwardRef(` — the call, not the word —
 is the correct check and gives 3 → 0.
 
 **CORRECTION 2026-09-11 (final branch review).** "3 actual `forwardRef(`
 calls" is itself a miscount of lines, not calls — the same wrong-unit error
-this entry flags in the `raw string forwardRef` row just above. At `8af4ed2`,
+this entry flags in the `raw string forwardRef` row just above. At `569d793`,
 `planet.module.ts:29` carries **two** calls on one line —
 `forwardRef(() => ShipModule), forwardRef(() => TickModule)` — plus one each
 in `ship.module.ts:25` and `tick.module.ts:9`. That is **4 calls on 3 lines**,
@@ -5587,27 +5587,27 @@ and `planet → tick → ship`.
 
 **Repository map** (files under `backend/src/`, by when they were introduced):
 
-Pre-existing (before `8af4ed2`): `combat/mine.repository.ts`,
+Pre-existing (before `569d793`): `combat/mine.repository.ts`,
 `cybertron/cybertron.repository.ts`, `mail/mail-inbox.repository.ts`,
 `midnight/midnight.repository.ts`, `player/player-score.repository.ts`,
 `team/team.repository.ts`.
 
-New in Phase 3: `player/user.repository.ts` (Task 2, `6bccd3d`),
+New in Phase 3: `player/user.repository.ts` (Task 2, `d742f2d`),
 `ship/ship.repository.ts` and `galaxy/wormhole.repository.ts` (Task 4,
-`3108806`/`6fcdf34`).
+`8f2cd97`/`27cf4fe`).
 
 **Finding — `as never` went the wrong way, and the spec's premise only holds
 for one of its two seams.** Phase 3's own text claims typed seams make such
 casts unnecessary. Measured per commit:
 
 ```
-8af4ed2  509   phase start
-d969409  511   Task 1, ship factory          +2
-6bccd3d  512   Task 2, user repository       +1
-c5bda05  544   Task 3, ship-class cache     +32
-3108806  552   Task 4, repositories          +8
-602e725  551   fix round
-1ff4bea  551   Task 6, fixture sweep          0
+569d793  509   phase start
+76ecb04  511   Task 1, ship factory          +2
+d742f2d  512   Task 2, user repository       +1
+69521a3  544   Task 3, ship-class cache     +32
+8f2cd97  552   Task 4, repositories          +8
+40cdbd9  551   fix round
+5ae6e80  551   Task 6, fixture sweep          0
 ```
 
 509 → 551, +42, the wrong direction. Split by seam: the **fixture** seam
@@ -5637,7 +5637,7 @@ cast **precisely because** the parameter is typed as a concrete class
 (`WormholeRepository`) rather than a port; a narrow interface there would
 have accepted the object literal with no cast at all. Task 5 is the only
 task that introduced real ports (`SHIP_STATE_PORT`, `PLANET_STATE_PORT`) and
-it added **zero** (551 → 551, verified at `602e725` and `6fa0c30`). So casts
+it added **zero** (551 → 551, verified at `40cdbd9` and `d3ae802`). So casts
 track **concrete-class dependencies**, and ports were **cast-neutral**. The
 honest statement: `as never` rose because Tasks 3 and 4 made specs
 instantiate concrete services and repositories and stub their own Prisma
@@ -5673,7 +5673,7 @@ a real gap for a future `AuthRepository`, not a decision this phase made; it
 is recorded here rather than left implicit so Phase 4/5 doesn't assume auth
 is already behind a seam.
 
-**Deploy gate, Docker, VERSION:** `git diff --name-only 8af4ed2..HEAD --
+**Deploy gate, Docker, VERSION:** `git diff --name-only 569d793..HEAD --
 .github/` is empty; `.github/workflows/ci.yml` still gates on
 `branches: [master]` and `if: github.event_name == 'push'`; `git diff master
 -- VERSION` is empty. Both `backend/Dockerfile` and `frontend/Dockerfile`
@@ -5707,7 +5707,7 @@ and that dropping a frontend `@see` citation would fail it. **That claim is
 false.** The spec's `SOURCE_FILES` list walks only `backend/src` and
 `backend/test`; the 45 canon citations living in `frontend/` are checked by
 nothing — not counted, not quote-verified against `/reference/ge-source/`.
-The plan was corrected in place at commit `dcdb521` rather than silently
+The plan was corrected in place at commit `8a16f23` rather than silently
 fixed, because the false constraint had already been acted on (Task 1 moved
 citations under the belief a test would catch a mistake, when none would
 have). The corrected framing: citations move unchanged because they are the

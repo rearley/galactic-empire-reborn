@@ -28,7 +28,7 @@ Copied from the spec and from standing project rules. Every task's requirements 
 
 ## Baseline — measure before you start
 
-Recorded 2026-09-11 on `restructure` at `541914b`:
+Recorded 2026-09-11 on `restructure` at `41aaf2b`:
 
 | | value |
 |---|---|
@@ -764,14 +764,14 @@ echo "prisma in gateway: $(grep -c 'this.prisma' src/gateway/game.gateway.ts)"  
 
 ```bash
 cd /home/rick/dev/galactic-empire-reborn
-git diff --name-only 8af4ed2..HEAD -- .github/
+git diff --name-only 569d793..HEAD -- .github/
 grep -n "branches:\|github.event_name" .github/workflows/ci.yml
 git diff master -- VERSION
 ```
 
-**Use `8af4ed2..HEAD`, this phase's own range — NOT `master..HEAD`.** Phases 0, 1
-and 2 legitimately changed `ci.yml` (the Docker build context at `540f65f`, the lint
-gating at `1050298`), so a comparison against master reports work that is correct and
+**Use `569d793..HEAD`, this phase's own range — NOT `master..HEAD`.** Phases 0, 1
+and 2 legitimately changed `ci.yml` (the Docker build context at `ca69120`, the lint
+gating at `3f100cc`), so a comparison against master reports work that is correct and
 already reviewed. The first and third commands must produce no output.
 
 The two greps check the gate's CONTENT rather than whether the file differs at all:

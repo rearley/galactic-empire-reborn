@@ -227,32 +227,32 @@ Split by **whether an upgrade can change runtime behaviour**, not by calendar.
       `.github/workflows/ci.yml` (both jobs). **Verified: both images build; the
       backend image runs `node v24.21.0` and `dist/src/main.js` loads.**
 - [x] Add `engines.node` to both `package.json` files. Pinned by
-      `backend/test/unit/node-runtime-version.spec.ts` (`66e53b1`).
-- [x] Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (`84ccc49`).
+      `backend/test/unit/node-runtime-version.spec.ts` (`4dd0e0d`).
+- [x] Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (`d36f310`).
 - [x] Frontend: React 19, Vite 8, Vitest 5, Tailwind 4 (config rewrite),
-      TypeScript 6.0.3. One batch — it is only 3,521 isolated lines (`0e3d4d0`).
+      TypeScript 6.0.3. One batch — it is only 3,521 isolated lines (`b24ba4f`).
 - [x] oxlint with type-aware rules, both apps, wired into CI. Frontend runs
       `--type-aware`; backend runs syntax-only (see the `moduleResolution`
-      blocker above). (`1050298`, fix round `30f9975`.)
+      blocker above). (`3f100cc`, fix round `cee7271`.)
 
 ### Phase 1 — one typed wire contract — COMPLETE 2026-09-10
 
 - [x] Root npm workspace (`packages/*`, `backend`, `frontend`), single root
-      `package-lock.json`, `@ge/wire` symlinked in. (Task 1, `84da4b3`.)
+      `package-lock.json`, `@ge/wire` symlinked in. (Task 1, `69b991d`.)
 - [x] `packages/wire` — dual CJS/ESM build, `WIRE_EVENTS` (30 server-to-client +
       2 client-to-server names, `as const`), the payload interfaces, and the
       Socket.io `ServerToClientEvents`/`ClientToServerEvents` generic maps.
       Proven to resolve from both a CommonJS and an ESM consumer. (Task 2,
-      `64495c2`.)
+      `2166b39`.)
 - [x] Backend's `Server`/`Socket` typed with those generics throughout
       `game.gateway.ts` and `ws-auth.guard.ts`; `CommandBroadcast` made a real
       discriminated union so the broadcast-dispatch path narrows without a
       cast; zero `as`/`any`/non-null assertions anywhere in the diff. (Task 3,
-      `9e1812d`.)
+      `585be7a`.)
 - [x] Frontend repointed at the same declaration: `contracts.ts` and
       `frontend/test/contracts-parity.spec.ts` deleted, 14 importers
       repointed, `specs/003-ship-commands/contracts/shared-types.ts` kept with
-      a SUPERSEDED note rather than deleted. (Task 4, `f6121d0`.)
+      a SUPERSEDED note rather than deleted. (Task 4, `246ed5e`.)
 
 **Blocker execution proved wrong:** the plan's "pick dot or colon and
 convert" bullet was withdrawn before execution (see the ruling in the
@@ -263,7 +263,7 @@ phase-1 ledger and the frozen-names decision in `docs/DECISIONS.md`
 close-out and NOT fixed here (documentation-only session):** neither Docker
 image builds on this branch. `backend/package.json` and
 `frontend/package.json` both depend on `@ge/wire` via `file:../packages/wire`
-(added `84da4b3`), but neither Dockerfile's build context was moved to the
+(added `69b991d`), but neither Dockerfile's build context was moved to the
 repo root and neither builds `packages/wire` as its own stage — the fix
 Task 1's own brief anticipated and named two shapes for, Step 9 of that
 brief. `docker build -f backend/Dockerfile backend/` and the frontend
@@ -273,7 +273,7 @@ issue. **Phase 2 (or a fix commit ahead of it) must resolve this before any
 Docker image is rebuilt from this branch** — it is not a phase-1-in-progress
 state, it is phase 1 shipping without one of its own exit criteria met.
 
-**RESOLVED 2026-09-11, `540f65f`** — before phase 2 started, as this entry
+**RESOLVED 2026-09-11, `ca69120`** — before phase 2 started, as this entry
 required. Both Dockerfiles now take the repo root as build context
 (`docker build -f backend/Dockerfile .`), build `packages/wire` as its own
 stage, and `@ge/wire` was verified resolvable inside the running backend
@@ -346,7 +346,7 @@ Verified at close-out: full suite 623 suites / 6,356 tests passing (one
 tracked `npx jest` process, `Ran all test suites.` printed once), both Docker
 images build from repo root, `@ge/wire` resolves in the backend image, deploy
 gate (`branches: [master]`, `if: github.event_name == 'push'`) unchanged in
-this phase's own `8af4ed2..HEAD` range, `VERSION` unchanged. Full before/after
+this phase's own `569d793..HEAD` range, `VERSION` unchanged. Full before/after
 table in `docs/PROGRESS.md` 2026-09-11.
 
 ### Phase 4 — frontend restructure — COMPLETE 2026-09-11
@@ -372,7 +372,7 @@ That is by design, but it means the first commit in this phase that touches
 any cited line will fail until `TOTAL_FLOOR` is re-measured — this is
 expected, not a regression, and is not something Phase 3 introduced. **This
 ratchet does not cover `frontend/` at all** — the plan originally claimed
-otherwise; corrected at commit `dcdb521`, filed as issue #22, full account in
+otherwise; corrected at commit `8a16f23`, filed as issue #22, full account in
 `docs/DECISIONS.md` 2026-09-11.
 
 ### Phase 5 — Prisma 7, NestJS 12, Vitest, TypeScript 7 (behaviour-risky)
@@ -403,23 +403,23 @@ on the grounds that it is the largest and riskiest item in the phase (55
 642 test files) and buys nothing the other four upgrades need.
 
 - [x] `moduleResolution: "node"` → `"bundler"`, dropping the
-      `ignoreDeprecations: "6.0"` escape hatch (`39e9c74`). Also the phase-0
+      `ignoreDeprecations: "6.0"` escape hatch (`89836c8`). Also the phase-0
       blocker that kept backend oxlint syntax-only — **oxlint now runs
-      `--type-aware`** (`e0b3f41`), its first run ever on this backend, and the
+      `--type-aware`** (`c667575`), its first run ever on this backend, and the
       3,441 findings were triaged into one rule disabled with a reason and six
       parked behind issues #28 and #29. No code fixed.
-- [x] Jest → Vitest on the backend (`a048856`). Moved AHEAD of Nest 12 during
+- [x] Jest → Vitest on the backend (`137533a`). Moved AHEAD of Nest 12 during
       execution: Jest 30 cannot `require()` Nest 12's ESM entrypoints from a
       CommonJS test. 2,697 call sites across 296 files. Surfaced #32 and #33,
       and a **safety fix** — `database-url.ts` identified a test run by
       `JEST_WORKER_ID`, which Vitest never sets.
-- [x] Prisma 5 → 7 on CommonJS (`d5b1754`): `prisma-client` generator with
+- [x] Prisma 5 → 7 on CommonJS (`79e909e`): `prisma-client` generator with
       `moduleFormat = "cjs"`, client generated OUTSIDE `src/` and git-ignored,
       `url` moved to `prisma.config.ts`, `@prisma/adapter-pg` driver adapter.
       Caused three regressions, all found and fixed: fail-fast on a bad
       connection was gone, a duplicate email became a 500, and the built image
       would not start.
-- [x] A boot-order oracle landed BEFORE any framework move (`d589804`), and
+- [x] A boot-order oracle landed BEFORE any framework move (`6ef4a78`), and
       immediately found that the heartbeats start before the galaxy exists and
       before the ship-class cache is warm (#30).
 - [ ] **NestJS 10 → 12 — BLOCKED, see issue #34.** `@nestjs/throttler` has no
@@ -444,7 +444,7 @@ this repo. Verified at close-out: 631 suites / 6,408 tests green, frontend 43 /
 336 green, `tsc --noEmit` clean, `npm run lint` clean and now type-aware, both
 Docker images build, the backend image loads the Prisma client and the whole
 app module, `prisma migrate deploy` inside it reaches the schema, deploy gate
-unchanged in this phase's own `6a066a8..HEAD` range, `VERSION` unchanged.
+unchanged in this phase's own `c5429a1..HEAD` range, `VERSION` unchanged.
 
 ## Pause condition
 

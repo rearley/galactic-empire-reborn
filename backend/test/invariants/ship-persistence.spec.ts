@@ -151,7 +151,7 @@ describe('noOrphanShipState', () => {
       ships: [{ shipId: 'A' }, { shipId: 'B' }],
       dbShips: {
         A: { userExists: true },
-        B: { userExists: false }, // ghost — would have been kicked per commit 618c1dc
+        B: { userExists: false }, // ghost — would have been kicked per commit 44ff93a
       },
     };
 

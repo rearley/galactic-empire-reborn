@@ -839,7 +839,7 @@ required a browser.
   to one flat event per transition (backend and frontend contracts already agree; only the tests and the
   `contracts-parity` guard still asserted the old shape), `AuthScreen` now opens in login mode so the
   `/register/i` button the tests clicked was the mode switch, `ScanPanel` renders newest-scan-first per
-  commit `6ae0f32`, and two `socketClient` mocks omitted the later-added `onSocketAuthFailed` export.
+  commit `687275c`, and two `socketClient` mocks omitted the later-added `onSocketAuthFailed` export.
 
 **Tests:** Backend 2827/2827 across 293 suites, exit 0. Frontend 135/135. `tsc --noEmit` clean both sides;
 `npm run build` green both sides. New specs: `test/integration/health/health.spec.ts` (3 cases: 200 ok,
@@ -899,9 +899,9 @@ assertion that the running suite resolves to `ge_test` and not `ge`). Dev-DB int
 - No CI, and the migration history is unexercised by tests (see audit above). Deferred deliberately.
 - `src/game/commands/command.types.ts:9` uses `client?: any`, against the CLAUDE.md "no `any`" rule.
 - (resolved) The origin of the planet loss is confirmed. `src/prisma/prisma.service.ts` has a single
-  commit in its history (`36a1d33`, feature 002) and no commit across all 219 commits/branches ever added
+  commit in its history (`9627405`, feature 002) and no commit across all 219 commits/branches ever added
   a `datasources` override under `backend/src/`; `jest.config.ts` never had `setupFiles`. The bug has
-  existed since feature 002. Commit `109e27a` (2026-06-26) treated the *symptom*: it added
+  existed since feature 002. Commit `2e57148` (2026-06-26) treated the *symptom*: it added
   `neutral-zone.fixture.ts` and called `seedNeutralZonePlanets(prisma)` in 9 midnight specs — the same
   specs that call `truncateAll(prisma)` on a `PrismaService` resolved from `PrismaModule`, i.e. the dev
   database. That made the midnight tests pass while leaving the truncation of `ge` in place, removing the
@@ -1075,7 +1075,7 @@ C-canonical 10× formula in `scan.handler.ts` preserved — the change is purely
 
 ## 2026-05-12 — 022 fidelity audit v2
 
-**Completed:** Four-subsystem C↔TS walk (persistence, combat ranges, AI targeting, scanners & visibility) across `reference/ge-source/` and the matching `backend/src` modules. 60+ findings filed in `specs/022-fidelity-audit-v2/findings.md` (P-001..P-021, C-001..C-016, A-001..A-011, S-001..S-014). 10+ HIGH findings fixed inline — most notably the AI fire-range gate (A-001/A-002) that resolved the across-the-map shot symptom motivating the audit, plus the player phaser range gate (C-001), the `scan lo` 10× projection fix (S-001), the `scan ra` sector-unit projection fix (S-003), `scan sh` cloak gate (S-004), beacon-on-move regression (S-005, F-005 regressed by `d75d337`), the Vakory scanRange seed pin (S-006), and the `maxTons`/`scanFull`/`msgFilter` reconnect hydration fix (P-002/P-003). A new `backend/src/game/invariants/` module hosts a runtime harness with 6 seed invariants (`weaponFireRangeRespected`, `aiCannotFireAcrossMap`, `aiRespectsNeutralZone`, `scanRangeMatchesScanType`, `inMemoryShipMatchesDb`, `noOrphanShipState`) wired into `TickService` via a snapshot-provider pattern behind `INVARIANTS_RUNTIME=1`.
+**Completed:** Four-subsystem C↔TS walk (persistence, combat ranges, AI targeting, scanners & visibility) across `reference/ge-source/` and the matching `backend/src` modules. 60+ findings filed in `specs/022-fidelity-audit-v2/findings.md` (P-001..P-021, C-001..C-016, A-001..A-011, S-001..S-014). 10+ HIGH findings fixed inline — most notably the AI fire-range gate (A-001/A-002) that resolved the across-the-map shot symptom motivating the audit, plus the player phaser range gate (C-001), the `scan lo` 10× projection fix (S-001), the `scan ra` sector-unit projection fix (S-003), `scan sh` cloak gate (S-004), beacon-on-move regression (S-005, F-005 regressed by `481961e`), the Vakory scanRange seed pin (S-006), and the `maxTons`/`scanFull`/`msgFilter` reconnect hydration fix (P-002/P-003). A new `backend/src/game/invariants/` module hosts a runtime harness with 6 seed invariants (`weaponFireRangeRespected`, `aiCannotFireAcrossMap`, `aiRespectsNeutralZone`, `scanRangeMatchesScanType`, `inMemoryShipMatchesDb`, `noOrphanShipState`) wired into `TickService` via a snapshot-provider pattern behind `INVARIANTS_RUNTIME=1`.
 
 **Tests:** New specs under `backend/test/invariants/` (6 invariants × ≥2 cases each, plus harness aggregation + throw-isolation tests). Per-fix unit tests: `phaser.range.spec.ts`, `droid-act-class-11.spec.ts` + `droid-act-class-12.spec.ts` range-gate describes, `scan-lo-range.spec.ts`, `scan-ra-unit-fix.spec.ts`, `scan-sh-cloak.spec.ts`, `ship-class-scanrange-pin.spec.ts`, `ship-state.mappers.spec.ts`, and an updated `beacon.spec.ts`. `tsc` clean on touched files; pre-existing failures in `test/gateway/*` and `test/integration/scan-*.spec.ts` remain (constructor arity drift unrelated to this audit) and are tracked separately.
 
@@ -2136,27 +2136,27 @@ collision, then the shield cluster.
 **Completed:** every finding in `docs/FIDELITY_AUDIT.md`, in seven commits.
 The report keeps the commit-by-commit map; the headline changes:
 
-- *Tier 1 exploits* (`740cc2a`) — missiles did ~500x intended damage; jammer and
+- *Tier 1 exploits* (`f4b7952`) — missiles did ~500x intended damage; jammer and
   zipper reached the whole galaxy on a sector-vs-raw unit mismatch; `buy` never
   read your balance; midnight wrote its empty-team marker into a primary key and
   froze scoring permanently once two teams emptied; the mail purge swept a table
   nothing writes to.
-- *Tier 2 combat* (`d7deb46`) — the shield knockdown cluster (four findings, one
+- *Tier 2 combat* (`22b93e2`) — the shield knockdown cluster (four findings, one
   `shieldhit` return type), decoys made single-use and stackable, phasers no
   longer recharge on an empty battery, and shooting a Cybertron now claims it.
-- *Tier 4 energy* (`4260b28`, `9bd81b3`) — deceleration is free again (running
+- *Tier 4 energy* (`3e5061b`, `1c09d68`) — deceleration is free again (running
   dry at warp was unrecoverable), passive recharge and auto-flux restored, a
   finished repair restores `topspeed` (blown engines were permanent), the
   restorative block moved from the 1s tick to the 6s one it belongs on, and
   hyperspace, gravity wells and wormholes implemented — three mechanics that
   had no effect at all.
-- *Tier 3 AI* (`8e57b0f`) — Cybertron countdowns count seconds again; the two
+- *Tier 3 AI* (`9076f59`) — Cybertron countdowns count seconds again; the two
   targeting columns had each other's meaning; break-off, shields and pursuit
   were inverted or missing; the allowance went to energy and was discarded.
-- *Tiers 5-7* (`aa3e5c4`) — planet economy loop guards, integer starvation,
+- *Tiers 5-7* (`7e69460`) — planet economy loop guards, integer starvation,
   zero-population skip, revolt draws, trade gates, and the scoring constants
   that were `lngopt` ceilings rather than values.
-- *Tier 8* (`997a4b6`) — `sca sh` announces itself, `damstr` bands, `rep sys`
+- *Tier 8* (`7e4393d`) — `sca sh` announces itself, `damstr` bands, `rep sys`
   subsystem lines, roster filtering, scan prefix matching, cloak and hails.
 
 **Tests:** backend 3395 passing (362 suites), frontend 156, browser 38. Every
@@ -2190,7 +2190,7 @@ ships) and played a new pilot through trade, scanning, combat, colonisation and
 the nightly job. Seven defects the 3,400-test suite could not see, in two
 commits.
 
-`0a28c08` — four from ordinary play:
+`a091d57` — four from ordinary play:
 - **Midnight ran exactly once per backend process.** `pg_try_advisory_lock` is
   session-scoped and Prisma pools connections, so the `finally` unlock ran on a
   different session and the lock leaked. Every later run — the nightly cron
@@ -2204,7 +2204,7 @@ commits.
 - **The Zygor-3 gold bank was dead** — the availability gate went in without
   its gold clause (GECMDS.C:4417-4423).
 
-`eee696d` — three from asking whether a new player can see an ambush coming:
+`321cb7a` — three from asking whether a new player can see an ambush coming:
 - **The Cybertron taunt went to the attacker's sector room**, not the targeted
   pilot's terminal. Since a heavy hunts from outside your scanners, that taunt
   is the only warning the game gives, and it reached nobody.
@@ -2325,7 +2325,7 @@ navigation. Three ships lost in the process.
 - *Midnight* — ran on demand, production report mail matching the colony.
 
 **Defects found and fixed:**
-- `war <speed> [degrees]` ignored the course argument (`775dd24`).
+- `war <speed> [degrees]` ignored the course argument (`2dc3f9c`).
 - Outgoing combat lines named the victim by userid ("hits @Droid-6") where
   `sca sh` needs the ship name — the same defect as the incoming line, which
   had already been fixed. Both halves now carry a resolved ship name.
@@ -2372,35 +2372,35 @@ plant a spy and besiege it. He lost 2,000 troops and then his ship.
 - *A hull bought at Zygor could never warp.* `createShipTransaction` never set
   `topspeed`, so every purchased ship took the column default of 0 — which is
   what `war` reads as blown engines. Nothing raises topspeed afterwards. The
-  entire ship-progression loop was dead on arrival. (`15f4155`)
+  entire ship-progression loop was dead on arrival. (`f719223`)
 - *`orb` had no proximity check.* C refuses orbit beyond 250 units, and that
   number interlocks with `checkdist` clearing `hostile` past 1000 and `fireion`
   firing only while `hostile > 1`. Without the gate an attacker orbited from
   5,800 units out, `hostile` was cleared on the next tick, and a colony holding
   200 ion cannons could not fire a shot. Restoring the gate restored planetary
-  defence. (`0b8ef32`)
+  defence. (`f305ab3`)
 - *Midnight restocked a copy nobody reads.* `refreshNeutralZone` writes
   Postgres; the game reads PlanetStateService. Its comment argued this was
   cosmetic because purchases never deplete neutral-zone stock — true, but the
   economy tick does: the posts hold 1,032,000 men, so `shouldRunEconomy` is
   true for them and each PLANTOCK starves their food and troops. Over days of
-  uptime the hub shop drained and stayed drained until restart. (`0753e7a`)
+  uptime the hub shop drained and stayed drained until restart. (`a56afd7`)
 - *`war`/`imp` reported a course the ship was not flying,* and `war <n> <deg>`
   set a heading the autopilot overwrote a tick later. Both now share one rule.
-  C has no autopilot at all — `holdcourse` there is a Cybertron field. (`5f4f467`)
+  C has no autopilot at all — `holdcourse` there is a Cybertron field. (`33a212f`)
 - *Eight commands appeared in no help topic* — `tea`, `ros`, `mai`, `rea`,
   `del`, `spy`, `sys`, `hel`. Teams were unreachable without knowing
   `tea create <name> <password>` already. Added a `comms` topic and a test that
   asserts coverage in the direction that was missing. `att` was also documented
-  without the amount it requires. (`72ed6a1`, `0b8ef32`)
+  without the amount it requires. (`6d7a89d`, `f305ab3`)
 - *`sca pl` labelled the five trading posts "— owned"*, indistinguishable from
   a rival's colony, and `sca pl <n>` printed the internal `**neutral**`
-  sentinel at the pilot. (`3b5771b`)
+  sentinel at the pilot. (`8363099`)
 - *A displaced session claimed a network fault* it had no evidence for and
-  offered no way back. (`3b5771b`)
+  offered no way back. (`8363099`)
 - *Intra-sector position could be negative* — sector from floor, offset from
   `coord % 1`. C's `coord2` adds 1 before taking the fraction precisely to
-  avoid this. Also restored C's SSMAX scale. (`29ee26e`)
+  avoid this. Also restored C's SSMAX scale. (`a474274`)
 
 **Confirmed working end-to-end:** colony production and starvation; revolt at
 `(taxrate/120)*0.35*men > troops` with distress mail; tax accrual and `wit`;
@@ -2456,23 +2456,23 @@ personas explicitly re-verified against the rebuilt server mid-session — so
   the origin POINT, wrong at both ends. The trading posts sit at 0.1-0.9, so
   most of the hub — where every new pilot must dock — could be fired on.
   `CybertronTickService` had the rule right all along in its own copy, so the
-  AI honoured a boundary the player weapons did not. (`6be9a3b`)
+  AI honoured a boundary the player weapons did not. (`6ad9ba2`)
 - *Every scan mode drew AI as captains and captains as AI* —
   `status === 1 ? 'ai' : 'human'`, but status 1 is GESTAT_USER. A unit test had
-  pinned the inversion in its own name. (`d07f311`)
+  pinned the inversion in its own name. (`594699c`)
 - *Dying emptied your bank.* Onboarding set `cash: START_CASH` unconditionally
   on a path that also serves the empty-fleet rebuild: a refund for the poor, a
-  wipe for the rich. C leaves the bank alone (GEFUNCS.C:106-113). (`a793403`)
+  wipe for the rich. C leaves the bank alone (GEFUNCS.C:106-113). (`7e824db`)
 - *Overspeed blew the drive with no warning* — the escalation ladder existed but
   every message sat behind a stale TODO, years after the per-ship routing it
-  waited on shipped. (`4caa5e7`)
+  waited on shipped. (`e9a0f8b`)
 - *`adm password team` from a teamless owner* was accepted and left "team"
   standing as an ordinary password anyone could type; C clears both in that
   case (GEMAIN.C:3266-3290). The admin screen also never showed who may land
-  and labelled the tax pool "Cash". (`d07f311`)
+  and labelled the tax pool "Cash". (`594699c`)
 - *`pri` refused what `buy` allowed* for gold at Zygor — `price` kept its own
   copy of the buy gates and it had drifted. It now quotes through
-  `computeBuyOutcome`. (`ffdd7b5`)
+  `computeBuyOutcome`. (`7caaa78`)
 
 **Also fixed this round, found by playing in the browser:**
 `rot @<deg>` (C's absolute turn) was never implemented; `imp` quoted a range
@@ -2486,7 +2486,7 @@ deaths with no killer were announced as "destroyed by unknown".
 **Corrected in-flight:** I added a help line claiming scan bearings are compass
 headings, followed my own bad help, and flew past the planet. Bearings are
 RELATIVE (`cbearing` always takes the observer's heading). Help fixed and a test
-now asserts it cannot claim otherwise (`686ea94`).
+now asserts it cannot claim otherwise (`9a756de`).
 
 **Harness limitation worth recording:** a ship is evicted from the world when
 its socket closes, and each `play.mjs` run disconnects at the end, so agents are
@@ -3418,7 +3418,7 @@ markup would be worse than none.
 `docs/audits/2026-09-05-canon-gaps.md`, in nine commits. Correctness first,
 then the narration tier.
 
-Correctness (`e7bc7b2`, `f4949a6`):
+Correctness (`095e4ec`, `7a286db`):
 - gold's half-ton weight was rounded up to 1 in the buy capacity gate, halving
   how much gold a hold would take — on the one item the Zygor-3 bank exists to
   move in bulk (GEFUNCS.C:2541)
@@ -3433,8 +3433,8 @@ Correctness (`e7bc7b2`, `f4949a6`):
 - planet distress mail was written even for an owner who watched the raid;
   `mailit(1)` suppresses it (GEFUNCS.C:2231)
 
-Narration (`870a5e8`, `d0e598e`, `4869689`, `f3cd81b`, `8c00b11`, `667b9a2`,
-`63d6e5b`): the WARP ladder and NOACCEL (which also fired 500 energy late,
+Narration (`47bcac6`, `1d932cd`, `756b01c`, `f4bd957`, `865b7bf`, `9e25b1e`,
+`49df112`): the WARP ladder and NOACCEL (which also fired 500 energy late,
 because the debit floor was 0 instead of `useenergy`'s reserve); bare `loc`
 releasing a lock; JAMMER3 to each jammed ship; ANNOUN/ENTWAR/WARHUP arrival
 and departure; CYBNEW/DROIDNEW; canon's `call_4_help` chain including ATTACK7
@@ -4292,7 +4292,7 @@ copy edit. Written failing first. Frontend 255 across 36 files.
 ## 2026-09-09 — the sysop toolkit is complete against canon, and the doc said otherwise
 
 **Completed:** rewrote the `SysHandlerService` doc comment, which still claimed
-the handler supported only `sys unjam`. The other twelve landed in `8809d7e`,
+the handler supported only `sys unjam`. The other twelve landed in `fcb2eda`,
 the commit before this session started.
 
 **What the check turned up.** Canon's `sys` is often described from the header
@@ -5415,12 +5415,12 @@ of it.
 - **Node 20 → 24** in both Dockerfiles and both CI jobs, `engines.node`
   (`>=24`) added to both `package.json` files, pinned by a new repo-invariant
   test, `backend/test/unit/node-runtime-version.spec.ts`. Both images verified
-  to build; the backend image boots and runs `node v24.21.0`. (`66e53b1`)
+  to build; the backend image boots and runs `node v24.21.0`. (`4dd0e0d`)
 - **Backend: TypeScript 6.0.3, Jest 30, ts-jest latest (29.4.12).** Two
   `backend/tsconfig.json` additions were required —
   `"ignoreDeprecations": "6.0"` and `"types": ["jest", "node"]` — both
   compile-time-only, no `src/**` behaviour change. See
-  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`84ccc49`)
+  `docs/DECISIONS.md` 2026-09-10 ("TypeScript pinned at 6.0.3"). (`d36f310`)
 - **Frontend: React 19, Vite 8, Vitest 5, Tailwind 4, TypeScript 6.0.3, in one
   batch.** Tailwind's config moved from `tailwind.config.ts` (deleted) into
   `src/styles.css`'s `@theme` block. Two Vitest-5-driven test-infrastructure
@@ -5429,7 +5429,7 @@ of it.
   renames (`flex-shrink-0`→`shrink-0`, `outline-none`→`outline-hidden`) across
   frontend `src/`, all behaviour-identical. No React-19-specific migration was
   needed — the codebase already used `createRoot` and current
-  `@testing-library/react` idioms. (`0e3d4d0`)
+  `@testing-library/react` idioms. (`b24ba4f`)
 - **oxlint, both apps, wired into CI**, backed by
   `backend/test/unit/lint-gate.spec.ts` (7 tests after a fix round). Frontend
   runs `--type-aware`; backend runs syntax-only because `oxlint-tsgolint`
@@ -5437,7 +5437,7 @@ of it.
   `docs/DECISIONS.md` 2026-09-10 ("oxlint, not ESLint") for the full rule
   table and rationale, and the restructure spec's "Blockers and constraints
   discovered" section for why that one tsconfig setting blocks both TS7 and
-  backend type-aware linting. (`1050298`, fix round `30f9975`)
+  backend type-aware linting. (`3f100cc`, fix round `cee7271`)
 
 **Tests:** measured at the end of phase 0 — backend 607 suites / 6,154 tests
 (up from the 605/6,141 pre-phase baseline: +1 suite/+6 tests from the runtime
@@ -5479,7 +5479,7 @@ decision in `docs/DECISIONS.md`.
   probe symbol resolved from a spec on each side. The repo root gained its
   first `package.json` (`workspaces: ["packages/*", "backend", "frontend"]`)
   and a single root `package-lock.json`, replacing the two per-app lockfiles.
-  (Task 1, `84da4b3`.)
+  (Task 1, `69b991d`.)
 - **The backend's `Server`/`Socket` are now typed with Socket.io's
   `ServerToClientEvents`/`ClientToServerEvents` generics, throughout
   `game.gateway.ts` and `ws-auth.guard.ts`.** A wrong payload at an emit site
@@ -5487,14 +5487,14 @@ decision in `docs/DECISIONS.md`.
   `CommandResult.broadcasts` became `CommandBroadcast[]`, a discriminated
   union on `event`, so the dynamic broadcast-dispatch path (`sca sh`,
   `sen`, `ren`, `tea`) narrows `payload` per event with zero casts, backed by
-  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `64495c2`
-  and `9e1812d`.)
+  an exhaustiveness-asserted `default: never` arm. (Tasks 2 and 3, `2166b39`
+  and `585be7a`.)
 - **The frontend imports the same declaration.** `frontend/src/types/contracts.ts`
   and the parity test that kept it in sync with the backend's shadow copy
   (`frontend/test/contracts-parity.spec.ts`) are deleted; 14 importers
   repointed at `@ge/wire`; `specs/003-ship-commands/contracts/shared-types.ts`
   kept with a SUPERSEDED note rather than deleted, per the keep-the-reasoning
-  rule in `docs/CLAUDE.md`. (Task 4, `f6121d0`.)
+  rule in `docs/CLAUDE.md`. (Task 4, `246ed5e`.)
 
 **Five real defects the typing surfaced** — this phase's actual justification,
 not a side effect of it. Full detail and the reasoning behind each fix in
@@ -5594,11 +5594,11 @@ must be resolved.
 **Completed:** Broke `game.gateway.ts` into per-concern collaborators
 (transport-focused) and split `scan.handler.ts` by rendering concern. Eight
 tasks total, on branch `restructure`, verified against baseline commit
-`fadb7a2`.
+`5510faf`.
 
 Before/after (measured directly, not copied from an intermediate claim):
 
-| | baseline (`fadb7a2`) | now |
+| | baseline (`5510faf`) | now |
 |---|---|---|
 | `backend/src/gateway/game.gateway.ts` | 2,743 | 1,482 |
 | `backend/src/game/commands/handlers/scan.handler.ts` | 1,258 | 488 |
@@ -5691,8 +5691,8 @@ split.
 - **I-1.** Restored two canon citations (`GECMDS.C:2529` scan_ra,
   `GECMDS.C:2598` scan_se) deleted from the no-mine-loop comment when the scan
   handler was split into `scan/scan-render.ts`. Restored verbatim from
-  `fadb7a2`, not re-derived.
-- **M-2 (operational).** Commit `b22b935` moved the ship-loss forensics
+  `5510faf`, not re-derived.
+- **M-2 (operational).** Commit `658be67` moved the ship-loss forensics
   warnings out of the `[GameGateway]` logging context and into
   `[ShipDestroyedService]` — a production-log grep for gateway warnings on a
   ship loss now finds nothing, and must search the new context instead.
@@ -5723,7 +5723,7 @@ untouched by this session.
 per-feature repositories, `forwardRef` retirement, ship-class boot cache,
 and the shared `ShipState` test factory. Task 7 only; no new feature code.
 
-Measured directly against `8af4ed2` (phase start) and `1ff4bea` (phase end):
+Measured directly against `569d793` (phase start) and `5ae6e80` (phase end):
 
 | Metric | Phase start | Now |
 |---|---|---|
@@ -5747,7 +5747,7 @@ once. Result: 623 suites / 6,356 tests, all passing, 9 snapshots passing,
 122.67s. Both `backend/Dockerfile` and `frontend/Dockerfile` build clean from
 the repo root; `require.resolve('@ge/wire')` resolves inside the running
 backend image. Deploy gate unchanged in this phase's own range
-(`8af4ed2..HEAD`): `.github/` untouched, `branches: [master]` and
+(`569d793..HEAD`): `.github/` untouched, `branches: [master]` and
 `if: github.event_name == 'push'` intact. `VERSION` unchanged from master, as
 expected — restructure phases bump once, at merge.
 
@@ -5791,7 +5791,7 @@ observation — "3,521 lines across 43 files. `App.tsx` at 388 is the largest."
 The 12 `socket.on` subscriptions and 15 hook calls found by reading the file
 are what Tasks 1-3 actually addressed.
 
-Measured directly against `1d76d70` (phase start, the plan commit) and `HEAD`
+Measured directly against `37a9914` (phase start, the plan commit) and `HEAD`
 (phase end):
 
 | Metric | Phase start | Now |
@@ -5817,8 +5817,8 @@ as a regression check (this phase touched no backend code) in one tracked
 exactly once, 623 suites / 6,356 tests, all passing — unchanged from Phase
 3's close-out numbers, as expected. Both `backend/Dockerfile` and
 `frontend/Dockerfile` build clean from the repo root. Deploy gate unchanged
-in this phase's own range (`1d76d70..HEAD`): `git diff --name-only
-1d76d70..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
+in this phase's own range (`37a9914..HEAD`): `git diff --name-only
+37a9914..HEAD -- .github/` is empty; `.github/workflows/ci.yml` still gates
 on `branches: [master]` and `if: github.event_name == 'push'`; `git diff
 master -- VERSION` is empty.
 
@@ -5830,7 +5830,7 @@ whole repo and would fail on a dropped frontend citation. It does not;
 `SOURCE_FILES` walks only `backend/src` and `backend/test`. The 45 canon
 citations in `frontend/` are checked by nothing, and every one moved in this
 phase was verified by hand rather than by a guard. Corrected in the plan at
-commit `dcdb521`. Filed as issue #22.
+commit `8a16f23`. Filed as issue #22.
 
 **Next:** Phase 5 — ESM, Prisma 7, NestJS 12 (behaviour-risky). Can start any
 time.
@@ -5874,7 +5874,7 @@ in place (it is not append-only).
 **Correction two — the hook-count metric.** That entry's table reported
 "hook calls (`useState`/`useEffect`/`useCallback`/`useMemo`/`useRef`) in
 `App.tsx`: 15 → 3." No definition of "hook calls in `App.tsx`" reproduces a
-3. Measured directly against `1d76d70` (phase start) and `HEAD` (phase end)
+3. Measured directly against `37a9914` (phase start) and `HEAD` (phase end)
 with `grep -noE '\b(use[A-Z][A-Za-z]*)(<[^>]*>)?\('`, filtered by hand to the
 relevant set:
 
@@ -5999,15 +5999,15 @@ a position to answer once the runners converge.
 
 ## 2026-09-11 — Phase 5 closed: Vitest and Prisma 7 landed, Nest 12 and TypeScript 7 are waiting on upstream
 
-Seven commits on `restructure`, `6a066a8..d5b1754`. Master untouched.
+Seven commits on `restructure`, `c5429a1..79e909e`. Master untouched.
 
 | item | state |
 |---|---|
-| `moduleResolution` node10 → bundler | done, `39e9c74` |
-| oxlint `--type-aware` on the backend | done, `e0b3f41` |
-| boot-order oracle | done, `d589804` |
-| Jest → Vitest | done, `a048856` |
-| Prisma 5 → 7 | done, `d5b1754` |
+| `moduleResolution` node10 → bundler | done, `89836c8` |
+| oxlint `--type-aware` on the backend | done, `c667575` |
+| boot-order oracle | done, `6ef4a78` |
+| Jest → Vitest | done, `137533a` |
+| Prisma 5 → 7 | done, `79e909e` |
 | NestJS 10 → 12 | **blocked**, issue #34 |
 | TypeScript 6 → 7 | **deferred to 7.1**, issue #35 |
 | CommonJS → ESM | **struck** — the premise was false |
@@ -6023,7 +6023,7 @@ Seven commits on `restructure`, `6a066a8..d5b1754`. Master untouched.
 | both Docker images | build |
 | backend image | loads the Prisma client and the whole app module |
 | `prisma migrate deploy` in the image | reaches the schema, fails only on the connection |
-| deploy gate, `6a066a8..HEAD` | unchanged |
+| deploy gate, `c5429a1..HEAD` | unchanged |
 | `VERSION` | unchanged |
 
 Backend suite was 626 / 6,385 at the start of the phase. The 23 extra tests are
@@ -6146,7 +6146,7 @@ only `.env.example`. No API tokens, no keys, no player data, no database dumps.
 
 **That produced one correction.** `docs/audits/2026-09-09-security-review.md`
 claimed the rotated database password had been "committed to this repo at
-`522774f`, permanent in history." It had not. `522774f` is an unrelated commit
+`5575f77`, permanent in history." It had not. `5575f77` is an unrelated commit
 and the password is in no commit at all — the exposure was a session transcript
 only. The audit has been annotated in place. The rotation was still correct; the
 claim about where the secret had been was not, and left in place it would have
@@ -6184,3 +6184,53 @@ commands uncopyable in exchange for nothing.
 - **The loopback bind** (item 2 above). Still not done. The audit sentence that
   made it urgent has been softened by the redaction, which makes the finding
   less legible to a stranger but no less true.
+
+## 2026-09-13 — History rewrite: author email and the last identifiers
+
+Items 4 and 5 of the publication list, closed, and the "one repository or two"
+sub-choice settled: **one.** The repository is kept and its history rewritten,
+rather than starting a clean one.
+
+**What forced it.** The redaction pass earlier today cleaned the working tree
+but audited file *contents* only. The Actions run logs turned out to be the
+louder leak — 68 of 72 runs, 1,490 occurrences of the author email, and the
+deploy hostname echoed out of commit messages by the checkout step. Chasing
+that back found the actual source: git metadata and five commit messages, which
+no amount of editing the tree can reach.
+
+**The Actions logs carried no secrets.** 119MB across every run, checked for
+tokens, keys and credentials: none. The workflows never had SSH, a hostname or a
+custom secret, because the deploy is pull-based — watchtower on the host follows
+a tag, so no host credential has ever existed in CI to leak. That design is why
+this was a redaction problem and not an incident.
+
+**What was rewritten**, with `git filter-repo`, validated by a dry run before it
+touched anything:
+
+- the author and committer email on all 746 commits, to the GitHub noreply
+  address; the name is unchanged
+- five commit messages naming the deploy host, an unrelated application on it,
+  the public game domain and the database role — the same placeholders the docs
+  now use
+
+**The SHA citations were repaired from the commit map**, not by hand: 177 short
+SHAs across 22 files, every one of the 77 distinct new values verified to
+resolve to a real commit. Two of those rewrites were wrong and were reverted —
+`version.spec.ts` (both copies) pins a *fixture* SHA and asserts its truncation,
+so the mechanical pass rewrote the expected output while leaving the input
+alone. That is the failure mode to remember if this is ever done again: a
+7-character hex string is not always a citation. The full suites were run
+afterwards for exactly this reason, and are green — 6,504 backend, 326 frontend.
+
+**Costs accepted.** Every SHA in the repository changed. Pull request #45 is
+orphaned from the commits it merged. GitHub keeps unreachable objects
+addressable by SHA for a period, so the old history is not instantly gone —
+which is why this was done well before the repository is made public rather
+than after. The four merged feature branches still on the remote were deleted
+rather than rewritten; they held nothing master does not.
+
+**A backup bundle of the pre-rewrite history was taken first** and is outside
+the repository. It contains every identifier this pass removed, so it does not
+belong anywhere near a public tree, and it should be deleted once the rewrite is
+confirmed good.
+

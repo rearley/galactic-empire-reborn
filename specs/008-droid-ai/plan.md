@@ -26,7 +26,7 @@ math. All decision randomness flows through the existing `Random` port from
 `droid.annoy` event and bridged to the player's socket by `GameGateway`.
 
 The Cybertron spawn-visibility fix (FR-032 / US4) was landed pre-merge in
-`CybertronRepository.createSpawn` (commit e2c8c9a). This plan inherits that
+`CybertronRepository.createSpawn` (commit b01c009). This plan inherits that
 fix and adds a regression test under `test/game/cybertron/` to pin the
 behavior so future refactors cannot reintroduce the defect.
 
@@ -141,7 +141,7 @@ backend/
                                                        # spawn → in-memory map populated this tick
 ```
 
-**Structure Decision**: Backend-only feature in the existing single NestJS project. New `game/droid/` module adjacent to `game/cybertron/`. The only modifications outside the new module are: (a) one early-`continue` in `ShipStateService.flush()` for ephemeral states, (b) one optional field on the `ShipState` interface, (c) one event subscription in `GameGateway` for `droid.annoy`, and (d) three rows added to the ship-class seed. No frontend changes; no Prisma schema change; no new third-party dependency. The Cybertron spawn-visibility fix (FR-032) is already in code (commit e2c8c9a) — this plan adds only its regression test.
+**Structure Decision**: Backend-only feature in the existing single NestJS project. New `game/droid/` module adjacent to `game/cybertron/`. The only modifications outside the new module are: (a) one early-`continue` in `ShipStateService.flush()` for ephemeral states, (b) one optional field on the `ShipState` interface, (c) one event subscription in `GameGateway` for `droid.annoy`, and (d) three rows added to the ship-class seed. No frontend changes; no Prisma schema change; no new third-party dependency. The Cybertron spawn-visibility fix (FR-032) is already in code (commit b01c009) — this plan adds only its regression test.
 
 ## Phase 0: Research
 
@@ -170,7 +170,7 @@ See [research.md](./research.md). All Technical Context unknowns resolved (no
 - **Fight-back trigger**: Both classes 11 and 12 require `cantexit > 0` (set by 006b when a hostile attack lands). Class 11 requires `lastfired >= 0`; class 12 requires `lastfired > 0`. The C source distinction is preserved verbatim — exposed by separate constants in `droid.config.ts` so the difference is auditable.
 - **Hyperspace fight-back distance**: `ddist < 30000` for phaser fire when both attacker and Droid are in hyperspace (`where == 1`). For normal-space fight-back (`where == 0`) the only gates are `phasr >= PMINFIRE` (existing constant) and `wptr->cloak != 10`.
 - **`droid_won` and `droid_died`**: `droid_won` (post-victory speed change) is wired into the existing `combat.ship-destroyed` listener — when a Droid's victim dies, the Droid sets `speed2b = rndm(5000.0)`. `droid_died` removes the Droid from the in-memory map (`ShipStateService.removeFromGame`) and frees its slot in the in-memory population accounting; no DB delete.
-- **Cybertron spawn-visibility (US4 / FR-032)**: The fix already exists at `cybertron.repository.ts:141-151` (commit e2c8c9a) — after `prisma.ship.create`, the row is re-fetched and `ShipStateService.loadShip(state)` is called. This plan adds a regression test under `test/game/cybertron/createSpawn-visibility.spec.ts` that drives `createSpawn` against a real test DB and asserts `shipState.get(userid, shipno)` returns the new ship in the same operation. No production code change is required for US4.
+- **Cybertron spawn-visibility (US4 / FR-032)**: The fix already exists at `cybertron.repository.ts:141-151` (commit b01c009) — after `prisma.ship.create`, the row is re-fetched and `ShipStateService.loadShip(state)` is called. This plan adds a regression test under `test/game/cybertron/createSpawn-visibility.spec.ts` that drives `createSpawn` against a real test DB and asserts `shipState.get(userid, shipno)` returns the new ship in the same operation. No production code change is required for US4.
 - **Fault isolation**: Each Droid's per-tick action is wrapped in `try/catch`; a thrown handler logs and continues. Mirrors the 006a/006b/007 per-ship isolation pattern.
 
 ## Phase 1: Design & Contracts

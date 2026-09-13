@@ -124,7 +124,7 @@
 
 ## Phase 6: User Story 4 — Cybertron spawn-visibility patch (Priority: P3)
 
-**Goal**: The pre-existing Cybertron spawn-visibility defect (newly created Cybertrons not loaded into in-memory state until restart) is already fixed in code (commit `e2c8c9a`). This phase adds the regression test that pins the fix so future refactors cannot reintroduce the defect.
+**Goal**: The pre-existing Cybertron spawn-visibility defect (newly created Cybertrons not loaded into in-memory state until restart) is already fixed in code (commit `b01c009`). This phase adds the regression test that pins the fix so future refactors cannot reintroduce the defect.
 
 **Independent Test**: Drive `CybertronRepository.createSpawn` against a real test DB and assert `ShipStateService.get(userid, shipno)` returns the new ship in the same operation, before any restart or re-hydrate.
 

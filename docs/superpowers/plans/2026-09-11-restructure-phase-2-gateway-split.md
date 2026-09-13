@@ -39,7 +39,7 @@ Copied from the spec. Every task's requirements implicitly include these.
 
 ## Baseline — measure before you start
 
-Recorded 2026-09-11 on `restructure` at `41101ea`:
+Recorded 2026-09-11 on `restructure` at `5403b7f`:
 
 | | value |
 |---|---|

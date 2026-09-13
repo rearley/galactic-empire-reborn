@@ -225,7 +225,7 @@ git commit -m "feat(invariants): scaffold harness + runtime tick hook behind INV
 **Files:**
 - Read: `reference/ge-source/GEMAIN.H`, `GEMAIN.C`, `GEFUNCS.C` (find session save/restore + ghost-user logic)
 - Read: `backend/src/game/ship/ship-state.types.ts`, `ship-state.service.ts`, `ship-state.mappers.ts`, `ship-tick.service.ts`, `maintenance.service.ts`, `auto-shield.ts`, `ship-overspeed.ts`
-- Read: `backend/src/auth/` (JWT vs User row — recent fix `618c1dc` is the context)
+- Read: `backend/src/auth/` (JWT vs User row — recent fix `44ff93a` is the context)
 - Write: `specs/022-fidelity-audit-v2/findings.md` — append `P-001`, `P-002`, … under the **Ship state persistence** table.
 
 - [ ] **Step 2.1: C source inventory**
@@ -249,7 +249,7 @@ For each persisted field on `ShipState`, answer:
 - Is the field authoritative in memory, in DB, or both?
 - When is it flushed? On what trigger?
 - What happens on reconnect — read from DB or trust memory?
-- What happens to in-memory state when the User row is missing (the `618c1dc` scenario)?
+- What happens to in-memory state when the User row is missing (the `44ff93a` scenario)?
 - Does midnight job operate on memory, DB, or both?
 
 For each rule that has a C counterpart, record `match` / `drift` / `missing` / `extra`. File findings as `P-NNN` rows in `findings.md`.
@@ -531,7 +531,7 @@ If async snapshot prep adds nontrivial cost, gate it behind a second flag `INVAR
 
 ### 6f: `noOrphanShipState` — ship-persistence
 
-Invariant: for every entry in `world.ships`, a matching User row exists (the `618c1dc` scenario must fail the test). Fixture test for the rule itself; runtime check uses the same `dbShips` slice.
+Invariant: for every entry in `world.ships`, a matching User row exists (the `44ff93a` scenario must fail the test). Fixture test for the rule itself; runtime check uses the same `dbShips` slice.
 
 After 6f passes, commit:
 
