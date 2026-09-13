@@ -360,6 +360,16 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.sha }}
             APP_VERSION=${{ steps.version.outputs.value }}
+          # The action defaults to full provenance when it pushes, and the full
+          # predicate embeds this workflow's build context -- on a push event
+          # that is the entire payload, `pusher.email` included. That address
+          # comes from the account's email setting rather than from git, so the
+          # 2026-09-13 history rewrite did not touch it: it was still in the
+          # build log afterwards, and `exporting attestation manifest` means the
+          # same predicate rides along on the image in ghcr, which goes public
+          # with the repository. mode=min keeps what was built and from which
+          # commit, and drops the context.
+          provenance: mode=min
           # :latest is what watchtower follows; the sha tag is what makes a bad
           # deploy recoverable — pin the compose file to a sha to roll back.
           tags: |
