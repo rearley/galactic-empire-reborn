@@ -360,16 +360,24 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.sha }}
             APP_VERSION=${{ steps.version.outputs.value }}
-          # The action defaults to full provenance when it pushes, and the full
-          # predicate embeds this workflow's build context -- on a push event
-          # that is the entire payload, `pusher.email` included. That address
-          # comes from the account's email setting rather than from git, so the
-          # 2026-09-13 history rewrite did not touch it: it was still in the
-          # build log afterwards, and `exporting attestation manifest` means the
-          # same predicate rides along on the image in ghcr, which goes public
-          # with the repository. mode=min keeps what was built and from which
-          # commit, and drops the context.
-          provenance: mode=min
+          # The action defaults to provenance on when it pushes, and BuildKit's
+          # Actions integration writes the whole push payload into the predicate
+          # at invocation.environment.github_event_payload -- `pusher.email`
+          # included. That address comes from the account's email setting rather
+          # than from git, so the 2026-09-13 history rewrite did not touch it,
+          # and `exporting attestation manifest` means the predicate rides along
+          # on the image in ghcr, which goes public with the repository.
+          #
+          # mode=min was tried first and does NOT fix it: it trims the build
+          # detail and leaves invocation.environment intact. Read the provenance
+          # out of the build log of 8ac5743 -- the commit that set mode=min --
+          # and the payload is still there. Only `false` drops the attestation,
+          # and the payload with it.
+          #
+          # What that costs is the SLSA attestation, which is worth little here:
+          # GIT_SHA is already a build-arg on every image, so what is running
+          # stays traceable without it.
+          provenance: false
           # :latest is what watchtower follows; the sha tag is what makes a bad
           # deploy recoverable — pin the compose file to a sha to roll back.
           tags: |
