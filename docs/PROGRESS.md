@@ -6238,7 +6238,7 @@ confirmed good.
 
 **CORRECTION to the entry above.** That entry said the history rewrite closed
 the author-email exposure. It did not close all of it. The first build after the
-rewrite still carried `1328538+rearley@users.noreply.github.com`, four times, and the chase turned
+rewrite still carried the old address, four times, and the chase turned
 up something the file and history audits both missed.
 
 **Where it comes from.** `pusher.email` in the GitHub event payload, which is
@@ -6275,4 +6275,22 @@ attached, and the action echoes that file.
 private" on the GitHub account. Until that is set, `pusher.email` is the real
 address and every run log picks it up again. `provenance: false` keeps it out of
 the images; nothing in this repository can keep it out of the logs.
+
+### Postscript, same day — the entry above leaked the address it documented
+
+Writing up the redaction reintroduced the very string it was about: the
+correction quoted the address verbatim to say where it had been found. Caught by
+re-running the repo-wide sweep against a fresh clone afterwards, which is the
+only reason it is not still there.
+
+The lesson is small and worth keeping: **a redaction pass is not finished when
+the identifiers are gone, it is finished when the sweep is clean against a fresh
+clone of what was actually published.** Prose written about a secret is prose
+that tends to contain it, and the author of the redaction is the least likely
+person to notice.
+
+The account setting was changed the same day, so `pusher.email` now resolves to
+the noreply address. That closes the last surface. It is unverified end to end,
+because the address only appears in a build job's provenance metadata and no
+build has run since — the next deploy will show it.
 
