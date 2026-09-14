@@ -253,7 +253,7 @@ had no effect.
 
 ```bash
 cd backend
-npm test               # full Jest suite (600+ suites, 6,000+ tests)
+npm test               # full Vitest suite (650+ files, 6,500+ tests)
 npm run test:manual    # manual smoke tests (requires live DB)
 ```
 

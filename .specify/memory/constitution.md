@@ -76,7 +76,7 @@ never after.
 - **Idempotency tests**: The midnight job MUST be tested for idempotency — running it twice
   MUST produce the same result as running it once.
 
-Backend tests use Jest. Frontend tests use Vitest.
+Backend, frontend and the wire contract all use Vitest.
 
 ### III. Architecture
 
@@ -140,7 +140,7 @@ documented discussion:
 | Real-time | Socket.io (`@nestjs/platform-socket.io`) |
 | Calendar scheduling | `@nestjs/schedule` (`@Cron` only — see Principle III) |
 | Game-loop ticks | Raw `setInterval` in `OnModuleInit`/`OnModuleDestroy` |
-| Backend tests | Jest |
+| Backend tests | Vitest |
 | Frontend tests | Vitest |
 | Deployment | Docker + Docker Compose (Hetzner CPX32) |
 

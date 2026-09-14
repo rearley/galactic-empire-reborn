@@ -6710,3 +6710,32 @@ account.
 checking a copy of the rule instead of the rule. It asserts both directions:
 hooks, tests, tools, docs and specs do not build; `src`, Dockerfiles, `VERSION`,
 the lockfile and `ci.yml` do.
+
+## 2026-09-14 — v0.16.2: the last Jest leaves the monorepo (#47)
+
+`packages/wire` was still on Jest, kept alive for **one spec file**. That file
+carried `jest`, `ts-jest` and `@types/jest`, and with them the `glob` and
+`picomatch` Dependabot alerts — the only place either came from.
+
+Migrated to Vitest, which the backend and frontend already used. The spec needed
+no changes: it uses `describe`/`it`/`expect` and nothing else, all provided under
+`globals: true` to match the backend. The new config is deliberately smaller than
+the backend's — no decorators here, so no SWC transform for
+`emitDecoratorMetadata`; no database, so no global setup or single-threading.
+
+**The lockfile lost 8,513 lines.** No CI change was needed: the workflow invokes
+`npm test --workspace @ge/wire`, which never named a runner, and
+`ci-runs-wire-tests.spec.ts` pins the invocation rather than the tool.
+
+Verified that the reinstall moved nothing that ships — Nest, Prisma, React,
+Express and Socket.io are all on the versions they were.
+
+Three stale references surfaced and were corrected: the README advertised a
+"full Jest suite", and the spec-kit constitution named Jest in its stack table
+and in a sentence about which runner each side uses.
+
+**Two references to Jest were deliberately left.** The constitution's rationale
+for the tick engine — that `@Interval` decorators are incompatible with Jest fake
+timers — is the recorded reason a still-current architectural decision was made.
+Rewriting it to say Vitest would falsify the history that justifies it. The rule
+in `docs/CLAUDE.md` is to keep the reasoning, not to refresh its vocabulary.
