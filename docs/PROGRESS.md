@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 94 entries.
+Append-only, **newest at the bottom**. 95 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-14 — a support link that a fork cannot inherit](#2026-09-14--a-support-link-that-a-fork-cannot-inherit)
 - [2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible](#2026-09-11--correction-to-the-phase-4-close-out-the-roster-claim-was-wrong-for-two-of-four-handlers-and-the-hook-count-metric-was-not-reproducible)
 - [2026-09-11 — Phase 4 close-out: the frontend, verified](#2026-09-11--phase-4-close-out-the-frontend-verified)
 - [2026-09-11 — Phase 3 close-out: the persistence boundary, verified](#2026-09-11--phase-3-close-out-the-persistence-boundary-verified)
@@ -6811,3 +6812,39 @@ Writing it surfaced a flaw in the rule itself: `vitest/globals` is a subpath of
 a real package, not shorthand for an `@types` package, so demanding
 `@types/vitest/globals` invents a dependency that does not exist. The mapping
 now handles bare names, scoped names and subpaths separately.
+
+## 2026-09-14 — a support link that a fork cannot inherit
+
+The landing page can now ask for help paying for the server. The interesting
+part is not the button; it is that the URL is nowhere in the source.
+
+This repo is public and AGPL, so anyone may run their own galaxy from it. A
+sponsor link written into a component would ride along into every fork, and a
+stranger's players would fund THIS server rather than the one they play on —
+silently, because the button looks identical either way. So the value arrives
+as a `DONATE_URL` build arg, exposed to the bundle as `VITE_DONATE_URL` and
+baked in at build time, exactly the way `GIT_SHA` and `APP_VERSION` already
+are. `.github/workflows/ci.yml` reads it from a repository **variable**, not
+from the workflow file, so a fork's build gets an empty value and renders no
+button at all. Unset is the default and the only default.
+
+`backend/test/unit/donate-url-build-arg.spec.ts` pins the wiring and, more
+usefully, asserts that no sponsor URL appears in the Dockerfile, the workflow,
+`Landing.tsx`, or `support.ts`. Each of those four would defeat the variable,
+and each looks perfectly reasonable in isolation — a "sensible default" in the
+Dockerfile is the likeliest way this regresses.
+
+Two deliberate constraints on the button itself:
+
+- **A plain anchor, never an embedded widget.** A payment processor's script on
+  the landing page would put a third party in front of a stranger who has not
+  agreed to anything yet, for something that is functionally a hyperlink.
+- **Money buys server time and never an advantage.** The page says so, and
+  `landing.spec.tsx` asserts the sentence is present. This is a port of Mike
+  Murdock's game; selling anything that touches gameplay would monetise his
+  work and wreck the balance at the same time. The test is there so that
+  removing the promise requires removing an assertion.
+
+Verified by building `frontend/Dockerfile` with the arg set and grepping the
+built bundle for the value — the check that `npm run build` and 6,925 passing
+tests could not make, and the lesson from v0.16.4 three days ago.

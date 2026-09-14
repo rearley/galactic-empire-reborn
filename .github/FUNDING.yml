@@ -1,0 +1,4 @@
+# Adds the Sponsor button to the repository page. The landing page's own link is
+# separate and comes from the DONATE_URL repository variable — see
+# frontend/src/support.ts for why it is not hardcoded there.
+github: [rearley]

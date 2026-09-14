@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Landing } from '../../src/routes/Landing';
 import { PORT_RELEASE, PORT_RELEASE_DATE, HOOKS, FAITHFUL, CHANGED } from '../../src/content/port-notes';
 
@@ -69,5 +69,36 @@ describe('Landing', () => {
 describe('port-notes', () => {
   it('is honest about the galaxy size, which is the deviation players feel', () => {
     expect(CHANGED.join(' ')).toMatch(/201/);
+  });
+});
+
+describe('Landing — supporting the server', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('shows nothing at all when no link is configured', () => {
+    // The default, and what every fork of this repo gets. An unconfigured
+    // build must not beg on anyone's behalf.
+    vi.stubEnv('VITE_DONATE_URL', '');
+    renderLanding();
+    expect(screen.queryByRole('link', { name: /support the server/i })).not.toBeInTheDocument();
+  });
+
+  it('links to the configured page when one is set', () => {
+    vi.stubEnv('VITE_DONATE_URL', 'https://github.com/sponsors/someone');
+    renderLanding();
+    const link = screen.getByRole('link', { name: /support the server/i });
+    expect(link).toHaveAttribute('href', 'https://github.com/sponsors/someone');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('says money buys server time and never an advantage', () => {
+    // The promise is the whole reason this is acceptable on a port of someone
+    // else's game. Selling anything that touches gameplay would monetise
+    // Murdock's work and wreck the balance; saying so out loud is what makes
+    // the claim checkable. If this assertion is ever deleted, read the commit
+    // that deleted it very carefully.
+    vi.stubEnv('VITE_DONATE_URL', 'https://github.com/sponsors/someone');
+    renderLanding();
+    expect(screen.getByText(/never an advantage/i)).toBeInTheDocument();
   });
 });

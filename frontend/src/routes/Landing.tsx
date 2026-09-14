@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { SiteHeader } from './SiteHeader';
 import { PORT_RELEASE, PORT_RELEASE_DATE, HOOKS, FAITHFUL, CHANGED } from '../content/port-notes';
+import { supportUrl } from '../support';
 
 function Rule(): React.JSX.Element {
   return <hr className="my-10 border-gray-800" />;
@@ -9,6 +10,38 @@ function Rule(): React.JSX.Element {
 
 function Cmd({ children }: { children: React.ReactNode }): React.JSX.Element {
   return <code className="text-yellow-400">{children}</code>;
+}
+
+/**
+ * The "help pay for the server" block, or nothing when no link is configured.
+ *
+ * Deliberately a plain anchor and not a payment widget: an embedded script from
+ * a processor would put a third party on the page that a stranger visits before
+ * they have agreed to anything, for something that is functionally a hyperlink.
+ */
+function Support(): React.JSX.Element | null {
+  const href = supportUrl();
+  if (href === null) return null;
+  return (
+    <>
+      <Rule />
+      <section className="text-center">
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block border border-gray-700 px-6 py-2 text-xs uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-gray-200"
+        >
+          Support the server
+        </a>
+        <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-gray-600">
+          This runs on a rented box that costs real money every month. Donations go to keeping it
+          online — never an advantage in the game. Nothing here is for sale, and nothing ever will
+          be: the game is Mike Murdock&apos;s, and it is free.
+        </p>
+      </section>
+    </>
+  );
 }
 
 export function Landing(): React.JSX.Element {
@@ -117,6 +150,8 @@ export function Landing(): React.JSX.Element {
         <p className="mt-4 text-center text-xs text-gray-600">
           Free, no client to install. Pick a commander name and you are flying.
         </p>
+        <Support />
+
         <p className="mt-8 text-center text-xs text-gray-600">
           Galactic Empire was written by Mike Murdock, who released its source publicly. This port
           is free software and says{' '}

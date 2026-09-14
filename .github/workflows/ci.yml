@@ -362,9 +362,14 @@ jobs:
           # Baked into the image so the running app can say which commit it is.
           # Same value as the :sha tag below, so a version on screen names a
           # pullable image, which is what makes it useful for rolling back.
+          #
+          # DONATE_URL comes from a repository variable rather than this file so
+          # that a fork building its own image gets an empty value, and so no
+          # button, instead of quietly shipping this repo's sponsor link.
           build-args: |
             GIT_SHA=${{ github.sha }}
             APP_VERSION=${{ steps.version.outputs.value }}
+            DONATE_URL=${{ vars.DONATE_URL }}
           # The action defaults to provenance on when it pushes, and BuildKit's
           # Actions integration writes the whole push payload into the predicate
           # at invocation.environment.github_event_payload -- `pusher.email`

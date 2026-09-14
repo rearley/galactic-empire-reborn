@@ -35,6 +35,13 @@ ARG APP_VERSION=""
 ENV VITE_GIT_SHA=$GIT_SHA
 ENV VITE_APP_VERSION=$APP_VERSION
 
+# Where the landing page's "support the server" link points. Empty means no
+# button at all, which is the correct default for a fork: this repo is public,
+# so a sponsor link baked into the source would follow every copy of it and
+# collect on the original author's behalf. @see frontend/src/support.ts
+ARG DONATE_URL=""
+ENV VITE_DONATE_URL=$DONATE_URL
+
 RUN npm run build
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
