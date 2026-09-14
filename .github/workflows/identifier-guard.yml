@@ -1,0 +1,66 @@
+name: Identifier guard
+
+# Deliberately separate from ci.yml, and deliberately unfiltered.
+#
+# ci.yml ignores `docs/**` and `**/*.md` so prose does not spend a CI run or
+# restart a live game, and that rule is correct. But three of the four
+# identifier leaks this guard exists to stop were in `docs/PROGRESS.md` — the
+# guard wired only into that workflow would not have fired on a single one of
+# them.
+#
+# This job is seconds long, builds nothing and deploys nothing, so it can afford
+# to run on absolutely everything. It is the reason ci.yml can go on ignoring
+# documentation.
+#
+# It checks two surfaces. The tree is the obvious one. The commit MESSAGE is the
+# one that got past everything else and reached the build log of a run that
+# published production images — no scan of a working tree can see it, and the
+# local hook can be skipped with --no-verify or bypassed by pushing from
+# elsewhere.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: idguard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the message check needs commits to read.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Tracked files
+        run: node tools/identifier-guard.mjs
+
+      - name: Commit messages
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # A new branch, or a force-push, gives an all-zero or unreachable
+          # `before`. Fall back to the tip alone rather than skipping the check:
+          # a check that quietly does nothing is the failure this guard is for.
+          if [ -n "${BEFORE:-}" ] && [ "${BEFORE}" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            RANGE="${BEFORE}..${SHA}"
+          else
+            RANGE="-1 ${SHA}"
+          fi
+          echo "checking messages for: ${RANGE}"
+          git log --format=%B ${RANGE} > /tmp/messages.txt
+          node tools/identifier-guard.mjs --check-message /tmp/messages.txt

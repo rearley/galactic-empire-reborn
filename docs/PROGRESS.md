@@ -6667,3 +6667,26 @@ Two rules survive this, and they are the ones worth keeping:
 - **A guard that exempts anything from itself has to justify the exemption in
   the same breath.** "It would flag itself" is not a justification; it is the
   finding.
+
+### And the guard would not have run on the pushes that leaked
+
+`ci.yml` filters out `docs/**` and `**/*.md`, deliberately, so prose does not
+spend a CI run or restart a live game. That rule is right and stays. But **three
+of the four identifier leaks were in `docs/PROGRESS.md`** — a docs-only push
+starts no workflow at all, so the guard wired only into `ci.yml` would not have
+fired on a single one of the incidents it was written for.
+
+The control was correct and unreachable, which is the same as absent.
+
+`.github/workflows/identifier-guard.yml` now runs on every push and pull request
+with no path filter. It is seconds long, builds nothing and deploys nothing, so
+it can afford to run on everything — and it is what lets `ci.yml` go on ignoring
+documentation. It checks both surfaces: the tracked tree, and the commit
+messages in the push, since the local hook can be skipped with `--no-verify` and
+a push can come from a clone that never installed it.
+
+`backend/test/unit/identifier-guard-workflow.spec.ts` pins that it has no path
+filter, runs on push and pull request, invokes the guard, checks messages, and
+is not gated behind the build-needed job. The failure mode here is silent: a
+guard that is never invoked reports nothing, and looks exactly like a guard that
+found nothing.
