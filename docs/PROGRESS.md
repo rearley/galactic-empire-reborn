@@ -6739,3 +6739,38 @@ for the tick engine — that `@Interval` decorators are incompatible with Jest f
 timers — is the recorded reason a still-current architectural decision was made.
 Rewriting it to say Vitest would falsify the history that justifies it. The rule
 in `docs/CLAUDE.md` is to keep the reasoning, not to refresh its vocabulary.
+
+## 2026-09-14 — v0.16.3: pinning the unpatched transitives (#48)
+
+`overrides` in the root `package.json` for six packages whose parents pin
+vulnerable versions and have shipped no fix:
+
+| Package | Was | Now | Reachable? |
+|---|---|---|---|
+| `qs` | 6.14.2 | 6.16.0 | **yes** — Express parses every query string with it |
+| `body-parser` | 1.20.4 | 1.20.6 | **yes** — every request body |
+| `multer` | 2.0.2 | 2.3.0 | no upload route exists |
+| `mysql2` | 3.15.3 | 3.23.1 | Postgres only; no MySQL connection is opened |
+| `file-type` | 20.4.1 | 21.3.2 | Nest file-validation pipes, unused |
+| `deepmerge-ts` | 7.1.5 | 8.0.0 | prisma config loading, on a file we own |
+
+Production `npm audit` went from six high-severity findings to none. The two
+that mattered are `qs` and `body-parser`: those are the only ones on a code path
+this app actually executes, and the full backend suite — including the
+integration tests that drive real HTTP — passes on them.
+
+**Why this took four attempts, which is the part worth recording.** npm only
+re-resolves overrides when BOTH `package-lock.json` and `node_modules` are
+removed. Deleting the lockfile alone is not enough: npm reuses the existing tree
+and applies nothing, silently, with no warning. Worse, the check used to verify
+it was wrong — npm 11 does not write an `overrides` key into the lockfile, so
+grepping for one reported failure even after the override had taken. `npm ls`
+marking a package `overridden` is the signal that actually means something.
+
+Blast radius was measured before accepting it: 240 insertions and 252 deletions
+in the lockfile, and **no dependency that ships moved** — Nest, Prisma, React,
+Express, Socket.io, bcrypt and passport are all on the versions they were.
+
+Still open, and correctly: `@nestjs/core` needs the Nest 11 upgrade (#46) since
+overriding a direct dependency to the next major IS that upgrade, and
+`react-router` needs a 6 → 7 major that fixes nothing reachable here.

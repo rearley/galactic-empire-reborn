@@ -8,5 +8,13 @@
   ],
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "body-parser": "1.20.6",
+    "multer": "2.3.0",
+    "mysql2": "3.23.1",
+    "file-type": "21.3.2",
+    "deepmerge-ts": "8.0.0"
   }
 }
