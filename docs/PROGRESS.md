@@ -6563,8 +6563,8 @@ it was sitting in `main.ts`, `http-security.ts`, `game-config.ts`, two specs,
 Two narrower misses from the same pass, both caused by matching literal strings
 rather than meaning:
 
-- `/opt/<panel-path>/` survived because the rule replaced the full compose path and left
-  the prefix — and the prefix alone names the platform.
+- The panel's config prefix survived because the rule replaced the full compose
+  path and left the prefix standing — and the prefix alone names the platform.
 - The firewall posture survived in prose. The rule matched `<host-firewall> -P INPUT
   DROP`; the documents said "the <host-firewall> default DROP policy" and "`<host-firewall> -L
   -n | grep 3100`", which it never saw.
@@ -6579,3 +6579,23 @@ sweep is only as good as the vocabulary it is given. Grepping for the things you
 already know to hide finds exactly those, and reports clean. This one was found
 only because a push was about to happen and the sweep was run again with a wider
 net.
+
+### Postscript — and then this entry leaked the prefix it was about
+
+The paragraph above originally spelled out the config prefix while explaining
+why the prefix was the problem. It was written AFTER the sweep had run clean and
+BEFORE the commit, so nothing checked it, and it reached both the committed
+document and the commit message — which GitHub Actions echoes into the build log
+of a run that publishes images.
+
+That is three times in two days that documenting a disclosure has reproduced it:
+the author's email address, a live colony's figures, and now this. The rule that
+keeps being relearned is the same one — **describe the value, never restate it**
+— and the process fix is narrower and more useful: **the identifier sweep is the
+last thing before `git add`, not the last thing before the final write.** Every
+one of these three landed in the window between the sweep and the commit.
+
+The committed prefix here is corrected. The one in commit `0e1ae1d`'s message is
+not, and cannot be without rewriting a commit that is already deployed; it is
+logged here for the history sweep that has to run before the repository is made
+public.
