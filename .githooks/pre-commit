@@ -1,0 +1,7 @@
+#!/bin/sh
+# Refuse a commit that reintroduces a redacted identifier.
+#
+# The manual sweep failed four times in two days because it ran before the last
+# write. A hook cannot: it runs after every write, immediately before the commit.
+# @see tools/identifier-guard.mjs
+node tools/identifier-guard.mjs || exit 1

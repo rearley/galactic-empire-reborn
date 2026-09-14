@@ -1,0 +1,5 @@
+#!/bin/sh
+# The tree is not the only surface. Commit 0e1ae1d carried a redacted path in
+# its MESSAGE, which GitHub Actions then echoed into the build log of the run
+# that published production images. No scan of the working tree can see that.
+node tools/identifier-guard.mjs --check-message "$1" || exit 1

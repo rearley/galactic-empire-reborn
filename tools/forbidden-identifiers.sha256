@@ -1,0 +1,32 @@
+# SHA-256 of identifiers that must never appear in this repository.
+#
+# Hashes, not terms, and deliberately so: a file listing what you are hiding is
+# itself the disclosure, and this repository is public. Nobody — including the
+# guard — can read the vocabulary back out of this file.
+#
+# Add one with:  node tools/identifier-guard.mjs --add <term>
+# That writes the digest and never the term, not even to your shell history if
+# you prefix the command with a space.
+#
+# Terms are normalised before hashing: lowercased, with commas, whitespace and
+# leading/trailing dots and slashes removed. So a path prefix is caught inside a
+# longer path, and a formatted number is caught however it is punctuated.
+074a7074c5cbf45fafc0ee0401a249552572331cf10de3c4caf44cf7e3399070
+23df0679051277409d666fb8d2e382f54561a887be02b98eb9cc9ecc9efb85a4
+aed7badfffe76e290e2850a2fb89ca4aad0eacedee9c0feb2069eaf1c2554928
+fcb383681acc8c3554cc329bc98f9d601713ddedf21164b41d03f7bfcadaf0f1
+111d8cac2a6c626b5e00d69bb4a1aab2a55e57e0a98ff2369da1a2551d75c1ac
+d0c21c4fabf2681bd90a83e278783964af21a4cb01e34f765764bf6b255ae386
+0ffcaad43cf97d6ea827980ad3c39b4fefe3c29ee7805aa21b5d99359b66d65d
+1256a556f6dc493db56abd93f07244c6be01abda21bd34d933bd4165bbc74392
+0f75ba9658721aa3a185e6ac18b63b7fa3b709a5ec264be07d1f35408e003a8a
+7b50bdd407a8c815d221c01203fc9a241648c79805faa36a0dc70e9d3a46c7e5
+47d5e1b90e2847dee30feb8cbd498a57dca47eb9990992a92aae752af1e66ec1
+94cfc0c09b6f2a280711b0a2c0c369d072808c4077294da2f75e17597adbe7c0
+cc5c118d8474702b0c435aec29c9abf11b9b4d189f8f146d038bc99fa4ac0b5d
+64ef6fb216afd3580a55c744635fbd62a8810a5744076180f8d84e5338bb2ec6
+2f66eaf8aab40d72e663aa5da854e8c91391effddc248f0b8f54d49b90827a0e
+838339210f851d66cf288f3538b23fb3ab03f45856c2a6b77d63549edf2b0cc5
+3537b1512eb457447e591d9cce9e55b9ef054f2b5bf42d363962c380679b67cc
+a465b6f35e88f8a2a3f0e2536dcba591d9c6bda498171d80764e54e6b18fd197
+194e4c160d6af404c33cd581a34e6b6710d62173aa0dc00eaafb27f1493c7064

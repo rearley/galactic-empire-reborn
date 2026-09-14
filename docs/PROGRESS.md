@@ -6599,3 +6599,47 @@ The committed prefix here is corrected. The one in commit `0e1ae1d`'s message is
 not, and cannot be without rewriting a commit that is already deployed; it is
 logged here for the history sweep that has to run before the repository is made
 public.
+
+## 2026-09-14 — A test for redacted identifiers, because four apologies is not a control
+
+Four times in two days a redaction was undone by the writing that recorded it:
+an author's email address, a live colony's figures, a config path prefix, and a
+firewall rule — each reintroduced in the sentence explaining its removal, and
+three of the four pushed. One reached the build log of a run that published
+production images, because a commit **message** is a surface no tree scan sees.
+
+The pattern was always dressed differently and was always the same: the manual
+sweep ran, reported clean, and then the last write happened. Every leak landed
+in the window between the sweep and `git add`.
+
+**The session contains its own controlled experiment.** In the same two days the
+citation ratchet caught the same author twice, automatically, before anything
+shipped. Two problems, comparable care, opposite outcomes — and the only
+difference is that one had a test.
+
+So this now has one.
+
+- `tools/identifier-guard.mjs` tokenises every tracked file, hashes the
+  candidates, and fails on a match. Tokens are normalised, so a path prefix is
+  caught inside a longer path and a number is caught however it is punctuated —
+  all three of the real leaks were verified against a planted canary before this
+  was committed, not assumed.
+- **The vocabulary is stored as SHA-256 digests, never plaintext.** A file
+  listing what you are hiding is itself the disclosure, doubly so in a repository
+  about to go public. Add a term with `--add`, which writes the digest and never
+  the term. Nothing, including the guard, can read the list back.
+- A hit reports `file:line` and a hash prefix, **never the matched text**.
+  Printing it into a CI log would be the leak the guard exists to prevent.
+- `.githooks/pre-commit` runs it over the tree, and `.githooks/commit-msg` runs
+  it over the message — the surface that got past everything else. Enable with
+  `git config core.hooksPath .githooks`.
+- `backend/test/balance/no-forbidden-identifiers.balance.spec.ts` is the
+  authority, because a hook is per-clone and can be skipped, and CI cannot be.
+  It includes a test that the guard catches a planted identifier: a scanner that
+  silently matches nothing is worse than no scanner, since it manufactures
+  confidence.
+
+The honest limit: this matches whole tokens, not phrases or arbitrary substrings.
+It suits hostnames, domains, paths, product names and distinctive numbers, and
+does not suit prose. It would not have caught a leak written as an unhyphenated
+description. It catches all four of the ones that actually happened.
