@@ -3885,7 +3885,7 @@ other form. Task 3 carries the same fix for `USERNAME_INDEX_MARKERS`.
   already used and one who picked a taken display name need different next
   steps.
 - *Backfilling email onto existing rows.* Not built. The database is wiped
-  when the game moves to <panel>, and the nine existing human rows are test
+  when the game moves to the hosting panel, and the nine existing human rows are test
   accounts, so there is nothing real to migrate.
 - *Matching `meta.target` on index name only.* This was the plan's original
   design and is the bug the markers-array fix corrects — see Reason above.

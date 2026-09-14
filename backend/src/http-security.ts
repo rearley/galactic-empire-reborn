@@ -3,7 +3,7 @@
  *
  * `loopback`, not `true`. `@nestjs/throttler` keys its buckets on `req.ip`, and
  * with `trust proxy` off — Express's default, and what this app shipped with —
- * `req.ip` behind <panel>'s nginx is 127.0.0.1 for every visitor on earth: one
+ * `req.ip` behind the panel's nginx is 127.0.0.1 for every visitor on earth: one
  * shared bucket of AUTH_THROTTLE_LIMIT requests a minute, so any single host
  * could keep it saturated and lock everyone out of login and registration.
  *

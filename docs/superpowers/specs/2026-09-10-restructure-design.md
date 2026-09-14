@@ -36,7 +36,7 @@ Second goal, stated 2026-09-10: the repository goes public. It must not read as
   merge. The root `CLAUDE.md` rule is "bump `VERSION` in the same commit as any
   change that will be deployed" — and it still holds, because **nothing on this
   branch deploys**. The push trigger is master-only, so no phase-0..5 commit can
-  reach ghcr or the watchtower on the <panel> host. The bump belongs in the merge
+  reach ghcr or the watchtower on the deploy host. The bump belongs in the merge
   commit, once, and it must actually land there: that merge is a real production
   deploy carrying a runtime major and a CSS-engine major together. Do not
   "correct" this against the root rule — the two agree.
@@ -49,7 +49,7 @@ Verified 2026-09-10 by reading `.github/workflows/ci.yml`:
 - The `pull_request` trigger has no branch filter, but the `build` job requires
   `github.event_name == 'push'`. So a PR runs **both test suites and no image build**.
 - Working pattern: commit here freely, open a **draft PR** for free CI on every
-  push, with no path to ghcr and no path to the watchtower on the <panel> host.
+  push, with no path to ghcr and no path to the watchtower on the deploy host.
 
 **TRAP.** If this branch is ever added to the push trigger to get CI without a
 PR, the `build` job's condition becomes true and it will ship `:latest` straight

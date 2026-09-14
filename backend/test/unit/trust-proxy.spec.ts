@@ -4,7 +4,7 @@ import { configureHttpSecurity, TRUST_PROXY } from '../../src/http-security';
  * The auth rate limiter must see the CALLER's address, not nginx's.
  *
  * `@nestjs/throttler`'s default tracker is `req.ip`. Express's `trust proxy`
- * defaults to false, and production runs behind <panel>'s nginx proxying to
+ * defaults to false, and production runs behind the panel's nginx proxying to
  * 127.0.0.1:3000 (docs/DEPLOYMENT.md), so `req.ip` was the loopback address for
  * every visitor on earth — one shared bucket of 10 requests a minute.
  *

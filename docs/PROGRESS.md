@@ -3532,7 +3532,7 @@ written into DECISIONS.md.
 ## 2026-09-07 — public web presence: landing, email auth, stats, logout
 **Completed:** the full public-web-presence plan (13 tasks, SDD ledger at
 `.superpowers/sdd/2026-09-07-public-web-presence/progress.md`), ahead of the
-game's first deploy to a public <panel> subdomain:
+game's first deploy to a public the hosting panel subdomain:
 
 - Email became the login credential alongside the existing display handle.
   `User.email`/`emailVerifiedAt` added; `username` made nullable; a raw
@@ -3603,7 +3603,7 @@ treated as a defect: `ChooseUsername`'s field label reads "Username" rather
 than the design's in-world "Commander name," because the test asserted
 `getByLabelText(/username/i)` — parked as the author's call, not reverted.
 
-**Next:** the actual <panel> deploy. `docs/DEPLOYMENT.md` (new, this task) is a
+**Next:** the actual the hosting panel deploy. `docs/DEPLOYMENT.md` (new, this task) is a
 first draft written from the codebase and needs correcting against the real
 server on first deploy — nginx `try_files`, the Socket.io `Upgrade` headers,
 required env vars, and confirming `GE_DEBUG_ENDPOINTS` is unset are the
@@ -3887,7 +3887,7 @@ client and joined that room, gated only on "are you a bound player", so any
 player could subscribe to all 201x201 rooms and read every `player.sector`
 update. Nothing called them — the frontend never emitted either — so both
 handlers are deleted, with `validateCoord` and `SectorPayload`. (3) `trust proxy`
-was unset behind <panel>'s nginx, so the auth throttler saw 127.0.0.1 for every
+was unset behind the panel's nginx, so the auth throttler saw 127.0.0.1 for every
 caller and the whole internet shared one 10-per-minute bucket; a single host
 could hold it saturated and block all logins and registrations.
 **Tests:** `snapshot-broadcast-scoping.spec.ts` (5), `trust-proxy.spec.ts` (2),
@@ -3981,8 +3981,8 @@ never reconnected reports healthy too.
 beta**, but the reasoning was re-derived properly and now has a condition
 attached — see the backlog item below.
 **Next:** the pre-public account hardening below.
-**Known issues:** `:3100` is safe by ONE mechanism (the <host-firewall> default DROP
-policy); the loopback bind is offered and not done.
+**Known issues:** `:3100` is safe by ONE mechanism (the host's default-deny
+input policy); the loopback bind is offered and not done.
 
 ## Backlog — before going public: account-enumeration hardening
 
@@ -6335,3 +6335,247 @@ and `git grep` sees none of them. Only `git log --all -p` sees all three. Every
 clean verdict in the entries above was produced by a command that could not have
 found what was there.
 
+
+## 2026-09-13 — A public colony calculator, which runs the game rather than modelling it
+
+`/calculators` joins the guide, stats and credits pages on the public site. Four
+tabs — Production, Survival, Tax, Growth — over a shared colony form: population,
+food, troops, environment, resource, tax rate, planet cash, and a rate per item.
+
+**The design decision worth recording is that the page computes nothing.** The
+obvious build is to port `GEPLANET.C:multiply()` into TypeScript and run it in
+the browser. That produces a second source of truth, and the first time it drifts
+the site teaches players something false about a game whose entire pitch is
+fidelity. Instead `POST /public/calculator` builds a throwaway `PlanetState` from
+the request and hands it to `applyEconomyTickWithLosses` — the same pure function
+`PlanetTickService` calls every PLANTOCK. Per-item production is recovered by
+diffing that function's own output, not by re-deriving the formula. A test asserts
+the endpoint's figures equal the tick's, slot for slot, so the two cannot separate.
+
+`GET /public/planet-model` serves `MANHOURS`, `MAXPL`, `BASEPRICE` and `ITEM_TONS`
+straight from the generated `constants/items.ts`, so the frontend renders reference
+columns without transcribing canon into a second table.
+
+Only the advice is the calculator's own, because canon computes no such thing:
+minimum food rate, doubling time, whether a tax rate collects more than the
+production it costs. Each has its own test.
+
+**Extracted `revoltPressure(taxrate, men)`** into `planet-economy.ts` and pointed
+`PlanetEconomyService` at it. It was an inline expression in the service; the
+calculator needed the same number, and the one figure a player plans a tax rate
+around is the worst possible place for two copies to disagree.
+
+**Two bugs the tests caught rather than the author:**
+
+- The tax verdict rendered from React state, not from the response. Those
+  disagree for as long as a request is in flight, so the page could caption
+  "untaxed" beside a garrison requirement in the tens of thousands. It now echoes the
+  clamped `taxrate` it actually ran at, and the page renders from that.
+- Two expectations in the first draft of the spec were simply wrong, and the
+  implementation was right: `food.safe` is correctly `false` at planet cash 0
+  (rate 21 clears the bill at fact 2.625 but not at 1.75 — the one-tick gap every
+  colony sits in before its first gold lands), and the minimum food rate is 20,
+  not 21. 21 was a recommended margin that had been mistaken for the break-even.
+  Both were corrected to assert what is true, and the second was tightened to pin
+  the boundary from both sides.
+
+The page says in its own copy that it is an addition the original never had, that
+it models THIS deployment's options rather than stock Galactic Empire, and that
+colonists eating food is this port's deviation rather than Murdock's rule.
+
+**Tests:** backend `test/public/calculator.spec.ts` (16) and
+`calculator.controller.spec.ts` (6, all hostile-input); frontend
+`test/routes/calculators.spec.tsx` (11). VERSION 0.15.4 → 0.16.0.
+
+### Corrections the same day, all three from playtesting the page on dev
+
+**The calculator shipped prefilled with a real colony's live figures.** The
+defaults were the owner's own population, food stock and exact production rates,
+hardcoded into a page served to anyone. (The figures themselves are deliberately
+not repeated here — see the postscript at the end of this entry.) Two problems, and
+the smaller one is the one that was noticed first: a populated form implies the
+page read your planet, which it cannot (it has no session, and a player with
+several colonies would rightly ask which one it picked). The larger one is that
+it published somebody's live game state. The page now starts at zero, shows a
+prompt instead of a table of zeroes, says in the form that it cannot see your
+account, and offers a *Load an example* button whose figures are round on
+purpose — 100,000 men, 10,000 food — so nobody mistakes them for a real holding.
+
+**The Tax tab explained that planet cash is unrecoverable but never said the tax
+pool is the opposite.** It now does, on the panel and in the tips: tax accrues
+separately from planet cash, is the one colony income that reaches your own
+credits, and comes out with `wit` while landed on a colony you own. Verified
+against `withdraw.handler.ts` and `PlanetStateService.withdrawTax` before the
+copy was written, rather than described from canon and hoped for.
+
+**Growth was re-deriving the rate formula** instead of diffing the tick, the one
+figure on the page that could still have drifted. Now `menProduced / men`.
+
+### CORRECTION — `BASEPRICE` in `constants/items.ts`
+
+The block above that array opened "NOT canon: the shipped MBMGEMSG.MSG has no
+ITMPR blocks", contradicting the same file's header, which records that this
+belief came from reading `GE/MSG/` — the pre-3.2d snapshot CLAUDE.md forbids.
+`GE/REL/` carries all 25 ITMPR blocks and `item-tables-canon.balance.spec.ts`
+already pinned the array against them. Rewritten rather than deleted, because a
+comment that invites the wrong correction should show that it was settled.
+
+Checking it turned up a real trap worth a test. **ITMPR is the one option family
+whose captions run in a different order from the item enum:** ITMPR11 reads
+"mines" and ITMPR12 "jammers", while `I_JAMMER` is 10 and `I_MINE` is 11 — the
+reverse of ITMWT11/12, which do match. Canon reads the family positionally
+(GEMAIN.C:569), so position is what the game charges: jammers 21, mines 16. The
+existing loop compares position against position and would keep passing if
+someone swapped the two while "fixing" them against the captions, so a named test
+now pins both values.
+
+### Editorial pass on the calculator, after reading it as a player rather than as its author
+
+The page was written by someone who already knew the model, and it showed. The
+column heads were shorthand for concepts the reader has no reason to hold:
+"Credits" did not say credits *for what*, and "Ticks to fill" did not say fill
+*what*. Both were obvious to the author and opaque to everyone else.
+
+- Heads rewritten: Per tick → **Made each tick**, Credits → **Worth if sold**,
+  Tons → **Cargo tons**, Cap → **Storage cap**, Ticks to fill → **Ticks until
+  full**, cr/ton → **Credits per ton**.
+- A **column key** under the table defines all seven in a sentence each, and says
+  the things the numbers imply but do not state: that "worth if sold" is gross
+  and not profit (you still have to fly it to Zygor-3, and there is a 0.1%
+  transfer fee), that production past a storage cap is discarded, and that
+  "ticks until full" is really *how long you can leave it before you start
+  wasting production*.
+- Every stat on Survival, Tax and Growth gained a one-line hint. The two that
+  most needed it: "Production lost to tax" now says it counts every item at base
+  price, and "Troops needed to stop a revolt" now says that meeting it removes
+  the roll rather than shrinking it.
+- The bare **production multiplier** figure now says what it is made of and that
+  it scales the storage caps too, which is the part players meet as a surprise.
+- **Survival explains why a small colony's food rate looks ruinous** — mouths are
+  counted in whole hundreds while production scales smoothly, so a 200-person
+  village needs rate 30 while the same planet at scale settles at `52.5 / fact`.
+  Without that line the tab reads as a punishment rather than as advice.
+
+Also: **the rate inputs existed only in the Production table**, so Survival could
+quote a minimum food rate with nothing to act on and Growth could quote a
+doubling time with its governing rate two tabs away. Both tabs now carry the one
+rate their advice is about, sharing the same state, and Survival offers a *Use N*
+button that adopts the minimum it just quoted. A test pins that the tabs
+recalculate from one shared colony, so this cannot decay into four forms.
+
+**Tests:** frontend `test/routes/calculators.spec.tsx` now 24. Suite 350.
+
+### Postscript — this entry first repeated the figures it was about
+
+Written up, the paragraph above quoted the exact population and food stock it was
+describing as a leak, and a test fixture used the same population as sample input.
+Both were caught by the pre-push identifier sweep rather than by writing them.
+This is the second time in two days that documenting a disclosure has reproduced
+it — the same shape as the PROGRESS entry that reprinted the author's old email
+address while recording its removal. The lesson is the same and evidently needs
+learning twice: when the subject of a note is a value that should not be public,
+the note describes the value and does not contain it.
+
+### The shared budget of 100 was warned about, not enforced
+
+Asked whether rates could exceed 100, the honest answer was "per field yes, in
+total no". Each input was capped at 100 and a backend test pinned it, but the
+sum was only flagged — the page said "over budget" and then computed anyway,
+quoting production for a 140-point colony that cannot exist. A wrong number
+under an authoritative-looking heading is worse than no number.
+
+Canon does not warn either. `adm rate` REFUSES: the request is cut to whatever
+is unallocated and the player is told (GEMAIN.C:3539-3560, ADMEN2FA). So
+`sanitise` now runs `clampRateToBudget` — the same function `adm rate` uses —
+across all fourteen slots in index order, and the result carries both the rates
+the tick actually ran with and a `rateClamps` list of what was reduced. The page
+names the item, what was asked for and what it got, and says `adm rate` cuts it
+the same way.
+
+That makes the old "over budget" branch unreachable, so it is gone rather than
+left as dead reassurance. This is the third rule shared with the game rather than
+copied — after `applyEconomyTickWithLosses` and `revoltPressure` — and the reason
+is the same each time: the advice a player plans against has to be the rule they
+meet.
+
+**Tests:** backend calculator spec 21, frontend 26. Suites 352 frontend.
+
+### The calculator white-screened on a response shape it did not expect
+
+Reported from dev as `Cannot read properties of undefined (reading 'length')`.
+Two faults, and the second is the one that mattered.
+
+The immediate cause was mine and dull: `dist` was rebuilt after `rateClamps` was
+added to the response but the dev process was never restarted, so the page was
+newer than the server answering it.
+
+The real defect is that this crashed the page at all. **A deploy replaces the two
+halves separately**, so for a few seconds any player can be served a page newer
+than the backend answering it — 200, valid JSON, missing whatever was added last.
+The render path trusted the shape and died on the first `.length`, giving a blank
+tab, which is the single worst failure mode available: a player can neither read
+it nor describe it, and it looks like the whole site is down.
+
+Responses are now passed through `normalise()` on arrival, which fills every
+field the render path reads. A stale server degrades to "nothing to say" — no
+clamp notice, zeroed stats — instead of a white screen.
+
+**This was a hole in the tests, not just the code.** Every existing test mocked a
+well-formed body; the network-failure path was covered but the malformed-body
+path was not, so nothing would ever have caught it. Three tests now delete fields
+from the response and assert the page still renders: newer fields missing, the
+item list missing, and the survival/tax/growth blocks missing.
+
+**Tests:** frontend `calculators.spec.tsx` 29, suite 355.
+
+### Rate table usability, from typing 20 into all fourteen slots
+
+Reported from dev: entering 20 across the board triggers the clamp notice, but by
+the time you have worked down a fourteen-row table the notice is off the top of
+the screen. Correct behaviour, useless placement — the feedback was nowhere near
+the thing being edited.
+
+- **Clear all rates** button above the table. Starting a spread over meant
+  zeroing fourteen boxes by hand.
+- **A totals row in the table footer** — `n / 100` and how much is left — so the
+  budget is legible at the bottom of the table as well as above the tabs.
+- **The clamped row marks itself.** A slot the budget squeezed now shows
+  `→ 40` beside its input, so the cut is visible on the row that took it rather
+  than only in a summary the reader has scrolled past.
+
+The notice above the tabs stays; it names every clamp at once, which the row
+markers cannot.
+
+## 2026-09-14 — Finishing the redaction: the host's platform, not just its name
+
+The September pass removed the hostname, the co-tenant databases and the secret
+path, and declared the repository clean. The pre-push sweep before shipping the
+calculator found it was not: **45 references to the hosting panel by name across
+15 files**, including six in shipped source comments and two in the CI workflow.
+
+The earlier pass had matched on identifiers — a hostname, a domain, a path — and
+those were all gone. What it never searched for was the *platform*. Naming the
+panel tells a reader what management surface exists on the host and what its
+default layout is, which is the same class of disclosure as naming the box, and
+it was sitting in `main.ts`, `http-security.ts`, `game-config.ts`, two specs,
+`nginx.conf`, `ci.yml` and eleven documents.
+
+Two narrower misses from the same pass, both caused by matching literal strings
+rather than meaning:
+
+- `/opt/<panel-path>/` survived because the rule replaced the full compose path and left
+  the prefix — and the prefix alone names the platform.
+- The firewall posture survived in prose. The rule matched `<host-firewall> -P INPUT
+  DROP`; the documents said "the <host-firewall> default DROP policy" and "`<host-firewall> -L
+  -n | grep 3100`", which it never saw.
+
+All now generic: "the hosting panel", "the panel's nginx", "the deploy host",
+`<panel-config-path>`, "the host's default-deny input policy". Nothing was
+deleted — every sentence still says what it said, minus the vendor. No test
+asserted on any of it; all 45 were prose.
+
+**The lesson, and it is the third time this session in a different costume:** a
+sweep is only as good as the vocabulary it is given. Grepping for the things you
+already know to hide finds exactly those, and reports clean. This one was found
+only because a push was about to happen and the sweep was run again with a wider
+net.

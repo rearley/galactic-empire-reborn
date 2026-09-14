@@ -544,7 +544,7 @@ gh pr create --draft --base master --head restructure \
   --body "Tracking PR for the restructure branch. Draft on purpose — this exists to run CI on every push. See docs/superpowers/specs/2026-09-10-restructure-design.md."
 ```
 
-This gives full CI on every push to the branch. The `build` job requires `github.event_name == 'push'`, so a pull request runs both suites and never builds an image. Nothing reaches ghcr and nothing reaches the watchtower on the <panel> host.
+This gives full CI on every push to the branch. The `build` job requires `github.event_name == 'push'`, so a pull request runs both suites and never builds an image. Nothing reaches ghcr and nothing reaches the watchtower on the deploy host.
 
 ---
 

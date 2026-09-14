@@ -46,9 +46,9 @@ deleted afterwards.
 
 **The rotation corrected a documentation error worth knowing about.**
 `docs/DEPLOYMENT.md` said the secret lived in `/opt/ge/.env`. That path has
-never existed. GE is managed by the <panel> Docker extension, so `DATABASE_URL`
+never existed. GE is managed by the panel's Docker extension, so `DATABASE_URL`
 and `JWT_SECRET` sit inline in the compose file that extension maintains under
-`/opt/<panel-path>/`, not in an `.env` at all. Anyone following the doc
+`<panel-config-path>/`, not in an `.env` at all. Anyone following the doc
 during an incident would have searched the wrong filesystem. The doc now says
 where the value is and, more usefully, how to ask the container instead of
 trusting a written path.
@@ -261,11 +261,11 @@ These hit the verification cap. Each is plausible and each needs its own read be
 - **Unlimited concurrent sockets per account**, each costing two Prisma queries (`game.gateway.ts:271`). Low.
 - **Backend container runs as root and shares the host network namespace in production** (`backend/Dockerfile:20`). Low, and partly a deliberate deployment choice.
 
-**One thing I could not check.** The production host's firewall. The read-only probe over the <panel> connection was blocked by the permission classifier, so I have left it out rather than speculate. Confirm manually that the host-networked backend on `:3100` is **not** reachable from the internet — if it is, it bypasses <panel>'s TLS termination *and* the nginx-level decision not to proxy `/debug/`:
+**One thing I could not check.** The production host's firewall. The read-only probe over the the hosting panel connection was blocked by the permission classifier, so I have left it out rather than speculate. Confirm manually that the host-networked backend on `:3100` is **not** reachable from the internet — if it is, it bypasses the hosting panel's TLS termination *and* the nginx-level decision not to proxy `/debug/`:
 
 ```
 ss -lnt | grep 3100
-<host-firewall> -L -n | grep 3100     # or: firewall-cmd --list-all
+<list the host firewall rules and look for 3100>
 ```
 
 ---

@@ -80,12 +80,28 @@ export function capitaliseItem(name: string): string {
 /**
  * Base price per item.
  *
- * NOT canon: the shipped MBMGEMSG.MSG has no ITMPR blocks (see file header), so
- * these come from the wiki and cannot be verified against the original. Gold is
- * the one that matters -- it is the cash-to-gold bank rate at Zygor -- and the
- * wiki disagrees with itself: sysop-options.md and colonizing-planets.md both
- * say 1000, while items.md says 100. items.md is the same summary row that gets
- * gold's WEIGHT demonstrably wrong, so the two agreeing sources win.
+ * CORRECTED 2026-09-13. This block used to open "NOT canon: the shipped
+ * MBMGEMSG.MSG has no ITMPR blocks", which contradicted this file's own header
+ * and was wrong for the reason that header gives: the belief came from reading
+ * GE/MSG/MBMGEMSG.MSG, the pre-3.2d snapshot CLAUDE.md forbids. GE/REL/ carries
+ * all 25 ITMPR blocks, and test/balance/item-tables-canon.balance.spec.ts pins
+ * this array against them item for item. The note is rewritten rather than
+ * deleted because it invited exactly the wrong correction, and the next reader
+ * should see that it was considered and settled.
+ *
+ * The wiki reasoning it recorded stands as history, and canon agrees with it:
+ * gold is the cash-to-gold bank rate at Zygor, the wiki disagreed with itself
+ * (sysop-options.md and colonizing-planets.md said 1000, items.md said 100),
+ * the two agreeing sources won, and ITMPR13 says 1000.
+ *
+ * **Do not "fix" jammers and mines against the option captions.** ITMPR is the
+ * one family whose captions run in a different order from the item enum:
+ * ITMPR11 reads "mines" and ITMPR12 "jammers", while I_JAMMER is 10 and I_MINE
+ * is 11 — the reverse of ITMWT11/12, which do match the enum. Canon reads this
+ * family positionally, so position is what the game actually charges: jammers
+ * 21, mines 16. Trusting the captions instead silently swaps two prices.
+ *
+ * @see GEMAIN.C:569 `baseprice[i] = numopt(ITMPR01+i,0,32000);`
  * @see docs/DECISIONS.md — gold base price
  */
 export const BASEPRICE: readonly number[] = Object.freeze([

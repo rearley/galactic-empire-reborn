@@ -11,6 +11,7 @@ export function SiteHeader(): React.JSX.Element {
       <Link to="/" className="uppercase tracking-widest text-yellow-400">Galactic Empire</Link>
       <nav className="flex gap-4 text-gray-400">
         <Link to="/guide" className="hover:text-gray-200">Guide</Link>
+        <Link to="/calculators" className="hover:text-gray-200">Calculators</Link>
         <Link to="/stats" className="hover:text-gray-200">Status</Link>
         <Link to="/provenance" className="hover:text-gray-200">Credits</Link>
         {signedIn ? (

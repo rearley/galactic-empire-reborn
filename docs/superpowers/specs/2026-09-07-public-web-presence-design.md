@@ -7,7 +7,7 @@ registration, public stats page, logout.
 
 ## Why
 
-The game is about to be deployed to a public subdomain on a <panel> server. A
+The game is about to be deployed to a public subdomain on a the hosting panel server. A
 visitor arriving at the root currently gets a bare username/password box with
 no explanation of what the game is. There is also no logout, and the only
 credential is a display handle, which is unrecoverable if forgotten.
@@ -65,7 +65,7 @@ and returning later resumes rather than stranding the account.
 
 ### Deployment consequence
 
-Deep links must fall through to `index.html`. nginx on <panel> needs
+Deep links must fall through to `index.html`. nginx on the hosting panel needs
 `try_files $uri $uri/ /index.html;` with `/auth`, `/public` and `/socket.io`
 proxied to `:3000`. This implementation creates
 `docs/DEPLOYMENT.md` (it does not exist today) holding a starting block, to be
@@ -105,7 +105,7 @@ exactly, now keyed on email.
 
 ### Existing accounts
 
-The database is wiped when the game moves to <panel>, so no email backfill path
+The database is wiped when the game moves to the hosting panel, so no email backfill path
 is built. The nine existing human rows are test accounts.
 
 ## 3. Two-step registration

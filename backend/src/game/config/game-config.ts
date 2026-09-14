@@ -337,9 +337,9 @@ export function candidateConfigPaths(
   const out: string[] = [];
   const push = (p: string): void => { if (!out.includes(p)) out.push(p); };
 
-  // An explicit deployment answer, ahead of all path arithmetic. Docker and
-  // <panel> mount a volume and inject environment; they do not rebuild an image
-  // to retune a galaxy. The derived paths below stay as fallbacks so source
+  // An explicit deployment answer, ahead of all path arithmetic. Docker and a
+  // hosting panel mount a volume and inject environment; they do not rebuild an
+  // image to retune a galaxy. The derived paths below stay as fallbacks so source
   // runs, ts-jest and compiled runs all keep working with no setup.
   const explicit = env['GE_CONFIG_PATH'];
   if (explicit !== undefined && explicit !== '') push(path.resolve(explicit));

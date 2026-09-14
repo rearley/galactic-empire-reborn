@@ -80,6 +80,22 @@ export function shouldRunEconomy(state: PlanetState): boolean {
   return isOwnedOrFree(state) && Number(state.items[I_MEN].qty) > 0;
 }
 
+/**
+ * How much unrest a tax rate generates, measured in troops needed to contain it.
+ *
+ *   tfact = (taxrate / 120) * 0.35;  men *= tfact;  if (men > troops) ...revolt
+ *
+ * A colony revolts only when this exceeds the garrison, and the roll is skipped
+ * entirely when it does not — so a garrison at or above the pressure is not a
+ * reduced chance of revolt, it is none. Extracted so `PlanetEconomyService` and
+ * the public calculator cannot drift apart on the one number a player plans a
+ * tax rate around.
+ * @see GEPLANET.C:348 `tfact = ((float)plptr->taxrate/120.0)* .35;`
+ */
+export function revoltPressure(taxrate: number, men: number): number {
+  return (taxrate / 120) * 0.35 * men;
+}
+
 export function applyEconomyTick(state: PlanetState): PlanetState {
   return applyEconomyTickWithLosses(state).state;
 }

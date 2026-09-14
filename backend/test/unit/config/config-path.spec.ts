@@ -41,8 +41,9 @@ describe('candidateConfigPaths', () => {
 
 /**
  * A deployment needs ONE predictable answer to "where is the config?", and it
- * needs to be settable without rebuilding the image — <panel> and Docker mount a
- * volume and inject environment, they do not rebuild to retune a galaxy.
+ * needs to be settable without rebuilding the image — a hosting panel and
+ * Docker mount a volume and inject environment, they do not rebuild to retune
+ * a galaxy.
  *
  * The four candidate paths are correct and stay: they are what makes source
  * runs, ts-jest runs and compiled runs all work without setup. GE_CONFIG_PATH

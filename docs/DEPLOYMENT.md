@@ -6,7 +6,7 @@
 >
 > **AMENDED 2026-09-08.** The original draft was written blind, from the
 > codebase, before anyone had looked at the target server. It has now been
-> checked against the real host over the <panel> MCP connection. The
+> checked against the real host over the host management connection. The
 > **Target environment** section below is observed fact; the rest is amended
 > to match it. Nothing has been deployed yet — the steps are unrun.
 >
@@ -41,7 +41,7 @@ deliberately not recorded here — see the redaction note at the end of this fil
 
 | | |
 |---|---|
-| Host | Ubuntu LTS, <panel> |
+| Host | Ubuntu LTS, managed by a hosting panel |
 | Docker | Engine + Compose plugin, both current |
 | Node on host | **none** — everything runs in containers |
 | PostgreSQL | **16.x, native on the host**, already running |
@@ -95,16 +95,16 @@ Secrets live in `/opt/<app>/.env`, never in the compose file — for the apps
 that follow this pattern. **GE ended up not following it**; see "Where that
 value actually lives" below.
 
-**3. The frontend probably does not need a container.** <panel>'s nginx already
+**3. The frontend probably does not need a container.** the panel's nginx already
 serves `<game-domain>` from its docroot. Building `frontend/dist` and
 placing it there is simpler than running the repo's frontend container and
 proxying to it — and it is what makes the `try_files` rule below apply, since
-<panel>'s own nginx does the serving.
+the panel's own nginx does the serving.
 
 ## nginx on this host
 
-<panel> owns `nginx.conf` and regenerates it; custom rules go in
-`vhost_nginx.conf`, which <panel> includes inside the server block. The existing
+The panel owns `nginx.conf` and regenerates it; custom rules go in
+`vhost_nginx.conf`, which the panel includes inside the server block. The existing
 apps do exactly this — see
 `/var/www/vhosts/system/<other-domain>/conf/vhost_nginx.conf` for a working
 example on this server.
@@ -113,7 +113,7 @@ For `<game-domain>`, create
 `/var/www/vhosts/system/<game-domain>/conf/vhost_nginx.conf`:
 
 ```nginx
-# SPA deep links. Without this, /stats and /play 404 — <panel>'s nginx looks for
+# SPA deep links. Without this, /stats and /play 404 — the panel's nginx looks for
 # files with those names and finds none. This is the single most likely thing
 # to be wrong on a first deploy.
 location / {
@@ -154,8 +154,8 @@ location ^~ /public/ {
 }
 ```
 
-Apply with `<panel> sbin nginx_control --reconfigure-domain <game-domain>`
-(or <panel>'s "Apache & nginx Settings" panel), then `nginx -t` before reloading.
+Apply with `<panel-nginx-reconfigure> <game-domain>`
+(or the hosting panel's "Apache & nginx Settings" panel), then `nginx -t` before reloading.
 
 **Rate limiting note.** The app throttles `/auth/*` per caller. Behind a proxy
 every request appears to come from the proxy unless `X-Forwarded-For` is
@@ -181,8 +181,8 @@ DATABASE_URL=postgresql://<dbuser>:<password>@localhost:5432/<dbuser>?schema=pub
 **Where that value actually lives — read this before an incident, not during
 one.** The section above says secrets belong in `/opt/<app>/.env`, which is the
 pattern the other apps on this host follow. **GE does not follow it.** This
-stack is managed by the <panel> Docker extension, which keeps its own compose
-file under `/opt/<panel-path>/`, owned by root and mode 600; there is no `/opt/ge` and
+stack is managed by the panel's Docker extension, which keeps its own compose
+file under `<panel-config-path>/`, owned by root and mode 600; there is no `/opt/ge` and
 no `.env`, and `DATABASE_URL` and `JWT_SECRET` are written inline in that
 compose file.
 
@@ -224,7 +224,7 @@ PGPASSWORD=<old> psql -h localhost -U <dbuser> -d <dbuser> -c 'select 1'   # mus
 Then delete any backup copy of the compose file, since it holds the old secret.
 
 **A note on how this went wrong the first time.** A `<dbuser>` database already
-existed — in **MySQL**, because that is what <panel> creates by default. This
+existed — in **MySQL**, because that is what the hosting panel creates by default. This
 application cannot run on it, and not marginally: `schema.prisma` declares
 `provider = "postgresql"`, `User.options` and `User.fkeys` are native scalar
 arrays (`Int[]`, `String[]`) which MySQL has no type for, email uniqueness is a
@@ -243,7 +243,7 @@ together:
 
 1. **Backend** — the NestJS application (`backend/`), compiled to
    `backend/dist/` and run with Node directly (`node dist/src/main.js`, or
-   whatever process manager <panel> offers — pm2, systemd, or Passenger's Node
+   whatever process manager the hosting panel offers — pm2, systemd, or Passenger's Node
    support). It listens on **`:3000`** by default (`process.env.PORT ?? 3000`,
    `backend/src/main.ts:12`) and serves three things: the `/auth` REST
    endpoints, the unauthenticated `/public` REST endpoints, and the
@@ -310,9 +310,9 @@ server {
 }
 ```
 
-On <panel> specifically, this likely wants to go in the domain's "Additional
+On the hosting panel specifically, this likely wants to go in the domain's "Additional
 nginx directives" box (Websites & Domains → the domain → Apache & nginx
-Settings) rather than a hand-edited vhost file, since <panel> regenerates its
+Settings) rather than a hand-edited vhost file, since the hosting panel regenerates its
 own nginx config from its UI. Confirm the exact mechanism against the real
 panel — this is one of the things this draft cannot know in advance.
 
@@ -326,7 +326,7 @@ Set for the backend process:
 
 | Variable | Purpose | Notes |
 |---|---|---|
-| `DATABASE_URL` | Postgres connection string | Set inline in the <panel> stack's `compose.yaml`, not an `.env` — see the database section. Read by `PrismaService`; production must NOT set `TEST_DATABASE_URL`, which is a separate variable that test runs bind to instead (`backend/src/prisma/database-url.ts`). |
+| `DATABASE_URL` | Postgres connection string | Set inline in the the hosting panel stack's `compose.yaml`, not an `.env` — see the database section. Read by `PrismaService`; production must NOT set `TEST_DATABASE_URL`, which is a separate variable that test runs bind to instead (`backend/src/prisma/database-url.ts`). |
 | `JWT_SECRET` | Signs and verifies auth tokens | Required — both `auth/jwt.strategy.ts` and `auth/auth.module.ts` throw at boot if it is unset. Generate a real secret; do not reuse anything from `.env.example`. |
 | `PORT` | Backend listen port | Defaults to `3000` if unset (`backend/src/main.ts:12`). |
 | `MIDNIGHT_MAILDAYS` | Mail purge age, days | Integer 1–7, default 3 (canon `MAILDAYS`, clamp ceiling 7 per `GEMAIN.C:497`). |
@@ -368,12 +368,12 @@ are committed, versioned artifacts that are never edited after creation.
 
 ## Open questions for the first real deploy
 
-- Exact process manager and restart command <panel> expects for a Node app
-  (pm2 / systemd unit / <panel>'s Node.js extension).
-- Whether <panel>'s Node.js support proxies to the app itself, making the
+- Exact process manager and restart command the hosting panel expects for a Node app
+  (pm2 / systemd unit / the hosting panel's Node.js extension).
+- Whether the hosting panel's Node.js support proxies to the app itself, making the
   manual nginx block above partially redundant — reconcile once the panel is
   in front of us.
-- TLS termination point and certificate renewal (Let's Encrypt via <panel> is
+- TLS termination point and certificate renewal (Let's Encrypt via the hosting panel is
   the presumed default, unconfirmed).
 - Log destination and rotation for the backend process.
 
@@ -388,11 +388,11 @@ silently. GE runs on **3100** instead. Check `ss -lnt` before choosing a port on
 a shared host — host networking means every app shares one port space, and the
 default in `main.ts` is exactly the port most likely to be occupied.
 
-**2. `duplicate location "/"`.** <panel>'s generated `nginx.conf` already defines
+**2. `duplicate location "/"`.** the hosting panel's generated `nginx.conf` already defines
 `location /` (proxying to Apache on `:7081`), so a prefix `location /` in
 `vhost_nginx.conf` makes the whole config fail to build — and it fails at
 `httpdmng --reconfigure-domain`, which reports the error only in its own output,
-while `nginx -t` still passes against the last good config. <panel>'s own Docker
+while `nginx -t` still passes against the last good config. the hosting panel's own Docker
 extension solves this with **regex** locations (`location ~ ^/.*`), which are
 evaluated before prefix matches and do not collide. Do the same.
 

@@ -7,7 +7,7 @@ import { configureHttpSecurity } from './http-security';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  // Behind <panel>'s nginx the auth throttler saw the proxy's address for every
+  // Behind the panel's nginx the auth throttler saw the proxy's address for every
   // caller, so the whole internet shared one 10-per-minute bucket.
   // @see src/http-security.ts
   configureHttpSecurity(app.getHttpAdapter().getInstance() as { set(k: string, v: unknown): void });

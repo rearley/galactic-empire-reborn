@@ -3,14 +3,14 @@ name: CI and deploy
 # Tests, then images. One workflow, because the gate has to be real: the build
 # job declares `needs` on both suites, so GitHub itself refuses to start it when
 # a test fails. Nothing unproven can reach ghcr, and nothing unproven can reach
-# the <panel> host that pulls from it.
+# the deploy host that pulls from it.
 #
 # This used to be two workflows and the split was the problem. deploy.yml
 # triggered on its own `push`, so a red test run did not stop an image shipping.
 # A `workflow_run` trigger would have gated it while losing the path rules
 # below, because workflow_run cannot filter on paths.
 #
-# Images go to ghcr, where a watchtower container on the <panel> host follows
+# Images go to ghcr, where a watchtower container on the deploy host follows
 # :latest — so a merge to master redeploys without anyone touching the server,
 # usually within five minutes.
 #

@@ -2939,7 +2939,7 @@ git add docs
 git commit -m "$(cat <<'EOF'
 docs: deployment notes and living docs for the public web presence
 
-DEPLOYMENT.md is a first draft to be corrected against the real <panel>
+DEPLOYMENT.md is a first draft to be corrected against the real the hosting panel
 server. It records the two things easiest to get wrong: try_files, without
 which every deep link 404s, and the Upgrade headers, without which the
 socket silently falls back to polling.

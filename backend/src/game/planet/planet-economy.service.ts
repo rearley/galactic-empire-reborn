@@ -24,7 +24,7 @@ const MESG_SPYC2 = 32 as const;
  * this path, so the numbering is this port's and must stay stable.
  */
 const MESG_SPYM2 = 35 as const;
-import { applyEconomyTickWithLosses, hasRealOwner, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
+import { applyEconomyTickWithLosses, hasRealOwner, revoltPressure, FREE_PLANET_OWNER, ProductionCapHit } from './planet-economy';
 import { PlanetState } from './planet-state.types';
 
 /**
@@ -138,9 +138,9 @@ export class PlanetEconomyService {
     const men = Number(next.items[I_MEN].qty);
     const troops = Number(next.items[I_TROOPS].qty);
 
-    // GEPLANET.C:348-353 — taxrate/120 * 0.35 * men
-    const revoltPressure = (next.taxrate / 120) * 0.35 * men;
-    if (revoltPressure <= troops) return { state: next, revolted: false };
+    // GEPLANET.C:348-353 — taxrate/120 * 0.35 * men. Shared with the public
+    // calculator so the advice a player plans against is the rule they meet.
+    if (revoltPressure(next.taxrate, men) <= troops) return { state: next, revolted: false };
 
     // GEPLANET.C:359 — gernd() % 10 == 0
     if (Math.floor(this.random.next() * 10) !== 0) return { state: next, revolted: false };

@@ -28,6 +28,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   MAXPL, ITEM_TONS, ITEM_VALUE, MANHOURS, BASEPRICE, NUMITEMS, ITEM_NAMES, I_ION, I_GOLD, I_SPY,
+  I_JAMMER, I_MINE,
 } from '../../src/game/constants/items';
 
 const MSG = resolve(
@@ -95,5 +96,28 @@ describe('base prices come from ITMPR01-14', () => {
     for (let i = 0; i < NUMITEMS; i++) {
       expect([ITEM_NAMES[i], BASEPRICE[i]]).toEqual([ITEM_NAMES[i], canon![i]]);
     }
+  });
+
+  /**
+   * The trap in that loop, made explicit.
+   *
+   * ITMPR is the one option family whose CAPTIONS run in a different order from
+   * the item enum: ITMPR11 reads "mines" and ITMPR12 "jammers", while I_JAMMER
+   * is 10 and I_MINE is 11 — the reverse of ITMWT11/12, which do match. Canon
+   * reads the family positionally — GEMAIN.C:569 `baseprice[i] = numopt(ITMPR01+i,0,32000);`
+   * — so position is what the game charges and the captions are stale display
+   * text.
+   *
+   * The loop above would keep passing if someone swapped these two, because it
+   * compares position against position. This pins the values a player actually
+   * pays, so a "fix" made by reading the captions fails here instead.
+   */
+  it('prices jammers and mines by position, not by the swapped ITMPR captions', () => {
+    expect(BASEPRICE[I_JAMMER]).toBe(21);
+    expect(BASEPRICE[I_MINE]).toBe(16);
+
+    const canon = family('ITMPR');
+    expect(canon![I_JAMMER]).toBe(21);
+    expect(canon![I_MINE]).toBe(16);
   });
 });
