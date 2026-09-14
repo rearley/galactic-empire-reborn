@@ -6565,9 +6565,9 @@ rather than meaning:
 
 - The panel's config prefix survived because the rule replaced the full compose
   path and left the prefix standing — and the prefix alone names the platform.
-- The firewall posture survived in prose. The rule matched `<host-firewall> -P INPUT
-  DROP`; the documents said "the <host-firewall> default DROP policy" and "`<host-firewall> -L
-  -n | grep 3100`", which it never saw.
+- The firewall posture survived in prose. The replacement rule was written
+  against the exact shell command; the documents described the same posture in
+  words and in a different command, neither of which the rule could see.
 
 All now generic: "the hosting panel", "the panel's nginx", "the deploy host",
 `<panel-config-path>`, "the host's default-deny input policy". Nothing was
