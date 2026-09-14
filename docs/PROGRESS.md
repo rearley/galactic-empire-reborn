@@ -6774,3 +6774,40 @@ Express, Socket.io, bcrypt and passport are all on the versions they were.
 Still open, and correctly: `@nestjs/core` needs the Nest 11 upgrade (#46) since
 overriding a direct dependency to the next major IS that upgrade, and
 `react-router` needs a 6 → 7 major that fixes nothing reachable here.
+
+## 2026-09-14 — v0.16.4: the frontend image had been finding `@types/node` by accident
+
+The v0.16.3 push published the backend image and **failed to publish the
+frontend**, leaving production briefly on a backend of 0.16.3 and a frontend of
+0.16.1. The wire contract had not changed between them so nothing misbehaved,
+but the skew is real and is exactly what the version pair exists to make visible.
+
+```
+error TS2688: Cannot find type definition file for 'node'.
+```
+
+`frontend/tsconfig.json` has always carried `"types": ["node"]` while only the
+BACKEND declared `@types/node`. Locally that works: npm hoists the backend's
+devDependencies to the workspace root, where the frontend's `tsc` finds them.
+The frontend image does not — `frontend/Dockerfile` installs
+`--workspace=frontend --workspace=packages/wire` and nothing else.
+
+It survived on a **second** accident. `packages/wire` depended on Jest, Jest
+depends on `@types/node`, and wire IS installed in the frontend image. Moving
+wire to Vitest removed that path and the latent bug became a build failure.
+
+**Nothing available locally could have caught it.** `npm run build` in
+`frontend/`, `tsc --noEmit`, and all 6,550 backend and 359 frontend tests passed
+on the commit that broke the image, because every one of them runs against the
+hoisted root tree. The fix was verified the only way that means anything: by
+building `frontend/Dockerfile` locally and watching it succeed.
+
+`@types/node` is now declared by the workspace whose tsconfig asks for it, and
+`backend/test/unit/workspace-type-deps.spec.ts` checks the rule generally —
+whatever a workspace names in `types`, that workspace declares. It was confirmed
+to fail before the fix and pass after.
+
+Writing it surfaced a flaw in the rule itself: `vitest/globals` is a subpath of
+a real package, not shorthand for an `@types` package, so demanding
+`@types/vitest/globals` invents a dependency that does not exist. The mapping
+now handles bare names, scoped names and subpaths separately.
