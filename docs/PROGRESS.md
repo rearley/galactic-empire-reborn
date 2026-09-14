@@ -6643,3 +6643,27 @@ The honest limit: this matches whole tokens, not phrases or arbitrary substrings
 It suits hostnames, domains, paths, product names and distinctive numbers, and
 does not suit prose. It would not have caught a leak written as an unhyphenated
 description. It catches all four of the ones that actually happened.
+
+### Postscript — the guard exempted itself, and that is how the fifth one happened
+
+The first draft of the guard illustrated its matching rules with the real strings
+it exists to suppress, and then listed its own source and spec in the scan's
+skip list so they would not be flagged. It reported the tree clean while being
+the only two files in the tree that still carried the terms.
+
+That is the same failure a fifth time, arrived at from the opposite direction:
+not a value restated in prose, but a blind spot built deliberately so the tool
+would not complain about itself.
+
+Both files now use invented examples, and `SKIP` contains only the digest list,
+which cannot leak by construction. **The guard scans its own source and its own
+spec.** It caught the remaining line the moment that exemption was removed —
+which is the first evidence in this whole sequence of the mechanism working on
+its author rather than the author working on the mechanism.
+
+Two rules survive this, and they are the ones worth keeping:
+
+- **Never demonstrate a filter with a real example of what it filters.**
+- **A guard that exempts anything from itself has to justify the exemption in
+  the same breath.** "It would flag itself" is not a justification; it is the
+  finding.

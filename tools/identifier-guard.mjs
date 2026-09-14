@@ -45,11 +45,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const HASH_FILE = 'tools/forbidden-identifiers.sha256';
 
 /** Files whose own content is the guard's machinery, or is not ours to police. */
-const SKIP = [
-  HASH_FILE,
-  'tools/identifier-guard.mjs',
-  'backend/test/balance/no-forbidden-identifiers.balance.spec.ts',
-];
+/**
+ * Only the digest list is exempt, and only because it cannot leak by
+ * construction. This program and its spec ARE scanned: excluding them is how
+ * the first draft came to carry the very strings it suppresses.
+ */
+const SKIP = [HASH_FILE];
 const SKIP_DIRS = ['reference/', 'node_modules/', 'dist/'];
 
 /** SHA-256 of a term, normalised the same way candidate tokens are. */
@@ -59,8 +60,13 @@ export function hashTerm(term) {
 
 /**
  * Lowercase, and drop the separators that vary between a path, a sentence and a
- * formatted number. `<population>`, `<population>` and `<population>` all normalise alike, as do
- * `/opt/<panel-path>/` and `opt/<panel-path>`.
+ * formatted number. `987,654`, `987654` and `987.654` all normalise alike, as do
+ * `/etc/example/` and `etc/example`.
+
+ * Examples here are invented on purpose. An earlier draft illustrated the rules
+ * with the real strings it exists to suppress, and then excluded this file from
+ * its own scan so it would not flag them — which is how a guard acquires the
+ * blind spot it was written to remove.
  */
 function normalise(s) {
   return s.toLowerCase().replace(/[,\s]/g, '').replace(/^[./]+|[./]+$/g, '');
@@ -73,13 +79,13 @@ function tokens(line) {
   for (const m of line.matchAll(RUN)) {
     const raw = m[0];
     out.add(raw);
-    // A compound like `rick@example.com` or `opt/<panel-path>/var` also yields its parts
+    // A compound like `user@example.com` or `etc/example/var` also yields its parts
     // and its leading pairs, so a path prefix is caught inside a longer path.
     const parts = raw.split(/[@/]/).filter(Boolean);
     parts.forEach((p) => out.add(p));
     for (let i = 1; i < parts.length; i++) out.add(parts.slice(0, i + 1).join('/'));
   }
-  // Digit groups with separators stripped, so `<population>` is seen as `<population>`.
+  // Digit groups with separators stripped, so `987,654` is seen as `987654`.
   for (const m of line.matchAll(/[0-9][0-9,]{2,}/g)) out.add(m[0].replace(/,/g, ''));
   return out;
 }

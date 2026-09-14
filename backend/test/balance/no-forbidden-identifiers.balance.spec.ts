@@ -32,9 +32,9 @@ describe('forbidden identifiers', () => {
   });
 
   it('is case- and separator-insensitive, because prose varies and paths do not', () => {
-    const hashes = new Set([hashTerm('opt/<panel-path>'), hashTerm('<population>')]);
-    expect(scanText('under /opt/<panel-path>/ somewhere', hashes).length).toBe(1);
-    expect(scanText('a population of <population> colonists', hashes).length).toBe(1);
+    const hashes = new Set([hashTerm('etc/canarypath'), hashTerm('987654')]);
+    expect(scanText('under /ETC/CANARYPATH/ somewhere', hashes).length).toBe(1);
+    expect(scanText('a population of 987,654 colonists', hashes).length).toBe(1);
   });
 
   it('does not fire on ordinary prose', () => {
