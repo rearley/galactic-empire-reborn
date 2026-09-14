@@ -270,11 +270,16 @@ jobs:
           AFTER: ${{ github.sha }}
         run: |
           set -uo pipefail
+          # `.githooks/` is here because hooks run on a developer's machine and
+          # are never copied into a container. A push touching only those files
+          # once spent a CI run and restarted a live game to publish a
+          # byte-identical image. Pinned by test/unit/ci-build-inputs.spec.ts.
+          #
           # Deliberately a SUPERSET of the paths-ignore on the trigger above.
           # The trigger only skips a push where EVERY file is ignored, so a
           # commit pairing a README with a test file would otherwise arrive here
           # and build. This list is the authority; the trigger is the shortcut.
-          NOT_A_BUILD_INPUT='^(backend/test/|frontend/test/|frontend/e2e/|tools/|backend/tools/|docs/|specs/|LICENSE$|NOTICE$)|\.md$'
+          NOT_A_BUILD_INPUT='^(backend/test/|frontend/test/|frontend/e2e/|tools/|backend/tools/|docs/|specs/|\.githooks/|LICENSE$|NOTICE$)|\.md$'
 
           if [ -z "$BEFORE" ] \
             || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \

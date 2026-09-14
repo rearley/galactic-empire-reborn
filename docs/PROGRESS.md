@@ -6690,3 +6690,23 @@ filter, runs on push and pull request, invokes the guard, checks messages, and
 is not gated behind the build-needed job. The failure mode here is silent: a
 guard that is never invoked reports nothing, and looks exactly like a guard that
 found nothing.
+
+## 2026-09-14 — v0.16.1: git hooks were a build input, and a deploy went out unversioned
+
+Adding `.githooks/` shipped an image. Hooks run on a developer's machine and are
+never copied into a container, so that build published something byte-identical
+to what was already running — it spent a CI run and restarted a live game to
+change nothing. `.githooks/` is now in `NOT_A_BUILD_INPUT`.
+
+The same push also broke the VERSION rule: `.githooks/` and `.github/` are build
+inputs, so those commits deployed, and `VERSION` was left at 0.16.0. The damage
+was nil because nothing under `backend/src` or `frontend/src` had changed and the
+images were identical — but that was luck rather than process. Bumped to 0.16.1
+here, in the commit that changes `ci.yml` and therefore deploys on its own
+account.
+
+`backend/test/unit/ci-build-inputs.spec.ts` pins the gate, and reads the pattern
+**out of the workflow** rather than restating it, so the test cannot drift into
+checking a copy of the rule instead of the rule. It asserts both directions:
+hooks, tests, tools, docs and specs do not build; `src`, Dockerfiles, `VERSION`,
+the lockfile and `ci.yml` do.
