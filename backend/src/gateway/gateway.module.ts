@@ -3,6 +3,7 @@ import { GameGateway } from './game.gateway';
 import { ConnectedShipsRegistry } from './connected-ships.registry';
 import { ShipDestroyedService } from './ship-destroyed.service';
 import { ConnectionLifecycleService } from './connection-lifecycle.service';
+import { DisconnectTelemetryService } from './disconnect-telemetry.service';
 import { ShipModule } from '../game/ship/ship.module';
 import { CommandsModule } from '../game/commands/commands.module';
 import { CombatModule } from '../game/combat/combat.module';
@@ -15,7 +16,13 @@ import { PublicModule } from '../public/public.module';
 
 @Module({
   imports: [ShipModule, CommandsModule, CombatModule, AuthModule, PrismaModule, PlayerModule, OnboardingModule, PhysicsModule, PublicModule],
-  providers: [ConnectedShipsRegistry, ShipDestroyedService, ConnectionLifecycleService, GameGateway],
+  providers: [
+    ConnectedShipsRegistry,
+    ShipDestroyedService,
+    DisconnectTelemetryService,
+    ConnectionLifecycleService,
+    GameGateway,
+  ],
   exports: [GameGateway, ConnectedShipsRegistry],
 })
 export class GatewayModule {}

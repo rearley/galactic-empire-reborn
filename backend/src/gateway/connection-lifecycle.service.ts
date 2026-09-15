@@ -9,6 +9,7 @@ import { WsAuthGuard } from '../auth/ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRepository } from '../game/player/user.repository';
 import { ConnectedShipsRegistry, ConnectedPlayer } from './connected-ships.registry';
+import { DisconnectTelemetryService } from './disconnect-telemetry.service';
 import { GESTAT_USER, MAXPLRS, MAIL_CLASS_DISTRESS } from '../game/constants';
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
@@ -99,6 +100,14 @@ export class ConnectionLifecycleService {
      */
     @Optional()
     private readonly users: UserRepository = new UserRepository(prisma),
+    /**
+     * Diagnostic only — see DisconnectTelemetryService. `@Optional()` with a
+     * default for the same reason `users` has one: the suite constructs this
+     * class directly in a dozen places, and none of them should have to know
+     * about a table nothing reads.
+     */
+    @Optional()
+    private readonly telemetry: DisconnectTelemetryService = new DisconnectTelemetryService(prisma),
   ) {}
 
   /**
@@ -128,6 +137,12 @@ export class ConnectionLifecycleService {
 
     const userid = payload.sub;
     client.data.userid = userid;
+
+    // Close any open disconnect row now, on AUTH rather than on boarding: a
+    // player who reconnects and stops at the ship-select prompt has still come
+    // back, and measuring only those who reboard would bias the gap percentiles
+    // downward. Diagnostic only; cannot throw. @see DisconnectTelemetryService
+    await this.telemetry.recordReturn(userid);
     client.data.username = payload.username;
     this.presence.arrive(userid);
 
@@ -655,8 +670,26 @@ export class ConnectionLifecycleService {
         // a server-side reason not present in CLIENT_SIDE_REASONS.
         const reason = client.data.disconnectReason as string | undefined;
         const isClientSide = ConnectionLifecycleService.CLIENT_SIDE_REASONS.has(reason ?? '');
+        const killed = ship.cantexit > 0 && isClientSide;
 
-        if (ship.cantexit > 0 && isClientSide) {
+        // Telemetry BEFORE either arm runs. Both evict the hull — the kill arm
+        // through COMBAT_SHIP_DESTROYED, the clean arm through `unboard` — so a
+        // row written afterwards would have no position, no speed and no
+        // `cantexit` to record, for precisely the disconnects worth studying.
+        // Diagnostic only; it cannot throw. @see DisconnectTelemetryService
+        await this.telemetry.recordDisconnect({
+          userid,
+          shipno: activeShipNo,
+          username: ship.username ?? null,
+          reason: reason ?? null,
+          cantexit: ship.cantexit,
+          killed,
+          xcoord: ship.xcoord,
+          ycoord: ship.ycoord,
+          speed: ship.speed,
+        });
+
+        if (killed) {
           // Kill path: emit COMBAT_SHIP_DESTROYED so the existing handler DELETES
           // the hull row (not a reset), broadcasts the kill, and PlayerScoreService
           // awards credit. @see GEFUNCS.C:killem gepdb(GEDELETE) — attacker attribution

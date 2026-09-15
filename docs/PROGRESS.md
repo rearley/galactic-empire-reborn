@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 95 entries.
+Append-only, **newest at the bottom**. 96 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-15 — measuring the disconnect window before fixing it](#2026-09-15--measuring-the-disconnect-window-before-fixing-it)
 - [2026-09-14 — a support link that a fork cannot inherit](#2026-09-14--a-support-link-that-a-fork-cannot-inherit)
 - [2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible](#2026-09-11--correction-to-the-phase-4-close-out-the-roster-claim-was-wrong-for-two-of-four-handlers-and-the-hook-count-metric-was-not-reproducible)
 - [2026-09-11 — Phase 4 close-out: the frontend, verified](#2026-09-11--phase-4-close-out-the-frontend-verified)
@@ -6848,3 +6849,67 @@ Two deliberate constraints on the button itself:
 Verified by building `frontend/Dockerfile` with the arg set and grepping the
 built bundle for the value — the check that `npm run build` and 6,925 passing
 tests could not make, and the lesson from v0.16.4 three days ago.
+
+## 2026-09-15 — measuring the disconnect window before fixing it
+
+The disconnect window has been known since 2026-09-08: Socket.io's defaults
+(`pingInterval` 25s + `pingTimeout` 20s) leave up to ~45 seconds where the
+server still believes a dropped player is flying. Near a planet that is fatal,
+because orbiting means flying into the gravity well and stopping 25 units short
+of death.
+
+It is still unfixed because the obvious fix is a trap. The same timeout also
+decides the `warhupa` anti-rage-quit kill, so lowering it trades rare planet
+crashes for frequent wrongful combat deaths — a mobile blip mid-combat costs
+the hull.
+
+**The design that escapes the trade is to decouple the two decisions**: park
+the ship fast (eviction is safe, reversible, and free if they return) but judge
+the rage-quit slow, applying the kill only after a grace period. Canon could
+conflate them because a carrier drop was known at once; ours is a guess.
+
+Two things were confirmed by reading rather than assumed, and both make the
+design work:
+
+- **`cantexit` survives parking.** It is a real column
+  (`schema.prisma:180`, `WARSHP.cantexit`), read by `prismaShipToState` and
+  absent from both `IN_MEMORY_ONLY` and `NOT_FLUSHED`, so every flush writes it.
+  A player who pulls the plug comes back still locked in the fight.
+- **It is frozen while parked.** The decrement lives at
+  `combat-tick.service.ts:646`, inside a tick that iterates the in-memory map,
+  and a parked ship is not in that map. Staying and fighting lets the lock
+  expire; disconnecting suspends it.
+
+**And one thing the design does not yet answer**, found while writing this up:
+parking removes the hull from the tick map, so nothing can hit it. The grace
+period is therefore a window of invulnerability, and a player could blip out
+deliberately to dodge a volley. Canon had no such hole because disconnecting
+mid-combat was simply lethal. So the fix is three decisions, not two.
+
+**None of that is built.** What shipped here is the measurement, because the
+two timings the design needs are invented numbers today. `DisconnectEvent`
+records one row per drop — reason, `cantexit`, whether the kill fired,
+position, speed — and closes it with `returnedAfterMs` when the player next
+authenticates. A week of that turns "5-10 seconds, call it 60 for grace" into a
+percentile.
+
+Deliberate choices worth keeping:
+
+- **Diagnostic only.** Nothing reads the table and no gameplay decision depends
+  on it. Both methods swallow their own failures: this runs inside
+  `handleDisconnect` beside the hull flush and the kill path, and telemetry that
+  can throw would turn a logging outage into lost ships.
+- **Written BEFORE either disconnect arm runs.** Both evict the hull — the kill
+  arm through `COMBAT_SHIP_DESTROYED`, the clean arm through `unboard` — so a
+  row written afterwards would record nothing for exactly the disconnects worth
+  studying.
+- **Closed on AUTH, not on boarding.** A player who reconnects and stops at the
+  ship-select prompt has still come back; measuring only those who reboard
+  would bias every percentile downward.
+- **No planet-distance column.** Coordinates are stored raw so proximity can be
+  computed later against the immobile planet rows, and the gateway keeps no
+  dependency on the planet subsystem.
+
+The fix itself is filed as an issue rather than attempted, on the grounds that
+a fix to a problem whose shape we are guessing at is how the first version of
+this got deferred in the first place.

@@ -206,3 +206,37 @@ The probe is checked both on `onApplicationBootstrap` (self-heal) and on
 every admin-triggered run. `recordRun` uses upsert so same-day re-runs update
 the counters rather than failing on a unique constraint. There is no FK to any
 other table — this is a standalone audit row.
+
+## DisconnectEvent
+
+One row per dropped connection, written by `ConnectionLifecycleService` and
+read by nothing. **Diagnostic only — no gameplay decision depends on it.**
+
+It exists to answer a question the code cannot. Socket.io's defaults
+(`pingInterval` 25s + `pingTimeout` 20s) leave up to ~45 seconds where the
+server still believes a dropped player is flying, which is fatal on approach to
+a planet. Tightening that is not safe on its own, because the same timeout also
+decides the `warhupa` anti-rage-quit kill (`GEMAIN.C:1397`) — so a mobile blip
+mid-combat currently costs the hull. The fix is to park fast and judge slow, but
+both timings are guesses until the real distribution of `returnedAfterMs` is
+known. Hence: measure first.
+
+Columns: `userid`, `shipno`, `username` (denormalised so a deleted account still
+reads), `reason` (Socket.io's own string), `cantexit` and `killed` (whether the
+anti-rage-quit actually fired), `xcoord`/`ycoord`/`speed`, `disconnectedAt`, and
+the nullable pair `returnedAt` / `returnedAfterMs`.
+
+`returnedAfterMs` is the number the table exists to produce. It is written when
+the player next AUTHENTICATES, not when they reboard — someone who reconnects
+and stops at the ship-select prompt has still come back, and measuring only
+those who reboard would bias every percentile downward. It is clamped at zero,
+because clock skew between the two writes would otherwise poison the column.
+
+There is deliberately **no planet-distance column**: coordinates are stored raw
+so proximity can be computed later against the (immobile) planet rows, and the
+gateway keeps no dependency on the planet subsystem.
+
+Indexed on `(userid, returnedAt)` — closing the open row on reconnect, and the
+per-player "does this one blip a lot" query — and on `disconnectedAt` for the
+time-ordered percentile reads. No FK to any other table; rows outlive the
+accounts and hulls they describe on purpose.

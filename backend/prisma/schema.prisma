@@ -580,3 +580,51 @@ model MidnightRun {
   /// Phase 4: number of teams marked removed (teamcode = -1)
   teamsRemoved       Int
 }
+
+/// One row per dropped connection, written by ConnectionLifecycleService.
+///
+/// Diagnostic only — nothing in the game reads this table, and no gameplay
+/// decision depends on it. It exists to answer a question the code cannot:
+/// how long a real disconnect actually lasts on real players' connections.
+///
+/// Socket.io's defaults leave up to ~45s where the server still believes a
+/// dropped player is flying. Tightening that is not safe on its own, because
+/// the same timeout also decides the `warhupa` anti-rage-quit kill
+/// (GEMAIN.C:1397) — a mobile blip mid-combat currently costs the hull. The
+/// fix is to park fast and judge slow, but BOTH timings are guesses until the
+/// distribution of `returnedAfterMs` is known. Measure first.
+///
+/// No planet distance column on purpose: `xcoord`/`ycoord` are recorded raw so
+/// proximity can be computed later against the (immobile) planet rows, and the
+/// gateway keeps no dependency on the planet subsystem.
+model DisconnectEvent {
+  id              String    @id @default(uuid())
+  /// WARUSR.userid of the player who dropped
+  userid          String
+  /// Which hull they were flying, 1-based per user
+  shipno          Int
+  /// Display handle at drop time, denormalised so a deleted account still reads
+  username        String?
+  /// Socket.io disconnect reason — 'transport close', 'ping timeout', and the
+  /// rest of CLIENT_SIDE_REASONS, or a server-side reason on deploy/restart
+  reason          String?
+  /// Battle lock at the moment of the drop. > 0 is what makes a disconnect fatal
+  cantexit        Int
+  /// Whether the anti-rage-quit kill actually fired for this disconnect
+  killed          Boolean
+  /// Position at drop. Raw coords; join to planets later for proximity
+  xcoord          Float
+  ycoord          Float
+  /// Speed at drop — a stationary ship cannot fall into a gravity well
+  speed           Int
+  disconnectedAt  DateTime
+  /// NULL while the player has not come back. Closed by the next connection
+  returnedAt      DateTime?
+  /// The number this table exists to produce: how long the gap actually was
+  returnedAfterMs Int?
+
+  /// Closing an open row on reconnect, and per-player "does this one blip a lot"
+  @@index([userid, returnedAt])
+  /// Time-ordered reads for the percentile queries
+  @@index([disconnectedAt])
+}
