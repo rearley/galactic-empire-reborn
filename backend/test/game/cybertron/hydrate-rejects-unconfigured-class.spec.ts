@@ -77,7 +77,7 @@ describe('hydrateAll rejects an unconfigured class', () => {
     // The failure that would matter: a config change must not empty the galaxy.
     const { repo, loaded } = build([shipRow(21, 1), shipRow(99, 2), shipRow(24, 3)]);
     await repo.hydrateAll();
-    expect(loaded.map((s) => s.shpclass).sort()).toEqual([21, 24]);
+    expect(loaded.map((s) => s.shpclass).sort((a, b) => a - b)).toEqual([21, 24]);
   });
 
   it('asks the database which classes are configured', async () => {
@@ -111,6 +111,6 @@ describe('the guard fails OPEN', () => {
 
     await new CybertronRepository(prisma, shipState).hydrateAll();
 
-    expect(loaded.map((s) => s.shpclass).sort()).toEqual([21, 99]);
+    expect(loaded.map((s) => s.shpclass).sort((a, b) => a - b)).toEqual([21, 99]);
   });
 });
