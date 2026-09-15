@@ -255,7 +255,19 @@ jobs:
     name: Build needed?
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name == 'push'
+    # `workflow_dispatch` is here because of 2026-09-15. A push carrying real
+    # source changes failed LINT, so no image was built. The next push was
+    # test-only, so the gate correctly said "nothing to build" — and two
+    # releases sat on master, built by nothing, while production reported an
+    # older version. The gate reads ONE push range; it cannot know the previous
+    # push never produced an image.
+    #
+    # Manual dispatch is the recovery path for exactly that, and it did not
+    # work: this condition skipped the gate, so the build skipped too, and a
+    # dispatch could only ever re-run the tests. It now builds — `before` is
+    # empty on a dispatch, which the step below already treats as "cannot
+    # resolve the range, build anyway".
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     outputs:
       build: ${{ steps.decide.outputs.build }}
     steps:
@@ -316,7 +328,7 @@ jobs:
     # request never gets here, and neither does a push that changes nothing an
     # image contains.
     needs: [backend, frontend, changes]
-    if: github.event_name == 'push' && needs.changes.outputs.build == 'true'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.changes.outputs.build == 'true'
 
     permissions:
       contents: read

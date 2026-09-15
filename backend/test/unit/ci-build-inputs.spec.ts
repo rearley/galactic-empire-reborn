@@ -42,3 +42,45 @@ describe('the build gate', () => {
       .forEach((f) => expect([f, re.test(f)]).toEqual([f, false]));
   });
 });
+
+/**
+ * Manual dispatch must be able to DEPLOY, not just re-run the tests.
+ *
+ * 2026-09-15: a push carrying real source changes failed lint, so no image was
+ * built. The next push was test-only, so the gate correctly said "nothing to
+ * build" — and two releases sat on master while production reported an older
+ * version. The gate reads ONE push range and cannot know the previous push
+ * produced no image.
+ *
+ * `workflow_dispatch` is the recovery path for precisely that, and it did not
+ * work: both the gate job and the build job were fenced behind
+ * `github.event_name == 'push'`, so a dispatch ran the suites and skipped
+ * everything that ships.
+ */
+describe('a manual dispatch can ship', () => {
+  const jobCondition = (name: string): string => {
+    const at = ci.indexOf(`name: ${name}`);
+    expect(at, `job "${name}" not found in ci.yml`).toBeGreaterThan(-1);
+    const block = ci.slice(at, at + 1200);
+    const m = /^\s*if: (.+)$/m.exec(block);
+    return m ? m[1] : '';
+  };
+
+  it('lets a dispatch reach the build gate', () => {
+    expect(jobCondition('Build needed?')).toContain('workflow_dispatch');
+  });
+
+  it('lets a dispatch reach the publish job', () => {
+    expect(jobCondition('Build and publish images')).toContain('workflow_dispatch');
+  });
+
+  it('still requires the gate to say yes', () => {
+    // Dispatch must not become a way to bypass the build-input rule; it only
+    // widens WHO may ask, not WHAT qualifies.
+    expect(jobCondition('Build and publish images')).toContain("needs.changes.outputs.build == 'true'");
+  });
+
+  it('keeps workflow_dispatch as a declared trigger', () => {
+    expect(ci).toMatch(/^\s*workflow_dispatch:\s*$/m);
+  });
+});
