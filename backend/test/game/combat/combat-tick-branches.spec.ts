@@ -185,19 +185,17 @@ const found = (h: Harness, name: string): unknown =>
 
 describe('a projectile slot with no live projectile in it must not detonate', () => {
   /**
-   * Canon opens the torpedo walk with `if (tptr->distance > 1)`
-   * (GEFUNCS.C:1548). A slot at distance 0 or 1 is DORMANT, not arrived —
-   * everything that CANCELS a torpedo does it by zeroing the distance. Without
-   * the guard `0 - torpsped` is negative, falls through to hit resolution, and
-   * detonates a torpedo that was already called off. That is a free kill on a
-   * pilot who did nothing wrong.
+   * A slot at distance ZERO is DORMANT, not arrived — everything that CANCELS a
+   * torpedo does it by zeroing the distance. Without a guard, `0 - torpsped` is
+   * negative, falls through to hit resolution, and detonates a torpedo that was
+   * already called off. That is a free kill on a pilot who did nothing wrong.
    */
   it('clears a dormant torpedo slot instead of resolving a hit', async () => {
     const firer = makeShip({ userid: 'a', shipno: 1, channel: 5 });
     const victim = makeShip({
       userid: 'b', shipno: 2, channel: 6,
       ltorpsChannel: [5, 255, 255],
-      ltorpsDistance: [1, 0, 0], // canon's boundary: `> 1` is alive, 1 is not
+      ltorpsDistance: [0, 0, 0],
     });
     const h = await makeHarness([firer, victim], fixedRandom(0.99));
 
@@ -209,6 +207,45 @@ describe('a projectile slot with no live projectile in it must not detonate', ()
     // cantexit is the battle lock a hit sets; still 0 means nothing landed.
     expect(victim.cantexit).toBe(0);
     expect(found(h, COMBAT_HIT)).toBeUndefined();
+  });
+
+  /**
+   * A torpedo at distance ONE lands. This is a DELIBERATE deviation from
+   * canon's literal text, on determinable intent.
+   *
+   * Canon asks the same liveness question two ways inside one loop:
+   *
+   * @see GEFUNCS.C:1548 `	if (tptr->distance > 1)`
+   * @see GEFUNCS.C:1595 `			if (tptr->distance > 0)`
+   *
+   * and the consequence of the stricter one is not a design: a torpedo
+   * decrements only while `distance > torpsped`, so it can come to rest on
+   * exactly 1, and is then skipped forever — never detonating, never clearing,
+   * holding one of MAXTORPS 3 tubes for the life of the hull. With
+   * TORPSPED 2441 that is roughly one shot in 2441, permanent and silent.
+   *
+   * Nothing in canon's data or help text describes a torpedo that expires in
+   * flight, and `> 0` is what the same loop uses eleven lines later. So the
+   * intent is legible, and the port takes it.
+   *
+   * @see docs/DECISIONS.md 2026-09-15 — canon bugs with determinable intent
+   */
+  it('detonates a torpedo that came to rest one unit out', async () => {
+    const firer = makeShip({ userid: 'a', shipno: 1, channel: 5 });
+    const victim = makeShip({
+      userid: 'b', shipno: 2, channel: 6,
+      ltorpsChannel: [5, 255, 255],
+      ltorpsDistance: [1, 0, 0],
+    });
+    const h = await makeHarness([firer, victim], fixedRandom(0.99));
+
+    h.fire();
+
+    expect(victim.damage).toBeGreaterThan(0);
+    // The tube is returned either way; what changed is that the shot counts.
+    expect(victim.ltorpsChannel[0]).toBe(255);
+    expect(victim.ltorpsDistance[0]).toBe(0);
+    expect(found(h, COMBAT_HIT)).toBeDefined();
   });
 
   /**

@@ -138,6 +138,29 @@ balanced, better documented, or pinned by a passing test. Deviations are allowed
 only when they are deliberate, written down in `docs/DECISIONS.md`, and
 justified by something other than "we could not find the canonical value".
 
+**One exception: a defect whose intent is legible.** Murdock's code has bugs,
+and reproducing one faithfully is not fidelity — it is cargo cult. Where canon
+CONTRADICTS ITSELF, implement the evident intent instead.
+
+The evidence must come from canon, never from us. These qualify:
+
+- **canon answers one question two ways.** `GEFUNCS.C:1548` gates the torpedo
+  walk on `distance > 1` while the same loop's still-flying branch eleven lines
+  later uses `distance > 0`. One of them is a typo, and the strict one strands a
+  torpedo on exactly 1 forever — holding a tube for the life of the hull.
+- **code that can never run**, so a shipped feature never fires.
+- **a value contradicted by the data file it is read from.**
+
+These do NOT qualify, and are exactly why the paragraph above is strict: "it is
+unbalanced", "it feels bad", "players expect otherwise", "another port does it
+differently". A deviation argued from taste is the failure mode this section
+exists to prevent, and a bug is not whatever we would have written instead.
+
+Fixing one costs a `docs/DECISIONS.md` entry QUOTING BOTH canon lines — the
+contradiction is the evidence, so it goes in the record — and a test that names
+the deviation as deliberate. **If the intent is not legible, canon wins and the
+bug ships.**
+
 The full original distribution is vendored, READ ONLY, at `/reference/`.
 
 > **Before reading anything under `/reference/`, read `reference/CLAUDE.md`.**

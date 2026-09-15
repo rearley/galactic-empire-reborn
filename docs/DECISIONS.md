@@ -5987,3 +5987,57 @@ An explicit 0 is a player's choice and still outranks the default.
 off two options the player never touched. Padding now uses `OPTION_DEFAULTS`,
 which `set-options.catalog.ts` derives from the catalog itself — one source of
 truth for reader and writer.
+
+## 2026-09-15 — canon bugs with determinable intent are fixed, not reproduced
+
+**Decision.** Where canon CONTRADICTS ITSELF and the intent is legible, the port
+implements the intent. Where it does not, canon wins and the bug ships. The rule
+and its criteria now live in `CLAUDE.md` under "The classic game is the source
+of truth".
+
+**Why the rule needed the exception.** The existing rule said the classic game
+is right "including when our port's version is better balanced, better
+documented, or pinned by a passing test" — and that strictness has earned its
+keep, because every time this port has reasoned from taste it has been wrong.
+But it had no answer for a defect, and reproducing a defect faithfully is not
+fidelity. Rick's framing: *"I did say I want classic game but I have also said I
+don't want to copy obvious bugs. If we can reasonably determine intent then we
+fix it, make the game solid."*
+
+**Why the criteria are narrow.** "Determinable intent" is exactly the phrase a
+future session will use to justify a change it simply prefers, so the evidence
+has to come from canon and not from us: canon answering one question two ways,
+code that can never run, a value contradicted by the file it is read from.
+Explicitly NOT qualifying: unbalanced, feels bad, players expect otherwise,
+another port does it differently.
+
+## 2026-09-15 — a torpedo at distance 1 detonates (the first case under that rule)
+
+**Canon contradicts itself inside one loop:**
+
+    if (tptr->distance > 1)          GEFUNCS.C:1548   opening the walk
+    if (tptr->distance > 0)          GEFUNCS.C:1595   the still-flying branch
+
+**Why the stricter one cannot be the design.** A torpedo decrements only while
+`distance > torpsped`, so it can come to rest on exactly 1. The next tick's
+`> 1` test then skips it forever: it never detonates, never clears, and holds
+one of `MAXTORPS` 3 tubes for the life of the hull. With `TORPSPED` 2441 that is
+roughly one shot in 2441 — permanent, silent, and impossible to diagnose from
+the cockpit. Nothing in canon's data or help text describes a torpedo that
+expires in flight, and the same loop answers the same question with `> 0` eleven
+lines later.
+
+**What we do.** `combat-tick.service.ts` gates on `distance <= 0`. Distance 0
+still means DORMANT and must never detonate — everything that cancels a torpedo
+does it by zeroing the distance — so that protection is unchanged and still
+tested. Distance 1 now lands.
+
+**What changed for us specifically.** The port never had canon's tube leak: it
+cleared the slot at `<= 1` rather than skipping it, so the tube always came
+back. What it did instead was silently discard that torpedo. So this is a
+one-in-2441 shot that used to vanish and now hits — the smaller half of canon's
+bug, fixed in the same place.
+
+Credit: spotted by manicpop, maintainer of `ge-next`, and brought to us by Rick.
+Read against canon here rather than taken from their code — see the licensing
+note in `CLAUDE.md` about not copying fixes from sibling ports.

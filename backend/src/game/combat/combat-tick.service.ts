@@ -678,13 +678,21 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
 
       const oldDist = carrier.ltorpsDistance[i] ?? 0;
 
-      // Canon's own liveness test, which we had only on the missile loop:
-      // `if (tptr->distance > 1)` (GEFUNCS.C:1548). A slot at distance 0 is
-      // DORMANT, not arrived — anything that cancels a torpedo does it by
-      // zeroing the distance, and without this guard `0 - TORPSPED` falls
-      // straight through to hit resolution and detonates the cancelled
-      // torpedo on the target.
-      if (oldDist <= 1) {
+      // A slot at distance 0 is DORMANT, not arrived — anything that cancels a
+      // torpedo does it by zeroing the distance, and without this guard
+      // `0 - TORPSPED` falls straight through to hit resolution and detonates
+      // the cancelled torpedo on the target.
+      //
+      // The threshold is 0, not canon's 1, and that is a DELIBERATE deviation
+      // on determinable intent. Canon opens this walk with
+      // @see GEFUNCS.C:1548 `	if (tptr->distance > 1)`
+      // while the still-flying branch eleven lines later asks
+      // `if (tptr->distance > 0)` — two thresholds for one liveness question in
+      // one loop. A torpedo decrements only while `distance > torpsped`, so it
+      // can come to rest on exactly 1 and is then skipped FOREVER: never
+      // detonating, never clearing, holding one of MAXTORPS 3 tubes for the
+      // life of the hull. @see docs/DECISIONS.md 2026-09-15
+      if (oldDist <= 0) {
         this.clearTorpSlot(carrier, i);
         continue;
       }
