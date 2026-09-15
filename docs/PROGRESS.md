@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 96 entries.
+Append-only, **newest at the bottom**. 97 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-15 — the first player from the Discord was announced by account key](#2026-09-15--the-first-player-from-the-discord-was-announced-by-account-key)
 - [2026-09-15 — measuring the disconnect window before fixing it](#2026-09-15--measuring-the-disconnect-window-before-fixing-it)
 - [2026-09-14 — a support link that a fork cannot inherit](#2026-09-14--a-support-link-that-a-fork-cannot-inherit)
 - [2026-09-11 — CORRECTION to the Phase 4 close-out: the roster claim was wrong for two of four handlers, and the hook-count metric was not reproducible](#2026-09-11--correction-to-the-phase-4-close-out-the-roster-claim-was-wrong-for-two-of-four-handlers-and-the-hook-count-metric-was-not-reproducible)
@@ -6913,3 +6914,54 @@ Deliberate choices worth keeping:
 The fix itself is filed as an issue rather than attempted, on the grounds that
 a fix to a problem whose shape we are guessing at is how the first version of
 this got deferred in the first place.
+
+## 2026-09-15 — the first player from the Discord was announced by account key
+
+The game was posted in manicpop's Discord. The first stranger to sign up flew a
+ship the galaxy identified as:
+
+```
+Commanded by: usr_9d4ddc16bfb77c21e5b1afcd
+```
+
+This was supposed to be fixed. `display-name.ts` exists precisely for it, and
+it was correct — the caller was not.
+
+**Three paths put a ship into the live map, and only two hydrated the
+captain's `User` row:** boot hydration and boarding did; `OnboardingService`
+did not. It called `prismaShipToState(ship)` and `loadShip(state)` with nothing
+in between. `username` is an `IN_MEMORY_ONLY` field with no `Ship` column, so
+the mapper cannot populate it and `displayName()` falls back to `userid`.
+
+**It could only ever affect a brand-new player, on their first session, and it
+self-heals on their next connection** — which is exactly why it survived. Nobody
+already playing has been a new player since the fix landed. The one audience
+that could see it was the one audience we most wanted not to.
+
+Diagnosed from `docker logs ge-backend`, which named the culprit directly:
+`[OnboardingService] Onboarding complete for usr_9d4ddc16…: ship "Colonial One"`.
+The production DB query that would have confirmed it another way was refused by
+the auto-mode classifier, and the logs turned out to be the better evidence
+anyway.
+
+**The fix is one function, not one more assignment.** The mapper's own header
+already recorded six earlier cases of "caller must remember to hydrate X"
+(maxTons, maxWarp, …); this was the seventh, and patching the third call site
+would have left the arrangement that produced all seven intact. There is now a
+single `applySessionProfile()` in `ship/session-profile.ts`, and all three
+entry points call it. A fourth gets the whole set or none of it.
+
+`escalation-user-kills.spec.ts` had pinned this invariant by grepping the two
+call sites for `state.userKills =`. That assertion was right about the danger
+and wrong about where to look — it could not have caught the third site,
+because it only knew about two. It now pins the three call sites and the one
+helper, which is both what survives the refactor and what actually failed.
+
+Also unhydrated on that path, and worth recording as **not** a second bug:
+`maxTons` and `maxWarp`. `maxTons` falls back to 1000 everywhere it is read and
+the Interceptor's real capacity IS 1000, so nothing was visible. That is luck,
+not design, and it stops being true the moment a new player's first hull is
+something other than an Interceptor.
+
+Held from deploy at the player's request — they were mid-session, and a restart
+would have bounced the very person the fix is for.

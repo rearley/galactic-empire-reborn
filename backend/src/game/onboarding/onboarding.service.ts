@@ -6,6 +6,7 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { rollSpawnPosition } from './spawn-placement';
 import { isValidShipName } from './name-validator';
 import { prismaShipToState } from '../ship/ship-state.mappers';
+import { applySessionProfile } from '../ship/session-profile';
 import { ShipState } from '../ship/ship-state.types';
 import { ENGYMAX, GESTAT_USER } from '../constants';
 import { START_CLASS, START_FLUX_PODS } from '../constants/onboarding';
@@ -187,6 +188,20 @@ export class OnboardingService {
     await this.users.applyOnboardingGrant(userid, onboardingUserUpdate(topshipno, newShipno));
 
     const state = prismaShipToState(ship);
+    // The captain's handle, team, kills and option flags. Without this the new
+    // hull enters the galaxy anonymous and `displayName()` falls back to the
+    // synthetic account key — which is what a brand-new player's first session
+    // broadcast on 2026-09-15. @see ship/session-profile.ts
+    //
+    // Swallowed, not thrown: the Ship row is already written by this point, so
+    // a hiccup here must not abort finalize and strand a hull that exists in
+    // Postgres but never reached the map. Boarding re-hydrates on the next
+    // connection.
+    try {
+      applySessionProfile(state, await this.users.getSessionProfile(userid));
+    } catch (err) {
+      this.logger.warn(`Could not hydrate session profile for ${userid}: ${String(err)}`);
+    }
     this.shipStateService.loadShip(state);
     this.logger.log(`Onboarding complete for ${userid}: ship "${shipname}" class ${START_CLASS}`);
     return state;

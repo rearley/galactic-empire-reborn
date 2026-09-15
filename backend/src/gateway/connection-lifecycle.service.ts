@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserRepository } from '../game/player/user.repository';
 import { ConnectedShipsRegistry, ConnectedPlayer } from './connected-ships.registry';
 import { DisconnectTelemetryService } from './disconnect-telemetry.service';
+import { applySessionProfile } from '../game/ship/session-profile';
 import { GESTAT_USER, MAXPLRS, MAIL_CLASS_DISTRESS } from '../game/constants';
 import { shipKey, ShipState } from '../game/ship/ship-state.types';
 import { SHIP_STATUS_ABANDONED } from '../game/commands/_ship-management-constants';
@@ -475,17 +476,9 @@ export class ConnectionLifecycleService {
         return;
       }
       try {
-        const userRow = await this.users.getSessionProfile(userid);
-        if (userRow?.teamcode != null) state.teamcode = userRow.teamcode;
-        if (userRow?.username) state.username = userRow.username;
-        if (userRow?.fkeys) state.fkeys = userRow.fkeys;
-        // Cumulative captain kills, so a veteran boarding a fresh hull keeps
-        // the Cybertron standing they earned. @see GECYBS.C:441, :524
-        if (userRow?.kills != null) state.userKills = userRow.kills;
-        state.scanNames = (userRow?.options?.[0] ?? 0) === 1;
-        state.scanHome = (userRow?.options?.[1] ?? 0) === 1;
-        state.scanFull = (userRow?.options?.[2] ?? 0) === 1;
-        state.msgFilter = (userRow?.options?.[3] ?? 0) === 1;
+        // One helper, three callers — boot hydration, here, and first-ship
+        // creation. @see game/ship/session-profile.ts for why.
+        applySessionProfile(state, await this.users.getSessionProfile(userid));
       } catch {
         // Non-fatal: teamcode/scanNames/scanHome will be defaults; re-derived on next full hydration
       }

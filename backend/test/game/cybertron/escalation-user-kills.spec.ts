@@ -61,11 +61,25 @@ import { resolve } from 'node:path';
 describe('userKills is hydrated everywhere teamcode is', () => {
   const src = (p: string) => readFileSync(resolve(__dirname, '../../..', p), 'utf8');
 
+  // The three assignments became ONE, in `ship/session-profile.ts`, after the
+  // 2026-09-15 production bug: onboarding was a third entry point that nobody
+  // had noticed, so a new captain's first hull hydrated nothing at all. This
+  // block now pins the call sites rather than the assignment, which is both
+  // what survives the refactor and what actually failed.
   it.each([
     ['src/game/ship/ship-state.service.ts', 'boot hydration'],
     ['src/gateway/connection-lifecycle.service.ts', 'boarding a ship'],
-  ])('%s populates it (%s)', (path) => {
-    expect(src(path)).toMatch(/state\.userKills = /);
+    ['src/game/onboarding/onboarding.service.ts', 'a captain\'s FIRST hull'],
+  ])('%s hydrates the profile (%s)', (path) => {
+    expect(src(path)).toMatch(/applySessionProfile\(/);
+  });
+
+  it('the one helper sets the counter, and the handle beside it', () => {
+    // Both fields ride the same hydration. The handle is here because losing
+    // it is what made this visible: the galaxy announced an account key.
+    const helper = src('src/game/ship/session-profile.ts');
+    expect(helper).toMatch(/state\.userKills = /);
+    expect(helper).toMatch(/state\.username = /);
   });
 
   it('the boot-hydration include still carries kills', () => {

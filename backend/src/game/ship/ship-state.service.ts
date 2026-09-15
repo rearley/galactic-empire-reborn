@@ -5,6 +5,7 @@ import { UserRepository } from '../player/user.repository';
 import { TickKind } from '../tick/tick.types';
 import { TickService } from '../tick/tick.service';
 import { ShipState, shipKey } from './ship-state.types';
+import { applySessionProfile } from './session-profile';
 import { prismaShipToState, stateToPrismaUpdate } from './ship-state.mappers';
 import { MIDNIGHT_COMPLETED } from '../midnight/midnight-events';
 import { GESTAT_AUTO, GESTAT_USER, GESTAT_AVAIL } from '../constants';
@@ -172,18 +173,8 @@ export class ShipStateService implements OnModuleInit {
 
     for (const row of rows) {
       const state = prismaShipToState(row);
-      if (row.user?.teamcode != null) state.teamcode = row.user.teamcode;
-      // Canon names a player by their handle, not the account key. @see display-name.ts
-      if (row.user?.username) state.username = row.user.username;
-      if (row.user?.fkeys) state.fkeys = row.user.fkeys;
-      // Cumulative captain kills — what the Cybertron escalation gates read.
-      // Ship.kills is per-hull and resets on every replacement.
-      // @see GECYBS.C:441, :524; ShipState.userKills
-      if (row.user?.kills != null) state.userKills = row.user.kills;
-      state.scanNames = (row.user?.options?.[0] ?? 0) === 1;
-      state.scanHome = (row.user?.options?.[1] ?? 0) === 1;
-      state.scanFull = (row.user?.options?.[2] ?? 0) === 1;
-      state.msgFilter = (row.user?.options?.[3] ?? 0) === 1;
+      // One helper, three callers. @see ship/session-profile.ts
+      applySessionProfile(state, row.user);
       state.maxTons = maxTonsByClass.get(state.shpclass) ?? 1000;
       state.maxWarp = maxWarpByClass.get(state.shpclass);
       // Self-heal: topspeed=0 on a warp-capable class means it was never set at creation.
