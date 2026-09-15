@@ -172,7 +172,13 @@ The full original distribution is vendored, READ ONLY, at `/reference/`.
 
 The short version:
 
-1. **The C source** — `reference/ge-source/` (identical to `ge-upstream/mbmgemp/*.C`)
+1. **The C source** — `reference/ge-source/`, which holds the EIGHT gameplay
+   files. It is not the whole of `ge-upstream/mbmgemp/*.C`: **`GELIB.C` lives
+   only upstream**, and so do `GESAMPLE.C`, `MBMGEGRF.C` and `SECURE.C`. That
+   matters because `GELIB.C` carries the geometry primitives — `vector()`,
+   `cbearing()`, `angleb()`, `anglec()` — and the RNG, all of which this port
+   cites. Read it at `reference/ge-upstream/mbmgemp/GELIB.C`; the citation
+   verifier already loads both trees.
 2. **The `.MSG` data files** — `ge-upstream/mbmgemp/GE/REL/`, above all
    `MBMGESHP.MSG` (the ship class table loaded at boot) and `MBMGEMSG.MSG`
    (sysop options, items, neutral-zone planets).

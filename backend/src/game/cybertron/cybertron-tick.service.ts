@@ -87,6 +87,7 @@ import {
   decideCybEvasion,
   canPursue,
   notClaimed,
+  countCybertronClaims,
   shouldTaunt,
   creditsAreOwed,
   escalationKills,
@@ -227,8 +228,7 @@ export class CybertronTickService implements OnModuleInit {
   private selectAiShips(): ShipState[] {
     return this.shipState
       .findAllShips()
-      .filter((s) => s.status === GESTAT_AUTO
-        && this.shipClassCache.getCategory(s.shpclass) === 'CPU_COMBATIVE');
+      .filter((s) => s.status === GESTAT_AUTO && this.isCybertronClass(s.shpclass));
   }
 
   private onAiTick(ctx: TickContext): void {
@@ -1128,12 +1128,23 @@ export class CybertronTickService implements OnModuleInit {
     });
   }
 
+  /**
+   * ONE definition of "is a Cybertron", shared with `selectAiShips`.
+   *
+   * These two were allowed to disagree, and that is the whole of B-01: filtering
+   * which ships RUN the Cybertron brain does not change which ships get COUNTED
+   * by it. @see docs/audits/2026-09-15-ge-next-bug-review.md
+   */
+  private isCybertronClass(shpclass: number): boolean {
+    return this.shipClassCache.getCategory(shpclass) === 'CPU_COMBATIVE';
+  }
+
   private countClaims(targetChannel: number): number {
-    let count = 0;
-    for (const s of this.shipState.findAllShips()) {
-      if (s.status === 2 && s.cybmine === targetChannel) count++;
-    }
-    return count;
+    return countCybertronClaims(
+      this.shipState.findAllShips(),
+      targetChannel,
+      (c) => this.isCybertronClass(c),
+    );
   }
 
   /** Find an active player ship by shipno. */

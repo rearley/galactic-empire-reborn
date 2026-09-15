@@ -1,6 +1,7 @@
 import { DECOYTIME, MAXDECOY,
   CYB_ALLOW,
   CYB_MAXCASH,
+  GESTAT_AUTO,
 } from '../constants';
 import type { Random } from '../combat/random.port';
 import type { CybertronClassConfig } from './cybertron.config';
@@ -450,4 +451,42 @@ export function creditsAreOwed(userid: string): boolean {
  */
 export function escalationKills(ship: { kills: number; userKills?: number }): number {
   return ship.userKills ?? ship.kills;
+}
+
+/**
+ * How many CYBERTRONS have claimed this channel — the gang-up limit's counter.
+ *
+ * Canon counts every automaton:
+ *
+ * @see GECYBS.C:368 `	if (wptr->status == GESTAT_AUTO && wptr->cybmine == (byte)usrn)`
+ *
+ * but `cybmine` is a Cybertron's field — it appears nowhere in `GEDROIDS.C`, and
+ * a droid carrying one is meaningless data being counted. Canon reaches the bug
+ * through droids inheriting `cybmine = 0` from the new-ship template; this port
+ * reached the same counter through the phaser handler, which faithfully writes
+ * the firer's channel onto ANY `GESTAT_AUTO` victim (@see GECMDS.C:980
+ * `			if (wptr->status == GESTAT_AUTO)`). Shooting a droid therefore
+ * registered a Cybertron claim on the shooter, and `noClaim` 1 — an Interceptor
+ * — meant one shot could lock every Cybertron out of pursuing that player.
+ *
+ * Deliberate deviation on determinable intent: the counter asks how many
+ * CYBERTRONS have claimed this player, so it counts Cybertrons.
+ * @see docs/audits/2026-09-15-ge-next-bug-review.md B-01
+ *
+ * Takes the class predicate rather than a cache so it stays pure, and so the
+ * caller is forced to use the SAME definition of "is a Cybertron" that decides
+ * which ships run the Cybertron brain at all.
+ */
+export function countCybertronClaims(
+  ships: readonly { status: number; cybmine: number; shpclass: number }[],
+  targetChannel: number,
+  isCybertronClass: (shpclass: number) => boolean,
+): number {
+  let count = 0;
+  for (const s of ships) {
+    if (s.status !== GESTAT_AUTO) continue;
+    if (!isCybertronClass(s.shpclass)) continue;
+    if (s.cybmine === targetChannel) count++;
+  }
+  return count;
 }
