@@ -98,20 +98,24 @@ written down anywhere yet.
   into "whatever hits hardest". The document itself flags it as balance.
 - **The NPC redesign wholesale.** Their own advice, and ours.
 
-## Not yet verified
+## The remaining ten, now verified
 
-Listed so the next pass has a work list, not because they are dismissed:
+| # | Item | Verdict |
+|---|---|---|
+| 1 | Flux / energy underflow | **CLOSED.** Every debit validates first — cloak collapses when short, the droid hyperphaser returns below `HPMINFIR`, shields clamp at 0. `bigint`/`number` removes the wrapping class outright. |
+| 2 | Team code reuse | **CLOSED.** `teamcode` is the PRIMARY KEY and rows are never deleted; removal sets a `removed` flag. That is ge-next's tombstone, reached independently — and the schema comment records WHY, because canon's `teamcode = -1` collided the moment a second team emptied. |
+| 3 | Phaser spread bias, even-class truncation | **REFUSE.** They flag the phaser package as balance-affecting themselves. Ours is symmetric anyway: `withinArc` folds `abs(victimAngle - firingAngle)` to ≤180 and tests against `focus + PHABIAS`, so the beam is centred by construction. |
+| 4 | PRICE shows the owner the wrong base price | **CLOSED.** We implement canon's two-price rule (`BASEPRICE` to the owner, `markup2a` to everyone else, GECMDS.C:4437). A player already reported it as a bug — issue #1 — and it was canon. We added a line to the output saying so. |
+| 5 | `MAXPLREC` creation-failure handling | **N/A.** No fixed planet-record ceiling to fail against. |
+| 6 | Stale/malformed NPC records after a config change | **OPEN, low.** `hydrateAll` filters on `userid startsWith 'Cybrg-'` and skips `damage >= 100`, but does NOT check the saved `shpclass` against the slot's configured class. Change the class config and an old row loads as a class no longer configured for that slot. Admin-driven and rare; the symptom is a Cybertron of an unexpected class, not corruption. |
+| 7 | Zero-acceleration Cyber-Base entering movement code | **UNVERIFIED.** Our pursuit bands set `desiredSpeed`/`speed2b` without consulting `maxAcceleration`, so the shape of the bug is plausible here. Needs a read of the movement path against a zero-accel class. |
+| 8 | NPC classes crowding each other out | **PARTIAL — canon wins.** Canon's "first class below cap in table order" bias does not apply: `pickSpawnClass` picks UNIFORMLY among eligible classes. The 1% wildcard branch can still select a class already at its cap, which is the half that applies — but canon does not contradict itself there, so under the determinable-intent rule it stays. ge-next's slot-range allocator is a redesign they advise against copying. |
+| 9 | Scan `?` letters, stale/self locks | **UNVERIFIED.** `?` is our "never identified" sentinel and the SCAN1 fix earlier today depends on it. Whether a stale or self lock can survive is a separate question this audit did not reach. |
+| 10 | Mine slot magic value overloaded | **CLOSED.** `MINE_SLOT_FREE = 255` marks a free slot, and `MineState.deployedBy` carries a stable userid independent of it — which is exactly the separation they ask for. |
 
-- flux underflow — do we validate before subtracting, or subtract and check?
-- team code reuse and referential integrity (`teamcode` is stored on planets)
-- phaser beam spread biased to one side; even-numbered class truncation
-- `PRICE` showing an owner the wrong base price
-- `MAXPLREC` creation-failure handling
-- stale/malformed Cybertron records surviving a config change
-- zero-acceleration Cyber-Base entering movement code
-- NPC classes crowding each other out of the slot pool (`autortia`)
-- scan-table `?` letters and stale/self locks
-- "unused mine slot" vs "active mine with no owner" sharing one magic value
+**Tally across the whole document: one live defect (B-01, fixed), fifteen
+already handled or structurally impossible, two refused as balance, two
+unverified, one open at low priority.**
 
 ## Found on the way: `reference/ge-source/` is incomplete
 
