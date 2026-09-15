@@ -5947,3 +5947,43 @@ package); replacing `@nestjs/throttler` (it guards login against brute force and
 a hand-rolled replacement is very likely worse than a maintained library);
 taking TypeScript 7 now and rebuilding the dev loop (seven seconds, against the
 CLI's own statement that the limitation is temporary).
+
+## 2026-09-15 — SCANNAMES and SCANFULL default ON
+
+**Decision.** A player who has never run `set` now gets `scannames` and
+`scanfull` on. `scanhome` and `filter` keep canon's default. No option is
+removed.
+
+**Canon.** `GECMDS.C:5197-5201` defines exactly four options —
+`scannames`, `scanhome`, `scanfull`, `filter` — under `#define NUMOPTS 4`, and
+canon zeroes every `WARUSR.options[]` byte, so all four start off.
+
+**Why we deviate.** Canon's default was right for canon's display. A scan
+printed into the same scrolling log as combat and chatter, so extra detail cost
+you the screen, and making a pilot opt in was a real kindness. This port renders
+scans into a dedicated panel (`ScanPanel.tsx`) that is on screen either way —
+`scanfull` only decides whether the per-contact table inside it has rows. The
+cost the default was protecting against does not exist here, so the default was
+protecting nobody and hiding the distance readout a new pilot uses to decide
+fight-or-run.
+
+Raised by a player on 2026-09-15, two days after the game went public. Both of
+the deviation's halves matter: the reason for canon's value is identifiable, and
+it is identifiably absent here.
+
+**Why not remove the options, which is what was suggested.** They are canon by
+exact name, `scanhome` is a genuine preference rather than a vestige
+(append-vs-overwrite), and deleting a canon command's options is a far larger
+deviation than shipping different defaults for them. Anyone who wants the
+sparser readout keeps it.
+
+**Mechanism, and the bug it fixed on the way.** Registration writes
+`options: []`, so every slot is ABSENT rather than off — which means the reader
+can supply the default and existing accounts pick it up with no data migration.
+An explicit 0 is a player's choice and still outranks the default.
+
+`SetHandlerService` padded absent slots with `0` before writing one, so
+`set filter on` would have materialised slots 0-2 as zeros and silently switched
+off two options the player never touched. Padding now uses `OPTION_DEFAULTS`,
+which `set-options.catalog.ts` derives from the catalog itself — one source of
+truth for reader and writer.

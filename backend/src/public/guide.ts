@@ -67,7 +67,12 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'question you are really asking before a fight.',
   set:
     'Function keys are typed rather than pressed — `fset f1 pha 0 0`, then `f1` — ' +
-    'because a browser will not give up F11 or F12.',
+    'because a browser will not give up F11 or F12. ' +
+    '`scannames` and `scanfull` also start ON here, where the original started ' +
+    'them off. On a BBS a scan printed into the same scrolling text as ' +
+    'everything else, so the extra detail cost you the screen; here it has its ' +
+    'own panel, which is on show whether you use it or not. Turn either off and ' +
+    'it stays off — `scanhome` and `filter` are untouched.',
   new:
     'The original sold you a hull and dropped you back at the main menu, where ' +
     'your fleet was listed and you picked the new ship straight away. This port ' +

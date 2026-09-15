@@ -4,6 +4,7 @@ import { formatMessage, MessageId } from '../messages';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { UserRepository } from '../../player/user.repository';
+import { OPTION_DEFAULTS } from './set-options.catalog';
 
 /**
  * Registry entry for a toggleable ship option.
@@ -46,7 +47,7 @@ export class SetHandlerService {
           s.scanNames = value;
         });
         const options = [...((await users.getOptions(ship.userid)) ?? [])];
-        while (options.length <= 0) options.push(0);
+        while (options.length <= 0) options.push(OPTION_DEFAULTS[options.length] ?? 0);
         options[0] = value ? 1 : 0;
         await users.setOptions(ship.userid, options);
       },
@@ -60,7 +61,7 @@ export class SetHandlerService {
           s.scanHome = value;
         });
         const options = [...((await users.getOptions(ship.userid)) ?? [])];
-        while (options.length <= 1) options.push(0);
+        while (options.length <= 1) options.push(OPTION_DEFAULTS[options.length] ?? 0);
         options[1] = value ? 1 : 0;
         await users.setOptions(ship.userid, options);
       },
@@ -74,7 +75,7 @@ export class SetHandlerService {
           s.scanFull = value;
         });
         const options = [...((await users.getOptions(ship.userid)) ?? [])];
-        while (options.length <= 2) options.push(0);
+        while (options.length <= 2) options.push(OPTION_DEFAULTS[options.length] ?? 0);
         options[2] = value ? 1 : 0;
         await users.setOptions(ship.userid, options);
       },
@@ -88,7 +89,7 @@ export class SetHandlerService {
           s.msgFilter = value;
         });
         const options = [...((await users.getOptions(ship.userid)) ?? [])];
-        while (options.length <= 3) options.push(0);
+        while (options.length <= 3) options.push(OPTION_DEFAULTS[options.length] ?? 0);
         options[3] = value ? 1 : 0;
         await users.setOptions(ship.userid, options);
       },

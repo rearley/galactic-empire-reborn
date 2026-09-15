@@ -1,4 +1,5 @@
 import { ShipState } from './ship-state.types';
+import { OPTION_DEFAULTS } from '../commands/handlers/set-options.catalog';
 
 /**
  * The `User` columns a live ship caches, as `UserRepository.getSessionProfile`
@@ -47,8 +48,12 @@ export function applySessionProfile(
   // Ship.kills is per-hull and resets on every replacement.
   // @see GECYBS.C:441, :524
   if (profile?.kills != null) state.userKills = profile.kills;
-  state.scanNames = (profile?.options?.[0] ?? 0) === 1;
-  state.scanHome = (profile?.options?.[1] ?? 0) === 1;
-  state.scanFull = (profile?.options?.[2] ?? 0) === 1;
-  state.msgFilter = (profile?.options?.[3] ?? 0) === 1;
+  // An ABSENT slot takes the default; an explicit 0 is the player's choice and
+  // outranks it. Registration writes `options: []`, so existing accounts pick
+  // up a changed default with no data migration. @see set-options.catalog.ts
+  const opt = (i: number): boolean => (profile?.options?.[i] ?? OPTION_DEFAULTS[i]) === 1;
+  state.scanNames = opt(0);
+  state.scanHome = opt(1);
+  state.scanFull = opt(2);
+  state.msgFilter = opt(3);
 }
