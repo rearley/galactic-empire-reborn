@@ -268,6 +268,13 @@ jobs:
     # empty on a dispatch, which the step below already treats as "cannot
     # resolve the range, build anyway".
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Top-level is `contents: read`. The gate additionally reads this
+    # workflow's own run history to find the last commit that actually shipped
+    # an image; without `actions: read` that lookup 403s and the gate falls
+    # back to the push range for ever, silently.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       build: ${{ steps.decide.outputs.build }}
     steps:
@@ -280,6 +287,7 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
           # `.githooks/` is here because hooks run on a developer's machine and
@@ -301,13 +309,58 @@ jobs:
             exit 0
           fi
 
-          if ! CHANGED=$(git diff --name-only "$BEFORE" "$AFTER"); then
+          # THE BASE IS THE LAST COMMIT THAT SHIPPED, not the last push.
+          #
+          # `before` answers "what changed since the previous push". The gate
+          # needs "what changed since the previous push that produced an
+          # IMAGE", and the two diverge the moment a build-input push fails:
+          # on 2026-09-15 a lint failure stopped the build, the next push was
+          # test-only, and two releases sat on master while production served
+          # an older version. Both gate decisions were correct for their own
+          # push; the combination was not.
+          #
+          # A successful RUN is not enough — a test-only push is a green run
+          # with a SKIPPED build job, which is precisely the run that shipped
+          # nothing. So this matches the publish job by name and requires it to
+          # have concluded `success`.
+          BASE="$BEFORE"
+          LAST_SHIPPED=""
+          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=master&status=completed&per_page=20" \
+                   --jq '.workflow_runs[] | "\(.id) \(.head_sha)"' 2>/dev/null || true)
+          while read -r RUN_ID RUN_SHA; do
+            [ -n "${RUN_ID:-}" ] || continue
+            SHIPPED=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs" \
+                        --jq '[.jobs[] | select(.name | startswith("Build and publish images")) | .conclusion] | index("success")' \
+                        2>/dev/null || true)
+            if [ -n "$SHIPPED" ] && [ "$SHIPPED" != "null" ]; then
+              LAST_SHIPPED="$RUN_SHA"
+              break
+            fi
+          done <<< "$RUNS"
+
+          if [ -n "$LAST_SHIPPED" ] && git cat-file -e "${LAST_SHIPPED}^{commit}" 2>/dev/null; then
+            if [ "$LAST_SHIPPED" = "$AFTER" ]; then
+              echo "This commit already shipped; nothing to rebuild."
+              echo "build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Last commit that shipped an image: $LAST_SHIPPED"
+            BASE="$LAST_SHIPPED"
+          else
+            # Not fatal. Falling back to the push range is the old behaviour,
+            # and the layer under THAT is building anyway — because the one
+            # outcome worse than a redundant build is a deploy that silently
+            # did not happen.
+            echo "Could not resolve the last shipped commit — falling back to the push range."
+          fi
+
+          if ! CHANGED=$(git diff --name-only "$BASE" "$AFTER"); then
             echo "git diff failed across the range — building."
             echo "build=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "Changed in this push:"
+          echo "Changed since $BASE:"
           echo "$CHANGED" | sed 's/^/  /'
 
           RELEVANT=$(echo "$CHANGED" | grep -Ev "$NOT_A_BUILD_INPUT" || true)

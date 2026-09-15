@@ -84,3 +84,58 @@ describe('a manual dispatch can ship', () => {
     expect(ci).toMatch(/^\s*workflow_dispatch:\s*$/m);
   });
 });
+
+/**
+ * The gate compares against the last commit that actually SHIPPED.
+ *
+ * 2026-09-15, the second half of the same incident. A push carrying source
+ * changes failed lint, so no image was built. The next push was test-only, so
+ * the gate said "nothing here reaches an image" — correctly, for that push —
+ * and two releases sat on master while production served an older version.
+ * Both decisions were right in isolation; the combination was wrong, because
+ * the gate only ever knew about ONE push.
+ *
+ * `github.event.before` answers "what changed since the last push". The
+ * question the gate actually needs answered is "what changed since the last
+ * push that produced an image", and only the build job's own history knows
+ * that. So the gate asks the Actions API for the most recent run whose publish
+ * job succeeded, and diffs from THAT commit.
+ *
+ * Failing to resolve it is not fatal — it falls back to the push range, then to
+ * building — because the one outcome worse than a redundant build is a deploy
+ * that silently did not happen.
+ */
+describe('the build gate diffs from the last shipped commit', () => {
+  const gate = (): string => {
+    const at = ci.indexOf('name: Build needed?');
+    return ci.slice(at, ci.indexOf('name: Build and publish images'));
+  };
+
+  it('asks the Actions API which run last published', () => {
+    expect(gate()).toMatch(/actions\/workflows\/ci\.yml\/runs|actions\/runs\/.*\/jobs/);
+  });
+
+  it('matches the publish job by name, so a skipped build does not count', () => {
+    // A test-only push is a SUCCESSFUL run with a SKIPPED build job. Taking the
+    // last green run would have picked exactly the run that shipped nothing —
+    // which is the bug, restated.
+    expect(gate()).toMatch(/Build and publish images/);
+    expect(gate()).toMatch(/success/);
+  });
+
+  it('grants the job permission to read that history', () => {
+    // Top-level permissions are contents: read. Without actions: read the
+    // lookup returns 403 and the gate silently falls back forever.
+    expect(gate()).toMatch(/actions:\s*read/);
+  });
+
+  it('falls back rather than failing closed', () => {
+    // Three layers: last-shipped, then the push range, then build anyway.
+    expect(gate()).toMatch(/build=true/);
+    expect(gate()).toMatch(/BEFORE/);
+  });
+
+  it('still lets an unresolvable range force a build', () => {
+    expect(gate()).toMatch(/Cannot resolve the push range/);
+  });
+});
