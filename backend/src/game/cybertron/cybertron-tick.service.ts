@@ -88,6 +88,7 @@ import {
   canPursue,
   notClaimed,
   countCybertronClaims,
+  isStationaryClass,
   shouldTaunt,
   creditsAreOwed,
   escalationKills,
@@ -1013,9 +1014,18 @@ export class CybertronTickService implements OnModuleInit {
 
     // The target's own motion decides the combat band: canon matches a runner
     // that has gone to hyperspace rather than crawling at 990. @see GECYBS.C:793-796
+    // A Base Star is configured immobile (S23ACCL 0, S23WARP 0) and canon's
+    // hyperwarp band moves it anyway. @see cyb-decisions.isStationaryClass
+    const hullClass = this.shipClassCache.get(ship.shpclass);
+    const stationary = isStationaryClass(
+      hullClass?.maxAcceleration ?? 0,
+      hullClass?.maxWarp ?? 0,
+    );
+
     const band = pickPursuitBand(
       dist, hyperdist1, hyperdist2, prevWhere, topSpeed, this.random,
       { where: target.where, speed2b: target.speed2b },
+      stationary,
     );
 
     // cyb_annoy in the pursuit ladder. C taunts in three of the four bands and

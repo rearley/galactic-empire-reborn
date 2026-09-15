@@ -107,15 +107,19 @@ written down anywhere yet.
 | 3 | Phaser spread bias, even-class truncation | **REFUSE.** They flag the phaser package as balance-affecting themselves. Ours is symmetric anyway: `withinArc` folds `abs(victimAngle - firingAngle)` to ≤180 and tests against `focus + PHABIAS`, so the beam is centred by construction. |
 | 4 | PRICE shows the owner the wrong base price | **CLOSED.** We implement canon's two-price rule (`BASEPRICE` to the owner, `markup2a` to everyone else, GECMDS.C:4437). A player already reported it as a bug — issue #1 — and it was canon. We added a line to the output saying so. |
 | 5 | `MAXPLREC` creation-failure handling | **N/A.** No fixed planet-record ceiling to fail against. |
-| 6 | Stale/malformed NPC records after a config change | **OPEN, low.** `hydrateAll` filters on `userid startsWith 'Cybrg-'` and skips `damage >= 100`, but does NOT check the saved `shpclass` against the slot's configured class. Change the class config and an old row loads as a class no longer configured for that slot. Admin-driven and rare; the symptom is a Cybertron of an unexpected class, not corruption. |
-| 7 | Zero-acceleration Cyber-Base entering movement code | **UNVERIFIED.** Our pursuit bands set `desiredSpeed`/`speed2b` without consulting `maxAcceleration`, so the shape of the bug is plausible here. Needs a read of the movement path against a zero-accel class. |
+| 6 | Stale/malformed NPC records after a config change | **FIXED.** `hydrateAll` filters on `userid startsWith 'Cybrg-'` and skips `damage >= 100`, but does NOT check the saved `shpclass` against the slot's configured class. Change the class config and an old row loads as a class no longer configured for that slot. `hydrateAll` now checks the saved class against the configured CPU_COMBATIVE set and skips (does not delete — `createSpawn` upserts the slot anyway). The guard FAILS OPEN on an empty class table: rejecting everything there would empty the galaxy of AI at boot, which `persistence.spec.ts` caught by using a real database and seeding no classes. |
+| 7 | Zero-acceleration Cyber-Base entering movement code | **CONFIRMED, FIXED.** Real, and latent rather than live. Canon's data says immobile (`S23ACCL 0`, `S23WARP 0`) and the hyperwarp band writes `ptr->speed` directly with no bound — measured at 100,000 units for a target 50 sectors out. Unreachable today only because `S23LATK 20` means the base attacks classes 20+ and players fly 1-9; that is a sysop tunable, not a fix. `isStationaryClass` now withholds the movement half of the band while leaving shields and heading alone. The fix is NOT a speed clamp: hyperwarp is deliberately unbounded ("20 X normal speed", GECYBS.C:744), so clamping to `topSpeed` would break every mobile Cybertron. |
 | 8 | NPC classes crowding each other out | **PARTIAL — canon wins.** Canon's "first class below cap in table order" bias does not apply: `pickSpawnClass` picks UNIFORMLY among eligible classes. The 1% wildcard branch can still select a class already at its cap, which is the half that applies — but canon does not contradict itself there, so under the determinable-intent rule it stays. ge-next's slot-range allocator is a redesign they advise against copying. |
-| 9 | Scan `?` letters, stale/self locks | **UNVERIFIED.** `?` is our "never identified" sentinel and the SCAN1 fix earlier today depends on it. Whether a stale or self lock can survive is a separate question this audit did not reach. |
+| 9 | Scan `?` letters, stale/self locks | **CLOSED.** `findShip`'s `@` path excludes self explicitly and re-validates the lock on every use — `isIngame` then `inScanRange`, each clearing it (`clearedLock: true`) when it fails. It prefers the composite `lockKey` over a bare `shipno`, with a note explaining that every droid and every player's first ship is shipno 1. `?` is canon's own unidentified sentinel, not a defect. |
 | 10 | Mine slot magic value overloaded | **CLOSED.** `MINE_SLOT_FREE = 255` marks a free slot, and `MineState.deployedBy` carries a stable userid independent of it — which is exactly the separation they ask for. |
 
-**Tally across the whole document: one live defect (B-01, fixed), fifteen
-already handled or structurally impossible, two refused as balance, two
-unverified, one open at low priority.**
+**Final tally across the whole document: three defects found and fixed (B-01,
+#6, #7), sixteen already handled or structurally impossible, two refused as
+balance, nothing left open.**
+
+Of the three, only B-01 was reachable in normal play. #7 was latent behind a
+sysop tunable and #6 behind a configuration change — both worth fixing because
+"unreachable because of a setting" is not the same as fixed.
 
 ## Found on the way: `reference/ge-source/` is incomplete
 

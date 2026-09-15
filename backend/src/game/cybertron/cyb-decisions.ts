@@ -112,6 +112,24 @@ export function rollTorpedoCount(
 }
 
 /**
+ * A class that can neither accelerate nor warp is a STATION.
+ *
+ * Canon configures exactly one: the Cybertron Base Star, `S23ACCL 0` and
+ * `S23WARP 0` in `MBMGESHP.MSG`. The pursuit code ignores both and writes
+ * `ptr->speed` directly in the hyperwarp band
+ * (@see GECYBS.C:746 `		ptr->speed = ptr->speed2b;`), so a distant target sends
+ * a base across the galaxy at twenty times normal speed. Class data
+ * contradicted by the code that reads it. @see docs/DECISIONS.md 2026-09-15
+ *
+ * BOTH must be zero, deliberately. A hull that can accelerate but not warp
+ * still moves, and so does the reverse; requiring both keeps this to the shape
+ * canon actually configures rather than guessing at partial data.
+ */
+export function isStationaryClass(maxAcceleration: number, maxWarp: number): boolean {
+  return maxAcceleration === 0 && maxWarp === 0;
+}
+
+/**
  * Select pursuit speed band based on distance to target.
  * Returns the desired speed, where flag, and shield adjustments.
  * @see GECYBS.C:742-801 cyb_check_lockon — four-band selection
@@ -129,7 +147,20 @@ export function pickPursuitBand(
    * @see GECYBS.C:793-796
    */
   target: { where: number; speed2b: number },
+  /**
+   * True for a station. It still turns, taunts and fights — only the movement
+   * half of the decision is withheld, because a clamp cannot express this:
+   * hyperwarp is deliberately unbounded ("20 X normal speed", GECYBS.C:744),
+   * so bounding the band by `topSpeed` would break every mobile Cybertron.
+   */
+  stationary = false,
 ): PursuitBand {
+  if (stationary) {
+    // No `speed`, no `speedClamp`, no `where`: nothing that moves it or puts
+    // it into hyperspace. Shields still go up, on the same rule as the close
+    // and combat bands — a base defends itself.
+    return { desiredSpeed: 0, raiseShields: currentWhere === 0 };
+  }
   if (distance >= hyperdist1) {
     // Hyperwarp band — 20x speed, shields down. C snaps `ptr->speed` straight
     // to speed2b here rather than accelerating into it. @see GECYBS.C:745-746

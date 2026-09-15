@@ -67,10 +67,23 @@ export class CybertronRepository {
    * @see specs/007-cybertron-ai/plan.md R-7 (single Cybrg- prefix covers Sarterns too)
    */
   async hydrateAll(): Promise<void> {
-    const users = await this.prisma.user.findMany({
-      where: { userid: { startsWith: 'Cybrg-' } },
-      include: { ships: true },
-    });
+    const [users, configured] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { userid: { startsWith: 'Cybrg-' } },
+        include: { ships: true },
+      }),
+      // The sysop's configuration is the authority on what a Cybertron IS, and
+      // it is the thing that changes. @see ge-next review item #6
+      this.prisma.shipClass.findMany({
+        where: { category: 'CPU_COMBATIVE' },
+        select: { classNumber: true },
+      }),
+    ]);
+    // EMPTY means "could not determine the configuration", not "no class is
+    // configured". Rejecting everything on an unseeded or unreachable
+    // ShipClass table would empty the galaxy of AI on boot — a far worse
+    // failure than the ghost hull this guard exists to stop. Fail open.
+    const configuredClasses = new Set(configured.map((c) => c.classNumber));
 
     let count = 0;
     for (const user of users) {
@@ -89,6 +102,23 @@ export class CybertronRepository {
         // a phantom COMBAT_SHIP_DESTROYED to all clients. The spawn-slot
         // tick replenishes the slot via createSpawn (upsert).
         if (ship.damage >= 100) continue;
+
+        // A class that is no longer a configured Cybertron. Remove one from the
+        // configuration and its saved rows still loaded, as hulls the class
+        // cache cannot resolve — `?? 1` topspeed, `?? 0` acceleration, no
+        // category, no `noClaim`. It does not crash; it flies a ghost.
+        //
+        // SKIPPED, not deleted: deleting live rows during boot is a much larger
+        // promise than this evidence supports, and it is not needed —
+        // `createSpawn` upserts on (userid, shipno), so the slot is reclaimed
+        // by the next spawn either way.
+        if (configuredClasses.size > 0 && !configuredClasses.has(ship.shpclass)) {
+          this.logger.warn(
+            `Skipping ${ship.userid}:${ship.shipno} — class ${ship.shpclass} is no longer ` +
+            'a configured Cybertron class. The spawn tick will reclaim the slot.',
+          );
+          continue;
+        }
 
         const state = prismaShipToState(ship as Parameters<typeof prismaShipToState>[0]);
         state.status = 2; // GESTAT_AUTO
