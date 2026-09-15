@@ -16,6 +16,12 @@ export interface ScanAnnouncement {
   bearing: number;
   /** Present on SCAN1 only. */
   scannerName?: string;
+  /**
+   * The scantab letter the SCANNED ship knows the scanner by — SCAN1's `%c`.
+   * Present on SCAN1 only, and it is also the branch condition: canon tests
+   * `ltr == '?'`. @see GECMDS.C:2277 `prfmsg(SCAN1,ltr,warsptr->shipname);`
+   */
+  letter?: string;
 }
 
 /**
@@ -41,7 +47,13 @@ export interface ScanAnnouncement {
 export function decideScanAnnouncement(
   scanner: { shipname: string; xcoord: number; ycoord: number },
   target: { xcoord: number; ycoord: number; heading: number; scanRange: number },
-  targetKnowsScanner: boolean,
+  /**
+   * The letter this target has the scanner filed under, or null/'?' if it has
+   * never identified them. Canon branches on the LETTER rather than on a
+   * boolean (`ltr == '?'`), and SCAN1 then prints it — passing a boolean is
+   * what left `%c` to be filled by the ship name and `%s` by nothing.
+   */
+  targetsLetterForScanner: string | null,
 ): ScanAnnouncement {
   // Signed -180..180, from the TARGET's frame toward the scanner:
   // cbearing(&wptr->coord, &warsptr->coord, wptr->heading). This is the number
@@ -52,6 +64,13 @@ export function decideScanAnnouncement(
 
   const distRaw = cdistance(target, scanner) * 10_000;
   if (distRaw > target.scanRange) return { kind: 'SCAN2', bearing };
-  if (!targetKnowsScanner) return { kind: 'SCAN3', bearing };
-  return { kind: 'SCAN1', bearing, scannerName: scanner.shipname };
+  if (targetsLetterForScanner === null || targetsLetterForScanner === '?') {
+    return { kind: 'SCAN3', bearing };
+  }
+  return {
+    kind: 'SCAN1',
+    bearing,
+    letter: targetsLetterForScanner,
+    scannerName: scanner.shipname,
+  };
 }

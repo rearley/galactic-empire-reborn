@@ -1197,9 +1197,33 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // every taunt TWICE to a target standing in the taunter's own sector — the
     // ordinary case, since that is where a Cybertron does its taunting.
     // Bystanders in that sector still see the exchange.
+    // FILTER, not ALWAYS:
+    //
+    //   if (class == FILTER && (warusroff(shpno)->options[MSG_FILTER] == TRUE))
+    //     { clrprf(); return; }
+    //
+    // @see GEMAIN.C:2563 `if (class == FILTER && (warusroff(shpno)->options[MSG_FILTER] == TRUE))`
+    //      — the message is DROPPED for any pilot who set the
+    // option, and `cyb_annoy` sends with `outprfge(FILTER,usrn)`
+    // (@see GECYBS.C:403). So `set filter on` silences taunts, INCLUDING the
+    // target's own copy,
+    // since `usrn` in `outprfge(FILTER, usrn)` IS the taunted pilot. The port
+    // emitted unconditionally, so the one option for quieting the galaxy did
+    // nothing about the chattiest thing in it.
+    //
+    // Excluded by room rather than by filtering a recipient list, because this
+    // is a two-room emit; same shape as the kill broadcast's exclusion list.
+    // @see ship-destroyed.service.ts
+    const quiet = new Set(
+      this.shipStateService
+        .findAllShips()
+        .filter((s) => s.msgFilter)
+        .map((s) => `user:${s.userid}`),
+    );
     this.server
       .to(`user:${useridOf(event.targetShipKey)}`)
       .to(`sector:${event.sector.x}:${event.sector.y}`)
+      .except([...quiet])
       .emit(CYBERTRON_EVENT.TAUNT, event);
   }
 

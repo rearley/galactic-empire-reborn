@@ -45,6 +45,9 @@ describe('GameGateway — a Cybertron taunt reaches the pilot it is aimed at', (
         const rooms = [room];
         const node = {
           to: (r: string) => { rooms.push(r); return node; },
+          // Fluency only — which users are excluded is asserted by
+          // cybertron-taunt-filter.spec.ts; no ship here has msgFilter set.
+          except: () => node,
           emit: (event: string, payload: unknown) => {
             for (const r of rooms) roomEmits.push({ room: r, event, payload });
           },

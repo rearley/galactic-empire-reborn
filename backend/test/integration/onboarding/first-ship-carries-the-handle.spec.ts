@@ -9,7 +9,8 @@
  * `Commanded by: usr_9d4ddc16bfb77c21e5b1afcd`, and it self-healed on their
  * next connection, which is why nobody who was already playing ever saw it.
  *
- * @see src/game/ship/display-name.ts  @see GEFUNCS.C:2596 username()
+ * @see src/game/ship/display-name.ts
+ * @see GEFUNCS.C:2596 `char    * FUNC username(ptr)`
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';

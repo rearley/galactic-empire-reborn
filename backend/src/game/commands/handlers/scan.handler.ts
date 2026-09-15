@@ -503,18 +503,20 @@ export class ScanHandlerService {
     // `ltr == '?'` — has the scanned ship ever scanned the scanner?
     const targetTab = this.getScantab(target.userid, target.shipno);
     const scannerKey = `${scanner.userid}#${scanner.shipno}`;
-    const knows =
-      targetTab?.some((e) => e.shipKey === scannerKey && e.letter !== '?') ?? false;
+    // The LETTER, not a boolean. This line used to compute `knows` by finding
+    // the scantab entry and then discarding it — so SCAN1's `%c` had nothing to
+    // print and the ship name fell into it instead. @see scan-announce.ts
+    const letter = targetTab?.find((e) => e.shipKey === scannerKey)?.letter ?? null;
 
     const a = decideScanAnnouncement(
       { shipname: scanner.shipname, xcoord: scanner.xcoord, ycoord: scanner.ycoord },
       { xcoord: target.xcoord, ycoord: target.ycoord, heading: target.heading, scanRange: targetRange },
-      knows,
+      letter,
     );
 
     const text =
       a.kind === 'SCAN1'
-        ? formatMessage(MessageId.SCAN1, a.scannerName ?? '?')
+        ? formatMessage(MessageId.SCAN1, a.letter ?? '?', a.scannerName ?? '')
         : a.kind === 'SCAN2'
           ? formatMessage(MessageId.SCAN2, a.bearing)
           : formatMessage(MessageId.SCAN3, a.bearing);

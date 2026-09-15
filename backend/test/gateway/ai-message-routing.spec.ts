@@ -25,8 +25,12 @@ type Emit = { rooms: string[]; event: string };
 function build() {
   const emits: Emit[] = [];
   const gateway = makeGateway({ random: mockRandom });
+  // `.except()` models Socket.io's exclusion list. The taunt path uses it to
+  // drop pilots with `set filter on`; this double ignores WHO is excluded and
+  // only has to keep the chain fluent. @see cybertron-taunt-filter.spec.ts
   const chain = (rooms: string[]) => ({
     to: (r: string) => chain([...rooms, r]),
+    except: () => chain(rooms),
     emit: (event: string) => { emits.push({ rooms, event }); },
   });
   (gateway as unknown as { server: unknown }).server = { to: (r: string) => chain([r]) };

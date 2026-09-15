@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 97 entries.
+Append-only, **newest at the bottom**. 98 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-15 — two messages players caught within an hour of each other](#2026-09-15--two-messages-players-caught-within-an-hour-of-each-other)
 - [2026-09-15 — the first player from the Discord was announced by account key](#2026-09-15--the-first-player-from-the-discord-was-announced-by-account-key)
 - [2026-09-15 — measuring the disconnect window before fixing it](#2026-09-15--measuring-the-disconnect-window-before-fixing-it)
 - [2026-09-14 — a support link that a fork cannot inherit](#2026-09-14--a-support-link-that-a-fork-cannot-inherit)
@@ -6965,3 +6966,46 @@ something other than an Interceptor.
 
 Held from deploy at the player's request — they were mid-session, and a restart
 would have bounced the very person the fix is for.
+
+## 2026-09-15 — two messages players caught within an hour of each other
+
+Both found by new arrivals, both in message plumbing, and neither reachable by
+anyone who had been playing a while.
+
+**1. A Cybertron taunt ignored `set filter on`.** Canon sends every taunt with
+`outprfge(FILTER,usrn)` (GECYBS.C:403), and `GEMAIN.C:2563` drops a
+FILTER-class message for any pilot who set the option. The port honoured
+`msgFilter` for arrival/departure notices and the kill broadcast but emitted
+taunts unconditionally — so the one option a pilot has for quieting the galaxy
+did nothing about the chattiest thing in it. The exclusion now covers the
+TARGET's own copy too, because `usrn` in canon's call IS the taunted pilot.
+
+Found while answering a different question: a player reported being hailed by a
+Cybertron they could not see, which turned out to be correct canon behaviour —
+the first taunt fires from the brake band at `hyperdist2`, ten sectors out,
+exactly the edge of an Interceptor's 100 000-unit scanner. Checking that led to
+the filter gap beside it.
+
+**2. SCAN1 was passing one field to a two-field message.**
+
+```
+Sir! We are being scanned by Ship B, The .
+```
+
+`SCAN1` is `'***\nSir! We are being scanned by Ship %c, The %s.'` and canon
+calls it `prfmsg(SCAN1,ltr,warsptr->shipname)` (GECMDS.C:2277) — a scantab
+letter, then the hull name. The port passed `scannerName` alone, so the name
+landed in `%c` and rendered as its first character while `%s` got nothing.
+
+The letter was never carried at all. `buildScanAnnouncement` computed whether
+the target knew the scanner by FINDING the scantab entry and then throwing the
+entry away, keeping only a boolean. Canon's own condition is `ltr == '?'`, so
+the letter IS the branch — carrying it makes the missing field and the test the
+same thing, and `decideScanAnnouncement` now takes `string | null` rather than
+a boolean. The type change made every stale call site a compile error rather
+than a silent wrong answer.
+
+Worth noting what the shape of both bugs has in common with the onboarding one
+earlier the same day: in all three, the value existed and the code that needed
+it simply was not given it. None was a logic error. A type that could not
+express the wrong thing would have caught two of the three.

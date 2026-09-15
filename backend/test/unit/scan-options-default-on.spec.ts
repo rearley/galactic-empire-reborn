@@ -9,7 +9,8 @@
  * no longer exists. Raised by a player on 2026-09-15.
  *
  * The options themselves are NOT removed. They are canon by exact name
- * (GECMDS.C:5197-5201) and anyone who wants a sparser readout keeps it.
+ * (GECMDS.C:5197 `char	*options[NUMOPTS]={`) and anyone who wants a sparser
+ * readout keeps it.
  *
  * @see docs/DECISIONS.md 2026-09-15  @see GUIDE_DEVIATIONS
  */
