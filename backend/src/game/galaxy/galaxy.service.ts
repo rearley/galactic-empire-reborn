@@ -11,6 +11,12 @@ import { loadGalaxyConfig } from './galaxy.config';
 import { Rng } from './rng';
 import { rollPlanetInventory } from './planet-seed';
 import { S00, S00_PLNUM } from './s00';
+import {
+  planReturnWormholes,
+  occupancyFromSectors,
+  sectorKey,
+  type WormholeLike,
+} from './wormhole-pairing';
 import { GalaxyConfig, GalaxyWormholeView } from './galaxy.types';
 import { GravityBody } from '../physics/gravity';
 
@@ -217,7 +223,7 @@ export class GalaxyService implements OnModuleInit {
     const rng = new Rng(cfg.seed);
 
     // Origin sector (0,0) — generated s00 fixture, @see tools/extract-s00.mjs
-    await this.generateOrigin(tx, rng);
+    const originWormholes = await this.generateOrigin(tx, rng);
 
     // All remaining sectors in row-major y,x order
     // @see specs/004-galaxy-generator/research.md Decision 6
@@ -236,6 +242,16 @@ export class GalaxyService implements OnModuleInit {
         this.generateSector(buf, rng, x, y, cfg);
       }
     }
+
+    // Pair the wormholes. Canon does this at creation, sector by sector, because
+    // it builds a sector the first time someone flies into one; this generator
+    // builds the whole galaxy up front, so the pass runs over the finished set —
+    // the first point at which a destination sector's occupancy is known.
+    // Without it every hole in the galaxy was one-way, which is canon's
+    // documented FAILURE case ("too bad, this wormhole is a one way bugger",
+    // @see GEPLANET.C:406 `   wormhole is a one way bugger.`) applied
+    // universally. @see wormhole-pairing.ts
+    this.pairWormholes(buf, originWormholes, cfg.maxplanets);
 
     await this.flushBuffer(tx, buf);
 
@@ -333,7 +349,12 @@ export class GalaxyService implements OnModuleInit {
   private async generateOrigin(
     tx: Prisma.TransactionClient,
     rng: Rng,
-  ): Promise<void> {
+  ): Promise<WormholeLike[]> {
+    // Collected and returned rather than buffered: these rows are written here
+    // directly, but the pairing pass still has to see them or a hole out of the
+    // neutral zone — the busiest one in the game, since every new pilot starts
+    // beside it — would be the one hole left with no way back.
+    const originWormholes: WormholeLike[] = [];
     await tx.sector.create({
       data: { xsect: 0, ysect: 0, plnum: 0, type: SECTYPE_NORMAL, numplan: S00_PLNUM },
     });
@@ -371,6 +392,11 @@ export class GalaxyService implements OnModuleInit {
             // build_worm copies the fixture name — GEPLANET.C:806
             name: entry.name,
           },
+        });
+        originWormholes.push({
+          xsect: 0, ysect: 0, plnum,
+          xcoord, ycoord,
+          destXcoord: destX + 0.5, destYcoord: destY + 0.5,
         });
         continue;
       }
@@ -415,6 +441,44 @@ export class GalaxyService implements OnModuleInit {
           ...items,
         },
       });
+    }
+    return originWormholes;
+  }
+
+  /**
+   * Add the return half of every wormhole that can have one.
+   *
+   * Mutates the buffer: pushes the new rows and bumps each receiving sector's
+   * `numplan`, which is canon's `sector.numplan++` after the insert
+   * (@see GEPLANET.C:444 `			sector.numplan++;`).
+   *
+   * The origin sector is seeded as full so it can never RECEIVE one — see
+   * `occupancyFromSectors`. Its own outbound holes are passed in and paired
+   * normally.
+   */
+  private pairWormholes(
+    buf: GenerationBuffer,
+    originWormholes: readonly WormholeLike[],
+    maxPlanets: number,
+  ): void {
+    const occupancy = occupancyFromSectors(buf.sectors, maxPlanets);
+    const plan = planReturnWormholes(
+      [...originWormholes, ...(buf.wormholes as WormholeLike[])],
+      occupancy,
+      maxPlanets,
+    );
+
+    const sectorByKey = new Map(buf.sectors.map((sec) => [sectorKey(sec.xsect, sec.ysect), sec]));
+    for (const ret of plan) {
+      buf.wormholes.push({
+        ...ret,
+        type: PLTYPE_WORM,
+        // @see GEPLANET.C:429 `			worm.visible = 1;`
+        visible: 1,
+        name: '',
+      });
+      const sec = sectorByKey.get(sectorKey(ret.xsect, ret.ysect));
+      if (sec) sec.numplan = (sec.numplan ?? 0) + 1;
     }
   }
 

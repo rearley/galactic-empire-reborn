@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 98 entries.
+Append-only, **newest at the bottom**. 99 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-15 — every wormhole in the galaxy was one-way](#2026-09-15--every-wormhole-in-the-galaxy-was-one-way)
 - [2026-09-15 — two messages players caught within an hour of each other](#2026-09-15--two-messages-players-caught-within-an-hour-of-each-other)
 - [2026-09-15 — the first player from the Discord was announced by account key](#2026-09-15--the-first-player-from-the-discord-was-announced-by-account-key)
 - [2026-09-15 — measuring the disconnect window before fixing it](#2026-09-15--measuring-the-disconnect-window-before-fixing-it)
@@ -7009,3 +7010,55 @@ Worth noting what the shape of both bugs has in common with the onboarding one
 earlier the same day: in all three, the value existed and the code that needed
 it simply was not given it. None was a logic error. A type that could not
 express the wrong thing would have caught two of the three.
+
+## 2026-09-15 — every wormhole in the galaxy was one-way
+
+A player took the wormhole in sector (0,0) slot 4, and there was nothing in the
+sector she landed in to come back through.
+
+Canon pairs wormholes, and Murdock left a note explaining it to his future self
+(`GEPLANET.C:392-407`). The generator creates the destination sector, then
+inserts a return hole into its next free planet slot — and one-way is the
+documented FALLBACK, taken only when that sector already holds nine planets:
+*"then too bad, this wormhole is a one way bugger."*
+
+This port wrote one row per hole and no return anywhere, so canon's failure case
+was universal. Every wormhole in the galaxy was one-way.
+
+**Two things made this more than a missing line.**
+
+The first is WHERE a return goes. Canon puts it exactly where the traveller
+lands and points it exactly at the mouth they came from. That cannot be copied
+here, because this port delivers you to the CENTRE of the destination sector (a
+deliberate convention, pinned by `galaxy-balance` G8.3/G8.4) — so a
+canon-placed return would sit precisely on the arrival point and drag the
+traveller straight back out. The return now takes the same position WITHIN its
+sector that the original takes within its own: deterministic, needs no RNG
+(the backfill has none), and leaves a short flight to a hole you can see on scan
+rather than a trapdoor underfoot.
+
+The second is that canon pairs at creation, sector by sector, because it builds
+a sector the first time someone flies into one. This generator builds the whole
+galaxy up front, so pairing is a pass over the finished set — the first point at
+which a destination sector's occupancy is known. That is why the rule is a
+function rather than a few lines inside the generator: **the same pass has to
+run against a live galaxy generated before the rule existed.**
+
+Hence `tools/backfill-wormhole-returns.ts`. It is a dry run by default, inserts
+only, never touches sector (0,0), never exceeds `maxplanets`, takes `plnum` from
+the highest in use rather than a count (a live galaxy can have gaps), and is
+idempotent — a hole that already has a return is skipped, so a second run
+writes nothing. Not yet run against production.
+
+The origin sector is deliberately never added TO: its contents are canon-fixed
+`S00P*` data from `MBMGEMSG.MSG`, written outside the generation buffer. Holes
+pointing OUT of it are paired normally, which is the direction that strands
+people — and is exactly what this player hit.
+
+**The existing suite caught both of my mistakes.** G8.3/G8.4 rejected the first
+placement scheme, which is what surfaced the drag-back problem; G7.2's density
+model was written against roll odds alone and had to learn about pairing, so it
+now bounds the count between "nothing could be paired" and "everything was",
+with a new G7.3 asserting the coverage that actually matters. The citation
+ratchet then caught a wrong line number — `worm.visible = 1` is `GEPLANET.C:429`,
+not the `:436` I first wrote.

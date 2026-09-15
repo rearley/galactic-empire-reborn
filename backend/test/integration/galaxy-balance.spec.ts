@@ -103,13 +103,43 @@ describe('GalaxyService balance and wormhole integrity (G7, G8)', () => {
     expect(density).toBeLessThanOrEqual(expected * (1 + TOLERANCE));
   });
 
-  it('G7.2 — wormhole DENSITY matches what the tunables predict', async () => {
+  it('G7.2 — wormhole DENSITY sits between the rolled count and twice it', async () => {
+    // The tunables predict how many wormhole MOUTHS get rolled. Since
+    // 2026-09-15 the generator also pairs them, adding a return hole for every
+    // one whose destination sector has a free slot — so the table holds the
+    // rolled mouths PLUS up to that many again. @see wormhole-pairing.ts
+    //
+    // The bounds are therefore the two honest extremes: no hole could be paired
+    // (every destination sector full) and every hole was. Anything outside them
+    // means the roll odds moved or the pairing pass stopped working, which is
+    // what this test is for. G7.3 checks that pairing actually happened.
     const count = await prisma.wormhole.count();
     const sectors = (2 * UNIVMAX + 1) ** 2;
     const density = count / sectors;
     const { wormholes: expected } = await expectedDensities();
     expect(density).toBeGreaterThanOrEqual(expected * (1 - TOLERANCE));
-    expect(density).toBeLessThanOrEqual(expected * (1 + TOLERANCE));
+    expect(density).toBeLessThanOrEqual(2 * expected * (1 + TOLERANCE));
+  });
+
+  it('G7.3 — almost every wormhole has a return', async () => {
+    // The invariant the density bound above cannot express, and the one a
+    // player actually feels. Canon pairs wormholes and leaves one-way holes
+    // only where the destination sector is full ("too bad, this wormhole is a
+    // one way bugger" — @see GEPLANET.C:406 `   wormhole is a one way bugger.`).
+    // Before 2026-09-15 this port paired
+    // none of them, and a pilot who took one was stranded.
+    const wormholes = await prisma.wormhole.findMany({
+      select: { xsect: true, ysect: true, destXcoord: true, destYcoord: true },
+    });
+    const links = new Set(
+      wormholes.map((w) => `${w.xsect},${w.ysect}->${Math.floor(w.destXcoord)},${Math.floor(w.destYcoord)}`),
+    );
+    const oneWay = wormholes.filter(
+      (w) => !links.has(`${Math.floor(w.destXcoord)},${Math.floor(w.destYcoord)}->${w.xsect},${w.ysect}`),
+    );
+    // A full destination sector is canon's own exception, and the origin sector
+    // is deliberately never added to, so a handful is expected — a fifth is not.
+    expect(oneWay.length / wormholes.length).toBeLessThan(0.2);
   });
 
   // ── G8: Wormhole destination coordinate integrity ────────────────────────────
