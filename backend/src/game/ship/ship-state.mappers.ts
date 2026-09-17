@@ -2,6 +2,18 @@ import { Ship, Prisma } from '../../prisma/client';
 import { ShipState } from './ship-state.types';
 
 /**
+ * Three empty tubes, because GEMAIN.H:125 `#define MAXTORPS 3` and MAXMISSL
+ * matches it, and the tick walks fixed slots. So the array is always that
+ * length: production carries rows with `{}` and `{0,0}` in these columns, and a
+ * short one is a hull with tubes that do not exist rather than fewer of them.
+ *
+ * Functions, not shared constants: each hydrated ship needs its OWN arrays, and
+ * a shared literal would be mutated in place by the first torpedo to land.
+ */
+const EMPTY_TUBE_CHANNELS = (): number[] => [255, 255, 255];
+const EMPTY_TUBE_DISTANCES = (): number[] => [0, 0, 0];
+
+/**
  * Converts a Prisma Ship row to the in-memory ShipState representation.
  * The dirty flag starts false — the row was just loaded from Postgres.
  * @see GEMAIN.H WARSHP struct
@@ -34,11 +46,26 @@ export function prismaShipToState(row: Ship): ShipState {
     helm: row.helm,
     train: row.train,
     where: row.where,
-    ltorpsChannel: row.ltorpsChannel,
-    ltorpsDistance: row.ltorpsDistance,
-    lmisslChannel: row.lmisslChannel,
-    lmisslDistance: row.lmisslDistance,
-    lmisslEnergy: row.lmisslEnergy,
+    // DISARMED on the way in, deliberately. These are persisted columns, so a
+    // ship that was under fire when the server stopped would otherwise hydrate
+    // with the volley still inbound and be hit by it a SECOND time on the first
+    // physics tick. When the volley was lethal the row never healed — the ship
+    // died before anything flushed the spent tubes, so the same three missiles
+    // killed it again on every boot. `Cybrg-216` did exactly that across three
+    // restarts with a byte-identical manifest.
+    //
+    // Canon does not cover a restart — a MajorBBS module did not have one — but
+    // it does cover the principle. `cleartm` walks every ship and blanks the
+    // tubes belonging to a channel that has left, by channel and not by
+    // distance: GEFUNCS.C:1766 `wptr->ltorps[j].channel = 255;`. A restart is
+    // that same event for EVERY channel at once, so this is cleartm's rule
+    // applied to the only case canon never had to name.
+    // @see docs/DECISIONS.md 2026-09-17, issue #53
+    ltorpsChannel: EMPTY_TUBE_CHANNELS(),
+    ltorpsDistance: EMPTY_TUBE_DISTANCES(),
+    lmisslChannel: EMPTY_TUBE_CHANNELS(),
+    lmisslDistance: EMPTY_TUBE_DISTANCES(),
+    lmisslEnergy: EMPTY_TUBE_DISTANCES(),
     decout: row.decout,
     jammer: row.jammer,
     freq: row.freq,

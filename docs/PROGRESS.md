@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 100 entries.
+Append-only, **newest at the bottom**. 101 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-17 — a restart re-fired every volley that was in the air](#2026-09-17--a-restart-re-fired-every-volley-that-was-in-the-air)
 - [2026-09-17 — two new players killed a Cyberquad, and the log could not say how](#2026-09-17--two-new-players-killed-a-cyberquad-and-the-log-could-not-say-how)
 - [2026-09-15 — every wormhole in the galaxy was one-way](#2026-09-15--every-wormhole-in-the-galaxy-was-one-way)
 - [2026-09-15 — two messages players caught within an hour of each other](#2026-09-15--two-messages-players-caught-within-an-hour-of-each-other)
@@ -7157,3 +7158,52 @@ at 1,000 credits each. That is canon and it is a firehose, compressing the
 shipyard price curve into a player's first hours. Not changed: a retroactive
 nerf would punish exactly the players who engaged first. Recorded in
 `DECISIONS.md` rather than fixed.
+
+## 2026-09-17 — a restart re-fired every volley that was in the air
+
+The `cause=` field added hours earlier paid for itself on its first deploy.
+
+v0.20.3 went out at 15:01 and `Cybrg-216` — the phantom destruction of #53,
+which I had twice diagnosed wrongly — announced itself again three minutes
+later, confirming the manual row reset had been cosmetic. But the manifest now
+read `cause=missile`, and that pointed one column away from where I had stopped
+looking:
+
+```
+lmisslChannel  = {14,14,14}
+lmisslDistance = {1070,1070,1070}
+lmisslEnergy   = {50000,50000,50000}
+```
+
+Three missiles at maximum charge, frozen 1070 units out. `mislsped` closes that
+inside one tick, so all three landed on the first tick after hydration, for far
+more than the 100 that kills. The ship then died before anything flushed the
+spent tubes, so the row kept `damage = 0` and the same three missiles killed it
+again on the next boot. Forever.
+
+**It was never one bad row.** Four more Cybertrons were holding live volleys —
+210, 213 and 214 with full-charge missiles, 212 with two torpedoes. In-flight
+projectiles are persisted columns, so **every restart re-fires whatever was in
+the air**, at every ship. Cybrg-216 was simply the case where the volley was
+lethal and the victim was an automaton nobody missed.
+
+Fixed by disarming both tube arrays in `prismaShipToState`, which is the single
+seam every hydration path goes through. Reasoning in `DECISIONS.md`: canon never
+had a mid-flight restart, but `cleartm` (`GEFUNCS.C:1764-1766`) already blanks
+tubes belonging to a channel that has left, keyed on the channel rather than the
+distance — and a restart is that event for every channel at once.
+
+**Two corrections to my own work, both caught by the project's guards rather
+than by me.** I cited `cleartm` as clearing `distance`; it clears `channel`, and
+at `:1766` not `:1740` — the citation ratchet rejected the quote against the
+vendored source. Twice now a citation has failed because the quote wrapped onto
+the next line, which the scanner reads as unquoted; worth remembering that the
+number and its proof have to sit on one line.
+
+Before that, I had posted two confident root causes for #53 and both were wrong:
+`where = 1` (not anomalous — sixteen Cybertrons are in it right now) and a mine
+(both boots logged `0 mines hydrated`). I also read `lastfired=<n>
+lastfiredBy=none` as evidence of a credit bug when it is just what any hydrated
+ship looks like, since `lastfired` is persisted and `lastfiredBy` is not. All
+four log rows cited in #42 were withdrawn. The droid stamping defect fixed in
+v0.20.3 stands on the code — 17 write sites against 11 — and not on those rows.

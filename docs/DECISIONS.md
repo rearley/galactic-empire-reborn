@@ -106,6 +106,7 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-09-02 — Colonists will eat (fixing an inherited original bug)](#2026-09-02-colonists-will-eat-fixing-an-inherited-original-bug)
 - [2026-09-02 — Gold base price set to 1000, on wiki evidence only](#2026-09-02-gold-base-price-set-to-1000-on-wiki-evidence-only)
 - [2026-09-17 — The Cybertron gold faucet is canon, and stays, because the fix is unfair now](#2026-09-17--the-cybertron-gold-faucet-is-canon-and-stays-because-the-fix-is-unfair-now)
+- [2026-09-17 — In-flight projectiles are session state and are disarmed on hydration](#2026-09-17--in-flight-projectiles-are-session-state-and-are-disarmed-on-hydration)
 - [2026-09-07 — Email as the login credential, with a partial lower() unique index](#2026-09-07-email-as-the-login-credential-with-a-partial-lower-unique-index)
 - [2026-09-07 — Two-step registration and the nullable username guarded by WsAuthGuard](#2026-09-07-two-step-registration-and-the-nullable-username-guarded-by-wsauthguard)
 - [2026-09-07 — Logout is site chrome, not a game command](#2026-09-07-logout-is-site-chrome-not-a-game-command)
@@ -6088,3 +6089,55 @@ that file is explicitly not canon (`reference/CLAUDE.md`), and picking a number
 out of it is how wrong values have entered this codebase before. Reducing the
 `killem` transfer fraction — a deviation from canon in a function with no
 contradiction in it to justify one.
+
+## 2026-09-17 — In-flight projectiles are session state and are disarmed on hydration
+
+**Context:** `ltorps*` and `lmissl*` are persisted columns. A ship carrying
+inbound projectiles when the server stops hydrates with them still inbound, and
+`checktm` resolves them on the first physics tick — so the victim is hit a
+second time by shots that already landed.
+
+Where the volley was lethal the row never healed, because the ship died before
+anything flushed the spent tubes:
+
+1. boot — hydrate with three missiles inbound
+2. tick 1 — all three land, the ship dies
+3. removed from memory; the row keeps its distances and `damage = 0`
+4. next boot — same row, same volley, forever
+
+`Cybrg-216` did this across three restarts with a byte-identical manifest,
+carrying `lmisslDistance {1070,1070,1070}` at `lmisslEnergy {50000,50000,50000}`
+from a channel that no longer exists. Four more Cybertrons were holding live
+volleys when this was found, so it was never one bad row.
+
+**Decision:** `prismaShipToState` blanks both tube arrays — channels to 255,
+distances and charges to 0 — on every hydration.
+
+**Reason:** Canon never had this case, because a MajorBBS module did not restart
+mid-flight. But it settles the principle. `cleartm` walks every ship in the game
+and blanks the tubes belonging to a channel that has LEFT, keyed on the channel
+rather than the distance:
+
+```c
+if (wptr->ltorps[j].channel == (unsigned char)channel)
+    { wptr->ltorps[j].channel = 255; }     /* GEFUNCS.C:1764-1766 */
+```
+
+A restart is that same event for every channel at once. Nothing is owed to a
+shot whose firer is gone, and by the time the row is read again its channel has
+usually been recycled — which would hand the kill to whoever now holds it.
+
+It lives in the shared mapper rather than in boot hydration alone because every
+path that reads a hull off disk has the same defect. The gateway re-boards a
+cold ship through the same function (`connection-lifecycle.service.ts:468`), and
+a player's own hull re-armed with a stale volley is the same bug wearing a
+different hat.
+
+**Alternatives rejected:** Flushing the victim's state on death — fixes the
+repeat but still lets a restart re-fire a non-lethal volley, which is the same
+bug, quieter. Dropping the columns from the schema — same effect, a migration,
+and it removes state that is genuinely useful to inspect when diagnosing a kill.
+
+**Known cost:** a player who disconnects long enough to be evicted from memory
+loses the projectiles inbound at them. That is a dodge, but a slow and public
+one, and the alternative is being killed on login by a shot fired days earlier.
