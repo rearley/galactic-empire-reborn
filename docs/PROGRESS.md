@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 101 entries.
+Append-only, **newest at the bottom**. 102 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-17 — the suite was not slow because it was serial](#2026-09-17--the-suite-was-not-slow-because-it-was-serial)
 - [2026-09-17 — a restart re-fired every volley that was in the air](#2026-09-17--a-restart-re-fired-every-volley-that-was-in-the-air)
 - [2026-09-17 — two new players killed a Cyberquad, and the log could not say how](#2026-09-17--two-new-players-killed-a-cyberquad-and-the-log-could-not-say-how)
 - [2026-09-15 — every wormhole in the galaxy was one-way](#2026-09-15--every-wormhole-in-the-galaxy-was-one-way)
@@ -7207,3 +7208,69 @@ lastfiredBy=none` as evidence of a credit bug when it is just what any hydrated
 ship looks like, since `lastfired` is persisted and `lastfiredBy` is not. All
 four log rows cited in #42 were withdrawn. The droid stamping defect fixed in
 v0.20.3 stands on the code — 17 write sites against 11 — and not on those rows.
+
+## 2026-09-17 — the suite was not slow because it was serial
+
+`docs/` calls the 283-second backend suite the largest tax on every change, and
+issue #51 proposed splitting it into `pure` and `db` projects so ~650 files
+would stop paying for the ~10 that need a shared database. Before doing that,
+the assumption got measured — and it was wrong.
+
+Serialization was not the dominant cost. **Per-file module re-evaluation was.**
+The breakdown said `import 47% / tests 44%`: 1,006 modules evaluated 1,757
+times, once per spec file. One flag changed it:
+
+| | duration |
+|---|---|
+| as configured | 283s |
+| `--no-isolate` | 90s |
+
+Vitest had been printing the hint in every run's footer and understating it —
+it says "~42s faster", the real figure is 193.
+
+**`isolate: false` is not safe for every file, and finding out which took five
+runs.** The failing set was non-deterministic — 10, 13, 18, 0 and 1 failures
+across six different files — so counting files from any one run was meaningless.
+Three causes, each small:
+
+- **`vi.mock` shares a module registry.** Four specs in 670 use it. The clearest
+  symptom was `integration/auth/login.spec.ts` asserting bcrypt's constant-time
+  path takes ≥100ms and measuring **7ms**: it had picked up another file's stub.
+- **`process.env` is per-process**, so a spec that assigns to it races every
+  spec that reads one. `database-url.spec.ts` failed once in four runs.
+- **A Nest testing module** carries module-scope seams its providers install.
+  `CommandsModule.onModuleInit` calls `setIonTrailObserverSource` — a deliberate
+  global, because `impulseCommand` is a plain literal with no DI, and correct in
+  production where exactly one CommandsModule exists. `impulse.spec.ts` ran
+  against another spec's class cache and threw `ShipClass 21 not in cache`.
+
+That last one was left alone. The global is right for its actual runtime;
+reshaping production DI to suit a test runner is the tail wagging the dog.
+
+**The split is computed, not listed.** `test/helpers/isolation-policy.ts` reads
+the rule off each file, so a spec classifies itself. A hand-maintained array
+would have been a snapshot of one afternoon's failures, and the next spec to
+stub an env var would join the fast project silently and fail intermittently in
+CI months later — the exact hazard #51's description warned about. 78 files
+isolated, 592 shared.
+
+**A performance change nearly altered what CI checks.** The first draft scanned
+`test/` recursively and pulled in `test/manual/T053.manual.spec.ts`, which has
+its own config and its own `test:manual` script — five tests joined `npm test`
+that had never been in it. Caught by the file count moving 670 → 671 for no
+reason. `test/helpers/suite-membership.spec.ts` now pins membership against an
+independent walk, in both directions, because the opposite slip — a directory
+dropped from the roots list — removes specs from every run and nothing fails.
+
+**Result: 283s → 137s**, five consecutive clean runs within 2s of each other,
+peak RSS 1.33 GB. Not the 90s of the unguarded flag, because the 78 isolated
+files still pay per-file isolation; that is the price of the three causes above
+being real.
+
+The `pool: 'forks'` OOM note in the config was checked rather than assumed —
+`isolate: false` reuses one graph per worker, which moves toward the old
+failure. It was measured, not hoped at.
+
+#51 stays open for the `pure`/`db` question it actually raised, but at 137s the
+case for classifying ~460 files should be re-argued against that number rather
+than against 283s.
