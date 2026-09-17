@@ -368,7 +368,14 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           //
           // A COLLISION is the one cause we can name here, because the physics
           // tick recorded it on the ship this same tick.
-          weapon: victim.deathCause?.kind === 'gravity' ? 'gravity' : null,
+          // `deathCause` is the more specific fact and outranks the last weapon
+          // to touch the hull: a ship grazed by a torpedo and then flown into a
+          // planet was killed by the planet. Otherwise report what actually
+          // landed — `null` only when nothing recorded a weapon at all, which
+          // is a genuine gap rather than a default. @see issue #52
+          weapon: victim.deathCause?.kind === 'gravity'
+            ? 'gravity'
+            : (victim.lastWeapon ?? null),
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,
           loot,
@@ -511,6 +518,7 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
             v.lastfired = channel;
             v.lastfiredBy = mineOwnerName === null ? undefined : { channel, name: mineOwnerName };
+            v.lastWeapon = 'mine';
           });
           shieldConsumed = r.shieldConsumed;
         } else {
@@ -518,6 +526,7 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
             v.damage = v.damage + hullDamage;
             v.lastfired = channel;
             v.lastfiredBy = mineOwnerName === null ? undefined : { channel, name: mineOwnerName };
+            v.lastWeapon = 'mine';
           });
         }
 
@@ -915,6 +924,7 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
         v.lastfired = attackerChannel;
         v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
+        v.lastWeapon = weapon;
       });
       shieldConsumed = r.shieldConsumed;
     } else {
@@ -922,6 +932,7 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         v.damage = v.damage + hullDamage;
         v.lastfired = attackerChannel;
         v.lastfiredBy = firerName === null ? undefined : { channel: attackerChannel, name: firerName };
+        v.lastWeapon = weapon;
       });
     }
 

@@ -105,6 +105,17 @@ export interface CombatSubsystemDamagedEvent {
 }
 
 export const COMBAT_SHIP_DESTROYED = 'combat.ship-destroyed' as const;
+/**
+ * What ended a ship, as the destruction manifest reports it.
+ *
+ * Named and exported because it is stamped on `ShipState.lastWeapon` when the
+ * damage LANDS, far from the kill that later reads it. A hyper-phaser collapses
+ * to `'phaser'` here: it is a distinct weapon to the victim being hit
+ * (`CombatHitEvent`), but not a distinct way to die.
+ */
+export type ShipDestroyedWeapon =
+  | 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity';
+
 export interface CombatShipDestroyedEvent {
   victimId: string;
   attackerId: string | null;
@@ -123,7 +134,7 @@ export interface CombatShipDestroyedEvent {
    * indistinguishable from a self-destruct (both null, weapon null).
    * @see planet-kill.ts, GEFUNCS.C:1797 fireion
    */
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity' | null;
+  weapon: ShipDestroyedWeapon | null;
   /**
    * Who or WHAT to name when no attacking SHIP resolves — the planet, for an
    * ion kill or a collision. Null for ordinary ship-vs-ship kills, where the

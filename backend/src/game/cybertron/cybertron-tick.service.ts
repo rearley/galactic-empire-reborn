@@ -545,6 +545,7 @@ export class CybertronTickService implements OnModuleInit {
       this.shipState.mutate(victim.userid, victim.shipno, (v) => {
         v.damage += damage;
         v.lastfired = ship.channel ?? NO_CHANNEL;
+        v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
         if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
@@ -661,6 +662,7 @@ export class CybertronTickService implements OnModuleInit {
           // @see GEFUNCS.C:2459-2462 — SHIELDDM, not plain "down".
           if (result.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          v.lastWeapon = 'phaser';
           // Name the firer where the damage lands: a channel scrub on logout
           // would otherwise leave the loss mail with nobody to blame. The AI
           // path never set this, so a player killed by a Cybertron got
@@ -674,6 +676,7 @@ export class CybertronTickService implements OnModuleInit {
         this.shipState.mutate(victim.userid, victim.shipno, (v) => {
           v.damage = v.damage + hullDamage;
           v.lastfired = ship.channel ?? NO_CHANNEL;
+          v.lastWeapon = 'phaser';
           v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
           v.cantexit = FIRETICKS;
         });

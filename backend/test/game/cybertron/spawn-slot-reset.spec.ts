@@ -18,6 +18,7 @@
  * is what this branch is standing in for.
  */
 import { CybertronRepository } from '../../../src/game/cybertron/cybertron.repository';
+import { NO_CHANNEL } from '../../../src/game/ship/ship-channel.registry';
 import { ShipStateService } from '../../../src/game/ship/ship-state.service';
 import type { SpawnSlotInit } from '../../../src/game/cybertron/cybertron.repository';
 import { PrismaService } from '../../../src/prisma/prisma.service';
@@ -72,6 +73,11 @@ describe('CybertronRepository.createSpawn — a recycled slot is a fresh ship', 
     expect(update.damage).toBe(0);
     expect(update.cantexit).toBe(0);
     expect(update.hostile).toBe(0);
-    expect(update.lastfired).toBe(0);
+    // NOT 0. This asserted 0 until 2026-09-17, which pinned a real defect: 0 is
+    // a valid channel, and canon's "nobody shot this ship" sentinel is -1 —
+    // GEFUNCS.C:226 `tmpshp.lastfired = -1;`, enforced by killem at
+    // GEFUNCS.C:1105 `if (who >= 0 && who < nships && who != usrn)`. A slot
+    // reset to 0 named whoever held channel 0. @see respawn-clears-lastfired.spec.ts
+    expect(update.lastfired).toBe(NO_CHANNEL);
   });
 });

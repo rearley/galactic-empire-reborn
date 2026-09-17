@@ -220,6 +220,11 @@ export class ShipManagementTickService implements OnModuleInit {
       this.shipState.mutate(victim.userid, victim.shipno, (v) => {
         v.damage += damage;
         v.lastfired = -1;
+        // Cleared, not set: canon has no weapon for a scuttle blast and the
+        // union has no member for one. Reporting the last torpedo to graze this
+        // hull as the cause would be a wrong answer, where `unknown` is merely
+        // an incomplete one. @see issue #52
+        v.lastWeapon = undefined;
       });
 
       this.events.emit(COMBAT_DESTRUCT_BLAST, {

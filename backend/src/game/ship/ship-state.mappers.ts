@@ -109,6 +109,9 @@ const IN_MEMORY_ONLY = [
   'lastfiredBy',
   // Set by a gravity collision so the mail names the body, not a person.
   'deathCause',
+  // The weapon that last damaged this hull, so the destruction manifest can
+  // name it. In-memory only, for the same reason as `lastfiredBy`. @see issue #52
+  'lastWeapon',
   // Function-key bindings, cached from User.fkeys. They belong to the CAPTAIN,
   // not the hull, so they follow them across ships and have no Ship column.
   // @see src/game/commands/fkeys.ts

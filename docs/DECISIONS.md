@@ -105,6 +105,7 @@ were rejected — the last of those is usually the part worth reading.
 - [2026-09-02 — UNIVWRAP implemented, defaulting to canon NO](#2026-09-02-univwrap-implemented-defaulting-to-canon-no)
 - [2026-09-02 — Colonists will eat (fixing an inherited original bug)](#2026-09-02-colonists-will-eat-fixing-an-inherited-original-bug)
 - [2026-09-02 — Gold base price set to 1000, on wiki evidence only](#2026-09-02-gold-base-price-set-to-1000-on-wiki-evidence-only)
+- [2026-09-17 — The Cybertron gold faucet is canon, and stays, because the fix is unfair now](#2026-09-17--the-cybertron-gold-faucet-is-canon-and-stays-because-the-fix-is-unfair-now)
 - [2026-09-07 — Email as the login credential, with a partial lower() unique index](#2026-09-07-email-as-the-login-credential-with-a-partial-lower-unique-index)
 - [2026-09-07 — Two-step registration and the nullable username guarded by WsAuthGuard](#2026-09-07-two-step-registration-and-the-nullable-username-guarded-by-wsauthguard)
 - [2026-09-07 — Logout is site chrome, not a game command](#2026-09-07-logout-is-site-chrome-not-a-game-command)
@@ -6041,3 +6042,49 @@ bug, fixed in the same place.
 Credit: spotted by manicpop, maintainer of `ge-next`, and brought to us by Rick.
 Read against canon here rather than taken from their code — see the licensing
 note in `CLAUDE.md` about not copying fixes from sibling ports.
+
+## 2026-09-17 — The Cybertron gold faucet is canon, and stays, because the fix is unfair now
+
+**Context:** Auditing two new players' Cybertron kills surfaced the size of the
+reward. Madam_Airlock reached **1,062,860 credits from three kills**, having
+started with the canon 100,000 (`STRTCASH {…: 100}`).
+
+That is not an exploit. `killem` transfers up to the whole of every item slot —
+
+```c
+amt = ptr->items[i] / (gernd()%5 +1);   /* GEFUNCS.C:1122-1136 */
+```
+
+— and Cybertrons spawn carrying gold. The live population on this date held
+201–1,083 units each, at `ITMPR13 {Base price for gold: 1000}`. A single
+Cyberquad kill can therefore drop half a million to a million credits.
+
+**The concern is real.** The shipyard price curve assumes a climb: Mark-3
+shields cost 40,000, Mark-6 phasers 400,000, Mark-10 phasers 2,000,000. A player
+who kills three Cybertrons in a weekend skips most of it. `CYBGOLD` is a sysop
+option and lowering it is a one-line change.
+
+**Decision:** Leave it. Do not tune `CYBGOLD`.
+
+**Reason:** Two, and the second is the binding one.
+
+It is canon, and this project's rule is that canon wins unless a deviation is
+deliberate, documented, and justified by something other than taste. "The
+economy feels too fast" is precisely the argument the Reference Source section
+of `CLAUDE.md` names as the failure mode to avoid.
+
+More importantly, the game is live and players have already banked it. A nerf
+now devalues what the earliest players earned, and they are the ones who showed
+up first — from the Discord, before there was much reason to. A balance change
+that punishes early engagement is worse than an economy that runs hot.
+
+**Revisit when:** a wipe or a season boundary makes the change cost nobody
+anything. That is the moment to reopen it, not before. See also the note at
+`docs/DECISIONS.md` on `CYBGOLD` and the damage curve, which reaches the same
+"try something else first" conclusion from the combat side.
+
+**Alternatives rejected:** Lowering `CYBGOLD` to the `GE/REL2/` value of 25 —
+that file is explicitly not canon (`reference/CLAUDE.md`), and picking a number
+out of it is how wrong values have entered this codebase before. Reducing the
+`killem` transfer fraction — a deviation from canon in a function with no
+contradiction in it to justify one.

@@ -522,6 +522,11 @@ export class DroidTickService implements OnModuleInit {
           // @see GEFUNCS.C:2459-2462
           if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
           v.lastfired = droid.channel ?? NO_CHANNEL;
+          v.lastWeapon = 'phaser';
+          // The name beside the channel, because `leave()` recycles channels and a
+          // scrub would otherwise leave the kill with no attacker at all.
+          // @see attackerNameFromLastFired, issue #42
+          v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
           v.cantexit = FIRETICKS;
         });
         hullDamage = 0;
@@ -530,6 +535,11 @@ export class DroidTickService implements OnModuleInit {
         this.shipState.mutate(target.userid, target.shipno, (v) => {
           v.damage = v.damage + hullDamage;
           v.lastfired = droid.channel ?? NO_CHANNEL;
+          v.lastWeapon = 'phaser';
+          // The name beside the channel, because `leave()` recycles channels and a
+          // scrub would otherwise leave the kill with no attacker at all.
+          // @see attackerNameFromLastFired, issue #42
+          v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
           v.cantexit = FIRETICKS;
         });
       }
@@ -637,6 +647,11 @@ export class DroidTickService implements OnModuleInit {
       this.shipState.mutate(target.userid, target.shipno, (v) => {
         v.damage = v.damage + damage;
         v.lastfired = droid.channel ?? NO_CHANNEL;
+        v.lastWeapon = 'phaser';
+        // The name beside the channel, because `leave()` recycles channels and a
+        // scrub would otherwise leave the kill with no attacker at all.
+        // @see attackerNameFromLastFired, issue #42
+        v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
         v.cantexit = FIRETICKS;
       });
 

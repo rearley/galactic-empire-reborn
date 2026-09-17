@@ -471,6 +471,10 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
       // @see GEFUNCS.C:1797 fireion, kill-resolution.ts attackerNameFromLastFired
       s.lastfired = -1;
       s.lastfiredBy = undefined;
+      // The cannons ARE the weapon, and the union carries 'ion' for exactly
+      // this. Leaving a stale value here would report whatever last grazed the
+      // hull as the thing that killed it. @see issue #52
+      s.lastWeapon = 'ion';
       if (shieldsUp && hit.shieldKnock > 0) {
         const r = shieldhit(s.shield, s.shieldtype, hit.shieldKnock);
         s.shield = r.newCharge;

@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { prismaShipToState, stateToPrismaUpdate } from '../ship/ship-state.mappers';
 import { shipKey } from '../ship/ship-state.types';
+import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { CYB_MAXCASH } from '../constants';
 import type { CybertronLoadout } from './cyb-decisions';
 
@@ -229,7 +230,12 @@ export class CybertronRepository {
           // on the caller's OWN ship (GECMDS.C:5031), and zeroes it for every
           // new hull (GEFUNCS.C:256 initshp). An automaton never sets it.
           destruct: 0,
-          lastfired: 0,
+          // NO_CHANNEL, not 0: canon's sentinel for "nobody shot this ship" is -1,
+          // GEFUNCS.C:226 `tmpshp.lastfired = -1;`, and killem refuses anything below
+          // it at GEFUNCS.C:1105 `if (who >= 0 && who < nships && who != usrn)`.
+          // So channel 0 is a REAL player: a recycled slot written as 0 points at
+          // whoever holds it. @see issue #42
+          lastfired: NO_CHANNEL,
           lock: 0,
           ltorpsChannel: [255, 255, 255],
           ltorpsDistance: [0, 0, 0],

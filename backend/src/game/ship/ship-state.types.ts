@@ -1,4 +1,5 @@
 import { Prisma } from '../../prisma/client';
+import type { ShipDestroyedWeapon } from '../combat/combat-events';
 
 /**
  * Composite key for the in-memory ship state Map.
@@ -78,6 +79,20 @@ export interface ShipState {
    * "an unknown assailant" invents an enemy out of a fact the server knew.
    */
   deathCause?: { kind: 'gravity'; what: string };
+
+  /**
+   * The weapon that last damaged this ship, so the destruction manifest can say
+   * HOW a pilot died rather than `cause=unknown`.
+   *
+   * In-memory only, like `lastfiredBy`, and stamped beside `lastfired` at every
+   * site that applies damage. Kept SEPARATE from `lastfiredBy` on purpose: a
+   * mine whose owner has left the game records no name, and folding the weapon
+   * into that object would lose `cause=mine` along with the attacker.
+   *
+   * Canon has no equivalent — `killem` reports no weapon, because on a BBS the
+   * victim had just read the hit line themselves. @see issue #52
+   */
+  lastWeapon?: ShipDestroyedWeapon;
   shieldtype: number;
   shieldstat: number;
   shield: number;

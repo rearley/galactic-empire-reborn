@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 99 entries.
+Append-only, **newest at the bottom**. 100 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-17 — two new players killed a Cyberquad, and the log could not say how](#2026-09-17--two-new-players-killed-a-cyberquad-and-the-log-could-not-say-how)
 - [2026-09-15 — every wormhole in the galaxy was one-way](#2026-09-15--every-wormhole-in-the-galaxy-was-one-way)
 - [2026-09-15 — two messages players caught within an hour of each other](#2026-09-15--two-messages-players-caught-within-an-hour-of-each-other)
 - [2026-09-15 — the first player from the Discord was announced by account key](#2026-09-15--the-first-player-from-the-discord-was-announced-by-account-key)
@@ -7062,3 +7063,97 @@ now bounds the count between "nothing could be paired" and "everything was",
 with a new G7.3 asserting the coverage that actually matters. The citation
 ratchet then caught a wrong line number — `worm.visible = 1` is `GEPLANET.C:429`,
 not the `:436` I first wrote.
+
+## 2026-09-17 — two new players killed a Cyberquad, and the log could not say how
+
+A question from the Discord: two new players joined and one killed a Cyberquad
+in an Interceptor almost immediately. Was that skill, or did they know an
+exploit from the classic game? Both play GE on a live MajorBBS today, so the
+question was fair.
+
+**Both audited clean, and the arithmetic is exact.** Madam_Airlock's score is
+3050 — Cyberquad 2000 + Cybertron Scout 1000 + Sarten Attack Drone 50, three
+kills, no remainder. manicpop's is 3000 — Cyberquad + Scout. Neither has a PvP
+victim, and both scores land on round class-point sums with no roster bonus,
+which is what a normal `killem` produces.
+
+The mechanism is canon and worth writing down, because it will come up again.
+**Torpedo damage has no term for the firing ship** (`GEFUNCS.C:1555`
+`damfact = tdammax * rndm(.5);`) — only `tdammax` (35) and the TARGET's
+`damfact`. An Interceptor's torpedo hits exactly as hard as a Dreadnought's, at
+7 credits a round. A Mk3 Interceptor cannot win a phaser duel with a Cyberquad
+(0.87 against 1.50 per unit; parity needs Mark-6, at 400,000 credits) — so
+torpedoes are the only path, and they are the cheapest weapon in the game.
+The Cybertron combat band then caps itself at `990.0` (`GECYBS.C:796`), nine
+units under the `speed > 999` torpedo-immunity threshold, while a player holding
+warp 1 is immune. The AI is always lockable; the player need not be.
+
+**What the audit could NOT do is the reason for three issues.**
+
+The question was "which weapon", and the destruction manifest could not answer
+it. All fourteen in production said `cause=unknown`, because the kill path set
+`weapon` in exactly one place and it resolved to `'gravity'` or `null`. The
+answer had to be inferred from score arithmetic and remaining inventory
+instead. `ShipState.lastWeapon` now carries it, stamped beside `lastfired` at
+every site that applies damage (#52).
+
+It is deliberately NOT folded into `lastfiredBy`: a mine whose owner has left
+records no name, and conflating the two would lose `cause=mine` along with the
+attacker. The two paths that deliberately drop attribution now say so — ion
+cannons stamp `'ion'`, a scuttle blast clears the field rather than reporting
+whatever last grazed the hull.
+
+**A real credit-loss bug, found by reading rather than by the log.** There are
+17 sites writing `lastfired` and 11 writing `lastfiredBy`, and the gap includes
+all three droid damage paths. `attackerNameFromLastFired` returns a name only
+when the recorded channel still matches `lastfired`, so an unstamped droid hit
+does not merely lose the droid's name — it strands whatever the previous
+attacker recorded and the kill resolves to nobody. **A droid grazing a ship a
+player was fighting voided that player's credit, with the droid still alive.**
+The despawn scrub that #42 suspected was never required.
+
+**No production kill has been shown lost to it, and I claimed otherwise twice
+before checking.** `lastfired` is a persisted column; `lastfiredBy` is
+in-memory only, by design. So every hydrated ship carries an old `lastfired`
+and no `lastfiredBy`, and `lastfired=<n> lastfiredBy=none` is what ANY of them
+looks like on death — an artefact of the restart, not a symptom. All four log
+rows first cited as evidence are withdrawn: two were sysop kills, two were
+hydration. The defect stands on the code; the log never showed it, which is
+the whole reason #52 mattered.
+
+**And a latent one that had to be fixed FIRST.** `createSpawn` reset a recycled
+slot with `lastfired: 0`, but 0 is a valid channel — canon's sentinel is -1
+(`GEFUNCS.C:226` `tmpshp.lastfired = -1;`, enforced at `GEFUNCS.C:1105`). It was
+harmless only because an empty `lastfiredBy` made attribution return null.
+Closing the droid gap without this would have converted a silent null into a
+confident wrong answer: a respawned Cybertron dying uncredited would credit
+channel 0's player. `spawn-slot-reset.spec.ts` had pinned the 0, which is the
+failure mode CLAUDE.md warns about — a defect held in place by a passing test.
+
+**Two things the sysop's own tooling explained.** `sys kill` is a bare
+`damage = 101` with no attribution write, which is faithful
+(`GECMDS.C:4807-4810`), so it credits whoever last shot the target. Two of the
+four uncredited deaths first attributed to the droid bug were sysop kills and
+were retracted from #42. One row also showed `lastfired=0 lastfiredBy=none` —
+the respawn defect above, caught in the wild.
+
+**Still open: #53.** `Cybrg-216` is announced destroyed six seconds after every
+boot — first physics tick, byte-identical manifest, DB row untouched at
+`damage = 0`. Not a sysop kill, and not gravity (sector (2,1) holds no planet).
+Three theories raised and all three eliminated: not a sysop kill; not gravity
+(no planet there, and a crash prints `cause=gravity`); not a mine (both boots
+logged `0 mines hydrated`, and the `Mine` table is empty). I also argued the
+persisted `where = 1` was the cause — wrong, and posted with more confidence
+than it earned: `where = 1` is the ordinary state of a moving Cybertron, and
+sixteen of them are in it right now, healthy. The production row was reset
+anyway, but since the reasoning behind that reset is disproven it should not be
+assumed to have fixed anything. The next restart is the test. Root cause
+genuinely unknown.
+
+**Gold was re-examined and deliberately left alone.** Three Cybertron kills took
+Madam_Airlock to 1,062,860 credits, because `killem` transfers up to 100% of
+each item (`GEFUNCS.C:1122-1136`) and Cybertrons spawn carrying 200–1,100 gold
+at 1,000 credits each. That is canon and it is a firehose, compressing the
+shipyard price curve into a player's first hours. Not changed: a retroactive
+nerf would punish exactly the players who engaged first. Recorded in
+`DECISIONS.md` rather than fixed.
