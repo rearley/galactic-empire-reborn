@@ -26,7 +26,13 @@ not luck and not cleverness; it is what porting to a different substrate does.
 The corollary is the finding that matters: **where we DID keep canon's
 representation, we kept canon's bug.** B-01 below is exactly that.
 
-## Confirmed live defect
+## Confirmed live defect — FIXED 2026-09-15 in v0.20.1
+
+> **CLOSED.** `719a37c` — `countClaims` now takes a class predicate
+> (`cybertron-tick.service.ts:1155`, `countCybertronClaims` in
+> `cyb-decisions.ts:511`) so only `CPU_COMBATIVE` hulls are counted. Pinned by
+> `test/game/cybertron/claims-are-cybertron-only.spec.ts`. The analysis below is
+> kept because it is the reasoning for the deviation, not a to-do.
 
 ### B-01 — shooting a droid registers a fake Cybertron claim on you
 
