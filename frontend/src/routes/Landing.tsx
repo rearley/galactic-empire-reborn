@@ -153,6 +153,14 @@ export function Landing(): React.JSX.Element {
         <Support />
 
         <p className="mt-8 text-center text-xs text-gray-600">
+          The game is live and still being worked on.{' '}
+          <Link to="/changelog" className="text-gray-500 hover:text-gray-300 hover:underline">
+            What changed, and why
+          </Link>{' '}
+          — separating what this port broke from where it deliberately differs from the original.
+        </p>
+
+        <p className="mt-4 text-center text-xs text-gray-600">
           Galactic Empire was written by Mike Murdock, who released its source publicly. This port
           is free software and says{' '}
           <Link to="/provenance" className="text-gray-500 hover:text-gray-300 hover:underline">

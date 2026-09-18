@@ -11,6 +11,7 @@ import { ChooseUsername } from './routes/ChooseUsername';
 import { Stats } from './routes/Stats';
 import { Guide, GuidePage } from './routes/Guide';
 import { Provenance } from './routes/Provenance';
+import { Changelog } from './routes/Changelog';
 import { Calculators } from './routes/Calculators';
 
 const rootElement = document.getElementById('root');
@@ -27,6 +28,7 @@ createRoot(rootElement).render(
         <Route path="/stats" element={<Stats />} />
         <Route path="/guide" element={<Guide />} />
         <Route path="/guide/:slug" element={<GuidePage />} />
+        <Route path="/changelog" element={<Changelog />} />
         <Route path="/provenance" element={<Provenance />} />
         <Route path="/calculators" element={<Calculators />} />
         <Route path="/play" element={<RequireAuth><App /></RequireAuth>} />

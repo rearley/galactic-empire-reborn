@@ -40,6 +40,32 @@ If a new canon help topic becomes reachable, add it to `CONCEPTS` or `COMMANDS`
 in the same file — those lists decide what appears, not `CANON_HELP` itself.
 
 
+## The changelog — hand-written, and the one file that must not go stale
+
+`changelog.ts` is the second hand-maintained file here, and unlike the guide it
+has no generator behind it. **Write the entry in the same commit as the change,
+next to the `VERSION` bump**, in the language of somebody who plays the game
+rather than somebody who reads the diff.
+
+Pick the category deliberately; they exist to stay apart, for the same reason
+`GUIDE_DEVIATIONS` and `GUIDE_CORRECTIONS` do above:
+
+| category | means |
+|---|---|
+| `port-bug` | we broke it, we fixed it — nothing to do with the original |
+| `corrected-to-canon` | we had drifted; this matches the original again |
+| `deliberate-deviation` | we knowingly differ, and the entry says what the original did |
+| `canon-was-wrong` | the original's help contradicts its own code, and we follow the code |
+| `port-original` | something the 1988 game never had — the guide, the calculators, f-keys, this page |
+
+A release with nothing to tell a player goes in `SILENT_RELEASES` with a reason.
+`test/public/changelog.spec.ts` fails on a `VERSION` that appears in neither, so
+forgetting is loud rather than silent — which is the entire point, because a
+changelog that lags is worse than none.
+
+Entries are rendered as PLAIN TEXT. Backticks and markdown reach the browser as
+literal punctuation; a backtick did exactly that on the first run.
+
 ## Known limits of this directory, deliberately accepted
 
 - **The marketing copy is not crawlable.** The landing page ships as

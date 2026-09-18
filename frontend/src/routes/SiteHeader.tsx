@@ -13,6 +13,7 @@ export function SiteHeader(): React.JSX.Element {
         <Link to="/guide" className="hover:text-gray-200">Guide</Link>
         <Link to="/calculators" className="hover:text-gray-200">Calculators</Link>
         <Link to="/stats" className="hover:text-gray-200">Status</Link>
+        <Link to="/changelog" className="hover:text-gray-200">Changes</Link>
         <Link to="/provenance" className="hover:text-gray-200">Credits</Link>
         {signedIn ? (
           <>

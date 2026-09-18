@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 108 entries.
+Append-only, **newest at the bottom**. 109 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — the changelog, ten days after it was designed](#2026-09-18--the-changelog-ten-days-after-it-was-designed)
 - [2026-09-18 — the four deaths that had no name](#2026-09-18--the-four-deaths-that-had-no-name)
 - [2026-09-18 — three identical welcomes, and the one that was canon](#2026-09-18--three-identical-welcomes-and-the-one-that-was-canon)
 - [2026-09-18 — ship entry is a screen now, and the browser found two more bugs](#2026-09-18--ship-entry-is-a-screen-now-and-the-browser-found-two-more-bugs)
@@ -7559,4 +7560,63 @@ both typecheckers clean. The one failure is the pre-existing
 a project that declares 24.
 
 Not done: per-cause ship-loss mail, deliberately. @see DECISIONS.
+
+## 2026-09-18 — the changelog, ten days after it was designed
+
+Designed 2026-09-08, deliberately deferred until the game had been played for a
+week, and built today — the day it went public with four version bumps and
+nothing telling players what had changed.
+
+Everything structural was already settled and none of it was revisited: a file
+in the repo rather than a table, keyed by `VERSION`, four categories, rendered
+in the site theme. What the build added:
+
+**`/changelog`, its own page**, alongside `/guide`, `/stats` and `/provenance`,
+linked from the header and the foot of the landing page. The two categories the
+guide already speaks keep the colours it speaks them in — yellow for a
+deliberate deviation, sky for where the original contradicts itself — so a
+reader who has seen one page does not learn a second vocabulary.
+
+**A staleness guard, which is the part worth keeping.** A `VERSION` with neither
+an entry nor a line in `SILENT_RELEASES` fails the suite. A dependency upgrade
+genuinely has nothing to tell a player and inventing something would be worse
+than silence; a release nobody accounted for is an oversight; and without this
+the two are indistinguishable. `0.21.0` (NestJS 10 to 11) is the first silent
+release and says so in writing.
+
+**It starts at public launch, not at v0.1.0.** Reconstructing player-facing notes
+from two hundred pre-launch commits would be a guess presented as a record, and
+nobody was playing yet to have noticed. The 2026-09-08 note warned this would be
+the expensive path if it were left long enough; ten days was not long enough for
+that to bite.
+
+Caught by looking at the real page rather than the tests: **a backtick in an
+entry rendered as a literal backtick**, because the page prints plain text. The
+spec now rejects markup in an entry, which is the sort of thing only a browser
+tells you.
+
+**The staleness guard then failed on its own author, and was right to.** Bumping
+`VERSION` for the changelog itself had nowhere to file the entry: "we added a
+page" is not a bug, not a drift back to canon, not a knowing difference in how
+the game behaves, and not canon contradicting itself. The design settled four
+categories on 2026-09-08 and the fifth — `port-original` — is the class this
+codebase already names in fifteen source comments: f-keys, the guide, the
+calculators, this page. It does not re-open the deviation/correction split the
+other four protect; it names something that split never covered. Ten minutes
+old and the guard had already earned itself.
+
+Every other entry today is `port-bug`, which is honest — four bumps, all of them
+fixing things this port broke. The remaining three categories are in the legend
+waiting for the first change that earns them.
+
+Second thing the browser found: the page was served with the guide's
+`max-age=3600`, copied without thinking. An hour-long browser cache OUTLIVES the
+deploy it describes — a player who read the page before a release is told for
+another hour that the release does not exist, which is the one failure mode a
+changelog cannot have. It showed up here as the page rendering four categories
+while the API served five. Now sixty seconds, with the reason in the source.
+
+Verified: backend 679 files / 6,690 tests, frontend 48 / 379, both linters and
+typecheckers clean, and the page driven in a browser against the rebuilt dev
+stack. The one failure is the pre-existing `node-runtime-version` spec.
 

@@ -394,6 +394,13 @@ lags is worse than no version: it says a deploy landed when it did not.
 - **major** — reserved; the port reaching parity with canon is not a `1.0`
   until a returning player says it is
 
+**A bump also needs a changelog entry**, in the same commit, in
+`backend/src/public/changelog.ts` — one of five categories, written for a player
+rather than a reviewer. A release with nothing to tell a player goes in
+`SILENT_RELEASES` with a reason instead. The suite fails on a `VERSION` that is
+in neither, because a changelog that lags says a release landed with nothing in
+it. Categories and wording rules in `backend/src/public/CLAUDE.md`.
+
 The UI header shows `v<VERSION> · <short git SHA>`, and `/public/stats`
 reports the same pair for the backend. Two values because they fail
 differently: `VERSION` is meaningful but hand-maintained, so it goes stale the

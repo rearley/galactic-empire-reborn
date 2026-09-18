@@ -6237,3 +6237,58 @@ transit branch with its own cause, so the dead arm is gone rather than excused.
 and everything else gets the generic mail, so a pilot who kills themselves at
 the origin still gets a mail that names no cause. Naming self-inflicted deaths
 to PLAYERS is a separate, player-facing change; this one is instrumentation.
+
+## 2026-09-18 — The changelog is a file, keyed by VERSION, in four categories
+
+**Context:** the design was settled on 2026-09-08 and the build deliberately
+deferred until the game had been played for a week. It went public on
+2026-09-18 with four version bumps in a day and nothing telling players what
+had changed.
+
+**Decision:**
+
+- **A file in the repo** (`backend/src/public/changelog.ts`), not a database
+  table. Entries are written by whoever writes the code, in the same commit,
+  and reviewed with it. No admin surface, no migration. A table was considered
+  so entries could be edited without a deploy and rejected for now — file to
+  table is an easier move than the reverse.
+- **Keyed by `VERSION`.** Every deployed change already bumps it, so one bump
+  is one entry.
+- **Five categories, and keeping them apart is the point**: `port-bug`,
+  `corrected-to-canon`, `deliberate-deviation`, `canon-was-wrong`, and
+  `port-original`.
+- **Rendered in the site theme** at `/changelog`, alongside `/guide`, `/stats`
+  and `/provenance`, with the two shared categories keeping the colours the
+  guide already speaks them in — yellow for a deliberate deviation, sky for
+  where the original contradicts itself.
+- **Starts at public launch.** Reconstructing player-facing notes from two
+  hundred pre-launch commits would be a guess presented as a record, and nobody
+  was playing yet to have noticed.
+
+**Reason for four and not three:** `backend/src/public/guide.ts` already keeps
+`GUIDE_DEVIATIONS` and `GUIDE_CORRECTIONS` apart, because collapsing them
+either accuses Murdock of a change we made or claims his design as our
+improvement. A three-bucket changelog would re-make that conflation on the most
+public page this port has — the same page that promises we are honest about
+where we differ.
+
+**The staleness guard:** a release with neither an entry nor a line in
+`SILENT_RELEASES` fails the suite. A dependency upgrade genuinely has nothing to
+tell a player, and inventing something would be worse than silence — but a
+release nobody accounted for is an oversight, and the two are indistinguishable
+without this. The reason for each silence is written down where someone can
+disagree with it.
+
+**The fifth category was found by the guard, immediately.** The design settled
+four, and bumping `VERSION` for the changelog itself failed the staleness test
+because "we added a page" is none of them: not a bug, not a drift back to canon,
+not a knowing difference in how the GAME behaves, and not canon contradicting
+itself. `port-original` is the class this codebase already names in fifteen
+source comments — f-keys, the guide, the calculators — and it needed somewhere
+to be said out loud. This does NOT re-open the deviation/correction split the
+other four exist to protect; it names a kind of change that split never covered.
+
+**Known cost:** the entries are prose, and prose written by the person who wrote
+the code is the person least able to see what a player would not understand.
+Nothing here catches a technically accurate entry that reads as gibberish; only
+a reader can.
