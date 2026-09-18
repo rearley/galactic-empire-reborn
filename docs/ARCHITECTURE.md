@@ -312,6 +312,14 @@ leaving, self-destruct warnings) and `user:{userid}` (per-captain alerts — pla
 cloak collapse). The onboarding finalize path used to hand-roll its own welcome and skip both,
 leaving a first-session pilot deaf until they reloaded.
 
+The inverse is `ConnectionLifecycleService.detachFromWorld`, and every path that stops a captain
+flying without dropping the connection goes through it: `x` (`maybeExitGame`), `abandon`
+(`maybeReenterShipEntry`) and death (`GameGateway.recoverAfterDeath`). It leaves every room but the
+socket's own id room, drops the `ConnectedShipsRegistry` entry and broadcasts `player.left`, clears
+`client.data.activeShipNo`, and pushes an empty `player.snapshot`. All three paths previously undid
+the ship half and none of the socket half, so a captain at the ship-select screen was still being
+fed the traffic of the sector they had left.
+
 Client listeners: `command:result` carries replies to typed commands; `event.log` is the catch-all
 for unsolicited notices and `message.send` carries radio traffic. All three must have listeners in
 `App.tsx` — the gateway emitting is not enough, and a missing listener is silent.
@@ -319,7 +327,10 @@ for unsolicited notices and `message.send` carries radio traffic. All three must
 Broadcast filtering: `broadcasts[]` entries may carry `freq` (deliver only to ships tuned to that
 frequency on one of their three channels — C's `outsect`/`outwar` frequency argument) and
 `excludeSelf` (drop the sender, C's `usrnum` exclude). A `hail` broadcast carries no frequency and
-reaches every uncloaked socket.
+reaches every uncloaked socket. `excludeSelf` applies on all five dispatch branches — it was
+honoured only on the three that filter recipients themselves, so the two that take a room as given
+(`galaxy`, `sector:{x}:{y}`) silently dropped it, which is what let `x` and `clo off` narrate a
+pilot's own departure and decloak back to them.
 
 Re-entry path: a handler that leaves the captain shipless returns
 `CommandResult.reenterShipEntry: true`. The gateway then re-runs `presentShipEntry`, which resolves
@@ -652,15 +663,21 @@ Components (frontend/src/components/)
 
 Auth / onboarding components (frontend/src/auth/, frontend/src/onboarding/)
   AuthScreen          ← register/login form; calls /auth/register; stores JWT via tokenStore.setToken
-  ShipSelectPrompt    ← rendered on prompt:ship-select (≥2 ships); lists the fleet,
-                         emits prompt:reply with the chosen index
+  PreFlightScreen     ← the whole screen while onboardingPrompt is non-null: banner, TitleBar and one
+                         prompt, and NONE of the game. Hosts the two below
+  ShipSelectPrompt    ← rendered on prompt:ship-select; lists the fleet, emits prompt:reply with the
+                         chosen index. Also reached by `x` with a single hull, which is where logout lives
   ShipNamePrompt      ← rendered when onboardingPrompt.type === 'ship-name'; emits prompt:reply; shows
                          role="alert" on error="name-taken"
   tokenStore          ← localStorage wrapper: getToken / setToken / clearToken (key: 'ge_jwt')
 
 App.tsx flow:
-  getToken() present → connectSocket() + render Terminal (with ClassPickerPrompt or ShipNamePrompt overlay)
+  getToken() present → connectSocket(); onboardingPrompt set → PreFlightScreen, else Terminal
   getToken() absent  → render AuthScreen → onAuthenticated → setToken + connectSocket + re-render Terminal
+
+The event log is UNMOUNTED on the pre-flight screen, not cleared: death lands a captain there
+(recoverAfterDeath → presentShipEntry) and the YOURDEAD lines explaining the kill are in that
+scrollback, which is still there when they board again.
 ```
 
 ### Planet revolt (game/planet/planet-economy.service.ts)

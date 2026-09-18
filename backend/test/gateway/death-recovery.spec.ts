@@ -34,14 +34,27 @@ describe('recovery after death', () => {
     };
     gw.logger = { error: vi.fn() };
     gw.presentShipEntry = vi.fn().mockResolvedValue(undefined);
+    // Clearing the dead shipno is no longer done here: it is one part of
+    // detaching from the world, alongside leaving the rooms and dropping the
+    // registration, and all three now happen in one place. What this file
+    // still owns is that death REACHES that call and then re-presents ship
+    // entry. @see test/gateway/death-leaves-world.spec.ts for the effects.
+    gw.connectionLifecycle = {
+      detachFromWorld: vi.fn((_host: unknown, s: { data: Record<string, unknown> }) => {
+        s.data.activeShipNo = undefined;
+      }),
+    };
     return { gw, socket };
   }
 
-  it('clears the dead shipno and re-presents ship entry', async () => {
+  it('detaches the socket from the world and re-presents ship entry', async () => {
     const { gw, socket } = build();
     await (gw as unknown as { recoverAfterDeath: (u: string) => Promise<void> })
       .recoverAfterDeath('alice');
 
+    expect(
+      (gw.connectionLifecycle as { detachFromWorld: Mock }).detachFromWorld,
+    ).toHaveBeenCalledWith(expect.anything(), socket);
     expect(socket.data.activeShipNo).toBeUndefined();
     // A captain who was online for the death has already had YOURDEAD, so
     // re-entry suppresses the "destroyed while you were away" notice.

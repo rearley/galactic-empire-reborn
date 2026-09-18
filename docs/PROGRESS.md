@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 105 entries.
+Append-only, **newest at the bottom**. 106 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — ship entry is a screen now, and the browser found two more bugs](#2026-09-18--ship-entry-is-a-screen-now-and-the-browser-found-two-more-bugs)
 - [2026-09-18 — `x` put the ship away and left the socket in the sector](#2026-09-18--x-put-the-ship-away-and-left-the-socket-in-the-sector)
 - [2026-09-18 — the roster ghost was a bidirectional map maintained in one direction](#2026-09-18--the-roster-ghost-was-a-bidirectional-map-maintained-in-one-direction)
 - [2026-09-18 — NestJS 10 → 11, and a backend upgrade that moved frontend versions](#2026-09-18--nestjs-10--11-and-a-backend-upgrade-that-moved-frontend-versions)
@@ -7434,3 +7435,52 @@ local shell on Node 22 against a project that declares 24.
 Not addressed: #50's question of what a DISCONNECT should do, which is a
 different decision — this is the path where the player is still connected and
 told us they were leaving.
+
+
+## 2026-09-18 — ship entry is a screen now, and the browser found two more bugs
+
+Follow-on from the `x` leak earlier today. Stopping the server feeding a socket
+that is not in the game fixed the updates; it did not fix the screen. Ship
+entry was never a screen — it swapped the bottom input bar and left the whole
+terminal mounted behind it, so the log, the scan map, the scan readout and the
+roster all stayed up, frozen, for a captain who was not flying.
+
+`PreFlightScreen` is now the entire view whenever `onboardingPrompt` is set, for
+both prompts: the fleet menu after `x` or on a multi-hull login, and the
+name-your-ship prompt a first-time pilot sees. The connection banner and title
+bar stay, because a dropped socket and the build identity are facts about the
+SESSION rather than the game. `TitleBar` was extracted so the two callers cannot
+drift on the one thing that must not — the version string.
+
+**The event log is unmounted, not cleared.** Dying mid-session lands a captain
+on this screen (`recoverAfterDeath` → `presentShipEntry`), and the YOURDEAD
+lines saying what killed them are in that scrollback. Hiding it keeps it for
+when they board again; clearing it would throw away the explanation.
+
+Two bugs came out of the work, neither of them the reported one:
+
+**`recoverAfterDeath` had the same leak as `x`.** It was written before
+`detachFromWorld` and did the one part it could do by hand,
+`socket.data.activeShipNo = undefined`, so a killed captain sat at the ship
+prompt still in their old sector's rooms with the dead hull still registered.
+Routed through `detachFromWorld`, which now has all three callers — `x`,
+`abandon`, death — and is the single answer to "what does stopping flying do".
+
+**`excludeSelf` was silently dropped on two of the five broadcast branches.**
+Found by typing `x` in a browser and reading "\*\*\* Scanners can no longer locate
+The Orbiter, Sir!" about my own ship. `processBroadcasts` computes `excludeId`
+at the top of the loop and only ever handed it to `emitToSockets`, so the two
+branches that take a room as given — `galaxy` and `sector:{x}:{y}` — ignored it.
+Those are exactly the two that `x` and `clo off` use. The cloak handler's source
+carries a comment describing the bug the flag was added to fix ("the pilot was
+told 'Sensors indicate a ship de-cloaking nearby Sir!' about themselves"), so
+that fix has never worked either. Both handlers set the flag; nothing read it.
+
+The second one is worth the note on method: it was invisible to 6,600 backend
+tests and to reading the handler, which looks correct in isolation. Driving the
+real client for ninety seconds found it.
+
+Verified: backend 675 files / 6,669 tests, frontend 46 / 372, both builds and
+both linters clean, and the `x` → select → board round trip driven in a browser.
+The one failure is the pre-existing `node-runtime-version` spec, which fails
+because this shell is on Node 22 against a project that declares 24.

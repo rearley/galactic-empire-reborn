@@ -223,8 +223,12 @@ export class ConnectionLifecycleService {
    *
    * Every room but the socket's own id room goes: Socket.io puts each socket
    * in a room named after itself and that one is its addressing, not ours.
+   *
+   * Public because the third way to stop flying — `recoverAfterDeath`, which
+   * drops a killed captain at ship entry — lives on the gateway. It did the
+   * one part it could do by hand and had the identical hole.
    */
-  private detachFromWorld(host: LifecycleHost, client: GameSocket): void {
+  detachFromWorld(host: LifecycleHost, client: GameSocket): void {
     // Copied first: `leave` mutates the very set being walked.
     const rooms = client.rooms === undefined ? [] : Array.from(client.rooms);
     for (const room of rooms) {

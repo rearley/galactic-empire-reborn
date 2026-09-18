@@ -5,13 +5,11 @@ import { usePlayerList } from './state/usePlayerList';
 import { EventLog } from './components/EventLog';
 import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
-import { ConnectionIndicator } from './components/ConnectionIndicator';
-import { BUILD_VERSION } from './version';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { ScanPanel } from './components/ScanPanel';
-import { ShipNamePrompt } from './onboarding/ShipNamePrompt';
-import { ShipSelectPrompt } from './onboarding/ShipSelectPrompt';
+import { TitleBar } from './components/TitleBar';
+import { PreFlightScreen } from './onboarding/PreFlightScreen';
 import { clearToken } from './auth/tokenStore';
 import { logout } from './auth/logout';
 import { connectSocket, socket, onSocketAuthFailed } from './socket/socketClient';
@@ -25,9 +23,9 @@ import { useFkeys } from './hooks/useFkeys';
  * Root application component — five-region terminal UI (FR-002).
  * Mounted only behind `RequireAuth` at /play, which already guarantees a
  * valid token with a username, so App itself no longer branches on auth.
- * During onboarding (prompt:ship-name active) renders ShipNamePrompt, and
- * when a captain owns more than one hull (prompt:ship-select) renders the fleet
- * menu, instead of normal command input.
+ * Ship entry — naming a first ship, or choosing from a fleet — is its own
+ * screen rather than a swapped input bar, so none of the game renders for a
+ * captain who is not in it. @see onboarding/PreFlightScreen.tsx
  *
  * @see specs/011-onboarding/contracts/websocket-events.md §Connection
  * @see specs/010-react-frontend/spec.md FR-002
@@ -136,32 +134,22 @@ function Terminal(): React.JSX.Element {
     };
   }, [players, localShipId, shipName, appendLines]);
 
-  const shipNameError =
-    onboardingPrompt?.type === 'ship-name' ? (onboardingPrompt.payload.error ?? null) : null;
-
-  const renderBottomInput = (): React.JSX.Element => {
-    if (onboardingPrompt?.type === 'ship-name') {
-      return (
-        <ShipNamePrompt
-          onSubmit={(name) => emitPromptReply(name)}
-          error={shipNameError}
-        />
-      );
-    }
-    if (onboardingPrompt?.type === 'ship-select') {
-      return (
-        <ShipSelectPrompt
-          ships={onboardingPrompt.payload.ships}
-          onSelect={(index) => emitPromptReply(index)}
-          // Present only on a RE-emitted menu: the gateway says whether the
-          // number was outside the list or the hull is gone. @see issue #6
-          error={onboardingPrompt.payload.error ?? null}
-          onLogout={() => logout()}
-        />
-      );
-    }
-    return <CommandInput onSubmit={send} />;
-  };
+  // Between hulls — naming a first ship, choosing from a fleet, or picking up
+  // after one was destroyed — none of the game is rendered at all. It used to
+  // be: ship entry swapped the bottom input bar and left the log, the scan
+  // panels and the roster mounted behind it, so a captain who had typed `x`
+  // watched a game they were no longer in. @see onboarding/PreFlightScreen.tsx
+  if (onboardingPrompt) {
+    return (
+      <PreFlightScreen
+        prompt={onboardingPrompt}
+        status={status}
+        onReconnect={reconnect}
+        onReply={(value) => emitPromptReply(value)}
+        onLogout={() => logout()}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
@@ -169,18 +157,7 @@ function Terminal(): React.JSX.Element {
       <ConnectionBanner status={status} onReconnect={reconnect} />
 
       {/* Top bar: title + connection indicator (FR-002, FR-022) */}
-      <div className="flex items-center justify-between border-b border-gray-800 px-3 py-1">
-        <span className="text-xs text-gray-500 uppercase tracking-widest">
-          Galactic Empire
-          {/* Build identity. Deploys are hands-off, so this is the only way to
-              tell whether what you are looking at is the change you pushed.
-              @see src/version.ts */}
-          <span className="ml-2 normal-case tracking-normal text-gray-700" title="build">
-            {BUILD_VERSION}
-          </span>
-        </span>
-        <ConnectionIndicator status={status} />
-      </div>
+      <TitleBar status={status} />
 
       {/* Main area: log (left), map (right), player-list side-panel slot (FR-002) */}
       <div className="flex flex-1 overflow-hidden">
@@ -216,8 +193,8 @@ function Terminal(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Bottom: command input or onboarding prompt (FR-002) */}
-      {renderBottomInput()}
+      {/* Bottom: command input (FR-002) */}
+      <CommandInput onSubmit={send} />
     </div>
   );
 }

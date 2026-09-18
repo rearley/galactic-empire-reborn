@@ -887,8 +887,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const socketId of room) {
       const socket = this.server.sockets.sockets?.get(socketId);
       if (!socket) continue;
-      socket.data.activeShipNo = undefined;
       try {
+        // Clears `activeShipNo`, and with it the rooms and the registration —
+        // a killed captain is not in a sector any more and must stop being
+        // sent one's traffic. @see connection-lifecycle.service.ts
+        // detachFromWorld
+        this.connectionLifecycle.detachFromWorld(this.lifecycleHost(), socket);
         await this.presentShipEntry(socket, userid, { noticeShipLoss: false });
       } catch (err) {
         const stack = err instanceof Error ? err.stack : String(err);
@@ -1503,7 +1507,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
       } else if (broadcast.room === 'galaxy') {
         // Galaxy-wide: all connected sockets, no filtering
-        dispatchBroadcast(this.server, broadcast);
+        dispatchBroadcast(excludeId ? this.server.except(excludeId) : this.server, broadcast);
       } else if (broadcast.room.startsWith('ship:')) {
         // A message addressed to ONE pilot, the way C writes to a single
         // terminal with `outprfge(FILTER, shpnum)`. Used by `sca sh` to tell
@@ -1532,7 +1536,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           (uid, shipno) => this.shipStateService.get(uid, shipno),
         );
       } else {
-        dispatchBroadcast(this.server.to(broadcast.room), broadcast);
+        // `excludeId` has to be applied HERE as well as on the filtered
+        // branches. It was computed at the top of the loop and then only ever
+        // handed to `emitToSockets`, so the two branches that take a room as
+        // given dropped it — and they are the ones `x` and `clo off` use. The
+        // pilot leaving read their own "Scanners can no longer locate ..."
+        // line, and the decloaking pilot was told a ship was decloaking
+        // nearby. Both handlers set the flag; nothing read it.
+        const target = excludeId
+          ? this.server.to(broadcast.room).except(excludeId)
+          : this.server.to(broadcast.room);
+        dispatchBroadcast(target, broadcast);
       }
     }
   }
