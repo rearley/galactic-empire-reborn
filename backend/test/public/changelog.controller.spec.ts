@@ -31,10 +31,8 @@ describe('ChangelogController', () => {
 describe('ChangelogController cache policy', () => {
   it('caches for a minute, not the guide’s hour', async () => {
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync(
-      new URL('../../src/public/changelog.controller.ts', import.meta.url),
-      'utf8',
-    );
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '../../src/public/changelog.controller.ts'), 'utf8');
     expect(src).toContain("'Cache-Control', 'public, max-age=60'");
   });
 });

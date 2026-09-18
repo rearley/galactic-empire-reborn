@@ -19,9 +19,11 @@ import { DebugController } from './debug/debug.controller';
 import { debugEndpointsEnabled } from './debug/debug-endpoints';
 import { HealthController } from './health/health.controller';
 import { PublicModule } from './public/public.module';
+import { ReportsModule } from './game/reports/reports.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ScheduleModule.forRoot(), PrismaModule, AuthModule, InvariantsModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule, MidnightModule, PublicModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }), ScheduleModule.forRoot(), PrismaModule, AuthModule, InvariantsModule, TickModule, ShipModule, GalaxyModule, PlanetModule, PhysicsModule, CombatModule, CybertronModule, DroidModule, CommandsModule, GatewayModule, MidnightModule, PublicModule, ReportsModule],
   controllers: [...(debugEndpointsEnabled() ? [DebugController] : []), HealthController],
 })
 export class AppModule {}

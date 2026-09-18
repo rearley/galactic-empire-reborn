@@ -12,6 +12,7 @@ import { Stats } from './routes/Stats';
 import { Guide, GuidePage } from './routes/Guide';
 import { Provenance } from './routes/Provenance';
 import { Changelog } from './routes/Changelog';
+import { Reports } from './routes/Reports';
 import { Calculators } from './routes/Calculators';
 
 const rootElement = document.getElementById('root');
@@ -29,6 +30,8 @@ createRoot(rootElement).render(
         <Route path="/guide" element={<Guide />} />
         <Route path="/guide/:slug" element={<GuidePage />} />
         <Route path="/changelog" element={<Changelog />} />
+        {/* Sysop only, enforced by the server — see routes/Reports.tsx */}
+        <Route path="/reports" element={<RequireAuth><Reports /></RequireAuth>} />
         <Route path="/provenance" element={<Provenance />} />
         <Route path="/calculators" element={<Calculators />} />
         <Route path="/play" element={<RequireAuth><App /></RequireAuth>} />

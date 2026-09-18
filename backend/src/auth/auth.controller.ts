@@ -1,15 +1,6 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Post,
-  Req,
-  UseFilters,
-  UseGuards,
-  UsePipes,
-  ValidationPipe,
-} from '@nestjs/common';
+import { Get, Body, Controller, HttpCode, Post, Req, UseFilters, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { isSysopUsername } from './sysop';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -48,6 +39,29 @@ export class AuthController {
   )
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  /**
+   * Who am I, and may I see the reports?
+   *
+   * Exists so the site chrome can decide whether to offer the sysop their
+   * Reports link without guessing. The answer is COSMETIC — `ReportsController`
+   * asks the same question again and is the thing that actually refuses — but a
+   * button that 403s when pressed is worse than no button.
+   *
+   * Reads the username from the TOKEN rather than the database: it is already
+   * in the payload, and one more query per page load buys nothing.
+   */
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  me(@Req() req: { user: { sub: string; username: string | null } }): {
+    username: string | null;
+    sysop: boolean;
+  } {
+    return {
+      username: req.user.username ?? null,
+      sysop: isSysopUsername(req.user.username),
+    };
   }
 
   @Post('username')

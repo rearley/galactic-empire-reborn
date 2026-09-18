@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
+import { isSysopUsername } from '../../../auth/sysop';
 import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -122,16 +123,14 @@ export class SysHandlerService {
    * across resets, so it can be set once and stay true. Matching is
    * case-insensitive because `User.username` is case-insensitively unique.
    *
+   * The check itself moved to `auth/sysop.ts` when the reports page needed the
+   * same question answered over HTTP; the reasoning above is why it reads a
+   * username, and stays here where the canon gate is.
+   *
    * @see GECMDS.C:4752-4760 cmd_sysop
    */
   private isSysop(ship: ShipState): boolean {
-    const name = ship.username?.trim().toLowerCase();
-    if (!name) return false;
-    return (process.env.GE_SYSOP_USERNAME ?? '')
-      .split(',')
-      .map((u) => u.trim().toLowerCase())
-      .filter((u) => u.length > 0)
-      .includes(name);
+    return isSysopUsername(ship.username);
   }
 
   /**

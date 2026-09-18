@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 110 entries.
+Append-only, **newest at the bottom**. 111 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — `bug` — reporting from inside the game, and a route that would not have worked](#2026-09-18--bug--reporting-from-inside-the-game-and-a-route-that-would-not-have-worked)
 - [2026-09-18 — the header was broken on a phone, and nobody had looked](#2026-09-18--the-header-was-broken-on-a-phone-and-nobody-had-looked)
 - [2026-09-18 — the changelog, ten days after it was designed](#2026-09-18--the-changelog-ten-days-after-it-was-designed)
 - [2026-09-18 — the four deaths that had no name](#2026-09-18--the-four-deaths-that-had-no-name)
@@ -7659,4 +7660,54 @@ commit otherwise.
 Verified in a browser at 390px — header nav now 166px, no horizontal scroll,
 every link reachable. Frontend 49 files / 384 tests, backend 679 / 6,689, both
 linters and typecheckers clean.
+
+## 2026-09-18 — `bug` — reporting from inside the game, and a route that would not have worked
+
+The changelog's issue-tracker link needs a GitHub account and arrives with none
+of the context that makes a report actionable. Rick wanted reporting from inside
+the game "while fresh", and asked whether that meant a help desk with its own
+sysop login. It did not: three pieces already existed and shrank it to a day.
+
+- **Sysop identity** — the `GE_SYSOP_USERNAME` allowlist that gates `sys`.
+- **An authenticated admin surface** — `/admin/midnight/run` behind a guard.
+- **A mail system** — which is the right way to REPLY, and the wrong place to
+  store: the midnight job purges mail at `MAILDAYS`, so reports would evaporate
+  before they were read.
+
+So: `bug <text>` writes to a table of its own with the context the server knows
+and the player never includes — hull, sector, damage, and the BUILD, which is
+what decides whether a report is still about the running code. `/admin/reports`
+reads it, gated on the same allowlist as `sys`, now one function in
+`auth/sysop.ts` called by both. The sysop signs in as an ordinary player and the
+header offers them a Reports link; the link is cosmetic and the endpoint is what
+refuses.
+
+**The thing worth writing down: the API route would not have worked in
+production, and no test would have said so.** It was mounted at `/reports` —
+the same path as the PAGE — and nginx proxies exactly four prefixes to the
+backend (`/auth/`, `/admin/`, `/public/`, `/socket.io/`), everything else being
+served `index.html`. In the browser the page's own fetch came back as Vite's app
+shell, `r.json()` threw, and the page showed its "sysop only" refusal to an
+account that WAS the sysop. Two bugs wearing one costume: a URL collision and an
+unproxied prefix. Moved to `/admin/reports`, with a test pinning the mount point
+against `nginx.conf` so the next route cannot repeat it.
+
+Canon settles the shape of none of this and says so clearly: `cmd_sysop` is the
+only sysop surface in GECMDS.C, because a MajorBBS player mailed the sysop
+through the BBS, one level up from the game. Worth noting while reading it —
+canon's own sysop gate is doubled either side of an `#ifdef PHARLAP`, asking
+`hasmkey(SYSKEY)` on one arm and `usrptr->flags&ISYSOP` on the other. The
+codebase cites the ISYSOP arm, which is the one a non-PharLap build compiles.
+
+Verified end to end against the dev stack, which is the only way any of the
+above surfaced: filed a report in the browser as a non-sysop player, saw the row
+in Postgres with its context, confirmed the non-sysop sees neither the link nor
+the data when typing the URL, then restarted the backend with the sysop
+allowlist widened, saw the report, closed it, and confirmed the status in the
+database. The allowlist override was passed to the process rather than written
+to `.env`, and the backend was restarted afterwards without it.
+
+Backend 681 files / 6,706 tests, frontend 50 / 390, both linters and
+typecheckers clean. The one failure is the pre-existing `node-runtime-version`
+spec.
 

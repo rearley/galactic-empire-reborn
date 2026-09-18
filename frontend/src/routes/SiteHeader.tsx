@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { getToken } from '../auth/tokenStore';
 import { logout } from '../auth/logout';
+import { useSysop } from '../auth/useSysop';
 
 /**
  * Shared nav for the public pages. Not rendered inside the terminal.
@@ -18,6 +19,8 @@ import { logout } from '../auth/logout';
  */
 export function SiteHeader(): React.JSX.Element {
   const signedIn = getToken() !== null;
+  // Cosmetic only — the endpoint refuses on its own. @see auth/useSysop.ts
+  const { sysop } = useSysop();
   return (
     <header className="flex items-center justify-between border-b border-gray-800 px-4 py-3 font-mono text-sm">
       <Link to="/" className="uppercase tracking-widest text-yellow-400">Galactic Empire</Link>
@@ -26,6 +29,9 @@ export function SiteHeader(): React.JSX.Element {
         {signedIn ? (
           <>
             <Link to="/play" className="hover:text-gray-200">Play</Link>
+            {sysop && (
+              <Link to="/reports" className="hover:text-gray-200">Reports</Link>
+            )}
             <button type="button" onClick={() => logout()} className="hover:text-gray-200">Log out</button>
           </>
         ) : (

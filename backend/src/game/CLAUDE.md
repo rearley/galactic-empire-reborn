@@ -21,6 +21,8 @@ backend/src/game/
   cybertron/      ← CybertronTickService + CybertronRepository
   droid/          ← DroidTickService + DroidSpawner
   midnight/       ← MidnightService — nightly maintenance cron
+  reports/        ← BugReportService + the sysop's /admin/reports endpoint;
+                    PORT-ORIGINAL, canon has no player-to-sysop channel
 ```
 
 State lives in a NestJS service singleton (`Map<shipId, ShipState>`) and is the

@@ -21,7 +21,7 @@ import { HELP_TOPICS, HELP_TOPIC_ALIASES, HelpTopicId } from '../../src/game/com
 
 /** Every verb the router answers to. @see command-router.service.ts */
 const ALL_VERBS = [
-  'abandon', 'abort', 'admin', 'att', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
+  'abandon', 'abort', 'admin', 'att', 'bug', 'buy', 'cloak', 'cls', 'dat', 'dec', 'del',
   'destruct', 'flux', 'fre', 'hel', 'impulse', 'jam', 'jettison', 'loc',
   'mai', 'maint', 'min', 'mis', 'nav', 'new', 'orbit', 'pha', 'pln', 'pri', 'rea',
   'rename', 'report', 'ros', 'rotate', 'scan', 'sell', 'sen', 'set', 'shi', 'spy',

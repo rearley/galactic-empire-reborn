@@ -109,6 +109,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.24.0',
+    date: '2026-09-18',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'Type bug followed by what went wrong, and it goes straight to the sysop without leaving the game. Your ship, sector, damage and the build you are on are attached automatically, so "it killed me" is enough to act on. Try hel bug.',
+      },
+    ],
+  },
+  {
     version: '0.23.1',
     date: '2026-09-18',
     entries: [

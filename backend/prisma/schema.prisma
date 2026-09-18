@@ -39,44 +39,44 @@ datasource db {
 
 model User {
   /// WARUSR.userid[UIDSIZ=30] — player login name, primary key
-  userid        String   @id
+  userid          String    @id
   /// Display handle chosen in step 2 of registration; case-insensitive unique
   /// (lower index in migration). NULL means signup was abandoned after step 1 —
   /// WsAuthGuard refuses such a token, and midnight sweeps the row at 10 days.
-  username      String?
+  username        String?
   /// Login credential. Nullable because the Cybertron rows in this table can
   /// never have one; uniqueness is a partial lower() index, not @unique.
-  email         String?
+  email           String?
   /// Reserved for a future verification flow. Written by nothing today.
   emailVerifiedAt DateTime?
   /// bcrypt hash of password; NULL rows cannot log in (backfill policy in DECISIONS.md)
-  passwordHash  String?
+  passwordHash    String?
   /// Registration timestamp
-  createdAt     DateTime @default(now())
+  createdAt       DateTime  @default(now())
   /// WARUSR.score — accumulated score; BigInt per FR-036
-  score      BigInt  @default(0)
+  score           BigInt    @default(0)
   /// WARUSR.noships
-  noships    Int     @default(0)
+  noships         Int       @default(0)
   /// WARUSR.topshipno
-  topshipno  Int     @default(0)
+  topshipno       Int       @default(0)
   /// WARUSR.kills
-  kills      Int     @default(0)
+  kills           Int       @default(0)
   /// WARUSR.rospos
-  rospos     Int     @default(0)
+  rospos          Int       @default(0)
   /// WARUSR.planets
-  planets    Int     @default(0)
+  planets         Int       @default(0)
   /// WARUSR.cash — BigInt per FR-036
-  cash       BigInt  @default(0)
+  cash            BigInt    @default(0)
   /// WARUSR.debt — BigInt per FR-036
-  debt       BigInt  @default(0)
+  debt            BigInt    @default(0)
   /// WARUSR.plscore — BigInt per FR-036
-  plscore    BigInt  @default(0)
+  plscore         BigInt    @default(0)
   /// WARUSR.klscore — BigInt per FR-036
-  klscore    BigInt  @default(0)
+  klscore         BigInt    @default(0)
   /// WARUSR.population — BigInt per FR-036
-  population BigInt  @default(0)
+  population      BigInt    @default(0)
   /// WARUSR.options[30] — player option flags; native array per FR-034
-  options    Int[]
+  options         Int[]
   /// Function-key command bindings, f1..f12 at indices 0..11.
   ///
   /// PORT-ORIGINAL: canon has no such feature. On a BBS this lived in the
@@ -85,9 +85,9 @@ model User {
   /// faithful to. A browser cannot reliably claim F-keys (F11 and F12 never
   /// reach the page), so these are TYPED: `fset f1 pha 0 0`, then `f1`.
   /// @see docs/DECISIONS.md
-  fkeys      String[]  @default([])
+  fkeys           String[]  @default([])
   /// WARUSR.teamcode — no FK; dangling teamcode tolerated per original game behavior (R-3)
-  teamcode   BigInt?
+  teamcode        BigInt?
 
   ships     Ship[]
   mails     Mail[]
@@ -103,111 +103,111 @@ model User {
 
 model Ship {
   /// WARSHP.userid[UIDSIZ] — FK to User (R-3: enforced)
-  userid          String
+  userid         String
   /// WARSHP.shipno — ship id number; composite PK with userid (SHPKEY, FR-009)
-  shipno          Int
+  shipno         Int
   /// WARSHP.shipname[35]
-  shipname        String
+  shipname       String
   /// WARSHP.shpclass — resolves to ShipClass.classNumber (FR-027); not an FK
-  shpclass        Int
+  shpclass       Int
   /// WARSHP.heading — double precision per FR-033
-  heading         Float  @default(0)
+  heading        Float    @default(0)
   /// WARSHP.head2b
-  head2b          Float  @default(0)
+  head2b         Float    @default(0)
   /// WARSHP.speed
-  speed           Float  @default(0)
+  speed          Float    @default(0)
   /// WARSHP.speed2b
-  speed2b         Float  @default(0)
+  speed2b        Float    @default(0)
   /// WARSHP.coord.xcoord — COORD struct (GEMAIN.H:261); FR-033
-  xcoord          Float  @default(0)
+  xcoord         Float    @default(0)
   /// WARSHP.coord.ycoord
-  ycoord          Float  @default(0)
+  ycoord         Float    @default(0)
   /// WARSHP.damage
-  damage          Float  @default(0)
+  damage         Float    @default(0)
   /// WARSHP.energy
-  energy          Float  @default(0)
+  energy         Float    @default(0)
   /// WARSHP.phasr
-  phasr           Float  @default(0)
+  phasr          Float    @default(0)
   /// WARSHP.phasrtype — byte; meaning enforced in code
-  phasrtype       Int    @default(0)
+  phasrtype      Int      @default(0)
   /// WARSHP.kills
-  kills           Int    @default(0)
+  kills          Int      @default(0)
   /// WARSHP.lastfired
-  lastfired       Int    @default(0)
+  lastfired      Int      @default(0)
   /// WARSHP.shieldtype
-  shieldtype      Int    @default(0)
+  shieldtype     Int      @default(0)
   /// WARSHP.shieldstat
-  shieldstat      Int    @default(0)
+  shieldstat     Int      @default(0)
   /// WARSHP.shield
-  shield          Int    @default(0)
+  shield         Int      @default(0)
   /// WARSHP.cloak
-  cloak           Int    @default(0)
+  cloak          Int      @default(0)
   /// WARSHP.degrees
-  degrees         Int    @default(0)
+  degrees        Int      @default(0)
   /// WARSHP.percent
-  percent         Int    @default(0)
+  percent        Int      @default(0)
   /// WARSHP.tactical
-  tactical        Int    @default(0)
+  tactical       Int      @default(0)
   /// WARSHP.helm
-  helm            Int    @default(0)
+  helm           Int      @default(0)
   /// WARSHP.train
-  train           Int    @default(0)
+  train          Int      @default(0)
   /// WARSHP.where — hyperspace flag
-  where           Int    @default(0)
+  where          Int      @default(0)
   /// WARSHP.ltorps[MAXTORPS=3].channel — parallel array per FR-035
-  ltorpsChannel   Int[]
+  ltorpsChannel  Int[]
   /// WARSHP.ltorps[MAXTORPS=3].distance
-  ltorpsDistance  Int[]
+  ltorpsDistance Int[]
   /// WARSHP.lmissl[MAXMISSL=3].channel — parallel array per FR-035
-  lmisslChannel   Int[]
+  lmisslChannel  Int[]
   /// WARSHP.lmissl[MAXMISSL=3].distance
-  lmisslDistance  Int[]
+  lmisslDistance Int[]
   /// WARSHP.lmissl[MAXMISSL=3].energy
-  lmisslEnergy    Int[]
+  lmisslEnergy   Int[]
   /// WARSHP.decout[MAXDECOY=10] — decoys out; native array per FR-034
-  decout          Int[]
+  decout         Int[]
   /// WARSHP.jammer
-  jammer          Int    @default(0)
+  jammer         Int      @default(0)
   /// WARSHP.freq[3] — subspace/hyperspace/planetary frequencies
-  freq            Int[]
+  freq           Int[]
   /// WARSHP.items[NUMITEMS=14] — cargo quantities; BigInt per FR-037, native array per FR-034
-  items           BigInt[]
+  items          BigInt[]
   /// WARSHP.titem
-  titem           Int    @default(0)
+  titem          Int      @default(0)
   /// WARSHP.hostile
-  hostile         Int    @default(0)
+  hostile        Int      @default(0)
   /// WARSHP.cantexit
-  cantexit        Int    @default(0)
+  cantexit       Int      @default(0)
   /// WARSHP.repair
-  repair          Int    @default(0)
+  repair         Int      @default(0)
   /// WARSHP.hypha
-  hypha           Int    @default(0)
+  hypha          Int      @default(0)
   /// WARSHP.firecntl
-  firecntl        Int    @default(0)
+  firecntl       Int      @default(0)
   /// WARSHP.destruct — byte
-  destruct        Int    @default(0)
+  destruct       Int      @default(0)
   /// WARSHP.status — byte; record status. 0=avail,1=user,2=auto @see GEMAIN.H GESTAT_*
-  status          Int    @default(1)
+  status         Int      @default(1)
   /// WARSHP.cybmine
-  cybmine         Int    @default(0)
+  cybmine        Int      @default(0)
   /// WARSHP.cybskill
-  cybskill        Int    @default(0)
+  cybskill       Int      @default(0)
   /// WARSHP.cybupdate
-  cybupdate       Int    @default(0)
+  cybupdate      Int      @default(0)
   /// WARSHP.tick
-  tick            Int    @default(0)
+  tick           Int      @default(0)
   /// WARSHP.emulate
-  emulate         Int    @default(0)
+  emulate        Int      @default(0)
   /// WARSHP.minesnear
-  minesnear       Int    @default(0)
+  minesnear      Int      @default(0)
   /// WARSHP.lock — locked-on ship number
-  lock            Int    @default(0)
+  lock           Int      @default(0)
   /// WARSHP.holdcourse
-  holdcourse      Int    @default(0)
+  holdcourse     Int      @default(0)
   /// WARSHP.topspeed
-  topspeed        Int    @default(0)
+  topspeed       Int      @default(0)
   /// WARSHP.warncntr
-  warncntr        Int    @default(0)
+  warncntr       Int      @default(0)
 
   user User @relation(fields: [userid], references: [userid])
 
@@ -241,51 +241,51 @@ model Sector {
 
 model Planet {
   /// GALPLNT.xsect
-  xsect       Int
+  xsect      Int
   /// GALPLNT.ysect
-  ysect       Int
+  ysect      Int
   /// GALPLNT.plnum — planet number within sector; composite PK (PKEY, FR-015)
-  plnum       Int
+  plnum      Int
   /// GALPLNT.type
-  type        Int    @default(0)
+  type       Int       @default(0)
   /// GALPLNT.coord.xcoord
-  xcoord      Float  @default(0)
+  xcoord     Float     @default(0)
   /// GALPLNT.coord.ycoord
-  ycoord      Float  @default(0)
+  ycoord     Float     @default(0)
   /// GALPLNT.userid — owner; nullable, no FK (R-3: ownership flips without strict ref-check)
-  userid      String?
+  userid     String?
   /// GALPLNT.name[20]
-  name        String @default("")
+  name       String    @default("")
   /// GALPLNT.enviorn — environment factor
-  enviorn     Int    @default(0)
+  enviorn    Int       @default(0)
   /// GALPLNT.resource
-  resource    Int    @default(0)
+  resource   Int       @default(0)
   /// GALPLNT.cash — BigInt per FR-036
-  cash        BigInt @default(0)
+  cash       BigInt    @default(0)
   /// GALPLNT.debt — BigInt per FR-036
-  debt        BigInt @default(0)
+  debt       BigInt    @default(0)
   /// GALPLNT.tax — BigInt per FR-036
-  tax         BigInt @default(0)
+  tax        BigInt    @default(0)
   /// GALPLNT.taxrate
-  taxrate     Int    @default(0)
+  taxrate    Int       @default(0)
   /// GALPLNT.warnings
-  warnings    Int    @default(0)
+  warnings   Int       @default(0)
   /// GALPLNT.password[10]
-  password    String @default("")
+  password   String    @default("")
   /// GALPLNT.lastattack[UIDSIZ=30] — no FK (R-3: may reference deleted user)
-  lastattack  String @default("")
+  lastattack String    @default("")
   /// GALPLNT.beacon[BEACONMSGSZ=75] — sector announcement message
-  beacon      String @default("")
+  beacon     String    @default("")
   /// GALPLNT.spyowner[UIDSIZ=30] — no FK
-  spyowner    String @default("")
+  spyowner   String    @default("")
   /// GALPLNT.technology
-  technology  Int    @default(0)
+  technology Int       @default(0)
   /// GALPLNT.teamcode — no FK (R-3)
-  teamcode    BigInt @default(0)
+  teamcode   BigInt    @default(0)
   /// NOT canon. When this planet's economy last ran; null = never.
   /// The schedule was in-memory, so every restart made every planet due at once
   /// and granted a free PLANTOCK. @see docs/DECISIONS.md 2026-09-06
-  lastTickAt  DateTime?
+  lastTickAt DateTime?
 
   // ITEM substructure — parallel arrays, one column per ITEM field, NUMITEMS=14 entries each
   /// ITEM.qty[NUMITEMS] — BigInt per FR-037
@@ -315,17 +315,17 @@ model Wormhole {
   /// GALWORM.plnum
   plnum      Int
   /// GALWORM.type
-  type       Int   @default(0)
+  type       Int    @default(0)
   /// GALWORM.coord.xcoord — origin position
-  xcoord     Float @default(0)
+  xcoord     Float  @default(0)
   /// GALWORM.coord.ycoord
-  ycoord     Float @default(0)
+  ycoord     Float  @default(0)
   /// GALWORM.visible — is the wormhole visible flag
-  visible    Int   @default(0)
+  visible    Int    @default(0)
   /// GALWORM.destination.xcoord — destination COORD
-  destXcoord Float @default(0)
+  destXcoord Float  @default(0)
   /// GALWORM.destination.ycoord
-  destYcoord Float @default(0)
+  destYcoord Float  @default(0)
   /// GALWORM.name[20]
   name       String @default("")
 
@@ -337,24 +337,24 @@ model Wormhole {
 
 model Team {
   /// TEAM.teamcode — long; primary key; BigInt for 32-bit signed range
-  teamcode  BigInt @id
+  teamcode  BigInt  @id
   /// Team disbanded at midnight for having no members.
   /// C sets `teamtab[i].teamcode = -1` to free the array slot (GEMAIN.C:1293);
   /// teamcode is the primary key here, so the marker needs its own column —
   /// writing -1 into it collided as soon as a second team emptied out.
   removed   Boolean @default(false)
   /// TEAM.teamname[31]
-  teamname  String @default("")
+  teamname  String  @default("")
   /// TEAM.teamcount
-  teamcount Int    @default(0)
+  teamcount Int     @default(0)
   /// TEAM.teamscore — BigInt; accumulates across the game lifetime
-  teamscore BigInt @default(0)
+  teamscore BigInt  @default(0)
   /// TEAM.password[11]
-  password  String @default("")
+  password  String  @default("")
   /// TEAM.secret[11]
-  secret    String @default("")
+  secret    String  @default("")
   /// TEAM.flag
-  flag      Int    @default(0)
+  flag      Int     @default(0)
 }
 
 // ─── Mail (MAIL) ─────────────────────────────────────────────────────────────
@@ -415,25 +415,25 @@ model MailStat {
   /// MAILKEY.msgno
   msgno   BigInt
   /// MAILSTAT.type
-  type    Int    @default(0)
+  type    Int      @default(0)
   /// MAILSTAT.stamp
-  stamp   Int    @default(0)
+  stamp   Int      @default(0)
   /// MAILSTAT.dtime[20]
-  dtime   String @default("")
+  dtime   String   @default("")
   /// MAILSTAT.topic[30]
-  topic   String @default("")
+  topic   String   @default("")
   /// MAILSTAT.name1[25]
-  name1   String @default("")
+  name1   String   @default("")
   /// MAILSTAT.int1
-  int1    Int    @default(0)
+  int1    Int      @default(0)
   /// MAILSTAT.int2
-  int2    Int    @default(0)
+  int2    Int      @default(0)
   /// MAILSTAT.cash — BigInt per FR-036
-  cash    BigInt @default(0)
+  cash    BigInt   @default(0)
   /// MAILSTAT.debt
-  debt    BigInt @default(0)
+  debt    BigInt   @default(0)
   /// MAILSTAT.tax
-  tax     BigInt @default(0)
+  tax     BigInt   @default(0)
   /// MAILSTAT.itemqty[NUMITEMS=14] — BigInt[] per FR-037, native array per FR-034
   itemqty BigInt[]
 
@@ -449,64 +449,64 @@ model MailStat {
 
 model ShipClass {
   /// Wiki "#" column — the class number referenced by WARSHP.shpclass
-  classNumber            Int     @id
+  classNumber           Int     @id
   /// Wiki "Class" / type label (e.g. "Interceptor", "Cybertron Scout")
-  typeName               String
+  typeName              String
   /// Wiki "Name" column — ship name template; CPU ships use "###" suffix placeholder
-  shipNameTemplate       String
+  shipNameTemplate      String
   /// Category: "PLAYER", "CPU_COMBATIVE", or "CPU_DROID"
-  category               String
+  category              String
   /// Wiki Shi — max shield level
-  maxShields             Int
+  maxShields            Int
   /// Wiki Pha — max phaser level
-  maxPhaser              Int
+  maxPhaser             Int
   /// Wiki Tor
-  hasTorpedo             Boolean
+  hasTorpedo            Boolean
   /// Wiki Mis
-  hasMissile             Boolean
+  hasMissile            Boolean
   /// Wiki Dec
-  hasDecoy               Boolean
+  hasDecoy              Boolean
   /// Wiki Jam
-  hasJammer              Boolean
+  hasJammer             Boolean
   /// Wiki Zip
-  hasZipper              Boolean
+  hasZipper             Boolean
   /// Wiki Mine/Min
-  hasMine                Boolean
+  hasMine               Boolean
   /// Wiki Atck/Att — can attack planets
-  canAttackPlanet        Boolean
+  canAttackPlanet       Boolean
   /// Wiki Clo — has cloaking device
-  hasCloak               Boolean
+  hasCloak              Boolean
   /// Wiki Acc — max acceleration (normalized integer)
-  maxAcceleration        Int
+  maxAcceleration       Int
   /// Wiki Warp — max warp factor
-  maxWarp                Int
+  maxWarp               Int
   /// Wiki Tons — cargo/hull tonnage (normalized integer)
-  maxTons                Int
+  maxTons               Int
   /// Wiki Price — player purchase price; BigInt to accommodate 32m (Death Star); 0 for CPU ships
-  maxPrice               BigInt
+  maxPrice              BigInt
   /// Wiki Scan — scan range (normalized integer)
-  scanRange              Int
+  scanRange             Int
   /// Wiki Pts — score points awarded on kill
-  points                 Int
+  points                Int
   /// Wiki Dmg — damage factor
-  damageFactor           Int
+  damageFactor          Int
   /// Wiki Cyb — Cybertrons will attack this ship class (player table); false for CPU ships
-  cybCanAttack           Boolean
+  cybCanAttack          Boolean
   /// Wiki CPU-table "User" — the lowest player ship class this CPU pursues
   /// unprovoked; 0 pursues all. C compares `lowest_to_attk - 1 <= victim.shpclass`,
   /// so a 6 here reaches class 5. 0 on player rows — they hunt nobody.
   /// @see GECYBS.C:711, 719  @see reference/wiki/cpu-ships.md
-  cybLowestClassAttacks  Int
+  cybLowestClassAttacks Int
   /// Wiki PLAYER-table "Cyb#" — how many combative CPU ships may pursue this
   /// ship at once. 0 means never pursued unprovoked (Heavy Freighter, Freight
   /// Barge). Read from the ship being HUNTED, never from the hunter. 0 on CPU
   /// rows — nothing hunts them.
   /// @see GECYBS.C:357-376  @see reference/wiki/player-ships.md
-  noClaim                Int
+  noClaim               Int
   /// Wiki Make — max simultaneous instances (CPU only); 0 for player ships
-  make                   Int
+  make                  Int
   /// Wiki Tough — AI difficulty level 0/1 (CPU only); 0 for player ships
-  tough                  Int
+  tough                 Int
 }
 
 // ─── GalaxyMeta (singleton provenance row) ───────────────────────────────────
@@ -536,19 +536,19 @@ model GalaxyMeta {
 
 model Mine {
   /// Synthetic surrogate PK — MINE has no natural key in the original (R-4)
-  id          Int      @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   /// MINE.channel — byte
-  channel     Int
+  channel    Int
   /// MINE.timer — unsigned countdown
-  timer       Int
+  timer      Int
   /// MINE.coord.xcoord
-  xcoord      Float
+  xcoord     Float
   /// MINE.coord.ycoord
-  ycoord      Float
+  ycoord     Float
   /// FR-029: userid of the ship that deployed this mine; no FK (deployer may be deleted)
-  deployedBy  String
+  deployedBy String
   /// FR-029: timestamp of deployment
-  deployedAt  DateTime @default(now())
+  deployedAt DateTime @default(now())
 }
 
 // ─── MidnightRun ─────────────────────────────────────────────────────────────
@@ -627,4 +627,52 @@ model DisconnectEvent {
   @@index([userid, returnedAt])
   /// Time-ordered reads for the percentile queries
   @@index([disconnectedAt])
+}
+
+/// A bug report filed from inside the game, while it is still fresh.
+///
+/// PORT-ORIGINAL. Canon has no player-to-sysop channel at all: on a BBS that
+/// lived one level up, in the BBS itself, and `cmd_sysop` is the only sysop
+/// surface in GECMDS.C. @see docs/DECISIONS.md 2026-09-18
+///
+/// A table of its own rather than a `Mail` row, for two reasons. The midnight
+/// job purges mail older than MAILDAYS (3 days), so reports would evaporate
+/// before they were read; and `Mail` mirrors canon's MAIL struct field for
+/// field (`topic`, `string1`, `name1`, `int1`...), which this would have to be
+/// bent into. Replying to a reporter through mail is still the right move — it
+/// is only storage that does not fit.
+///
+/// The context columns are what makes a report actionable and what a player
+/// never thinks to include. All of them are what the SERVER knew at filing; the
+/// client's own event log is not here, because the server cannot reconstruct
+/// what the player saw.
+model BugReport {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  /// WARUSR.userid of the reporter — FK by convention, like DisconnectEvent
+  userid    String
+  /// Display handle at filing, denormalised so a deleted account still reads
+  username  String?
+  /// What they typed after `bug`
+  text      String
+  /// The hull they were flying, and what it was
+  shipno    Int?
+  shipname  String?
+  shpclass  Int?
+  /// Where it happened. Raw coords, as DisconnectEvent records them
+  xcoord    Float?
+  ycoord    Float?
+  /// Hull damage at filing — "it killed me" reads differently at 99 than at 2
+  damage    Float?
+  /// The build it happened ON. A report against a version that has since been
+  /// replaced is a different report, and without this nobody can tell.
+  version   String
+  sha       String
+  /// 'open' or 'closed'. Deliberately a string, not an enum: the statuses this
+  /// will want are not knowable yet, and a migration per status is a bad trade.
+  status    String   @default("open")
+
+  /// The only read this table has: newest first, optionally filtered by status
+  @@index([createdAt])
+  @@index([status, createdAt])
 }

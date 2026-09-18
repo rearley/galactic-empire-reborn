@@ -88,6 +88,11 @@ exports[`Help topic snapshots > comms topic body matches snapshot 1`] = `
   "  tea <name> <password>  — join an existing team",
   "  tea leave              — leave your team",
   "  cls                    — clear the event log",
+  "",
+  "Found a bug, or something the original did differently?",
+  "  bug <what went wrong>  — report it to the sysop, from right here",
+  "Your ship, sector, damage and the build you are on are attached to the",
+  "report automatically, so "it killed me" is enough to act on.",
 ]
 `;
 
@@ -224,6 +229,11 @@ exports[`Help topic snapshots > full HELP_TOPICS catalog matches snapshot 1`] = 
       "  tea <name> <password>  — join an existing team",
       "  tea leave              — leave your team",
       "  cls                    — clear the event log",
+      "",
+      "Found a bug, or something the original did differently?",
+      "  bug <what went wrong>  — report it to the sysop, from right here",
+      "Your ship, sector, damage and the build you are on are attached to the",
+      "report automatically, so "it killed me" is enough to act on.",
     ],
     "title": "Comms & Fleet",
   },

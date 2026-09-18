@@ -94,6 +94,10 @@ export const HELP_TOPIC_ALIASES: Readonly<Record<string, HelpTopicId>> = Object.
   // pilot following the game's own instruction hit "Unknown help topic".
   // Until the per-command topics are written, every gameplay verb at least
   // reaches the topic that documents it. @see MBMGEHLP.MSG
+  // PORT-ORIGINAL: canon has no player-to-sysop channel, so no canon topic
+  // documents this one. It sits with comms because that is where a player
+  // looking for "how do I tell someone" would go. @see issue #54, bug.handler
+  bug: 'comms',
   att: 'combat',
   cloak: 'combat',
   dec: 'combat',
@@ -524,6 +528,11 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
       '  tea <name> <password>  — join an existing team',
       '  tea leave              — leave your team',
       '  cls                    — clear the event log',
+      '',
+      'Found a bug, or something the original did differently?',
+      '  bug <what went wrong>  — report it to the sysop, from right here',
+      'Your ship, sector, damage and the build you are on are attached to the',
+      'report automatically, so "it killed me" is enough to act on.',
     ],
   },
   newprice: {

@@ -6292,3 +6292,60 @@ other four exist to protect; it names a kind of change that split never covered.
 the code is the person least able to see what a player would not understand.
 Nothing here catches a technically accurate entry that reads as gibberish; only
 a reader can.
+
+## 2026-09-18 — Bug reports are filed in-game, stored in their own table, read by the sysop who plays
+
+**Context:** the changelog gave players a link to the issue tracker, which needs
+a GitHub account and arrives without any of the context that makes a report
+actionable. Rick wanted reporting from inside the game "while fresh", and asked
+whether that meant a help desk with its own sysop login.
+
+**Decision:** the smallest thing that works, in four parts.
+
+1. **`bug <text>`**, a command. Three characters like every canon verb, and the
+   router matches on the first three (GECMDS.C:249 `struct cmd * FUNC
+   gesearch(ptr,tab,len)`), so `bug` and `buy` do not shadow each other.
+2. **Its own table**, not a `Mail` row. The midnight job purges mail older than
+   `MAILDAYS` (3 days), so reports would evaporate before they were read, and
+   `Mail` mirrors canon's struct field for field (`topic`, `string1`, `name1`,
+   `int1`) — storing a report there means bending it into a shape it is not.
+   Replying to a reporter THROUGH mail is still the right move; only storage
+   does not fit.
+3. **The server attaches the context**: hull, class, sector, damage, and the
+   build (`VERSION` + SHA). That last one is what decides whether a report is
+   still about the running code, and no player has ever included it. The
+   client's own event log is NOT attached — the server cannot reconstruct what
+   the player saw, and a plausible invented log is worse than none.
+4. **No admin login.** The sysop signs in as an ordinary player, and
+   `/admin/reports` is gated on the same `GE_SYSOP_USERNAME` allowlist that
+   gates the `sys` command — one function in `auth/sysop.ts`, called by both.
+
+**Reason for the shared gate:** two copies of an authorization check is how one
+of them quietly stops matching the other. It fails closed — unset means nobody,
+including the operator — because a reports feed is every player's words,
+including whatever they pasted into one while angry.
+
+**Why no help desk:** a second authenticated surface on a public game is the
+cost, and `docs/PROGRESS.md` already carries pre-public hardening notes saying
+auth surface is where the risk is. The account exists; the allowlist exists.
+
+**PORT-ORIGINAL, and canon is clear about it.** `cmd_sysop` is the only sysop
+surface in GECMDS.C, because a MajorBBS player mailed the sysop one level up,
+through the BBS rather than the game module. Canon's own gate is doubled either
+side of an `#ifdef PHARLAP`: GECMDS.C:4752 `if ((!syscmds) || (sysonly &&
+!(hasmkey(SYSKEY))))` on one arm and :4754 `if ((!syscmds) || (sysonly &&
+!(usrptr->flags&ISYSOP)))` on the other. Both mean "the BBS says this person is
+staff", which is the thing this port has no equivalent of.
+
+**Mounted at `/admin/reports`, and that is not cosmetic.** nginx proxies exactly
+four prefixes to the backend — `/auth/`, `/admin/`, `/public/`, `/socket.io/` —
+and everything else is served `index.html`. The page lives at `/reports`, so a
+top-level API route there is both a collision with the page's own URL and, in
+production, unreachable: the app shell answers first. It was written that way
+and caught by opening the page, not by a test; a test now pins the mount point
+against nginx.conf.
+
+**Known limits, accepted:** no reply path to the reporter yet (the mail system
+is there when it is wanted), no event-log capture, and `status` is a string
+rather than an enum because the statuses this will want are not knowable yet and
+a migration per status is a bad trade.
