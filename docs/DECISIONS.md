@@ -6189,3 +6189,51 @@ killed them are cleared along with everything else. The ship-loss mail is then
 the only record. Accepted deliberately by the owner when the alternative was
 offered; revisit by showing the last transmission on the pre-flight screen
 rather than by keeping the whole log.
+
+## 2026-09-18 — A death reports its CAUSE, and `weapon` was half a name
+
+**Context:** #52 taught the destruction manifest to name the weapon that landed
+the killing blow. Every death that arrives without a weapon kept printing
+`cause=unknown` — an overspeed break, the galaxy's perimeter wall, a wormhole
+transit, and the neutral-zone self-zap that answers firing at the origin. All
+four are ordinary, reachable ways to die, and `physics-tick.service.ts` had no
+`lastWeapon` site in the whole file.
+
+**Decision:** three parts.
+
+1. `ShipState.deathCause` is the home for a death with no attacker, and its
+   `kind` widens to `'gravity' | 'teleport' | 'wormhole' | 'overspeed' |
+   'neutral-zone'`. `ShipState.lastWeapon` keeps meaning "what SHOT you" and
+   keeps the weapon-only union.
+2. The emitted field on `CombatShipDestroyedEvent` and its wire payload is
+   renamed `weapon` → `cause`, typed `ShipDestroyedCause = ShipDestroyedWeapon |
+   ShipDeathCause`.
+3. `unknown` stays, and now means it.
+
+**Reason:** two fields answering adjacent questions is how #52 happened in the
+first place, and the field name was the other half of the confusion — the
+forensics manifest has printed `cause=` since #52 while the field it read was
+called `weapon`, with `'gravity'` a member of a type called Weapon. Naming the
+question makes "what shot you" and "what ended you" separately answerable, which
+is what a reader of the manifest actually needs. Once every path stamps
+something, `cause=unknown` becomes a genuine gap rather than a default — which
+is the signal the #50 disconnect sample needs when it is re-read around
+2026-09-25, since a gravity death from the blind window is exactly the case that
+currently reads as a mystery.
+
+**Alternatives rejected:** widening `lastWeapon` to carry non-weapons — the
+cheaper diff, and it would have left a field called "weapon" holding
+`'overspeed'`, which is the defect being fixed. Keeping `weapon` on the wire and
+`cause` internally — two names for one fact across a boundary, which is worse
+than either name alone.
+
+**Also removed:** the CRASH label's `event.isWormhole ? 'wormhole n' : 'planet n'`
+ternary. `checkGravity` only ever pairs a `crash` effect with a body that is not
+a wormhole, so the wormhole arm was unreachable and was carried in the coverage
+notes as deliberately uncovered. A wormhole death now arrives through the
+transit branch with its own cause, so the dead arm is gone rather than excused.
+
+**Not done:** per-cause ship-loss mail. Gravity keeps `MESG_SHIPLOSS_GRAVITY`
+and everything else gets the generic mail, so a pilot who kills themselves at
+the origin still gets a mail that names no cause. Naming self-inflicted deaths
+to PLAYERS is a separate, player-facing change; this one is instrumentation.

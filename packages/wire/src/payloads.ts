@@ -350,6 +350,16 @@ export interface CombatPhaserFiredPayload {
 }
 
 /**
+ * What ended a ship: a weapon, or one of the causes that has no attacker at
+ * all. Split in two on the backend (`ShipDestroyedWeapon` / `ShipDeathCause`)
+ * and flattened here, because the client only ever asks "what does the manifest
+ * say" — @see backend/src/game/combat/combat-events.ts, issue #54
+ */
+export type ShipDestroyedCause =
+  | 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion'
+  | 'gravity' | 'teleport' | 'wormhole' | 'overspeed' | 'neutral-zone';
+
+/**
  * Payload actually put on the wire for `combat.hit`, built field by field in
  * `backend/src/gateway/game.gateway.ts` — NOT spread from the event.
  *
@@ -411,7 +421,7 @@ export interface CombatShipDestroyedEvent {
    * `'ion'` means a planet's cannons made the kill — there is no attacking
    * ship. @see planet-kill.ts, GEFUNCS.C:1797 fireion
    */
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity' | null;
+  cause: ShipDestroyedCause | null;
   /** Who or WHAT to name when no attacking SHIP resolves — the planet, for an ion kill or a collision. */
   attackerName?: string | null;
   sector: { x: number; y: number };
@@ -451,7 +461,7 @@ export interface CombatShipDestroyedEvent {
 export interface CombatShipDestroyedPayload {
   victimId: string;
   attackerId: string | null;
-  weapon: 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity' | null;
+  cause: ShipDestroyedCause | null;
   attackerName: string | null;
 }
 

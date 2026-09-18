@@ -158,7 +158,7 @@ describe('GameGateway — combat-disconnect kill (P-001)', () => {
       expect.objectContaining({
         victimUserid: 'user1',
         victimShipKey: 'user1:1',
-        weapon: null,
+        cause: null,
         loot: [],
       }),
     );

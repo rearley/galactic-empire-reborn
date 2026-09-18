@@ -277,7 +277,7 @@ describe('T070-5 — a Cybertron kill moves no cash', () => {
       victimId: 'Cybrg-300:300', attackerId: 'player1:1',
       victimShipKey: 'Cybrg-300:300', attackerShipKey: 'player1:1',
       victimUserid: 'Cybrg-300', attackerUserid: 'player1',
-      attackerChannel: 1, weapon: 'phaser', sector: { x: 5, y: 5 },
+      attackerChannel: 1, cause: 'phaser', sector: { x: 5, y: 5 },
       tickAt: new Date(), loot: [], scoreAwarded: 0,
     };
 

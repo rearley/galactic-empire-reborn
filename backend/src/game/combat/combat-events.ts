@@ -114,7 +114,31 @@ export const COMBAT_SHIP_DESTROYED = 'combat.ship-destroyed' as const;
  * (`CombatHitEvent`), but not a distinct way to die.
  */
 export type ShipDestroyedWeapon =
-  | 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion' | 'gravity';
+  | 'phaser' | 'torpedo' | 'missile' | 'mine' | 'ion';
+
+/**
+ * What ended a ship when it was not another captain's weapon.
+ *
+ * Split from `ShipDestroyedWeapon` for #54. The two answer adjacent questions
+ * — "what shot you" and "what ended you" — and one union answering both is
+ * what made `cause=` ambiguous to read: `'gravity'` was a member of a type
+ * called Weapon. Each of these is stamped on `ShipState.deathCause` where the
+ * damage is applied, and none of them has an attacker:
+ *
+ *   gravity       a planet or wormhole well — GEFUNCS.C:836 `void  FUNC gravity(ptr,usrn)`
+ *   teleport      telezip, the perimeter wall — GEFUNCS.C:819 `void  FUNC telezip(ptr,usrn)`
+ *   wormhole      transit damage
+ *   overspeed     an overspeed break ridden down to zero hull
+ *   neutral-zone  SE100DAM, the zap that answers firing at the origin
+ */
+export type ShipDeathCause =
+  | 'gravity' | 'teleport' | 'wormhole' | 'overspeed' | 'neutral-zone';
+
+/**
+ * Everything a manifest can name as the end of a ship. The emitted field is
+ * `cause` rather than `weapon` because half of what it carries is not one.
+ */
+export type ShipDestroyedCause = ShipDestroyedWeapon | ShipDeathCause;
 
 export interface CombatShipDestroyedEvent {
   victimId: string;
@@ -129,12 +153,16 @@ export interface CombatShipDestroyedEvent {
   attackerUserid: string | null;
   attackerChannel: number;
   /**
+   * What ended this ship — a weapon, or one of the causes that has no attacker
+   * at all. `null` means nothing recorded anything, which the manifest prints
+   * as `unknown` and which is now a genuine gap rather than a default.
+   *
    * `'ion'` means a planet's cannons made the kill — there is no attacking
    * ship, so `attackerId`/`attackerUserid` are null and were previously
-   * indistinguishable from a self-destruct (both null, weapon null).
+   * indistinguishable from a self-destruct (both null, cause null).
    * @see planet-kill.ts, GEFUNCS.C:1797 fireion
    */
-  weapon: ShipDestroyedWeapon | null;
+  cause: ShipDestroyedCause | null;
   /**
    * Who or WHAT to name when no attacking SHIP resolves — the planet, for an
    * ion kill or a collision. Null for ordinary ship-vs-ship kills, where the

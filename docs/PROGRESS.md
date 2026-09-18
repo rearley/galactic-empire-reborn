@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 107 entries.
+Append-only, **newest at the bottom**. 108 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — the four deaths that had no name](#2026-09-18--the-four-deaths-that-had-no-name)
 - [2026-09-18 — three identical welcomes, and the one that was canon](#2026-09-18--three-identical-welcomes-and-the-one-that-was-canon)
 - [2026-09-18 — ship entry is a screen now, and the browser found two more bugs](#2026-09-18--ship-entry-is-a-screen-now-and-the-browser-found-two-more-bugs)
 - [2026-09-18 — `x` put the ship away and left the socket in the sector](#2026-09-18--x-put-the-ship-away-and-left-the-socket-in-the-sector)
@@ -7519,4 +7520,43 @@ on the pre-flight screen rather than to keep the whole log.
 
 Verified in the browser against the rebuilt dev stack: three `x` / select rounds
 back to back, one welcome each time. Frontend 47 files / 375 tests.
+
+## 2026-09-18 — the four deaths that had no name
+
+#54. `cause=` on the destruction manifest named the weapon that killed a ship
+and said `unknown` for everything else — which is four ordinary ways to die: an
+overspeed break, striking the galaxy's perimeter wall, a wormhole transit, and
+the neutral-zone zap that answers a pilot firing at the origin.
+
+The issue left three questions open and they are settled in DECISIONS. The short
+version: `deathCause` is where a death with no attacker lives and its kinds
+widen; `lastWeapon` keeps meaning "what shot you"; and the emitted field is
+renamed `weapon` → `cause`, because the manifest has printed `cause=` since #52
+while reading a field called `weapon` whose union included `'gravity'`. Naming
+the question is most of the fix — the rest is five stamps.
+
+Found on the way, and worth more than the rename: **the CRASH label's wormhole
+arm was dead code.** `checkGravity` only ever pairs a `crash` effect with a body
+that is not a wormhole, so `event.isWormhole ? 'wormhole n' : 'planet n'` could
+never take its first branch. It was already known — carried in the coverage
+notes as deliberately uncovered — and the honest fix once wormhole deaths have
+their own cause is to delete it rather than keep excusing it.
+
+Two things cost time in the tests and are worth knowing:
+
+- **A ship whose `head2b` differs from its `heading` spends its movement step
+  ROTATING.** A harness that forgets it watches a stationary ship and concludes
+  the production code is broken. The existing physics spec defaults them
+  together for exactly this reason; mine did not.
+- **The gravity pass reads the ship's LIVE position**, so a body fixed at the
+  ship's starting coordinates is thousands of raw units away by the time it is
+  measured — the bands are hundredths of a sector. The existing gravity spec
+  gets this right by accident, through a closure that re-reads the ship.
+
+Verified: backend 677 files / 6,681 tests, frontend 47 / 375, both linters and
+both typecheckers clean. The one failure is the pre-existing
+`node-runtime-version` spec, which fails because this shell runs Node 22 against
+a project that declares 24.
+
+Not done: per-cause ship-loss mail, deliberately. @see DECISIONS.
 

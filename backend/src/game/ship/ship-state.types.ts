@@ -1,5 +1,5 @@
 import { Prisma } from '../../prisma/client';
-import type { ShipDestroyedWeapon } from '../combat/combat-events';
+import type { ShipDeathCause, ShipDestroyedWeapon } from '../combat/combat-events';
 
 /**
  * Composite key for the in-memory ship state Map.
@@ -78,7 +78,7 @@ export interface ShipState {
    * neither do we. But the port's ship-loss mail has to say SOMETHING, and
    * "an unknown assailant" invents an enemy out of a fact the server knew.
    */
-  deathCause?: { kind: 'gravity'; what: string };
+  deathCause?: { kind: ShipDeathCause; what: string };
 
   /**
    * The weapon that last damaged this ship, so the destruction manifest can say

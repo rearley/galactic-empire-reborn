@@ -89,7 +89,7 @@ describe('collision cause survives the whole mail chain', () => {
   it('files a collision under the gravity type, naming the body', async () => {
     const { svc, created } = build();
     await (svc as unknown as { handle: (e: CombatShipDestroyedEvent) => Promise<void> })
-      .handle(destroyed({ weapon: 'gravity', attackerName: 'planet 1' }));
+      .handle(destroyed({ cause: 'gravity', attackerName: 'planet 1' }));
     expect(created[0]?.type).toBe(MESG_SHIPLOSS_GRAVITY);
     expect(created[0]?.name1).toBe('planet 1');
   });

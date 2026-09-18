@@ -193,7 +193,7 @@ export class ShipDestroyedService {
     const payload = {
       victimId: event.victimId,
       attackerId: event.attackerId,
-      weapon: killedByPlanet ? ('ion' as const) : event.weapon,
+      cause: killedByPlanet ? ('ion' as const) : event.cause,
       // Name the killer. A planet kill takes the planet's name; a ship kill
       // resolves the attacking ship's, because the client's own player list
       // holds live PLAYERS only — an AI killer is never in it, so a Cybertron
@@ -363,7 +363,7 @@ export class ShipDestroyedService {
       // into a Cyberquad, watched it die and got no credit. @see issue #42
       `lastfired=${event.attackerChannel >= 0 ? event.attackerChannel : 'none'}`,
       `lastfiredBy=${event.attackerName ? `'${event.attackerName}'` : 'none'}`,
-      `cause=${event.weapon ?? 'unknown'}`,
+      `cause=${event.cause ?? 'unknown'}`,
       `sector=(${event.sector.x},${event.sector.y})`,
     ];
 

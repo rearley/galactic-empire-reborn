@@ -196,7 +196,7 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
 
   it('records the cause, so a collision is not mistaken for a killing', () => {
     const { gateway, logs } = build();
-    destroy(gateway, { weapon: 'gravity' });
+    destroy(gateway, { cause: 'gravity' });
     expect(logs.find((l) => l.includes('ship destroyed')) ?? '').toContain('gravity');
   });
 

@@ -27,7 +27,7 @@ function makeEvent(overrides: Partial<CombatShipDestroyedEvent> = {}): CombatShi
     victimUserid: '@Droid-1',
     attackerUserid: 'attacker',
     attackerChannel: 1,
-    weapon: 'phaser',
+    cause: 'phaser',
     sector: { x: 5, y: 5 },
     tickAt: new Date(),
     loot: [],

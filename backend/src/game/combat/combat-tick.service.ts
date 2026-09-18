@@ -371,11 +371,13 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           // `deathCause` is the more specific fact and outranks the last weapon
           // to touch the hull: a ship grazed by a torpedo and then flown into a
           // planet was killed by the planet. Otherwise report what actually
-          // landed — `null` only when nothing recorded a weapon at all, which
-          // is a genuine gap rather than a default. @see issue #52
-          weapon: victim.deathCause?.kind === 'gravity'
-            ? 'gravity'
-            : (victim.lastWeapon ?? null),
+          // landed — `null` only when nothing recorded anything at all, which
+          // is a genuine gap rather than a default.
+          //
+          // Every kind of `deathCause` wins here, not just gravity: the test
+          // used to name one because gravity was the only kind there was.
+          // @see issue #52 (the weapon half), issue #54 (the rest)
+          cause: victim.deathCause?.kind ?? victim.lastWeapon ?? null,
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,
           loot,

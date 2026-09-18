@@ -81,7 +81,7 @@ describe('GameGateway — KILLEDBY galaxy broadcast', () => {
     attackerUserid: 'Cybrg-222',
     attackerName: 'Cybrg-49340',
     attackerChannel: 7,
-    weapon: null,
+    cause: null,
     sector: { x: 6, y: 9 },
     tickAt: new Date(),
     loot: [],
@@ -239,7 +239,7 @@ describe('GameGateway — DIED, the killer-less death', () => {
   });
 
   it('announces an ion-cannon kill, which has no attacking ship', () => {
-    expect(fire({ weapon: 'ion', attackerName: 'New Ceylon' }).texts.join('\n'))
+    expect(fire({ cause: 'ion', attackerName: 'New Ceylon' }).texts.join('\n'))
       .toContain('has been destroyed!!!');
   });
 });

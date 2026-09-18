@@ -75,7 +75,7 @@ export class ShipLossMailService implements OnModuleInit {
           userid: event.victimUserid,
           class: MAIL_CLASS_DISTRESS,
           msgno: this.nextMsgno(),
-          type: event.weapon === 'gravity' ? MESG_SHIPLOSS_GRAVITY : MESG_SHIPLOSS,
+          type: event.cause === 'gravity' ? MESG_SHIPLOSS_GRAVITY : MESG_SHIPLOSS,
           stamp: Math.floor(Date.now() / 1000),
           topic: 'SHIP LOST',
           // A planet distress puts the PLANET in name1; this puts the killer

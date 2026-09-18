@@ -538,6 +538,10 @@ describe('PhaserHandlerService — hyper-phaser (firer at warp, C-009 firehp)', 
     expect(getShip(h, bob).damage).toBe(0);
     // No fire event when the beam never leaves the ship.
     expect(h.emitted.find((e) => e.event === COMBAT_PHASER_FIRED)).toBeUndefined();
+    // The zap can be what finishes a damaged hull, and it has no attacker. A
+    // pilot who killed themselves at the origin used to produce a manifest
+    // reading `cause=unknown`. @see issue #54
+    expect(getShip(h, alice).deathCause?.kind).toBe('neutral-zone');
   });
 
   // C-009 Fix 1 (RED): hyperphaser BYPASSES shields — damage goes straight to hull.

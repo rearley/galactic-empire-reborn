@@ -39,7 +39,7 @@ const makeDestroyedEvent = (victimUserid: string, victimShipno: number): CombatS
   victimUserid,
   attackerUserid: null,
   attackerChannel: 255,
-  weapon: 'phaser',
+  cause: 'phaser',
   sector: { x: 5, y: 3 },
   tickAt: new Date(),
   loot: [],

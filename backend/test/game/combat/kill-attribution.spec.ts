@@ -206,7 +206,7 @@ describe('CombatTickService — a collision is attributed to the body', () => {
     h.fire();
 
     expect(destroyedEvents).toHaveLength(1);
-    expect(destroyedEvents[0].weapon).toBe('gravity');
+    expect(destroyedEvents[0].cause).toBe('gravity');
     expect(destroyedEvents[0].attackerName).toBe('planet 1');
     expect(destroyedEvents[0].attackerUserid).toBeNull();
   });

@@ -167,6 +167,10 @@ export class ShipTickService implements OnModuleInit, OnModuleDestroy {
           s.topspeed = overspeed.topspeed;
           s.speed2b = overspeed.speed2b;
           s.damage += overspeed.damage;
+          // A break can be the thing that finishes a damaged hull, and it has
+          // no attacker — without this the manifest said `unknown` for a death
+          // the server caused itself. @see issue #54
+          s.deathCause = { kind: 'overspeed', what: 'structural failure' };
         });
         this.events?.emit(SHIP_OVERSPEED, {
           shipId: `${ship.userid}:${ship.shipno}`,

@@ -66,7 +66,7 @@ function makeSampleEvent(): CombatShipDestroyedEvent {
     victimUserid: 'player1',
     attackerUserid: 'player2',
     attackerChannel: 1,
-    weapon: 'phaser',
+    cause: 'phaser',
     sector: { x: 0, y: 0 },
     tickAt: new Date(),
     loot: [],

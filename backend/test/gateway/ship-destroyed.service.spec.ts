@@ -61,7 +61,7 @@ function destroyedEvent(over: Partial<CombatShipDestroyedEvent> = {}): CombatShi
     attackerUserid: 'usr_killer',
     attackerName: null,
     attackerChannel: 7,
-    weapon: 'phaser',
+    cause: 'phaser',
     sector: { x: -12, y: 40 },
     tickAt: new Date(),
     loot: [{ itemIndex: 12, amount: 471n }],
@@ -204,8 +204,8 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     await h.service.handle(destroyedEvent(), emit);
     expect(emit.announced).toHaveLength(1);
     const payload = emit.announced[0] as Record<string, unknown>;
-    expect(Object.keys(payload).sort()).toEqual(['attackerId', 'attackerName', 'victimId', 'weapon']);
-    expect(payload.weapon).toBe('phaser');
+    expect(Object.keys(payload).sort()).toEqual(['attackerId', 'attackerName', 'cause', 'victimId']);
+    expect(payload.cause).toBe('phaser');
     expect(payload.attackerName).toBe('Marauder');
   });
 
@@ -215,9 +215,9 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
     // The service owns the ion-hit ledger now; the gateway's PLANET_ION_FIRED
     // handler is what calls this on every hit.
     h.service.recordIonAttacker('usr_victim:2', 'Ceti Alpha');
-    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, weapon: null }), emit);
+    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, cause: null }), emit);
     const payload = emit.announced[0] as Record<string, unknown>;
-    expect(payload.weapon).toBe('ion');
+    expect(payload.cause).toBe('ion');
     expect(payload.attackerName).toBe('Ceti Alpha');
   });
 
@@ -236,7 +236,7 @@ describe('ShipDestroyedService — every side effect of a ship dying', () => {
   it('announces DIED, excluding only the victim, when no ship killed them', async () => {
     const h = build();
     const emit = emitterSpy();
-    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, weapon: 'gravity' }), emit);
+    await h.service.handle(destroyedEvent({ attackerId: null, attackerUserid: null, attackerShipKey: null, cause: 'gravity' }), emit);
     expect(emit.exceptLines).toHaveLength(1);
     expect(emit.exceptLines[0].text).toBe(formatMessage(MessageId.DIED, 'WildCat', 'jo'));
     expect(emit.exceptLines[0].rooms).toBe('user:usr_victim');

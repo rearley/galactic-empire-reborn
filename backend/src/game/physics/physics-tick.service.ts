@@ -488,6 +488,10 @@ export class PhysicsTickService implements OnModuleInit {
           s.speed = 0;
           s.speed2b = 0;
           s.damage = s.damage + TELEDAM;
+          // Name it, in case the 17 is what finishes them. Every path that can
+          // kill stamps a cause, so `unknown` on a manifest now means we truly
+          // do not know rather than that nobody bothered. @see issue #54
+          s.deathCause = { kind: 'teleport', what: 'the galactic rim' };
 
           // ...and drops you out of hyperspace. C does NOT, and that is an
           // oversight rather than a design: telezip zeroes speed and speed2b
@@ -621,16 +625,23 @@ export class PhysicsTickService implements OnModuleInit {
           // damage figure with no attacker, which is indistinguishable from a
           // killer who logged off — and the mail then told a pilot who had
           // flown into a planet that "an unknown assailant" got them.
-          s.deathCause = {
-            kind: 'gravity',
-            what: event.isWormhole ? `wormhole ${event.plnum}` : `planet ${event.plnum}`,
-          };
+          // Always a planet: `checkGravity` only ever pairs a `crash` with a
+          // body that is not a wormhole — a wormhole gets the `wormhole`
+          // (transit) effect instead — so the wormhole arm of this label was
+          // unreachable and was carried in TEST_STRATEGY.md as deliberately
+          // uncovered. A wormhole death now arrives through the transit branch
+          // above, with its own kind. @see test/game/physics/physics-tick-final.spec.ts
+          s.deathCause = { kind: 'gravity', what: `planet ${event.plnum}` };
           return;
         }
         const w = event.effect as { destination: { xcoord: number; ycoord: number }; damage: number };
         s.xcoord = w.destination.xcoord;
         s.ycoord = w.destination.ycoord;
         s.damage += w.damage;
+        // A transit that kills is a wormhole death, not an unknown one — and
+        // it is a DIFFERENT cause from crashing into a body, which stays
+        // `gravity`. @see issue #54
+        s.deathCause = { kind: 'wormhole', what: `wormhole ${event.plnum}` };
         // cleartm(usrn) — a transit shakes off everything chasing you.
         for (let i = 0; i < s.ltorpsDistance.length; i++) s.ltorpsDistance[i] = 0;
         for (let i = 0; i < s.ltorpsChannel.length; i++) s.ltorpsChannel[i] = 255;

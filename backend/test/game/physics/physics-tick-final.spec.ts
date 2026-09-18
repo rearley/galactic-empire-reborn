@@ -45,10 +45,13 @@
  *     keys are unique, so it is unreachable.
  *   - physics-tick 235, the `err instanceof Error ? stack : String(err)` log
  *     ternary — a display fallback inside the fault logger.
- *   - physics-tick 626, `event.isWormhole ? 'wormhole n' : 'planet n'` in the
- *     CRASH deathCause. `checkGravity` only ever pairs a `crash` effect with a
- *     body that is not a wormhole (gravity.ts — a wormhole gets the
- *     `wormhole` effect), so the wormhole arm of that label is unreachable.
+ *   - the CRASH deathCause label used to be
+ *     `event.isWormhole ? 'wormhole n' : 'planet n'` and was listed here as
+ *     unreachable: `checkGravity` only ever pairs a `crash` effect with a body
+ *     that is not a wormhole (gravity.ts — a wormhole gets the `wormhole`
+ *     effect). #54 deleted the dead arm rather than leaving it uncovered, and a
+ *     wormhole death now arrives through the transit branch carrying its own
+ *     cause. Nothing to exclude any more.
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {

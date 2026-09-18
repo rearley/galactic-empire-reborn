@@ -65,7 +65,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       victimUserid: 'b',
       attackerUserid: 'a',
       attackerChannel: 7,
-      weapon: null,
+      cause: null,
       sector: { x: 12, y: 3 },
       tickAt: new Date(),
       loot: [],
@@ -79,7 +79,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     // socket disconnect reason to every client.
     // @see test/gateway/destroyed-payload-scoping.spec.ts
     expect(serverEmitMock).toHaveBeenCalledWith(COMBAT_SHIP_DESTROYED, {
-      victimId: 'b:2', attackerId: 'a:7', weapon: null, attackerName: null,
+      victimId: 'b:2', attackerId: 'a:7', cause: null, attackerName: null,
     });
     // The DESTRUCTION notice stays galaxy-wide and unfiltered. The only
     // targeted emit is YOURDEAD to the victim, which C sends with
@@ -100,7 +100,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       victimUserid: 'x',
       attackerUserid: null,
       attackerChannel: 99,
-      weapon: null,
+      cause: null,
       sector: { x: 0, y: 0 },
       tickAt,
       loot: [],
@@ -109,7 +109,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     await gateway.handleCombatShipDestroyed(event);
     expect(serverEmitMock).toHaveBeenCalledTimes(1);
     expect(serverEmitMock.mock.calls[0][1]).toStrictEqual({
-      victimId: 'x:1', attackerId: null, weapon: null, attackerName: null,
+      victimId: 'x:1', attackerId: null, cause: null, attackerName: null,
     });
   });
 
@@ -139,7 +139,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       victimUserid: 'raider',
       attackerUserid: null,
       attackerChannel: -1,
-      weapon: 'ion',
+      cause: 'ion',
       sector: { x: 1, y: 1 },
       tickAt: new Date(),
       loot: [],
@@ -148,7 +148,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     await gateway.handleCombatShipDestroyed(event);
 
     expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
-      weapon: 'ion',
+      cause: 'ion',
       attackerName: 'Aurelia-Landing',
     });
   });
@@ -162,7 +162,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     const base: CombatShipDestroyedEvent = {
       victimId: 'raider:2', attackerId: null, victimShipKey: 'raider:2',
       attackerShipKey: null, victimUserid: 'raider', attackerUserid: null,
-      attackerChannel: -1, weapon: 'ion', sector: { x: 1, y: 1 },
+      attackerChannel: -1, cause: 'ion', sector: { x: 1, y: 1 },
       tickAt: new Date(), loot: [], scoreAwarded: 0,
     };
     await gateway.handleCombatShipDestroyed(base);
@@ -190,7 +190,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       attackerUserid: null,
       // Reset to NO_CHANNEL because the firer left — no ion hit ever recorded.
       attackerChannel: -1,
-      weapon: null,
+      cause: null,
       sector: { x: 4, y: 4 },
       tickAt: new Date(),
       loot: [],
@@ -199,7 +199,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
     await gateway.handleCombatShipDestroyed(event);
 
     expect(serverEmitMock.mock.calls[0][1]).toMatchObject({
-      weapon: null,
+      cause: null,
       attackerName: null,
     });
   });
@@ -232,7 +232,7 @@ describe('GameGateway — COMBAT_SHIP_DESTROYED broadcast (T055)', () => {
       victimUserid: 'usr_tarq',
       attackerUserid: 'Cybrg-49326',
       attackerChannel: 222,
-      weapon: null,
+      cause: null,
       sector: { x: 0, y: -1 },
       tickAt: new Date(),
       loot: [],

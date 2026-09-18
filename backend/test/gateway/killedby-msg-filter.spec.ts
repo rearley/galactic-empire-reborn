@@ -77,7 +77,7 @@ describe('GameGateway — KILLEDBY respects MSG_FILTER', () => {
     attackerUserid: 'usr_kil',
     attackerName: 'Marauder',
     attackerChannel: 7,
-    weapon: null,
+    cause: null,
     sector: { x: 6, y: 9 },
     tickAt: new Date(),
     loot: [],

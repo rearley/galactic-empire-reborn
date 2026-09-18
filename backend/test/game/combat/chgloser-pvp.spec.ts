@@ -29,7 +29,7 @@ function makeEvent(over: Partial<CombatShipDestroyedEvent> = {}): CombatShipDest
     victimUserid: 'victim',
     attackerUserid: 'attacker',
     attackerChannel: 1,
-    weapon: 'phaser',
+    cause: 'phaser',
     sector: { x: 5, y: 5 },
     tickAt: new Date(),
     loot: [],

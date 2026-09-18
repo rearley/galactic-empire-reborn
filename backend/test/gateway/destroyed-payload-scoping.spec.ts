@@ -25,7 +25,7 @@ import { makeGateway } from '../helpers/make-gateway';
  *   scoreAwarded, attackerChannel, tickAt
  *
  * The client (App.tsx handleShipDestroyed -> destructionLine) reads four
- * fields: victimId, attackerId, weapon, attackerName. Everything else was
+ * fields: victimId, attackerId, cause, attackerName. Everything else was
  * unasked-for and three parts of it are the exact disclosures this port has
  * been closing all week — the account key `displayName()` exists to hide
  * (GEFUNCS.C:2596 username), a live position feed, and the disconnect reason
@@ -65,7 +65,7 @@ describe('combat.ship-destroyed carries only what the client renders', () => {
       victimId: 'usr_victim:2', attackerId: 'usr_killer:1',
       victimShipKey: 'usr_victim:2', attackerShipKey: 'usr_killer:1',
       victimUserid: 'usr_victim', attackerUserid: 'usr_killer', attackerChannel: 7,
-      weapon: 'phaser', sector: { x: -12, y: 40 }, tickAt: new Date(),
+      cause: 'phaser', sector: { x: -12, y: 40 }, tickAt: new Date(),
       loot: [{ itemIndex: 12, amount: 471n }], scoreAwarded: 1000,
       victimDisconnectReason: 'client namespace disconnect',
       ...extra,
@@ -81,7 +81,7 @@ describe('combat.ship-destroyed carries only what the client renders', () => {
 
     expect(p.victimId).toBe('usr_victim:2');
     expect(p.attackerId).toBe('usr_killer:1');
-    expect(p.weapon).toBe('phaser');
+    expect(p.cause).toBe('phaser');
     expect(p).toHaveProperty('attackerName');
   });
 

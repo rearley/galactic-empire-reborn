@@ -149,7 +149,7 @@ describe('server notices reach the event log', () => {
       victimId: 'usr_raider:2',
       victimUserid: 'usr_raider',
       attackerId: null,
-      weapon: 'ion',
+      cause: 'ion',
       attackerName: 'Aurelia-Landing',
     });
     const text = screen.getByTestId('event-log').textContent ?? '';
@@ -163,7 +163,7 @@ describe('server notices reach the event log', () => {
       victimId: 'usr_raider:2',
       victimUserid: 'usr_raider',
       attackerId: null,
-      weapon: 'ion',
+      cause: 'ion',
       attackerName: null,
     });
     const text = screen.getByTestId('event-log').textContent ?? '';
@@ -183,7 +183,7 @@ describe('server notices reach the event log', () => {
       victimId: 'usr_raider:2',
       victimUserid: 'usr_raider',
       attackerId: 'usr_hunter:1',
-      weapon: 'phaser',
+      cause: 'phaser',
       attackerName: null,
     });
     expect(screen.getByTestId('event-log').textContent ?? '').not.toContain('destroyed');
@@ -208,7 +208,7 @@ describe('server notices reach the event log', () => {
       victimId: 'Cybrg-222:1',
       victimUserid: 'Cybrg-222',
       attackerId: null,
-      weapon: null,
+      cause: null,
       attackerName: null,
     });
     const text = screen.getByTestId('event-log').textContent ?? '';

@@ -21,7 +21,12 @@
  * defender learns their own colony did the work.
  */
 export interface DestructionEvent {
-  weapon: string | null;
+  /**
+   * What ended the ship. Named `cause` rather than `weapon` since #54, because
+   * half of what it can carry is not a weapon — gravity, a wormhole transit, an
+   * overspeed break, the neutral-zone zap.
+   */
+  cause: string | null;
   attackerId: string | null;
   attackerName?: string | null;
 }
@@ -30,6 +35,6 @@ export function destructionLine(
   event: DestructionEvent,
   victimName: string,
 ): string | null {
-  if (event.weapon !== 'ion' || event.attackerId !== null) return null;
+  if (event.cause !== 'ion' || event.attackerId !== null) return null;
   return `${victimName} was destroyed by ${event.attackerName ?? 'planetary defences'}.`;
 }

@@ -802,7 +802,7 @@ export class ConnectionLifecycleService {
               : attackerNameFromLastFired(ship, (c) =>
                   this.shipStateService.findAllShips().some((o) => o.channel === c)),
             attackerChannel: ship.lastfired,
-            weapon: null,
+            cause: null,
             // Socket.io's own reason, carried through so the log can tell a
             // closed tab from a dropped connection. The kill above cannot use
             // it — canon kills on any hangup with cantexit > 0 — but a sysop

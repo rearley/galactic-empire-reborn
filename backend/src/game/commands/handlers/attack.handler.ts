@@ -86,6 +86,10 @@ export class AttackHandlerService {
     if (isInNeutralZone(ship)) {
       this.shipState.mutate(ship.userid, ship.shipno, (s) => {
         s.damage = s.damage + SE100DAM;
+        // Self-inflicted and attacker-less: without a cause the manifest read
+        // `cause=unknown` for a pilot who shot themselves at the origin.
+        // @see issue #54
+        s.deathCause = { kind: 'neutral-zone', what: 'the neutral zone' };
       });
       return { lines: [{ text: formatMessage(MessageId.WPN_ZAP), category: 'combat' }] };
     }

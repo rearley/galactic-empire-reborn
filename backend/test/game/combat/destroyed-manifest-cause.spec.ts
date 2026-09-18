@@ -1,24 +1,32 @@
 /**
- * The destruction manifest must name the weapon that landed the killing blow.
+ * Every death names what ended it, or says honestly that it does not know.
  *
- * `ShipDestroyedService` prints `cause=${event.weapon ?? 'unknown'}`
- * (ship-destroyed.service.ts:366) against a union that already lists every
- * weapon in the game. But the kill path set it in exactly one place —
+ * #52 gave the manifest the WEAPON that landed the killing blow. Everything
+ * that kills a ship without a weapon kept printing `cause=unknown`, and several
+ * of those are ordinary ways to die: flying into the galaxy's edge, a wormhole
+ * transit, riding an overspeed break down to zero hull, and the neutral-zone
+ * self-zap that answers a pilot who opens fire at the origin.
  *
- *   weapon: victim.deathCause?.kind === 'gravity' ? 'gravity' : null
+ * Two fields were answering adjacent questions, which is how #52 happened in
+ * the first place. They are now separated by meaning rather than by history:
  *
- * — so it resolved to 'gravity' or null, and null prints as `unknown`. Every
- * one of the fourteen manifests in production on 2026-09-17 said
- * `cause=unknown`, including a Cyberquad killed by a player with torpedoes.
+ *   `lastWeapon`  — what SHOT you. Stamped where damage lands, beside `lastfired`.
+ *   `deathCause`  — what ENDED you, when it was not another captain's weapon.
  *
- * The information was never missing: every COMBAT_HIT already carries an
- * accurate weapon. It was discarded between the hit landing and the death
- * resolving. `lastWeapon` is stamped at the same sites as `lastfired`, and is
- * deliberately NOT folded into `lastfiredBy` — a mine whose owner has left the
- * game records no name, and conflating the two would lose `cause=mine` along
- * with the attacker.
+ * `deathCause` outranks `lastWeapon` at resolution, because it is the more
+ * specific fact: a ship grazed by a torpedo and then flown into a planet was
+ * killed by the planet. The emitted field is `cause`, which is what the
+ * forensics manifest has printed since #52 — only the field name still said
+ * `weapon`, and that mismatch is what made "what shot you" and "what ended you"
+ * ambiguous every time somebody read it.
  *
- * @see https://github.com/rearley/galactic-empire-reborn/issues/52
+ * `unknown` survives deliberately. Once every path stamps something it stops
+ * meaning "nobody bothered" and starts meaning "we genuinely do not know",
+ * which is the signal worth having when the disconnect-window sample in #50 is
+ * re-read.
+ *
+ * @see https://github.com/rearley/galactic-empire-reborn/issues/54
+ * @see test/game/combat/destroyed-manifest-weapon.spec.ts — the weapon half
  */
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
@@ -79,7 +87,7 @@ async function makeHarness(ships: ShipState[], seed = 99) {
   } as unknown as MineRepository;
 
   const events = new EventEmitter2();
-  const logger = new Logger('DestroyedManifestWeaponSpec');
+  const logger = new Logger('DestroyedManifestCauseSpec');
   vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
   const classCache = new ShipClassCacheService({} as never);
@@ -115,56 +123,45 @@ function victimAt95(over: Partial<ShipState>): ShipState {
   });
 }
 
-describe('the destruction manifest names the weapon', () => {
-  it('a torpedo kill reports cause=torpedo', async () => {
-    const firer = makeShip({ userid: 'a', shipno: 7, xcoord: 0, ycoord: 0 });
-    const victim = victimAt95({
-      ltorpsChannel: [7, 255, 255],
-      ltorpsDistance: [10, 0, 0],
+describe('the destruction manifest names a non-weapon cause', () => {
+  const CAUSES = [
+    { kind: 'overspeed' as const, what: 'structural failure', label: 'an overspeed break' },
+    { kind: 'teleport' as const, what: 'the galactic rim', label: 'the perimeter wall' },
+    { kind: 'wormhole' as const, what: 'wormhole 3', label: 'a wormhole transit' },
+    { kind: 'neutral-zone' as const, what: 'neutral zone', label: 'the neutral-zone zap' },
+  ];
+
+  for (const c of CAUSES) {
+    it(`${c.label} reports cause=${c.kind}`, async () => {
+      const victim = victimAt95({ damage: 101, deathCause: { kind: c.kind, what: c.what } });
+      const h = await makeHarness([victim]);
+      h.fire();
+
+      expect(h.destroyed).toHaveLength(1);
+      expect(h.destroyed[0].cause).toBe(c.kind);
     });
-    const h = await makeHarness([firer, victim]);
-    h.fire();
 
-    expect(h.destroyed).toHaveLength(1);
-    expect(h.destroyed[0].cause).toBe('torpedo');
-  });
+    it(`${c.label} outranks a weapon that only grazed the hull`, async () => {
+      // The same precedence gravity already had, for the same reason: the
+      // specific fact wins over the last weapon to touch the hull.
+      const victim = victimAt95({
+        damage: 101,
+        lastWeapon: 'torpedo',
+        deathCause: { kind: c.kind, what: c.what },
+      });
+      const h = await makeHarness([victim]);
+      h.fire();
 
-  it('a missile kill reports cause=missile', async () => {
-    const firer = makeShip({ userid: 'c', shipno: 9, xcoord: 0, ycoord: 0 });
-    const victim = victimAt95({
-      lmisslChannel: [9, 255, 255],
-      lmisslDistance: [10, 0, 0],
-      lmisslEnergy: [50000, 0, 0],
+      expect(h.destroyed[0].cause).toBe(c.kind);
     });
-    const h = await makeHarness([firer, victim]);
-    h.fire();
+  }
 
-    expect(h.destroyed).toHaveLength(1);
-    expect(h.destroyed[0].cause).toBe('missile');
-  });
-
-  it('gravity still wins over any weapon stamped earlier', async () => {
-    // A ship grazed by a torpedo that did NOT kill it, then flown into a
-    // planet, is killed by the planet. `deathCause` is the more specific fact
-    // and must not be displaced by the last weapon to touch the hull.
-    const victim = victimAt95({
-      damage: 101,
-      lastWeapon: 'torpedo',
-      deathCause: { kind: 'gravity', what: 'planet 4' },
-    });
-    const h = await makeHarness([victim]);
-    h.fire();
-
-    expect(h.destroyed).toHaveLength(1);
-    expect(h.destroyed[0].cause).toBe('gravity');
-  });
-
-  it('a death with no recorded weapon still reports null, not a stale one', async () => {
+  it('still reports null when nothing recorded anything at all', async () => {
+    // `unknown` on the manifest, and now it means it.
     const victim = victimAt95({ damage: 101 });
     const h = await makeHarness([victim]);
     h.fire();
 
-    expect(h.destroyed).toHaveLength(1);
     expect(h.destroyed[0].cause).toBeNull();
   });
 });

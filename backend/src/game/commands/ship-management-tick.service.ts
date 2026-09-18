@@ -322,7 +322,7 @@ export class ShipManagementTickService implements OnModuleInit {
         victimUserid: ship.userid,
         attackerUserid: null,
         attackerChannel: 0,
-        weapon: null,
+        cause: null,
         sector: { x: sectorX, y: sectorY },
         tickAt: new Date(),
         loot: [],

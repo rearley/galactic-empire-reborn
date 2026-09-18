@@ -332,7 +332,7 @@ describe('the kill ledger — combat.ship-destroyed', () => {
     victimUserid,
     attackerUserid,
     attackerChannel: 2,
-    weapon: 'phaser',
+    cause: 'phaser',
     sector: { x: 5, y: 5 },
     tickAt: new Date(),
     loot: [],
