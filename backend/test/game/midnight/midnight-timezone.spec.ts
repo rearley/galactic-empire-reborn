@@ -14,7 +14,21 @@
  * or doubled midnight is invisible until scores are wrong.
  */
 import { runDateFor, GAME_TIMEZONE } from '../../../src/game/midnight/midnight-time';
-import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants';
+/**
+ * Nest's own metadata key for `@Cron`, declared here rather than imported.
+ *
+ * It used to come from `@nestjs/schedule/dist/schedule.constants`. Version 12
+ * added an `exports` map limited to `"."` and `"./package.json"`, so that deep
+ * path is no longer reachable — correctly, it was always package internals —
+ * and the public index does not re-export the constant.
+ *
+ * Its value is the string below (`schedule.constants.d.ts`:
+ * `export declare const SCHEDULE_CRON_OPTIONS = "SCHEDULE_CRON_OPTIONS"`).
+ * Copying it means a future Nest that RENAMES the key would leave
+ * `getMetadata` returning undefined, so the assertion below is written to fail
+ * loudly on that rather than silently pass on an empty object.
+ */
+const SCHEDULE_CRON_OPTIONS = 'SCHEDULE_CRON_OPTIONS';
 import { MidnightService } from '../../../src/game/midnight/midnight.service';
 
 describe('the game clock', () => {
@@ -55,6 +69,11 @@ describe('the midnight cron', () => {
       SCHEDULE_CRON_OPTIONS,
       MidnightService.prototype.scheduledRun,
     );
+    // Guards the hand-copied key above: if Nest ever renames it, this reads
+    // undefined and `toMatchObject` on undefined is not a failure anyone can
+    // interpret. Fail on the lookup itself, where the cause is legible.
+    expect(opts, 'no @Cron metadata found — has Nest renamed SCHEDULE_CRON_OPTIONS?')
+      .toBeDefined();
     expect(opts).toMatchObject({ cronTime: '0 0 * * *', timeZone: GAME_TIMEZONE });
   });
 });

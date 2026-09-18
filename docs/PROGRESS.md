@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 102 entries.
+Append-only, **newest at the bottom**. 103 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — NestJS 10 → 11, and a backend upgrade that moved frontend versions](#2026-09-18--nestjs-10--11-and-a-backend-upgrade-that-moved-frontend-versions)
 - [2026-09-17 — the suite was not slow because it was serial](#2026-09-17--the-suite-was-not-slow-because-it-was-serial)
 - [2026-09-17 — a restart re-fired every volley that was in the air](#2026-09-17--a-restart-re-fired-every-volley-that-was-in-the-air)
 - [2026-09-17 — two new players killed a Cyberquad, and the log could not say how](#2026-09-17--two-new-players-killed-a-cyberquad-and-the-log-could-not-say-how)
@@ -7274,3 +7275,61 @@ failure. It was measured, not hoped at.
 #51 stays open for the `pure`/`db` question it actually raised, but at 137s the
 case for classifying ~460 files should be re-argued against that number rather
 than against 283s.
+
+## 2026-09-18 — NestJS 10 → 11, and a backend upgrade that moved frontend versions
+
+`@nestjs/common`, `core`, `platform-express`, `platform-socket.io` and
+`websockets` were a major version behind on 10.4.22. #46 had already done the
+research: the peer graph resolves, Express 4 → 5 is the real content, and our
+exposure to it is unusually small — zero wildcard routes, zero `@Res()`, Express
+present in two files as a type import.
+
+That analysis held. The upgrade needed **one** code change in the whole repo,
+and it was in a test.
+
+**The alert backlog cleared as predicted.** Nest 11.2.5 pulls `express@5.2.1` and
+`multer@2.3.0`:
+
+| | high | moderate |
+|---|---|---|
+| before | 1 | 3 |
+| after | **0** | 2 |
+
+The two survivors are `react-router`/`react-router-dom`, which #46 scoped out
+and verified as unreachable — we do not SSR and every `navigate()`/`<Link>` call
+site passes a literal path. This mattered more than when the issue was filed:
+the repository went public on 2026-09-18, so the alerts were visible.
+
+**The one break was a test reaching into package internals.**
+`midnight-timezone.spec.ts` imported `SCHEDULE_CRON_OPTIONS` from
+`@nestjs/schedule/dist/schedule.constants`. Version 12 added an `exports` map
+limited to `"."` and `"./package.json"`, so the deep path is no longer reachable
+— correctly, since it was always internals — and the public index does not
+re-export it. The key is now declared locally with the reason, plus an assertion
+that the metadata lookup SUCCEEDED, so a future Nest that renames the key fails
+on the lookup rather than passing vacuously on an empty object.
+
+`boot-order.spec.ts` was the one to watch, per #30 — it pins lifecycle-hook
+order and exists for exactly this upgrade. It passed unchanged.
+
+**The finding worth keeping: this is an npm workspaces monorepo, and that
+couples the two apps at install time.** `workspaces: ["packages/*", "backend",
+"frontend"]` means ONE root `package-lock.json` and one hoisted `node_modules`;
+`backend/` and `frontend/` have no lockfiles of their own.
+
+Two consequences, both hit today:
+
+- **Installing inside `backend/` fights the layout.** It produced a nested
+  `backend/node_modules` with 41 packages and a second `@nestjs/common`, so
+  TypeScript saw two incompatible `DynamicModule` types and reported errors in
+  three modules that had nothing wrong with them. Install from the root.
+- **A backend upgrade moved sixteen frontend packages.** Regenerating the
+  lockfile re-resolved `vitest` 5.0.0 → 5.0.1, `jsdom`, `oxlint`, `rolldown`,
+  `@types/node` and others. All were tooling, all within declared caret ranges,
+  and no React or Vite version moved — but the coupling is real and is not
+  visible from `backend/package.json`. It was measured before and after rather
+  than assumed, and the frontend suite (45 files, 368 tests) and build were run
+  to confirm it.
+
+Verified: backend 671 files / 6,653 tests, frontend 45 / 368, both builds clean,
+on Node 24.
