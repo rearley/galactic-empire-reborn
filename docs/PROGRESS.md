@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 111 entries.
+Append-only, **newest at the bottom**. 112 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — the Reports link was in the one place the sysop never looks](#2026-09-18--the-reports-link-was-in-the-one-place-the-sysop-never-looks)
 - [2026-09-18 — `bug` — reporting from inside the game, and a route that would not have worked](#2026-09-18--bug--reporting-from-inside-the-game-and-a-route-that-would-not-have-worked)
 - [2026-09-18 — the header was broken on a phone, and nobody had looked](#2026-09-18--the-header-was-broken-on-a-phone-and-nobody-had-looked)
 - [2026-09-18 — the changelog, ten days after it was designed](#2026-09-18--the-changelog-ten-days-after-it-was-designed)
@@ -7710,4 +7711,35 @@ to `.env`, and the backend was restarted afterwards without it.
 Backend 681 files / 6,706 tests, frontend 50 / 390, both linters and
 typecheckers clean. The one failure is the pre-existing `node-runtime-version`
 spec.
+
+## 2026-09-18 — the Reports link was in the one place the sysop never looks
+
+Reported within minutes of the last commit: "when I log in i go to ship selector.
+I thought I said as sysop i get options?" He had said exactly that — "have a
+Play and Reports button so I can see reports etc or I can play the game" — and
+what shipped required editing the URL.
+
+The link went into `SiteHeader`, which is public-pages only. Logging in goes
+straight to `/play`, and the game renders `TitleBar` instead — so the one
+account that needed the link never saw a header that had it. The feature was
+built and then hidden behind the one door its user does not walk through.
+
+It lives in `TitleBar` now, which is on screen in both places the choice is
+wanted: the ship-select screen, which is already a "what do you want to do"
+moment, and mid-flight. `SiteHeader` keeps its copy for the public pages.
+
+A plain `<a>` rather than a react-router `Link`, and that is not laziness:
+`App` is rendered with NO Router ancestor by a dozen existing terminal specs
+(the comment in App.tsx says so explicitly, because `useNavigate` threw there
+before), and a `Link` outside Router context throws. A whole-page load is also
+the honest behaviour — you are leaving the game, and the socket should close
+behind you.
+
+Verified in the browser as a sysop: the link appears in flight and at ship
+select, reaches the page, and Play comes back. The allowlist widening was passed
+to the process rather than written to `.env`, and the backend restarted without
+it afterwards.
+
+Frontend 51 files / 393 tests. The lesson is smaller than the entry: a link is
+only built when it is reachable from where its user actually stands.
 

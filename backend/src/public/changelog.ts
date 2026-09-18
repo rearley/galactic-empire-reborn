@@ -109,6 +109,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.24.1',
+    date: '2026-09-18',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The sysop can reach the reports from inside the game now, instead of having to edit the address bar. The link sits in the top bar, on the ship-select screen and in flight.',
+      },
+    ],
+  },
+  {
     version: '0.24.0',
     date: '2026-09-18',
     entries: [
