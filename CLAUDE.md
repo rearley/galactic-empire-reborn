@@ -11,10 +11,6 @@ running as a modern 24/7 persistent web game.
 
 ## Tech Stack
 
-- **Backend**: NestJS + TypeScript + Prisma ORM
-- **Frontend**: React + Vite + TypeScript + Tailwind CSS
-- **Database**: PostgreSQL 16+
-- **Real-time**: Socket.io via @nestjs/platform-socket.io
 - **Scheduling**: raw `setInterval` in `TickService` for the three game
   heartbeats — two opened in lifecycle hooks, the planet sweep started by
   `PlanetTickService`; @nestjs/schedule (`@Cron`) for midnight only. See
@@ -26,17 +22,9 @@ running as a modern 24/7 persistent web game.
 
 ## Repository Structure
 
-```
-galactic-empire-reborn/
-  reference/
-    ge-source/      ← Original C source. READ ONLY. Never modify.
-  backend/          ← NestJS application
-  frontend/         ← React/Vite application
-  docs/             ← Living architecture documentation (always keep current)
-  specs/            ← spec-kit feature specs
-  CLAUDE.md         ← This file
-  README.md
-```
+**`reference/` is READ ONLY — the original C source and the vendored
+distribution. Never modify anything under it.** `docs/` is living documentation
+and is always kept current; `specs/` holds the spec-kit feature specs.
 
 `CLAUDE.md` files also sit in `reference/`, `docs/`, `backend/prisma/`,
 `backend/src/game/` and `backend/src/public/`. See the table below.
