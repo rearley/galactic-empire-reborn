@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 import {
   PORT_RELEASE,
   PORT_RELEASE_DATE,
@@ -123,6 +124,7 @@ export function Provenance(): React.JSX.Element {
           port deliberately differs from it.
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }

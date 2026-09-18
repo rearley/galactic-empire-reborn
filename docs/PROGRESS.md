@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 109 entries.
+Append-only, **newest at the bottom**. 110 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — the header was broken on a phone, and nobody had looked](#2026-09-18--the-header-was-broken-on-a-phone-and-nobody-had-looked)
 - [2026-09-18 — the changelog, ten days after it was designed](#2026-09-18--the-changelog-ten-days-after-it-was-designed)
 - [2026-09-18 — the four deaths that had no name](#2026-09-18--the-four-deaths-that-had-no-name)
 - [2026-09-18 — three identical welcomes, and the one that was canon](#2026-09-18--three-identical-welcomes-and-the-one-that-was-canon)
@@ -7619,4 +7620,43 @@ while the API served five. Now sixty seconds, with the reason in the source.
 Verified: backend 679 files / 6,690 tests, frontend 48 / 379, both linters and
 typecheckers clean, and the page driven in a browser against the rebuilt dev
 stack. The one failure is the pre-existing `node-runtime-version` spec.
+
+## 2026-09-18 — the header was broken on a phone, and nobody had looked
+
+Rick asked, reasonably gently, whether the header was getting ugly now that it
+carried seven links: "fine on wide screen monitors but just want to be careful
+we don't get too ugly".
+
+Measured rather than judged, and it was not ugly, it was broken. At 390px the
+nav measured **457px inside a 390px viewport**: the document scrolled sideways
+and the last items — including **Log out** — sat past the right edge where
+nothing could reach them. It fits at 768px with about 100px of slack, so every
+desktop review had passed it. Adding the bug-report link he asked for in the
+same message would have made it worse.
+
+The fix is a split rather than a squeeze: **the header is what a visitor came to
+DO** (the guide, and getting in or out), **the footer is what the project IS**
+(calculators, status, changes, credits, and where to report a bug). A header
+that grows by one link per page will break again, so the rule is written where
+someone will meet it: new pages go in the footer unless a player needs them
+mid-session.
+
+**Bug reports go to the issue tracker, and the link is DERIVED from
+`SOURCE_URL`** rather than hardcoded — the same reasoning that makes the donate
+link a build arg. This repo is AGPL and anyone may run their own galaxy from it;
+a fixed link would send a fork's bug reports here, and neither their players nor
+their operator would notice. A fork already has to change `SOURCE_URL` for the
+licence's source offer, so one edit covers both.
+
+Also removed the changelog teaser added to the landing page four hours earlier.
+It existed because there was no footer; now there is one, and two links to the
+same page a hundred pixels apart is clutter rather than emphasis.
+
+The changelog rule proved itself on its second day: the version bump and the
+entry went in together without prompting, and the guard would have failed the
+commit otherwise.
+
+Verified in a browser at 390px — header nav now 166px, no horizontal scroll,
+every link reachable. Frontend 49 files / 384 tests, backend 679 / 6,689, both
+linters and typecheckers clean.
 

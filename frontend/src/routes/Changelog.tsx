@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 
 type Category =
   | 'port-bug'
@@ -143,6 +144,7 @@ export function Changelog(): React.JSX.Element {
           </>
         )}
       </main>
+      <SiteFooter />
     </div>
   );
 }

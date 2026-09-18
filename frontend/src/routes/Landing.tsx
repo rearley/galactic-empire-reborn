@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 import { PORT_RELEASE, PORT_RELEASE_DATE, HOOKS, FAITHFUL, CHANGED } from '../content/port-notes';
 import { supportUrl } from '../support';
 
@@ -152,15 +153,13 @@ export function Landing(): React.JSX.Element {
         </p>
         <Support />
 
+        {/*
+          * No changelog teaser here any more. It was added when the page had no
+          * footer; now the footer carries "Changes" on every public page, and
+          * two links to one page a hundred pixels apart is clutter rather than
+          * emphasis.
+          */}
         <p className="mt-8 text-center text-xs text-gray-600">
-          The game is live and still being worked on.{' '}
-          <Link to="/changelog" className="text-gray-500 hover:text-gray-300 hover:underline">
-            What changed, and why
-          </Link>{' '}
-          — separating what this port broke from where it deliberately differs from the original.
-        </p>
-
-        <p className="mt-4 text-center text-xs text-gray-600">
           Galactic Empire was written by Mike Murdock, who released its source publicly. This port
           is free software and says{' '}
           <Link to="/provenance" className="text-gray-500 hover:text-gray-300 hover:underline">
@@ -169,6 +168,7 @@ export function Landing(): React.JSX.Element {
           .
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }

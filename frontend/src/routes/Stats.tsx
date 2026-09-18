@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 
 interface RosterEntry {
   rank: number;
@@ -106,6 +107,7 @@ export function Stats(): React.JSX.Element {
           </>
         )}
       </main>
+      <SiteFooter />
     </div>
   );
 }

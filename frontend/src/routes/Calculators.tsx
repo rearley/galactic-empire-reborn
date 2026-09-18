@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 import {
   PAGE_TITLE, PAGE_BLURB, SCOPE_NOTE, Tip,
   PRODUCTION_TIPS, SURVIVAL_TIPS, TAX_TIPS, GROWTH_TIPS,
@@ -381,6 +382,7 @@ export function Calculators(): React.JSX.Element {
             showing you nothing.
           </p>
         </main>
+      <SiteFooter />
       </div>
     );
   }
@@ -719,6 +721,7 @@ export function Calculators(): React.JSX.Element {
           )}
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

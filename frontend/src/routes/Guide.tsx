@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 
 /**
  * The player's guide.
@@ -120,6 +121,7 @@ export function Guide(): React.JSX.Element {
           </section>
         ))}
       </main>
+      <SiteFooter />
     </div>
   );
 }
@@ -161,6 +163,7 @@ export function GuidePage(): React.JSX.Element {
           </>
         )}
       </main>
+      <SiteFooter />
     </div>
   );
 }

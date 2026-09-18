@@ -109,6 +109,20 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.23.1',
+    date: '2026-09-18',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'Found a bug, or something the original did differently? Every page now has a link to the issue tracker at the bottom. Reports from players are the fastest way this gets better.',
+      },
+      {
+        category: 'port-bug',
+        text: 'The menu no longer runs off the side of a phone screen. On a narrow display the last few links, including Log out, sat past the right edge where nothing could reach them.',
+      },
+    ],
+  },
+  {
     version: '0.23.0',
     date: '2026-09-18',
     entries: [
