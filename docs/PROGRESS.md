@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 103 entries.
+Append-only, **newest at the bottom**. 104 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — the roster ghost was a bidirectional map maintained in one direction](#2026-09-18--the-roster-ghost-was-a-bidirectional-map-maintained-in-one-direction)
 - [2026-09-18 — NestJS 10 → 11, and a backend upgrade that moved frontend versions](#2026-09-18--nestjs-10--11-and-a-backend-upgrade-that-moved-frontend-versions)
 - [2026-09-17 — the suite was not slow because it was serial](#2026-09-17--the-suite-was-not-slow-because-it-was-serial)
 - [2026-09-17 — a restart re-fired every volley that was in the air](#2026-09-17--a-restart-re-fired-every-volley-that-was-in-the-air)
@@ -7333,3 +7334,50 @@ Two consequences, both hit today:
 
 Verified: backend 671 files / 6,653 tests, frontend 45 / 368, both builds clean,
 on Node 24.
+
+## 2026-09-18 — the roster ghost was a bidirectional map maintained in one direction
+
+#49: switching ships briefly left the old hull on **other** players' rosters.
+The switching player never saw their own stale entry.
+
+That asymmetry was the whole clue. `ConnectedShipsRegistry` keeps two maps meant
+to be inverses — `byShipId` and `bySocketId` — and `upsert` maintained one of
+them on a switch:
+
+```
+before        byShipId{A->S}        bySocketId{S->A}
+upsert(B,S)   prior = byShipId.get(B) = undefined, so nothing is deleted
+after         byShipId{A->S, B->S}  bySocketId{S->B}
+```
+
+`upsert` evicts a prior SOCKET for the same SHIP — the single-socket-per-ship
+takeover, which has its own spec — but never a prior SHIP for the same SOCKET.
+`bySocketId` is overwritten and stays right; `byShipId` accumulates. `list()`
+iterates `byShipId` and `emitScopedSnapshotToAll` fans it out to everyone, so
+the ghost was in every other player's snapshot. The switching player's own view
+comes from `bySocketId`, which was never wrong.
+
+**The route in is `x`.** It returns you to ship select, and picking a hull runs
+`handleShipSelectReply` → `boardShipAndWelcome` → `upsert` on the same socket.
+`registry.remove` is called from exactly one place in the codebase — the
+disconnect handler — so `x` always upserts over a live registration. Rick
+supplied that, and it turned a plausible fix into a confirmed one: the issue's
+three candidate causes (no "left" event, a race, or a client that merges rather
+than replaces) were all wrong, and none of them would have been found by
+reading the broadcast code, which is correct.
+
+**"It clears on its own" was not a resync.** `list()` skips any ship
+`shipStateService` cannot resolve, so the ghost simply outlived the switch by
+however long the old hull happened to stay in memory. Nothing reconciled it, and
+on a long-lived hull it would not have cleared at all.
+
+Fixed in `upsert` by evicting any hull already bound to the incoming socket,
+keyed on the SOCKET rather than the userid — a captain may legitimately hold a
+second hull from a second socket, and evicting by owner would unregister a
+session still flying. Five cases pinned, including the two existing contracts
+this sits next to: the takeover return value, and the `x`-with-one-hull no-op
+that once made a player displace themselves.
+
+Not fixed here, and still open in #50: the same question asked of disconnect —
+what removes a ship from a sector, and does every path fire? This closes the
+switch case only.
