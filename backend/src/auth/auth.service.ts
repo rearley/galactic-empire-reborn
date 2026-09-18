@@ -267,6 +267,21 @@ export class AuthService {
   }
 
   /**
+   * The account's display name, read live.
+   *
+   * `/auth/me` uses it instead of the token's `username` claim: the token lasts
+   * 30 days and the claim is `null` for an account that had not chosen a name
+   * when it was minted. @see auth/sysop.ts
+   */
+  async usernameOf(userid: string): Promise<string | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { userid },
+      select: { username: true },
+    });
+    return row?.username ?? null;
+  }
+
+  /**
    * Verifies a JWT and returns its payload.
    *
    * Propagates JsonWebTokenError and TokenExpiredError to the caller —

@@ -20,14 +20,27 @@ describe('ReportsController', () => {
     { id: 'r2', text: 'gravity killed me at warp', status: 'closed', createdAt: new Date() },
   ];
 
-  function build(env: Record<string, string | undefined> = { GE_SYSOP_USERNAME: 'Rick' }) {
+  function build(
+    env: Record<string, string | undefined> = { GE_SYSOP_USERNAME: 'Rick' },
+    /**
+     * What the DATABASE says this account is called. The controller asks it
+     * rather than trusting the token's `username` claim, which is a 30-day-old
+     * copy and null on a token minted before registration step 2.
+     */
+    dbUsername: string | null = 'Rick',
+  ) {
     const service = {
       list: vi.fn().mockResolvedValue(rows),
       setStatus: vi.fn().mockResolvedValue(true),
     } as unknown as BugReportService;
-    return { controller: new ReportsController(service, env), service };
+    const users = {
+      findUsername: vi.fn().mockResolvedValue(dbUsername),
+    } as unknown as import('../../../src/game/player/user.repository').UserRepository;
+    return { controller: new ReportsController(service, users, env), service, users };
   }
 
+  /** The token. Its `username` is deliberately WRONG in most of these — the
+   * controller must not be reading it. */
   const as = (username: string | null) => ({ user: { sub: 'u1', username } });
 
   it('gives the sysop the reports, newest first', async () => {
@@ -40,12 +53,30 @@ describe('ReportsController', () => {
   });
 
   it('matches the allowlist case-insensitively, as usernames are', async () => {
-    const { controller } = build({ GE_SYSOP_USERNAME: 'rick' });
+    const { controller } = build({ GE_SYSOP_USERNAME: 'rick' }, 'RICK');
     await expect(controller.list(as('RICK') as never, undefined)).resolves.toBeDefined();
   });
 
+  it('believes the database, not the token', async () => {
+    // A token minted before registration step 2 carries `username: null`, and
+    // it stays that way for 30 days. The sysop must not lose access to their
+    // own reports because of a stale claim.
+    const { controller, users } = build({ GE_SYSOP_USERNAME: 'Rick' }, 'Rick');
+
+    await expect(controller.list(as(null) as never, undefined)).resolves.toBeDefined();
+    expect(users.findUsername).toHaveBeenCalledWith('u1');
+  });
+
+  it('refuses when the token claims a name the account does not have', async () => {
+    // The claim is signed, so this is not forgery — but it can be STALE, and
+    // the database is the only current answer.
+    const { controller } = build({ GE_SYSOP_USERNAME: 'Rick' }, 'Wasp');
+
+    await expect(controller.list(as('Rick') as never, undefined)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('refuses an ordinary captain', async () => {
-    const { controller, service } = build();
+    const { controller, service } = build({ GE_SYSOP_USERNAME: 'Rick' }, 'Wasp');
 
     await expect(controller.list(as('Wasp') as never, undefined)).rejects.toBeInstanceOf(ForbiddenException);
     expect(service.list).not.toHaveBeenCalled();
@@ -58,9 +89,9 @@ describe('ReportsController', () => {
     await expect(controller.list(as('Rick') as never, undefined)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('refuses a token with no username at all', async () => {
-    const { controller } = build();
-    await expect(controller.list(as(null) as never, undefined)).rejects.toBeInstanceOf(ForbiddenException);
+  it('refuses when the account has no display name at all', async () => {
+    const { controller } = build({ GE_SYSOP_USERNAME: 'Rick' }, null);
+    await expect(controller.list(as('Rick') as never, undefined)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('filters by status when asked', async () => {

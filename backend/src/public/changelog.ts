@@ -96,6 +96,8 @@ export interface ChangelogRelease {
  * oversight and fails.
  */
 export const SILENT_RELEASES: Record<string, string> = {
+  '0.24.2':
+    'Sysop-only: the reports gate now reads the account name from the database rather than a 30-day-old token claim. No player can see any difference.',
   '0.21.0': 'Framework upgrade (NestJS 10 to 11). No change a player can see.',
   '0.22.0':
     'Shipped alongside 0.22.1 within the hour; both are described under 0.22.1 so the page does not split one change across two versions.',

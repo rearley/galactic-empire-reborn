@@ -145,6 +145,23 @@ export class UserRepository {
    * account; the socket layer forces a logout rather than letting onboarding
    * update a row that is not there.
    */
+  /**
+   * The account's display name, read live.
+   *
+   * Exists because sysop identity must not be answered from a JWT claim: the
+   * token lasts 30 days and its `username` is `null` for an account that had
+   * not finished step 2 when it was minted, so a stale token can quietly
+   * demote the sysop until they log in again.
+   * @see auth/sysop.ts
+   */
+  async findUsername(userid: string): Promise<string | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { userid },
+      select: { username: true },
+    });
+    return row?.username ?? null;
+  }
+
   async exists(userid: string): Promise<boolean> {
     const row = await this.prisma.user.findUnique({
       where: { userid },

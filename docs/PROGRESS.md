@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 112 entries.
+Append-only, **newest at the bottom**. 113 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — sysop identity was answered from a month-old copy](#2026-09-18--sysop-identity-was-answered-from-a-month-old-copy)
 - [2026-09-18 — the Reports link was in the one place the sysop never looks](#2026-09-18--the-reports-link-was-in-the-one-place-the-sysop-never-looks)
 - [2026-09-18 — `bug` — reporting from inside the game, and a route that would not have worked](#2026-09-18--bug--reporting-from-inside-the-game-and-a-route-that-would-not-have-worked)
 - [2026-09-18 — the header was broken on a phone, and nobody had looked](#2026-09-18--the-header-was-broken-on-a-phone-and-nobody-had-looked)
@@ -7742,4 +7743,40 @@ it afterwards.
 
 Frontend 51 files / 393 tests. The lesson is smaller than the entry: a link is
 only built when it is reachable from where its user actually stands.
+
+## 2026-09-18 — sysop identity was answered from a month-old copy
+
+"it kinda worked where I saw report, clicked on it, clicked play and it was gone
+again. even hard refreshed."
+
+**The proximate cause was me.** Testing the sysop path needed an account on the
+allowlist, so the dev backend was restarted with `GE_SYSOP_USERNAME="rick,UiProbe"`
+and then, correctly, restarted without it. The browser being watched is signed in
+as `UiProbe` — it is the probe account this session drives — so the link appeared
+during the override window and vanished after it. Nothing in the code was wrong,
+and a hard refresh could not help, because refreshing re-asks a server whose
+answer had changed.
+
+**The question it prompted found a real one.** Asked whether the check goes off
+the display name or the email: it is `User.username`, the display name, matched
+case-insensitively — never the email, never the internal `userid`, which is
+`usr_<hex>`, minted at registration and different after every database reset, so
+it could never be configured ahead of time.
+
+But BOTH `/auth/me` and the reports endpoint were reading that name from the JWT
+CLAIM. Tokens last 30 days (`JWT_EXPIRES_IN`), and the claim is `null` for an
+account that had not finished registration step 2 when the token was minted. So
+a stale session silently answers "not the sysop" — the link disappears and stays
+gone until the next login, with no error anywhere. Exactly the symptom above,
+arrived at by a different route, which is what made it worth chasing rather than
+explaining away.
+
+Both now read the name live from the database. One query on a sysop-only route
+is nothing, and authorization must not depend on a month-old copy of a fact.
+Four cases pinned, including the two that matter: a token whose claim is `null`
+still gets in when the account qualifies, and a token claiming a name the account
+does not have is refused.
+
+Released as 0.24.2 and recorded in `SILENT_RELEASES`: no player can see any part
+of it, and inventing a player-facing line would be worse than silence.
 

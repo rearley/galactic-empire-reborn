@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { BugReportService } from './bug-report.service';
 import { ReportsController } from './reports.controller';
+import { PlayerModule } from '../player/player.module';
 
 /**
  * Player bug reports — the `bug` command writes, the sysop reads.
@@ -11,7 +12,7 @@ import { ReportsController } from './reports.controller';
  * two consumers of one service, and neither belongs inside the other.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PlayerModule],
   controllers: [ReportsController],
   providers: [BugReportService],
   exports: [BugReportService],

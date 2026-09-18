@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BugReportService } from './bug-report.service';
+import { UserRepository } from '../player/user.repository';
 import { BugReportRow, REPORT_CLOSED, REPORT_OPEN } from './bug-report.types';
 import { isSysopUsername } from '../../auth/sysop';
 
@@ -53,6 +54,7 @@ const STATUSES: readonly string[] = [REPORT_OPEN, REPORT_CLOSED];
 export class ReportsController {
   constructor(
     private readonly reports: BugReportService,
+    private readonly users: UserRepository,
     /**
      * The environment to read the allowlist from. Injectable so a test can vary
      * it without mutating `process.env`, which leaks across a shared worker.
@@ -66,7 +68,7 @@ export class ReportsController {
     @Req() req: AuthedRequest,
     @Query('status') status?: string,
   ): Promise<{ reports: BugReportRow[] }> {
-    this.assertSysop(req);
+    await this.assertSysop(req);
     if (status !== undefined && !STATUSES.includes(status)) {
       throw new BadRequestException('unknown status');
     }
@@ -79,7 +81,7 @@ export class ReportsController {
     @Param('id') id: string,
     @Body() body: { status: string },
   ): Promise<{ id: string; status: string }> {
-    this.assertSysop(req);
+    await this.assertSysop(req);
     if (!STATUSES.includes(body?.status)) throw new BadRequestException('unknown status');
 
     const found = await this.reports.setStatus(id, body.status);
@@ -92,8 +94,13 @@ export class ReportsController {
    * pretending otherwise would only confuse the sysop the day their allowlist
    * entry is wrong.
    */
-  private assertSysop(req: AuthedRequest): void {
-    if (!isSysopUsername(req.user?.username, this.env)) {
+  private async assertSysop(req: AuthedRequest): Promise<void> {
+    // The DATABASE, not the token. `username` is a 30-day-old claim that is
+    // `null` for an account which had not finished registration when the token
+    // was minted, so trusting it can silently demote the sysop until they log
+    // in again. One query on a sysop-only route is nothing.
+    const username = await this.users.findUsername(req.user?.sub ?? '');
+    if (!isSysopUsername(username, this.env)) {
       throw new ForbiddenException('sysop only');
     }
   }

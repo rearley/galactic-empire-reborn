@@ -49,19 +49,22 @@ export class AuthController {
    * asks the same question again and is the thing that actually refuses — but a
    * button that 403s when pressed is worse than no button.
    *
-   * Reads the username from the TOKEN rather than the database: it is already
-   * in the payload, and one more query per page load buys nothing.
+   * Reads the username from the DATABASE rather than the token: the claim is a
+   * 30-day-old copy, and `null` on a token minted before registration step 2,
+   * either of which silently answers "not the sysop" for a session that is.
    */
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
-  me(@Req() req: { user: { sub: string; username: string | null } }): {
+  async me(@Req() req: { user: { sub: string; username: string | null } }): Promise<{
     username: string | null;
     sysop: boolean;
-  } {
-    return {
-      username: req.user.username ?? null,
-      sysop: isSysopUsername(req.user.username),
-    };
+  }> {
+    // Read live, not from the token. The claim is a 30-day-old copy and is
+    // `null` for an account that had not finished step 2 when it was minted,
+    // so trusting it makes the sysop link disappear for a stale session and
+    // stay gone until the next login. @see auth/sysop.ts
+    const username = await this.authService.usernameOf(req.user.sub);
+    return { username, sysop: isSysopUsername(username) };
   }
 
   @Post('username')
