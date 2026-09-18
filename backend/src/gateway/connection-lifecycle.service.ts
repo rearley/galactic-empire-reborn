@@ -201,6 +201,45 @@ export class ConnectionLifecycleService {
    * The refusal while `cantexit > 0` lives in the handler, so this only ever
    * runs on a permitted exit.
    */
+  /**
+   * The mirror of what boarding does to a SOCKET, run when a captain stops
+   * flying without dropping the connection.
+   *
+   * `boardShipAndWelcome` does three things beyond hydrating the hull: joins
+   * `sector:x:y` and `user:<id>`, registers the socket in the registry, and
+   * announces the arrival. `x` and `abandon` undid the SHIP half — unboard,
+   * flush, status AVAIL — and none of the socket half, so a captain sitting at
+   * the ship-select screen stayed in the sector room they had left. Every
+   * sector-scoped `event.log`, every combat broadcast and every galaxy-wide
+   * `player.joined` / `player.left` kept arriving, and the rooms are the only
+   * thing that bounds what a socket may hear: a pilot who is nowhere has no
+   * viewpoint to scope against, so the answer is to hear nothing at all.
+   *
+   * The registry entry is dropped here rather than left for the disconnect
+   * handler, because `list()` only hides an unregistered hull once
+   * `ShipStateService` can no longer resolve it — a courtesy of eviction
+   * timing, not a guarantee. @see issue #49 for the roster ghost that came out
+   * of relying on it.
+   *
+   * Every room but the socket's own id room goes: Socket.io puts each socket
+   * in a room named after itself and that one is its addressing, not ours.
+   */
+  private detachFromWorld(host: LifecycleHost, client: GameSocket): void {
+    // Copied first: `leave` mutates the very set being walked.
+    const rooms = client.rooms === undefined ? [] : Array.from(client.rooms);
+    for (const room of rooms) {
+      if (room !== client.id) void client.leave(room);
+    }
+    const removed = this.registry.remove(client.id);
+    if (removed) host.server.emit('player.left', { shipId: removed.shipId });
+    client.data.activeShipNo = undefined;
+    // An empty roster, because the panel is scoped to the sector you are in and
+    // you are no longer in one. Without it the last roster the socket received
+    // stays on screen at the ship-select menu, frozen but indistinguishable
+    // from a live one.
+    client.emit('player.snapshot', { players: [] });
+  }
+
   async maybeExitGame(
     host: LifecycleHost,
     client: GameSocket,
@@ -213,6 +252,9 @@ export class ConnectionLifecycleService {
     try {
       this.scanHandler.clearScantab(userid, shipno);
       await this.shipStateService.unboard(userid, shipno);
+      // After the hull is put away, not before: `unboard` is addressed by
+      // `client.data.activeShipNo`, which this clears.
+      this.detachFromWorld(host, client);
       // autoBoard: false — `x` means leave, so never put them straight back in,
       // even with a single hull. @see test/gateway/exit-with-one-ship.spec.ts
       await this.presentShipEntry(host, client, userid, { noticeShipLoss: false, autoBoard: false });
@@ -230,6 +272,9 @@ export class ConnectionLifecycleService {
     const userid = client.data.userid as string | undefined;
     if (!userid) return;
     try {
+      // `abandon` clears `activeShipNo` in the handler and stopped there, which
+      // left the same rooms and the same registration behind as `x` did.
+      this.detachFromWorld(host, client);
       await this.presentShipEntry(host, client, userid, { noticeShipLoss: false });
     } catch (err: unknown) {
       host.error('Ship re-entry after abandon failed:', err);

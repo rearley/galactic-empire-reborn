@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 104 entries.
+Append-only, **newest at the bottom**. 105 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — `x` put the ship away and left the socket in the sector](#2026-09-18--x-put-the-ship-away-and-left-the-socket-in-the-sector)
 - [2026-09-18 — the roster ghost was a bidirectional map maintained in one direction](#2026-09-18--the-roster-ghost-was-a-bidirectional-map-maintained-in-one-direction)
 - [2026-09-18 — NestJS 10 → 11, and a backend upgrade that moved frontend versions](#2026-09-18--nestjs-10--11-and-a-backend-upgrade-that-moved-frontend-versions)
 - [2026-09-17 — the suite was not slow because it was serial](#2026-09-17--the-suite-was-not-slow-because-it-was-serial)
@@ -7381,3 +7382,55 @@ that once made a player displace themselves.
 Not fixed here, and still open in #50: the same question asked of disconnect —
 what removes a ship from a sector, and does every path fire? This closes the
 switch case only.
+
+
+## 2026-09-18 — `x` put the ship away and left the socket in the sector
+
+Reported from play: type `x`, sit at the ship-select screen, and the event log
+keeps scrolling and the player list keeps moving. A screen for someone who is
+not in the game was showing the game.
+
+Boarding does two separable things. `boardShipAndWelcome` hydrates the HULL —
+memory, status, flush — and then does three things to the SOCKET: joins
+`sector:x:y` and `user:<id>`, registers it in `ConnectedShipsRegistry`, and
+announces the arrival. `x` undid the first half and none of the second.
+`maybeExitGame` called `clearScantab`, `unboard` and then straight on to
+`presentShipEntry`. The socket never left a room, `data.activeShipNo` still
+named the hull it had just put away, and `registry.remove` is called from
+exactly one place in the codebase — the disconnect handler.
+
+So the rooms kept delivering. Sector-scoped `event.log`, every combat
+broadcast, and the galaxy-wide `player.joined` / `player.left` pair all arrived
+at a socket with no ship. The rooms are the only thing that bounds what a
+socket may hear, and a captain who is nowhere has no viewpoint to scope
+against — the answer is to hear nothing, not to filter it in the client, which
+leaks straight back out through devtools.
+
+`abandon` had the identical leak, from the other direction: its handler clears
+`activeShipNo` on the client data and stops there, so the rooms and the
+registration survived into the next hull. A captain who abandoned and named a
+new ship ended up in two sector rooms.
+
+Fixed with one `detachFromWorld` on the lifecycle service, called by both
+paths: leave every room but the socket's own id room, drop the registration and
+announce the departure the way a disconnect does, clear `activeShipNo`, and
+push an empty roster so the panel does not sit there frozen and
+indistinguishable from a live one. It runs AFTER `unboard`, which is addressed
+by the `activeShipNo` it clears.
+
+Dropping the registration here rather than leaving it to disconnect also closes
+the roster ghost's remaining half. Yesterday's `upsert` fix stopped `byShipId`
+accumulating on a switch; it did not give `x` a way to deregister at all. That
+it *looked* fine was `list()` skipping any ship `ShipStateService` cannot
+resolve — eviction timing, not a guarantee.
+
+Five cases pinned in `test/gateway/exit-leaves-world.spec.ts`, each failing
+before the change: the two rooms, the registry entry and its `player.left`, the
+cleared `activeShipNo`, the emptied roster, and that the captain still lands at
+ship select. Gateway suite 55 files / 421 tests; full backend 673 / 6,663, with
+the one pre-existing `node-runtime-version` failure that comes of running the
+local shell on Node 22 against a project that declares 24.
+
+Not addressed: #50's question of what a DISCONNECT should do, which is a
+different decision — this is the path where the player is still connected and
+told us they were leaving.
