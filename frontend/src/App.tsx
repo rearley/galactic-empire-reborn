@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { destructionLine } from './features/combat/destructionLine';
 import { useSocket } from './socket/useSocket';
 import { usePlayerList } from './state/usePlayerList';
@@ -133,6 +133,31 @@ function Terminal(): React.JSX.Element {
       socket.off('combat.decoy-intercept', handleDecoyIntercept);
     };
   }, [players, localShipId, shipName, appendLines]);
+
+  /**
+   * A new hull starts with a clean log.
+   *
+   * Every boarding prints WELCOM — tossingegame,
+   * GEFUNCS.C:172 `prfmsg(WELCOM,waruptr->userid);` — and canon is right to: it runs each time a
+   * pilot is tossed into the arena. In canon `x` dropped you to the main menu,
+   * which redrew the screen, so the next welcome never landed directly under
+   * the last. Our single scrollback stacked them, and `x` / select / `x` /
+   * select read as three identical greetings. Reported from play.
+   *
+   * Cleared when ship entry BEGINS, not when it ends. `player.snapshot` is
+   * what clears the prompt, and boarding emits the WELCOM `command:result`
+   * BEFORE that snapshot — so clearing on the way out would wipe the welcome
+   * the player just arrived for and leave an empty log.
+   *
+   * Compared during render rather than reset in an effect, the same recipe
+   * `useScanMap` uses for the same job — scan data is dropped on a hull change
+   * for the same reason. @see hooks/useScanMap.ts, issue #25
+   */
+  const [wasEnteringShip, setWasEnteringShip] = useState(onboardingPrompt !== null);
+  if ((onboardingPrompt !== null) !== wasEnteringShip) {
+    setWasEnteringShip(onboardingPrompt !== null);
+    if (onboardingPrompt !== null) clearLog();
+  }
 
   // Between hulls — naming a first ship, choosing from a fleet, or picking up
   // after one was destroyed — none of the game is rendered at all. It used to

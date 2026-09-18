@@ -6141,3 +6141,51 @@ and it removes state that is genuinely useful to inspect when diagnosing a kill.
 **Known cost:** a player who disconnects long enough to be evicted from memory
 loses the projectiles inbound at them. That is a dodge, but a slow and public
 one, and the alternative is being killed on login by a shot fired days earlier.
+
+## 2026-09-18 — The event log is cleared when ship entry begins, and what that costs
+
+**Context:** `x` / select / `x` / select stacked identical greetings in the log:
+
+    Welcome aboard Commander rick, the con is yours. Type ? if you need assistance.
+    Welcome aboard Commander rick, the con is yours. Type ? if you need assistance.
+    Welcome aboard Commander rick, the con is yours. Type ? if you need assistance.
+
+Reported from play, and the first question was whether the line itself is a bug.
+It is not. Canon prints it on every boarding:
+
+```c
+btupmt(usrnum,'>');
+prfmsg(WELCOM,waruptr->userid);     /* GEFUNCS.C:172, in tossingegame */
+outprfge(ALWAYS,usrnum);
+```
+
+`tossingegame` runs each time a pilot is tossed into the arena, so a captain who
+exits and re-enters is greeted again. The server is right.
+
+**Decision:** the CLIENT clears the event log when ship entry begins — the
+moment a `prompt:ship-name` or `prompt:ship-select` arrives, not when it is
+answered.
+
+**Reason:** this is presentation, not canon. In canon `x` dropped you to the
+main menu (`mnu_fightsub`, GEMAIN.C:2859), which redrew the screen, so the next
+WELCOM never landed directly under the last one. A single scrollback spanning
+every hull a captain flies is the port's own invention, and it is the thing that
+turns a correct message into a duplicate. Scan data already resets on a hull
+change for the same kind of reason, with its own spec.
+
+Clearing on the way IN rather than the way out is load-bearing: `player.snapshot`
+is what clears the prompt client-side, and boarding emits the WELCOM
+`command:result` BEFORE that snapshot. Clearing when the prompt goes away would
+wipe the welcome the player just arrived for and leave an empty log.
+
+**Alternatives rejected:** Suppressing the repeated WELCOM server-side — that is
+a canon deviation argued from taste, which is the failure mode the fidelity rule
+exists to prevent. A divider line per boarding — keeps the history, but the
+complaint was the repetition and a divider does not remove it.
+
+**Known cost, and it is real:** death lands a captain at ship entry
+(`recoverAfterDeath` → `presentShipEntry`), so the YOURDEAD lines explaining what
+killed them are cleared along with everything else. The ship-loss mail is then
+the only record. Accepted deliberately by the owner when the alternative was
+offered; revisit by showing the last transmission on the pre-flight screen
+rather than by keeping the whole log.

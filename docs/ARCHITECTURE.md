@@ -675,9 +675,13 @@ App.tsx flow:
   getToken() present → connectSocket(); onboardingPrompt set → PreFlightScreen, else Terminal
   getToken() absent  → render AuthScreen → onAuthenticated → setToken + connectSocket + re-render Terminal
 
-The event log is UNMOUNTED on the pre-flight screen, not cleared: death lands a captain there
-(recoverAfterDeath → presentShipEntry) and the YOURDEAD lines explaining the kill are in that
-scrollback, which is still there when they board again.
+The event log is CLEARED when ship entry begins — on the arriving prompt, not on the answer,
+because `player.snapshot` clears the prompt and boarding emits the WELCOM `command:result` before
+it. Canon prints WELCOM on every boarding in tossingegame,
+GEFUNCS.C:172 `prfmsg(WELCOM,waruptr->userid);`, and its main-menu redraw
+kept the repeats apart; our single scrollback stacked them. The cost is that a captain killed
+mid-session loses the YOURDEAD lines when they board the replacement.
+@see docs/DECISIONS.md 2026-09-18
 ```
 
 ### Planet revolt (game/planet/planet-economy.service.ts)

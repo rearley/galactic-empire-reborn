@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 106 entries.
+Append-only, **newest at the bottom**. 107 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-18 — three identical welcomes, and the one that was canon](#2026-09-18--three-identical-welcomes-and-the-one-that-was-canon)
 - [2026-09-18 — ship entry is a screen now, and the browser found two more bugs](#2026-09-18--ship-entry-is-a-screen-now-and-the-browser-found-two-more-bugs)
 - [2026-09-18 — `x` put the ship away and left the socket in the sector](#2026-09-18--x-put-the-ship-away-and-left-the-socket-in-the-sector)
 - [2026-09-18 — the roster ghost was a bidirectional map maintained in one direction](#2026-09-18--the-roster-ghost-was-a-bidirectional-map-maintained-in-one-direction)
@@ -7484,3 +7485,38 @@ Verified: backend 675 files / 6,669 tests, frontend 46 / 372, both builds and
 both linters clean, and the `x` → select → board round trip driven in a browser.
 The one failure is the pre-existing `node-runtime-version` spec, which fails
 because this shell is on Node 22 against a project that declares 24.
+
+## 2026-09-18 — three identical welcomes, and the one that was canon
+
+Reviewing the new ship-entry screen, Rick found `x` / select / `x` / select
+stacking the same greeting three times over.
+
+The first question was whether the line is a bug, and it is not.
+`tossingegame` prints it at GEFUNCS.C:172 `prfmsg(WELCOM,waruptr->userid);`, which
+runs each time a pilot is tossed into the arena — so canon greets a captain on
+every boarding, and the server is right to send it. What is ours is the log pane
+underneath: canon's `x` dropped you to the main menu, which redrew the screen,
+so the next welcome never landed directly under the last. A single scrollback
+spanning every hull a captain flies is the port's own invention, and it is what
+turns a correct message into a duplicate.
+
+So the fix is presentation, not canon: the client clears the event log when ship
+entry BEGINS. Same rule scan data already follows — a new hull starts blind, with
+its own spec written after the same kind of play report.
+
+Clearing on the way IN rather than the way out is load-bearing, and it is the
+part that would have been got wrong by guessing. `player.snapshot` is what clears
+the prompt client-side, and boarding emits the WELCOM `command:result` BEFORE
+that snapshot — so clearing when the prompt goes away wipes the welcome the
+player just arrived for and leaves an empty log. One of the three specs pins
+exactly that ordering.
+
+The cost is recorded in DECISIONS rather than hidden: death lands a captain at
+ship entry, so the YOURDEAD lines explaining the kill are cleared with
+everything else, and the ship-loss mail becomes the only record. Offered as a
+trade and accepted; the way out, if it bites, is to show the last transmission
+on the pre-flight screen rather than to keep the whole log.
+
+Verified in the browser against the rebuilt dev stack: three `x` / select rounds
+back to back, one welcome each time. Frontend 47 files / 375 tests.
+
