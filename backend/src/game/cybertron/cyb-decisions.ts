@@ -119,7 +119,8 @@ export function rollTorpedoCount(
  * `ptr->speed` directly in the hyperwarp band
  * (@see GECYBS.C:746 `		ptr->speed = ptr->speed2b;`), so a distant target sends
  * a base across the galaxy at twenty times normal speed. Class data
- * contradicted by the code that reads it. @see docs/DECISIONS.md 2026-09-15
+ * contradicted by the code that reads it.
+ * @see docs/DECISIONS.md 2026-09-18 — A Base Star is a station
  *
  * BOTH must be zero, deliberately. A hull that can accelerate but not warp
  * still moves, and so does the reverse; requiring both keeps this to the shape

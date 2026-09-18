@@ -28,7 +28,11 @@
 import { canPursue, notClaimed } from '../../../src/game/cybertron/cyb-decisions';
 
 describe('canPursue — the hunter\'s lowest_to_attk (GECYBS.C:711, 719)', () => {
-  it('a Base Star (User = 1) pursues every class', () => {
+  // NOT the Base Star, whose LATK is 20 (`MBMGESHP.MSG:5204` S23LATK) — at that
+  // threshold it pursues no player class at all, since canon's USER classes are
+  // 1-9 plus 41. This case pins the boundary value 1.
+  // @see docs/DECISIONS.md 2026-09-18 — A Base Star is a station
+  it('a hunter with User = 1 pursues every class', () => {
     for (const victimClass of [1, 3, 9, 34]) {
       expect(canPursue(1, victimClass)).toBe(true);
     }

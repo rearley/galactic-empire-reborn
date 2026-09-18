@@ -6349,3 +6349,76 @@ against nginx.conf.
 is there when it is wanted), no event-log capture, and `status` is a string
 rather than an enum because the statuses this will want are not knowable yet and
 a migration per status is a bad trade.
+
+## 2026-09-18 — A Base Star is a station: the hyperwarp band does not move a hull canon configured immobile
+
+**The contradiction, both halves quoted.** Canon's ship table configures the
+Cybertron Base Star with no engines at all —
+`MBMGESHP.MSG:5147` `S23ACCL {  Acceleration Rate: 0}` and
+`MBMGESHP.MSG:5154` `S23WARP {  Maximum Warp: 0}`.
+
+The pursuit code reads neither. `cyb_check_lockon` assigns speed straight from
+the distance to the target, with no reference to the class:
+
+```c
+GECYBS.C:742	if (low_dist >= hyperdist1)
+GECYBS.C:743		{
+GECYBS.C:744		/* if far away invoke hyper-warp 20 X normal speed */
+GECYBS.C:745		ptr->speed2b = (double)low_dist*2000.0;
+GECYBS.C:746		ptr->speed = ptr->speed2b;
+```
+
+A value contradicted by the code that reads it, which is one of the three
+criteria in `CLAUDE.md`. @see docs/DECISIONS.md 2026-09-15 — canon bugs with
+determinable intent are fixed, not reproduced.
+
+**Decision.** `isStationaryClass(maxAcceleration, maxWarp)` in
+`cyb-decisions.ts`, threaded into `pickPursuitBand` by
+`cybertron-tick.service.ts`. A stationary class never enters the hyperwarp band.
+
+**BOTH values must be zero.** A hull that can accelerate but not warp still
+moves, and so does the reverse. Requiring both keeps the rule to the shape canon
+actually configures — exactly one class — rather than generalising from half the
+data to hulls canon never meant to pin down.
+
+**What the bug does if left in.** `S23MAKE {1}`: there is one Base Star in the
+galaxy, ever. It locks on, cannot rotate (`max_accel 0`), sets a high warp,
+never arrives, and flies into the galactic barrier. The single most valuable
+target in the game — `S23PNTS {10000}`, the largest bounty in the table —
+deletes itself, and nothing respawns it.
+
+**Reachability, which is why this sat unnoticed.** A player cannot trigger it.
+`S23LATK {20}` gates pursuit, and canon's USER classes are 1-9 plus 41; classes
+10-20 are `<NONE>`. What CAN satisfy the threshold is class 41 (Sysopian Death
+Star) and every CPU class 21-25 and 31-33, because `cyb_check_lockon` has no
+"target is not a cyborg" filter — compare `GEDROIDS.C:272`, `:322` and `:430`,
+which all guard with `wptr->status == GESTAT_USER`. The Cybertron version checks
+only `ingegame(zothusn) && wptr->cloak != 10` (`GECYBS.C:717`). Whether that path
+is actually reachable through `ingegame` is NOT established here; the guard is
+justified by the class data alone and does not depend on the answer.
+
+**This does not touch firing.** The phaser loop in `cyb_lives` (`GECYBS.C:239`)
+never consults `lowest_to_attk`; it walks every ship and gates on scan range,
+`tooclose`, and `cantexit`. A Base Star shooting a player who comes within range
+is canon working correctly, and stays. Raised in play by Rick, who was shot by
+one while hunting another AI nearby — `wptr->cantexit > 0` bypasses the
+`tooclose` test (`GECYBS.C:270`, `:290`), so being already in combat widens the
+fire trigger from `TOOCLOSE`..`2*TOOCLOSE` (2,500-5,000, i.e. a quarter to a
+half sector) out to the hard cap of 30,000 — three sectors. Detection is 20
+sectors (`S23SRNG {200000}`) and has never been the firing range.
+
+**Not taken from elsewhere.** `elwynor/elwge` fixes this by excluding all cybs
+with `max_accel == 0` from the movement routines. We do not copy from that tree
+(@see `NOTICE`, and `CLAUDE.md` — Licensing); the contradiction above is the
+evidence, derived from canon, and the rule here is narrower: both engine values,
+not one.
+
+**Tests.** `stationary-base-star.spec.ts` names the deviation as deliberate;
+`cyb-topspeed.spec.ts` allows zero for this hull; `pursuit-fleeing-target.spec.ts`
+asserts it does not teleport; `ship-class-canon.balance.spec.ts` pins the class
+data against `MBMGESHP.MSG`.
+
+**Paperwork this entry closes.** The code carried `@see docs/DECISIONS.md
+2026-09-15`, and no entry recorded the fix — the citation resolved to the policy
+that permits it, not to a record of it. The guard shipped correctly; only the
+evidence was missing.
