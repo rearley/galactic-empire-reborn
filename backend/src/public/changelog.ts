@@ -111,6 +111,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.24.3',
+    date: '2026-09-19',
+    entries: [
+      {
+        category: 'deliberate-deviation',
+        text: 'A message sent with sen can now be up to 500 characters, up from 200. The original set no limit of its own beyond the length of a BBS input line.',
+      },
+    ],
+  },
+  {
     version: '0.24.1',
     date: '2026-09-18',
     entries: [

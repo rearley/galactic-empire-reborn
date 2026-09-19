@@ -66,20 +66,20 @@ describe('SenHandlerService', () => {
     });
   });
 
-  describe('FR-016a: message > 200 chars rejected', () => {
+  describe('message > 500 chars rejected (deliberate: port-original cap, DECISIONS 2026-09-19)', () => {
     it('returns usage error and no broadcasts for overlong message', () => {
       const ship = makeShip();
-      const longMsg = 'x'.repeat(201).split(' ');
+      const longMsg = 'x'.repeat(501).split(' ');
       const result = handler.command.handler(ship, ['a', ...longMsg], ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
       // the answer to the wrong NUMBER of arguments, not a wrong channel.
       expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);
     });
 
-    it('accepts exactly 200 chars', () => {
+    it('accepts exactly 500 chars', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
-      const msg200 = 'x'.repeat(200);
-      const result = handler.command.handler(ship, ['a', msg200], ctx) as CommandResult;
+      const msg500 = 'x'.repeat(500);
+      const result = handler.command.handler(ship, ['a', msg500], ctx) as CommandResult;
       expect(result.broadcasts).toHaveLength(1);
     });
   });

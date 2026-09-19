@@ -6422,3 +6422,19 @@ data against `MBMGESHP.MSG`.
 2026-09-15`, and no entry recorded the fix — the citation resolved to the policy
 that permits it, not to a record of it. The guard shipped correctly; only the
 evidence was missing.
+
+## 2026-09-19 — `sen` message cap is 500 characters
+
+**Canon.** `cmd_send` (`GECMDS.C:1825`) has no length check: it calls
+`rstrin()` to rejoin the words and sends the whole line. The only bound was the
+MajorBBS input buffer (`input[INPSIZ]`, `GEGLOBAL.H:259`), whose size lives in
+the BBS headers and is not in `reference/`.
+
+**Decision.** The port caps a message at 500 characters
+(`MAX_MSG_LEN`, `sen.handler.ts`). It was 200, an undocumented number from the
+original spec (FR-016a); raised to 500 at the sysop's request. A cap is still
+needed because a socket, unlike a BBS line, has no natural length limit.
+
+**Open.** An overlong message is answered with SNDFMT ("Type HELP SEND for the
+correct usage."), which never says the message was too long. Tracked as
+GitHub issue #57.

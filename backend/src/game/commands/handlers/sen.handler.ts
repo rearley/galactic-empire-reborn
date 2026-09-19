@@ -7,7 +7,12 @@ import { shipKey } from '../../ship/ship-state.types';
 import { allowChat } from './helpers/chat-throttle';
 
 const CHANNEL_MAP: Record<string, number> = { a: 0, b: 1, c: 2 };
-const MAX_MSG_LEN = 200;
+/**
+ * PORT-ORIGINAL. Canon has no cap of its own — `cmd_send` rebuilds the line with
+ * `rstrin()` and sends it whole, so the MajorBBS input buffer was the only limit.
+ * @see docs/DECISIONS.md 2026-09-19 — `sen` message cap
+ */
+const MAX_MSG_LEN = 500;
 
 /**
  * Handles `sen <A|B|C> <message>` — broadcasts a message per sender's frequency.
