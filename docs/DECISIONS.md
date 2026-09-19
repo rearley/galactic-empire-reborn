@@ -6438,3 +6438,25 @@ needed because a socket, unlike a BBS line, has no natural length limit.
 **Open.** An overlong message is answered with SNDFMT ("Type HELP SEND for the
 correct usage."), which never says the message was too long. Tracked as
 GitHub issue #57.
+
+## 2026-09-19 — The calculator may read your own colonies
+
+**Decision.** A signed-in player gets a dropdown on `/calculators` listing their
+own planets by name and sector. Picking one fills the form from the live
+`PlanetStateService` map. The endpoint is `GET /public/my-planets`, behind the
+JWT guard (`MyPlanetsController`), and the owner comes from the token alone —
+the request names no planet, so it cannot name someone else's. Owner only, not
+team planets. Nothing is written back; the calculator POST stays open and
+unchanged. PORT-ORIGINAL, like the calculator.
+
+**Why this is not the leak the page was built to avoid.** The page "starts
+EMPTY" because it once shipped prefilled with a real colony — somebody's live
+holdings shown to every visitor, and a filled form implying it had read yours.
+Here the figures go only to the account that owns them, and the form fills only
+when that player picks a named colony.
+
+**What it may show.** Only what the owner already reads in game: stock, rates,
+cash and tax rate from `adm`, environment and resource from a scan.
+`ownedPlanetsFor` copies nothing else — not the password, beacon or spy owner —
+and a test pins the response's keys.
+

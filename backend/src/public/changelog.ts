@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.25.0',
+    date: '2026-09-19',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'Signed in, the colony calculator now has a dropdown of your own planets, by name and sector. Pick one and its figures fill the form; change anything you like to plan, and Reset to planet puts them back. Nothing you do there changes the colony in the game.',
+      },
+    ],
+  },
+  {
     version: '0.24.3',
     date: '2026-09-19',
     entries: [

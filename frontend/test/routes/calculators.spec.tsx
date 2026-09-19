@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Calculators } from '../../src/routes/Calculators';
+import { clearToken, setToken } from '../../src/auth/tokenStore';
 
 /**
  * The calculator page.
@@ -105,7 +106,7 @@ async function renderWithData(): Promise<void> {
   await waitFor(() => expect(screen.queryByTestId('empty-prompt')).not.toBeInTheDocument());
 }
 
-beforeEach(() => vi.restoreAllMocks());
+beforeEach(() => { vi.restoreAllMocks(); clearToken(); });
 
 describe('Calculators', () => {
   it('asks the server to run the real tick rather than computing in the browser', async () => {
@@ -226,10 +227,12 @@ describe('Calculators', () => {
     expect(sent.taxrate).toBe(0);
   });
 
-  it('says it cannot see your account, because a filled form implies it can', async () => {
+  it('tells a signed-out reader where the figures come from, and that signing in can fill them', async () => {
+    // A filled form implies the page read a colony. Signed out it has not, and
+    // says so — and says what would change that.
     mockServer();
     await renderReady();
-    expect(screen.getByText(/does not read your account/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in to load one of your own colonies/i)).toBeInTheDocument();
   });
 
   it('prompts for figures rather than presenting a table of zeroes', async () => {
@@ -431,3 +434,110 @@ describe('Calculators', () => {
     expect(await screen.findByText(/the original had no such thing/i)).toBeInTheDocument();
   });
 });
+
+/**
+ * A signed-in player can fill the form from one of their own colonies.
+ *
+ * The list comes from `/public/my-planets`, which answers for the account in
+ * the token and nothing else. These tests are about the page: it only asks
+ * when someone is signed in, a pick reaches the tick exactly like typing
+ * would, and a failed lookup leaves the page usable rather than broken.
+ */
+function stockOf(men: number, food: number): number[] {
+  const s = new Array<number>(14).fill(0); s[0] = men; s[5] = food; return s;
+}
+function ratesOf(food: number, gold: number): number[] {
+  const r = new Array<number>(14).fill(0); r[5] = food; r[12] = gold; return r;
+}
+const reply = (ok: boolean, code: number, payload: unknown) =>
+  ({ ok, status: code, json: async (): Promise<unknown> => payload });
+
+describe('Calculators — your own colonies', () => {
+  const HOME = {
+    xsect: 3, ysect: -5, plnum: 1, name: 'Zygor II',
+    input: { stock: stockOf(424_242, 30_000), rates: ratesOf(23, 2), enviorn: 3, resource: 1, taxrate: 15, planetCash: 12_345 },
+  };
+  const OUTPOST = {
+    xsect: -7, ysect: 2, plnum: 2, name: 'Outpost',
+    input: { stock: stockOf(5_000, 900), rates: ratesOf(40, 0), enviorn: 1, resource: 2, taxrate: 0, planetCash: 0 },
+  };
+
+  function mockWithPlanets(planets: unknown, status = 200) {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      void init;
+      if (url.includes('planet-model')) return reply(true, 200, MODEL);
+      if (url.includes('my-planets')) return reply(status === 200, status, planets);
+      return reply(true, 200, result());
+    });
+    globalThis.fetch = f as unknown as typeof fetch;
+    return f;
+  }
+
+  /** The newest body POSTed to the calculator. */
+  function lastPost(f: ReturnType<typeof mockWithPlanets>): CalcBody {
+    const all = posted(f as unknown as ReturnType<typeof mockServer>);
+    return all[all.length - 1];
+  }
+
+  it('does not ask for anyone\'s colonies when nobody is signed in', async () => {
+    const f = mockWithPlanets([HOME]);
+    await renderReady();
+    expect(f.mock.calls.some(([url]) => url.includes('my-planets'))).toBe(false);
+    expect(screen.queryByLabelText(/load one of your colonies/i)).not.toBeInTheDocument();
+  });
+
+  it('sends the token, and lists each colony by name and sector', async () => {
+    setToken('tok');
+    const f = mockWithPlanets([OUTPOST, HOME]);
+    await renderReady();
+    const select = await screen.findByLabelText(/load one of your colonies/i);
+    expect(within(select).getByRole('option', { name: 'Zygor II — sector (3,-5)' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Outpost — sector (-7,2)' })).toBeInTheDocument();
+    const call = f.mock.calls.find(([url]) => url.includes('my-planets'));
+    const headers = (call?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok');
+  });
+
+  it('runs a picked colony through the tick exactly as if it had been typed', async () => {
+    setToken('tok');
+    const f = mockWithPlanets([HOME]);
+    await renderReady();
+    const select = await screen.findByLabelText(/load one of your colonies/i);
+    fireEvent.change(select, { target: { value: '3:-5:1' } });
+    await waitFor(() => {
+      const last = lastPost(f);
+      expect(last.stock[0]).toBe(424_242);
+      expect(last.rates[12]).toBe(2);
+      expect(last.taxrate).toBe(15);
+    });
+  });
+
+  it('puts the colony back after the player has tried other figures', async () => {
+    setToken('tok');
+    const f = mockWithPlanets([HOME]);
+    await renderReady();
+    fireEvent.change(await screen.findByLabelText(/load one of your colonies/i), { target: { value: '3:-5:1' } });
+    fireEvent.change(screen.getByLabelText(/tax rate/i), { target: { value: '40' } });
+    await waitFor(() => expect(lastPost(f).taxrate).toBe(40));
+    await userEvent.click(screen.getByRole('button', { name: /reset to planet/i }));
+    await waitFor(() => expect(lastPost(f).taxrate).toBe(15));
+  });
+
+  it('says so plainly when the player owns no colonies yet', async () => {
+    setToken('tok');
+    mockWithPlanets([]);
+    await renderReady();
+    expect(await screen.findByText(/you don't own any planets yet/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/load one of your colonies/i)).not.toBeInTheDocument();
+  });
+
+  it('behaves as signed out when the lookup is refused, rather than showing an error', async () => {
+    setToken('stale');
+    mockWithPlanets({ message: 'Unauthorized' }, 401);
+    await renderReady();
+    await waitFor(() => expect(screen.queryByLabelText(/load one of your colonies/i)).not.toBeInTheDocument());
+    expect(screen.queryByText(/could not reach/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/you don't own any planets yet/i)).not.toBeInTheDocument();
+  });
+});
+

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
+import { getToken } from '../auth/tokenStore';
 import {
   PAGE_TITLE, PAGE_BLURB, SCOPE_NOTE, Tip,
   PRODUCTION_TIPS, SURVIVAL_TIPS, TAX_TIPS, GROWTH_TIPS,
@@ -24,6 +25,20 @@ interface PlanetModelItem {
   manhours: number; maxpl: number; baseprice: number; tons: number;
 }
 interface PlanetModel { tickSeconds: number; ticksPerDay: number; items: PlanetModelItem[] }
+
+/** What the calculator takes, and what one of your colonies arrives as. */
+interface ColonyFigures {
+  stock: number[]; rates: number[];
+  enviorn: number; resource: number; taxrate: number; planetCash: number;
+}
+
+/**
+ * One of the signed-in player's own colonies, from `/public/my-planets`.
+ * @see backend/src/public/my-planets.ts
+ */
+interface MyPlanet { xsect: number; ysect: number; plnum: number; name: string; input: ColonyFigures }
+
+const planetId = (p: Pick<MyPlanet, 'xsect' | 'ysect' | 'plnum'>): string => `${p.xsect}:${p.ysect}:${p.plnum}`;
 
 interface ItemResult {
   index: number; name: string; rate: number;
@@ -92,7 +107,12 @@ const I_GOLD = 12;
  *
  * So: zeroes until the reader types, and an example they opt into. The example
  * uses round numbers for the same reason — nobody should be able to mistake it
- * for a real player's holdings.
+ * for a real player's holdings. *
+ * A signed-in player can now load one of their OWN colonies, and that answers
+ * both objections rather than reopening them: the form fills only when they
+ * pick a named colony, so it never implies a guess, and the figures go only to
+ * the account that owns them. The page still starts empty.
+ * @see docs/DECISIONS.md 2026-09-19 — the calculator may read your own colonies
  */
 const EMPTY = {
   stock: new Array<number>(NUMITEMS).fill(0),
@@ -303,6 +323,13 @@ export function Calculators(): React.JSX.Element {
   const [result, setResult] = useState<CalcResult | null>(null);
   const [tab, setTab] = useState<Tab>('Production');
   const [failed, setFailed] = useState(false);
+  /**
+   * The signed-in player's colonies. `null` means there is nothing to offer —
+   * signed out, or the lookup was refused — and the page then reads exactly as
+   * it does for a visitor. An empty array means signed in with no colonies.
+   */
+  const [myPlanets, setMyPlanets] = useState<MyPlanet[] | null>(null);
+  const [pickedId, setPickedId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -310,6 +337,21 @@ export function Calculators(): React.JSX.Element {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((m: PlanetModel) => { if (!cancelled) setModel(m); })
       .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Only asked when someone is signed in. The server answers for the account in
+  // the token and nothing else, and a refusal (a stale token, say) is not an
+  // error worth showing on a page that works perfectly well without it.
+  useEffect(() => {
+    const token = getToken();
+    let cancelled = false;
+    if (token) {
+      fetch('/public/my-planets', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((list: MyPlanet[]) => { if (!cancelled && Array.isArray(list)) setMyPlanets(list); })
+        .catch(() => { /* behave as signed out */ });
+    }
     return () => { cancelled = true; };
   }, []);
 
@@ -350,14 +392,28 @@ export function Calculators(): React.JSX.Element {
   const setRate = setAt(rates, setRates);
   const setStockAt = setAt(stock, setStock);
 
-  const loadExample = useCallback(() => {
-    setStock(EXAMPLE.stock.slice());
-    setRates(EXAMPLE.rates.slice());
-    setEnviorn(EXAMPLE.enviorn);
-    setResource(EXAMPLE.resource);
-    setTaxrate(EXAMPLE.taxrate);
-    setPlanetCash(EXAMPLE.planetCash);
+  const applyFigures = useCallback((f: ColonyFigures) => {
+    setStock(f.stock.slice());
+    setRates(f.rates.slice());
+    setEnviorn(f.enviorn);
+    setResource(f.resource);
+    setTaxrate(f.taxrate);
+    setPlanetCash(f.planetCash);
   }, []);
+
+  const loadExample = useCallback(() => {
+    setPickedId('');
+    applyFigures(EXAMPLE);
+  }, [applyFigures]);
+
+  const picked = myPlanets?.find((p) => planetId(p) === pickedId);
+
+  /** Fill the form from a colony. Nothing goes back to the game. */
+  const pickPlanet = useCallback((id: string) => {
+    setPickedId(id);
+    const p = myPlanets?.find((q) => planetId(q) === id);
+    if (p) applyFigures(p.input);
+  }, [myPlanets, applyFigures]);
 
   const clearRates = useCallback(() => setRates(new Array<number>(NUMITEMS).fill(0)), []);
 
@@ -406,10 +462,50 @@ export function Calculators(): React.JSX.Element {
               Load an example
             </button>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-500">
-            This page does not read your account or your colonies — it has no idea who you are.
-            Type the figures from <span className="text-gray-300">adm</span> in game.
-          </p>
+          {myPlanets === null ? (
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+              Sign in to load one of your own colonies, or type the figures from{' '}
+              <span className="text-gray-300">adm</span> in game.
+            </p>
+          ) : myPlanets.length === 0 ? (
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+              You don't own any planets yet. Type the figures from{' '}
+              <span className="text-gray-300">adm</span> to plan one.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <label htmlFor="my-planet" className="block">
+                <span className="block text-xs uppercase tracking-widest text-gray-500">
+                  Load one of your colonies
+                </span>
+                <select
+                  id="my-planet"
+                  value={pickedId}
+                  onChange={(e) => pickPlanet(e.target.value)}
+                  className="mt-1 border border-gray-800 bg-black px-2 py-1 font-mono text-sm text-gray-100 focus:border-yellow-400 focus:outline-none"
+                >
+                  <option value="">Choose a colony…</option>
+                  {myPlanets.map((p) => (
+                    <option key={planetId(p)} value={planetId(p)}>
+                      {`${p.name} — sector (${p.xsect},${p.ysect})`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {picked && (
+                <button
+                  type="button"
+                  onClick={() => applyFigures(picked.input)}
+                  className="text-xs uppercase tracking-widest text-yellow-400 hover:text-yellow-200"
+                >
+                  Reset to planet
+                </button>
+              )}
+              <span className="text-xs text-gray-500">
+                Changes here are for planning only — nothing is sent back to the game.
+              </span>
+            </div>
+          )}
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Field label="Population" value={stock[I_MEN]} onChange={(v) => setStockAt(I_MEN, v)} />
             <Field label="Food cases" value={stock[I_FOOD]} onChange={(v) => setStockAt(I_FOOD, v)} />

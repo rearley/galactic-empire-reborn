@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 114 entries.
+Append-only, **newest at the bottom**. 115 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-19 — the calculator can load your own colonies](#2026-09-19--the-calculator-can-load-your-own-colonies)
 - [2026-09-19 — "little to no gold" was a hold full of mines](#2026-09-19--little-to-no-gold-was-a-hold-full-of-mines)
 - [2026-09-18 — sysop identity was answered from a month-old copy](#2026-09-18--sysop-identity-was-answered-from-a-month-old-copy)
 - [2026-09-18 — the Reports link was in the one place the sysop never looks](#2026-09-18--the-reports-link-was-in-the-one-place-the-sysop-never-looks)
@@ -7802,3 +7803,20 @@ issue #57. The e2e `sen` test still asserted 200 and is corrected here.
 
 Suite: 6,716 of 6,717 pass. The one failure is `node-runtime-version.spec.ts`,
 which fails on this dev machine (Node 22 vs the declared 24), not on the change.
+
+## 2026-09-19 — the calculator can load your own colonies
+
+Signed in, `/calculators` now shows a dropdown of the player's own planets,
+labelled `name — sector (x,y)`. Picking one fills the form from the live
+planet map; "Reset to planet" restores it after experimenting. Nothing is
+written back. Signed out, the page is unchanged apart from its copy.
+
+- `GET /public/my-planets` (`MyPlanetsController`, JWT-guarded) returns
+  `ownedPlanetsFor(jwt.sub, PlanetStateService.all())`, already shaped as
+  `CalculatorInput`. `PublicModule` now imports `PlanetModule`; no cycle.
+- Owner only, and only fields the owner already sees in game. A test pins the
+  response's keys so the password and the rest cannot ride along.
+- A refused lookup (stale token) makes the page behave as signed out.
+- Decision recorded: `docs/DECISIONS.md` 2026-09-19. Plan:
+  `docs/superpowers/plans/2026-09-19-calculator-planet-import.md`. v0.25.0.
+
