@@ -189,6 +189,13 @@ export interface CombatShipDestroyedEvent {
   victimDisconnectReason?: string;
   loot: Array<{ itemIndex: number; amount: bigint }>;
   /**
+   * Stacks the killer's hold could not take, dropped whole by `chkweight`
+   * (GEFUNCS.C:1129 `chkweight(wptr,i,amt)`). Logged only — canon tells
+   * nobody. Absent when nothing
+   * was dropped.
+   */
+  lootDropped?: Array<{ itemIndex: number; amount: bigint }>;
+  /**
    * The victim's ship name and class, for the killer's salvage report:
    * `prfmsg(KILLGOT1,ptr->shipname)` and
    * `prfmsg(KILLPNTS,gechrbuf,shipclass[ptr->shpclass].typename)`.

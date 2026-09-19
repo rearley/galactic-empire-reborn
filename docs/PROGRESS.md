@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 113 entries.
+Append-only, **newest at the bottom**. 114 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-19 — "little to no gold" was a hold full of mines](#2026-09-19--little-to-no-gold-was-a-hold-full-of-mines)
 - [2026-09-18 — sysop identity was answered from a month-old copy](#2026-09-18--sysop-identity-was-answered-from-a-month-old-copy)
 - [2026-09-18 — the Reports link was in the one place the sysop never looks](#2026-09-18--the-reports-link-was-in-the-one-place-the-sysop-never-looks)
 - [2026-09-18 — `bug` — reporting from inside the game, and a route that would not have worked](#2026-09-18--bug--reporting-from-inside-the-game-and-a-route-that-would-not-have-worked)
@@ -7780,3 +7781,24 @@ does not have is refused.
 Released as 0.24.2 and recorded in `SILENT_RELEASES`: no player can see any part
 of it, and inventing a player-facing line would be worse than silence.
 
+## 2026-09-19 — "little to no gold" was a hold full of mines
+
+A player said his last five kills paid little or no gold. The `ship destroyed:`
+manifests showed every wreck carrying 207–1,166 gold, so the victims were not
+empty. The loot loop matches canon line for line: each stack is divided by
+`gernd()%5 +1`, and `chkweight` drops a stack that will not fit, whole. Mines
+(item 11) are looted just before gold (item 12) and weigh 5 tons each, so a
+hold already loaded with mines is filled by the wreck's mines and the gold is
+lost. Canon behaviour; nothing to fix in play.
+
+What was missing was the evidence: `cargo=` records what was aboard, not what
+moved. The manifest now also prints `loot=[…]` and, when a stack was refused,
+`dropped=[…]`, via an optional `onDropped` on `resolveKillSpoils` fed from both
+kill paths (combat tick and disconnect). Logging only — v0.24.4, silent.
+
+Also in this session: the `sen` message cap went from 200 to 500 (v0.24.3,
+`docs/DECISIONS.md` 2026-09-19); its misleading overlong-message error is
+issue #57. The e2e `sen` test still asserted 200 and is corrected here.
+
+Suite: 6,716 of 6,717 pass. The one failure is `node-runtime-version.spec.ts`,
+which fails on this dev machine (Node 22 vs the declared 24), not on the change.

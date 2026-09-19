@@ -66,10 +66,10 @@ describe('sen E2E round-trip', () => {
     });
   });
 
-  describe('message > 200 chars rejected', () => {
+  describe('message > 500 chars rejected', () => {
     it('rejects overlong message with zero broadcasts', () => {
       const ship = makeShip({ freq: [0, 0, 0] });
-      const longMsg = 'x '.repeat(101).trim(); // 201 chars
+      const longMsg = 'x '.repeat(251).trim(); // 501 chars
       const result = router.dispatch(`sen a ${longMsg}`, ship, ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
       expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);

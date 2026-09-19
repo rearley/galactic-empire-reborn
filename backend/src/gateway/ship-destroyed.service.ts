@@ -367,6 +367,20 @@ export class ShipDestroyedService {
       `sector=(${event.sector.x},${event.sector.y})`,
     ];
 
+    // What the killer actually took, and what their hold refused. `cargo=`
+    // below is what was ABOARD. Between the two sit the divisor —
+    // GEFUNCS.C:1127 `amt = ptr->items[i] / (gernd()%5 +1);` — and `chkweight`,
+    // and a stack that will not fit is dropped whole.
+    // Added when a player's Cybertron kills paid "little to no gold": the
+    // wrecks carried 255-1,166 gold and his hold was full of mines, but no
+    // line in the log could say which.
+    const stacks = (list: ReadonlyArray<{ itemIndex: number; amount: bigint }>) =>
+      list.map((t) => `${ITEM_NAMES[t.itemIndex] ?? `item${t.itemIndex}`}=${t.amount}`).join(' ');
+    parts.push(`loot=[${stacks(event.loot ?? [])}]`);
+    if (event.lootDropped && event.lootDropped.length > 0) {
+      parts.push(`dropped=[${stacks(event.lootDropped)}]`);
+    }
+
     // Only present when the death came from the disconnect path. It is the one
     // fact that separates "closed the tab" from "their network dropped", and
     // the kill treats both identically.

@@ -194,6 +194,28 @@ describe('ship-loss forensics — the log must be enough to restore from', () =>
     expect(line).toMatch(/gold[=:]\s*814/i);
   });
 
+  it('records what the killer took, and what would not fit in their hold', () => {
+    // The victim's cargo is what was aboard; this is what actually moved.
+    // A full hold drops a stack whole (GEFUNCS.C:1129 `chkweight(wptr,i,amt)`), and a player
+    // reporting "no gold from that kill" is answered by this line alone.
+    const { gateway, logs } = build();
+    destroy(gateway, {
+      loot: [{ itemIndex: 11, amount: 10n }],
+      lootDropped: [{ itemIndex: 12, amount: 400n }],
+    });
+    const line = logs.find((l) => l.includes('ship destroyed')) ?? '';
+    expect(line).toContain('loot=[mines=10]');
+    expect(line).toContain('dropped=[gold=400]');
+  });
+
+  it('prints an empty loot list and no dropped field when nothing was left behind', () => {
+    const { gateway, logs } = build();
+    destroy(gateway);
+    const line = logs.find((l) => l.includes('ship destroyed')) ?? '';
+    expect(line).toContain('loot=[]');
+    expect(line).not.toContain('dropped=');
+  });
+
   it('records the cause, so a collision is not mistaken for a killing', () => {
     const { gateway, logs } = build();
     destroy(gateway, { cause: 'gravity' });

@@ -96,6 +96,8 @@ export interface ChangelogRelease {
  * oversight and fails.
  */
 export const SILENT_RELEASES: Record<string, string> = {
+  '0.24.4':
+    'Sysop-only: the kill log now records what the killer took and what a full hold dropped. Nothing about a kill changes for a player.',
   '0.24.2':
     'Sysop-only: the reports gate now reads the account name from the database rather than a 30-day-old token claim. No player can see any difference.',
   '0.21.0': 'Framework upgrade (NestJS 10 to 11). No change a player can see.',

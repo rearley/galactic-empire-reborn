@@ -330,11 +330,13 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         // place, and so do we now: the gateway's disconnect kill calls the
         // same helper instead of shipping an empty hold.
         // @see GEFUNCS.C:1116-1136, GEMAIN.C:1420
+        const lootDropped: LootTransfer[] = [];
         const loot: LootTransfer[] = attacker
           ? resolveKillSpoils(victim, attacker, {
               mutate: (userid, shipno, fn) => this.shipState.mutate(userid, shipno, fn),
               maxTonsFor: (shpclass) => this.shipClassCache.getMaxTons(shpclass),
               random: this.random,
+              onDropped: (t) => lootDropped.push(t),
             })
           : [];
 
@@ -381,6 +383,7 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           sector: { x: Math.floor(victim.xcoord), y: Math.floor(victim.ycoord) },
           tickAt: ctx.firedAt,
           loot,
+          ...(lootDropped.length > 0 ? { lootDropped } : {}),
           scoreAwarded,
         };
         this.emitDestroyed(event);

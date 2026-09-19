@@ -774,11 +774,13 @@ export class ConnectionLifecycleService {
           // and its cargo loop (GEFUNCS.C:1122-1136) does not ask how the
           // victim died. This path used to hardcode `loot: []`, so the one
           // death a killer had to work hardest for paid nothing.
+          const lootDropped: Array<{ itemIndex: number; amount: bigint }> = [];
           const loot = attackerShip
             ? resolveKillSpoils(ship, attackerShip, {
                 mutate: (u, n, fn) => this.shipStateService.mutate(u, n, fn),
                 maxTonsFor: (shpclass) => this.shipClassCache.getMaxTons(shpclass),
                 random: this.random,
+                onDropped: (t) => lootDropped.push(t),
               })
             : [];
 
@@ -811,6 +813,7 @@ export class ConnectionLifecycleService {
             sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
             tickAt: new Date(),
             loot,
+            ...(lootDropped.length > 0 ? { lootDropped } : {}),
             scoreAwarded,
           };
 

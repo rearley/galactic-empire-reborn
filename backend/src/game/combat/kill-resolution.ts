@@ -16,6 +16,12 @@ export interface KillSpoilsDeps {
   /** Killer's hold capacity, by ship class. May throw when the class is uncached. */
   maxTonsFor(shpclass: number): number;
   random: Random;
+  /**
+   * Told about each stack `chkweight` refused. Canon discards it silently, and
+   * so does the game; this exists only so the kill log can say what a full
+   * hold cost. PORT-ORIGINAL, no effect on play.
+   */
+  onDropped?(transfer: LootTransfer): void;
 }
 
 /** Fallback hold size when the ship-class cache cannot answer. */
@@ -90,6 +96,8 @@ export function resolveKillSpoils(
       });
       usedTons += neededTons;
       loot.push({ itemIndex: i, amount: amt });
+    } else {
+      deps.onDropped?.({ itemIndex: i, amount: amt });
     }
   }
   return loot;
