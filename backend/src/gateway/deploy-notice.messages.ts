@@ -13,10 +13,10 @@ export enum DeployPhase {
 /**
  * PORT-ORIGINAL. Canon has no player-facing shutdown or sysop-broadcast text.
  *
- * The only shutdown path writes to the BBS log and nothing to a player:
- * `logthis("***GALACTIC EMPIRE SHUTDOWN***")` (GEMAIN.C:1474, in `clswara()`),
- * and `cmd_sysop` has no broadcast subcommand. A modem game never needed either
- * — the carrier just dropped, and there was no such thing as a redeploy.
+ * The only shutdown path writes to the BBS log and nothing to a player — in
+ * `clswara()`, GEMAIN.C:1475 `logthis("***GALACTIC EMPIRE SHUTDOWN***")` — and
+ * `cmd_sysop` has no broadcast subcommand. A modem game never needed either:
+ * the carrier just dropped, and there was no such thing as a redeploy.
  *
  * These imitate the REGISTER of canon's in-fiction shutdown reports — clipped,
  * addressed to "Sir", e.g. `Shields shut down, Sir.` (MBMGEMSG.MSG:2648) — so

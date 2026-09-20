@@ -3,8 +3,8 @@ import { DeployPhase, DEPLOY_NOTICE_TEXT, DEPLOY_NOTICE_CATEGORY } from '../../s
 /**
  * PORT-ORIGINAL copy, approved verbatim by the owner 2026-09-20.
  *
- * Canon has no player-facing shutdown message at all — `clswara()` only writes
- * `logthis("***GALACTIC EMPIRE SHUTDOWN***")` to the BBS log (GEMAIN.C:1474),
+ * Canon has no player-facing shutdown message at all. `clswara()` writes only
+ * to the BBS log — GEMAIN.C:1475 `logthis("***GALACTIC EMPIRE SHUTDOWN***")` —
  * and `cmd_sysop` has no broadcast subcommand. A modem game never needed one:
  * the carrier just dropped.
  *

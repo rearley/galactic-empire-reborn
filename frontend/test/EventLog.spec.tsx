@@ -51,6 +51,24 @@ describe('EventLog', () => {
     expect(screen.getAllByTestId('log-line-combat')[0].className).toContain('text-red-400');
   });
 
+  it('styles an alert distinctly from an ordinary system line', () => {
+    // `alert` was a valid EventLogCategory in @ge/wire with no entry in
+    // CATEGORY_CLASS, so it fell through to the default and rendered exactly
+    // like `system` — silently discarding the one distinction the category
+    // exists to carry. The redeploy countdown is the first line to use it, and
+    // it is precisely the line that must not look like routine chatter.
+    const lines: LogEntry[] = [
+      { text: 'Fleet-wide systems shutdown in 45 seconds, Sir.', category: 'alert', id: 20 },
+      { text: 'routine', category: 'system', id: 21 },
+    ];
+    render(<EventLog lines={lines} />);
+
+    const alert = screen.getAllByTestId('log-line-alert')[0];
+    const system = screen.getAllByTestId('log-line-system')[0];
+    expect(alert.className).toContain('text-orange-300');
+    expect(alert.className).not.toEqual(system.className);
+  });
+
   it('renders empty list without crashing', () => {
     render(<EventLog lines={[]} />);
     expect(screen.getByTestId('event-log')).toBeDefined();

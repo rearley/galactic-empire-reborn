@@ -1,8 +1,9 @@
 /**
  * The redeploy notice goes to EVERY socket, `set filter on` included.
  *
- * Canon's only galaxy-wide primitive, `outwar` (GEMAIN.C:1517), is FILTER class
- * — a player running `set filter on` silences it, which is what
+ * The only galaxy-wide primitive canon has is
+ * GEMAIN.C:1517 `outwar(int filter,unsigned exclude,unsigned freq)`, FILTER
+ * class — a player running `set filter on` silences it, which is what
  * ai-arrival-broadcast.spec.ts pins for CYBNEW. This deliberately does NOT
  * follow it. Everything canon sends that way is in-fiction chatter; this is
  * out-of-fiction news that the player's session is about to end, and filtering

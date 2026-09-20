@@ -45,6 +45,24 @@ services:
       timeout: 5s
       retries: 6
       start_period: 30s
+    # Warn players before watchtower stops this container.
+    #
+    # Watchtower runs the pre-update command IN the container and WAITS for it,
+    # which is what buys the 45-second countdown — it is the only point in the
+    # pipeline that knows the restart is actually happening. The CI job only
+    # knows an image was published, so it can say no more than "5 to 10 minutes".
+    #
+    # The timeout is in MINUTES and the default is 60 SECONDS, too close to a
+    # 45-second sleep plus node startup. Two gives room without letting a hung
+    # hook hold a deploy for long — and a non-zero exit or a timeout does not
+    # stop the update anyway.
+    #
+    # THESE LABELS DO NOTHING until the host's watchtower runs with
+    # WATCHTOWER_LIFECYCLE_HOOKS=true, which is a change to shared
+    # infrastructure. @see docs/DECISIONS.md 2026-09-20
+    labels:
+      com.centurylinklabs.watchtower.lifecycle.pre-update: "node /app/backend/scripts/deploy-warn.mjs"
+      com.centurylinklabs.watchtower.lifecycle.pre-update-timeout: "2"
     networks:
       - ge_net
 

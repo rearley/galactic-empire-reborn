@@ -460,3 +460,39 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Tell whoever is playing that a restart is coming.
+  #
+  # DELIBERATELY VAGUE about timing, because this job cannot know it. CI's work
+  # ends at ghcr, and watchtower polls on its own five-minute schedule, so the
+  # restart is somewhere in the next 0-5 minutes. The precise countdown is the
+  # pre-update hook's job (backend/scripts/deploy-warn.mjs), 45 seconds before
+  # the container stops — that is the only place in the pipeline that knows.
+  #
+  # FAILS OPEN, twice over: `continue-on-error` so a courtesy can never mark a
+  # good deploy red, and a missing secret is a clean skip rather than an error.
+  # The server suppresses the notice entirely when nobody is in-game, so this
+  # costs nothing on a quiet push.
+  notify:
+    name: Warn players
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [build]
+    if: needs.build.result == 'success'
+    continue-on-error: true
+    steps:
+      - name: Announce the inbound refit
+        env:
+          NOTICE_URL: ${{ secrets.DEPLOY_NOTICE_URL }}
+          ADMIN_TOKEN: ${{ secrets.MIDNIGHT_ADMIN_TOKEN }}
+        run: |
+          set -u
+          if [ -z "${NOTICE_URL:-}" ] || [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "Notice endpoint or token not configured — skipping."
+            exit 0
+          fi
+          curl -fsS --max-time 10 -X POST "$NOTICE_URL" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"phase":"inbound"}' \
+            || echo "Notice failed — the deploy stands."

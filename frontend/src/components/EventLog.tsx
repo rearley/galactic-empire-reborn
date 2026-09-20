@@ -25,6 +25,11 @@ const CATEGORY_CLASS: Record<string, string> = {
   combat:  'text-red-400',
   nav:     'text-cyan-300',
   chat:    'text-yellow-300',
+  // Operational rather than in-fiction, and today only the redeploy countdown.
+  // Orange sits between `nav` and `combat`: urgent without reading as damage.
+  // Without this it fell through to the default and looked like an ordinary
+  // line, which is the one thing an alert must not do.
+  alert:   'text-orange-300',
 };
 
 interface EventLogProps {
