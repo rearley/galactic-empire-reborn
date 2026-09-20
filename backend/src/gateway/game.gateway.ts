@@ -19,8 +19,11 @@ import {
   PHYSICS_UNIVERSE_EDGE,
   PhysicsUniverseEdgeEvent,
 } from '../game/physics/physics-events';
-import { Inject, Logger } from '@nestjs/common';
+import { BeforeApplicationShutdown, Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { DeployNoticeService } from './deploy-notice.service';
+import { DeployPhase } from './deploy-notice.messages';
+import { DEPLOY_NOTICE, type DeployNoticePayload } from './deploy-notice.events';
 import type { Ship } from '../prisma/client';
 import type {
   BroadcastTarget,
@@ -211,7 +214,7 @@ function hitText(
 }
 
 @WebSocketGateway({ cors: true })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown {
   @WebSocketServer()
   server!: GameServer;
 
@@ -228,7 +231,43 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(RANDOM) private readonly random: Random,
     private readonly shipDestroyed: ShipDestroyedService,
     private readonly connectionLifecycle: ConnectionLifecycleService,
+    private readonly deployNotice: DeployNoticeService,
   ) {}
+
+  /**
+   * A redeploy notice reaches EVERY socket.
+   *
+   * `this.server.emit`, deliberately NOT
+   * `this.server.except(this.filteredRooms())` the way `announceAiArrival`
+   * does. Canon's galaxy-wide `outwar` is FILTER class, so `set filter on`
+   * silences it; this ignores the filter because it is operational news that
+   * the player's session is about to end rather than in-fiction chatter, and
+   * filtering it would surprise exactly the players who filtered.
+   *
+   * @see docs/DECISIONS.md 2026-09-20 — deploy warning broadcast
+   */
+  @OnEvent(DEPLOY_NOTICE)
+  handleDeployNotice(payload: DeployNoticePayload): void {
+    this.server.emit('event.log', { category: payload.category, text: payload.text });
+  }
+
+  /**
+   * The last line out before the process exits.
+   *
+   * BEST EFFORT — it races the socket close, so some players will never see
+   * it. The warning that actually does the work is the pre-update one, 45
+   * seconds earlier (`scripts/deploy-warn.mjs`). Never throws: nothing here may
+   * delay or fail a shutdown.
+   */
+  beforeApplicationShutdown(): void {
+    try {
+      this.deployNotice.announce(DeployPhase.DOWN);
+    } catch (err) {
+      // Deliberately swallowed, like CombatTickService's shutdown flush: a
+      // courtesy must never be the reason a container fails to stop.
+      this.logger.warn(`deploy sign-off failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   /** Emit one narration line to the room it names. */
   private emitNarration({ room, category, text }: Narration): void {
