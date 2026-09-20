@@ -942,6 +942,28 @@ export class CybertronTickService implements OnModuleInit {
         // target outside the zone, or coast away if there is none.
         // @see docs/DECISIONS.md 2026-09-20
         ship.cybmine = 255;
+
+        // And give it a way to USE that freedom. The speed it is holding is a
+        // COMBAT speed — the close band assigns `rndm(500.0)` once it is within
+        // half a sector of its prey — so releasing the claim on its own leaves
+        // the ship parked on the hub at a crawl, free to go and far too slow to
+        // get anywhere. Found exactly so in production after v0.27.5: Cybrg-205
+        // at (0.54, 0.29), claim correctly cleared, `speed2b` 284.
+        //
+        // Canon's own idle cruise is the right value, and it is what the ship
+        // would eventually be given anyway — `cybupdate` re-rolls it on a
+        // 100-200 activation cadence whenever there is no target:
+        //
+        //   GECYBS.C:473 `		ptr->speed2b = rndm(d_topspeed); /* change the direction */`
+        //   GECYBS.C:474 `		ptr->head2b = rndm(359.9);`
+        //
+        // Applying it HERE rather than waiting for that countdown is the
+        // port-original half: our release rule is what created the crawl, so
+        // our release rule clears it. One re-roll, held until the next cadence
+        // — not the per-activation re-roll removed in v0.27.4, which was a
+        // random walk that went nowhere.
+        ship.speed2b = this.random.next() * topSpeed;
+        ship.head2b = this.random.next() * 359.9;
       } else if (current.cloak === 10) {
         // Target cloaked — hold course and maybe give up
         ship.holdcourse = Math.floor(this.random.next() * 5) + 5;

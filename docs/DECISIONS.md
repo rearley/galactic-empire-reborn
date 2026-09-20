@@ -6744,3 +6744,48 @@ Cybertron's state on every restart for no reported problem. `cybupdate` and
 wiring one in is a constructor change across several call sites, and using
 `Math.random` in a repository would break the determinism the port exists for.
 Recorded here so the gap is a decision rather than another silent omission.
+
+## 2026-09-20 — Releasing the claim was not enough; the ship kept the combat crawl
+
+Third amendment to the neutral-zone sanctuary, and the same failure mode a third
+time: a port-original rule implemented in part.
+
+v0.27.5 released a Cybertron's claim when its target reached sector (0,0). It
+worked — verified in production, `Cybrg-205` came back from the deploy with
+`cybmine` 255. It also went nowhere, because the claim was the only thing
+released. The ship was still holding the speed the COMBAT band had given it:
+
+GECYBS.C:796 `			ptr->speed2b = ((low_dist > .5) ? 990.0:rndm(500.0));`
+
+Inside half a sector of its prey that is `rndm(500.0)`, and the production ship
+was holding 284. A Cybertron free to leave, crawling too slowly to get out of
+the sector it was freed from — sitting beside the player it had just stopped
+hunting, indistinguishable from the camping this whole line of work set out to
+end. Reported from play within minutes of the deploy: "the SOB seems to still be
+hanging out".
+
+Nothing re-rolls that speed promptly. The idle cruise is on `cybupdate`, a
+100-200 activation cadence (GECYBS.C:476 `	ptr->cybupdate = 100 + gernd()%100;`),
+and the observed ship was 56 activations from its turn.
+
+**Decision:** the release now applies canon's own idle cruise re-roll at the
+moment it drops the claim —
+
+GECYBS.C:473 `		ptr->speed2b = rndm(d_topspeed); /* change the direction */`
+GECYBS.C:474 `		ptr->head2b = rndm(359.9);`
+
+— rather than waiting for the countdown. The values are canon's; only the moment
+they are applied is ours, which is correct, because the crawl is an artefact of
+our release rule and nothing in canon produces it.
+
+**Not the v0.27.4 bug returning.** That was a re-roll on EVERY activation, which
+is a random walk with zero expected displacement. This is ONE re-roll at a
+single event, held until the normal cadence comes round — a direction and a
+speed, kept long enough to travel.
+
+**Alternatives rejected.** Heading the ship deliberately away from the origin:
+invents a behaviour canon has no equivalent of, when a random heading from
+inside (0,0) leaves the sector within one unit of travel whichever way it points.
+Leaving the speed and shortening `cybupdate`: still leaves the ship parked for
+an arbitrary interval, and quietly changes a cadence that governs every
+Cybertron in the galaxy rather than just the one being released.

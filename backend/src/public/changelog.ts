@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.7',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A Cybertron that gave up on you when you reached the neutral zone gave up where it stood, at the crawling speed it had been using to shadow you — so it sat there beside you looking every bit like it was still camping the trading posts. It now picks a proper cruising speed and a heading when it loses interest, and actually leaves.',
+      },
+    ],
+  },
+  {
     version: '0.27.6',
     date: '2026-09-20',
     entries: [

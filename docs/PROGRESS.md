@@ -8113,3 +8113,31 @@ Third Cybertron defect today with the same shape — a canon block implemented i
 part, where the missing part is the bug.
 
 **Tests:** backend 690 suites / 6,755. v0.27.6.
+
+## Session 2026-09-20 (fourth pass) — free to go, too slow to leave
+
+v0.27.5 shipped and the owner reported the Obliterator still hanging about the
+hub. The production row showed the fix had worked and had not been enough:
+`Cybrg-205`, `cybmine` 255 — claim correctly released — sitting at (0.54, 0.29)
+with `speed2b` 284.
+
+284 is a COMBAT speed. The close band assigns `rndm(500.0)` once a Cybertron is
+within half a sector of its prey (GECYBS.C:796), and releasing the claim left
+that speed in place. The ship was free to leave and crawling too slowly to get
+out of the sector, parked beside the player it had just stopped hunting. The
+idle cruise that would have replaced it runs on the 100-200 activation
+`cybupdate` cadence, and this ship was 56 activations away from its turn.
+
+The release now applies canon's idle re-roll (GECYBS.C:473-474) at the moment it
+drops the claim. Canon's values; ours is only the moment, which is right,
+because the crawl is an artefact of our release rule. One re-roll held until the
+normal cadence — explicitly not the per-activation re-roll removed in v0.27.4,
+which was a random walk with zero expected displacement.
+
+Fourth Cybertron defect in a day, and the fourth with the same shape: a rule
+implemented in part, where the missing part is the bug. Worth naming as a
+pattern — the neutral-zone work has now been wrong at acquisition, at
+validation, at hydrate, and at release, each time because the change addressed
+the state that was reported rather than every field the state was made of.
+
+**Tests:** backend 690 suites / 6,756. v0.27.7.

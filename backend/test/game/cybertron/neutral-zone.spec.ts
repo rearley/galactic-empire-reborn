@@ -208,6 +208,41 @@ describe('neutral-zone: an existing lock is released when the target reaches (0,
     expect(cyb.cybmine).toBe(255);
   });
 
+  it('gives the ship a cruise speed to leave on, not the combat crawl', async () => {
+    const { shipMap, fireTick } = await buildHarness(7);
+
+    // 284 is the speed a production Obliterator was found holding inside the
+    // zone: the combat band assigns `rndm(500)` once it is within half a sector
+    // of its prey. Releasing the claim without replacing that leaves the ship
+    // parked — free to go, crawling too slowly to get anywhere, until the idle
+    // re-roll comes round up to 200 activations later.
+    const cyb = makeShip({
+      userid: 'Cybrg-207', shipno: 207, shpclass: 21, status: 2,
+      xcoord: 0.54, ycoord: 0.29, cybmine: 18, tick: 1,
+      cybupdate: 100, holdcourse: 0, damage: 0,
+      speed2b: 284, head2b: 17,
+    });
+    shipMap.set('Cybrg-207:207', cyb);
+
+    const player = makeShip({
+      userid: 'player5', shipno: 5, shpclass: 3, status: 1,
+      xcoord: 0.5, ycoord: 0.5, channel: 18,
+    });
+    shipMap.set('player5:5', player);
+
+    fireTick(1);
+    await new Promise((r) => setImmediate(r));
+
+    expect(cyb.cybmine).toBe(255);
+    expect(cyb.speed2b).not.toBe(284);
+    expect(cyb.head2b).not.toBe(17);
+    // Canon's idle cruise is `rndm(d_topspeed)` — bounded by the hull, and a
+    // real speed rather than a combat crawl.
+    // @see GECYBS.C:473 `		ptr->speed2b = rndm(d_topspeed); /* change the direction */`
+    expect(cyb.speed2b).toBeGreaterThan(284);
+    expect(cyb.speed2b).toBeLessThanOrEqual(cyb.topspeed * 1000);
+  });
+
   it('keeps the lock while the target stays outside the neutral sector', async () => {
     const { shipMap, fireTick } = await buildHarness(7);
 
