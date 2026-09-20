@@ -7,6 +7,7 @@ import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { DeployBanner } from './components/DeployBanner';
+import { VersionBanner } from './components/VersionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { FkeyBar } from './components/FkeyBar';
 import { ScanPanel } from './components/ScanPanel';
@@ -20,6 +21,7 @@ import type { CombatShipDestroyedPayload } from '@ge/wire';
 import { useScanMap } from './hooks/useScanMap';
 import { useEventLog } from './hooks/useEventLog';
 import { useDeployNotice } from './hooks/useDeployNotice';
+import { useVersionCheck } from './hooks/useVersionCheck';
 import { useFkeys } from './hooks/useFkeys';
 import { useIsNarrow } from './hooks/useIsNarrow';
 
@@ -75,6 +77,7 @@ function Terminal(): React.JSX.Element {
   // ABOVE the PreFlightScreen early return, like `useIsNarrow`: a hook called
   // conditionally changes the hook order between renders.
   const deployNotice = useDeployNotice();
+  const versionCheck = useVersionCheck();
 
   // Delivered synchronously from the socket callback — no state slot to
   // overwrite, so a burst cannot drop results. @see socket/useCommandResultQueue
@@ -192,6 +195,11 @@ function Terminal(): React.JSX.Element {
     return (
       <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
         <DeployBanner notice={deployNotice} />
+        <VersionBanner
+          serverVersion={versionCheck.serverVersion}
+          onReload={versionCheck.reload}
+          onDismiss={versionCheck.dismiss}
+        />
         <ConnectionBanner status={status} onReconnect={reconnect} />
         <TitleBar status={status} />
 
@@ -259,6 +267,16 @@ function Terminal(): React.JSX.Element {
         * that explains the other.
         */}
       <DeployBanner notice={deployNotice} />
+
+      {/*
+        * BELOW the deploy banner: during a redeploy the countdown is the one
+        * that matters, and this only becomes true once the server is back.
+        */}
+      <VersionBanner
+        serverVersion={versionCheck.serverVersion}
+        onReload={versionCheck.reload}
+        onDismiss={versionCheck.dismiss}
+      />
 
       {/* Top: connection status banner (FR-019) — hidden when connected */}
       <ConnectionBanner status={status} onReconnect={reconnect} />

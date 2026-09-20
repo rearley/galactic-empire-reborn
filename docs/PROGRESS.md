@@ -8170,3 +8170,27 @@ reconnect, so the header can report a version the server is no longer running.
 Not yet addressed.
 
 **Tests:** backend 690 suites / 6,756. v0.27.8.
+
+## Session 2026-09-20 (sixth pass) — the client never knew it was stale
+
+Closes the open item logged an hour earlier in this file.
+
+A redeploy drops the socket and Socket.io reconnects on its own, so the page
+keeps the bundle it loaded with and nothing prompts a refresh. The owner had to
+hard-refresh to pick up v0.27.7. Beyond the wrong version in the header, a stale
+client can be speaking an older event contract than the server it just
+reconnected to — the thing `@ge/wire` and its event-count guards catch at build
+time and cannot police at runtime.
+
+`useVersionCheck` now runs on `connect` — the same hook point that clears the
+deploy banner, and the only moment the answer can have changed — fetches
+`/public/stats` with `cache: 'no-store'`, and compares against `BUILD_VERSION`.
+On a mismatch `VersionBanner` offers a reload rather than taking one: the
+reconnect lands exactly when a player is typing to re-orient themselves. Polite
+live region, where the deploy countdown is assertive.
+
+Dev builds are excluded — `v?` and `dev` — so the banner cannot become
+background noise in the one environment that restarts constantly.
+
+**Tests:** frontend 57 suites / 449, including 14 new. Backend 690 / 6,756.
+v0.28.0.

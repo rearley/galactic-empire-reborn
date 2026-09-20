@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.28.0',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'After a restart your console now tells you when it is running an older build than Fleet Command, with a Reload button. Previously the page kept whatever version it was loaded with — the reconnect is automatic, so nothing ever prompted you to refresh, and the version in the header could be one the server had already replaced. It asks rather than reloading on its own, because the reconnect tends to land exactly when you are typing.',
+      },
+    ],
+  },
+  {
     version: '0.27.8',
     date: '2026-09-20',
     entries: [

@@ -6830,3 +6830,50 @@ was the next symptom. When canon writes a block of fields together it is
 describing one state transition, and implementing a subset leaves the state
 half-transitioned. Implement the block, or record the omission as a known gap
 and expect to come back to it.
+
+## 2026-09-20 — A stale client is told, not reloaded
+
+**Context.** Deploys are hands-off and Socket.io reconnects by itself, so a page
+survives a redeploy holding the bundle it was loaded with. Nothing ever prompted
+a refresh. Reported from play: the owner had to hard-refresh to pick up v0.27.7,
+and until they did the header reported a version the server was no longer
+running. That is not only cosmetic — a stale client can be speaking an older
+event contract than the server it has just reconnected to, which is the failure
+the `@ge/wire` package and its event-count guards exist to prevent at build
+time and cannot police at runtime.
+
+**Decision.** On the socket's `connect` event, fetch `/public/stats`, compare
+its `version` with the client's own `BUILD_VERSION`, and on a mismatch show a
+banner offering a reload. Both sides already format the string identically —
+`v0.28.0 · <sha>` — so the comparison is a plain inequality, and no attempt is
+made to decide which build is newer: the server is the one serving the bundle,
+so any disagreement means the page is the stale side.
+
+**Reason it asks rather than reloading.** The reconnect lands at the exact
+moment a player is most likely to be typing a command to re-orient themselves
+after the restart. An automatic reload there is the most disruptive possible
+timing and would discard whatever is in the command line. The banner is also
+`role="status"` / `aria-live="polite"`, where the deploy countdown is
+`assertive`: the countdown is time-critical and interrupts, this loses nothing
+by being noticed at the next pause.
+
+**Two things that would silently defeat it, both handled.** `/public/stats` is
+served `Cache-Control: public, max-age=15` and this runs moments after a
+redeploy, so the fetch passes `cache: 'no-store'` — a cached body would report
+the version that was just replaced, which is precisely the answer that makes the
+check useless. And every failure path returns null rather than a guess: a
+reconnect can race the server coming back, and an unreachable endpoint must read
+as "unknown", never as "you are up to date" and never as a spurious prompt.
+
+**Development builds never trigger it.** `dev` is what `version.ts` yields with
+no GIT_SHA and `v?` with no VITE_APP_VERSION; a dev client rebuilds on save, so
+nagging on every restart would be noise — and would train the reflex to ignore
+the banner that matters in production.
+
+**Alternatives rejected.** Polling on a timer: a redeploy is the only thing that
+changes the answer and it always drops the socket first, so `connect` asks the
+question once per event instead of hundreds of times. Pushing the version down
+the socket: it would have to be added to the wire contract and the event-count
+guards, for a value the client can already read over HTTP at the one moment it
+matters. Forcing the reload from the server: the server cannot know what a
+player is in the middle of.
