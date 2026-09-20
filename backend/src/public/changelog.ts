@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.0',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'The game now warns you before it restarts for an update. You get a heads-up when a new build is on its way, and a 45-second countdown just before the server actually goes down. Your ship, your cargo and your position are saved either way — you will come back where you left off, so there is no need to dock or land first.',
+      },
+    ],
+  },
+  {
     version: '0.26.2',
     date: '2026-09-20',
     entries: [

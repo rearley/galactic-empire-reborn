@@ -55,6 +55,12 @@ import {
  * with `set filter on`. Adding an unfilterable announcement would be
  * port-original and needs a DECISIONS.md entry first.
  *
+ * One such announcement now exists, and it is NOT a sysop command: the redeploy
+ * notice, sent by the deploy pipeline rather than by anyone typing, and
+ * deliberately unfilterable. It changes nothing here — there is still no way
+ * for a sysop to broadcast, and adding one would still need its own entry.
+ * @see gateway/deploy-notice.controller.ts, docs/DECISIONS.md 2026-09-20
+ *
  * @see GECMDS.C:4742 cmd_sysop
  * @see test/game/commands/sys-commands.spec.ts
  * @see test/game/commands/handlers/sys-authorization.spec.ts

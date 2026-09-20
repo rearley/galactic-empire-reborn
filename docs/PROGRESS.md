@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 117 entries.
+Append-only, **newest at the bottom**. 118 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -7873,3 +7873,45 @@ narrow screen. Note this is the SAME header that v0.23.1 split for exactly this
 reason; adding the Reports link in v0.24.1 refilled the row. Verified at
 390x844. v0.26.2.
 
+
+## 2026-09-20 — A redeploy announces itself
+
+Deploys have always landed on players' heads unannounced: push, CI, ghcr, then
+watchtower picks it up within five minutes and the container stops. Restarts
+are cheap — ~1s of ship state, no hull losses — so this was never a correctness
+problem, only the experience of being dropped mid-flight with no warning.
+
+Now there are two warnings, from two places, because they know different
+things. CI's work ends at the registry and it cannot know when watchtower will
+poll, so after images publish it posts `inbound` and the copy says no more than
+"5 to 10 minutes". Watchtower's pre-update lifecycle hook runs when the
+container is genuinely about to stop AND watchtower blocks on it, so the script
+in the image posts `imminent`, gets a countdown back, and sleeps it — 45
+seconds that are actually 45 seconds. `beforeApplicationShutdown` adds a
+sign-off that deliberately says "refit", not "shutdown", because as the last
+line before the socket closes the latter reads like the game ending.
+
+One endpoint behind both (`POST /admin/deploy/notice`, reusing
+`AdminTokenGuard`), which checks `PresenceService.count()` and says nothing to
+an empty galaxy. That zero is load-bearing rather than cosmetic: it comes back
+as `countdownSeconds: 0`, so an unattended deploy is never slowed by 45 seconds
+of courtesy nobody would hear. The hook runs inside the container, so it talks
+to 127.0.0.1 and the countdown needs no public endpoint and no secret on the
+host.
+
+PORT-ORIGINAL, and `sys.handler.ts` had already written the condition: canon
+has no player-facing shutdown message (`clswara()` only logs) and no sysop
+broadcast, so an unfilterable announcement needed a DECISIONS entry first. It
+has one, including the deliberate deviation that the notice ignores `set filter
+on` where canon's `outwar` honours it.
+
+Found on the way: `alert` was a valid `EventLogCategory` with no colour in
+`EventLog.tsx`, so it rendered identically to `system` — and it is the category
+the countdown uses. Also corrected a citation while quoting it for the ratchet:
+the shutdown `logthis` is GEMAIN.C:1475, not :1474.
+
+**Inert until the host is configured** — the labels need
+`WATCHTOWER_LIFECYCLE_HOOKS=true` on the shared watchtower, and the CI job
+skips cleanly without its two secrets. Both are owner-side infra changes.
+
+**Tests:** backend 689 suites / 6,746 (+18 new), frontend 53 / 417 (+1). v0.27.0.

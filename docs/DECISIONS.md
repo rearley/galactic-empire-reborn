@@ -6520,3 +6520,72 @@ command on `title` and the accessible name.
 **Nothing bound renders nothing.** An empty strip would cost log height and
 teach a new player nothing; `hel fset` does that job.
 
+
+## 2026-09-20 — The game warns players before a redeploy, and the warning ignores `set filter on`
+
+**Decision.** A redeploy announces itself to everyone in-game, from two places.
+`POST /admin/deploy/notice` (bearer token, `AdminTokenGuard`) takes a phase,
+checks `PresenceService.count()`, and emits `DEPLOY_NOTICE`; `GameGateway`
+broadcasts it as an `event.log` line. CI calls it with `inbound` after images
+publish; watchtower's pre-update hook calls it with `imminent` and then sleeps
+the countdown the server hands back. `beforeApplicationShutdown` sends a
+sign-off. Copy lives in `gateway/deploy-notice.messages.ts`.
+
+**This is PORT-ORIGINAL, and `sys.handler.ts` predicted the entry.** Canon has
+no player-facing shutdown message and no sysop broadcast. The only shutdown path
+writes to the BBS log and nothing to a player — in `clswara()`,
+GEMAIN.C:1475 `logthis("***GALACTIC EMPIRE SHUTDOWN***")` — and `cmd_sysop`
+(GECMDS.C:4742 `cmd_sysop`) has no broadcast subcommand. A modem game needed
+neither: a carrier drop was self-explanatory, and there was no such thing as a
+redeploy.
+
+**DELIBERATE DEVIATION: the notice is unfilterable.** Canon's only galaxy-wide
+primitive is GEMAIN.C:1517 `outwar(int filter,unsigned exclude,unsigned freq)`,
+FILTER class, which `set filter on` silences — that is how CYBNEW and an open
+hail reach the galaxy. This does not follow it. Everything canon sends that way
+is in-fiction chatter a player may reasonably not want; this is out-of-fiction
+news that their session is about to end, and filtering it would surprise exactly
+the players who filtered. `server.emit`, not `server.except(filteredRooms())`.
+
+**Two hook points because they know different things.** CI's work ends at ghcr,
+and watchtower polls on its own five-minute schedule, so a CI-side countdown
+would be a guess — its copy says "5 to 10 minutes" and nothing sharper.
+Watchtower's pre-update hook runs when the container is genuinely about to stop
+and watchtower BLOCKS on it, so 45 seconds there is a real 45 seconds. Running
+inside the container also means it talks to `127.0.0.1`, so the countdown needs
+no public endpoint and no secret leaves the host.
+
+**The sign-off says "refit", not "shutdown".** `***GALACTIC EMPIRE SHUTDOWN***`
+was considered verbatim and rejected: as the last line before the socket closes
+it reads like the game ending. "Comms lost. Refit in progress — stand by to
+resume." is what stops a player closing the tab. The word "shutdown" survives in
+the 45-second line, where the countdown gives it context.
+
+**Suppressed when nobody is in-game.** `notified === 0` is load-bearing rather
+than informational: the endpoint returns `countdownSeconds: 0`, so the hook
+skips its sleep and an unattended deploy is never slowed by a courtesy with no
+audience.
+
+**`MIDNIGHT_ADMIN_TOKEN` is reused for a non-midnight endpoint.** Both sit at
+the same trust level and a second secret to rotate buys nothing. The name is a
+wart; renaming would churn a production environment variable for cosmetics.
+
+**Alternatives rejected.** Firing only from CI — cheapest, but it can never
+state a real countdown, and it needs a public endpoint plus a secret in GitHub.
+Firing only on SIGTERM — certain, but zero notice, and it races the socket
+close. Gating deploys on an empty server — on a 24/7 world "empty" may never
+arrive, so it needs a deadline fallback anyway. A `WATCHTOWER_SCHEDULE` window
+— that watchtower updates all eight containers on the host, so a schedule would
+delay every project on the box (see the 2026-09-14 decision to stay
+push-and-forget, which this supersedes only in part: deploys are still
+hands-off, they now announce themselves).
+
+**Inert until the host is configured.** The labels do nothing until the shared
+watchtower runs with `WATCHTOWER_LIFECYCLE_HOOKS=true`, and the CI job skips
+cleanly without `DEPLOY_NOTICE_URL` / `MIDNIGHT_ADMIN_TOKEN`. Both are changes
+to shared infrastructure and are the owner's to make.
+
+**Found on the way:** `alert` was a valid `EventLogCategory` in `@ge/wire` with
+no entry in `EventLog.tsx`'s `CATEGORY_CLASS`, so it fell through to the default
+and rendered identically to `system` — silently discarding the one distinction
+the category exists for. Fixed in the same release.
