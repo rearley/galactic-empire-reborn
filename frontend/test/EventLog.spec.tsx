@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { EventLog } from '../src/components/EventLog';
 import type { LogEntry } from '../src/types/logEntry';
@@ -92,6 +92,45 @@ describe('EventLog', () => {
     rerender(<EventLog lines={[...lines, { text: 'line 2', category: 'success', id: 10 }]} />);
     await nextFrame();
     expect(container.scrollTop).toBe(500);
+  });
+
+  /**
+   * The container SHRINKING must re-scroll a following log.
+   *
+   * Reported from production on the redeploy sign-off: the last line arrived
+   * and "did not seem to scroll". Nothing is wrong with the line. The socket
+   * closes a moment after it, `ConnectionBanner` appears above the log, and the
+   * flex-1 container loses that height — so content already written sits below
+   * the fold. The scroll effect is keyed on `lines`, which did NOT change, so
+   * nothing brought it back.
+   *
+   * Not specific to the sign-off: the banner appears on every disconnect, and
+   * the phone's shortcut bar changes height whenever a binding is added.
+   */
+  it('re-scrolls when the container shrinks under it', async () => {
+    const observers: Array<() => void> = [];
+    const RO = vi.fn(function (this: unknown, cb: () => void) {
+      observers.push(cb);
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal('ResizeObserver', RO);
+
+    const lines: LogEntry[] = [{ text: 'line 1', category: 'info', id: 30 }];
+    render(<EventLog lines={lines} />);
+    const container = screen.getByTestId('event-log');
+    Object.defineProperty(container, 'scrollHeight', { value: 500, writable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 200, writable: true });
+    await nextFrame();
+
+    // The banner appears: same content, less room for it.
+    container.scrollTop = 0;
+    Object.defineProperty(container, 'clientHeight', { value: 140, writable: true });
+    expect(observers.length).toBeGreaterThan(0);
+    observers.forEach((cb) => { act(() => cb()); });
+    await nextFrame();
+
+    expect(container.scrollTop).toBe(500);
+    vi.unstubAllGlobals();
   });
 
   // T009: 500-entry buffer cap with FIFO drop (FR-010)

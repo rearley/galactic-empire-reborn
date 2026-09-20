@@ -7958,3 +7958,29 @@ Measured: 11 requests through, then 429; the site and `/public/` unaffected.
 Verified on BOTH GE vhosts — the canonical domain and its alias. The second is
 a copy of the first, and drifting them apart is a known trap the file warns
 about, so a change to one is always a change to both.
+
+## 2026-09-20 — The event log did not follow its own resize
+
+Reported from play, minutes after the deploy notice went live: the sign-off
+line arrived and "did not seem to scroll". Nothing was wrong with the line.
+
+The auto-scroll effect is keyed on `lines`, which is the only trigger it ever
+had. So anything changing the log's HEIGHT after the last line left the newest
+text below the fold with nothing to bring it back. The sign-off is the perfect
+way to see it — the socket closes a moment later, `ConnectionBanner` appears
+above the log, and the `flex-1` container loses exactly that much room, all
+without `lines` changing.
+
+Not specific to the sign-off, which is why it is worth fixing rather than
+special-casing: the banner appears on EVERY disconnect and reconnect, and on a
+phone the shortcut bar gains a row whenever a binding is added. Anyone who has
+ever wondered why the log looked a line behind after a blip was seeing this.
+
+Fixed with a `ResizeObserver` on the container that re-scrolls while the reader
+is still following. No rAF around it — a ResizeObserver already delivers at
+most once per frame, before paint — and it is guarded on the API existing, so
+the log still renders in environments without it. The test drives a shrinking
+container rather than a new line, so it fails on the old code for the right
+reason.
+
+**Tests:** frontend 53 suites / 418. v0.27.2.

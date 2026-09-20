@@ -138,6 +138,35 @@ export function EventLog({ lines }: EventLogProps): React.JSX.Element {
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [lines, stickyBottom, scrollToBottom]);
 
+  /**
+   * Follow the bottom when the CONTAINER resizes, not only when a line arrives.
+   *
+   * The effect above is keyed on `lines`. That is the only trigger it had, so
+   * anything that changed the log's HEIGHT after the last line left the newest
+   * text below the fold with nothing to bring it back. Reported from play on
+   * the redeploy sign-off — the socket closes a moment after that line,
+   * `ConnectionBanner` appears above the log, and this flex-1 container loses
+   * exactly that much room.
+   *
+   * Not specific to the sign-off. The banner appears on EVERY disconnect, and
+   * on a phone the shortcut bar grows a row whenever a binding is added.
+   *
+   * No rAF: a ResizeObserver already delivers at most once per frame, before
+   * paint. Absent in some test environments, hence the guard — the log must
+   * still render where `ResizeObserver` does not exist.
+   */
+  useEffect(() => {
+    if (!stickyBottom) return undefined;
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver !== 'function') return undefined;
+    const observer = new ResizeObserver(() => {
+      const current = containerRef.current;
+      if (current) scrollToBottom(current);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [stickyBottom, scrollToBottom]);
+
   return (
     <>
       <div className="border-b border-gray-800 px-3 py-1 shrink-0 flex items-center justify-between">

@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.2',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The event log could be left showing an older line than the newest one. It happened whenever something changed the log\u2019s height \u2014 most visibly the \u201Cdisconnected\u201D banner appearing, which pushed the last line you were sent just out of sight. The log now follows the newest line when it is resized, not only when a new line arrives.',
+      },
+    ],
+  },
+  {
     version: '0.27.0',
     date: '2026-09-20',
     entries: [
