@@ -179,3 +179,54 @@ describe('T019 — neutral-zone: player inside sector (0,0) is never targeted', 
     expect(true).toBe(true);
   });
 });
+
+// ─── The zone protects a pilot who is ALREADY being hunted ───────────────────
+
+describe('neutral-zone: an existing lock is released when the target reaches (0,0)', () => {
+  it('drops cybmine when the locked target is inside the neutral sector', async () => {
+    const { shipMap, fireTick } = await buildHarness(7);
+
+    // Locked on channel 18 and already at the hub's edge — the exact state a
+    // production Sarten Obliterator was found in: a live claim on a pilot who
+    // had since flown into (0,0).
+    const cyb = makeShip({
+      userid: 'Cybrg-205', shipno: 205, shpclass: 21, status: 2,
+      xcoord: 0.69, ycoord: 0.53, cybmine: 18, tick: 1, cybupdate: 100,
+      holdcourse: 0,
+    });
+    shipMap.set('Cybrg-205:205', cyb);
+
+    const player = makeShip({
+      userid: 'player3', shipno: 3, shpclass: 3, status: 1,
+      xcoord: 0.5, ycoord: 0.5, channel: 18,
+    });
+    shipMap.set('player3:3', player);
+
+    fireTick(1);
+    await new Promise((r) => setImmediate(r));
+
+    expect(cyb.cybmine).toBe(255);
+  });
+
+  it('keeps the lock while the target stays outside the neutral sector', async () => {
+    const { shipMap, fireTick } = await buildHarness(7);
+
+    const cyb = makeShip({
+      userid: 'Cybrg-206', shipno: 206, shpclass: 21, status: 2,
+      xcoord: 4, ycoord: 4, cybmine: 18, tick: 1, cybupdate: 100,
+      holdcourse: 0,
+    });
+    shipMap.set('Cybrg-206:206', cyb);
+
+    const player = makeShip({
+      userid: 'player4', shipno: 4, shpclass: 3, status: 1,
+      xcoord: 4.5, ycoord: 4.5, channel: 18,
+    });
+    shipMap.set('player4:4', player);
+
+    fireTick(1);
+    await new Promise((r) => setImmediate(r));
+
+    expect(cyb.cybmine).toBe(18);
+  });
+});

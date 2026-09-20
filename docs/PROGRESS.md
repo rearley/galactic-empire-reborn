@@ -8053,3 +8053,33 @@ the owner asked for by name: sit in the hub and the galaxy loses interest; step
 out and you can be re-acquired immediately.
 
 **Tests:** backend 690 suites / 6,752. v0.27.4.
+
+## Session 2026-09-20 (later) — the sanctuary only covered half the engagement
+
+The Obliterator was still cycling through (0,0), reported within the hour: in,
+out a sector or two, back. Not the absorbing state from earlier — the opposite
+end of the same rule.
+
+The zone-blindness kept above lives in the target-SELECTION loop, so it decides
+who may be locked. `cyb_check_lockon` validates an existing target before it
+ever gets there (GECYBS.C:678-706), and that branch releases a claim for two
+reasons only: the target left the game, or the target cloaked. A Cybertron that
+had locked a pilot outside the zone therefore kept the claim when the pilot flew
+in. It could not fire, but the combat band sets its speed from the victim's own,
+so it parked on the pilot, overshot a stationary one, and hyperwarped back in.
+
+Confirmed in the production database before touching anything: `Cybrg-205`,
+class 25, at (0.69, 0.53) — inside sector (0,0) — holding `cybmine` 18. Eleven
+other Cybertrons held live claims at the same moment.
+
+The validation branch now releases the claim when the target is in the zone and
+falls through to the scan, which finds someone outside it or nobody. The player
+guide already described this behaviour under `cybertrons`; only the code
+disagreed.
+
+Noted, not fixed: `cybmine` persists across restarts while channels are
+session-scoped and recycled, so a stored claim can name a channel that now
+belongs to a different ship. Harmless today because the lookup requires an
+active player, but it is aliasing waiting for a busier galaxy.
+
+**Tests:** backend 690 suites / 6,754. v0.27.5.

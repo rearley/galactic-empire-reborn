@@ -6667,3 +6667,29 @@ gone. A loiter timer: does not address the cause, and leaves the in-and-out.
 Letting players fire into the zone without the `SE100DAM` self-zap: puts a hole
 in the rule that stops players fighting each other on the hub, which is load
 bearing.
+
+**Amended the same day — the deviation was only half implemented.** The rule
+above lived in the ACQUISITION scan only. `cyb_check_lockon` validates an
+existing target first (GECYBS.C:678-706), and that branch drops a claim for
+exactly two reasons — the target left the game, and the target cloaked — so a
+Cybertron that had locked you OUTSIDE the zone kept the claim when you flew in.
+It could not fire, but it followed: the combat band matches the victim's own
+motion — GECYBS.C:794 `			ptr->speed2b = ((wptr->speed2b > d_topspeed) ? d_topspeed:(wptr->speed2b*1.25));` —
+so it parked on top of a stationary pilot, overshot, and hyperwarped back in
+from a sector or two out. Reported from play as a Sarten Obliterator cycling in
+and out of the hub, and confirmed in the production database: `Cybrg-205`,
+class 25, at (0.69, 0.53) with `cybmine` 18 — inside sector (0,0) holding a live
+claim.
+
+The validation branch now releases the claim when the target is in the zone and
+falls through to the scan, which either finds someone outside it or leaves the
+ship with no target to coast away from. The rule is the one already printed in
+the player guide under `cybertrons`; only the code disagreed with it.
+
+Worth recording alongside it: `cybmine` is PERSISTED while channels are
+session-scoped and recycled (`ShipChannelRegistry`), so a claim that survives a
+restart names a channel that may now belong to somebody else. It is harmless
+today — `findPlayerByChannel` requires `status === 1`, so a reallocated channel
+held by an AI hull resolves to nothing and the claim clears on the next
+activation — but it is an aliasing bug waiting for a busier galaxy, and the fix
+is to scrub `cybmine` on hydrate rather than to trust a stale number.

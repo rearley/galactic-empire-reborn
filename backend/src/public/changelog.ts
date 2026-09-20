@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.5',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A Cybertron that had already locked on to you followed you into the neutral zone and stayed there. It could not fire — but it sat on top of you, drifting a sector out and hyperwarping back in, which made the trading posts feel anything but safe. A Cybertron now gives up its claim the moment you reach sector (0,0) and goes looking for somebody else.',
+      },
+    ],
+  },
+  {
     version: '0.27.4',
     date: '2026-09-20',
     entries: [

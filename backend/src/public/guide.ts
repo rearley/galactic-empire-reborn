@@ -66,9 +66,10 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'looking: one would lock on to you at the trading posts, fly over and ' +
     'shadow you at your own speed until you left, and open up the moment you ' +
     'crossed the line. Since every pilot starts at (0,0) and the posts are the ' +
-    'one place you are meant to be safe, they stay a real refuge — but only ' +
-    'while you are in them. Step out and anything that wants you can pick you ' +
-    'up again straight away.',
+    'one place you are meant to be safe, they stay a real refuge — and one ' +
+    'that has already claimed you drops the claim the moment you get there. ' +
+    'But only while you are in them: step out and anything that wants you can ' +
+    'pick you up again straight away.',
   rep:
     '`rep sys` calls the phaser inoperable until the bank holds enough charge ' +
     'to actually fire. The original called it operative the moment the bank was ' +

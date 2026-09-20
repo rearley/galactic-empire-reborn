@@ -929,7 +929,20 @@ export class CybertronTickService implements OnModuleInit {
         ship.speed2b = this.random.next() * topSpeed;
         return;
       }
-      if (current.cloak === 10) {
+      if (this.isInNeutralZone(current)) {
+        // PORT-ORIGINAL, and the other half of the sanctuary rule below. The
+        // acquisition scan already refuses to LOCK a pilot inside (0,0), but a
+        // lock taken outside it was never released, so a Cybertron that had
+        // claimed you followed you onto the hub and shadowed you there: it
+        // cannot fire — canon's one neutral test is the hunter's own position,
+        // GECYBS.C:251 `			if (!neutral(&ptr->coord) ` — so it just sat on top of
+        // you, drifting out a sector and hyperwarping back in. Found in
+        // production as a Sarten Obliterator holding station at (0.69, 0.53)
+        // with a live claim. Falling through to the scan below lets it pick a
+        // target outside the zone, or coast away if there is none.
+        // @see docs/DECISIONS.md 2026-09-20
+        ship.cybmine = 255;
+      } else if (current.cloak === 10) {
         // Target cloaked — hold course and maybe give up
         ship.holdcourse = Math.floor(this.random.next() * 5) + 5;
         ship.speed2b = this.random.next() * topSpeed;
