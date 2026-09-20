@@ -237,15 +237,16 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
         data: {
           userid: 'Cybrg-test-claim', shipno: 922, shipname: 'Claimer',
           shpclass: 21, xcoord: 1, ycoord: 1, damage: 0, status: 2,
-          // The production state that prompted this: a live claim on channel 18.
-          cybmine: 18, holdcourse: 7,
+          // The production state that prompted this: a live claim on channel 18,
+          // and the close-combat crawl that went with shadowing a player.
+          cybmine: 18, holdcourse: 7, speed2b: 284, topspeed: 8,
           items: Array(16).fill(0n),
         },
       });
 
-      const loaded: { userid: string; cybmine: number; holdcourse: number }[] = [];
+      const loaded: { userid: string; cybmine: number; holdcourse: number; speed2b: number }[] = [];
       const shipState = {
-        loadShip: vi.fn((s: { userid: string; cybmine: number; holdcourse: number }) => loaded.push(s)),
+        loadShip: vi.fn((s: { userid: string; cybmine: number; holdcourse: number; speed2b: number }) => loaded.push(s)),
         findByUserid: vi.fn().mockReturnValue([]),
         findAllShips: vi.fn().mockReturnValue([]),
         get: vi.fn().mockReturnValue(undefined),
@@ -259,6 +260,13 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
       // 255 is "I have claimed nobody" — the loop re-acquires on its next
       // activation exactly as it would for a freshly spawned hull.
       expect(claimer?.cybmine).toBe(255);
+      // And a cruise speed to carry it, UNCONDITIONALLY. The stored speed
+      // belongs to whatever the ship was doing when the process died, and the
+      // claim that justified it has just been cleared: a close-combat crawl
+      // survived the restart and left an Obliterator inching around the hub at
+      // 284 on v0.27.7. Canon overwrites it on every load.
+      // @see GECYBS.C:134 `		ptr->speed2b = (double)(ptr->topspeed)*500.0;`
+      expect(claimer?.speed2b).toBe(8 * 1000);
       // Cleared in the same canon block, and it gates the re-acquisition:
       // a stored countdown would make the ship skip lockon for several
       // activations after boot. @see GECYBS.C:136 `		ptr->holdcourse = 0;`

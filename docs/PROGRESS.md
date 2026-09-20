@@ -8141,3 +8141,32 @@ validation, at hydrate, and at release, each time because the change addressed
 the state that was reported rather than every field the state was made of.
 
 **Tests:** backend 690 suites / 6,756. v0.27.7.
+
+## Session 2026-09-20 (fifth pass) — the crawl survived the restart too
+
+v0.27.7 deployed and `Cybrg-205` had left sector (0,0) — but only just, sitting
+at (-0.22, 0.79) still holding `speed2b` 284 with no claim. The release re-roll
+added in v0.27.7 fires at the moment a claim is dropped, and this ship's claim
+had already been cleared before the deploy, so there was no event for it to
+catch.
+
+The restart should have covered that and did not. `hydrateAll` restored the
+cruise speed only `if (state.speed2b === 0)`, which kick-starts a stopped ship
+and leaves every other one holding whatever the process died on. Canon has no
+such guard (GECYBS.C:134) and overwrites it on every load, because the stored
+value describes an engagement that no longer exists. Now unconditional, and the
+`topspeed > 0` guard dropped with it — the Base Star's `0 * 1000` is the speed
+it should have.
+
+This is the second time in one day that trimming a canon block produced the next
+bug, both times on my own judgement that the omitted field was unrelated to the
+symptom in hand. Written up in DECISIONS as a rule rather than another entry:
+canon writing fields together describes one state transition, and a subset
+leaves it half-transitioned.
+
+**Known issues / open:** the owner had to hard-refresh the browser to pick up
+the new build after a deploy. The client keeps its old bundle across the
+reconnect, so the header can report a version the server is no longer running.
+Not yet addressed.
+
+**Tests:** backend 690 suites / 6,756. v0.27.8.

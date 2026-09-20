@@ -6789,3 +6789,44 @@ inside (0,0) leaves the sector within one unit of travel whichever way it points
 Leaving the speed and shortening `cybupdate`: still leaves the ship parked for
 an arbitrary interval, and quietly changes a cadence that governs every
 Cybertron in the galaxy rather than just the one being released.
+
+## 2026-09-20 — The hydrate cruise-speed guard, and trimming a canon block twice
+
+Correction to the decision recorded above the same day, which deliberately left
+`speed2b` out of the hydrate block on the grounds that it was "canon but
+unrelated to the claim". That reasoning was wrong, and production showed it
+within the hour.
+
+`hydrateAll` restored the cruise speed only when the stored speed was zero:
+
+```
+if (state.speed2b === 0 && state.topspeed > 0) { state.speed2b = state.topspeed * 1000; }
+```
+
+That kick-starts a ship that had stopped and leaves every other ship holding
+whatever speed the process died on. Frequently that is a COMBAT speed —
+GECYBS.C:796 `			ptr->speed2b = ((low_dist > .5) ? 990.0:rndm(500.0));` at
+point-blank range — which is meaningless the moment the claim beside it is
+cleared. `Cybrg-205` came back from the v0.27.7 deploy with `cybmine` 255 and
+`speed2b` 284, observed at (-0.22, 0.79): no target, and crawling too slowly to
+go looking for one.
+
+Canon has no guard. It overwrites the speed on every load, in the same block:
+
+GECYBS.C:134 `		ptr->speed2b = (double)(ptr->topspeed)*500.0;`
+
+**Decision:** the assignment is now unconditional, as canon's is. The
+`topspeed > 0` guard is gone too — the one hull that ships with `topspeed` 0 is
+the Cybertron Base Star, an immobile fortress, and `0 * 1000` is exactly the
+speed it ought to have.
+
+**The lesson, recorded because it cost five releases in one day.** Every defect
+in this run had the same shape: a canon block implemented in part. Blind in the
+zone, then the claim that survived entering it, then the claim that survived a
+restart, then the crawl that survived the release, then the crawl that survived
+the restart. Twice the missing part was omitted deliberately, by me, on the
+argument that it was unrelated to the symptom being fixed — and both times it
+was the next symptom. When canon writes a block of fields together it is
+describing one state transition, and implementing a subset leaves the state
+half-transitioned. Implement the block, or record the omission as a known gap
+and expect to come back to it.

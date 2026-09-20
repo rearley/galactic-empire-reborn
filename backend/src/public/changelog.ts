@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.8',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'Cybertrons now come back from a restart at a proper cruising speed. They had been keeping whatever speed they were travelling at when the game went down — and for one that had been closing on a player, that is a crawl meant for point-blank fighting, which left it inching around the trading posts for a long while after the restart with nothing to chase.',
+      },
+    ],
+  },
+  {
     version: '0.27.7',
     date: '2026-09-20',
     entries: [

@@ -145,11 +145,28 @@ export class CybertronRepository {
         state.cybmine = CYBMINE_NONE;
         state.holdcourse = 0;
 
-        // Kick-start movement — original sets speed2b = topspeed*500 on load (@see GECYBS.C:134)
-        // Our topspeed is in warp units where warp 1 = 1000, so multiply by 1000
-        if (state.speed2b === 0 && state.topspeed > 0) {
-          state.speed2b = state.topspeed * 1000;
-        }
+        // Cruise speed, UNCONDITIONALLY — the third line of the same canon block:
+        //
+        //   GECYBS.C:134 `		ptr->speed2b = (double)(ptr->topspeed)*500.0;`
+        //
+        // Our topspeed is in warp units where warp 1 = 1000, so multiply by 1000.
+        //
+        // This used to be guarded by `speed2b === 0`, which only ever kick-started
+        // a ship that had stopped. Everything else kept whatever speed the process
+        // died holding — and that is frequently a COMBAT speed, meaningless once
+        // the claim above has been cleared. The close band assigns `rndm(500.0)`
+        // at point-blank range, so an Obliterator that had been shadowing a player
+        // came back from the v0.27.7 deploy still crawling at 284, with no target
+        // and no way to get anywhere: observed at (-0.22, 0.79), barely moving.
+        //
+        // Canon overwrites it on every load precisely because the stored value
+        // describes an engagement that no longer exists. Restoring the cruise
+        // speed is what makes a hydrated Cybertron equivalent to a fresh one,
+        // which is the whole point of the block.
+        // No `topspeed > 0` guard: canon has none, and it needs none. The one
+        // hull that ships with `topspeed` 0 is the Cybertron Base Star, an
+        // immobile fortress, and `0 * 1000` is exactly the speed it should have.
+        state.speed2b = state.topspeed * 1000;
         this.shipState.loadShip(state);
         count++;
       }
