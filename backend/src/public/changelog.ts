@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.26.2',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'On a phone the site header ran the game’s name straight into the menu beside it, with no space between them. The menu now drops to its own line when there is not room for both.',
+      },
+    ],
+  },
+  {
     version: '0.26.1',
     date: '2026-09-20',
     entries: [

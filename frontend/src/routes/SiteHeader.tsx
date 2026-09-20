@@ -21,10 +21,15 @@ export function SiteHeader(): React.JSX.Element {
   const signedIn = getToken() !== null;
   // Cosmetic only — the endpoint refuses on its own. @see auth/useSysop.ts
   const { sysop } = useSysop();
+  // Wraps, with a gap. `justify-between` has nothing left to distribute once
+  // the row is full, so a signed-in sysop on a 390px phone — four items beside
+  // the wordmark — got "GALACTIC EMPIREGuide", the two running together with no
+  // space at all. The gap keeps them apart at any width, and the wrap moves the
+  // nav onto its own line when the row cannot hold both.
   return (
-    <header className="flex items-center justify-between border-b border-gray-800 px-4 py-3 font-mono text-sm">
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-gray-800 px-4 py-3 font-mono text-sm">
       <Link to="/" className="uppercase tracking-widest text-yellow-400">Galactic Empire</Link>
-      <nav className="flex gap-4 text-gray-400">
+      <nav className="flex flex-wrap gap-4 text-gray-400">
         <Link to="/guide" className="hover:text-gray-200">Guide</Link>
         {signedIn ? (
           <>

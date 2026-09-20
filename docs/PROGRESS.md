@@ -7864,3 +7864,12 @@ of chips in a 390px viewport. It now wraps, capped at `max-h-24`, with each
 chip clipped to nine characters and the full command on `title`. Verified at
 390x844: nine bindings, three rows, everything reachable. v0.26.1.
 
+Third phone fix of the day, from a screenshot of the landing page: the site
+header read "GALACTIC EMPIREGuide". `SiteHeader` was `flex justify-between`
+with no gap and no wrap, and `justify-between` has nothing to distribute once
+the row is full — signed in as the sysop that is four items beside the
+wordmark. Now `flex-wrap` with `gap-x-6`, so the nav takes its own line on a
+narrow screen. Note this is the SAME header that v0.23.1 split for exactly this
+reason; adding the Reports link in v0.24.1 refilled the row. Verified at
+390x844. v0.26.2.
+

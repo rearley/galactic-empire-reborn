@@ -33,6 +33,17 @@ describe('SiteHeader', () => {
     }
   });
 
+  it('keeps a gap between the wordmark and the nav, and wraps rather than colliding', () => {
+    // Signed in as the sysop there are four items beside the wordmark, and on a
+    // 390px phone they ran into it: the header read "GALACTIC EMPIREGuide".
+    // `justify-between` alone has nothing to give once the row is full.
+    setToken('a-token');
+    const { container } = renderIn(<SiteHeader />);
+    const header = container.querySelector('header')!;
+    expect(header.className).toMatch(/flex-wrap/);
+    expect(header.className).toMatch(/gap-x-/);
+  });
+
   it('offers the way in when signed out, and the way back when signed in', () => {
     renderIn(<SiteHeader />);
     expect(screen.getByRole('link', { name: 'Enlist' })).toBeDefined();
