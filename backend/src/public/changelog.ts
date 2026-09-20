@@ -96,6 +96,8 @@ export interface ChangelogRelease {
  * oversight and fails.
  */
 export const SILENT_RELEASES: Record<string, string> = {
+  '0.27.1':
+    'A corrected code comment. The sysop Reports page was fixed the same day, but in the web server’s configuration rather than in this release, so there is nothing here a player could see.',
   '0.24.4':
     'Sysop-only: the kill log now records what the killer took and what a full hold dropped. Nothing about a kill changes for a player.',
   '0.24.2':

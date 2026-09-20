@@ -7925,3 +7925,36 @@ the shutdown `logthis` is GEMAIN.C:1475, not :1474.
 skips cleanly without its two secrets. Both are owner-side infra changes.
 
 **Tests:** backend 690 suites / 6,748 (+22 new), frontend 53 / 417 (+1). v0.27.0.
+
+## 2026-09-20 — The sysop Reports page had never worked in production
+
+Found while closing the last gap for the deploy notice, not by looking for it.
+`POST /admin/deploy/notice` returned 502 from the public host, and 502 rather
+than 404 is the interesting part: it means nginx matched a location and could
+not reach the upstream. The GE vhosts proxy `/socket.io/` and `/(auth|public)/`
+to the backend on 127.0.0.1:3100 and send everything else to the frontend
+container on 8081 — which serves the SPA and cannot reach the backend. So every
+`/admin/*` call from the internet died there.
+
+`/admin/reports` is one of those calls. The Reports page has been fetching it
+since it shipped, and its own doc comment asserted that nginx proxied `/admin/`
+— which was never true. A local dev server proxies everything, so it worked on
+the machine where it was written and nowhere else. The comment is corrected in
+place rather than deleted, because the wrong belief is the interesting part.
+
+Both vhosts now carry `location ~ ^/admin/(reports|deploy)(/|$)`. Narrow on
+purpose: `/admin/midnight/run` is deliberately NOT matched, so the destructive
+maintenance pass stays reachable on loopback only. Both exposed routes keep
+their app guards — reports needs a JWT plus a sysop check read from the
+database, deploy needs a 192-bit bearer token, constant-time compared.
+
+Also closed a real gap the audit surfaced: the app throttles `/auth` only
+("no other route in the app is affected", auth.module.ts), so the sysop routes
+had no rate limit at all. Nobody could get THROUGH them, but nothing stopped
+anyone hammering them. There is now an nginx `limit_req` zone
+(`/etc/nginx/conf.d/ge-admin-limit.conf`, 30r/m burst 10) returning 429.
+Measured: 11 requests through, then 429; the site and `/public/` unaffected.
+
+Verified on BOTH GE vhosts — the canonical domain and its alias. The second is
+a copy of the first, and drifting them apart is a known trap the file warns
+about, so a change to one is always a change to both.

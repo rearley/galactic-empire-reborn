@@ -30,10 +30,18 @@ const authHeaders = (): HeadersInit => ({
  *
  * Reachable by anybody who types the URL; the SERVER is what refuses. The data
  * comes from `/admin/reports` rather than `/reports`, because the page owns
- * that path in the SPA and nginx only proxies `/auth/`, `/admin/`, `/public/`
- * and `/socket.io/` to the backend — anything else is served the app shell. The link
- * in the header is a convenience for the one account that can use it, not the
- * permission itself.
+ * that path in the SPA. The link in the header is a convenience for the one
+ * account that can use it, not the permission itself.
+ *
+ * THIS COMMENT USED TO SAY nginx proxies `/admin/`. It did not, and this page
+ * was broken in production from the day it shipped until 2026-09-20: the vhost
+ * proxied only `/socket.io/` and `/(auth|public)/`, so `/admin/reports` fell
+ * through to the frontend container, which cannot reach the backend, and
+ * returned 502. Found while wiring the deploy notice, which needed the same
+ * gap closed. The production vhosts now proxy `/admin/(reports|deploy)` —
+ * narrow on purpose, so `/admin/midnight/run` stays loopback-only — behind an
+ * nginx rate limit. A local dev server proxies everything, which is exactly
+ * why nobody saw it.
  *
  * Each card leads with the player's own words and follows with the context the
  * server attached: who, which hull, where, how damaged, and which build. The
