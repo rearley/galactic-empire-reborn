@@ -69,7 +69,15 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'one place you are meant to be safe, they stay a real refuge — and one ' +
     'that has already claimed you drops the claim the moment you get there. ' +
     'But only while you are in them: step out and anything that wants you can ' +
-    'pick you up again straight away.',
+    'pick you up again straight away.\n\n' +
+    'Kill one and its class stays empty for a while, and the rarer the hull ' +
+    'the longer: a Scout is back in a few minutes, an Obliterator takes the ' +
+    'best part of a quarter of an hour, and the Base Star far longer than ' +
+    'that. The original had no such delay — it refilled whatever slot it ' +
+    'happened to look at next, so a kill could be undone almost at once. It ' +
+    'could afford that in a galaxy nine times this size, where the difficult ' +
+    'hulls were rare because they were hard to find. Here there is only one ' +
+    'Obliterator, so its rarity is spent on time instead.',
   rep:
     '`rep sys` calls the phaser inoperable until the bank holds enough charge ' +
     'to actually fire. The original called it operative the moment the bank was ' +

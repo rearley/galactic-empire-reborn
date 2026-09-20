@@ -59,3 +59,47 @@ export function scaleAiPopulation(canonCount: number, univmax: number): number {
   const scaled = Math.round((canonCount * univmax) / CANON_UNIVMAX);
   return Math.max(1, scaled);
 }
+
+/**
+ * How long a class stays empty after one of its hulls dies.
+ *
+ * PORT-ORIGINAL. Canon has no respawn delay at all: `autortia` examines one
+ * ship slot every 30 seconds and refills whatever it finds free
+ * (GEMAIN.C:2321 `if (ticktock2 >= 30 && ticktock1 < nships)`), so the wait is
+ * an accident of where the walk pointer happens to be when you make the kill.
+ * Canon expresses "this hull is special" ONLY as rarity — `tot_to_create` 2 for
+ * an Obliterator against 10 for a Scout.
+ *
+ * That lever loses its force at our galaxy size. `scaleAiPopulation` rounds
+ * canon's two Obliterators down to ONE at UNIVMAX 100, so killing it empties
+ * the galaxy of the class, and the port put it back within three minutes,
+ * guaranteed. Reported from play as taking the wind out of the kill.
+ *
+ * So rarity is re-expressed as TIME, using canon's own numbers rather than a
+ * table invented for the purpose: the delay is the base multiplied by how much
+ * rarer the class is than canon's commonest Cybertron. Nothing respawns faster
+ * than the port already did — the base is the floor, so this only ever takes a
+ * hull away for longer.
+ *
+ *   Scout (10)             3 min      Attack Drone (6)      5 min
+ *   Battle Cruiser (5)     6 min      Obliterator (2)      15 min
+ *   Base Star (1)         30 min
+ *
+ * A deviation argued from feel is normally exactly what `CLAUDE.md` forbids.
+ * This one is deliberate, owner-chosen over two canon-grounded alternatives,
+ * and recorded with them. @see docs/DECISIONS.md 2026-09-20
+ */
+
+/** What the port's spawn slot already cost: 30 physics ticks at 6s. */
+export const CYB_RESPAWN_BASE_MS = 30 * 6 * 1000;
+
+/** Canon's commonest Cybertron, the Scout at `tot_to_create` 10. The yardstick. */
+export const CANON_MOST_COMMON = 10 as const;
+
+export function respawnDelayMs(canonCount: number, baseMs: number = CYB_RESPAWN_BASE_MS): number {
+  if (canonCount <= 0) return baseMs;
+  // Clamped at the base: a class canon makes MORE common than the Scout would
+  // otherwise respawn faster than the port managed before this existed, which
+  // is the one thing this must never do.
+  return Math.max(baseMs, Math.round((baseMs * CANON_MOST_COMMON) / canonCount));
+}

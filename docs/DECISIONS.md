@@ -6877,3 +6877,76 @@ the socket: it would have to be added to the wire contract and the event-count
 guards, for a value the client can already read over HTTP at the one moment it
 matters. Forcing the reload from the server: the server cannot know what a
 player is in the middle of.
+
+## 2026-09-20 — Cybertron rarity is re-expressed as respawn time
+
+**A deviation argued from feel, which is normally exactly what this file
+forbids.** It is recorded in full, with the two canon-grounded alternatives it
+was chosen over, because the reasoning is the only thing that makes it
+reviewable later.
+
+**Context.** The owner killed a Sarten Obliterator — class 25, the toughest
+Cybertron — and had it back in under three minutes: "killing one and then not
+too long after have it flying back towards yeah can take the wind out."
+
+Two facts combine badly here, and neither is a bug on its own:
+
+1. Canon expresses "this hull is special" ONLY as rarity. `tot_to_create` is 2
+   for an Obliterator against 10 for a Scout; there is no respawn delay in canon
+   at all. `autortia` examines one ship slot every 30 seconds —
+   GEMAIN.C:2321 `if (ticktock2 >= 30 && ticktock1 < nships)` — and refills
+   whatever it finds free, so the wait is an accident of where the walk pointer
+   is standing when you make the kill.
+2. `scaleAiPopulation` rounds canon's two Obliterators down to ONE at our
+   UNIVMAX of 100. Killing it empties the galaxy of the class, and the port's
+   spawn slot put it back within three minutes, guaranteed.
+
+Canon's difficulty lever is therefore spent before the fight starts: at canon's
+size an Obliterator is rare because 361,201 sectors is a lot of ground, and the
+kill stands because the refill is slow and scattershot. Neither holds here.
+
+**The trap in the obvious fix.** Porting canon's mechanism literally makes this
+WORSE, not better. Canon's cycle length is proportional to the number of slots —
+one per 30 seconds — and canon walks ~24 AI slots, so a freed one waits ~6
+minutes on average and up to 12. We scaled the population down to ~9, so the
+same mechanism here would refill in ~4.5 minutes at worst. The latency a player
+feels is an accident of population size, not a constant anyone chose.
+
+**Decision.** A class whose hull has just died is held empty for a delay derived
+from CANON'S OWN rarity numbers rather than a table invented for the purpose:
+the base multiplied by how much rarer the class is than canon's commonest
+Cybertron, the Scout.
+
+```
+Scout (10)          3 min      Attack Drone (6)    5 min
+Battle Cruiser (5)  6 min      Obliterator (2)    15 min
+Base Star (1)      30 min
+```
+
+The base is the port's existing spawn-slot cost, 30 physics ticks at 6s, and it
+is a FLOOR: nothing respawns faster than it already did, so this can only ever
+take a hull away for longer.
+
+Armed by a DEATH, not by a deficit — a galaxy that has simply never been full
+(a fresh database, a raised `tot_to_create`) fills at the old pace, or a new
+install would sit empty waiting for hulls nobody killed. Enforced in `spawnOne`
+rather than `runSpawnSlot`, because that is the single funnel every spawn passes
+through, including `pickSpawnClass`'s 1% branch which ignores population
+entirely.
+
+**Alternatives rejected.**
+
+- *Canon's latency with canon's slot count* — walk a fixed 24-slot roster at
+  canon's 30s per slot regardless of our scaled population, giving ~6 minutes
+  average and an unpredictable wait. The most canon-shaped option, and rejected
+  only because the owner preferred difficulty to be legible: an unpredictable
+  wait makes every kill feel the same, where the point was to make the hard ones
+  feel different.
+- *Simply lengthening the interval* — smallest change, but it slows the Scout
+  and the Base Star identically, which is the thing that already fails.
+- *Restoring a cash payout for the kill* — considered and refused outright. That
+  is a bug this port removed in September; canon's flotsam cash grab is
+  commented out (GEFUNCS.C:1137-1139) and `chgloser` is gated on both ships
+  being human (GEFUNCS.C:1200). The reward stays canon; only the scarcity moves.
+
+**A player meets this**, so it is also in `GUIDE_DEVIATIONS` under `cybertrons`.

@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.29.0',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'deliberate-deviation',
+        text: 'Kill a Cybertron and its class now stays empty for a while — the rarer the hull, the longer. A Scout is back in a few minutes; an Obliterator takes the best part of a quarter of an hour, and the Base Star far longer. The original had no respawn delay: it refilled whatever slot it looked at next, so a kill could be undone almost immediately. It could afford that in a galaxy nine times this size, where the dangerous hulls were rare because they were hard to find. Here there is only one Obliterator, so its rarity buys you time instead.',
+      },
+    ],
+  },
+  {
     version: '0.28.0',
     date: '2026-09-20',
     entries: [

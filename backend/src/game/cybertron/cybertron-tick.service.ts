@@ -63,9 +63,11 @@ import {
   CombatHitEvent,
   CombatMissEvent,
   CombatShipDestroyedEvent,
+  COMBAT_SHIP_DESTROYED,
   COMBAT_TARGET_WARNING,
   CombatTargetWarningEvent,
 } from '../combat/combat-events';
+import { CANON_TOT_TO_CREATE, respawnDelayMs } from './cyb-population';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
 import { selectPhaserVictims } from '../combat/firep';
 import { findFreeTorpSlot } from '../combat/projectile-slots';
@@ -113,6 +115,13 @@ export class CybertronTickService implements OnModuleInit {
 
   /** Modulo-30 counter that gates spawn-slot execution. @see GEMAIN.C outer loop (R-2) */
   private spawnTickCounter = 0;
+  /**
+   * Earliest wall-clock time each class may be refilled, armed when one of its
+   * hulls dies. PORT-ORIGINAL — canon has no respawn delay.
+   * @see cyb-population.ts respawnDelayMs, docs/DECISIONS.md 2026-09-20
+   */
+  private readonly respawnNotBefore = new Map<number, number>();
+
   /** Allowance owed per Cybertron user since the last flush. @see GECYBS.C:229 */
   private readonly pendingAllowance = new Map<string, bigint>();
 
@@ -162,6 +171,9 @@ export class CybertronTickService implements OnModuleInit {
     );
     this.events.on(CYBERTRON_SCORED_KILL, (e: CybertronScoredKillEvent) =>
       this.onCybertronScoredKill(e),
+    );
+    this.events.on(COMBAT_SHIP_DESTROYED, (e: CombatShipDestroyedEvent) =>
+      this.onAiHullDestroyed(e),
     );
     this.logger.log('CybertronTickService subscribed to PHYSICS and SHIP_UPDATE ticks');
 
@@ -1272,6 +1284,34 @@ export class CybertronTickService implements OnModuleInit {
    */
 
   /**
+   * Start a class's respawn hold when one of its hulls dies.
+   *
+   * PORT-ORIGINAL, and armed by a DEATH rather than by a deficit: a galaxy that
+   * has simply never been full — a fresh database, a raised `tot_to_create` —
+   * must still fill at the old pace, or a new install would sit empty for half
+   * an hour waiting for hulls that nobody killed.
+   *
+   * Guarded on the USERID, not the class. Only the AI spawner writes
+   * `Cybrg-` rows, so a player dying cannot put a Cybertron class on hold even
+   * if their hull somehow shares its class number.
+   *
+   * @see cyb-population.ts respawnDelayMs, docs/DECISIONS.md 2026-09-20
+   */
+  private onAiHullDestroyed(e: CombatShipDestroyedEvent): void {
+    if (!e.victimUserid?.startsWith('Cybrg-')) return;
+    // `victimClass` is optional — some callers build the event after the ship
+    // is gone. With no class there is nothing to hold, and refilling at the old
+    // pace is the safe failure.
+    const classNumber = e.victimClass;
+    if (typeof classNumber !== 'number') return;
+    if (!this.classConfigs[classNumber]) return;
+
+    const canonCount = CANON_TOT_TO_CREATE[classNumber];
+    const delay = respawnDelayMs(canonCount ?? 0);
+    this.respawnNotBefore.set(classNumber, Date.now() + delay);
+  }
+
+  /**
    * Per-slot spawn entry point: pick a class (1-in-30 tick cadence) and spawn one ship.
    * One ship per slot — behavior unchanged from original game loop.
    * @see GEMAIN.C outer loop (R-2); GECYBS.C cyb_init spawn cadence
@@ -1308,6 +1348,16 @@ export class CybertronTickService implements OnModuleInit {
   private async spawnOne(classNumber: number, ctx?: TickContext): Promise<boolean> {
     const config = this.classConfigs[classNumber];
     if (!config) return false;
+
+    // The respawn hold, checked HERE rather than in runSpawnSlot because this is
+    // the single funnel every spawn passes through — including `pickSpawnClass`'s
+    // 1% branch, which ignores population entirely and would otherwise hand back
+    // an Obliterator minutes after one died.
+    const notBefore = this.respawnNotBefore.get(classNumber);
+    if (notBefore !== undefined) {
+      if (Date.now() < notBefore) return false;
+      this.respawnNotBefore.delete(classNumber);
+    }
     const aiShips = this.shipState.findAllShips().filter((s) => s.status === 2);
     const currentCount = aiShips.filter((s) => s.shpclass === classNumber).length;
     if (currentCount >= config.tot_to_create) return false;

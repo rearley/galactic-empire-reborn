@@ -8194,3 +8194,41 @@ background noise in the one environment that restarts constantly.
 
 **Tests:** frontend 57 suites / 449, including 14 new. Backend 690 / 6,756.
 v0.28.0.
+
+## Session 2026-09-20 (seventh pass) — killing the Obliterator now means something
+
+The owner killed a Sarten Obliterator and had it back inside three minutes.
+Investigated both halves of what he noticed:
+
+**The payout is canon and stays.** A Cybertron's bank balance is not a prize —
+canon's flotsam cash grab is commented out (GEFUNCS.C:1137-1139) and `chgloser`
+is gated on both ships being human (GEFUNCS.C:1200). `Cybrg-223` was carrying
+138,419 credits, none of it lootable; what drops is the gold in the hold, and
+that hull held 30. This port used to hand over the whole balance citing lines
+that turned out to be the middle of a name-building block; removed in September
+and not reopened.
+
+**The respawn was ours.** Canon examines one ship slot per 30 seconds and
+refills whatever is free. We run a targeted top-up every 30 physics ticks — 3
+minutes — so a killed hull is back on a guaranteed clock. Worse, the population
+scaling rounds canon's two Obliterators down to ONE at UNIVMAX 100, so the kill
+emptied the class and the galaxy restored it almost at once.
+
+The trap worth recording: porting canon's mechanism literally makes this FASTER,
+not slower. Canon's cycle length is proportional to slot count at 30s each, and
+we scaled the population down — the latency a player feels was never chosen by
+anyone, in either codebase.
+
+Owner chose, over two canon-grounded alternatives, to re-express rarity as time:
+a class is held empty after a death for the base delay scaled by how much rarer
+canon makes it than the Scout. 3 min for a Scout, 15 for an Obliterator, 30 for
+the Base Star. Base is a floor, so nothing respawns faster than before. Armed by
+a death rather than a deficit, so a fresh database still fills at the old pace.
+Enforced in `spawnOne`, the single funnel — `pickSpawnClass`'s 1% branch ignores
+population and would otherwise leak one straight back.
+
+Invented mechanics normally fail this project's bar, so the DECISIONS entry
+carries the rejected alternatives and the reason the canon-shaped one lost.
+Player-facing, so it is in `GUIDE_DEVIATIONS` under `cybertrons` too.
+
+**Tests:** backend 52 cybertron suites / 305, including 9 new. v0.29.0.
