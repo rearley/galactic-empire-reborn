@@ -115,6 +115,20 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.4',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'Cybertrons could get stuck in the neutral zone at sector (0,0) and mill around it indefinitely, which looked a great deal like one camping the trading posts. A Cybertron in the zone had been made blind \u2014 it could not see a target anywhere in the galaxy \u2014 so it never had anywhere to go, and it re-rolled its heading every few seconds on top of that. It can see again now, so it picks somebody and leaves. It still cannot fire from inside the zone, which is how the original worked.',
+      },
+      {
+        category: 'deliberate-deviation',
+        text: 'Staying put: a ship sitting inside the neutral zone is still invisible to Cybertrons, so the trading posts remain a genuine refuge. The original was harsher \u2014 a Cybertron there would lock on to you, fly over and shadow you at matching speed until you left.',
+      },
+    ],
+  },
+  {
     version: '0.27.3',
     date: '2026-09-20',
     entries: [

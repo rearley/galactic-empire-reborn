@@ -8023,3 +8023,33 @@ countdown ticks 0:45 down, turns into "any moment now" at zero, and the phone
 layout wraps it to three lines without disturbing the shortcut chips or log.
 
 **Tests:** frontend 55 suites / 435 (+17), backend 690 / 6,750. v0.27.3.
+
+## 2026-09-20 — The Obliterator was not camping the hub, it was trapped in it
+
+Reported from play: a Sarten Obliterator moving in and out of sector (0,0),
+keeping both active players penned in the trading hub. The owner's instinct was
+that fixing it would mean departing from canon. The opposite turned out true —
+it was ours, and the fix is a canon correction.
+
+Two port-only rules combined into an absorbing state. `if
+(this.isInNeutralZone(ship)) continue;` sat inside the target-selection loop and
+did not depend on the candidate, so a Cybertron in the zone skipped every ship in
+the galaxy and always ended with no target; the no-target branch then re-rolled
+speed and heading on every activation. A fresh random heading each time is a
+random walk with zero expected displacement, so it had neither a reason to leave
+nor a steady direction to leave in.
+
+Canon has neither rule, and both cited canon lines that do not contain them —
+GECYBS.C:709-731 for the blindness and :733-737 for the re-roll. The only
+`neutral()` in GECYBS.C is line 251, and it gates firing, not seeing. Two tests
+asserted the bug against the same false citations; they are inverted now and say
+where the rule actually came from.
+
+Kept deliberately: a pilot inside the zone is still untargetable. Canon would
+have the Obliterator lock on, fly over and shadow the player at matched speed
+until they left — worse than what was reported. Everyone spawns at (0,0) and the
+six trading posts are there, so the refuge stays. The resulting dynamic is one
+the owner asked for by name: sit in the hub and the galaxy loses interest; step
+out and you can be re-acquired immediately.
+
+**Tests:** backend 690 suites / 6,752. v0.27.4.

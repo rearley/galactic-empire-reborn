@@ -6615,3 +6615,55 @@ the stop can be late, and a banner counting into negative numbers would be the
 last thing a player saw. Only `imminent` gets a number, because `inbound` has
 none that is honest.
 
+
+## 2026-09-20 — The neutral zone blinds Cybertrons to pilots inside it, but not to the galaxy outside
+
+**Reported from play.** A Sarten Obliterator (class 25, the top Cybertron)
+appeared to camp sector (0,0), moving in and out of the trading hub and keeping
+two players penned there. It was not camping. It was stuck.
+
+**Two port-only rules made the origin an absorbing state.** The target-selection
+loop carried `if (this.isInNeutralZone(ship)) continue;` — a test that does not
+depend on the candidate, so a Cybertron standing in sector (0,0) skipped every
+ship in the galaxy, always reached `low_ship == -1`, and fell into a no-target
+branch that re-rolled `speed2b` and `head2b` on EVERY activation. A fresh random
+heading each time is a random walk: zero expected displacement. It could not
+acquire, so it never got a vector out, and it could not hold a course long
+enough to drift out either.
+
+**Canon does neither, and the citations we had for both were false.** The only
+`neutral()` call in the whole of GECYBS.C is GEMAIN-side line 251, inside the
+engagement scan: GECYBS.C:251 `if (!neutral(&ptr->coord)`. That gates FIRING.
+`cyb_check_lockon` contains no neutral test at all, so a canon Cybertron in the
+zone still locks the nearest pilot galaxy-wide and departs at hyperwarp. And
+canon's no-target branch sets only GECYBS.C:735 `ptr->tick = 255;` and
+GECYBS.C:736 `ptr->cybmine = 255;` — the ship coasts on its existing course.
+Both port behaviours cited GECYBS.C:709-731 and GECYBS.C:733-737, which contain
+neither rule. Two tests asserted the bug against the same false citations.
+
+**CORRECTED TO CANON:** the hunter-side blindness is gone and the no-target
+branch no longer touches speed or heading. Course still re-rolls on canon's
+cadence, `cybupdate` every 100-200 activations. A Cybertron may not fire from
+inside the zone — `runEngagementScan` still returns early, which is canon's
+line 251.
+
+**DELIBERATE DEVIATION, KEPT:** a pilot INSIDE sector (0,0) is still not a valid
+target. Canon would lock a pilot on the hub, fly to them, and — unable to fire —
+shadow them at matched speed (GECYBS.C:793-796 sets `speed2b` from the victim's
+own) until they stepped out. That makes the one place a new pilot is meant to be
+safe into a place they are escorted by a class-25. Every human spawns in sector
+(0,0) (GEFUNCS.C:196-197), the six `*EMPIRE*` trading posts are there, and we
+deploy at `UNIVMAX` 100 rather than canon's 300 with a handful of players who all
+converge on that hub. The zone stays a real refuge.
+
+**What the deviation costs, stated plainly:** while every player is inside the
+zone, no Cybertron in the galaxy has a target, so they all idle and wander. That
+is the intended shape — sit in the hub and the galaxy loses interest in you;
+leave and you are fair game, and anything that wants you can re-acquire at once.
+
+**Alternatives rejected.** Banning Cybertrons from entering the zone: a larger
+deviation that solves a problem we no longer have once the absorbing state is
+gone. A loiter timer: does not address the cause, and leaves the in-and-out.
+Letting players fire into the zone without the `SE100DAM` self-zap: puts a hole
+in the rule that stops players fighting each other on the hub, which is load
+bearing.

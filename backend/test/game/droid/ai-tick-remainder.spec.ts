@@ -511,41 +511,83 @@ describe('battle-lock beats distance in hyperspace (GECYBS.C:270-273)', () => {
   });
 });
 
-describe('a Cybertron inside the neutral zone hunts nobody (GECYBS.C:709-731)', () => {
+describe('a Cybertron inside the neutral zone can still SEE (GECYBS.C:251 is a firing gate)', () => {
   /**
-   * The exclusion sits INSIDE the candidate loop in `cyb_check_lockon`, which
-   * `cyb_lives` reaches on every activation regardless of what the engagement
-   * scan decided. Losing it would not let a Cybertron shoot inside sector
-   * (0,0) — the scan still refuses that — but it would let one sitting in the
-   * zone claim a pilot and follow them out of it, which is the same outcome
-   * one move later.
+   * INVERTED 2026-09-20. This block used to assert the opposite and cited
+   * `GECYBS.C:709-731` for it. Those lines are `cyb_check_lockon`'s candidate
+   * loop and contain no neutral test — the ONLY `neutral()` call in the whole
+   * of GECYBS.C is line 251, inside `cyb_lives`' engagement scan:
    *
-   * The zone is the WHOLE of sector (0,0): `0 <= x < 1` on each axis
-   * (GEPLANET.C:866 neutral, floor-based).
+   *   `if (!neutral(&ptr->coord) && ddist < scanrange)`
+   *
+   * That gates FIRING, not seeing. Canon's Cybertron standing in sector (0,0)
+   * still locks the nearest pilot in the galaxy and leaves at hyperwarp.
+   *
+   * Blinding it instead made the origin an ABSORBING STATE: the test sat
+   * inside the candidate loop and did not depend on the candidate, so a
+   * Cybertron in the zone skipped every ship in the galaxy, always fell to
+   * `low_ship == -1`, and — with the port's extra per-activation heading
+   * re-roll — random-walked inside one sector for ever. Reported from play as
+   * a Sarten Obliterator camping the trade hub.
+   *
+   * It still cannot SHOOT from inside: `runEngagementScan` returns early, which
+   * is canon's line 251. Seeing is what gives it somewhere to go.
    */
-  it('claims nothing while it stands in sector (0,0), and goes back to wandering', () => {
+  it('claims a pilot outside the zone while it stands in sector (0,0)', () => {
     const cyb = cybertron(CLASS_SCOUT, { xcoord: 0.5, ycoord: 0.5, cybmine: 255, holdcourse: 0 });
     const prey = cybPlayer(2, { xcoord: 2.0, ycoord: 0.5 });
     const { svc } = cybHarness([cyb, prey], fixedRandom(0.99));
 
     lockon(svc, cyb);
 
-    // `low_ship == -1` → random speed, random heading, re-arm and rest.
-    expect(cyb.cybmine).toBe(255);
-    expect(cyb.tick).toBe(255);
+    expect(cyb.cybmine).toBe(prey.channel);
   });
 
-  it('and claims the same pilot the moment it is one sector outside', () => {
-    // Only the attacker's x moves — 0.5 → 1.5, out of sector 0. Everything
-    // else is identical, so the claim in this case is attributable to the
-    // neutral-zone test and nothing else.
-    const cyb = cybertron(CLASS_SCOUT, { xcoord: 1.5, ycoord: 0.5, cybmine: 255, holdcourse: 0 });
-    const prey = cybPlayer(2, { xcoord: 2.0, ycoord: 0.5 });
+  it('points itself AT that pilot, which is how it leaves the zone', () => {
+    // The bug was never "it sits still" — it was that it had no reason to go
+    // anywhere. A real heading is the fix.
+    const cyb = cybertron(CLASS_SCOUT, { xcoord: 0.5, ycoord: 0.5, cybmine: 255, holdcourse: 0 });
+    const prey = cybPlayer(2, { xcoord: 20.0, ycoord: 0.5 });
     const { svc } = cybHarness([cyb, prey], fixedRandom(0.99));
 
     lockon(svc, cyb);
 
-    expect(cyb.cybmine).toBe(prey.channel);
+    // Due east, and moving.
+    expect(Math.round(cyb.head2b)).toBe(90);
+    expect(cyb.speed2b).toBeGreaterThan(0);
+  });
+
+  it('still refuses a pilot who is INSIDE the zone — that part is ours, not canon', () => {
+    // PORT-ORIGINAL and deliberate. Canon's `cyb_check_lockon` has no neutral
+    // test at all, so a canon Cybertron would lock a pilot sitting on the hub,
+    // fly to them, and shadow them at matched speed until they stepped out.
+    // We keep the zone a real sanctuary. @see docs/DECISIONS.md 2026-09-20
+    const cyb = cybertron(CLASS_SCOUT, { xcoord: 5.0, ycoord: 5.0, cybmine: 255, holdcourse: 0 });
+    const prey = cybPlayer(2, { xcoord: 0.5, ycoord: 0.5 });
+    const { svc } = cybHarness([cyb, prey], fixedRandom(0.99));
+
+    lockon(svc, cyb);
+
+    expect(cyb.cybmine).toBe(255);
+  });
+
+  it('with nobody to hunt it HOLDS its course instead of re-rolling it', () => {
+    // Canon's no-target branch sets only `tick` and `cybmine`
+    // (GECYBS.C:733-737) — the ship coasts on its last heading and leaves the
+    // area. The port re-rolled speed and heading on EVERY activation, which is
+    // a random walk with zero expected displacement: the second half of why a
+    // Cybertron could never find its way out of sector (0,0).
+    const cyb = cybertron(CLASS_SCOUT, {
+      xcoord: 0.5, ycoord: 0.5, cybmine: 255, holdcourse: 0, head2b: 42, speed2b: 1234,
+    });
+    const { svc } = cybHarness([cyb], fixedRandom(0.99));
+
+    lockon(svc, cyb);
+
+    expect(cyb.head2b).toBe(42);
+    expect(cyb.speed2b).toBe(1234);
+    expect(cyb.cybmine).toBe(255);
+    expect(cyb.tick).toBe(255);
   });
 });
 

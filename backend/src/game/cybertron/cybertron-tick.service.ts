@@ -954,8 +954,12 @@ export class CybertronTickService implements OnModuleInit {
         if (candidate.cloak === 10) continue;
         if (!canPursue(hunterLowestToAttack, candidate.shpclass)) continue;
 
-        // Neutral zone exclusion: Cybertron must not be in NZ, target must not be in NZ
-        if (this.isInNeutralZone(ship)) continue;
+        // PORT-ORIGINAL, and deliberate: a pilot inside sector (0,0) is not a
+        // target. Canon's `cyb_check_lockon` has NO neutral test — the only
+        // `neutral()` in GECYBS.C is line 251, which gates firing — so a canon
+        // Cybertron locks a pilot on the hub, flies to them and shadows them at
+        // matched speed until they step out. We make the zone a real sanctuary.
+        // @see docs/DECISIONS.md 2026-09-20
         if (this.isInNeutralZone(candidate)) continue;
 
         // Gang-up limit belongs to the ship being hunted, not the hunter. A
@@ -972,9 +976,22 @@ export class CybertronTickService implements OnModuleInit {
       }
 
       if (lowChannel === -1) {
-        // No eligible target — wander at random speed and rest for a while (@see GECYBS.C:733-737)
-        ship.speed2b = this.random.next() * topSpeed;
-        ship.head2b = this.random.next() * 359.9;
+        // Nobody to hunt. Canon sets ONLY these two and lets the ship coast on
+        // whatever course it already had:
+        //
+        //   GECYBS.C:735 `ptr->tick = 255;`
+        //   GECYBS.C:736 `ptr->cybmine = 255;`
+        //
+        // This used to re-roll `speed2b` and `head2b` here as well, citing the
+        // same lines, which do not contain it. A fresh random heading on every
+        // activation is a random walk: zero expected displacement, so a
+        // Cybertron with no target went nowhere instead of leaving. Paired with
+        // the old blind-in-the-zone rule above it made the origin an absorbing
+        // state — reported from play as a Sarten Obliterator camping the hub.
+        //
+        // Course still gets re-rolled, on canon's cadence: `cybupdate` every
+        // 100-200 activations — GECYBS.C:473 `ptr->speed2b = rndm(d_topspeed);` —
+        // which `cybUpdateDb` does.
         ship.tick = 255;
         ship.cybmine = 255;
         return;
