@@ -593,13 +593,36 @@ export const HELP_TOPICS: Readonly<Record<HelpTopicId, HelpTopic>> = Object.free
  *
  * So: canon verbatim, then our addition, marked as ours.
  *
- * `transfer` is the only entry today. Canon's HLPTRA (MBMGEHLP.MSG:1095)
- * documents ship-to-planet and planet-to-ship because that is all
- * `cmd_transfer` had; ship-to-ship is this port's addition, recorded as
- * deviation D1 in docs/DECISIONS.md.
+ * Canon's HLPTRA (MBMGEHLP.MSG:1095) documents ship-to-planet and
+ * planet-to-ship because that is all `cmd_transfer` had; ship-to-ship is this
+ * port's addition, recorded as deviation D1 in docs/DECISIONS.md. Canon's
+ * HLPSEN transmits the line whole and substitutes nothing, so `%t` is ours
+ * too — docs/DECISIONS.md 2026-09-20.
+ *
+ * KEYED ON THE THREE-CHARACTER VERB, because that is what the router matches
+ * (GECMDS.C:249 `struct cmd * FUNC gesearch(ptr,tab,len)`) and therefore what
+ * `canonHelpPage` falls back to. Keyed on the full word, `hel tra` returned
+ * canon alone — the shortest spelling, the one a player actually types, was
+ * the one that hid the feature.
  */
 const PORT_HELP_ADDENDA: Readonly<Record<string, ReadonlyArray<string>>> = Object.freeze({
-  transfer: Object.freeze([
+  sen: Object.freeze([
+    '',
+    'ADDED BY THIS PORT',
+    '  %t  — in a message, becomes the ship you currently have locked.',
+    '',
+    '    loc sh f',
+    '    sen a Hunting %t, all mine!',
+    '',
+    '  The original substituted nothing; on a BBS that was the terminal\'s job.',
+    '  Bind the whole line to a key and it still works:',
+    '',
+    '    fset f4 sen a Hunting %t, all mine!',
+    '',
+    '  With nothing locked the message is refused rather than sent with a gap',
+    '  in it. An ordinary percent sign is left alone.',
+  ]),
+  tra: Object.freeze([
     '',
     'ADDED BY THIS PORT',
     '  tra <qty> <item> <ship>  — hand cargo to another ship in your sector.',
@@ -618,7 +641,10 @@ export function canonHelpPage(
 
   // One page per lookup, as canon does — the page tells the player how to reach
   // the next one, and that instruction now resolves.
-  const addendum = PORT_HELP_ADDENDA[q] ?? [];
+  const addendum =
+    PORT_HELP_ADDENDA[q] ??
+    (opts.prefix === false ? undefined : PORT_HELP_ADDENDA[q.slice(0, 3)]) ??
+    [];
 
   const concept = CANON_CONCEPT_PAGES[q] ?? CANON_CONCEPT_PAGES[`${q}s`];
   if (concept) {

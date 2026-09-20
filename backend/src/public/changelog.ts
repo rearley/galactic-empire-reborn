@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.30.1',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'Two things this port added to commands are now documented in the game’s own help, where they were only on the web guide before. Type "hel sen" and the %t target token is explained under the original’s page for the command; "hel tra" now shows the ship-to-ship transfer note, which until now only appeared if you typed the word out in full.',
+      },
+    ],
+  },
+  {
     version: '0.30.0',
     date: '2026-09-20',
     entries: [

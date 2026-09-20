@@ -10,6 +10,8 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-20 — the help the game itself gives](#session-2026-09-20-ninth-pass--the-help-the-game-itself-gives)
+- [2026-09-20 — %t, the locked ship's name in a message](#session-2026-09-20-eighth-pass--t-the-locked-ships-name-in-a-message)
 - [2026-09-20 — killing the Obliterator now means something](#session-2026-09-20-seventh-pass--killing-the-obliterator-now-means-something)
 - [2026-09-20 — the client never knew it was stale](#session-2026-09-20-sixth-pass--the-client-never-knew-it-was-stale)
 - [2026-09-20 — the crawl survived the restart too](#session-2026-09-20-fifth-pass--the-crawl-survived-the-restart-too)
@@ -8328,3 +8330,38 @@ passed because Node 22 has it. Re-running `tsc` after a lint-only edit is not
 optional.
 
 **Tests:** backend 693 suites / 6,779, 14 new. v0.30.0.
+
+---
+
+## Session 2026-09-20 (ninth pass) — the help the game itself gives
+
+**Asked by the owner:** "you said you added it to built in help?"
+
+I had not. `%t` went into `GUIDE_DEVIATIONS` — the `/guide` page on the web —
+and into the changelog, and I described that as built-in help. The page a
+player reads with `hel sen` still carried only canon's HLPSEN, which documents
+a command that substitutes nothing. The only way to find the feature in-game
+was to have been told about it.
+
+The mechanism already existed and had one entry. `PORT_HELP_ADDENDA` appends
+after a canon page rather than editing it, so the original text stays verbatim
+and the addition is marked as ours. `%t` is now a second entry, carrying the
+worked example and the refusal rule, because a player who reads nothing else
+copies the example line.
+
+**A second bug fell out of writing the test.** The addenda were keyed on the
+full word — `transfer` — while the page lookup falls back to the three-character
+verb the router actually matches. So `hel transfer` showed the ship-to-ship
+note and `hel tra` did not: the shortest spelling, the one a player types, was
+the one that hid the feature. The addendum now resolves by the same rule as the
+page it attaches to.
+
+**The pattern, again.** This is the same shape as the (0,0) sanctuary four
+times over: a thing implemented in one of the places it belongs, where the
+missing place is the next bug. Documentation counts as one of those places.
+Shipping a port-original command leg now means three: the guide, the changelog,
+and the command's own help page.
+
+**Tests:** `test/unit/help-port-addenda.spec.ts`, 5 new — including one that
+asserts `hel tra` and `hel transfer` give the same answer, which was the
+failing one. backend 694 suites / 6,789. v0.30.1.
