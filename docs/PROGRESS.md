@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 116 entries.
+Append-only, **newest at the bottom**. 117 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-20 — bound shortcuts became buttons on a phone](#2026-09-20--bound-shortcuts-became-buttons-on-a-phone)
 - [2026-09-20 — the event log was off the side of the phone](#2026-09-20--the-event-log-was-off-the-side-of-the-phone)
 - [2026-09-19 — the calculator can load your own colonies](#2026-09-19--the-calculator-can-load-your-own-colonies)
 - [2026-09-19 — "little to no gold" was a hold full of mines](#2026-09-19--little-to-no-gold-was-a-hold-full-of-mines)
@@ -7842,4 +7843,18 @@ horizontal overflow (`scrollWidth` 390), the disclosures open, and `sca lo`
 renders the ASCII map inside the fold. Two log-clearing specs failed on the
 first pass because the new hook sat after the PreFlightScreen early return —
 a conditional hook, fixed by hoisting it. v0.25.1.
+
+## 2026-09-20 — bound shortcuts became buttons on a phone
+
+Follow-on from the phone layout, and from a correction: the f-key legend had
+been dropped on mobile as useless, when in fact the bindings are TYPED and a
+touch keyboard benefits from them most. `FkeyBar` now renders one chip per
+bound slot under the command line, narrow layout only, sending the bound text
+so the log echoes what ran. Unbound slots are left out; no bindings renders
+nothing.
+
+Verified in a browser at 390x844: `fset f1 sca lo` made the chip appear, and
+tapping it produced `Range Scan Dist:300000`. Two earlier "no chip bar"
+assertions passed for the wrong reason — the harness had no bindings — so the
+specs now push an `fkeys.snapshot` through the mocked socket first. v0.26.0.
 

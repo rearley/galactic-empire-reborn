@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 
 vi.mock('../src/auth/tokenStore', () => ({
   getToken: vi.fn(() => 'test-jwt-token'),
@@ -29,6 +29,19 @@ vi.mock('../src/socket/useSocket', () => ({
 }));
 
 import { App } from '../src/App';
+import { socket } from '../src/socket/socketClient';
+
+/**
+ * Push an `fkeys.snapshot` through the mocked socket, the way the server does
+ * on board and after every `fset`. Without it the harness has no bindings and
+ * "no chip bar" would pass for the wrong reason.
+ */
+function bindFkeys(bindings: string[]): void {
+  const on = socket.on as unknown as { mock: { calls: [string, (e: unknown) => void][] } };
+  const handlers = on.mock.calls.filter(([event]) => event === 'fkeys.snapshot');
+  expect(handlers.length).toBeGreaterThan(0);
+  act(() => { for (const [, fn] of handlers) fn({ fkeys: bindings }); });
+}
 
 /**
  * The phone layout.
@@ -91,6 +104,17 @@ describe('on a phone', () => {
     expect((roster as HTMLDetailsElement).open).toBe(false);
   });
 
+  it('offers the bound shortcuts as one tap, between the command line and the log', () => {
+    render(<App />);
+    bindFkeys(['pha 0', 'shi up']);
+    const bar = screen.getByTestId('fkey-bar');
+    expect(screen.getByTestId('fkey-chip-f1')).toHaveTextContent('f1 pha 0');
+    const input = screen.getByTestId('command-input');
+    const log = screen.getByTestId('event-log');
+    expect(input.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(log.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
   it('keeps the f-key legend, because the shortcuts are TYPED, not pressed', () => {
     // `fset f1 pha 0 0` then `f1` — a browser cannot claim the real F-keys
     // (game/commands/fkeys.ts), so these are commands you type, and typing
@@ -114,6 +138,14 @@ describe('on a desktop', () => {
   it('keeps the f-key legend', () => {
     render(<App />);
     expect(screen.getByTestId('fkey-map')).toBeInTheDocument();
+  });
+
+  it('gets no tap-bar even with slots bound — the side-panel legend is enough', () => {
+    render(<App />);
+    bindFkeys(['pha 0', 'shi up']);
+    expect(screen.queryByTestId('fkey-bar')).not.toBeInTheDocument();
+    // ...and the legend still lists them.
+    expect(screen.getByTestId('fkey-map')).toHaveTextContent('pha 0');
   });
 
   it('is the default when the browser cannot be asked', () => {

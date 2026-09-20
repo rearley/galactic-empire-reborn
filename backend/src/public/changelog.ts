@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.26.0',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'On a phone, every shortcut you have bound with fset now sits as a button under the command line — tap f1 instead of typing pha 0. Bind them at a desk, tap them on the move. The desktop terminal is unchanged; its f-key list is in the side panel as before.',
+      },
+    ],
+  },
+  {
     version: '0.25.1',
     date: '2026-09-20',
     entries: [

@@ -7,6 +7,7 @@ import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
+import { FkeyBar } from './components/FkeyBar';
 import { ScanPanel } from './components/ScanPanel';
 import { TitleBar } from './components/TitleBar';
 import { PreFlightScreen } from './onboarding/PreFlightScreen';
@@ -194,6 +195,13 @@ function Terminal(): React.JSX.Element {
           * first thing it covers — and with it the newest lines of the log.
           */}
         <CommandInput onSubmit={send} />
+
+        {/*
+          * Phone only. Every character costs a touch-keyboard tap here, so a
+          * bound slot is worth a button; on the desktop terminal the legend in
+          * the side panel is enough. @see components/FkeyBar.tsx
+          */}
+        <FkeyBar fkeys={fkeys} onSend={send} />
 
         <div className="flex flex-1 flex-col overflow-hidden border-t border-gray-800">
           <EventLog lines={logLines} />

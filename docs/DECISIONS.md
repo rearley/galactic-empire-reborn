@@ -6494,3 +6494,22 @@ touch keyboard than on a desktop.
 at first, and two unrelated log-clearing tests failed — React saw a different
 hook order between renders. The lint rule caught it as well.
 
+## 2026-09-20 — Bound shortcuts are buttons on a phone, and only on a phone
+
+**Decision.** In the narrow layout only, every bound `fset` slot renders as a
+chip under the command line (`components/FkeyBar.tsx`); tapping one sends the
+bound text. The desktop terminal keeps the legend in its side panel and gets no
+bar.
+
+**Why only there.** The binding is typed — `fset f1 pha 0 0`, then `f1` — and on
+a desktop that is two keystrokes nobody minds. On a phone every character is a
+touch-keyboard tap, so the same binding is worth a button. A bar on the desktop
+would spend log height to save typing that is already cheap.
+
+**It sends the BOUND TEXT, not the slot name.** Either works, since the router
+expands `f1` server-side, but sending `pha 0` makes the log echo what actually
+ran — which is what a player needs when a shortcut does something unexpected.
+
+**Nothing bound renders nothing.** An empty strip would cost log height and
+teach a new player nothing; `hel fset` does that job.
+
