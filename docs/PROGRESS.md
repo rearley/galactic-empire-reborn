@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 118 entries.
+Append-only, **newest at the bottom**. 178 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,12 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-20 — killing the Obliterator now means something](#session-2026-09-20-seventh-pass--killing-the-obliterator-now-means-something)
+- [2026-09-20 — the client never knew it was stale](#session-2026-09-20-sixth-pass--the-client-never-knew-it-was-stale)
+- [2026-09-20 — the crawl survived the restart too](#session-2026-09-20-fifth-pass--the-crawl-survived-the-restart-too)
+- [2026-09-20 — free to go, too slow to leave](#session-2026-09-20-fourth-pass--free-to-go-too-slow-to-leave)
+- [2026-09-20 — a claim that outlived the restart](#session-2026-09-20-later-still--a-claim-that-outlived-the-restart)
+- [2026-09-20 — the sanctuary only covered half the engagement](#session-2026-09-20-later--the-sanctuary-only-covered-half-the-engagement)
 - [2026-09-20 — bound shortcuts became buttons on a phone](#2026-09-20--bound-shortcuts-became-buttons-on-a-phone)
 - [2026-09-20 — the event log was off the side of the phone](#2026-09-20--the-event-log-was-off-the-side-of-the-phone)
 - [2026-09-19 — the calculator can load your own colonies](#2026-09-19--the-calculator-can-load-your-own-colonies)
@@ -8232,3 +8238,56 @@ carries the rejected alternatives and the reason the canon-shaped one lost.
 Player-facing, so it is in `GUIDE_DEVIATIONS` under `cybertrons` too.
 
 **Tests:** backend 52 cybertron suites / 305, including 9 new. v0.29.0.
+
+## Backlog — AI enhancements, raised by the owner 2026-09-20
+
+Forward-looking. Nothing here is started, and nothing here is a defect.
+
+### 1. A small AI under attack calls for help
+
+Owner's words: "when i attack a small AI, it should send a distress call and
+others within x range can come to the rescue."
+
+**Canon has nothing like this.** `GECYBS.C` and `GEDROIDS.C` were both searched
+for a distress, help, rescue or ally concept and there is none — every AI ship
+acquires independently, by its own proximity scan, and none of them knows that
+another is in trouble. The only automated response to an attack anywhere in
+canon is a PLANET's ion cannon, which fires on whoever is shooting at it
+(`MBMGEHLP.MSG:386-388`) and involves no ships. So this is PORT-ORIGINAL and
+needs the full treatment: an owner decision, a DECISIONS entry with the
+alternatives, and a `GUIDE_DEVIATIONS` line, exactly as the respawn delay got.
+
+**Some of it already emerges, which is worth knowing before building anything.**
+Cybertrons all scan for the nearest eligible target every activation, so
+attacking one inside another's scan range already tends to draw the second in —
+not because it was called, but because you are the closest thing to it. Before
+inventing a signal, establish how much of the wanted behaviour is already there
+and only missing a MESSAGE.
+
+**The constraint that will bite.** `noclaim` is canon's gang-up limit, held on
+the VICTIM's class, and it caps how many Cybertrons may claim one player at
+once (`GECYBS.C:711, 719`, and the port's `notClaimed`). A distress call that
+recruits responders must respect that cap or it silently deletes the one piece
+of canon that stops a pile-on. It is also the natural lever: "come to the
+rescue" could mean nothing more than letting a distress call RAISE the cap
+briefly, rather than adding a new pursuit path.
+
+**Open questions for the design conversation:**
+
+- What counts as "small"? Droids (31-33) are ephemeral and carry almost nothing;
+  Cybertron Scouts (21) are persistent and already the common hull. The two
+  would want different answers.
+- What is `x range`? It should be derived from something canon already
+  states — the responder's own `scanRange` is the obvious candidate, since that
+  is what "could have seen it" means everywhere else in this codebase — rather
+  than a new constant.
+- Does the responder abandon its current target? Cheapest version: only
+  unclaimed ships answer.
+- Does the player HEAR the distress call? A rescue nobody saw coming reads as a
+  bug. Canon's taunt machinery (`cyb-taunt-catalog.generated.ts`) is the
+  existing channel for an AI saying something, and reusing it keeps the voice
+  consistent.
+
+**Not to be confused with** the v0.29.0 respawn delay or the neutral-zone
+sanctuary work; this is additive, and it pushes difficulty in the opposite
+direction to both.
