@@ -6950,3 +6950,59 @@ entirely.
   being human (GEFUNCS.C:1200). The reward stays canon; only the scarcity moves.
 
 **A player meets this**, so it is also in `GUIDE_DEVIATIONS` under `cybertrons`.
+
+## 2026-09-20 — `%t` in a message expands to the locked ship
+
+**Context.** Owner: "what would be cool is if we can either through fset or
+something make it so I can lock on a ship and then send a message 'Hunting
+<target>, all mine!'"
+
+**Canon has nothing to be faithful to.** `cmd_send` rebuilds the line with
+`rstrin()` and transmits it whole —
+GECMDS.C:1825 `void  FUNC cmd_send()` — substituting nothing. On a BBS that sort
+of thing belonged to the terminal, which is precisely why `fset` is
+PORT-ORIGINAL here too: people bound F-keys in Telix to transmit `pha 0 0\r`,
+so there is no key handling and no templating in `GECMDS.C` at all.
+
+**Decision.** `%t` in a `sen` message expands to the name of the ship the sender
+has locked. `loc sh f`, then `sen a Hunting %t, all mine!`.
+
+**Expanded in `sen`, not in the f-key expansion**, although the request offered
+`fset` as the obvious home. Three reasons, and they all point the same way: a
+typed line and a bound line then behave identically; `CommandRouterService`
+stays free of any dependency on ship lookup, which it currently does not have
+and should not acquire for this; and `fset` keeps storing literal text, so
+`fset f4 sen a Hunting %t, all mine!` works without `fset` knowing the token
+exists.
+
+**It refuses rather than sending a line with a hole in it.** With no lock — or
+a lock on a ship that has since left the game — the message is declined and
+nothing transmits. "Hunting , all mine!" reaching the whole galaxy cannot be
+recalled, everyone has seen it, and the sender looks like they mistyped rather
+than like the game declined. A stale lock is treated the same as no lock, so a
+stale NAME never goes out.
+
+**Resolved from `lockKey`, not `lock`.** `lock` holds a `shipno`, which is
+per-user and therefore 1 for very nearly every first hull in the game; reading
+it as an identity is exactly the bug that once named a bystander two sectors
+away as a killer, and is why `ShipChannelRegistry` exists. `lockKey` carries
+the full `userid:shipno`.
+
+**Scope of the token.** One letter, `%t`, case-insensitive. A bare `%` means
+nothing and no other letter is claimed, so "shields at 50%" and "100% his
+fault" stay ordinary traffic. A second token, if ever wanted, gets its own
+letter and its own reason rather than a general template language — a chat line
+is not a format string, and the moment it becomes one, every message a player
+types has to be audited for what it might expand to.
+
+**Substituted with a FUNCTION replacement**, not a string one. `$&`, `$1` and
+friends are special on the replacement side of `String.replace`, so a pilot who
+named their ship `$&` would corrupt every line that named them. The function
+form also means a ship called `%t` substitutes once and stops, rather than
+seeding a second expansion.
+
+**Alternatives rejected.** A dedicated command (`hunt`, `claim`): a new keyword
+for one sentence, and it could not be re-worded by the player. Expanding in the
+f-key layer: would have worked only for bound lines and would have pulled a
+ship lookup into the router. A general `%x` template language: unbounded surface
+on the one input players type freely.

@@ -8291,3 +8291,40 @@ briefly, rather than adding a new pursuit path.
 **Not to be confused with** the v0.29.0 respawn delay or the neutral-zone
 sanctuary work; this is additive, and it pushes difficulty in the opposite
 direction to both.
+
+## Session 2026-09-20 (eighth pass) — `%t`, the locked ship's name in a message
+
+Owner, wanting something small: lock a ship, then send "Hunting <target>, all
+mine!" — "either through fset or something".
+
+Canon substitutes nothing. `cmd_send` rebuilds the line with `rstrin()` and
+transmits it whole (GECMDS.C:1825), because on a BBS templating belonged to the
+terminal — the same reason `fset` is port-original here.
+
+Built as `%t` inside `sen` rather than inside the f-key expansion, although
+`fset` was the obvious home. A typed line and a bound line then behave
+identically; `CommandRouterService` keeps out of ship lookup, which it has no
+dependency on today; and `fset` goes on storing literal text, so
+`fset f4 sen a Hunting %t, all mine!` works without `fset` knowing the token
+exists.
+
+It refuses rather than transmitting a line with a hole in it — no lock, or a
+lock on a ship that has left the game, declines the send. A broadcast cannot be
+recalled, and "Hunting , all mine!" makes the sender look like they mistyped.
+Resolved from `lockKey`, never `lock`: `lock` is a per-user `shipno` and is 1
+for nearly every first hull, which is the bug that once named a bystander as a
+killer.
+
+Scope kept to one letter. A bare `%` means nothing and no other letter is
+claimed, so "shields at 50%" stays ordinary traffic; a chat line is not a format
+string, and a general template language would mean auditing every message a
+player types for what it might expand to. Substitution uses a FUNCTION
+replacement, so a ship named `$&` cannot corrupt lines that name it.
+
+**Caught in review, worth recording:** v0.29.0 went out with a type error I
+introduced after its last typecheck — swapping `[...x].sort()` for `toSorted()`
+to satisfy a lint warning, which this project's TS lib does not carry. Tests
+passed because Node 22 has it. Re-running `tsc` after a lint-only edit is not
+optional.
+
+**Tests:** backend 693 suites / 6,779, 14 new. v0.30.0.

@@ -185,3 +185,66 @@ describe('SenHandlerService — frequency-scoped delivery (GECMDS.C:1853)', () =
     expect(result.lines[0].text).toContain('1234');
   });
 });
+
+/**
+ * `%t` — the locked target's name, in a message.
+ *
+ *   loc sh f
+ *   sen a Hunting %t, all mine!
+ *
+ * PORT-ORIGINAL, and the reason it lives in `sen` rather than in the f-key
+ * expansion: it works identically whether the line was typed or came out of
+ * `fset f4 sen a Hunting %t, all mine!`.
+ */
+describe('sen — %t expands to the locked ship', () => {
+  const withTarget = (target: ShipState | undefined): SenHandlerService =>
+    new SenHandlerService(undefined, {
+      get: (userid: string, shipno: number) =>
+        target && target.userid === userid && target.shipno === shipno ? target : undefined,
+    } as never);
+
+  it('names the ship this pilot has locked', () => {
+    const target = makeShip({ userid: 'usr_wasp', shipno: 2, shipname: 'ICantStopDying' });
+    const ship = makeShip({
+      freq: [0, 0, 0], shipname: 'BigCat II', lockKey: 'usr_wasp:2', lock: 2,
+    });
+
+    const result = withTarget(target)
+      .command.handler(ship, ['a', 'Hunting', '%t,', 'all', 'mine!'], ctx) as CommandResult;
+
+    expect(result.broadcasts?.[0].payload).toMatchObject({
+      text: 'Hunting ICantStopDying, all mine!',
+    });
+  });
+
+  it('refuses rather than transmitting a line with a hole in it', () => {
+    const ship = makeShip({ freq: [0, 0, 0], shipname: 'BigCat II', lockKey: null });
+
+    const result = withTarget(undefined)
+      .command.handler(ship, ['a', 'Hunting', '%t!'], ctx) as CommandResult;
+
+    expect(result.broadcasts ?? []).toHaveLength(0);
+    expect(result.lines[0].text).toContain('No target locked');
+  });
+
+  it('refuses when the lock names a ship that has left the game', () => {
+    // A stale lock must not transmit a stale name. `lockKey` still reads
+    // "usr_wasp:2"; nothing answers to it.
+    const ship = makeShip({ freq: [0, 0, 0], shipname: 'BigCat II', lockKey: 'usr_wasp:2', lock: 2 });
+
+    const result = withTarget(undefined)
+      .command.handler(ship, ['a', 'Hunting', '%t!'], ctx) as CommandResult;
+
+    expect(result.broadcasts ?? []).toHaveLength(0);
+    expect(result.lines[0].text).toContain('No target locked');
+  });
+
+  it('leaves an ordinary message alone, lock or no lock', () => {
+    const ship = makeShip({ freq: [0, 0, 0], shipname: 'BigCat II', lockKey: null });
+
+    const result = withTarget(undefined)
+      .command.handler(ship, ['a', 'shields', 'at', '50%'], ctx) as CommandResult;
+
+    expect(result.broadcasts?.[0].payload).toMatchObject({ text: 'shields at 50%' });
+  });
+});

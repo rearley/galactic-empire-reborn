@@ -91,6 +91,14 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'everything else, so the extra detail cost you the screen; here it has its ' +
     'own panel, which is on show whether you use it or not. Turn either off and ' +
     'it stays off — `scanhome` and `filter` are untouched.',
+  sen:
+    'Type `%t` in a message and it becomes the ship you have locked: ' +
+    '`loc sh f` then `sen a Hunting %t, all mine!` goes out naming them. The ' +
+    'original substituted nothing — on a BBS that was the terminal\'s job, ' +
+    'which is the same reason function keys are typed here. Bind the whole ' +
+    'thing to a key and it still works: `fset f4 sen a Hunting %t, all mine!`. ' +
+    'With nothing locked the message is refused rather than sent with a gap in ' +
+    'it, and an ordinary percent sign — "shields at 50%" — is left alone.',
   new:
     'The original sold you a hull and dropped you back at the main menu, where ' +
     'your fleet was listed and you picked the new ship straight away. This port ' +

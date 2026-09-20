@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.30.0',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'Type %t in a message and it becomes the ship you have locked. Lock a target, then send "Hunting %t, all mine!" and it goes out naming them \u2014 and it works bound to a function key too, so one key can call your shot. With nothing locked the message is refused rather than sent with a gap in it, and an ordinary percent sign, as in "shields at 50%", is left alone.',
+      },
+    ],
+  },
+  {
     version: '0.29.0',
     date: '2026-09-20',
     entries: [

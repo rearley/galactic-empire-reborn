@@ -41,8 +41,12 @@ describe('respawnDelayMs — rarity in canon becomes time here', () => {
   it('orders every class by canon rarity, without naming any of them', () => {
     const byRarity = [21, 24, 22, 25, 23];
     const delays = byRarity.map((c) => respawnDelayMs(CANON_TOT_TO_CREATE[c]));
-    const ascending = delays.toSorted((a, b) => a - b);
-    expect(delays).toEqual(ascending);
+    // Checked pairwise rather than against a sorted copy: `toSorted` is not in
+    // this project's TS lib, and `sort` on a spread trips the lint rule that
+    // exists to catch sorting in place.
+    for (let i = 1; i < delays.length; i++) {
+      expect(delays[i]).toBeGreaterThanOrEqual(delays[i - 1]);
+    }
   });
 
   it('never returns a delay shorter than the base, whatever it is handed', () => {

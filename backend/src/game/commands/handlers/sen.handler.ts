@@ -5,6 +5,8 @@ import { FREQ_SECTOR_MAX, FREQ_GALAXY_MIN } from './_freq-thresholds';
 import { formatMessage, MessageId } from '../messages';
 import { shipKey } from '../../ship/ship-state.types';
 import { allowChat } from './helpers/chat-throttle';
+import { expandTargetToken } from './helpers/target-token';
+import { ShipStateService } from '../../ship/ship-state.service';
 
 const CHANNEL_MAP: Record<string, number> = { a: 0, b: 1, c: 2 };
 /**
@@ -37,7 +39,36 @@ export class SenHandlerService {
    * Nest cannot resolve a bare function type — it passes undefined and the
    * default takes over, which is exactly the production behaviour.
    */
-  constructor(@Optional() private readonly now: () => number = () => Date.now()) {}
+  constructor(
+    @Optional() private readonly now: () => number = () => Date.now(),
+    /**
+     * Resolves the locked target for `%t`. `@Optional` and LAST so the many
+     * hand-built test harnesses that construct this with a clock alone keep
+     * working — without it `%t` simply never expands, which is the same
+     * refusal a pilot with no lock gets.
+     */
+    @Optional() private readonly shipService?: ShipStateService,
+  ) {}
+
+  /**
+   * The name of the ship this pilot has locked, or null.
+   *
+   * Resolved from `lockKey` rather than `lock`: `lock` holds a shipno, which is
+   * per-user and therefore 1 for almost every first hull in the game, while
+   * `lockKey` is the full "userid:shipno". Reading the wrong one is how an
+   * earlier bug named a bystander as a killer. @see ship-channel.registry.ts
+   *
+   * A lock on a ship that has since left the game resolves to null, and the
+   * caller refuses — a stale lock must not transmit a stale name.
+   */
+  private lockedTargetName(ship: ShipState): string | null {
+    const key = ship.lockKey;
+    if (!key || !this.shipService) return null;
+    const sep = key.lastIndexOf(':');
+    if (sep === -1) return null;
+    const target = this.shipService.get(key.slice(0, sep), Number(key.slice(sep + 1)));
+    return target?.shipname ?? null;
+  }
 
   get command(): Command {
     return {
@@ -58,7 +89,21 @@ export class SenHandlerService {
       return { lines: [{ text: formatMessage(MessageId.MSG_BADCOM), category: 'system' }] };
     }
 
-    const messageText = args.slice(1).join(' ');
+    const typed = args.slice(1).join(' ');
+
+    // `%t` becomes the ship you have locked. Expanded BEFORE the length check,
+    // so the cap applies to what actually goes out rather than to the template
+    // — a short line naming a long ship name is still a long line.
+    const expansion = expandTargetToken(typed, this.lockedTargetName(ship));
+    if (!expansion.ok) {
+      return {
+        lines: [{
+          text: 'No target locked, Sir — `loc <ship>` first, then say your piece.',
+          category: 'system',
+        }],
+      };
+    }
+    const messageText = expansion.text;
     if (messageText.length > MAX_MSG_LEN) {
       return { lines: [{ text: formatMessage(MessageId.MSG_USAGE_SEN), category: 'system' }] };
     }
