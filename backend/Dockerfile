@@ -109,6 +109,11 @@ COPY --from=builder --chown=node:node /app/backend/prisma.config.ts ./prisma.con
 # silently. That is how a UNIVMAX of 100 became a 601x601 galaxy in a container.
 # @see test/unit/config/config-ships-in-image.spec.ts
 COPY --from=builder --chown=node:node /app/backend/config ./config
+# Watchtower's pre-update hook runs this INSIDE the container, so it has to be
+# in the image rather than on the host. Plain .mjs executed by node — no build
+# step, so a bundling change cannot quietly break it, and the countdown it
+# holds is the only honest one in the pipeline. @see scripts/deploy-warn.mjs
+COPY --chown=node:node backend/scripts ./scripts
 COPY --chown=node:node backend/package*.json ./
 
 # Build identity, reported on /public/stats. Read at RUNTIME here (unlike the
