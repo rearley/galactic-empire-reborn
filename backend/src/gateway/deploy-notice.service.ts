@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PresenceService } from '../public/presence.service';
-import { DeployPhase, DEPLOY_NOTICE_TEXT, DEPLOY_NOTICE_CATEGORY } from './deploy-notice.messages';
-import { DEPLOY_NOTICE, type DeployNoticePayload } from './deploy-notice.events';
+import { DeployPhase, DEPLOY_NOTICE_TEXT, DEPLOY_NOTICE_CATEGORY, IMMINENT_COUNTDOWN_SECONDS } from './deploy-notice.messages';
+import { DEPLOY_NOTICE, type DeployNoticeEvent } from './deploy-notice.events';
 
 /**
  * Announces an imminent redeploy to everyone in-game.
@@ -37,10 +37,15 @@ export class DeployNoticeService {
     }
 
     const text = DEPLOY_NOTICE_TEXT[phase];
-    const payload: DeployNoticePayload = {
+    const payload: DeployNoticeEvent = {
       phase,
       text,
       category: DEPLOY_NOTICE_CATEGORY[phase],
+      // Only IMMINENT has a number anyone can stand behind: watchtower blocks
+      // on the hook for exactly this long. CI cannot know when watchtower will
+      // pull, and the sign-off is already too late to count anything down, so
+      // both are 0 and the banner shows no timer.
+      seconds: phase === DeployPhase.IMMINENT ? IMMINENT_COUNTDOWN_SECONDS : 0,
     };
     this.events.emit(DEPLOY_NOTICE, payload);
     this.logger.log(`deploy notice ${phase}: told ${notified} player(s)`);

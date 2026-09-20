@@ -21,7 +21,8 @@ import {
 } from '../game/physics/physics-events';
 import { Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { DEPLOY_NOTICE, type DeployNoticePayload } from './deploy-notice.events';
+import { DEPLOY_NOTICE, type DeployNoticeEvent } from './deploy-notice.events';
+import { DeployPhase } from './deploy-notice.messages';
 import type { Ship } from '../prisma/client';
 import type {
   BroadcastTarget,
@@ -244,8 +245,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * @see docs/DECISIONS.md 2026-09-20 — deploy warning broadcast
    */
   @OnEvent(DEPLOY_NOTICE)
-  handleDeployNotice(payload: DeployNoticePayload): void {
+  handleDeployNotice(payload: DeployNoticeEvent): void {
     this.server.emit('event.log', { category: payload.category, text: payload.text });
+    // TWO events, on purpose. The log line is the record and scrolls away with
+    // everything else; this one drives the banner, which does not. The first
+    // production deploy to warn anyone reached two players and one missed it
+    // entirely — they were not watching the log. Same words in both, so they
+    // cannot disagree.
+    this.server.emit('deploy.notice', {
+      phase: payload.phase === DeployPhase.IMMINENT ? 'imminent' : 'inbound',
+      text: payload.text,
+      seconds: payload.seconds,
+    });
   }
 
   /** Emit one narration line to the room it names. */

@@ -6602,3 +6602,16 @@ to shared infrastructure and are the owner's to make.
 no entry in `EventLog.tsx`'s `CATEGORY_CLASS`, so it fell through to the default
 and rendered identically to `system` — silently discarding the one distinction
 the category exists for. Fixed in the same release.
+
+**AMENDED 2026-09-20 — the countdown is a BANNER, not a log line.** The first
+production deploy to warn anyone reached two players; one saw it and one did
+not. Delivered is not seen, and the countdown's entire job is to be noticed. A
+new wire event `deploy.notice` carries the same words plus the seconds
+remaining, and `DeployBanner` renders it above the connection banner, outside
+the scrolling log. The `event.log` line stays — it is the record — so the two
+must never disagree, which is why the banner renders the server's `text` and
+writes no copy of its own. The timer floors at zero and reads "any moment now":
+the stop can be late, and a banner counting into negative numbers would be the
+last thing a player saw. Only `imminent` gets a number, because `inbound` has
+none that is honest.
+

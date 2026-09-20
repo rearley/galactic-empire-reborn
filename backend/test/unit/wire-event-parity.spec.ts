@@ -50,8 +50,8 @@ describe('@ge/wire event names match the backend constants they were moved from'
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it('carries exactly 30 server-to-client names and 2 client-to-server names', () => {
-    expect(Object.keys(WIRE_EVENTS.SERVER_TO_CLIENT)).toHaveLength(30);
+  it('carries exactly 31 server-to-client names and 2 client-to-server names', () => {
+    expect(Object.keys(WIRE_EVENTS.SERVER_TO_CLIENT)).toHaveLength(31);
     expect(Object.keys(WIRE_EVENTS.CLIENT_TO_SERVER)).toHaveLength(2);
   });
 });

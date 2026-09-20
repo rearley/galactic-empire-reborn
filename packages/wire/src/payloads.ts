@@ -40,6 +40,28 @@ export interface EventLogLine {
   category: EventLogCategory;
 }
 
+// ─── deploy.notice ────────────────────────────────────────────────────────
+
+/**
+ * A redeploy is coming. Sent alongside the `event.log` line, not instead of it:
+ * the log keeps the record, this drives the banner that makes it noticeable.
+ *
+ * It exists because a log line was not enough. The first production deploy to
+ * warn anyone reached two players and ONE of them saw it — the other was not
+ * watching the log, which scrolls. @see docs/DECISIONS.md 2026-09-20
+ */
+export interface DeployNoticePayload {
+  /** `inbound` is a 5-10 minute heads-up; `imminent` is the real countdown. */
+  phase: 'inbound' | 'imminent';
+  /** The same words as the log line, so the two can never disagree. */
+  text: string;
+  /**
+   * Seconds until the server stops, or 0 when there is no honest number to
+   * give. `inbound` is always 0: CI cannot know when watchtower will pull.
+   */
+  seconds: number;
+}
+
 // ─── command:result / scan:render ────────────────────────────────────────
 
 /**

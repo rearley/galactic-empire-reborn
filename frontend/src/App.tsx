@@ -6,6 +6,7 @@ import { EventLog } from './components/EventLog';
 import { ScanMap } from './components/ScanMap';
 import { CommandInput } from './components/CommandInput';
 import { ConnectionBanner } from './components/ConnectionBanner';
+import { DeployBanner } from './components/DeployBanner';
 import { PlayerListPanel } from './components/PlayerListPanel';
 import { FkeyBar } from './components/FkeyBar';
 import { ScanPanel } from './components/ScanPanel';
@@ -18,6 +19,7 @@ import { handleCommandResult } from './socket/command-result-handlers';
 import type { CombatShipDestroyedPayload } from '@ge/wire';
 import { useScanMap } from './hooks/useScanMap';
 import { useEventLog } from './hooks/useEventLog';
+import { useDeployNotice } from './hooks/useDeployNotice';
 import { useFkeys } from './hooks/useFkeys';
 import { useIsNarrow } from './hooks/useIsNarrow';
 
@@ -70,6 +72,9 @@ function Terminal(): React.JSX.Element {
   );
 
   const { lines: logLines, append: appendLines, clear: clearLog } = useEventLog();
+  // ABOVE the PreFlightScreen early return, like `useIsNarrow`: a hook called
+  // conditionally changes the hook order between renders.
+  const deployNotice = useDeployNotice();
 
   // Delivered synchronously from the socket callback — no state slot to
   // overwrite, so a burst cannot drop results. @see socket/useCommandResultQueue
@@ -186,6 +191,7 @@ function Terminal(): React.JSX.Element {
   if (narrow) {
     return (
       <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
+        <DeployBanner notice={deployNotice} />
         <ConnectionBanner status={status} onReconnect={reconnect} />
         <TitleBar status={status} />
 
@@ -247,6 +253,13 @@ function Terminal(): React.JSX.Element {
 
   return (
     <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
+      {/*
+        * ABOVE the connection banner on purpose: when a redeploy drops the
+        * socket both are showing, and "the server is restarting" is the one
+        * that explains the other.
+        */}
+      <DeployBanner notice={deployNotice} />
+
       {/* Top: connection status banner (FR-019) — hidden when connected */}
       <ConnectionBanner status={status} onReconnect={reconnect} />
 

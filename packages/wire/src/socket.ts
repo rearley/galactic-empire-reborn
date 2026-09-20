@@ -1,5 +1,6 @@
 import type {
   EventLogLine,
+  DeployNoticePayload,
   CommandResultPayload,
   ScanRenderEvent,
   GatewayError,
@@ -71,6 +72,7 @@ export interface ServerToClientEvents {
   'command.notice': (payload: CommandNoticePayload) => void;
   'message.send': (payload: MessageSendPayload) => void;
   'ship.renamed': (payload: ShipRenamedPayload) => void;
+  'deploy.notice': (payload: DeployNoticePayload) => void;
 }
 
 /**

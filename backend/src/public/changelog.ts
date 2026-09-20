@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.3',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-original',
+        text: 'The restart warning is now a banner across the top of the screen with a live countdown, instead of a line in the event log. The log scrolls, and the first time the warning went out one of the two players on at the time missed it completely. The banner cannot be scrolled past, and a glance at it tells you how long you have. You can dismiss it, and it clears itself once you are reconnected.',
+      },
+    ],
+  },
+  {
     version: '0.27.2',
     date: '2026-09-20',
     entries: [

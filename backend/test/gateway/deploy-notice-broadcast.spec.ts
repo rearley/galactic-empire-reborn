@@ -43,11 +43,11 @@ describe('deploy notice broadcast', () => {
       phase: DeployPhase.IMMINENT,
       text: DEPLOY_NOTICE_TEXT[DeployPhase.IMMINENT],
       category: 'alert',
+      seconds: 45,
     });
 
-    expect(emits).toHaveLength(1);
-    const line = emits[0];
-    expect(line.event).toBe('event.log');
+    const line = emits.filter((e) => e.event === 'event.log')[0];
+    expect(line).toBeDefined();
     expect(line.rooms).toEqual([]);
     // THE assertion. CYBNEW excludes filteredRooms(); this must not, or a
     // filtered player is bounced with no warning at all.
@@ -65,9 +65,34 @@ describe('deploy notice broadcast', () => {
       phase: DeployPhase.INBOUND,
       text: DEPLOY_NOTICE_TEXT[DeployPhase.INBOUND],
       category: 'system',
+      seconds: 0,
     });
 
-    expect(emits[0].payload).toMatchObject({ category: 'system' });
+    expect(emits.filter((e) => e.event === 'event.log')[0].payload)
+      .toMatchObject({ category: 'system' });
+  });
+
+  it('ALSO emits deploy.notice, carrying the countdown for the banner', () => {
+    // The log line is the record; the banner is what gets it noticed. The first
+    // production deploy to warn anyone reached two players and one of them
+    // missed it entirely, because a log scrolls and they were not watching it.
+    const { gateway, emits } = build();
+
+    handleNotice(gateway)({
+      phase: DeployPhase.IMMINENT,
+      text: DEPLOY_NOTICE_TEXT[DeployPhase.IMMINENT],
+      category: 'alert',
+      seconds: 45,
+    });
+
+    const banner = emits.filter((e) => e.event === 'deploy.notice')[0];
+    expect(banner).toBeDefined();
+    expect(banner.except).toEqual([]);
+    expect(banner.payload).toEqual({
+      phase: 'imminent',
+      text: DEPLOY_NOTICE_TEXT[DeployPhase.IMMINENT],
+      seconds: 45,
+    });
   });
 
 });

@@ -7984,3 +7984,42 @@ container rather than a new line, so it fails on the old code for the right
 reason.
 
 **Tests:** frontend 53 suites / 418. v0.27.2.
+
+## 2026-09-20 — The restart warning became a banner, because one was missed
+
+The first production deploy to warn anyone reached two players. The CI job
+reported `{"notified":2}` and the owner saw it; the other player did not. That
+is the whole failure worth recording: DELIVERED is not SEEN, and a warning
+nobody reads is not a warning.
+
+Three plausible reasons, and the scroll bug fixed in v0.27.2 was one of them —
+the line could land below the fold with only a small "jump to latest" to hint
+at it. The other two are not fixable in the log at all: it is one line among
+combat spam, and a player watching the scan map is not watching the log.
+
+So the countdown moved out of the log. `deploy.notice` is a new wire event sent
+ALONGSIDE the `event.log` line, carrying the same words plus the seconds
+remaining; `DeployBanner` renders it above everything, and `useDeployNotice`
+ticks it down. The log keeps the record, the banner gets it noticed.
+
+Decisions worth keeping:
+- The banner NEVER writes its own copy. It renders the server's `text`, so it
+  and the log line cannot drift apart.
+- The countdown is computed from a DEADLINE, not decremented, so a backgrounded
+  tab shows the right number when it returns rather than however many ticks it
+  managed.
+- It FLOORS AT ZERO and reads "any moment now". The stop can be late — the hook
+  sleeps 45s and the container still has to stop — and a banner counting into
+  negative numbers, or frozen at 0:00, would be the last thing a player saw.
+- Only `imminent` gets a timer. `inbound` is a 5-10 minute range because CI
+  cannot know when watchtower pulls, and inventing a number there would be a
+  lie. The sign-off is past counting anything.
+- It sits ABOVE the connection banner: during a redeploy both show, and "the
+  server is restarting" is the one that explains the other.
+- It clears on reconnect, because the restart is the thing it warned about.
+
+Verified in a real browser at 1900x1000 and 390x844 against a live backend: the
+countdown ticks 0:45 down, turns into "any moment now" at zero, and the phone
+layout wraps it to three lines without disturbing the shortcut chips or log.
+
+**Tests:** frontend 55 suites / 435 (+17), backend 690 / 6,750. v0.27.3.

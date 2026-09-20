@@ -1,5 +1,5 @@
 import { DeployNoticeService } from '../../src/gateway/deploy-notice.service';
-import { DeployPhase, DEPLOY_NOTICE_TEXT } from '../../src/gateway/deploy-notice.messages';
+import { DeployPhase, DEPLOY_NOTICE_TEXT, IMMINENT_COUNTDOWN_SECONDS } from '../../src/gateway/deploy-notice.messages';
 import { DEPLOY_NOTICE } from '../../src/gateway/deploy-notice.events';
 import type { PresenceService } from '../../src/public/presence.service';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
@@ -24,6 +24,7 @@ describe('DeployNoticeService', () => {
       phase: DeployPhase.IMMINENT,
       text: DEPLOY_NOTICE_TEXT[DeployPhase.IMMINENT],
       category: 'alert',
+      seconds: IMMINENT_COUNTDOWN_SECONDS,
     });
     expect(result).toEqual({ notified: 2, text: DEPLOY_NOTICE_TEXT[DeployPhase.IMMINENT] });
   });
@@ -47,6 +48,20 @@ describe('DeployNoticeService', () => {
       expect(emitter.emit).toHaveBeenCalledWith(
         DEPLOY_NOTICE,
         expect.objectContaining({ phase, text: DEPLOY_NOTICE_TEXT[phase] }),
+      );
+    }
+  });
+
+  it('gives a countdown ONLY for the imminent phase', () => {
+    // The banner ticks this down. `inbound` has no honest number to give - CI
+    // cannot know when watchtower will pull - and the sign-off is already too
+    // late to count anything, so both are 0 and the banner shows no timer.
+    for (const phase of [DeployPhase.INBOUND, DeployPhase.DOWN]) {
+      const { service, emitter } = build(1);
+      service.announce(phase);
+      expect(emitter.emit).toHaveBeenCalledWith(
+        DEPLOY_NOTICE,
+        expect.objectContaining({ seconds: 0 }),
       );
     }
   });

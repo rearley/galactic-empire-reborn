@@ -105,6 +105,8 @@ export const WIRE_EVENTS = {
     MESSAGE_SEND: 'message.send',
     /** Emitted via the dynamic broadcast path when a player renames their ship. Listened to by the frontend player roster. */
     SHIP_RENAMED: 'ship.renamed',
+    /** Emitted with the event.log line when a redeploy is announced. Listened to by the frontend deploy banner. */
+    DEPLOY_NOTICE: 'deploy.notice',
   },
   CLIENT_TO_SERVER: {
     /** `@SubscribeMessage('command')` — free-text command input. */

@@ -47,11 +47,12 @@ describe('WIRE_EVENTS', () => {
     'command.notice',
     'message.send',
     'ship.renamed',
+    'deploy.notice',
   ] as const;
 
   const expectedClientToServer = ['command', 'prompt:reply'] as const;
 
-  it('carries all 30 server-to-client event names, verbatim', () => {
+  it('carries all 31 server-to-client event names, verbatim', () => {
     const actual = Object.values(WIRE_EVENTS.SERVER_TO_CLIENT);
     for (const name of expectedServerToClient) {
       expect(actual).toContain(name);
