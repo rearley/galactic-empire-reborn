@@ -13,14 +13,23 @@ import { PlayerModule } from '../game/player/player.module';
 import { OnboardingModule } from '../game/onboarding/onboarding.module';
 import { PhysicsModule } from '../game/physics/physics.module';
 import { PublicModule } from '../public/public.module';
+import { DeployNoticeService } from './deploy-notice.service';
+import { DeployNoticeController } from './deploy-notice.controller';
+import { AdminTokenGuard } from '../game/midnight/admin-token.guard';
 
 @Module({
+  // PublicModule is where PresenceService comes from, and DeployNoticeService
+  // must get THAT instance — a second one would count a second, empty galaxy
+  // and suppress every notice.
   imports: [ShipModule, CommandsModule, CombatModule, AuthModule, PrismaModule, PlayerModule, OnboardingModule, PhysicsModule, PublicModule],
+  controllers: [DeployNoticeController],
   providers: [
     ConnectedShipsRegistry,
     ShipDestroyedService,
     DisconnectTelemetryService,
     ConnectionLifecycleService,
+    DeployNoticeService,
+    AdminTokenGuard,
     GameGateway,
   ],
   exports: [GameGateway, ConnectedShipsRegistry],
