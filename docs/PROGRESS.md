@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 115 entries.
+Append-only, **newest at the bottom**. 116 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-20 — the event log was off the side of the phone](#2026-09-20--the-event-log-was-off-the-side-of-the-phone)
 - [2026-09-19 — the calculator can load your own colonies](#2026-09-19--the-calculator-can-load-your-own-colonies)
 - [2026-09-19 — "little to no gold" was a hold full of mines](#2026-09-19--little-to-no-gold-was-a-hold-full-of-mines)
 - [2026-09-18 — sysop identity was answered from a month-old copy](#2026-09-18--sysop-identity-was-answered-from-a-month-old-copy)
@@ -7819,4 +7820,26 @@ written back. Signed out, the page is unchanged apart from its copy.
 - A refused lookup (stale token) makes the page behave as signed out.
 - Decision recorded: `docs/DECISIONS.md` 2026-09-19. Plan:
   `docs/superpowers/plans/2026-09-19-calculator-planet-import.md`. v0.25.0.
+
+## 2026-09-20 — the event log was off the side of the phone
+
+Three columns, two of them fixed at 320px and 192px and both `shrink-0`, need
+512px before the log gets anything. On a 390px handset the log was squeezed to
+nothing and pushed off-screen; the owner had to rotate the phone to read it.
+
+Below 768px (`useIsNarrow`, `hooks/useIsNarrow.ts`) the terminal now renders a
+single column: `CommandInput` above `EventLog` (the iOS keyboard covers the
+bottom of the viewport), scan and roster as closed `<details>`, the latter
+holding the f-key legend as well. The desktop tree is untouched.
+
+The legend was dropped on the first pass — "a phone has no function keys" —
+and the owner corrected it: the bindings are TYPED (`fset f1 pha 0 0`, then
+`f1`), because a browser cannot claim the real F-keys. On a touch keyboard that
+is worth MORE, not less.
+
+Verified in a real browser at 390x844 with the local probe account: no
+horizontal overflow (`scrollWidth` 390), the disclosures open, and `sca lo`
+renders the ASCII map inside the fold. Two log-clearing specs failed on the
+first pass because the new hook sat after the PreFlightScreen early return —
+a conditional hook, fixed by hoisting it. v0.25.1.
 

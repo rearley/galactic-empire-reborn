@@ -18,6 +18,7 @@ import type { CombatShipDestroyedPayload } from '@ge/wire';
 import { useScanMap } from './hooks/useScanMap';
 import { useEventLog } from './hooks/useEventLog';
 import { useFkeys } from './hooks/useFkeys';
+import { useIsNarrow } from './hooks/useIsNarrow';
 
 /**
  * Root application component — five-region terminal UI (FR-002).
@@ -159,6 +160,11 @@ function Terminal(): React.JSX.Element {
     if (onboardingPrompt !== null) clearLog();
   }
 
+  // The three columns need 512px of fixed width before the log gets any, so on
+  // a phone the log was squeezed to nothing and pushed off-screen — you had to
+  // turn the handset sideways to read it. Narrow gets its own tree.
+  const narrow = useIsNarrow();
+
   // Between hulls — naming a first ship, choosing from a fleet, or picking up
   // after one was destroyed — none of the game is rendered at all. It used to
   // be: ship entry swapped the bottom input bar and left the log, the scan
@@ -173,6 +179,61 @@ function Terminal(): React.JSX.Element {
         onReply={(value) => emitPromptReply(value)}
         onLogout={() => logout()}
       />
+    );
+  }
+
+  if (narrow) {
+    return (
+      <div className="flex h-screen flex-col bg-black text-gray-100 font-mono">
+        <ConnectionBanner status={status} onReconnect={reconnect} />
+        <TitleBar status={status} />
+
+        {/*
+          * The command line sits ABOVE the log here. iOS puts the keyboard over
+          * the bottom of the viewport, so an input pinned to the bottom is the
+          * first thing it covers — and with it the newest lines of the log.
+          */}
+        <CommandInput onSubmit={send} />
+
+        <div className="flex flex-1 flex-col overflow-hidden border-t border-gray-800">
+          <EventLog lines={logLines} />
+        </div>
+
+        {/*
+          * Folded, not stacked. Both panels are worth reaching for on a phone
+          * and neither is worth the screen while you are reading the log, so
+          * they are closed until asked for. Still MOUNTED when closed, which is
+          * what keeps their subscriptions and history alive.
+          */}
+        <details data-testid="panel-scan" className="shrink-0 border-t border-gray-800">
+          <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-widest text-gray-500">
+            Scan
+          </summary>
+          <div className="max-h-[50vh] overflow-auto border-t border-gray-800">
+            <ScanMap cells={scanCells} shipId={localShipId} kind={scanKind} />
+            <div className="border-t border-gray-800">
+              <ScanPanel shipId={localShipId} />
+            </div>
+          </div>
+        </details>
+
+        {/*
+          * The f-key legend STAYS on a phone. These are typed shortcuts —
+          * `fset f1 pha 0 0` then `f1` — not captured keypresses, because a
+          * browser cannot claim the real F-keys (see game/commands/fkeys.ts).
+          * Typing `f1` instead of `pha 0 0` is worth more on a touch keyboard
+          * than on a desktop, not less. This panel was dropped here on the
+          * first pass, on the false reasoning that a phone has no F-keys.
+          */}
+        <details data-testid="panel-players" className="shrink-0 border-t border-gray-800">
+          <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-widest text-gray-500">
+            Players &amp; shortcuts
+          </summary>
+          <div className="max-h-[40vh] overflow-auto border-t border-gray-800">
+            <PlayerListPanel players={players} fkeys={fkeys} />
+          </div>
+        </details>
+      </div>
     );
   }
 

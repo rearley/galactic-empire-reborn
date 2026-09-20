@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.25.1',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'On a phone the event log was squeezed off the side of the screen — you had to turn the handset sideways to read it. Narrow screens now get a single column: the command line on top where the keyboard cannot cover it, the log filling the rest, and the scan, player list and your f-key shortcuts folded away until you tap them.',
+      },
+    ],
+  },
+  {
     version: '0.25.0',
     date: '2026-09-19',
     entries: [

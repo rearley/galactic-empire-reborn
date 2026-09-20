@@ -6460,3 +6460,37 @@ cash and tax rate from `adm`, environment and resource from a scan.
 `ownedPlanetsFor` copies nothing else — not the password, beacon or spy owner —
 and a test pins the response's keys.
 
+## 2026-09-20 — A phone gets its own layout, not the terminal restyled
+
+**The bug.** `App.tsx` lays the game out as three columns: the event log on
+`flex-1`, then a 320px scan column and a 192px roster, both `shrink-0`. That is
+512px of fixed width before the log gets any, so on a 390px handset the two
+fixed columns alone overflowed the viewport and the log was squeezed to nothing
+and pushed off-screen. Reported by the owner: "I have to turn my phone sideways
+to even see the event log."
+
+**Decision.** Below 768px (`useIsNarrow`), render a different tree: command line
+first, log filling the rest, scan and roster as closed `<details>`. Nothing about the desktop terminal changes, so the root
+`CLAUDE.md` line "not mobile-first — desktop terminal feel is the target"
+still holds: this is the same client at a width where three columns cannot fit.
+
+**Why a media query rather than Tailwind's responsive classes.** The phone
+layout is a different TREE, not the same tree restyled — the input moves above
+the log and two panels become disclosures. Responsive classes would mean
+rendering both and hiding one, which mounts the scan panel twice and doubles
+its subscriptions.
+
+**Why the command line sits above the log.** iOS puts the keyboard over the
+bottom of the viewport, so an input pinned to the bottom is the first thing it
+covers, taking the newest log lines with it.
+
+**The f-key legend stays.** It was dropped here on the first pass, reasoning
+that a phone has no function keys. Wrong: the bindings are TYPED — `fset f1
+pha 0 0`, then `f1` — precisely because a browser cannot claim the real F-keys
+(`game/commands/fkeys.ts`). Typing `f1` instead of `pha 0 0` is worth more on a
+touch keyboard than on a desktop.
+
+**The hook must be called before the PreFlightScreen early return.** It was not,
+at first, and two unrelated log-clearing tests failed — React saw a different
+hook order between renders. The lint rule caught it as well.
+
