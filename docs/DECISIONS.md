@@ -6693,3 +6693,54 @@ today — `findPlayerByChannel` requires `status === 1`, so a reallocated channe
 held by an AI hull resolves to nothing and the claim clears on the next
 activation — but it is an aliasing bug waiting for a busier galaxy, and the fix
 is to scrub `cybmine` on hydrate rather than to trust a stale number.
+
+## 2026-09-20 — A persisted `cybmine` named a channel that no longer existed
+
+Follow-up to the amendment above, which recorded this and left it. Fixed the
+same day on the owner's instruction: "claims should not change who because of a
+restart but let the loop run as normal."
+
+`cybmine` holds the channel of the pilot a Cybertron has claimed. Channels are
+this port's equivalent of C's `usrnum`: allocated by `ShipChannelRegistry` when
+a ship enters the game, released and RECYCLED when it leaves, and held only in
+memory. Nothing writes a channel to the database. `cybmine` is a persisted
+column. So a claim that outlived a restart named whichever ship was handed that
+number next — the Cybertron came back already locked on a stranger, and flew at
+them.
+
+It was mostly self-correcting: `findPlayerByChannel` requires `status === 1`, so
+a recycled number held by an AI hull or nobody resolved to nothing and the claim
+cleared on the next activation. The case that does not self-correct is the one
+that matters — the number reallocated to a REAL player, who is then hunted for
+somebody else's engagement.
+
+**Canon clears it on load, and we were already implementing half of that block.**
+`cyb_init`'s load path sets seven fields after reading the saved record:
+
+```
+GECYBS.C:131 `		ptr->status = GESTAT_AUTO;`
+GECYBS.C:132 `		ptr->phasr = 100;`
+GECYBS.C:133 `		ptr->cybmine = (byte)255;`
+GECYBS.C:134 `		ptr->speed2b = (double)(ptr->topspeed)*500.0;`
+GECYBS.C:135 `		ptr->cybupdate = 100 + gernd()%20;`
+GECYBS.C:136 `		ptr->holdcourse = 0;`
+```
+
+`hydrateAll` implemented `status` and a conditional `speed2b`, citing :134, and
+silently dropped the rest. This is the same shape as the two Cybertron defects
+fixed earlier today: a canon block implemented in part, where the missing part
+is the bug.
+
+**Done:** `cybmine = 255` and `holdcourse = 0`. The first is the fix; the second
+goes with it because a stored countdown makes the ship skip target selection for
+up to nine activations, delaying exactly the clean re-acquisition the first
+arranges. The loop is otherwise untouched — a hydrated Cybertron now behaves
+like a freshly spawned one, scans on its next activation and picks a real target.
+
+**Deliberately NOT done, and why:** `phasr = 100` and the unconditional
+`speed2b` are canon but unrelated to the claim, and would change every
+Cybertron's state on every restart for no reported problem. `cybupdate` and
+`tick` are randomised, and `CybertronRepository` takes no `Random` port —
+wiring one in is a constructor change across several call sites, and using
+`Math.random` in a repository would break the determinism the port exists for.
+Recorded here so the gap is a decision rather than another silent omission.

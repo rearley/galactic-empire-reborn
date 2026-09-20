@@ -218,6 +218,54 @@ describe('Cybertron persistence (T056-T058, T060a)', () => {
     });
   });
 
+  // ─── The canon load block: a saved claim never survives the restart ──────
+
+  describe('hydrateAll — canon resets the engagement fields on load', () => {
+    it('clears a persisted cybmine rather than trusting a recycled channel', async () => {
+      // `cybmine` holds a CHANNEL, and channels are session-scoped and recycled
+      // by ShipChannelRegistry — they are not stored in the database. A claim
+      // that outlives a restart therefore names whoever happens to hold that
+      // number next, which is a different pilot. Canon clears it on load, in
+      // the same block as the speed2b kick-start this repository already cites.
+      // @see GECYBS.C:133 `		ptr->cybmine = (byte)255;`
+      await prisma.user.upsert({
+        where: { userid: 'Cybrg-test-claim' },
+        create: { userid: 'Cybrg-test-claim', username: 'Cybrg-test-claim', cash: 0n },
+        update: { cash: 0n },
+      });
+      await prisma.ship.create({
+        data: {
+          userid: 'Cybrg-test-claim', shipno: 922, shipname: 'Claimer',
+          shpclass: 21, xcoord: 1, ycoord: 1, damage: 0, status: 2,
+          // The production state that prompted this: a live claim on channel 18.
+          cybmine: 18, holdcourse: 7,
+          items: Array(16).fill(0n),
+        },
+      });
+
+      const loaded: { userid: string; cybmine: number; holdcourse: number }[] = [];
+      const shipState = {
+        loadShip: vi.fn((s: { userid: string; cybmine: number; holdcourse: number }) => loaded.push(s)),
+        findByUserid: vi.fn().mockReturnValue([]),
+        findAllShips: vi.fn().mockReturnValue([]),
+        get: vi.fn().mockReturnValue(undefined),
+      } as unknown as ShipStateService;
+
+      const repo = new CybertronRepository(prisma, shipState);
+      await repo.hydrateAll();
+
+      const claimer = loaded.find((s) => s.userid === 'Cybrg-test-claim');
+      expect(claimer).toBeDefined();
+      // 255 is "I have claimed nobody" — the loop re-acquires on its next
+      // activation exactly as it would for a freshly spawned hull.
+      expect(claimer?.cybmine).toBe(255);
+      // Cleared in the same canon block, and it gates the re-acquisition:
+      // a stored countdown would make the ship skip lockon for several
+      // activations after boot. @see GECYBS.C:136 `		ptr->holdcourse = 0;`
+      expect(claimer?.holdcourse).toBe(0);
+    });
+  });
+
   // ─── Spawn-slot collision: dead Cybertron row left in DB ─────────────────
 
   describe('createSpawn — stale dead Cybertron row in DB', () => {

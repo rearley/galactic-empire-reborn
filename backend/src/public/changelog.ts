@@ -115,6 +115,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.27.6',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A Cybertron that was hunting somebody when the game restarted could come back hunting a different pilot entirely. It stored who it was after as a session number, and those numbers are handed out fresh each time the game starts — so after a restart the old number pointed at whoever happened to hold it now. Cybertrons now come back from a restart with no target and pick one properly, which is what the original did.',
+      },
+    ],
+  },
+  {
     version: '0.27.5',
     date: '2026-09-20',
     entries: [

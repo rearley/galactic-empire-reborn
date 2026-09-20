@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ShipStateService } from '../ship/ship-state.service';
 import { prismaShipToState, stateToPrismaUpdate } from '../ship/ship-state.mappers';
 import { shipKey } from '../ship/ship-state.types';
-import { NO_CHANNEL } from '../ship/ship-channel.registry';
+import { CYBMINE_NONE, NO_CHANNEL } from '../ship/ship-channel.registry';
 import { CYB_MAXCASH } from '../constants';
 import type { CybertronLoadout } from './cyb-decisions';
 
@@ -124,6 +124,27 @@ export class CybertronRepository {
         const state = prismaShipToState(ship as Parameters<typeof prismaShipToState>[0]);
         state.status = 2; // GESTAT_AUTO
         state.dirty = false;
+
+        // A saved claim does not survive the restart, and must not.
+        //
+        // `cybmine` stores a CHANNEL. Channels are session-scoped, recycled,
+        // and held only in memory by ShipChannelRegistry — nothing writes them
+        // to the database. The number that meant "I am hunting Wasp" before the
+        // restart means whoever is handed 18 next, which is a different pilot;
+        // the Cybertron would arrive already locked on a stranger. Canon clears
+        // it on load, in this same block:
+        //
+        //   GECYBS.C:133 `		ptr->cybmine = (byte)255;`
+        //   GECYBS.C:136 `		ptr->holdcourse = 0;`
+        //
+        // 255 is "I have claimed nobody", so the AI loop runs exactly as it does
+        // for a fresh hull: it re-scans on its next activation and picks a real
+        // target. `holdcourse` goes with it — a stored countdown makes the ship
+        // skip target selection for up to nine activations after boot, which
+        // would delay precisely the re-acquisition this is arranging.
+        state.cybmine = CYBMINE_NONE;
+        state.holdcourse = 0;
+
         // Kick-start movement — original sets speed2b = topspeed*500 on load (@see GECYBS.C:134)
         // Our topspeed is in warp units where warp 1 = 1000, so multiply by 1000
         if (state.speed2b === 0 && state.topspeed > 0) {

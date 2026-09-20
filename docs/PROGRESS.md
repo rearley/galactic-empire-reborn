@@ -8083,3 +8083,33 @@ belongs to a different ship. Harmless today because the lookup requires an
 active player, but it is aliasing waiting for a busier galaxy.
 
 **Tests:** backend 690 suites / 6,754. v0.27.5.
+
+## Session 2026-09-20 (later still) — a claim that outlived the restart
+
+Raised as a note in the previous entry and fixed on the owner's instruction:
+claims must not change WHO after a restart, and the AI loop should otherwise run
+as normal.
+
+`cybmine` is a persisted column holding a CHANNEL, and channels are allocated in
+memory by `ShipChannelRegistry`, released and recycled on logout, and never
+written to the database. A claim surviving a restart therefore named whoever was
+handed that number next. Usually harmless — the lookup requires an active
+player, so a recycled number resolves to nothing and clears on the next
+activation — but where it resolved to a real pilot, that pilot was hunted for
+somebody else's engagement.
+
+Canon clears it on load, in the block `hydrateAll` already implements half of:
+`cyb_init` sets seven fields after reading the saved record (GECYBS.C:131-137)
+and we had `status` plus a conditional `speed2b`. Added `cybmine = 255` and
+`holdcourse = 0`, so a hydrated Cybertron now behaves like a freshly spawned
+one: no target, scans on its next activation, picks a real pilot.
+
+Left undone deliberately, and recorded in DECISIONS rather than dropped:
+`phasr` and the unconditional `speed2b` are canon but unrelated to the claim;
+`cybupdate` and `tick` are randomised and `CybertronRepository` takes no
+`Random` port.
+
+Third Cybertron defect today with the same shape — a canon block implemented in
+part, where the missing part is the bug.
+
+**Tests:** backend 690 suites / 6,755. v0.27.6.
