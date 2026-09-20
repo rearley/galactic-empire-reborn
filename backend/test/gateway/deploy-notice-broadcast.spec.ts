@@ -13,34 +13,27 @@
  */
 import { makeGateway } from '../helpers/make-gateway';
 import { DeployPhase, DEPLOY_NOTICE_TEXT } from '../../src/gateway/deploy-notice.messages';
-import type { DeployNoticeService } from '../../src/gateway/deploy-notice.service';
 
 interface Emit { rooms: string[]; except: string[]; event: string; payload: unknown }
 
 function build() {
   const emits: Emit[] = [];
-  const announce = vi.fn();
   const chain = (rooms: string[], except: string[]) => ({
     to: (r: string) => chain([...rooms, r], except),
     except: (e: string[]) => chain(rooms, [...except, ...e]),
     emit: (event: string, payload: unknown) => { emits.push({ rooms, except, event, payload }); },
   });
-  const gateway = makeGateway({
-    deployNotice: { announce } as unknown as DeployNoticeService,
-  });
+  const gateway = makeGateway();
   (gateway as unknown as { server: unknown }).server = {
     to: (r: string) => chain([r], []),
     except: (e: string[]) => chain([], e),
     emit: (event: string, payload: unknown) => { emits.push({ rooms: [], except: [], event, payload }); },
   };
-  return { gateway, emits, announce };
+  return { gateway, emits };
 }
 
 const handleNotice = (gateway: unknown) =>
   (gateway as { handleDeployNotice: (p: unknown) => void }).handleDeployNotice.bind(gateway);
-
-const shutdown = (gateway: unknown) =>
-  (gateway as { beforeApplicationShutdown: () => void }).beforeApplicationShutdown.bind(gateway);
 
 describe('deploy notice broadcast', () => {
   it('reaches every socket — no room, and no filter exclusion', () => {
@@ -77,18 +70,4 @@ describe('deploy notice broadcast', () => {
     expect(emits[0].payload).toMatchObject({ category: 'system' });
   });
 
-  it('says the sign-off line on shutdown', () => {
-    const { gateway, announce } = build();
-
-    shutdown(gateway)();
-
-    expect(announce).toHaveBeenCalledWith(DeployPhase.DOWN);
-  });
-
-  it('never lets a broken notice block a shutdown', () => {
-    const { gateway, announce } = build();
-    announce.mockImplementation(() => { throw new Error('boom'); });
-
-    expect(() => shutdown(gateway)()).not.toThrow();
-  });
 });

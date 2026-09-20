@@ -4,6 +4,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { debugEndpointsEnabled } from './debug/debug-endpoints';
 import { configureHttpSecurity } from './http-security';
+import { installDeploySignOff } from './gateway/deploy-sign-off';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -12,6 +13,11 @@ async function bootstrap(): Promise<void> {
   // @see src/http-security.ts
   configureHttpSecurity(app.getHttpAdapter().getInstance() as { set(k: string, v: unknown): void });
   app.useWebSocketAdapter(new IoAdapter(app));
+  // BEFORE enableShutdownHooks, and the order is the whole point: Node runs
+  // signal listeners in registration order, so this one fires while the sockets
+  // are still open. As a Nest shutdown hook it reached nobody — presence was
+  // already empty. @see gateway/deploy-sign-off.ts
+  installDeploySignOff(app);
   app.enableShutdownHooks();
 
   const port = process.env.PORT ?? 3000;

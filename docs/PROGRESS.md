@@ -7887,9 +7887,19 @@ poll, so after images publish it posts `inbound` and the copy says no more than
 "5 to 10 minutes". Watchtower's pre-update lifecycle hook runs when the
 container is genuinely about to stop AND watchtower blocks on it, so the script
 in the image posts `imminent`, gets a countdown back, and sleeps it — 45
-seconds that are actually 45 seconds. `beforeApplicationShutdown` adds a
-sign-off that deliberately says "refit", not "shutdown", because as the last
-line before the socket closes the latter reads like the game ending.
+seconds that are actually 45 seconds. A signal listener adds a sign-off that
+deliberately says "refit", not "shutdown", because as the last line before the
+socket closes the latter reads like the game ending.
+
+That sign-off shipped first as `GameGateway.beforeApplicationShutdown` and
+verification caught it reaching nobody — Nest closes the sockets before that
+hook runs, so presence was empty and the notice was correctly suppressed. It
+moved to a listener installed in `main.ts` ahead of `enableShutdownHooks()`,
+since Node runs signal listeners in registration order. All three phases were
+then confirmed against a live server with a real socket client: the countdown
+line arrives, the hook holds exactly 45s, and the sign-off lands before the
+socket closes. `npx tsc --noEmit` also caught type errors in the hook's spec
+that Vitest does not typecheck — hence `scripts/deploy-warn.d.mts`.
 
 One endpoint behind both (`POST /admin/deploy/notice`, reusing
 `AdminTokenGuard`), which checks `PresenceService.count()` and says nothing to
@@ -7914,4 +7924,4 @@ the shutdown `logthis` is GEMAIN.C:1475, not :1474.
 `WATCHTOWER_LIFECYCLE_HOOKS=true` on the shared watchtower, and the CI job
 skips cleanly without its two secrets. Both are owner-side infra changes.
 
-**Tests:** backend 689 suites / 6,746 (+18 new), frontend 53 / 417 (+1). v0.27.0.
+**Tests:** backend 690 suites / 6,748 (+22 new), frontend 53 / 417 (+1). v0.27.0.

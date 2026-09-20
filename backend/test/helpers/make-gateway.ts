@@ -29,7 +29,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PresenceService } from '../../src/public/presence.service';
 import { ShipDestroyedService } from '../../src/gateway/ship-destroyed.service';
 import { ConnectionLifecycleService } from '../../src/gateway/connection-lifecycle.service';
-import { DeployNoticeService } from '../../src/gateway/deploy-notice.service';
 
 export interface GatewayDeps {
   shipStateService: ShipStateService;
@@ -46,7 +45,6 @@ export interface GatewayDeps {
   presence: PresenceService;
   shipDestroyed: ShipDestroyedService;
   connectionLifecycle: ConnectionLifecycleService;
-  deployNotice: DeployNoticeService;
 }
 
 export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
@@ -63,9 +61,6 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     } as unknown as ShipStateService);
 
   const flat: Omit<GatewayDeps, 'shipDestroyed' | 'connectionLifecycle' | 'shipRepository'> = {
-    // Inert, per this file's rule: a spec that cares what the notice does must
-    // say so by overriding it. Only the shutdown hook touches it.
-    deployNotice: { announce: vi.fn(() => ({ notified: 0, text: null })) } as unknown as DeployNoticeService,
     shipStateService,
     commandRouter: { dispatch: vi.fn() } as unknown as CommandRouterService,
     registry: new ConnectedShipsRegistry(shipStateService),
@@ -142,6 +137,5 @@ export function makeGateway(overrides: Partial<GatewayDeps> = {}): GameGateway {
     deps.random,
     deps.shipDestroyed,
     deps.connectionLifecycle,
-    deps.deployNotice,
   );
 }

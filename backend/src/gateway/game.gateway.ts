@@ -19,10 +19,8 @@ import {
   PHYSICS_UNIVERSE_EDGE,
   PhysicsUniverseEdgeEvent,
 } from '../game/physics/physics-events';
-import { BeforeApplicationShutdown, Inject, Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { DeployNoticeService } from './deploy-notice.service';
-import { DeployPhase } from './deploy-notice.messages';
 import { DEPLOY_NOTICE, type DeployNoticePayload } from './deploy-notice.events';
 import type { Ship } from '../prisma/client';
 import type {
@@ -214,7 +212,7 @@ function hitText(
 }
 
 @WebSocketGateway({ cors: true })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown {
+export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: GameServer;
 
@@ -231,7 +229,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, Be
     @Inject(RANDOM) private readonly random: Random,
     private readonly shipDestroyed: ShipDestroyedService,
     private readonly connectionLifecycle: ConnectionLifecycleService,
-    private readonly deployNotice: DeployNoticeService,
   ) {}
 
   /**
@@ -249,24 +246,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, Be
   @OnEvent(DEPLOY_NOTICE)
   handleDeployNotice(payload: DeployNoticePayload): void {
     this.server.emit('event.log', { category: payload.category, text: payload.text });
-  }
-
-  /**
-   * The last line out before the process exits.
-   *
-   * BEST EFFORT — it races the socket close, so some players will never see
-   * it. The warning that actually does the work is the pre-update one, 45
-   * seconds earlier (`scripts/deploy-warn.mjs`). Never throws: nothing here may
-   * delay or fail a shutdown.
-   */
-  beforeApplicationShutdown(): void {
-    try {
-      this.deployNotice.announce(DeployPhase.DOWN);
-    } catch (err) {
-      // Deliberately swallowed, like CombatTickService's shutdown flush: a
-      // courtesy must never be the reason a container fails to stop.
-      this.logger.warn(`deploy sign-off failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
   }
 
   /** Emit one narration line to the room it names. */

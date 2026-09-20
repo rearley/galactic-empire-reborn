@@ -6555,6 +6555,19 @@ and watchtower BLOCKS on it, so 45 seconds there is a real 45 seconds. Running
 inside the container also means it talks to `127.0.0.1`, so the countdown needs
 no public endpoint and no secret leaves the host.
 
+**The sign-off is a SIGNAL listener, not a Nest shutdown hook, and measuring
+it is the only reason we know.** It shipped first as
+`GameGateway.beforeApplicationShutdown` and reached nobody: by the time that
+hook runs Nest has closed the sockets, so `PresenceService` is empty and the
+service correctly declines to say anything. The log read `deploy notice down:
+nobody in-game` one second after a connected player had been told about the
+countdown — a line that would have looked implemented for ever and never once
+fired. It now installs in `main.ts` BEFORE `enableShutdownHooks()`; Node runs
+signal listeners in registration order, so ours fires while the sockets are
+still open. Verified against a live server with a real client attached. Still
+best effort — the packet races the close — and it says its line only once,
+because a stuck container gets SIGTERM twice.
+
 **The sign-off says "refit", not "shutdown".** `***GALACTIC EMPIRE SHUTDOWN***`
 was considered verbatim and rejected: as the last line before the socket closes
 it reads like the game ending. "Comms lost. Refit in progress — stand by to
