@@ -6510,6 +6510,13 @@ would spend log height to save typing that is already cheap.
 expands `f1` server-side, but sending `pha 0` makes the log echo what actually
 ran — which is what a player needs when a shortcut does something unexpected.
 
+**The bar WRAPS; it does not scroll sideways.** It shipped as one scrolling
+row, which showed four of the owner's nine bindings and gave no hint the rest
+existed — 897px of chips in a 390px viewport. Wrapping shows everything bound;
+the height is capped (`max-h-24`) so a full twelve cannot swallow the log, and
+each chip clips its command to nine characters (`chipLabel`) with the whole
+command on `title` and the accessible name.
+
 **Nothing bound renders nothing.** An empty strip would cost log height and
 teach a new player nothing; `hel fset` does that job.
 

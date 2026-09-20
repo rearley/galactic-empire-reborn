@@ -8,6 +8,18 @@ interface FkeyBarProps {
 }
 
 /**
+ * How much of a binding a chip shows. Long enough to tell `scan lo full` from
+ * `scan sh @`, short enough that two chips fit a 390px row. The whole command
+ * stays on the button's title and accessible name, and in the legend under
+ * PLAYERS & SHORTCUTS.
+ */
+const CHIP_CHARS = 9;
+
+export function chipLabel(command: string): string {
+  return command.length <= CHIP_CHARS + 1 ? command : `${command.slice(0, CHIP_CHARS)}…`;
+}
+
+/**
  * One-tap shortcuts, PHONE ONLY.
  *
  * `fset f1 pha 0 0` binds a slot and typing `f1` runs it — typed rather than
@@ -19,6 +31,10 @@ interface FkeyBarProps {
  * Deliberately NOT rendered on the desktop terminal, which keeps the legend in
  * its side panel: there the bar would take log height to save two keystrokes
  * nobody minds typing. @see App.tsx, PlayerListPanel.tsx
+ *
+ * WRAPS rather than scrolling sideways. One row hid everything past the fourth
+ * chip with nothing to say so — the owner had nine slots bound and could see
+ * four. Height is capped so a full dozen cannot eat the log.
  *
  * It sends the BOUND TEXT rather than the slot name. Either would work — the
  * router expands `f1` server-side — but sending `pha 0` means the log echoes
@@ -37,7 +53,7 @@ export function FkeyBar({ fkeys, onSend }: FkeyBarProps): React.JSX.Element | nu
   return (
     <div
       data-testid="fkey-bar"
-      className="flex shrink-0 gap-2 overflow-x-auto whitespace-nowrap border-t border-gray-800 bg-black px-2 py-1"
+      className="flex max-h-24 shrink-0 flex-wrap gap-1 overflow-y-auto border-t border-gray-800 bg-black px-2 py-1"
     >
       {bound.map(({ slot, command }) => (
         <button
@@ -45,10 +61,12 @@ export function FkeyBar({ fkeys, onSend }: FkeyBarProps): React.JSX.Element | nu
           type="button"
           data-testid={`fkey-chip-${slot}`}
           onClick={() => onSend(command)}
-          className="shrink-0 border border-gray-700 px-2 py-1 font-mono text-xs text-gray-300 active:bg-gray-800"
+          title={`${slot}: ${command}`}
+          aria-label={`${slot} ${command}`}
+          className="shrink-0 border border-gray-700 px-2 py-1 font-mono text-xs whitespace-nowrap text-gray-300 active:bg-gray-800"
         >
           <span className="text-yellow-400">{slot}</span>
-          <span>{` ${command}`}</span>
+          <span>{` ${chipLabel(command)}`}</span>
         </button>
       ))}
     </div>

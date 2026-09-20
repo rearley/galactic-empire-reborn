@@ -113,6 +113,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.26.1',
+    date: '2026-09-20',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The shortcut buttons on a phone only showed the first few — the rest ran off the side of the screen with nothing to say so. They now wrap onto as many rows as they need, with longer commands shortened to fit. The full command is still listed under Players & shortcuts.',
+      },
+    ],
+  },
+  {
     version: '0.26.0',
     date: '2026-09-20',
     entries: [

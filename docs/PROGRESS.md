@@ -7858,3 +7858,9 @@ tapping it produced `Range Scan Dist:300000`. Two earlier "no chip bar"
 assertions passed for the wrong reason — the harness had no bindings — so the
 specs now push an `fkeys.snapshot` through the mocked socket first. v0.26.0.
 
+Same day, after seeing it on a real handset: the bar shipped as ONE scrolling
+row and showed four of nine bindings, with nothing to indicate the rest — 897px
+of chips in a 390px viewport. It now wraps, capped at `max-h-24`, with each
+chip clipped to nine characters and the full command on `title`. Verified at
+390x844: nine bindings, three rows, everything reachable. v0.26.1.
+
