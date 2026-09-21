@@ -2,16 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
-import { ShipState, shipKey } from '../../ship/ship-state.types';
+import { ShipState } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { ShipClassCacheService } from '../../physics/ship-class-cache.service';
-import { cdistance, jammerCounter } from '../../combat/combat-math';
+import { jammerCounter } from '../../combat/combat-math';
 import { JAMTIME } from '../../constants';
 import { I_JAMMER } from '../../constants/items';
-import {
-  COMBAT_TARGET_WARNING,
-  CombatTargetWarningEvent,
-} from '../../combat/combat-events';
+import { applyJam } from '../../combat/jam';
 
 /**
  * Handles `jam` — deploys a jammer that interferes with all ships within
@@ -24,6 +21,8 @@ import {
  *   For each active ship (including self):
  *     candidate.jammer = jammerCounter(distance, scanRange, JAMTIME)
  *   ship.items[I_JAMMER] -= 1n
+ *   ship.cantexit = FIRETICKS   (the handler used to skip this)
+ *   GECMDS.C:1650 `ptr->cantexit = FIRETICKS;`
  *
  * @see GECMDS.C:cmd_jammer 1593-1651
  */
@@ -51,42 +50,8 @@ export class JammerHandlerService {
       return { lines: [{ text: formatMessage(MessageId.JAM_NOAMMO), category: 'system' }] };
     }
 
-    let scanRange = 50000;
-    try {
-      scanRange = this.shipClassCache.getScanRange(ship.shpclass);
-    } catch {
-      // fall back
-    }
-
-    for (const candidate of this.shipState.findAllShips()) {
-      // cdistance() is in sector-units; scanRange is raw units. C scales the
-      // distance up before both the gate and the falloff — without the
-      // `* 10_000` every ship in the galaxy reads as point-blank.
-      // @see GECMDS.C:1636-1648 `ddist *= 10000;`
-      const dist = cdistance(ship, candidate) * 10_000;
-      if (dist >= scanRange) continue; // C only writes jammer inside the range branch
-      const value = jammerCounter(dist, scanRange, JAMTIME);
-      this.shipState.mutate(candidate.userid, candidate.shipno, (s) => {
-        s.jammer = value;
-      });
-      // Canon tells each ship it blinds: `prfmsg(JAMMER3); outprfge(FILTER,
-      // zothusn)` — addressed to the VICTIM, inside the same range branch that
-      // writes the counter (GECMDS.C:1645). Without it a victim's scan just
-      // went blank, which reads as a bug rather than as an attack and gives no
-      // cue to run or to call for `sys unjam`. The loop has no self-exclusion
-      // in canon, so the firer is warned too; that is canon, not an oversight.
-      this.events.emit(COMBAT_TARGET_WARNING, {
-        victimId: shipKey(candidate.userid, candidate.shipno),
-        kind: 'scanners-jammed',
-        // JAMMER3 takes no argument — canon does not say who jammed you.
-        attackerLetter: '',
-        tickAt: new Date(),
-      } satisfies CombatTargetWarningEvent);
-    }
-
-    this.shipState.mutate(ship.userid, ship.shipno, (s) => {
-      s.items[I_JAMMER] = (s.items[I_JAMMER] ?? 0n) - 1n;
-    });
+    // Canon's one jam(), shared with the AI. @see combat/jam.ts
+    applyJam(ship, this.shipState, this.shipClassCache, this.events);
 
     return {
       lines: [{ text: formatMessage(MessageId.JAM_FIRED), category: 'combat' }],

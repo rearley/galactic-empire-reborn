@@ -477,13 +477,14 @@ export class DroidTickService implements OnModuleInit {
     this.weapons.laymine(droid);
   }
 
-  /** Deploy jammer. @see GEDROIDS.C:515 jam — sets jammer=JAMTIME */
+  /**
+   * Canon's jam, the player's own: every ship in the droid's scan range is
+   * blinded, the droid included. This used to jam only the droid itself.
+   * @see GEDROIDS.C:515 `jam(ptr,usrn);`, AiWeapons.jam, #65
+   */
   private deployJammer(droid: ShipState): void {
-    const jamCount = Number(droid.items[I_JAMMER] ?? 0n);
-    if (jamCount <= 0) return;
-    droid.items = [...droid.items] as typeof droid.items;
-    droid.items[I_JAMMER] = BigInt(jamCount - 1);
-    droid.jammer = JAMTIME;
+    if (Number(droid.items[I_JAMMER] ?? 0n) <= 0) return;
+    this.weapons.jam(droid);
   }
 
   /** @see GEDROIDS.C:287-298 shieldup/shielddn */

@@ -319,7 +319,9 @@ describe('a Droid torpedo needs a free tube on the victim (GECMDS.C:1178-1184)',
     // Slot 1 is the one C's loop breaks on; slots 0 and 2 belong to torpedoes
     // already in flight and must not be overwritten.
     expect(target.ltorpsChannel).toEqual([7, droid.channel, 9]);
-    expect(target.ltorpsDistance[1]).toBeCloseTo(0.1 * SECTOR, 6);
+    // The range, floored by canon's unsigned cast, plus 20:
+    // GECMDS.C:1201 `wptr->ltorps[i].distance += 20;` (#65)
+    expect(target.ltorpsDistance[1]).toBe(Math.floor(0.1 * SECTOR) + 20);
     expect(target.ltorpsDistance[0]).toBe(1_000);
     expect(target.ltorpsDistance[2]).toBe(2_000);
   });

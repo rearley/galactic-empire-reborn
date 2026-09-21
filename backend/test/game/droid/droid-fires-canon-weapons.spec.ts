@@ -148,6 +148,9 @@ describe('a Droid torpedo is canon torp', () => {
     priv.launchTorpedo(droid, target, 500, true);
     expect(droid.items[I_TORP]).toBe(2n);
     expect(target.ltorpsChannel[0]).toBe(7);
+    // 20 further out than the range, as canon and the player's `tor` launch it:
+    // GECMDS.C:1201 `wptr->ltorps[i].distance += 20;` (#65)
+    expect(target.ltorpsDistance[0]).toBe(520);
     expect(warnings).toHaveLength(1);
   });
 });

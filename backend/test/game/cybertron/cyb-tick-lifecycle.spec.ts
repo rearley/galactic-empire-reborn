@@ -56,7 +56,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Random } from '../../../src/game/combat/random.port';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, I_MINE, I_JAMMER } from '../../../src/game/constants/items';
-import { CYB_MINDAM, FIRETICKS, GESTAT_AUTO, UNIVMAX } from '../../../src/game/constants';
+import { JAMTIME, CYB_MINDAM, FIRETICKS, GESTAT_AUTO, UNIVMAX } from '../../../src/game/constants';
 import type { CybertronClassConfig } from '../../../src/game/cybertron/cybertron.config';
 import {
   CYBERTRON_SCORED_KILL,
@@ -438,10 +438,12 @@ describe('a wounded Cybertron defends itself (GECYBS.C:625-641 cyb_check_damage)
     expect(cyb.items[I_JAMMER]).toBe(1n);
     expect(mines).toEqual([]);
     expect(cyb.items[I_MINE]).toBe(3n);
-    // head2b = 0.5*359.9, holdcourse = floor(0.5*10)+5 = 10, less the
-    // cyb_check_lockon decrement.
     expect(cyb.head2b).toBeCloseTo(179.95, 6);
-    expect(cyb.holdcourse).toBe(9);
+    // Canon's jam blinds the jammer too (#65), so this same activation ends in
+    // cyb_lives' jammed override, which re-rolls the hold after the lock-on
+    // decrement: GECYBS.C:335 `ptr->holdcourse = gernd()%10 + 5;` — floor(0.5*10)+5.
+    expect(cyb.jammer).toBe(JAMTIME);
+    expect(cyb.holdcourse).toBe(10);
   });
 });
 

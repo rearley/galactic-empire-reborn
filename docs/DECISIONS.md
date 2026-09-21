@@ -7232,3 +7232,41 @@ channel alone.
 
 Mutation-checked: without the identity test in `claimedPilot`, both #64 tests
 fail.
+
+## 2026-09-21 — One jam() for players and AI, and AI torpedoes launch +20 like everyone's
+
+**Context.** #65 had two canon differences held back from #62, because both
+change Cybertron behaviour and one needed a ruling. The owner ruled "yes, as
+canon" on the jammer.
+
+**Jammer.** Canon has one `jam()` (GECMDS.C:1624). The player's `jam`, a
+Cybertron (GECYBS.C:637) and a Droid (GEDROIDS.C:515) all call it. It does four
+things:
+- blinds every ship in the game within range, jammer included, scaled by
+  distance (:1644)
+- spends one jammer (:1649)
+- battle-locks the jammer (:1650)
+
+The port had three behaviours. The player's missed the combat lock. The
+Cybertron spent a jammer and jammed nobody. The Droid jammed only itself. Now
+`combat/jam.ts` `applyJam` is the one routine, and `AiWeapons.jam` and
+`JammerHandlerService` both call it.
+
+**The ruling: range.** Canon reads the range off `warsptr`, the current user's
+ship (:1638). That is the jammer for a player. The AI loop never sets it, so
+from the AI it is whoever `warsptr` last pointed at: AI creation sets it
+(GECYBS.C:115) and so does player input (GEMAIN.C:1498). The evident intent is
+the jammer's own scanner, which every other line of `jam()` reads, so that is
+what we use.
+
+**Consequence the tests caught.** Because canon blinds the jammer too, a
+Cybertron that jams reaches `cyb_lives`' jammed override in the same activation
+(GECYBS.C:331-335), which re-rolls `holdcourse`. `cyb-tick-lifecycle` pinned
+the old no-op; it now pins canon.
+
+**Torpedo distance.** Canon's `torp()` launches at the floored range plus 20
+(GECMDS.C:1201). The player's `tor` already did; `AiWeapons.torp` now does too.
+Two tests that pinned the bare range were updated.
+
+**Player-visible:** AI jamming reaches players; using `jam` now locks you into
+combat; AI torpedoes arrive a moment later. Three changelog entries, v0.31.4.

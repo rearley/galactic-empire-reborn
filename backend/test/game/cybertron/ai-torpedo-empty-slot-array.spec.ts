@@ -114,6 +114,8 @@ describe('AI torpedoes reach a target whose ltorps arrays are empty (GECMDS.C:11
     }).cybAttack(cyb, player, 0, 1000, { firedAt: new Date() });
 
     expect(player.ltorpsChannel[0]).toBe(7);
-    expect(player.ltorpsDistance[0]).toBe(1000);
+    // Launched 20 further out than the range, as canon and the player's `tor`
+    // do: GECMDS.C:1201 `wptr->ltorps[i].distance += 20;` (#65)
+    expect(player.ltorpsDistance[0]).toBe(1020);
   });
 });

@@ -14,6 +14,7 @@ import {
   CombatTargetWarningEvent,
 } from '../combat/combat-events';
 import { applyRandamageAndEmit } from '../combat/randamage.apply';
+import { applyJam } from '../combat/jam';
 import { selectPhaserVictims } from '../combat/firep';
 import { selectHyperVictims } from '../combat/firehp';
 import { findFreeTorpSlot } from '../combat/projectile-slots';
@@ -355,7 +356,10 @@ export class AiWeapons {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
       while (v.ltorpsDistance.length <= emptySlot) v.ltorpsDistance.push(0);
       v.ltorpsChannel[emptySlot] = ship.channel ?? NO_CHANNEL;
-      v.ltorpsDistance[emptySlot] = ddist;
+      // Canon launches 20 further out than the range, as the player's `tor`
+      // already does: GECMDS.C:1201 `wptr->ltorps[i].distance += 20;`
+      // (the unsigned cast first floors it). @see torpedo.handler.ts
+      v.ltorpsDistance[emptySlot] = Math.floor(ddist) + 20;
     });
 
     // `prfmsg(TFIRE2,shpltr(shpnum,usrn)); outprfge(FILTER,shpnum);` — the
@@ -437,4 +441,14 @@ export class AiWeapons {
       this.mineRegistry.remove(mine.id);
     }
   }
+
+  /**
+   * Canon's `jam`, the player's own. @see combat/jam.ts applyJam
+   *   GECYBS.C:637 `jam(ptr,usrn);`
+   *   GEDROIDS.C:515 `jam(ptr,usrn);`
+   */
+  jam(ship: ShipState): void {
+    applyJam(ship, this.shipState, this.classes, this.events);
+  }
+
 }

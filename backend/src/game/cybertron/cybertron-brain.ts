@@ -216,9 +216,10 @@ export class CybertronBrain {
         dirty = true;
       }
       if (cls?.hasJammer && Number(ship.items[I_JAMMER]) > 0 && Math.floor(this.random.next() * 100) === 0) {
-        // Jammer deploy — decrement inventory (full effect in US4/T054)
-        ship.items = [...ship.items] as typeof ship.items;
-        ship.items[I_JAMMER] = BigInt(Math.max(0, Number(ship.items[I_JAMMER]) - 1));
+        // Canon's jam, the player's own: every ship in range is blinded, the
+        // Cybertron included. This used to spend the jammer and jam nobody.
+        // @see AiWeapons.jam, #65
+        this.weapons.jam(ship);
         dirty = true;
       }
       ship.speed2b = topSpeed;

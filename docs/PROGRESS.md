@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 183 entries.
+Append-only, **newest at the bottom**. 184 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — one jam() for everyone](#session-2026-09-21-evening-3--one-jam-for-everyone)
 - [2026-09-21 — a claim is on a pilot, not a number](#session-2026-09-21-evening-2--a-claim-is-on-a-pilot-not-a-number)
 - [2026-09-21 — one set of weapons for both AI kinds, and the aim that always missed](#session-2026-09-21-late--one-set-of-weapons-for-both-ai-kinds-and-the-aim-that-always-missed)
 - [2026-09-21 — the galaxy simulation, and what it found first](#session-2026-09-21-evening--the-galaxy-simulation-and-what-it-found-first)
@@ -8597,3 +8598,27 @@ turn, and canon's full release runs. Details are in DECISIONS 2026-09-21.
   guard
 
 v0.31.3.
+
+## Session 2026-09-21 (evening, 3) — one `jam()` for everyone
+
+**Completed: #65.**
+
+The research answered one question outright. Canon's `warsptr` is never set by
+the AI loop, so an AI's jam range in canon is an accident. The owner ruled for
+canon's evident intent: AI jammers work as a player's do, from the jammer's own
+range.
+
+`combat/jam.ts` is now the one `jam()`. The player's handler, the Cybertron
+(which used to jam nobody) and the Droid (which used to jam only itself) all go
+through it. The player's `jam` also gained canon's combat lock, which it had
+been missing. AI torpedoes gained canon's `+20`, which the player's `tor`
+already had.
+
+Canon citations caught three wrong line numbers in my own jam comments
+(1645-1647 for what is 1644, 1649 and 1650) before commit. Every citation now
+carries its quote.
+
+**Tests:** 3 new in `test/game/combat/jam.spec.ts`, and 1 `+20` assertion. Three
+existing tests that pinned pre-canon values were updated with citations. v0.31.4.
+
+**Remaining under #58:** #63, port-original rules as named overlays.

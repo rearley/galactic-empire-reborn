@@ -119,6 +119,24 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.4',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'corrected-to-canon',
+        text: 'A wounded Cybertron or survey drone that triggers a jammer now jams you, as in the original: every ship within its scanner range, including its own, loses scans, locks, torpedoes and missiles for a while, longer the closer you are. Until now a Cybertron spent the jammer to no effect and a drone jammed only itself. It is rare \u2014 only a badly damaged AI in a fight does it \u2014 and you are warned when it happens.',
+      },
+      {
+        category: 'corrected-to-canon',
+        text: 'Using your own jammer now commits you to the fight for a few moments, as it always did in the original: you cannot leave the game straight after jamming, just as after firing.',
+      },
+      {
+        category: 'corrected-to-canon',
+        text: 'AI torpedoes are launched from the same distance yours are, a little further out than the range to the target, so they take a moment longer to arrive.',
+      },
+    ],
+  },
+  {
     version: '0.31.3',
     date: '2026-09-21',
     entries: [
