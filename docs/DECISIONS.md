@@ -7340,3 +7340,33 @@ canon's does: after the cloak, range and zone gates, and before the lock roll's
 outcome matters. So a failed lock provokes too, exactly as canon claims before
 the roll. The assignment is bare, as canon's is: it overrides an existing claim
 and ignores `noclaim`.
+
+## 2026-09-21 — A Cybertron closes to its own firing range before it slows to fight
+
+**Context.** #56, found in play: warp in, stop just outside an AI's firing
+range, and shoot it. Canon's close band starts at a CONSTANT distance,
+GECYBS.C:787 `if (low_dist <= 3.0)`. Inside it, against a target not at warp,
+the Cybertron drops to 990 (about warp 1). But its firing gate is its own
+scanner, `ddist < scanrange`, and the Cyberquad's is `S22SRNG 1000`, a tenth of
+a sector. That value is confirmed identically across every copy of the class
+table, so it stays. The Cyberquad therefore ambles the last three sectors at
+walking pace, about a minute of free fire for a stopped pilot.
+
+**This is a deviation, not a canon defect.** Canon does not contradict itself:
+the 3.0 is class-independent, the scan ranges are class-dependent, and the
+mismatch is emergent. None of the "legible defect" criteria apply.
+
+**Decision.** House rule `closeBandAtFiringRange`: the close band starts at
+`min(3.0, scanRange / 10 000)`. Only the Cyberquad changes (3.0 → 0.1). The
+Sarten Attack Drone gets 2.0; the Scout, Base Star and Obliterator are
+unchanged at 3.0. No canon constant is touched: 3.0, 990 and every `SxxSRNG`
+stay as they are. Switched off, `CANON_RULES` restores canon's 3.0.
+
+**Reason.** The argument is from canon's own structure, not from balance. The
+combat band means "I am in weapons range, slow down and fight", and canon's 3.0
+approximates a typical phaser envelope. The band should read the same envelope
+the firing gate reads. For one hull, canon's two numbers disagree by 30×.
+
+**Not done, recorded in #56:** the AI's lack of any danger model (threat
+assessment, grudge targeting). Each would be its own house rule, with its own
+entry.

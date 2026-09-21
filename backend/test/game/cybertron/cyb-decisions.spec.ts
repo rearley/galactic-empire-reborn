@@ -125,6 +125,20 @@ describe('pickSpawnClass skips classes inside their respawn hold', () => {
   });
 });
 
+describe('pickPursuitBand: where the close band starts (#56)', () => {
+  const still = { where: 0, speed2b: 0 };
+  const r = { next: () => 0.5 };
+  it('is canon\'s 3.0 sectors by default: GECYBS.C:787 `if (low_dist <= 3.0)`', () => {
+    expect(pickPursuitBand(2.0, 25, 10, 0, 8000, r, still).name).toBe('close');
+  });
+  it('can start nearer, so a short-ranged hull closes at top speed to where it can shoot', () => {
+    const band = pickPursuitBand(2.0, 25, 10, 0, 8000, r, still, false, 0.1);
+    expect(band.name).toBe('approach');
+    expect(band.desiredSpeed).toBe(8000);
+    expect(pickPursuitBand(0.05, 25, 10, 0, 8000, r, still, false, 0.1).name).toBe('close');
+  });
+});
+
 describe('countCybertronClaims counts claims on this pilot, not on this channel (#64)', () => {
   const cyb = (cybmine: number, cybmineKey?: string) => ({ status: 2, shpclass: 21, cybmine, cybmineKey });
   const isCyb = () => true;

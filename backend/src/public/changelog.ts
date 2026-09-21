@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.6',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'deliberate-deviation',
+        text: 'A Cyberquad no longer slows to a crawl three sectors out from you. Its weapons only reach a tenth of a sector, and in the original it dropped to walking pace at three sectors anyway, so a pilot who stopped just out of its reach could shoot it for a minute before it could answer. It now keeps its speed until it is close enough to fire. Every other Cybertron already slowed at about the range it can shoot from, and is unchanged.',
+      },
+    ],
+  },
+  {
     version: '0.31.5',
     date: '2026-09-21',
     entries: [

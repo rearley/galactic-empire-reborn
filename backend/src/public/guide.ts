@@ -77,7 +77,12 @@ export const GUIDE_DEVIATIONS: Readonly<Record<string, string>> = Object.freeze(
     'happened to look at next, so a kill could be undone almost at once. It ' +
     'could afford that in a galaxy nine times this size, where the difficult ' +
     'hulls were rare because they were hard to find. Here there is only one ' +
-    'Obliterator, so its rarity is spent on time instead.',
+    'Obliterator, so its rarity is spent on time instead.\n\n' +
+    'A Cyberquad keeps its speed until it is close enough to shoot. In the ' +
+    'original every Cybertron slowed to about warp 1 three sectors out, which ' +
+    'suits the rest of them, but a Cyberquad\u2019s guns reach only a tenth of a ' +
+    'sector: it crawled the last three sectors under fire, and a pilot who ' +
+    'stopped just out of its reach could shoot it for a minute unanswered.',
   rep:
     '`rep sys` calls the phaser inoperable until the bank holds enough charge ' +
     'to actually fire. The original called it operative the moment the bank was ' +

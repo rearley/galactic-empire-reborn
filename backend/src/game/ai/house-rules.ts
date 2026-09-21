@@ -50,6 +50,14 @@ export interface AiHouseRules {
    * rather than canon's 300. A no-op at canon's size.
    */
   scalePopulation: boolean;
+  /**
+   * A Cybertron's close band — where it drops to 990 and brawls — starts at its
+   * own firing range when that is shorter than canon's 3.0 sectors
+   * (GECYBS.C:787 `if (low_dist <= 3.0)`). The Cyberquad can only shoot from a
+   * tenth of a sector (S22SRNG 1000), so canon has it amble the last three
+   * sectors at walking pace, which a stopped pilot can exploit for a minute.
+   */
+  closeBandAtFiringRange: boolean;
 }
 
 /**
@@ -66,6 +74,7 @@ export const PORT_RULES: Readonly<AiHouseRules> = Object.freeze({
   releaseClaimsOnDeath: true,
   droidsSpawnOutsideZone: true,
   scalePopulation: true,
+  closeBandAtFiringRange: true,
 });
 
 /** Canon's AI: every house rule off. */
@@ -75,6 +84,7 @@ export const CANON_RULES: Readonly<AiHouseRules> = Object.freeze({
   releaseClaimsOnDeath: false,
   droidsSpawnOutsideZone: false,
   scalePopulation: false,
+  closeBandAtFiringRange: false,
 });
 
 /** The `docs/DECISIONS.md` heading that justifies each rule, verbatim after `## `. */
@@ -84,4 +94,5 @@ export const HOUSE_RULE_DECISIONS: Readonly<Record<keyof AiHouseRules, string>> 
   releaseClaimsOnDeath: "2026-09-21 — A Cybertron's claim changes only through a named transition",
   droidsSpawnOutsideZone: '2026-09-01 — Droids stay out of the neutral zone',
   scalePopulation: '2026-09-08 — AI population scales with UNIVMAX; HYPDST1/HYPDST2 wired',
+  closeBandAtFiringRange: '2026-09-21 — A Cybertron closes to its own firing range before it slows to fight',
 });

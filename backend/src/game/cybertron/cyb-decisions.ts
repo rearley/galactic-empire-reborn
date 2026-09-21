@@ -160,6 +160,12 @@ export function pickPursuitBand(
    * so bounding the band by `topSpeed` would break every mobile Cybertron.
    */
   stationary = false,
+  /**
+   * Where the close band starts, in sectors. Canon's constant is the default:
+   * GECYBS.C:787 `if (low_dist <= 3.0)`. The brain passes a nearer value for a
+   * hull whose firing range is shorter, under a house rule. @see #56
+   */
+  closeBandFrom = 3.0,
 ): PursuitBand {
   if (stationary) {
     // No `speed`, no `speedClamp`, no `where`: nothing that moves it or puts
@@ -192,7 +198,7 @@ export function pickPursuitBand(
       raiseShields: false,
     };
   }
-  if (distance > 3.0) {
+  if (distance > closeBandFrom) {
     // Close band — top speed toward target, shields up. C gates the shieldup on
     // `ptr->where == 0`: a Cybertron closing in NORMAL space puts them up. The
     // port had `currentWhere === 1`, so they only went up on the single tick it

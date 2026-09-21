@@ -610,10 +610,18 @@ export class CybertronBrain {
       hullClass?.maxWarp ?? 0,
     );
 
+    // PORT-ORIGINAL @house-rule closeBandAtFiringRange: slow to fight at the
+    // hull's own firing range when that is nearer than canon's 3.0 sectors.
+    // Canon's firing gate is the scanner, `ddist < scanRange` above; the band
+    // now reads the same envelope. @see ../ai/house-rules.ts, #56
+    const firingRange = (hullClass?.scanRange ?? 30_000) / 10_000;
+    const closeBandFrom = this.rules.closeBandAtFiringRange ? Math.min(3.0, firingRange) : 3.0;
+
     const band = pickPursuitBand(
       dist, hyperdist1, hyperdist2, prevWhere, topSpeed, this.random,
       { where: target.where, speed2b: target.speed2b },
       stationary,
+      closeBandFrom,
     );
 
     // cyb_annoy in the pursuit ladder. C taunts in three of the four bands and

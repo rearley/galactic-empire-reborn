@@ -18,7 +18,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip } from '../../helpers/make-ship';
 
-function cybHarness(ships: ShipState[], rules: AiHouseRules) {
+function cybHarness(ships: ShipState[], rules: AiHouseRules, scanRange = 500_000) {
   const map = new Map(ships.map((s) => [`${s.userid}:${s.shipno}`, s]));
   const shipState = {
     findAllShips: () => Array.from(map.values()),
@@ -30,7 +30,7 @@ function cybHarness(ships: ShipState[], rules: AiHouseRules) {
   } as unknown as ShipStateService;
   const classes = {
     get: () => ({
-      maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2, scanRange: 500_000, maxTons: 900,
+      maxAcceleration: 2000, maxWarp: 8, maxPhaser: 2, maxShields: 2, scanRange, maxTons: 900,
       hasTorpedo: false, hasMissile: false, hasJammer: false, hasMine: false, hasZipper: false,
       noClaim: 3, tough: 0, cybLowestClassAttacks: 1,
     }),
@@ -72,6 +72,28 @@ describe('zoneSanctuary', () => {
     const { svc } = cybHarness([c, hubPilot()], CANON_RULES);
     brainOf(svc).cybCheckLockon(c, 8000, { firedAt: new Date(0) });
     expect(c.cybmine).toBe(4);
+  });
+});
+
+describe('closeBandAtFiringRange (#56)', () => {
+  // A Cyberquad's scanner — its whole firing envelope — is S22SRNG 1000, a
+  // tenth of a sector. The pilot sits stopped two sectors out.
+  const quad = () => makeShip({ userid: 'Cybrg-203', shipno: 203, shpclass: 22, status: 2, xcoord: 5, ycoord: 5, cybmine: 255, holdcourse: 0, topspeed: 8 });
+  const parked = () => makeShip({ userid: 'p1', shipno: 1, status: 1, channel: 4, shpclass: 3, xcoord: 7, ycoord: 5, speed2b: 0, where: 0 });
+
+  it('on (the port): it closes at top speed until it is in its own firing range', () => {
+    const c = quad();
+    const { svc } = cybHarness([c, parked()], PORT_RULES, 1_000);
+    brainOf(svc).cybCheckLockon(c, 8000, { firedAt: new Date(0) });
+    expect(c.cybmine).toBe(4);
+    expect(c.speed2b).toBe(8000);
+  });
+
+  it('off (canon): it drops to 990 at three sectors, a minute short of its range', () => {
+    const c = quad();
+    const { svc } = cybHarness([c, parked()], CANON_RULES, 1_000);
+    brainOf(svc).cybCheckLockon(c, 8000, { firedAt: new Date(0) });
+    expect(c.speed2b).toBe(990);
   });
 });
 
