@@ -36,9 +36,23 @@ describe('the build gate', () => {
       .forEach((f) => expect([f, re.test(f)]).toEqual([f, true]));
   });
 
+  /**
+   * Test and lint tooling configs reach neither image — the Dockerfiles copy
+   * named paths, and none of these. On 2026-09-21 a change to
+   * `backend/vitest.config.ts` alone (#51) rebuilt both images and restarted a
+   * live game for a byte-identical deploy.
+   */
+  it('does not build for test-runner or linter config', () => {
+    ['backend/vitest.config.ts', 'backend/vitest.manual.config.ts', 'frontend/vitest.config.ts',
+     'frontend/playwright.config.ts', '.oxlintrc.json']
+      .forEach((f) => expect([f, re.test(f)]).toEqual([f, true]));
+  });
+
   it('still builds for anything that reaches an image', () => {
     ['backend/src/main.ts', 'frontend/src/App.tsx', 'packages/wire/src/index.ts',
-     'backend/Dockerfile', 'VERSION', 'package-lock.json', '.github/workflows/ci.yml']
+     'backend/Dockerfile', 'VERSION', 'package-lock.json', '.github/workflows/ci.yml',
+     // A lookalike of the vitest config that IS copied: frontend/Dockerfile:24.
+     'frontend/vite.config.ts', 'backend/prisma.config.ts']
       .forEach((f) => expect([f, re.test(f)]).toEqual([f, false]));
   });
 });

@@ -299,7 +299,12 @@ jobs:
           # The trigger only skips a push where EVERY file is ignored, so a
           # commit pairing a README with a test file would otherwise arrive here
           # and build. This list is the authority; the trigger is the shortcut.
-          NOT_A_BUILD_INPUT='^(backend/test/|frontend/test/|frontend/e2e/|tools/|backend/tools/|docs/|specs/|\.githooks/|LICENSE$|NOTICE$)|\.md$'
+          #
+          # Test-runner and linter configs are here too: the Dockerfiles copy
+          # named paths, none of these. On 2026-09-21 a push changing only tests
+          # and `backend/vitest.config.ts` rebuilt both images and restarted the
+          # game. `frontend/vite.config.ts` is NOT here — its image copies it.
+          NOT_A_BUILD_INPUT='^(backend/test/|frontend/test/|frontend/e2e/|tools/|backend/tools/|docs/|specs/|\.githooks/|LICENSE$|NOTICE$|(backend|frontend)/vitest(\.[a-z]+)?\.config\.ts$|frontend/playwright\.config\.ts$|\.oxlintrc\.json$)|\.md$'
 
           if [ -z "$BEFORE" ] \
             || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
