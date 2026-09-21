@@ -40,7 +40,7 @@ interface Slot {
 /**
  * What each Cybertron decided, for a sysop to read with `sys trace`.
  *
- * PORT-ORIGINAL. Canon's nearest thing is `sys list`, which shows where an AI
+ * PORT-ORIGINAL @not-a-house-rule: a sysop diagnostic, not AI behaviour. Canon's nearest thing is `sys list`, which shows where an AI
  * is and whom it has claimed, never why:
  *   GECMDS.C:4936 `prf("Chn Name xsect ysect damage tick cybmine\r");` Every Obliterator investigation on
  * 2026-09-20 began from such a row — `Cybrg-205`, `cybmine` 18, `speed2b` 284 —

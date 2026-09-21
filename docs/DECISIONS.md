@@ -7270,3 +7270,47 @@ Two tests that pinned the bare range were updated.
 
 **Player-visible:** AI jamming reaches players; using `jam` now locks you into
 combat; AI torpedoes arrive a moment later. Three changelog entries, v0.31.4.
+
+## 2026-09-21 — The AI's deviations from canon are named house rules
+
+**Context.** Issue #63, the last of the AI-layer review #58. The AI's
+deliberate deviations lived as `PORT-ORIGINAL` comments scattered across four
+directories. Nothing listed them, and the AI could not be run as canon's to
+compare. The owner asked for "a nice clean separation of code and easier to
+know what is what in the future".
+
+**Decision.** `src/game/ai/house-rules.ts` has one switch per deviation, each
+naming its DECISIONS entry:
+
+| Switch | Deviation |
+|---|---|
+| `zoneSanctuary` | No lock on a pilot in (0,0), release on entry, no engagement of a target inside it |
+| `respawnHold` | A killed class waits a hold scaled by its rarity |
+| `releaseClaimsOnDeath` | Every claim on a dead pilot is released at the kill |
+| `droidsSpawnOutsideZone` | Droid spawns re-roll out of (0,0) |
+| `scalePopulation` | Cybertron counts scale to UNIVMAX 100 |
+
+- **Modes.** Production runs `PORT_RULES` (all on). `CANON_RULES` (all off) is
+  canon's AI. `GalaxySim.create({ rules })` runs either, and a canon-mode
+  scenario pins the difference: with the sanctuary off, a pilot parked on the
+  hub is claimed on seeds 1, 2 and 3, and canon's own firing gates still keep
+  them from being hit.
+- **Wiring.** A switch is a plain boolean read where its behaviour acts. It is
+  not a wrapper around the brain, because a wrapper would need a hook at every
+  one of those points anyway and hides the rule from the reader.
+  - Each consumer takes the rules as an optional last constructor argument
+    (token `AI_HOUSE_RULES`, bound nowhere, so `PORT_RULES` runs), and no
+    module changed.
+- **Guards** (`test/game/ai/house-rules.spec.ts`):
+  - every `PORT-ORIGINAL` marker in the AI code names its switch
+    (`@house-rule <name>`) or says `@not-a-house-rule` with a reason
+  - every switch is read somewhere
+  - every DECISIONS heading it names exists
+  - each switch has an on/off test
+
+**Not a switch:**
+- The 2026-09-06 "Cybertrons leave hyperspace to fight" entry no longer has an
+  identifiable code site. #43 moved hyperspace exit to the shared movement
+  code, so the entry may now be stale, and #66 audits it.
+- `sys trace` and a kill-bookkeeping note are marked `@not-a-house-rule`:
+  neither is AI behaviour a player meets.

@@ -244,7 +244,7 @@ export function pickSpawnClass(
   configs: Record<number, CybertronClassConfig>,
   rand: Random,
   /**
-   * PORT-ORIGINAL: classes inside their v0.29.0 respawn hold. They are skipped
+   * PORT-ORIGINAL @house-rule respawnHold: classes inside their v0.29.0 respawn hold. They are skipped
    * by the normal pick, so a slot goes to a class that can actually spawn —
    * without this, a held pick was refused by `spawnOne` and the whole slot went
    * unused while another class sat short and ready. The 1% branch below is

@@ -108,7 +108,7 @@ export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: R
 }
 
 /**
- * PORT-ORIGINAL: the claimed pilot has flown into the neutral zone.
+ * PORT-ORIGINAL @house-rule zoneSanctuary: the claimed pilot has flown into the neutral zone.
  *
  * The acquisition scan already refuses to LOCK a pilot inside (0,0), but a lock
  * taken outside it was never released, so a Cybertron that had claimed you
@@ -182,7 +182,7 @@ export function releaseStale(ai: CybClaimState): void {
 }
 
 /**
- * PORT-ORIGINAL: another ship killed the pilot this AI had claimed.
+ * PORT-ORIGINAL @house-rule releaseClaimsOnDeath: another ship killed the pilot this AI had claimed.
  *
  * Canon's `killem` calls only the KILLER's `won_func`,
  *   GEFUNCS.C:1113 `shipclass[wptr->shpclass].won_func(wptr,who,ptr);`

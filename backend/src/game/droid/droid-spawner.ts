@@ -6,7 +6,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { Inject, Optional } from '@nestjs/common';
 import { ShipStateService } from '../ship/ship-state.service';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { Random, RANDOM } from '../combat/random.port';
@@ -23,6 +23,7 @@ import {
 import { randomMurdonianLoadout, randomSparseLoadout } from './droid-decisions';
 import { rollDroidSpawnCoord } from './droid-spawn-coord';
 import { UNIVMAX } from '../constants';
+import { AI_HOUSE_RULES, PORT_RULES, type AiHouseRules } from '../ai/house-rules';
 
 /** @see GEDROIDS.C:203-210 — typename dispatch in droid_lives */
 const DROID_CLASS_TYPENAMES: Record<number, string> = {
@@ -70,6 +71,8 @@ export class DroidSpawner {
     private readonly shipState: ShipStateService,
     private readonly classCache: ShipClassCacheService,
     @Inject(RANDOM) private readonly rng: Random,
+    // The port's AI house rules; production binds nothing and runs them all.
+    @Optional() @Inject(AI_HOUSE_RULES) private readonly rules: AiHouseRules = PORT_RULES,
   ) {}
 
   /**
@@ -115,7 +118,9 @@ export class DroidSpawner {
 
     // @see GEDROIDS.C:131-140 — C branches on universe size; the port only had
     // the large-universe arm, so half of every spawn landed outside a galaxy
-    // that is +/-10. Re-roll if the neutral zone (0,0) comes up.
+    // that is +/-10.
+    // PORT-ORIGINAL @house-rule droidsSpawnOutsideZone: re-roll if the neutral
+    // zone (0,0) comes up. Canon places a droid anywhere.
     let xcoord: number, ycoord: number;
     if (at) {
       xcoord = at.x;
@@ -124,7 +129,7 @@ export class DroidSpawner {
       do {
         xcoord = rollDroidSpawnCoord(this.rng, UNIVMAX);
         ycoord = rollDroidSpawnCoord(this.rng, UNIVMAX);
-      } while (Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
+      } while (this.rules.droidsSpawnOutsideZone && Math.floor(xcoord) === 0 && Math.floor(ycoord) === 0);
     }
 
     // @see GEDROIDS.C:146-163 — loadout: Murdonian gets heavy load, others get sparse

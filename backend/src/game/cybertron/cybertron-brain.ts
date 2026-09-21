@@ -64,6 +64,7 @@ import {
 } from './cyb-transitions';
 import { AiWeapons } from '../ai/ai-weapons';
 import { CybTraceService, formatScanSummary, tracedTransition, type CybScanTally } from './cyb-trace.service';
+import { PORT_RULES, type AiHouseRules } from '../ai/house-rules';
 
 /** What `CybertronBrain` needs. Optional members degrade exactly as they did in the tick. */
 export interface CybertronBrainDeps {
@@ -74,6 +75,8 @@ export interface CybertronBrainDeps {
   random: Random;
   repository: CybertronRepository;
   weapons: AiWeapons;
+  /** The port's AI house rules. @see ../ai/house-rules.ts */
+  rules?: AiHouseRules;
   /**
    * The scheduler's allowance ledger; `cyb_lives` accrues into it:
    * GECYBS.C:229 `warusroff(usrn)->cash += CYB_ALLOW;`
@@ -104,6 +107,7 @@ export class CybertronBrain {
   private readonly weapons: AiWeapons;
   private readonly pendingAllowance: Map<string, bigint>;
   private readonly trace?: CybTraceService;
+  private readonly rules: AiHouseRules;
 
   constructor(deps: CybertronBrainDeps) {
     this.shipState = deps.shipState;
@@ -115,6 +119,7 @@ export class CybertronBrain {
     this.weapons = deps.weapons;
     this.pendingAllowance = deps.pendingAllowance;
     this.trace = deps.trace;
+    this.rules = deps.rules ?? PORT_RULES;
   }
 
   /** Apply a claim transition, traced when there is a trace. @see cyb-trace.service.ts tracedTransition */
@@ -250,7 +255,10 @@ export class CybertronBrain {
     for (const target of this.shipState.findAllShips()) {
       if (target.status !== 1) continue;
       if (target.cloak === 10) continue;
-      if (this.isInNeutralZone(target)) continue; // neutral zone protects targets too
+      // PORT-ORIGINAL @house-rule zoneSanctuary — canon's only neutral test
+      // here is the hunter's own position, above:
+      // GECYBS.C:251 `if (!neutral(&ptr->coord)`
+      if (this.rules.zoneSanctuary && this.isInNeutralZone(target)) continue;
 
       const dist = cdistance(ship, target);
       const ddist = dist * 10_000;
@@ -491,8 +499,8 @@ export class CybertronBrain {
         this.tx(ship, 'releaseTargetLeft', () => releaseTargetLeft(ship, topSpeed, this.random));
         return;
       }
-      if (this.isInNeutralZone(current)) {
-        // PORT-ORIGINAL: the other half of the sanctuary rule in the scan below.
+      if (this.rules.zoneSanctuary && this.isInNeutralZone(current)) {
+        // PORT-ORIGINAL @house-rule zoneSanctuary: the other half of the sanctuary rule in the scan below.
         // Falls through to that scan, which finds someone outside the zone or
         // nobody. @see cyb-transitions.ts releaseZoneEntry
         this.tx(ship, 'releaseZoneEntry', () => releaseZoneEntry(ship, topSpeed, this.random), `${current.username ?? current.shipname} is in the neutral zone`);
@@ -522,13 +530,13 @@ export class CybertronBrain {
         if (candidate.cloak === 10) { tally.cloaked++; continue; }
         if (!canPursue(hunterLowestToAttack, candidate.shpclass)) { tally.outOfClass++; continue; }
 
-        // PORT-ORIGINAL, and deliberate: a pilot inside sector (0,0) is not a
+        // PORT-ORIGINAL @house-rule zoneSanctuary: a pilot inside sector (0,0) is not a
         // target. Canon's `cyb_check_lockon` has NO neutral test — the only
         // `neutral()` in GECYBS.C is line 251, which gates firing — so a canon
         // Cybertron locks a pilot on the hub, flies to them and shadows them at
         // matched speed until they step out. We make the zone a real sanctuary.
         // @see docs/DECISIONS.md 2026-09-20
-        if (this.isInNeutralZone(candidate)) { tally.inZone++; continue; }
+        if (this.rules.zoneSanctuary && this.isInNeutralZone(candidate)) { tally.inZone++; continue; }
 
         // Gang-up limit belongs to the ship being hunted, not the hunter. A
         // Cyb# of 0 (Heavy Freighter, Freight Barge) is never claimable.

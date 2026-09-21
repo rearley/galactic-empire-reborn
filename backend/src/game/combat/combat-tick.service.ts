@@ -64,6 +64,7 @@ import {
 } from '../invariants/runtime-events';
 import { releaseDeadTarget } from '../cybertron/cyb-transitions';
 import { CybTraceService } from '../cybertron/cyb-trace.service';
+import { AI_HOUSE_RULES, PORT_RULES, type AiHouseRules } from '../ai/house-rules';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
 const TORP_DECOY_THRESHOLD = 5000;
@@ -111,6 +112,8 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
     // Records a released claim in the holder's `sys trace`. Optional so the
     // hand-built harnesses keep compiling; untraced, the release still happens.
     @Optional() private readonly trace?: CybTraceService,
+    // The port's AI house rules; production binds nothing and runs them all.
+    @Optional() @Inject(AI_HOUSE_RULES) private readonly rules: AiHouseRules = PORT_RULES,
   ) {}
 
   /**
@@ -398,13 +401,13 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         this.shipState.removeFromGame(victim);
 
         // Clear cybmine on any Cybertron targeting the dead ship so they don't
-        // immediately re-engage the player when they respawn. PORT-ORIGINAL:
+        // immediately re-engage the player when they respawn. PORT-ORIGINAL @house-rule releaseClaimsOnDeath:
         // canon's killem releases only the killer's claim.
         // @see cyb-transitions.ts releaseDeadTarget
         for (const s of this.shipState.findAllShips()) {
           // cybmine holds the claimed player's CHANNEL (C: a usernumber,
           // GECYBS.C:368) — matching on shipno released the wrong claims.
-          if (s.status === GESTAT_AUTO && victim.channel !== undefined && s.cybmine === victim.channel) {
+          if (this.rules.releaseClaimsOnDeath && s.status === GESTAT_AUTO && victim.channel !== undefined && s.cybmine === victim.channel) {
             const release = (): void => releaseDeadTarget(s);
             if (this.trace) {
               this.trace.transition(shipKey(s.userid, s.shipno), s, 'releaseDeadTarget', release,

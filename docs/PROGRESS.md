@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 184 entries.
+Append-only, **newest at the bottom**. 185 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — the AI's deviations, named](#session-2026-09-21-evening-4--the-ais-deviations-named)
 - [2026-09-21 — one jam() for everyone](#session-2026-09-21-evening-3--one-jam-for-everyone)
 - [2026-09-21 — a claim is on a pilot, not a number](#session-2026-09-21-evening-2--a-claim-is-on-a-pilot-not-a-number)
 - [2026-09-21 — one set of weapons for both AI kinds, and the aim that always missed](#session-2026-09-21-late--one-set-of-weapons-for-both-ai-kinds-and-the-aim-that-always-missed)
@@ -8622,3 +8623,28 @@ carries its quote.
 existing tests that pinned pre-canon values were updated with citations. v0.31.4.
 
 **Remaining under #58:** #63, port-original rules as named overlays.
+
+## Session 2026-09-21 (evening, 4) — the AI's deviations, named
+
+**Completed: #63, closing the #58 AI-layer review.** v0.31.3 and v0.31.4 (#64,
+#65) were pushed at the owner's instruction before this started.
+
+`src/game/ai/house-rules.ts` lists every AI behaviour that is ours rather than
+canon's, as five switches, each tied to the DECISIONS entry that justifies it.
+Production runs them all. `CANON_RULES` runs canon's AI, and the simulation can
+run a whole galaxy either way. Guards fail on an undeclared `PORT-ORIGINAL`
+marker, on a switch nothing reads, and on a DECISIONS heading that does not
+exist. Details are in DECISIONS 2026-09-21.
+
+Found while building it: the 2026-09-06 hyperspace deviation lost its code site
+when #43 changed how AI ships leave hyperspace. It may now be canon behaviour.
+Filed as #66 for a canon audit rather than guessed at.
+
+**Tests:**
+- 10 on/off switch tests
+- 12 registry and guard tests
+- 3 canon-mode simulation seeds
+
+No behaviour change, so no version bump.
+
+**#58 status:** #59-#65 are done; #66 is open.

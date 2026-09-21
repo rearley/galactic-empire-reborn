@@ -44,6 +44,7 @@ import { ShipTickService } from '../../src/game/ship/ship-tick.service';
 import { TickService } from '../../src/game/tick/tick.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { makeShip } from '../helpers/make-ship';
+import { PORT_RULES, type AiHouseRules } from '../../src/game/ai/house-rules';
 import { headingToward } from '../../src/game/physics/physics-math';
 
 /** One emission, in order. */
@@ -100,7 +101,12 @@ export class GalaxySim {
   }
 
   /** Build and boot a galaxy. `installClock()` must have run first. */
-  static async create(opts: { seed: number }): Promise<GalaxySim> {
+  /**
+   * `rules` defaults to production's house rules; `CANON_RULES` runs the galaxy
+   * as canon's AI would. @see src/game/ai/house-rules.ts
+   */
+  static async create(opts: { seed: number; rules?: AiHouseRules }): Promise<GalaxySim> {
+    const rules = opts.rules ?? PORT_RULES;
     const random = new Mulberry32Adapter(opts.seed);
     const emitter = new EventEmitter2();
 
@@ -134,14 +140,14 @@ export class GalaxySim {
     } as unknown as MineRepository;
 
     const combat = new CombatTickService(
-      tick, shipState, mineRepo, mineRegistry, random, emitter, quietLogger, classes, traceService,
+      tick, shipState, mineRepo, mineRegistry, random, emitter, quietLogger, classes, traceService, rules,
     );
     const physics = new PhysicsTickService(tick, shipState, classes, emitter, undefined, random);
     const shipTick = new ShipTickService(tick, shipState, {} as MaintenanceService, undefined, emitter);
     const phaser = new PhaserHandlerService(shipState, classes, emitter, random, combat, traceService);
     const cyb = new CybertronTickService(
       tick, shipState, classes, repository, emitter, random,
-      undefined, combat, mineRegistry, mineRepo, traceService,
+      undefined, combat, mineRegistry, mineRepo, traceService, rules,
     );
 
     sim = new GalaxySim(opts.seed, emitter, classes, traceService, tick, phaser);

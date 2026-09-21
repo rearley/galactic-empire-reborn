@@ -17,6 +17,7 @@
 
 import { CYBGOLD, HYPDST1, HYPDST2, TOOCLOSE, UNIVMAX } from '../constants';
 import { CANON_TOT_TO_CREATE, scaleAiPopulation } from './cyb-population';
+import { PORT_RULES, type AiHouseRules } from '../ai/house-rules';
 export interface CybertronClassConfig {
   /** How many of this class should exist at steady state. @see GECYBS.C tot_to_create */
   tot_to_create: number;
@@ -65,13 +66,16 @@ export const CYBERTRON_CLASS_DEFAULTS: Record<number, CybertronClassConfig> =
  * Env pattern: CYBERTRON_CLASS_21_TOT_TO_CREATE=8, CYBERTRON_CLASS_24_HYPERDIST1=30, etc.
  * Called once at module initialization.
  */
-export function buildCybertronClassConfigs(): Record<number, CybertronClassConfig> {
+export function buildCybertronClassConfigs(rules: AiHouseRules = PORT_RULES): Record<number, CybertronClassConfig> {
   const config: Record<number, CybertronClassConfig> = {};
   for (const [classNumStr, defaults] of Object.entries(CYBERTRON_CLASS_DEFAULTS)) {
     const n = Number(classNumStr);
     const prefix = `CYBERTRON_CLASS_${n}_`;
+    // PORT-ORIGINAL @house-rule scalePopulation — canon's counts are for a
+    // galaxy three times the size of ours. Off, canon's own.
+    const count = rules.scalePopulation ? defaults.tot_to_create : CANON_TOT_TO_CREATE[n];
     config[n] = {
-      tot_to_create: envInt(`${prefix}TOT_TO_CREATE`, defaults.tot_to_create),
+      tot_to_create: envInt(`${prefix}TOT_TO_CREATE`, count),
       tooclose: envInt(`${prefix}TOOCLOSE`, defaults.tooclose),
       hyperdist1: envFloat(`${prefix}HYPERDIST1`, defaults.hyperdist1),
       hyperdist2: envFloat(`${prefix}HYPERDIST2`, defaults.hyperdist2),

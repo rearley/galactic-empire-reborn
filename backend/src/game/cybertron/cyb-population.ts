@@ -63,7 +63,7 @@ export function scaleAiPopulation(canonCount: number, univmax: number): number {
 /**
  * How long a class stays empty after one of its hulls dies.
  *
- * PORT-ORIGINAL. Canon has no respawn delay at all: `autortia` examines one
+ * PORT-ORIGINAL @house-rule respawnHold. Canon has no respawn delay at all: `autortia` examines one
  * ship slot every 30 seconds and refills whatever it finds free
  * (GEMAIN.C:2321 `if (ticktock2 >= 30 && ticktock1 < nships)`), so the wait is
  * an accident of where the walk pointer happens to be when you make the kill.

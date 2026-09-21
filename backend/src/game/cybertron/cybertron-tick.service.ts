@@ -44,6 +44,7 @@ import { CybertronControlService } from './cybertron-control.service';
 import { AiWeapons } from '../ai/ai-weapons';
 import { CybertronBrain, isCybertronClass } from './cybertron-brain';
 import { CybTraceService, tracedTransition } from './cyb-trace.service';
+import { AI_HOUSE_RULES, PORT_RULES, type AiHouseRules } from '../ai/house-rules';
 
 /**
  * Drives the Cybertron/Sartern AI state machine on every PHYSICS tick.
@@ -62,7 +63,7 @@ export class CybertronTickService implements OnModuleInit {
   private spawnTickCounter = 0;
   /**
    * Earliest wall-clock time each class may be refilled, armed when one of its
-   * hulls dies. PORT-ORIGINAL — canon has no respawn delay.
+   * hulls dies. PORT-ORIGINAL @house-rule respawnHold — canon has no respawn delay.
    * @see cyb-population.ts respawnDelayMs, docs/DECISIONS.md 2026-09-20
    */
   private readonly respawnNotBefore = new Map<number, number>();
@@ -71,7 +72,7 @@ export class CybertronTickService implements OnModuleInit {
   private readonly pendingAllowance = new Map<string, bigint>();
 
   /** Maps classNumber → CybertronClassConfig (merged from env overrides + defaults). */
-  private readonly classConfigs: Record<number, CybertronClassConfig> = buildCybertronClassConfigs();
+  private readonly classConfigs: Record<number, CybertronClassConfig>;
 
   private unsubscribe: (() => void) | null = null;
   private unsubscribeAi: (() => void) | null = null;
@@ -92,7 +93,11 @@ export class CybertronTickService implements OnModuleInit {
     // The sysop's `sys trace`. Optional for the same reason as the registry:
     // with none, every decision still runs and simply goes unrecorded.
     @Optional() private readonly trace?: CybTraceService,
+    // The port's AI house rules; production binds nothing and runs them all.
+    // @see ../ai/house-rules.ts
+    @Optional() @Inject(AI_HOUSE_RULES) private readonly rules: AiHouseRules = PORT_RULES,
   ) {
+    this.classConfigs = buildCybertronClassConfigs(rules);
     this.weapons = new AiWeapons({
       shipState, classes: shipClassCache, events, random, logger: this.logger,
       combatTick, mineRegistry, mineRepo, trace,
@@ -100,6 +105,7 @@ export class CybertronTickService implements OnModuleInit {
     this.brain = new CybertronBrain({
       shipState, shipClassCache, classConfigs: this.classConfigs, events, random,
       repository, trace, weapons: this.weapons, pendingAllowance: this.pendingAllowance,
+      rules,
     });
   }
 
@@ -296,7 +302,7 @@ export class CybertronTickService implements OnModuleInit {
   /**
    * Start a class's respawn hold when one of its hulls dies.
    *
-   * PORT-ORIGINAL, and armed by a DEATH rather than by a deficit: a galaxy that
+   * PORT-ORIGINAL @house-rule respawnHold, and armed by a DEATH rather than by a deficit: a galaxy that
    * has simply never been full — a fresh database, a raised `tot_to_create` —
    * must still fill at the old pace, or a new install would sit empty for half
    * an hour waiting for hulls that nobody killed.
@@ -308,6 +314,7 @@ export class CybertronTickService implements OnModuleInit {
    * @see cyb-population.ts respawnDelayMs, docs/DECISIONS.md 2026-09-20
    */
   private onAiHullDestroyed(e: CombatShipDestroyedEvent): void {
+    if (!this.rules.respawnHold) return;
     if (!e.victimUserid?.startsWith('Cybrg-')) return;
     // `victimClass` is optional — some callers build the event after the ship
     // is gone. With no class there is nothing to hold, and refilling at the old

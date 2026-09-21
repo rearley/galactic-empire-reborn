@@ -19,7 +19,10 @@ backend/src/game/
   commands/       ← CommandRouterService — routes player text input to
                     handlers in commands/handlers/
   ai/             ← AiWeapons — the canon weapons BOTH AI kinds fire (firep,
-                    firehp, torp, laymine, zip), as GECYBS.C and GEDROIDS.C do
+                    firehp, torp, laymine, zip, jam), as GECYBS.C and GEDROIDS.C do;
+                    house-rules.ts — EVERY AI behaviour that is ours rather than
+                    canon's, one switch each. Adding a deviation means adding a
+                    switch there; a PORT-ORIGINAL marker that names none fails CI
   cybertron/      ← CybertronTickService (the scheduler) + CybertronBrain (the
                     decisions) + CybertronRepository; claim changes only in
                     cyb-transitions.ts; CybTraceService behind `sys trace`

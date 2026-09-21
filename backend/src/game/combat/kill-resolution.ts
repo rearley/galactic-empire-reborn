@@ -19,7 +19,7 @@ export interface KillSpoilsDeps {
   /**
    * Told about each stack `chkweight` refused. Canon discards it silently, and
    * so does the game; this exists only so the kill log can say what a full
-   * hold cost. PORT-ORIGINAL, no effect on play.
+   * hold cost. PORT-ORIGINAL @not-a-house-rule: bookkeeping, no effect on play.
    */
   onDropped?(transfer: LootTransfer): void;
 }
