@@ -528,15 +528,23 @@ export function escalationKills(ship: { kills: number; userKills?: number }): nu
  * which ships run the Cybertron brain at all.
  */
 export function countCybertronClaims(
-  ships: readonly { status: number; cybmine: number; shpclass: number }[],
+  ships: readonly { status: number; cybmine: number; cybmineKey?: string; shpclass: number }[],
   targetChannel: number,
   isCybertronClass: (shpclass: number) => boolean,
+  /**
+   * Who the target is. A claim on the same channel but a different pilot — one
+   * who left, leaving the number to this one — is not a claim on this one.
+   * Omitted, or a claim with no key, counts by channel alone. @see issue #64
+   */
+  targetKey?: string,
 ): number {
   let count = 0;
   for (const s of ships) {
     if (s.status !== GESTAT_AUTO) continue;
     if (!isCybertronClass(s.shpclass)) continue;
-    if (s.cybmine === targetChannel) count++;
+    if (s.cybmine !== targetChannel) continue;
+    if (targetKey !== undefined && s.cybmineKey !== undefined && s.cybmineKey !== targetKey) continue;
+    count++;
   }
   return count;
 }

@@ -102,7 +102,7 @@ export class PhaserHandlerService {
 
   /** A hit turns an AI on the shooter; traced when there is a trace. */
   private provokeTraced(victim: ShipState, shooter: ShipState): void {
-    const apply = (): void => provoke(victim, shooter.channel ?? NO_CHANNEL);
+    const apply = (): void => provoke(victim, shooter);
     if (this.trace && victim.status === GESTAT_AUTO) {
       this.trace.transition(shipKey(victim.userid, victim.shipno), victim, 'provoke', apply,
         `hit by ${shooter.username ?? shooter.shipname}`);

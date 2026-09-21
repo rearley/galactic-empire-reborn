@@ -1,6 +1,15 @@
 import type { Random } from '../combat/random.port';
 import { GESTAT_AUTO } from '../constants';
-import { CYBMINE_NONE } from '../ship/ship-channel.registry';
+import { CYBMINE_NONE, NO_CHANNEL } from '../ship/ship-channel.registry';
+
+/** A ship a claim can name: its channel, and who it is. */
+export interface Claimable {
+  channel?: number;
+  userid: string;
+  shipno: number;
+}
+
+const keyOf = (s: Claimable): string => `${s.userid}:${s.shipno}`;
 
 /**
  * Every change to a Cybertron's claim, one function per transition.
@@ -34,6 +43,8 @@ import { CYBMINE_NONE } from '../ship/ship-channel.registry';
 /** The fields a claim transition may write. */
 export interface CybClaimState {
   cybmine: number;
+  /** Who `cybmine` claims. @see ShipState.cybmineKey */
+  cybmineKey?: string;
   speed2b: number;
   head2b: number;
   holdcourse: number;
@@ -53,8 +64,10 @@ export const CYB_WON_SPEED = 2000;
  * @see GECMDS.C:1072 `wptr->cybmine = usrn;` (hyper-phaser)
  * @see GECMDS.C:1374 `wptr->cybmine = usrn;` (torpedo/missile)
  */
-export function provoke(ai: { status: number; cybmine: number }, attackerChannel: number): void {
-  if (ai.status === GESTAT_AUTO) ai.cybmine = attackerChannel;
+export function provoke(ai: { status: number; cybmine: number; cybmineKey?: string }, attacker: Claimable): void {
+  if (ai.status !== GESTAT_AUTO) return;
+  ai.cybmine = attacker.channel ?? NO_CHANNEL;
+  ai.cybmineKey = keyOf(attacker);
 }
 
 /**
@@ -62,8 +75,9 @@ export function provoke(ai: { status: number; cybmine: number }, attackerChannel
  * follows sets speed and heading every activation, claimed or re-claimed.
  * @see GECYBS.C:740 `ptr->cybmine = (byte)low_ship;`
  */
-export function acquire(ai: CybClaimState, channel: number): void {
-  ai.cybmine = channel;
+export function acquire(ai: CybClaimState, target: Claimable): void {
+  ai.cybmine = target.channel ?? CYBMINE_NONE;
+  ai.cybmineKey = keyOf(target);
 }
 
 /**
@@ -74,6 +88,7 @@ export function acquire(ai: CybClaimState, channel: number): void {
  */
 export function releaseTargetLeft(ai: CybClaimState, topSpeed: number, rng: Random): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
   ai.speed2b = rng.next() * topSpeed;
 }
 
@@ -86,7 +101,10 @@ export function releaseTargetLeft(ai: CybClaimState, topSpeed: number, rng: Rand
 export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: Random): void {
   ai.holdcourse = Math.floor(rng.next() * 5) + 5;
   ai.speed2b = rng.next() * topSpeed;
-  if (Math.floor(rng.next() * 10) === 0) ai.cybmine = CYBMINE_NONE;
+  if (Math.floor(rng.next() * 10) === 0) {
+    ai.cybmine = CYBMINE_NONE;
+    ai.cybmineKey = undefined;
+  }
 }
 
 /**
@@ -115,6 +133,7 @@ export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: R
  */
 export function releaseZoneEntry(ai: CybClaimState, topSpeed: number, rng: Random): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
   ai.speed2b = rng.next() * topSpeed;
   ai.head2b = rng.next() * 359.9;
 }
@@ -127,6 +146,7 @@ export function releaseZoneEntry(ai: CybClaimState, topSpeed: number, rng: Rando
  */
 export function releaseBreakOff(ai: CybClaimState, topSpeed: number): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
   ai.speed2b = topSpeed;
 }
 
@@ -147,6 +167,7 @@ export function releaseBreakOff(ai: CybClaimState, topSpeed: number): void {
 export function releaseNoTarget(ai: CybClaimState): void {
   ai.tick = 255;
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
 }
 
 /**
@@ -157,6 +178,7 @@ export function releaseNoTarget(ai: CybClaimState): void {
  */
 export function releaseStale(ai: CybClaimState): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
 }
 
 /**
@@ -170,6 +192,7 @@ export function releaseStale(ai: CybClaimState): void {
  */
 export function releaseDeadTarget(ai: CybClaimState): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
 }
 
 /**
@@ -184,6 +207,7 @@ export function releaseDeadTarget(ai: CybClaimState): void {
  */
 export function releaseWon(ai: CybClaimState): void {
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
   ai.speed2b = CYB_WON_SPEED;
   ai.cybupdate = 0;
 }
@@ -240,6 +264,7 @@ export function idleCadence(ai: CybClaimState, topSpeed: number, rng: Random): v
 export function hydrate(ai: CybClaimState & { status: number; topspeed: number }): void {
   ai.status = GESTAT_AUTO;
   ai.cybmine = CYBMINE_NONE;
+  ai.cybmineKey = undefined;
   ai.holdcourse = 0;
   ai.speed2b = ai.topspeed * 1000;
 }

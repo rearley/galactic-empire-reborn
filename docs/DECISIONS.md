@@ -7200,3 +7200,35 @@ affected. Pinned at five headings in `test/game/ai/ai-weapons-aim.spec.ts`.
 - canon `torp()` adds 20 to the launch distance, and neither AI does.
 
 Both move Cybertron behaviour too, and neither was in the approved scope.
+
+## 2026-09-21 — A Cybertron claim is on a pilot, not on a channel number
+
+**Context.** Issue #64. `cybmine` holds a channel. `ShipChannelRegistry` hands
+out the LOWEST free channel, so a pilot who boards right after another leaves
+is given the departed pilot's number. `ShipStateService.leave` scrubs the freed
+channel from `lastfired` and from projectile slots, but not from `cybmine`.
+Until the claim's holder next had its turn, the newcomer was therefore hunted
+for someone else's fight, and counted against their own `noclaim` gang-up limit.
+
+**Canon.** Canon identifies claims by terminal line too, so the root is shared.
+But canon's own release says what a claim is for: GECYBS.C:684
+`if (!ingegame(zothusn))` drops it when the claimed pilot has left the game.
+In canon a line is reused only when a new caller dials in. Here reuse is
+immediate by design, so the check that states canon's intent is defeated before
+it can run. The intent is legible from that line, which is what makes this a
+fix and not a deviation.
+
+**Decision.** A claim also records WHO it is on: `cybmineKey`, a ship key, held
+in memory only. `acquire` and `provoke` set it; every release and `hydrate`
+clear it. All of that is inside `cyb-transitions.ts`, and the claim-writes
+guard now covers the new field. At the holder's next turn, a channel now held
+by someone else reads as the claimed pilot having left, so canon's full
+`releaseTargetLeft` runs, cruise re-roll included.
+
+We deliberately do NOT clear the claim at logout. That would skip the re-roll,
+the half-transition #59 exists to prevent. The `noclaim` count also ignores a
+claim that is really on a departed pilot. A claim with no key falls back to the
+channel alone.
+
+Mutation-checked: without the identity test in `claimedPilot`, both #64 tests
+fail.

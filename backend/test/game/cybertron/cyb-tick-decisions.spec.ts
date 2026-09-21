@@ -50,6 +50,7 @@ import { TickService } from '../../../src/game/tick/tick.service';
 import { TickContext, TickKind } from '../../../src/game/tick/tick.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Random } from '../../../src/game/combat/random.port';
+import { provoke } from '../../../src/game/cybertron/cyb-transitions';
 import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { FIRETICKS, GESTAT_AUTO } from '../../../src/game/constants';
@@ -375,6 +376,53 @@ describe('releasing or holding an existing claim (GECYBS.C:682-706)', () => {
 
     expect(cyb.cybmine).toBe(255);
     expect(cyb.speed2b).toBeCloseTo(0.99 * TOP_SPEED, 6);
+  });
+
+  /**
+   * #64. The port hands out the LOWEST free channel, so a pilot who boards
+   * straight after another leaves inherits their number — and, until now, any
+   * Cybertron claim on it. The claim then hunted the newcomer, who had done
+   * nothing, and counted against their gang-up limit. Canon keys claims by
+   * terminal line too, but its own release says what a claim is for:
+   *   GECYBS.C:684 `if (!ingegame(zothusn))`
+   * — the pilot who was claimed has left. A claim now remembers WHO it is on,
+   * and a channel held by somebody else reads as exactly that departure: the
+   * full target-left release, with its cruise re-roll, on the holder's own turn.
+   * @see docs/DECISIONS.md 2026-09-21
+   */
+  it('a claim does not pass to a newcomer who inherits the claimed pilot\'s channel', () => {
+    const cyb = cybertron(CLASS_SCOUT, { xcoord: 10, ycoord: 10, cybmine: 255 });
+    const claimed = player(2, { xcoord: 11, ycoord: 10 });
+    const ships = [cyb, claimed];
+    const { svc } = harness(ships, fixedRandom(0.99));
+
+    lockon(svc, cyb);
+    expect(cyb.cybmine).toBe(2);
+
+    // The claimed pilot logs out; a newcomer boards and is handed channel 2.
+    ships.splice(ships.indexOf(claimed), 1);
+    const newcomer = player(9, { userid: 'p9', shipno: 9, channel: 2, xcoord: 11, ycoord: 10 });
+    ships.push(newcomer);
+
+    lockon(svc, cyb);
+
+    expect(cyb.cybmine).toBe(255);
+    expect(cyb.speed2b).toBeCloseTo(0.99 * TOP_SPEED, 6);
+  });
+
+  it('a claim a pilot earned by shooting is likewise theirs, not their channel\'s', () => {
+    const cyb = cybertron(CLASS_SCOUT, { xcoord: 10, ycoord: 10, cybmine: 255 });
+    const shooter = player(2, { xcoord: 11, ycoord: 10 });
+    const ships = [cyb, shooter];
+    const { svc } = harness(ships, fixedRandom(0.99));
+    provoke(cyb, shooter);
+    expect(cyb.cybmine).toBe(2);
+
+    ships.splice(ships.indexOf(shooter), 1);
+    ships.push(player(9, { userid: 'p9', shipno: 9, channel: 2, xcoord: 11, ycoord: 10 }));
+    lockon(svc, cyb);
+
+    expect(cyb.cybmine).toBe(255);
   });
 
   it('a cloaked target is held, not dropped — the Cybertron sits on the spot', () => {

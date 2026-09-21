@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 182 entries.
+Append-only, **newest at the bottom**. 183 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — a claim is on a pilot, not a number](#session-2026-09-21-evening-2--a-claim-is-on-a-pilot-not-a-number)
 - [2026-09-21 — one set of weapons for both AI kinds, and the aim that always missed](#session-2026-09-21-late--one-set-of-weapons-for-both-ai-kinds-and-the-aim-that-always-missed)
 - [2026-09-21 — the galaxy simulation, and what it found first](#session-2026-09-21-evening--the-galaxy-simulation-and-what-it-found-first)
 - [2026-09-21 — sys trace: why a Cybertron did what it did](#session-2026-09-21-later--sys-trace-why-a-cybertron-did-what-it-did)
@@ -8572,3 +8573,27 @@ tests point at the files the code moved to. Backend 705 suites / 6,883 on Node
 
 **Next:** the owner reviews before pushing, especially the aim fix. Remaining
 under #58: #63 overlays, #64 channel aliasing, #65 jam and torpedo distance.
+
+## Session 2026-09-21 (evening, 2) — a claim is on a pilot, not a number
+
+**Completed: #64.** The owner opened the remaining #58 issues with "I think it
+is safe to work on the other issues."
+
+The investigation confirmed the aliasing, and it is not a theoretical one.
+Channels go lowest-free. `leave()` scrubbed the freed number from `lastfired`
+and from projectile slots, but not from `cybmine`. So the next pilot to board
+inherited any Cybertron claim on the one who left.
+
+Canon shares the root, but its own release line (GECYBS.C:684) states the
+intent. The fix gives claims an in-memory `cybmineKey`, written only by the
+transitions. A recycled channel then reads as "target left" on the holder's own
+turn, and canon's full release runs. Details are in DECISIONS 2026-09-21.
+
+**Tests:**
+- 2 behavioural tests through `cybCheckLockon`, mutation-checked
+- 10 release and hydrate key-clear cases
+- 3 `countCybertronClaims` cases
+- the `cybmineKey` field is listed as in-memory in the mapper's compile-time
+  guard
+
+v0.31.3.

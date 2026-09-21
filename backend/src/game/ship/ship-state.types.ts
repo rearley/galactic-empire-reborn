@@ -134,6 +134,13 @@ export interface ShipState {
   destruct: number;
   status: number;
   cybmine: number;
+  /**
+   * WHO `cybmine` claims, as a ship key — in memory only, never persisted.
+   * `cybmine` is a channel and channels are recycled lowest-first, so the
+   * number alone can come to name a newcomer. Set and cleared only by
+   * `cyb-transitions.ts`. @see issue #64
+   */
+  cybmineKey?: string;
   cybskill: number;
   cybupdate: number;
   tick: number;

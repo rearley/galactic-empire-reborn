@@ -132,6 +132,9 @@ const IN_MEMORY_ONLY = [
   'lockKey',
   // Assigned on entry to the world, released on exit.
   'channel',
+  // WHO a Cybertron's `cybmine` claims. Channels are session-scoped and
+  // recycled, and a saved claim is cleared on load anyway. @see issue #64
+  'cybmineKey',
   // Who last damaged this ship, so the loss mail can name them.
   'lastfiredBy',
   // Set by a gravity collision so the mail names the body, not a person.

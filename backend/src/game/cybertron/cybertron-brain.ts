@@ -485,7 +485,7 @@ export class CybertronBrain {
 
     // 2. Validate current target (@see GECYBS.C:678-706)
     if (ship.cybmine !== 255) {
-      const current = this.findPlayerByChannel(ship.cybmine);
+      const current = this.claimedPilot(ship);
       if (!current) {
         this.tx(ship, 'releaseTargetLeft', () => releaseTargetLeft(ship, topSpeed, this.random));
         return;
@@ -509,6 +509,7 @@ export class CybertronBrain {
       const hunterLowestToAttack = cls?.cybLowestClassAttacks ?? 0;
       let lowDist = 999_999_999.0;
       let lowChannel = -1;
+      let lowShip: ShipState | undefined;
       let lowName = '';
       // What the scan saw, for `sys trace`. Counting costs nothing and keeps
       // the loop's shape; only the summary line is skipped when untraced.
@@ -531,13 +532,14 @@ export class CybertronBrain {
         // Gang-up limit belongs to the ship being hunted, not the hunter. A
         // Cyb# of 0 (Heavy Freighter, Freight Barge) is never claimable.
         const victimNoClaim = this.shipClassCache.get(candidate.shpclass)?.noClaim ?? 0;
-        const claims = this.countClaims(candidate.channel ?? CYBMINE_NONE);
+        const claims = this.countClaims(candidate);
         if (!notClaimed(claims, victimNoClaim)) { tally.claimedOut++; continue; }
 
         const dist = cdistance(ship, candidate);
         if (dist < lowDist) {
           lowDist = dist;
           lowChannel = candidate.channel ?? CYBMINE_NONE;
+          lowShip = candidate;
           lowName = candidate.username ?? candidate.shipname;
         }
       }
@@ -555,7 +557,7 @@ export class CybertronBrain {
       }
 
       const wasAcquired = ship.cybmine === 255;
-      this.tx(ship, 'acquire', () => acquire(ship, lowChannel));
+      this.tx(ship, 'acquire', () => acquire(ship, lowShip!));
 
       if (wasAcquired) {
         const target = this.findPlayerByChannel(lowChannel);
@@ -575,7 +577,7 @@ export class CybertronBrain {
     }
 
     // 4. Apply pursuit band based on distance to current target (@see GECYBS.C:738-804)
-    const target = this.findPlayerByChannel(ship.cybmine);
+    const target = this.claimedPilot(ship);
     if (!target) {
       this.tx(ship, 'releaseStale', () => releaseStale(ship));
       return;
@@ -681,12 +683,27 @@ export class CybertronBrain {
     return inNeutralZone(ship);
   }
 
-  countClaims(targetChannel: number): number {
+  countClaims(target: ShipState): number {
     return countCybertronClaims(
       this.shipState.findAllShips(),
-      targetChannel,
+      target.channel ?? CYBMINE_NONE,
       (c) => this.isCybertronClass(c),
+      shipKey(target.userid, target.shipno),
     );
+  }
+
+  /**
+   * The pilot a Cybertron's claim is on — the one it CLAIMED, not whoever holds
+   * that channel now. Channels are recycled lowest-first, so a newcomer can be
+   * handed the number of the pilot who just left; to canon that is the claimed
+   * pilot leaving the game, GECYBS.C:684 `if (!ingegame(zothusn))`, and so it
+   * reads here as nobody. A claim with no key (set before #64) falls back to
+   * the channel alone. @see issue #64
+   */
+  private claimedPilot(ship: ShipState): ShipState | undefined {
+    const pilot = this.findPlayerByChannel(ship.cybmine);
+    if (!pilot || ship.cybmineKey === undefined) return pilot;
+    return shipKey(pilot.userid, pilot.shipno) === ship.cybmineKey ? pilot : undefined;
   }
 
   /**

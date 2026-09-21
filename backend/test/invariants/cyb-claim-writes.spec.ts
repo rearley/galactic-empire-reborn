@@ -22,7 +22,7 @@ import { join, relative } from 'node:path';
  */
 const SRC = join(__dirname, '../../src');
 const HOME = 'game/cybertron/cyb-transitions.ts';
-const WRITE = /\.(cybmine|cybupdate)\s*(?:[-+]?=(?!=)|\+\+|--)/;
+const WRITE = /\.(cybmine|cybmineKey|cybupdate)\s*(?:[-+]?=(?!=)|\+\+|--)/;
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

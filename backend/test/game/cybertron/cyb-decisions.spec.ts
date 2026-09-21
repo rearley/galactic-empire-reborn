@@ -12,6 +12,7 @@ import {
   rollTorpedoCount,
   pickPursuitBand,
   pickSpawnClass,
+  countCybertronClaims,
   randomInitLoadout,
   randomCybSkill,
 } from '../../../src/game/cybertron/cyb-decisions';
@@ -121,6 +122,24 @@ describe('pickSpawnClass skips classes inside their respawn hold', () => {
 
   it('with no hold predicate, behaves exactly as before', () => {
     expect(pickSpawnClass(short21and24, CANON_CAPS, draws(0.5, 0))).toBe(21);
+  });
+});
+
+describe('countCybertronClaims counts claims on this pilot, not on this channel (#64)', () => {
+  const cyb = (cybmine: number, cybmineKey?: string) => ({ status: 2, shpclass: 21, cybmine, cybmineKey });
+  const isCyb = () => true;
+
+  it('ignores a claim still on the pilot who left this channel behind', () => {
+    const ships = [cyb(5, 'pilot_Gone:1'), cyb(5, 'pilot_New:1')];
+    expect(countCybertronClaims(ships, 5, isCyb, 'pilot_New:1')).toBe(1);
+  });
+
+  it('counts a claim with no key by channel, as before', () => {
+    expect(countCybertronClaims([cyb(5)], 5, isCyb, 'pilot_New:1')).toBe(1);
+  });
+
+  it('counts by channel alone when no target key is given', () => {
+    expect(countCybertronClaims([cyb(5, 'pilot_Gone:1')], 5, isCyb)).toBe(1);
   });
 });
 

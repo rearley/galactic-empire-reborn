@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.3',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A Cybertron that was hunting a pilot who signed off no longer turns on whoever signs on next. The game hands a newly arrived ship the number the departed one had been using, and the Cybertron could follow the number instead of the pilot, arriving to attack someone who had done nothing to it. It now recognises that its quarry has gone and breaks off, as it always did when a pilot simply left.',
+      },
+    ],
+  },
+  {
     version: '0.31.2',
     date: '2026-09-21',
     entries: [

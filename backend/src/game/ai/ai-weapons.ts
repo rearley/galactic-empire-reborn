@@ -156,7 +156,7 @@ export class AiWeapons {
         v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
-        this.tx(v, 'provoke', () => provoke(v, ship.channel ?? NO_CHANNEL), `hit by ${ship.shipname}`);
+        this.tx(v, 'provoke', () => provoke(v, ship), `hit by ${ship.shipname}`);
       });
       this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.cantexit = FIRETICKS; });
 
@@ -274,7 +274,7 @@ export class AiWeapons {
       // chip damage. @see GECMDS.C:980-981
       if (victim.status === GESTAT_AUTO) {
         this.shipState.mutate(victim.userid, victim.shipno, (v) =>
-          this.tx(v, 'provoke', () => provoke(v, ship.channel ?? NO_CHANNEL), `hit by ${ship.shipname}`));
+          this.tx(v, 'provoke', () => provoke(v, ship), `hit by ${ship.shipname}`));
       }
 
       const shieldUp = victim.shieldstat === 1;

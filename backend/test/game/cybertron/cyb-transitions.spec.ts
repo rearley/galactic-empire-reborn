@@ -50,15 +50,17 @@ const base = (): Ship => ({
 });
 
 describe('provoke — a hit turns an AI on the shooter', () => {
-  it('writes the claim on an AI ship, and only the claim', () => {
+  const wasp = { channel: 18, userid: 'pilot_Wasp', shipno: 1 };
+
+  it('writes the claim on an AI ship — the channel, and who holds it — and nothing else', () => {
     const s = base();
-    provoke(s, 18);
-    expect(s).toEqual({ ...base(), cybmine: 18 });
+    provoke(s, wasp);
+    expect(s).toEqual({ ...base(), cybmine: 18, cybmineKey: 'pilot_Wasp:1' });
   });
 
   it('leaves a player ship alone', () => {
     const s = { ...base(), status: 1 };
-    provoke(s, 18);
+    provoke(s, wasp);
     expect(s).toEqual({ ...base(), status: 1 });
   });
 });
@@ -66,8 +68,8 @@ describe('provoke — a hit turns an AI on the shooter', () => {
 describe('acquire', () => {
   it('writes the claim only; the pursuit band steers separately', () => {
     const s = { ...base(), cybmine: CYBMINE_NONE };
-    acquire(s, 4);
-    expect(s).toEqual({ ...base(), cybmine: 4 });
+    acquire(s, { channel: 4, userid: 'pilot_Ace', shipno: 1 });
+    expect(s).toEqual({ ...base(), cybmine: 4, cybmineKey: 'pilot_Ace:1' });
   });
 });
 
@@ -76,6 +78,31 @@ describe('releaseTargetLeft', () => {
     const s = base();
     releaseTargetLeft(s, 4000, seq(0.25));
     expect(s).toEqual({ ...base(), cybmine: CYBMINE_NONE, speed2b: 1000 });
+  });
+});
+
+describe('every release forgets WHO it claimed, not just the channel (#64)', () => {
+  const keyed = (): Ship => ({ ...base(), cybmineKey: 'pilot_Wasp:1' });
+  it.each([
+    ['releaseTargetLeft', (s: Ship) => releaseTargetLeft(s, 4000, seq(0.25))],
+    ['releaseTargetCloaked, on its 1-in-10', (s: Ship) => releaseTargetCloaked(s, 4000, seq(0.5, 0.25, 0.05))],
+    ['releaseZoneEntry', (s: Ship) => releaseZoneEntry(s, 4000, seq(0.5, 0.5))],
+    ['releaseBreakOff', (s: Ship) => releaseBreakOff(s, 4000)],
+    ['releaseNoTarget', (s: Ship) => releaseNoTarget(s)],
+    ['releaseStale', (s: Ship) => releaseStale(s)],
+    ['releaseDeadTarget', (s: Ship) => releaseDeadTarget(s)],
+    ['releaseWon', (s: Ship) => releaseWon(s)],
+    ['hydrate', (s: Ship) => hydrate(s)],
+  ])('%s', (_name, release) => {
+    const s = keyed();
+    release(s);
+    expect(s.cybmineKey).toBeUndefined();
+  });
+
+  it('but a cloaked target kept on the other nine keeps its key too', () => {
+    const s = keyed();
+    releaseTargetCloaked(s, 4000, seq(0.5, 0.25, 0.5));
+    expect(s.cybmineKey).toBe('pilot_Wasp:1');
   });
 });
 
