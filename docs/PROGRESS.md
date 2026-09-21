@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 185 entries.
+Append-only, **newest at the bottom**. 186 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — the hyperspace deviation that never was](#session-2026-09-21-evening-5--the-hyperspace-deviation-that-never-was)
 - [2026-09-21 — the AI's deviations, named](#session-2026-09-21-evening-4--the-ais-deviations-named)
 - [2026-09-21 — one jam() for everyone](#session-2026-09-21-evening-3--one-jam-for-everyone)
 - [2026-09-21 — a claim is on a pilot, not a number](#session-2026-09-21-evening-2--a-claim-is-on-a-pilot-not-a-number)
@@ -8648,3 +8649,25 @@ Filed as #66 for a canon audit rather than guessed at.
 No behaviour change, so no version bump.
 
 **#58 status:** #59-#65 are done; #66 is open.
+
+## Session 2026-09-21 (evening, 5) — the hyperspace deviation that never was
+
+**Completed: #66, closing #58.** #63 pushed first, at the owner's instruction.
+
+The 2026-09-06 entry recorded "Cybertrons leave hyperspace to fight; canon's
+never do" as a deliberate deviation. Its premise was that canon's AI never
+passes through `accel()`. It does:
+- canon's movement tick calls `accel()` for every in-game ship (GEMAIN.C:2481)
+- `ingegame()` counts an AI hull as in the game (GEMAIN.C:2663)
+- the pursuit bands only clamp speed
+
+So a canon Cybertron in the close band decelerates under warp 1 and leaves
+hyperspace through GEFUNCS.C:538, as ours does. There is no house rule to add.
+The entry is marked superseded rather than deleted, so the reasoning that went
+wrong stays on record.
+
+**Tests:** `test/sim/hyperspace-exit.sim.spec.ts` pins the behaviour end to end
+on three seeds: a Cybertron hyperwarps to a pilot 60 sectors out, then drops to
+normal space still holding its claim. No code change, no version bump.
+
+**#58 is complete:** #59-#66 are all closed.

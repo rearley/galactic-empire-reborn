@@ -3639,6 +3639,19 @@ Two tests pinned the floored integers (`toBe(Math.floor(dmg100 * 0.5))` and
 they relied on held only while the defect did.
 
 ## 2026-09-06 — Cybertrons leave hyperspace to fight; canon's never do
+
+> **Superseded 2026-09-21 (#66): there is no deviation, and there never was.**
+> The premise below — that canon's AI "snaps `ptr->speed` directly rather than
+> decelerating through `accel()`" — is wrong. Canon's movement tick calls
+> `accel()` for EVERY ship in the game (GEMAIN.C:2481), and `ingegame()` is
+> true for an AI hull (GEMAIN.C:2663). The bands only CLAMP `ptr->speed`, so
+> when the close band sets `speed2b` under warp 1, canon's own deceleration
+> takes the Cybertron out of hyperspace (GEFUNCS.C:538), exactly as ours does.
+> The owner's preference recorded below ("I like ours being more dangerous") is
+> therefore also canon. Since #43 the port has had no AI-specific exit either:
+> every ship leaves hyperspace through the same transition. Pinned end to end
+> by `test/sim/hyperspace-exit.sim.spec.ts`. Kept, not deleted, because the
+> reasoning is the record of how the mistake was made.
 **Context:** Canon's pursuit block (GECYBS.C:735-805) contains exactly ONE
 `where` assignment: `ptr->where = 1` in the long band, at `low_dist >=
 hyperdist1` (25 sectors). The three closer bands never clear it — they only
