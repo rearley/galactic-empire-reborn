@@ -135,7 +135,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect(alice.phasr).toBe(0);
   });
 
-  it('a hit on an AI is recorded in its sys trace as a provoke, naming the shooter', () => {
+  it('a hit on an AI is recorded in its sys trace as a provoke, naming the shooter', async () => {
     const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', username: 'Wasp', xcoord: 5, ycoord: 5 });
     const cyb = makeShip({
       userid: 'Cybrg-205', shipno: 205, shipname: 'Obliterator', status: GESTAT_AUTO, cybmine: 255,
@@ -144,7 +144,7 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     const trace = new CybTraceService({ now: () => 0 });
     const h = makeHarness([alice, cyb], {}, trace);
 
-    h.handler.command.handler(alice, ['0', '0'], ctx);
+    await h.handler.command.handler(alice, ['0', '0'], ctx);
 
     expect(cyb.cybmine).toBe(1);
     expect(trace.read('Cybrg-205:205')).toEqual([expect.objectContaining({
