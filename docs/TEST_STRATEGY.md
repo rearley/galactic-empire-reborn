@@ -200,6 +200,34 @@ Two guards close the difference, both in
   `rep sys` phaser-readiness deviation, which had been sitting in a test
   docblock in words good enough to read like a decision had been taken.
 
+## What unit tests cannot see: the galaxy simulation
+
+Unit tests pin canon's odds and branches. They cannot see what those add up to
+over time. The hub-trap bugs of 2026-09-20 were exactly that: every unit test
+passed while an Obliterator lived in sector (0,0) for hours.
+
+`test/sim/` runs the real tick, movement, combat and Cybertron services over an
+in-memory galaxy. It runs on a fake clock at UNIVMAX 100, with canon's class
+table and three fixed seeds, and plays hours of simulated time in seconds.
+Scenarios assert emergent properties of play:
+
+- a pilot on the hub is never claimed
+- a parked pilot is found
+- a commuter's claims are released when it enters the zone
+- a killed class never returns early, and no spawn slot is wasted
+
+`sim-invariants.ts` checks four rules every simulated second. A failure prints
+the offending Cybertron's `sys trace`, so it reads like an investigation.
+
+It is in the default run: the whole directory takes about 8 seconds. Both
+properties added so far were mutation-checked by re-introducing the bug each
+guards against, and both caught it on every seed. The fight-back scenario found
+a real defect on its first run (DECISIONS 2026-09-21: the respawn hold wasted
+spawn slots).
+
+**When to add a scenario:** when a bug report describes behaviour over time
+("keeps", "never", "camps", "always comes back") rather than one wrong value.
+
 ## When play turns up a bug
 
 The loop that found nine defects in two days, in order:

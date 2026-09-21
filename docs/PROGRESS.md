@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 180 entries.
+Append-only, **newest at the bottom**. 181 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — the galaxy simulation, and what it found first](#session-2026-09-21-evening--the-galaxy-simulation-and-what-it-found-first)
 - [2026-09-21 — sys trace: why a Cybertron did what it did](#session-2026-09-21-later--sys-trace-why-a-cybertron-did-what-it-did)
 - [2026-09-21 — a claim changes in one place now](#session-2026-09-21--a-claim-changes-in-one-place-now)
 - [2026-09-20 — the help the game itself gives](#session-2026-09-20-ninth-pass--the-help-the-game-itself-gives)
@@ -8458,3 +8459,63 @@ a silent release because it is sysop-only.
 
 **Next:** #61 (long-run headless simulation), which can now assert on traces as
 well as on ship state.
+
+## Session 2026-09-21 (evening) — the galaxy simulation, and what it found first
+
+**Completed: #61.** `test/sim/` runs the real AI for hours of simulated play.
+
+- **The harness** (`GalaxySim`) puts the real `TickService`, movement, ship
+  housekeeping, combat, Cybertron AI, trace and `pha` over an in-memory ship
+  map. The real class cache loads canon's generated table, at UNIVMAX 100.
+- **The fake clock** covers timers and `Date` only, so wall time stays
+  measurable.
+- **Invariants,** checked every simulated second:
+  - `hub-trap`: no Cybertron in sector (0,0) for over 10 minutes
+  - `stale-claim` and `zone-claim`: a dead claim is gone once its holder has
+    spent its held course plus one activation
+  - `fire-into-zone`
+- **Scenarios,** each on seeds 1, 2 and 3:
+  - hub idler (4 h)
+  - parked out
+  - commuter (4 h)
+  - fight back (4 h, three pilots in the heaviest buyable hull shooting through
+    the real `pha` handler)
+
+Design is in `docs/superpowers/specs/2026-09-21-ai-galaxy-simulation-design.md`
+and the plan beside it. The owner chose the scenario mix and "default suite if
+fast". It is fast: the directory takes about 8 s, so it runs with every
+`vitest run` and in CI.
+
+**Mutation-checked:**
+- Re-introducing the v0.27.5 bug (claims never released on zone entry) fails
+  the commuter on every seed. The failure prints the holder's trace: acquire at
+  83.9 sectors, hyperwarp, brake, close, then a claim still held on a pilot back
+  on the hub.
+- Removing the spawn fix below fails fight-back on every seed.
+
+**Found on the first combat run, and fixed as v0.31.1.** The v0.29.0 respawn
+hold wasted spawn slots. `pickSpawnClass` could pick a class still inside its
+hold, `spawnOne` then refused it, and the three-minute slot went unused. In four
+simulated hours of fighting, 30 of 80 slots were lost this way, and the galaxy
+sat at about half strength. The owner chose to fix it now. The pick skips held
+classes; canon's 1% branch is untouched. See DECISIONS 2026-09-21. Player-visible,
+so it has a changelog entry.
+
+**Harness mistakes along the way, worth knowing for the next scenario:**
+- Vitest's fake timers also fake `performance.now` and `process.hrtime` unless
+  told not to. `GalaxySim.installClock()` fakes only what the game uses.
+- A fresh hull holds `speed2b` 0 until its idle re-roll. With no pilot in the
+  galaxy, nothing moves for a long time. That is canon, not a bug.
+- Events were stamped one second early until `run()` counted the second before
+  advancing it.
+- A first audit script reported "0 slots used" because of that stamping. Check
+  the instrument before trusting the reading.
+
+**Stated limits:** no gravity or planets, no Droids, and no `PlayerScoreService`,
+so `releaseWon` never fires in the sim.
+
+**Tests:** 25 in `test/sim` (plus 4 new `pickSpawnClass` unit tests). Backend
+703 suites / 6,861 on Node 24. v0.31.1.
+
+**Known issues:** the owner reports that one of today's pushes failed CI. That
+is next.
