@@ -62,7 +62,7 @@ import {
   CYBERTRON_SCORED_KILL,
   CybertronScoredKillEvent,
 } from '../../../src/game/player/player-score.service';
-import { CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-won';
+import { CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-transitions';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const CLASS_INTERCEPTOR = 1;

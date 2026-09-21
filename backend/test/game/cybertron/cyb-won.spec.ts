@@ -1,4 +1,10 @@
-import { cybWon, CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-won';
+import { releaseWon, CYB_WON_SPEED, type CybClaimState } from '../../../src/game/cybertron/cyb-transitions';
+
+const cybWon = <T extends CybClaimState>(ship: T): T => {
+  const s = { ...ship };
+  releaseWon(s);
+  return s;
+};
 
 /**
  * What a Cybertron does AFTER it kills you.
@@ -18,8 +24,8 @@ import { cybWon, CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-won';
  * Invisible from the cockpit, which is why play never found it — you are dead
  * at the moment it happens.
  */
-describe('cybWon', () => {
-  const base = { cybmine: 7, speed2b: 9000, cybupdate: 42 };
+describe('releaseWon', () => {
+  const base = { cybmine: 7, speed2b: 9000, head2b: 0, holdcourse: 0, cybupdate: 42, tick: 5 };
 
   it('releases the claim on the pilot it just killed', () => {
     // Holding a claim on a dead player suppresses other Cybertrons from
