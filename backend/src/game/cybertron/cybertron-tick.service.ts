@@ -82,6 +82,7 @@ import {
   randomInitLoadout,
   randomCybSkill,
   pickPursuitBand,
+  type PursuitBand,
   cybwhoops,
   gebemean,
   rollTorpedoCount,
@@ -110,6 +111,7 @@ import {
 } from './cyb-transitions';
 import { CombatTickService } from '../combat/combat-tick.service';
 import { CybertronControlService } from './cybertron-control.service';
+import { CybTraceService, formatScanSummary, type CybScanTally } from './cyb-trace.service';
 
 /**
  * Drives the Cybertron/Sartern AI state machine on every PHYSICS tick.
@@ -155,7 +157,19 @@ export class CybertronTickService implements OnModuleInit {
     // with no registry simply never sweeps, which is the pre-existing behaviour.
     @Optional() private readonly mineRegistry?: MineRegistry,
     @Optional() private readonly mineRepo?: MineRepository,
+    // The sysop's `sys trace`. Optional for the same reason as the registry:
+    // with none, every decision still runs and simply goes unrecorded.
+    @Optional() private readonly trace?: CybTraceService,
   ) {}
+
+  /**
+   * Apply a claim transition, recording it in the ship's trace when there is
+   * one. The transition runs either way. @see cyb-trace.service.ts
+   */
+  private tx(ship: ShipState, event: string, apply: () => void, detail?: string): void {
+    if (this.trace) this.trace.transition(shipKey(ship.userid, ship.shipno), ship, event, apply, detail);
+    else apply();
+  }
 
   /**
    * Subscribe to the PHYSICS tick, register event listeners, hydrate all Cybertron ships
@@ -294,6 +308,7 @@ export class CybertronTickService implements OnModuleInit {
   private cybLives(ship: ShipState, ctx: TickContext): void {
     // Mark tick for recalc at end of cybLives (255 = sentinel)
     ship.tick = 255;
+    this.trace?.beginActivation(shipKey(ship.userid, ship.shipno));
 
     const topSpeed = (ship.topspeed ?? 0) * 1000.0;
 
@@ -313,7 +328,10 @@ export class CybertronTickService implements OnModuleInit {
     }
 
     // cybupdate decrement + direction wander (@see GECYBS.C:455 db_update)
-    idleCadence(ship, topSpeed, this.random);
+    // Traced only on the activation that re-rolls the course; the countdown
+    // itself would fill the trace with one `cybupdate` decrement per activation.
+    if (ship.cybupdate === 1) this.tx(ship, 'idleCadence', () => idleCadence(ship, topSpeed, this.random));
+    else idleCadence(ship, topSpeed, this.random);
 
     // Jammed branch vs normal engagement scan (@see GECYBS.C:236-319)
     if (ship.jammer === 0) {
@@ -423,7 +441,7 @@ export class CybertronTickService implements OnModuleInit {
       // falls through and still evaluates fire on this pass.
       // @see GECYBS.C:255
       if (tough === CYB_TOUGH_1 && Math.floor(this.random.next() * CYB_BREAKOFF) === 0) {
-        releaseBreakOff(ship, topSpeed);
+        this.tx(ship, 'releaseBreakOff', () => releaseBreakOff(ship, topSpeed), `broke off from ${target.username ?? target.shipname}`);
         const brokeOff: CybertronBrokeOffPayload = {
           attackerShipKey: shipKey(ship.userid, ship.shipno),
           targetShipKey: shipKey(target.userid, target.shipno),
@@ -552,7 +570,7 @@ export class CybertronTickService implements OnModuleInit {
         v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
-        provoke(v, ship.channel ?? NO_CHANNEL);
+        this.tx(v, 'provoke', () => provoke(v, ship.channel ?? NO_CHANNEL), `hit by ${ship.shipname}`);
       });
       this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.cantexit = FIRETICKS; });
 
@@ -650,7 +668,8 @@ export class CybertronTickService implements OnModuleInit {
       // chasing — this is what turns stray fire into a fight rather than silent
       // chip damage. @see GECMDS.C:980-981
       if (victim.status === GESTAT_AUTO) {
-        this.shipState.mutate(victim.userid, victim.shipno, (v) => provoke(v, ship.channel ?? NO_CHANNEL));
+        this.shipState.mutate(victim.userid, victim.shipno, (v) =>
+          this.tx(v, 'provoke', () => provoke(v, ship.channel ?? NO_CHANNEL), `hit by ${ship.shipname}`));
       }
 
       const shieldUp = victim.shieldstat === 1;
@@ -926,16 +945,16 @@ export class CybertronTickService implements OnModuleInit {
     if (ship.cybmine !== 255) {
       const current = this.findPlayerByChannel(ship.cybmine);
       if (!current) {
-        releaseTargetLeft(ship, topSpeed, this.random);
+        this.tx(ship, 'releaseTargetLeft', () => releaseTargetLeft(ship, topSpeed, this.random));
         return;
       }
       if (this.isInNeutralZone(current)) {
         // PORT-ORIGINAL: the other half of the sanctuary rule in the scan below.
         // Falls through to that scan, which finds someone outside the zone or
         // nobody. @see cyb-transitions.ts releaseZoneEntry
-        releaseZoneEntry(ship, topSpeed, this.random);
+        this.tx(ship, 'releaseZoneEntry', () => releaseZoneEntry(ship, topSpeed, this.random), `${current.username ?? current.shipname} is in the neutral zone`);
       } else if (current.cloak === 10) {
-        releaseTargetCloaked(ship, topSpeed, this.random);
+        this.tx(ship, 'releaseTargetCloaked', () => releaseTargetCloaked(ship, topSpeed, this.random), `${current.username ?? current.shipname} is cloaked`);
         return;
       }
     }
@@ -948,11 +967,16 @@ export class CybertronTickService implements OnModuleInit {
       const hunterLowestToAttack = cls?.cybLowestClassAttacks ?? 0;
       let lowDist = 999_999_999.0;
       let lowChannel = -1;
+      let lowName = '';
+      // What the scan saw, for `sys trace`. Counting costs nothing and keeps
+      // the loop's shape; only the summary line is skipped when untraced.
+      const tally: CybScanTally = { seen: 0, cloaked: 0, outOfClass: 0, inZone: 0, claimedOut: 0, picked: null };
 
       for (const candidate of this.shipState.findAllShips()) {
         if (candidate.status !== 1) continue; // must be active player
-        if (candidate.cloak === 10) continue;
-        if (!canPursue(hunterLowestToAttack, candidate.shpclass)) continue;
+        tally.seen++;
+        if (candidate.cloak === 10) { tally.cloaked++; continue; }
+        if (!canPursue(hunterLowestToAttack, candidate.shpclass)) { tally.outOfClass++; continue; }
 
         // PORT-ORIGINAL, and deliberate: a pilot inside sector (0,0) is not a
         // target. Canon's `cyb_check_lockon` has NO neutral test — the only
@@ -960,30 +984,36 @@ export class CybertronTickService implements OnModuleInit {
         // Cybertron locks a pilot on the hub, flies to them and shadows them at
         // matched speed until they step out. We make the zone a real sanctuary.
         // @see docs/DECISIONS.md 2026-09-20
-        if (this.isInNeutralZone(candidate)) continue;
+        if (this.isInNeutralZone(candidate)) { tally.inZone++; continue; }
 
         // Gang-up limit belongs to the ship being hunted, not the hunter. A
         // Cyb# of 0 (Heavy Freighter, Freight Barge) is never claimable.
         const victimNoClaim = this.shipClassCache.get(candidate.shpclass)?.noClaim ?? 0;
         const claims = this.countClaims(candidate.channel ?? CYBMINE_NONE);
-        if (!notClaimed(claims, victimNoClaim)) continue;
+        if (!notClaimed(claims, victimNoClaim)) { tally.claimedOut++; continue; }
 
         const dist = cdistance(ship, candidate);
         if (dist < lowDist) {
           lowDist = dist;
           lowChannel = candidate.channel ?? CYBMINE_NONE;
+          lowName = candidate.username ?? candidate.shipname;
         }
+      }
+
+      if (this.trace) {
+        if (lowChannel !== -1) tally.picked = { name: lowName, channel: lowChannel, distance: lowDist };
+        this.trace.note(shipKey(ship.userid, ship.shipno), 'scan', formatScanSummary(tally));
       }
 
       if (lowChannel === -1) {
         // Nobody to hunt: park the activation and coast on the current course.
         // @see cyb-transitions.ts releaseNoTarget
-        releaseNoTarget(ship);
+        this.tx(ship, 'releaseNoTarget', () => releaseNoTarget(ship));
         return;
       }
 
       const wasAcquired = ship.cybmine === 255;
-      acquire(ship, lowChannel);
+      this.tx(ship, 'acquire', () => acquire(ship, lowChannel));
 
       if (wasAcquired) {
         const target = this.findPlayerByChannel(lowChannel);
@@ -1005,7 +1035,7 @@ export class CybertronTickService implements OnModuleInit {
     // 4. Apply pursuit band based on distance to current target (@see GECYBS.C:738-804)
     const target = this.findPlayerByChannel(ship.cybmine);
     if (!target) {
-      releaseStale(ship);
+      this.tx(ship, 'releaseStale', () => releaseStale(ship));
       return;
     }
 
@@ -1048,6 +1078,16 @@ export class CybertronTickService implements OnModuleInit {
       );
     }
 
+    const apply = (): void => this.applyBand(ship, band, target);
+    if (this.trace) this.trace.band(shipKey(ship.userid, ship.shipno), ship, band.name, apply);
+    else apply();
+  }
+
+  /**
+   * Steer on the chosen pursuit band: speed, hyperwarp entry, shields, heading.
+   * @see GECYBS.C:742 `if (low_dist >= hyperdist1)` and the bands after it
+   */
+  private applyBand(ship: ShipState, band: PursuitBand, target: ShipState): void {
     ship.speed2b = band.desiredSpeed;
     // C also touches `ptr->speed` directly in every band — a snap on hyperwarp
     // entry, a ceiling everywhere else — so a Cybertron actually brakes rather
@@ -1191,7 +1231,7 @@ export class CybertronTickService implements OnModuleInit {
 
     // canon's cyb_won: release the claim, settle to warp 2, force a flush.
     // @see cyb-transitions.ts releaseWon
-    this.shipState.mutate(e.attackerUserid, shipno, (s) => releaseWon(s));
+    this.shipState.mutate(e.attackerUserid, shipno, (s) => this.tx(s, 'releaseWon', () => releaseWon(s)));
   }
 
   /**
@@ -1336,6 +1376,10 @@ export class CybertronTickService implements OnModuleInit {
       tickAt,
     };
     this.events.emit(CYBERTRON_EVENT.SPAWNED, payload);
+    // A new hull in this slot: the previous one's trace is no longer about it.
+    // Reset here rather than at death, so a dead Cybertron's last moves stay
+    // readable until the slot is reused. @see cyb-trace.service.ts
+    this.trace?.reset(shipKey(userid, shipno));
     this.logger.log(`Spawned ${userid} class ${classNumber}`);
     return true;
   }

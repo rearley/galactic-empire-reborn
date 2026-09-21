@@ -45,6 +45,7 @@ import {
 import { CombatTickService } from '../../combat/combat-tick.service';
 import { dropShieldsForFire } from '../../combat/shield-drop';
 import { provoke } from '../../cybertron/cyb-transitions';
+import { CybTraceService } from '../../cybertron/cyb-trace.service';
 
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
@@ -95,7 +96,18 @@ export class PhaserHandlerService {
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
     @Optional() private readonly combatTick?: CombatTickService,
+    /** Records the claim a hit takes, in the AI's `sys trace`. */
+    @Optional() private readonly trace?: CybTraceService,
   ) {}
+
+  /** A hit turns an AI on the shooter; traced when there is a trace. */
+  private provokeTraced(victim: ShipState, shooter: ShipState): void {
+    const apply = (): void => provoke(victim, shooter.channel ?? NO_CHANNEL);
+    if (this.trace && victim.status === GESTAT_AUTO) {
+      this.trace.transition(shipKey(victim.userid, victim.shipno), victim, 'provoke', apply,
+        `hit by ${shooter.username ?? shooter.shipname}`);
+    } else apply();
+  }
 
   readonly command: Command = {
     keyword: 'pha',
@@ -257,7 +269,7 @@ export class PhaserHandlerService {
       // you could not pull one off a teammate, and one you shot ignored you.
       // @see GECMDS.C:980-981 `if (wptr->status == GESTAT_AUTO) wptr->cybmine = usrn;`
       if (candidate.status === GESTAT_AUTO) {
-        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => provoke(v, ship.channel ?? NO_CHANNEL));
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => this.provokeTraced(v, ship));
       }
 
       // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
@@ -480,7 +492,7 @@ export class PhaserHandlerService {
         v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
-        provoke(v, ship.channel ?? NO_CHANNEL);
+        this.provokeTraced(v, ship);
       });
 
       const hitEvent: CombatHitEvent = {

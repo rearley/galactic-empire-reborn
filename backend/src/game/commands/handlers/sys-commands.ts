@@ -28,6 +28,15 @@ export const SYS_HELP_LINES: readonly string[] = Object.freeze([
   'sys cybpause nnn            - pauses the cybertrons for nnn secs',
 ]);
 
+/**
+ * Subcommands this port added, listed by `sys help` AFTER canon's own lines and
+ * marked as ours, so the canon text above stays verbatim and a sysop can tell
+ * which is which. @see docs/DECISIONS.md 2026-09-21 — `sys trace`
+ */
+export const SYS_PORT_HELP_LINES: readonly string[] = Object.freeze([
+  "sys trace <name>            - (this port) A Cybertron's recent decisions",
+]);
+
 export interface ParsedSysArgs {
   sub: string;
   rest: string[];

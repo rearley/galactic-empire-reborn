@@ -1,5 +1,5 @@
 import { tryEnergyDebit, cbearing } from '../physics/physics-math';
-import { BeforeApplicationShutdown, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BeforeApplicationShutdown, Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { isInNeutralZone } from './neutral-zone';
 import { COMBAT_TARGET_WARNING, CombatTargetWarningEvent } from './combat-events';
 import { SHIP_PHASER_CHARGE, ShipPhaserChargeEvent } from '../ship/repair-events';
@@ -63,6 +63,7 @@ import {
   pushBounded,
 } from '../invariants/runtime-events';
 import { releaseDeadTarget } from '../cybertron/cyb-transitions';
+import { CybTraceService } from '../cybertron/cyb-trace.service';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
 const TORP_DECOY_THRESHOLD = 5000;
@@ -107,6 +108,9 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
     private readonly events: EventEmitter2,
     private readonly logger: Logger,
     private readonly shipClassCache: ShipClassCacheService,
+    // Records a released claim in the holder's `sys trace`. Optional so the
+    // hand-built harnesses keep compiling; untraced, the release still happens.
+    @Optional() private readonly trace?: CybTraceService,
   ) {}
 
   /**
@@ -401,7 +405,11 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
           // cybmine holds the claimed player's CHANNEL (C: a usernumber,
           // GECYBS.C:368) — matching on shipno released the wrong claims.
           if (s.status === GESTAT_AUTO && victim.channel !== undefined && s.cybmine === victim.channel) {
-            releaseDeadTarget(s);
+            const release = (): void => releaseDeadTarget(s);
+            if (this.trace) {
+              this.trace.transition(shipKey(s.userid, s.shipno), s, 'releaseDeadTarget', release,
+                `${victim.username ?? victim.shipname} was destroyed`);
+            } else release();
           }
         }
 

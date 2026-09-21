@@ -50,6 +50,7 @@ import {
 } from '../../../src/game/constants';
 import { I_GOLD } from '../../../src/game/constants/items';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
+import { CybTraceService } from '../../../src/game/cybertron/cyb-trace.service';
 
 /** A Random that always draws the same value. */
 function fixedRandom(value: number): Random {
@@ -103,7 +104,7 @@ interface Harness {
   fire(): void;
 }
 
-async function makeHarness(ships: ShipState[], random: Random): Promise<Harness> {
+async function makeHarness(ships: ShipState[], random: Random, trace?: CybTraceService): Promise<Harness> {
   const shipMap = new Map<string, ShipState>();
   for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
 
@@ -154,7 +155,7 @@ async function makeHarness(ships: ShipState[], random: Random): Promise<Harness>
   const logger = { log: vi.fn(), error: vi.fn(), warn: vi.fn() } as unknown as Logger;
 
   const service = new CombatTickService(
-    tickService, shipState, mineRepo, mines, random, events, logger, classCache,
+    tickService, shipState, mineRepo, mines, random, events, logger, classCache, trace,
   );
   // Registers the PHYSICS handler for real. Hydrates an empty mine table, so
   // any mine a case wants must be added to `mines` AFTER this returns.
@@ -560,6 +561,24 @@ describe('who gets paid for a wreck', () => {
 
     expect(hunter.cybmine).toBe(255);
     expect(other.cybmine).toBe(5);
+  });
+
+  it('records the released claim in the holder\'s sys trace, naming the dead pilot', async () => {
+    const killer = makeShip({ userid: 'a', shipno: 1, channel: 5 });
+    const victim = makeShip({ userid: 'b', shipno: 2, channel: 6, damage: 100, lastfired: 5, username: 'Wasp' });
+    const hunter = makeShip({
+      userid: 'cyb1', shipno: 1, channel: 8, status: GESTAT_AUTO, cybmine: 6,
+    });
+    const trace = new CybTraceService({ now: () => 0 });
+    const h = await makeHarness([killer, victim, hunter], fixedRandom(0.99), trace);
+
+    h.fire();
+
+    expect(trace.read('cyb1:1')).toEqual([expect.objectContaining({
+      event: 'releaseDeadTarget',
+      detail: 'Wasp was destroyed',
+      changes: [{ field: 'cybmine', from: 6, to: 255 }],
+    })]);
   });
 
   /**

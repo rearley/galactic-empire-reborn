@@ -18,7 +18,8 @@ backend/src/game/
   galaxy/         ← GalaxyService + procedural generator
   commands/       ← CommandRouterService — routes player text input to
                     handlers in commands/handlers/
-  cybertron/      ← CybertronTickService + CybertronRepository
+  cybertron/      ← CybertronTickService + CybertronRepository; claim changes
+                    only in cyb-transitions.ts; CybTraceService behind `sys trace`
   droid/          ← DroidTickService + DroidSpawner
   midnight/       ← MidnightService — nightly maintenance cron
   reports/        ← BugReportService + the sysop's /admin/reports endpoint;

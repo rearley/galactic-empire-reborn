@@ -16,8 +16,9 @@ import {
   CombatMissEvent,
   CombatSubsystemDamagedEvent,
 } from '../../../../src/game/combat/combat-events';
-import { FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
+import { GESTAT_AUTO, FIRETICKS, HPFIRAMT, HPMINFIR, PHATOWRP, PMINFIRE, SE100DAM, WARP_THRESHOLD } from '../../../../src/game/constants';
 import { makeShip as buildShip } from '../../../helpers/make-ship';
+import { CybTraceService } from '../../../../src/game/cybertron/cyb-trace.service';
 
 /**
  * Fixture engagement distance, in sectors.
@@ -64,6 +65,7 @@ interface Harness {
 function makeHarness(
   ships: ShipState[],
   classCfg: Record<number, { maxPhaser?: number; scanRange?: number; maxTons?: number }> = {},
+  trace?: CybTraceService,
 ): Harness {
   const shipMap = new Map<string, ShipState>();
   for (const s of ships) shipMap.set(shipKey(s.userid, s.shipno), s);
@@ -107,7 +109,7 @@ function makeHarness(
   });
 
   const random = new Mulberry32Adapter(42);
-  const handler = new PhaserHandlerService(shipState, cache, events, random);
+  const handler = new PhaserHandlerService(shipState, cache, events, random, undefined, trace);
   return { handler, shipMap, events, emitted, cache };
 }
 
@@ -131,6 +133,23 @@ describe('PhaserHandlerService — `pha <degree> [focus]`', () => {
     expect(bob.dirty).toBe(true);
     // Phaser always FULLY discharges on fire (GECMDS.C:1006).
     expect(alice.phasr).toBe(0);
+  });
+
+  it('a hit on an AI is recorded in its sys trace as a provoke, naming the shooter', () => {
+    const alice = makeShip({ userid: 'a', shipno: 1, shipname: 'Alice', username: 'Wasp', xcoord: 5, ycoord: 5 });
+    const cyb = makeShip({
+      userid: 'Cybrg-205', shipno: 205, shipname: 'Obliterator', status: GESTAT_AUTO, cybmine: 255,
+      xcoord: 5, ycoord: 5 - ENGAGEMENT_DIST, shield: 5000, shieldstat: 1,
+    });
+    const trace = new CybTraceService({ now: () => 0 });
+    const h = makeHarness([alice, cyb], {}, trace);
+
+    h.handler.command.handler(alice, ['0', '0'], ctx);
+
+    expect(cyb.cybmine).toBe(1);
+    expect(trace.read('Cybrg-205:205')).toEqual([expect.objectContaining({
+      event: 'provoke', detail: 'hit by Wasp', changes: [{ field: 'cybmine', from: 255, to: 1 }],
+    })]);
   });
 
   it('rejects when no phaser class mounted (phasrtype === 0)', () => {

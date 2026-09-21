@@ -14,8 +14,13 @@ import type { CybertronClassConfig } from './cybertron.config';
  * @see specs/007-cybertron-ai/plan.md R-5 (Random port reuse)
  */
 
+/** Canon's four distance bands, plus a station that never moves. @see GECYBS.C:742 `if (low_dist >= hyperdist1)` */
+export type PursuitBandName = 'stationary' | 'hyperwarp' | 'brake' | 'approach' | 'close';
+
 /** Result of pickPursuitBand: what the Cybertron should do this tick. */
 export interface PursuitBand {
+  /** Which band this is, for `sys trace`. */
+  name: PursuitBandName;
   desiredSpeed: number;
   /** 1 = enter/stay in hyperspace; 0 = normal space */
   /**
@@ -160,13 +165,14 @@ export function pickPursuitBand(
     // No `speed`, no `speedClamp`, no `where`: nothing that moves it or puts
     // it into hyperspace. Shields still go up, on the same rule as the close
     // and combat bands — a base defends itself.
-    return { desiredSpeed: 0, raiseShields: currentWhere === 0 };
+    return { name: 'stationary', desiredSpeed: 0, raiseShields: currentWhere === 0 };
   }
   if (distance >= hyperdist1) {
     // Hyperwarp band — 20x speed, shields down. C snaps `ptr->speed` straight
     // to speed2b here rather than accelerating into it. @see GECYBS.C:745-746
     const desiredSpeed = distance * 2000.0;
     return {
+      name: 'hyperwarp',
       desiredSpeed,
       speed: desiredSpeed,
       where: 1,
@@ -180,6 +186,7 @@ export function pickPursuitBand(
     // writes no `where`: leaving hyperspace is the movement code's job, when
     // the ship decelerates back under warp 1. @see GECYBS.C:759 `		/* BRAKE!!!!!! */`
     return {
+      name: 'brake',
       desiredSpeed: topSpeed,
       speedClamp: 20000,
       raiseShields: false,
@@ -192,6 +199,7 @@ export function pickPursuitBand(
     // dropped out of hyperwarp and the Cybertron fought bare-hulled.
     // @see GECYBS.C:774-784
     return {
+      name: 'approach',
       desiredSpeed: topSpeed,
       speedClamp: topSpeed,
       raiseShields: currentWhere === 0,
@@ -216,6 +224,7 @@ export function pickPursuitBand(
       ? 990.0
       : rand.next() * 500.0;
   return {
+    name: 'close',
     desiredSpeed,
     speedClamp: topSpeed,
     raiseShields: currentWhere === 0,

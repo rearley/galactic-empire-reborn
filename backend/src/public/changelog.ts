@@ -96,6 +96,8 @@ export interface ChangelogRelease {
  * oversight and fails.
  */
 export const SILENT_RELEASES: Record<string, string> = {
+  '0.31.0':
+    'A diagnostic for the server operator: a way to see why an AI ship did what it did. Nothing about how the AI ships behave changes.',
   '0.30.2':
     'A restructure of how the AI ships keep track of whom they are hunting, so the kind of mistake behind the hub-camping Obliterator cannot be made again. They behave exactly as before.',
   '0.27.1':

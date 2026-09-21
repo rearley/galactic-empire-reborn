@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 179 entries.
+Append-only, **newest at the bottom**. 180 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — sys trace: why a Cybertron did what it did](#session-2026-09-21-later--sys-trace-why-a-cybertron-did-what-it-did)
 - [2026-09-21 — a claim changes in one place now](#session-2026-09-21--a-claim-changes-in-one-place-now)
 - [2026-09-20 — the help the game itself gives](#session-2026-09-20-ninth-pass--the-help-the-game-itself-gives)
 - [2026-09-20 — %t, the locked ship's name in a message](#session-2026-09-20-eighth-pass--t-the-locked-ships-name-in-a-message)
@@ -8419,3 +8420,41 @@ defaults to, `node-runtime-version.spec.ts` fails as designed. v0.30.2.
 
 **Next:** #60, the decision trace. Each named transition is now the natural
 place to log.
+
+## Session 2026-09-21 (later) — `sys trace`: why a Cybertron did what it did
+
+**Completed: #60.** `sys trace <name>` prints one Cybertron's recent decisions:
+claim transitions with before → after values, a summary of each target scan,
+and pursuit-band changes. The trace is kept in memory by `CybTraceService`, up
+to 50 entries per ship. Design and rejected alternatives are in DECISIONS
+2026-09-21. Read against the 2026-09-20 production case, it would have shown
+`releaseZoneEntry cybmine 18→255 speed2b 284→…` followed by
+`scan 1 pilot: 1 in zone → no target`: the whole story in one read, instead of
+five deploys.
+
+The owner chose the scope: claims, scan and steering, not everything per
+activation.
+
+**Behaviour is unchanged.** Every consumer takes the trace as `@Optional()`, and
+the transitions still run whether or not a trace is present. The whole suite
+passes both ways.
+
+**Changes outside the trace itself:**
+- Pursuit bands now carry a `name` (`stationary`, `hyperwarp`, `brake`,
+  `approach`, `close`).
+- Band application moved into its own `applyBand` method, with the code moved
+  unchanged.
+- `sys help` lists canon's 13 lines verbatim, then one port line marked
+  "(this port)". The test that pinned exactly 13 now says 13 + 1.
+
+**To be straight about TDD:** the service, the tick wiring and `sys trace` each
+went red first. The two tests for traces written outside the tick (a player's
+phaser hit and the kill sweep) passed on their first run, because that wiring
+was written before its tests.
+
+**Tests:** 12 service, 4 tick wiring, 9 `sys trace` / `sys help`, and 1 each in
+the phaser and combat specs. backend 699 suites / 6,832 on Node 24. v0.31.0,
+a silent release because it is sysop-only.
+
+**Next:** #61 (long-run headless simulation), which can now assert on traces as
+well as on ship state.

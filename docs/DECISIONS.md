@@ -7063,3 +7063,54 @@ for the reasons in the 2026-09-20 hydrate entry.
 GECMDS.C:1373-1374) is now one `provoke()` call. A distress call, or any future
 reason to drop a claim, becomes a new function in this file rather than a new
 assignment in the tick.
+
+## 2026-09-21 — `sys trace`: a sysop can read why a Cybertron did what it did
+
+**Context.** Issue #60, under the AI-layer review #58. Canon's `sys list`
+(GECMDS.C:4936) shows where an AI is and whom it has claimed. It never shows
+why. Every Obliterator investigation on 2026-09-20 started from such a row
+(`Cybrg-205`, `cybmine` 18, `speed2b` 284) and worked backwards to guess which
+branch had put it there. That took five passes, each one a deploy. The dev-only
+debug controllers could not help, because the problem was in production.
+
+**Decision.** A port-original, read-only sysop subcommand, `sys trace <name>`,
+backed by `CybTraceService`. The service holds 50 entries per Cybertron, in
+memory, in canon's field names. There are three kinds of entry:
+
+- **Claim transitions** from `cyb-transitions.ts`, with before → after for the
+  fields that changed. A transition that changed nothing is not recorded, so
+  repeated hits from one shooter do not flood the trace. This includes the two
+  claim writes outside the tick: a player's phaser `provoke` names the shooter,
+  and combat's `releaseDeadTarget` names the dead pilot.
+- **One scan summary per target scan.** It counts the pilots looked at, how
+  many each rule excluded (cloaked, class, zone, `noclaim`), and who was picked.
+- **The pursuit band**, recorded only when it changes. A chase re-applies the
+  same band every activation and would otherwise push everything else out.
+
+`idleCadence` is recorded only on the activation that re-rolls the course. The
+countdown itself would add one line per activation.
+
+**Where it lives.** `CybertronControlModule`, the leaf that already held the
+`cybpause` switch. The tick, `pha`, combat and `sys` all import it, so there is
+no module cycle. Every consumer takes it as `@Optional()`. Without it, the
+behaviour is identical and nothing is recorded, so tracing cannot change what
+an AI does. The whole suite passes both with and without it.
+
+**Retention.** A slot is reset when a new hull spawns into it, not when the old
+hull dies, so a dead Cybertron's last moves stay readable until the slot is
+reused. Everything is lost on restart. This is a live diagnostic, not a
+history, and persisting it would put a write on every activation.
+
+**`sys help`.** Canon's 13 lines stay verbatim (GECMDS.C:4762-4776). The port's
+line follows them, marked "(this port)", from `SYS_PORT_HELP_LINES`.
+
+**Rejected:**
+- Tracing inside the pure transition functions. That would give them a side
+  effect and a dependency. The call-site wrapper keeps them pure.
+- Tracing everything each activation: firing, evasion, mines, taunts. Fifty
+  entries would then cover a minute or two.
+- Tracing Droids. They are ephemeral, they are not where the bugs have been,
+  and they have no transitions module. Revisit with #62, which gives both AI
+  kinds one actuator.
+
+Sysop-only, so there is nothing for `GUIDE_DEVIATIONS`.

@@ -9,6 +9,7 @@ import { MineRegistry } from './mine.registry';
 import { MineRepository } from './mine.repository';
 import { MathRandomAdapter, RANDOM } from './random.port';
 import { PlayerScoreModule } from '../player/player-score.module';
+import { CybertronControlModule } from '../cybertron/cybertron-control.module';
 
 /**
  * Combat module — owns ship-to-ship combat: phasers, torpedoes, missiles,
@@ -21,7 +22,7 @@ import { PlayerScoreModule } from '../player/player-score.module';
  * @see specs/006b-combat/plan.md
  */
 @Module({
-  imports: [PhysicsModule, ShipModule, TickModule, PrismaModule, EventEmitterModule, PlayerScoreModule],
+  imports: [PhysicsModule, ShipModule, TickModule, PrismaModule, EventEmitterModule, PlayerScoreModule, CybertronControlModule],
   providers: [
     CombatTickService,
     MineRepository,

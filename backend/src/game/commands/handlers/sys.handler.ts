@@ -2,7 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Command, CommandContext, CommandResult } from '../command.types';
 import { formatMessage, MessageId } from '../messages';
 import { isSysopUsername } from '../../../auth/sysop';
-import { ShipState } from '../../ship/ship-state.types';
+import { ShipState, shipKey } from '../../ship/ship-state.types';
 import { ShipStateService } from '../../ship/ship-state.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRepository } from '../../player/user.repository';
@@ -11,8 +11,10 @@ import { CybertronControlService } from '../../cybertron/cybertron-control.servi
 import { UNIVMAX } from '../../constants';
 import { ITEM_KEYWORDS, ITEM_NAMES } from '../../constants/items';
 import {
-  parseSysArgs, SYS_HELP_LINES, sysClassIsValid, sysTypeIsValid, sysGotoIsValid,
+  parseSysArgs, SYS_HELP_LINES, SYS_PORT_HELP_LINES, sysClassIsValid, sysTypeIsValid, sysGotoIsValid,
 } from './sys-commands';
+import { CybTraceService } from '../../cybertron/cyb-trace.service';
+import { findTraceTargets, renderTrace } from './sys-trace';
 
 /**
  * Handles `sys <subcommand>` — canon's sysop toolkit, behind the gate below.
@@ -47,6 +49,11 @@ import {
  *
  * So this port is complete against canon, not thirteen-of-eighteen. Verified by
  * listing every `sameas("…",margv[1])` between :4742 and the end of cmd_sysop.
+ *
+ * One subcommand is the PORT's, and `sys help` lists it after canon's lines,
+ * marked as ours:
+ *
+ *   trace       one Cybertron's recent decisions (read-only)   docs/DECISIONS.md 2026-09-21
  *
  * **There is no sysop broadcast, in canon or here.** Nothing in this toolkit
  * sends a message. The only galaxy-wide send is an ordinary open hail — `sen`
@@ -94,6 +101,12 @@ export class SysHandlerService {
      */
     @Optional()
     private readonly shipClassCache?: ShipClassCacheService,
+    /**
+     * `sys trace` reads it. `@Optional()` like the cache above; with none, the
+     * subcommand answers as if no ship had decided anything.
+     */
+    @Optional()
+    private readonly trace?: CybTraceService,
   ) {}
 
   readonly command: Command = {
@@ -181,7 +194,7 @@ export class SysHandlerService {
 
     switch (sub) {
       case 'help':
-        return SysHandlerService.say(...SYS_HELP_LINES);
+        return SysHandlerService.say(...SYS_HELP_LINES, ...SYS_PORT_HELP_LINES);
 
       case 'classlist':
         return this.classList();
@@ -219,6 +232,9 @@ export class SysHandlerService {
 
       case 'kill':
         return this.killByUsername(ship, rest[0], rest);
+
+      case 'trace':
+        return this.traceOne(rest[0]);
 
       case 'cybpause': {
         const secs = int(0);
@@ -338,6 +354,28 @@ export class SysHandlerService {
     }
     this.audit(ship, 'kill', rest, `killed ${hits.length}: ${hits.map((h) => `${h.username ?? h.userid}#${h.shipno}`).join(', ')}`);
     return SysHandlerService.say(...hits.map((h) => `Killed ${h.username ?? h.userid}`));
+  }
+
+  /**
+   * `sys trace <name>` — PORT-ORIGINAL, read-only: one Cybertron's recent
+   * decisions, for the question `sys list` cannot answer, which is why.
+   * @see cyb-trace.service.ts, docs/DECISIONS.md 2026-09-21
+   */
+  private traceOne(needle: string | undefined): CommandResult {
+    const name = needle?.trim();
+    if (!name) return SysHandlerService.say('Usage: sys trace <userid or ship name>');
+    const hits = findTraceTargets(this.shipState.findAllShips(), name);
+    if (hits.length === 0) return SysHandlerService.say(`No Cybertron matches "${name}"`);
+    if (hits.length > 1) {
+      return SysHandlerService.say(
+        `${hits.length} Cybertrons match "${name}" — be more specific:`,
+        ...hits.map((s) => `  ${s.userid} ${s.shipname}`),
+      );
+    }
+    const ship = hits[0];
+    return SysHandlerService.say(
+      ...renderTrace(ship, this.trace?.read(shipKey(ship.userid, ship.shipno)) ?? []),
+    );
   }
 
   /** `sys classlist` — GECMDS.C:4956. */

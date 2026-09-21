@@ -79,10 +79,10 @@ describe('the sysop gate holds for every subcommand', () => {
 describe('sysop subcommands', () => {
   beforeEach(() => { process.env.GE_SYSOP_USERNAME = 'rick'; });
 
-  it('help lists all 13', async () => {
+  it('help lists canon\'s 13, then the port\'s one (sys trace)', async () => {
     const { svc } = makeService();
     const r = await run(svc, makeShip(), ['help']);
-    expect(r.lines.length).toBe(13);
+    expect(r.lines.length).toBe(13 + 1);
     expect(r.lines.some((l) => l.text.includes('sys cybpause'))).toBe(true);
   });
 
