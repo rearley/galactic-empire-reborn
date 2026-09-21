@@ -44,6 +44,7 @@ import { ShipTickService } from '../../src/game/ship/ship-tick.service';
 import { TickService } from '../../src/game/tick/tick.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { makeShip } from '../helpers/make-ship';
+import { headingToward } from '../../src/game/physics/physics-math';
 
 /** One emission, in order. */
 export interface SimEvent {
@@ -275,4 +276,23 @@ export class GalaxySim {
   dispose(): void {
     this.tick.onModuleDestroy();
   }
+}
+
+/**
+ * Fly between two points: head for the current one at `speed` (warp × 1000),
+ * stop on arrival, and swap ends every `periodSeconds`. Steers the way the AI
+ * does, by `head2b` / `speed2b`, and lets the real movement code do the flying.
+ */
+export function commute(a: { x: number; y: number }, b: { x: number; y: number }, periodSeconds: number, speed = 2000): PilotScript {
+  return (pilot, sim) => {
+    const to = Math.floor(sim.elapsed / periodSeconds) % 2 === 0 ? b : a;
+    const dx = to.x - pilot.xcoord;
+    const dy = to.y - pilot.ycoord;
+    if (Math.hypot(dx, dy) < 0.2) {
+      pilot.speed2b = 0;
+      return;
+    }
+    pilot.head2b = headingToward(dx, dy);
+    pilot.speed2b = speed;
+  };
 }
