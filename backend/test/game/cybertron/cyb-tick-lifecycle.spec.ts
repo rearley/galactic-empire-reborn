@@ -62,7 +62,7 @@ import {
   CYBERTRON_SCORED_KILL,
   CybertronScoredKillEvent,
 } from '../../../src/game/player/player-score.service';
-import { CYB_WON_SPEED } from '../../../src/game/cybertron/cyb-transitions';
+import { CYB_WON_SPEED, idleCadence } from '../../../src/game/cybertron/cyb-transitions';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 
 const CLASS_INTERCEPTOR = 1;
@@ -247,11 +247,12 @@ function lives(svc: CybertronTickService, ship: ShipState): void {
   }).cybLives(ship, CTX);
 }
 
-/** `db_update`, as `cyb_lives` calls it: (ship, topspeed * 1000). */
+/**
+ * `db_update`, as `cyb_lives` calls it: (ship, topspeed * 1000), drawing from the
+ * service's own Random. @see cyb-transitions.ts idleCadence
+ */
 function updateDb(svc: CybertronTickService, ship: ShipState, topSpeed = TOP_SPEED): void {
-  (svc as unknown as {
-    cybUpdateDb: (s: ShipState, top: number) => void;
-  }).cybUpdateDb(ship, topSpeed);
+  idleCadence(ship, topSpeed, (svc as unknown as { random: Random }).random);
 }
 
 function spawnOne(svc: CybertronTickService, classNumber: number): Promise<boolean> {

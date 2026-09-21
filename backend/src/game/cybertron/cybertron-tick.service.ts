@@ -313,7 +313,7 @@ export class CybertronTickService implements OnModuleInit {
     }
 
     // cybupdate decrement + direction wander (@see GECYBS.C:455 db_update)
-    this.cybUpdateDb(ship, topSpeed);
+    idleCadence(ship, topSpeed, this.random);
 
     // Jammed branch vs normal engagement scan (@see GECYBS.C:236-319)
     if (ship.jammer === 0) {
@@ -358,24 +358,6 @@ export class CybertronTickService implements OnModuleInit {
     ship.dirty = true;
 
     void ctx; // will be used for tickAt in event payloads
-  }
-
-  /**
-   * `db_update` equivalent: decrement cybupdate, randomize direction when idle.
-   * @see GECYBS.C:455 db_update
-   */
-  private cybUpdateDb(ship: ShipState, topSpeed: number): void {
-    if (ship.cybupdate > 1) {
-      ship.cybupdate--;
-      return;
-    }
-    if (ship.cybupdate === 1) {
-      if (ship.cybmine === 255) {
-        ship.speed2b = this.random.next() * topSpeed;
-        ship.head2b = this.random.next() * 359.9;
-      }
-      ship.cybupdate = 100 + Math.floor(this.random.next() * 100);
-    }
   }
 
   /**
@@ -441,8 +423,7 @@ export class CybertronTickService implements OnModuleInit {
       // falls through and still evaluates fire on this pass.
       // @see GECYBS.C:255
       if (tough === CYB_TOUGH_1 && Math.floor(this.random.next() * CYB_BREAKOFF) === 0) {
-        ship.cybmine = 255;
-        ship.speed2b = topSpeed;
+        releaseBreakOff(ship, topSpeed);
         const brokeOff: CybertronBrokeOffPayload = {
           attackerShipKey: shipKey(ship.userid, ship.shipno),
           targetShipKey: shipKey(target.userid, target.shipno),
@@ -571,7 +552,7 @@ export class CybertronTickService implements OnModuleInit {
         v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
-        if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
+        provoke(v, ship.channel ?? NO_CHANNEL);
       });
       this.shipState.mutate(ship.userid, ship.shipno, (s) => { s.cantexit = FIRETICKS; });
 
@@ -669,9 +650,7 @@ export class CybertronTickService implements OnModuleInit {
       // chasing — this is what turns stray fire into a fight rather than silent
       // chip damage. @see GECMDS.C:980-981
       if (victim.status === GESTAT_AUTO) {
-        this.shipState.mutate(victim.userid, victim.shipno, (v) => {
-          v.cybmine = ship.channel ?? NO_CHANNEL;
-        });
+        this.shipState.mutate(victim.userid, victim.shipno, (v) => provoke(v, ship.channel ?? NO_CHANNEL));
       }
 
       const shieldUp = victim.shieldstat === 1;
@@ -947,53 +926,16 @@ export class CybertronTickService implements OnModuleInit {
     if (ship.cybmine !== 255) {
       const current = this.findPlayerByChannel(ship.cybmine);
       if (!current) {
-        // Target left the game
-        ship.cybmine = 255;
-        ship.speed2b = this.random.next() * topSpeed;
+        releaseTargetLeft(ship, topSpeed, this.random);
         return;
       }
       if (this.isInNeutralZone(current)) {
-        // PORT-ORIGINAL, and the other half of the sanctuary rule below. The
-        // acquisition scan already refuses to LOCK a pilot inside (0,0), but a
-        // lock taken outside it was never released, so a Cybertron that had
-        // claimed you followed you onto the hub and shadowed you there: it
-        // cannot fire — canon's one neutral test is the hunter's own position,
-        // GECYBS.C:251 `			if (!neutral(&ptr->coord) ` — so it just sat on top of
-        // you, drifting out a sector and hyperwarping back in. Found in
-        // production as a Sarten Obliterator holding station at (0.69, 0.53)
-        // with a live claim. Falling through to the scan below lets it pick a
-        // target outside the zone, or coast away if there is none.
-        // @see docs/DECISIONS.md 2026-09-20
-        ship.cybmine = 255;
-
-        // And give it a way to USE that freedom. The speed it is holding is a
-        // COMBAT speed — the close band assigns `rndm(500.0)` once it is within
-        // half a sector of its prey — so releasing the claim on its own leaves
-        // the ship parked on the hub at a crawl, free to go and far too slow to
-        // get anywhere. Found exactly so in production after v0.27.5: Cybrg-205
-        // at (0.54, 0.29), claim correctly cleared, `speed2b` 284.
-        //
-        // Canon's own idle cruise is the right value, and it is what the ship
-        // would eventually be given anyway — `cybupdate` re-rolls it on a
-        // 100-200 activation cadence whenever there is no target:
-        //
-        //   GECYBS.C:473 `		ptr->speed2b = rndm(d_topspeed); /* change the direction */`
-        //   GECYBS.C:474 `		ptr->head2b = rndm(359.9);`
-        //
-        // Applying it HERE rather than waiting for that countdown is the
-        // port-original half: our release rule is what created the crawl, so
-        // our release rule clears it. One re-roll, held until the next cadence
-        // — not the per-activation re-roll removed in v0.27.4, which was a
-        // random walk that went nowhere.
-        ship.speed2b = this.random.next() * topSpeed;
-        ship.head2b = this.random.next() * 359.9;
+        // PORT-ORIGINAL: the other half of the sanctuary rule in the scan below.
+        // Falls through to that scan, which finds someone outside the zone or
+        // nobody. @see cyb-transitions.ts releaseZoneEntry
+        releaseZoneEntry(ship, topSpeed, this.random);
       } else if (current.cloak === 10) {
-        // Target cloaked — hold course and maybe give up
-        ship.holdcourse = Math.floor(this.random.next() * 5) + 5;
-        ship.speed2b = this.random.next() * topSpeed;
-        if (Math.floor(this.random.next() * 10) === 0) {
-          ship.cybmine = 255;
-        }
+        releaseTargetCloaked(ship, topSpeed, this.random);
         return;
       }
     }
@@ -1034,29 +976,14 @@ export class CybertronTickService implements OnModuleInit {
       }
 
       if (lowChannel === -1) {
-        // Nobody to hunt. Canon sets ONLY these two and lets the ship coast on
-        // whatever course it already had:
-        //
-        //   GECYBS.C:735 `ptr->tick = 255;`
-        //   GECYBS.C:736 `ptr->cybmine = 255;`
-        //
-        // This used to re-roll `speed2b` and `head2b` here as well, citing the
-        // same lines, which do not contain it. A fresh random heading on every
-        // activation is a random walk: zero expected displacement, so a
-        // Cybertron with no target went nowhere instead of leaving. Paired with
-        // the old blind-in-the-zone rule above it made the origin an absorbing
-        // state — reported from play as a Sarten Obliterator camping the hub.
-        //
-        // Course still gets re-rolled, on canon's cadence: `cybupdate` every
-        // 100-200 activations — GECYBS.C:473 `ptr->speed2b = rndm(d_topspeed);` —
-        // which `cybUpdateDb` does.
-        ship.tick = 255;
-        ship.cybmine = 255;
+        // Nobody to hunt: park the activation and coast on the current course.
+        // @see cyb-transitions.ts releaseNoTarget
+        releaseNoTarget(ship);
         return;
       }
 
       const wasAcquired = ship.cybmine === 255;
-      ship.cybmine = lowChannel;
+      acquire(ship, lowChannel);
 
       if (wasAcquired) {
         const target = this.findPlayerByChannel(lowChannel);
@@ -1078,7 +1005,7 @@ export class CybertronTickService implements OnModuleInit {
     // 4. Apply pursuit band based on distance to current target (@see GECYBS.C:738-804)
     const target = this.findPlayerByChannel(ship.cybmine);
     if (!target) {
-      ship.cybmine = 255;
+      releaseStale(ship);
       return;
     }
 
