@@ -496,10 +496,13 @@ describe('a Droid phaser hit that blows the shield', () => {
    */
   it('goes into SHIELDDM, and the hull still takes nothing', () => {
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0,
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 5.1, ycoord: 5,
       where: 0, shieldstat: 1, shield: 1, shieldtype: 2,
     });
-    const droid = shotAtVakory({ xcoord: 0, ycoord: 0, where: 0, phasr: 100 });
+    // Facing the target, due east: a Droid fires down its nose, it does not
+    // aim (GEDROIDS.C:361 `ptr->degrees = 0;`). Out of sector (0,0), where
+    // firep spares every victim (GECMDS.C:951).
+    const droid = shotAtVakory({ xcoord: 5, ycoord: 5, where: 0, phasr: 100, heading: 90 });
     const h = buildHarness([droid, target]);
 
     // Premise: at point-blank the beam is worth at least a point.

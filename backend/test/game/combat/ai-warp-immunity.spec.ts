@@ -60,24 +60,25 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('both AI fire paths are gated', () => {
-  it('droids call the helper directly', () => {
-    const text = readFileSync(
-      resolve(__dirname, '../../..', 'src/game/droid/droid-tick.service.ts'), 'utf8');
-    expect(text).toMatch(/(?<![\w$])aiCanHitTarget\s*\(/);
-  });
-
   /**
-   * Cybertrons no longer call the helper by name. Their phaser now goes through
-   * the shared `firep` selection, which applies the same rule inline for every
-   * ship in the arc — canon's `wptr->where != 1 || ptr->phasrtype >= phatowrp`
-   * (GECMDS.C:949). Asserting the wiring rather than the identifier: the path
-   * must reach the shared selection, and that selection must carry the gate.
+   * Neither AI calls the helper by name any more. Both fire through AiWeapons —
+   * canon's own firep, which both GECYBS.C and GEDROIDS.C call — and its phaser
+   * goes through the shared `firep` selection, which applies the same rule
+   * inline for every ship in the arc: canon's
+   * `wptr->where != 1 || ptr->phasrtype >= phatowrp` (GECMDS.C:949).
+   * Asserting the wiring rather than the identifier. @see issue #62
    * The BEHAVIOUR is pinned in test/game/cybertron/ai-fire-arc.spec.ts.
    */
-  it('Cybertrons go through the shared firep selection', () => {
-    // Their weapons moved out of the tick into AiWeapons for #62.
+  it('both AI kinds fire through AiWeapons', () => {
+    for (const f of ['src/game/droid/droid-tick.service.ts', 'src/game/cybertron/cybertron-tick.service.ts']) {
+      const text = readFileSync(resolve(__dirname, '../../..', f), 'utf8');
+      expect(text).toMatch(/new AiWeapons\(/);
+    }
+  });
+
+  it('and AiWeapons goes through the shared firep selection', () => {
     const text = readFileSync(
-      resolve(__dirname, '../../..', 'src/game/cybertron/ai-weapons.ts'), 'utf8');
+      resolve(__dirname, '../../..', 'src/game/ai/ai-weapons.ts'), 'utf8');
     expect(text).toMatch(/(?<![\w$])selectPhaserVictims\s*\(/);
   });
 

@@ -16,6 +16,7 @@ import { AI_MINE_TIMER } from '../../../src/game/constants';
 import { I_MINE } from '../../../src/game/constants/items';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import type { Mock } from 'vitest';
+import { AiWeapons } from '../../../src/game/ai/ai-weapons';
 
 const droid = (over: Partial<ShipState> = {}): ShipState => {
   const items = Array(14).fill(0n) as bigint[];
@@ -30,14 +31,21 @@ const droid = (over: Partial<ShipState> = {}): ShipState => {
 function build(create: Mock) {
   const svc = Object.create(DroidTickService.prototype) as object;
   const added: unknown[] = [];
+  let current: ShipState;
+  // A Droid lays through the player's own laymine (GEDROIDS.C:512), so the
+  // bare service needs the shared weapons it fires. @see AiWeapons.laymine
   Object.assign(svc, {
-    mineRepo: { create },
-    mineRegistry: { add: (m: unknown) => added.push(m) },
-    logger: { error: vi.fn() },
+    weapons: new AiWeapons({
+      mineRepo: { create },
+      mineRegistry: { add: (m: unknown) => added.push(m) },
+      shipState: { mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => { fn(current); return current; } },
+      logger: { error: vi.fn() },
+    } as unknown as ConstructorParameters<typeof AiWeapons>[0]),
   });
   return {
     added,
     lay: async (ship: ShipState) => {
+      current = ship;
       (svc as { layMine: (s: ShipState) => void }).layMine(ship);
       await new Promise((r) => setImmediate(r));
     },

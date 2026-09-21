@@ -338,9 +338,13 @@ describe('normal-space fire — firep, and what shields do to it', () => {
   it('shields up: the charge falls and the hull is untouched', () => {
     const target = makeShip({
       userid: 'p1', shipno: 2, channel: 2,
-      xcoord: 0.5, ycoord: 0, shieldstat: 1, shield: 100, shieldtype: 2,
+      xcoord: 5.5, ycoord: 5, shieldstat: 1, shield: 100, shieldtype: 2,
     });
-    const { svc, droid } = buildHarness({}, target);
+    // Facing the target: a Droid fires down its nose, it does not aim
+    // (GEDROIDS.C:361 `ptr->degrees = 0;`). The target is due east. Both out
+    // of sector (0,0): firep spares a victim inside the neutral zone
+    // (GECMDS.C:951), which the old Droid-only copy did not.
+    const { svc, droid } = buildHarness({ heading: 90, xcoord: 5, ycoord: 5 }, target);
 
     act12(svc, droid, [target]);
 
@@ -355,9 +359,13 @@ describe('normal-space fire — firep, and what shields do to it', () => {
   it('shields down: the hull takes it and the charge is untouched', () => {
     const target = makeShip({
       userid: 'p1', shipno: 2, channel: 2,
-      xcoord: 0.5, ycoord: 0, shieldstat: 0, shield: 100, shieldtype: 2,
+      xcoord: 5.5, ycoord: 5, shieldstat: 0, shield: 100, shieldtype: 2,
     });
-    const { svc, droid } = buildHarness({}, target);
+    // Facing the target: a Droid fires down its nose, it does not aim
+    // (GEDROIDS.C:361 `ptr->degrees = 0;`). The target is due east. Both out
+    // of sector (0,0): firep spares a victim inside the neutral zone
+    // (GECMDS.C:951), which the old Droid-only copy did not.
+    const { svc, droid } = buildHarness({ heading: 90, xcoord: 5, ycoord: 5 }, target);
 
     act12(svc, droid, [target]);
 

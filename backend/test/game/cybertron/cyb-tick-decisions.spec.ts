@@ -234,7 +234,11 @@ describe('hyperspace and normal space are separate fights (GECYBS.C:263-284)', (
     const victim = player(2, {
       xcoord: 6.0, ycoord: 5.5, where: 1, shieldstat: 1, shield: 100,
     });
-    const { svc } = harness([cyb, victim], fixedRandom(0));
+    // Zero for the two draws above; 0.99 after, so firehp's own randamage roll
+    // (GECMDS.C:1082) comes up empty and cannot touch the shield this test is
+    // about.
+    let draw = 0;
+    const { svc } = harness([cyb, victim], { next: () => (draw++ < 2 ? 0 : 0.99) } as Random);
 
     scan(svc, cyb);
 

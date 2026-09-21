@@ -41,7 +41,7 @@ import {
 } from './cyb-transitions';
 import { CombatTickService } from '../combat/combat-tick.service';
 import { CybertronControlService } from './cybertron-control.service';
-import { AiWeapons } from './ai-weapons';
+import { AiWeapons } from '../ai/ai-weapons';
 import { CybertronBrain, isCybertronClass } from './cybertron-brain';
 import { CybTraceService, tracedTransition } from './cyb-trace.service';
 

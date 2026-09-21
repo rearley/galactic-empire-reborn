@@ -62,7 +62,7 @@ import {
   releaseTargetLeft,
   releaseZoneEntry,
 } from './cyb-transitions';
-import { AiWeapons } from './ai-weapons';
+import { AiWeapons } from '../ai/ai-weapons';
 import { CybTraceService, formatScanSummary, tracedTransition, type CybScanTally } from './cyb-trace.service';
 
 /** What `CybertronBrain` needs. Optional members degrade exactly as they did in the tick. */
@@ -382,8 +382,8 @@ export class CybertronBrain {
         ship.items[I_TORP] = BigInt(Math.floor(this.random.next() * 5) + 1);
       }
       if (Number(ship.items[I_TORP]) > 0) {
-        ship.items = [...ship.items] as typeof ship.items;
-        ship.items[I_TORP] = BigInt(Number(ship.items[I_TORP]) - 1);
+        // The torpedo is spent inside torp, and only when a tube is free —
+        // canon's order (GECMDS.C:1195). @see AiWeapons.torp
         // `if (i>0) lockwarn = FALSE;` — canon warns ONCE per volley, not
         // once per tube. @see GECYBS.C:537
         this.weapons.torp(ship, target, ddist, i === 0);

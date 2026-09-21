@@ -18,10 +18,9 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { TickService } from '../tick/tick.service';
 import { TickContext, TickKind } from '../tick/tick.types';
 import { ShipStateService } from '../ship/ship-state.service';
-import { NO_CHANNEL } from '../ship/ship-channel.registry';
 import { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { MineRegistry } from '../combat/mine.registry';
-import { MineRepository, MineRefusedError } from '../combat/mine.repository';
+import { MineRepository } from '../combat/mine.repository';
 import { Random, RANDOM } from '../combat/random.port';
 import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
@@ -34,18 +33,9 @@ import {
   DROID_CLASS_VAKORY,
   DROID_USERID_PREFIX,
   GESTAT_USER,
-  GESTAT_AUTO,
   PMINFIRE,
-  FIRETICKS,
-  HPMINFIR,
-  HPFIRAMT,
-  HPBEAMW,
   JAMTIME,
-  MAXTORPS,
   TORFACT,
-  WARP_THRESHOLD,
-  SHIELDDM,
-  AI_MINE_TIMER,
 } from '../constants';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import { buildDroidConfig } from './droid.config';
@@ -63,15 +53,10 @@ import {
 import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
-  COMBAT_PHASER_FIRED,
-  COMBAT_HIT,
-  CombatPhaserFiredEvent,
-  CombatHitEvent,
 } from '../combat/combat-events';
-import { applyRandamageAndEmit } from '../combat/randamage.apply';
-import { aiCanHitTarget, cdistance, hyperPhaserDamage, inScanRange, lineOfFire, phaserDamage, shieldhit, torpedoLockSucceeds, withinArc } from '../combat/combat-math';
+import { torpedoLockSucceeds } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
-import { findFreeTorpSlot } from '../combat/projectile-slots';
+import { AiWeapons } from '../ai/ai-weapons';
 
 const DROID_CLASSES = [DROID_CLASS_SCOW, DROID_CLASS_TRANSPORT, DROID_CLASS_VAKORY] as const;
 
@@ -101,7 +86,20 @@ export class DroidTickService implements OnModuleInit {
     private readonly events: EventEmitter2,
     @Inject(RANDOM) private readonly random: Random,
     @Optional() private readonly combatTick?: CombatTickService,
-  ) {}
+  ) {
+    this.weapons = new AiWeapons({
+      shipState, classes: classCache, events, random, logger: this.logger,
+      combatTick, mineRegistry, mineRepo,
+    });
+  }
+
+  /** The player's own weapons, which is what canon's droids fire. @see ../ai/ai-weapons.ts */
+  private readonly weapons: AiWeapons;
+
+  /** Droids fire outside a tick context; the weapons only read its clock. */
+  private fireCtx(): TickContext {
+    return { kind: TickKind.SHIP_UPDATE, tickNumber: 0, firedAt: new Date() };
+  }
 
   async onModuleInit(): Promise<void> {
     // Spawn evaluation is the port's own slot mechanic and stays on the 6s
@@ -393,7 +391,7 @@ export class DroidTickService implements OnModuleInit {
         // Replenish before fire @see GEDROIDS.C:480
         droid.items = [...droid.items] as typeof droid.items;
         droid.items[I_TORP] = BigInt(Math.floor(this.random.next() * 5) + 1);
-        this.launchTorpedo(droid, fb.target, fb.ddist);
+        this.launchTorpedo(droid, fb.target, fb.ddist, i === 0);
       }
 
       if (fb.alterVector) {
@@ -425,292 +423,58 @@ export class DroidTickService implements OnModuleInit {
   // ── Combat helpers ─────────────────────────────────────────────────────────
 
   /** Normal-space phaser fire. @see GEDROIDS.C:363-370 firep */
+  /**
+   * Canon's droid phaser: it does NOT aim. Before `firep` the droid points its
+   * beam straight down its own nose at focus 2,
+   *   GEDROIDS.C:361 `ptr->degrees = 0;`
+   *   GEDROIDS.C:362 `ptr->percent = 2;`
+   * then fires only with a charged bank at a target that is not cloaked:
+   *   GEDROIDS.C:363 `if (ptr->phasr >= PMINFIRE && wptr->cloak != 10)`
+   * — and `firep` sweeps that arc, hitting whatever is in it. The port had
+   * grown a droid-only copy that aimed at the target and hit only it.
+   * @see AiWeapons.firep, docs/DECISIONS.md 2026-09-21
+   */
   private firePhaser(droid: ShipState, target: ShipState): void {
-    if (droid.phasr < PMINFIRE) return;
-    if (target.cloak === 10) return;
-
-    // A-002: defense-in-depth range gate. Decision functions (class 11/12)
-    // already gate on scanRange (A-001), but `firePhaser` bypasses
-    // `PhaserHandlerService.handle()` and therefore inherits NONE of C-001's
-    // player-side gate. Mirror it here so future callers cannot bypass.
-    // @see specs/022-fidelity-audit-v2/findings.md A-002
-    let scanRangeGate = 25_000;
-    try { scanRangeGate = this.classCache.getScanRange(droid.shpclass); } catch { /* fallback */ }
-    if (!inScanRange(droid, target, scanRangeGate)) return;
-
-    const dx = target.xcoord - droid.xcoord;
-    const dy = target.ycoord - droid.ycoord;
-    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
-    const bearing = (absAngle - droid.heading + 360) % 360;
-    const sector = { x: Math.floor(droid.xcoord), y: Math.floor(droid.ycoord) };
-
-    this.events.emit(COMBAT_PHASER_FIRED, {
-      shipId: shipKey(droid.userid, droid.shipno),
-      bearing,
-      percent: 100,
-      hyper: false,
-      sector,
-      tickAt: new Date(),
-    } satisfies CombatPhaserFiredEvent);
-
-    const dist = cdistance(droid, target);
-    // Runtime invariants — record at fire time. scanRangeGate is the legal cap.
-    if (this.combatTick) {
-      this.combatTick.recordAiFireEvent({
-        shipClass: String(droid.shpclass),
-        shooter: { x: droid.xcoord, y: droid.ycoord },
-        target: { x: target.xcoord, y: target.ycoord },
-        scanRange: scanRangeGate,
-        distanceRaw: dist * 10_000,
-      });
-      this.combatTick.recordCombatEvent({
-        weapon: 'phaser',
-        shooter: { x: droid.xcoord, y: droid.ycoord },
-        target: { x: target.xcoord, y: target.ycoord },
-        maxRange: scanRangeGate / 10_000,
-      });
-    }
-    // firep's per-victim gate: a ship in hyperspace is unreachable unless the
-    // shooter carries a Mark-PHATOWRP phaser or better
-    // (GECMDS.C:949, `wptr->where != 1 || ptr->phasrtype >= phatowrp`).
-    // The player's handler enforced this and the AI paths did not, so any
-    // droid or Cybertron could shoot a player in transit — shields down on
-    // entry, `sca` refused, nothing to fire back with.
-    if (!aiCanHitTarget({ phasrtype: droid.phasrtype, targetWhere: target.where })) return;
-
-    if (lineOfFire(droid, target, bearing, 0)) {
-      const damage = phaserDamage({
-        phasrtype: droid.phasrtype,
-        phasr: droid.phasr,
-        distRaw: dist * 10000,
-        focus: 0,
-        victimMaxTons: this.classCache.getMaxTons(target.shpclass),
-        victimAtWarp: target.speed >= WARP_THRESHOLD,
-      });
-      // C wraps the ENTIRE consequence block in `if (damage >= 1)`
-      // (GECMDS.C:975-999): below one point nothing is applied, nothing is
-      // recorded, nothing is printed. Without the gate a droid grazing a
-      // passing ship for zero damage still set `lastfired` and
-      // `cantexit = FIRETICKS` — and ship-tick zeroes `repair` whenever
-      // `cantexit > 0`, so a damaged pilot within scanner range of any droid
-      // could never finish a repair. The gate is already present in the
-      // hyper-phaser path in this same file and in the player path.
-      // ...but `ptr->phasr = 0` is OUTSIDE the loop (GECMDS.C:1006), so the
-      // trigger costs the bank whatever the shot achieves. Returning without
-      // spending it left a droid firing beyond effective range with a
-      // permanently hot bank, able to open at full charge the moment its
-      // target closed. `cantexit` stays unset — canon's copy of THAT line is
-      // inside the gate (GECMDS.C:977).
-      if (damage < 1) {
-        droid.phasr = 0;
-        return;
-      }
-      // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
-    // shieldup() grants no charge (GEFUNCS.C:2409-2415), so a shield
-    // raised on an empty capacitor still absorbs the next hit in full —
-    // and blows on it. Requiring charge > 0 here handed full hull damage
-    // to anyone who had just raised shields.
-    const shieldUp = target.shieldstat === 1;
-      let hullDamage = damage;
-      let shieldConsumed = 0;
-      if (shieldUp) {
-        const r = shieldhit(target.shield, target.shieldtype, damage);
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
-          v.shield = r.newCharge;
-          // Only a BLOWN shield goes out of action, and it goes into SHIELDDM
-          // — not plain "down" — so `shi up` refuses until it is repaired.
-          // @see GEFUNCS.C:2459-2462
-          if (r.outcome === 'damaged') v.shieldstat = SHIELDDM;
-          v.lastfired = droid.channel ?? NO_CHANNEL;
-          v.lastWeapon = 'phaser';
-          // The name beside the channel, because `leave()` recycles channels and a
-          // scrub would otherwise leave the kill with no attacker at all.
-          // @see attackerNameFromLastFired, issue #42
-          v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
-          v.cantexit = FIRETICKS;
-        });
-        hullDamage = 0;
-        shieldConsumed = r.shieldConsumed;
-      } else {
-        this.shipState.mutate(target.userid, target.shipno, (v) => {
-          v.damage = v.damage + hullDamage;
-          v.lastfired = droid.channel ?? NO_CHANNEL;
-          v.lastWeapon = 'phaser';
-          // The name beside the channel, because `leave()` recycles channels and a
-          // scrub would otherwise leave the kill with no attacker at all.
-          // @see attackerNameFromLastFired, issue #42
-          v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
-          v.cantexit = FIRETICKS;
-        });
-      }
-      const droidPhasrTickAt = new Date();
-      this.events.emit(COMBAT_HIT, {
-        attackerId: shipKey(droid.userid, droid.shipno),
-        victimId: shipKey(target.userid, target.shipno),
-        weapon: 'phaser',
-        damageHull: hullDamage,
-        damageShield: shieldConsumed,
-        sector,
-        tickAt: droidPhasrTickAt,
-      } satisfies CombatHitEvent);
-
-      // @see GEFUNCS.C:randamage — called after every droid phaser hit (GEDROIDS.C → GECMDS.C:999)
-      applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidPhasrTickAt);
-    }
-
-    droid.phasr = 0;
-    droid.cantexit = FIRETICKS;
+    droid.degrees = 0;
+    droid.percent = 2;
+    if (droid.phasr < PMINFIRE || target.cloak === 10) return;
+    this.weapons.firep(droid, target, this.fireCtx(), { aimAtTarget: false });
   }
 
   /** Hyperspace phaser fire (firehp). @see GEDROIDS.C:351-355 */
+  /**
+   * Canon's droid hyper-phaser: within 30,000 of its target, aim and fire
+   * `firehp`, the player's own.
+   *   GEDROIDS.C:351 `if (ddist < 30000)`
+   *   GEDROIDS.C:353 `ptr->degrees = (int)(cbearing(&ptr->coord,&wptr->coord,ptr->heading)+.5);`
+   *   GEDROIDS.C:354 `firehp(ptr,usrn);`
+   * `AiWeapons.firehp` aims exactly so, and carries firehp's flux gate, its
+   * cost, and its randamage roll. @see AiWeapons.firehp
+   */
   private fireHyperPhaser(droid: ShipState, target: ShipState, ddist: number): void {
     const { fightbackHyperspaceMaxDist } = this.config.global;
     if (ddist >= fightbackHyperspaceMaxDist) return;
-
-    // The hyper-phaser runs on FLUX, not on the phaser bank. The entire body of
-    // `firehp` sits inside GECMDS.C:1029 `if (ptr->energy >= HPMINFIR)`, and
-    // its cost is charged to the firer before it looks for a victim at all:
-    //
-    //   ptr->energy -= HPFIRAMT;
-    //   ptr->hypha = 1;
-    //   ptr->cantexit = FIRETICKS;
-    //
-    // `ptr->phasr` is never touched anywhere in the function — `phasrtype` is
-    // read for damage scaling and that is all. This copy had no gate, debited
-    // nothing, never armed `hypha`, and instead emptied the normal phaser bank,
-    // so a droid that fired into hyperspace could not then fire a phaser in
-    // normal space. The Cybertron path was corrected earlier; this one was not.
-    // @see GECMDS.C:1039 `ptr->energy -= HPFIRAMT;`
-    if (droid.energy < HPMINFIR) return;
-
-    // A-002: defense-in-depth range gate. C-source `firehp` has explicit
-    // `ddistance < shipclass.scanrange` (GECMDS.C:1054). Even though
-    // `fightbackHyperspaceMaxDist` caps at 30000, also enforce per-class
-    // scanRange so heavy-scanner classes don't outrange their own arc.
-    // @see specs/022-fidelity-audit-v2/findings.md A-002
-    let scanRangeGate = 25_000;
-    try { scanRangeGate = this.classCache.getScanRange(droid.shpclass); } catch { /* fallback */ }
-    if (ddist > scanRangeGate) return;
-    const dx = target.xcoord - droid.xcoord;
-    const dy = target.ycoord - droid.ycoord;
-    const absAngle = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
-    const bearing = (absAngle - droid.heading + 360) % 360;
-    const sector = { x: Math.floor(droid.xcoord), y: Math.floor(droid.ycoord) };
-
-    this.events.emit(COMBAT_PHASER_FIRED, {
-      shipId: shipKey(droid.userid, droid.shipno),
-      bearing,
-      percent: 100,
-      hyper: true,
-      sector,
-      tickAt: new Date(),
-    } satisfies CombatPhaserFiredEvent);
-
-    // Charged before the victim search, exactly as canon does at GECMDS.C:1039-1041.
-    droid.energy = droid.energy - HPFIRAMT;
-    droid.hypha = 1;
-    droid.cantexit = FIRETICKS;
-
-    const dist = cdistance(droid, target);
-    // Runtime invariants — record at fire time.
-    if (this.combatTick) {
-      this.combatTick.recordAiFireEvent({
-        shipClass: String(droid.shpclass),
-        shooter: { x: droid.xcoord, y: droid.ycoord },
-        target: { x: target.xcoord, y: target.ycoord },
-        scanRange: scanRangeGate,
-        distanceRaw: ddist,
-      });
-      this.combatTick.recordCombatEvent({
-        weapon: 'hyper-phaser',
-        shooter: { x: droid.xcoord, y: droid.ycoord },
-        target: { x: target.xcoord, y: target.ycoord },
-        maxRange: scanRangeGate / 10_000,
-      });
-    }
-    // C-009 Fix 4: droid hyper arc = HPBEAMW (5°) — fixed beam width, NOT
-    // PHABIAS-based. `firehp` uses HPBEAMW half-angle (GECMDS.C:1050).
-    // C-009 Fix 1: firehp applies damage straight to hull (`wptr->damage += damage`,
-    // GECMDS.C:1078) — no shieldhit call, shields bypassed entirely.
-    if (withinArc(droid, target, bearing, HPBEAMW)) {
-      const damage = hyperPhaserDamage({
-        phasrtype: droid.phasrtype,
-        distRaw: dist * 10000,
-        victimMaxTons: this.classCache.getMaxTons(target.shpclass),
-      });
-      // No minimum-damage gate. `firep` has one (GECMDS.C:975) and `firehp`
-      // does not: inside the arc and inside scan range it applies damage,
-      // battle-locks both ships and rolls `randamage` with no test on the
-      // figure at all (GECMDS.C:1078-1082). This copy had picked up `firep`'s
-      // gate, so a droid grazing a ship in transit did nothing where a
-      // Cybertron in the same position knocked a system out.
-      this.shipState.mutate(target.userid, target.shipno, (v) => {
-        v.damage = v.damage + damage;
-        v.lastfired = droid.channel ?? NO_CHANNEL;
-        v.lastWeapon = 'phaser';
-        // The name beside the channel, because `leave()` recycles channels and a
-        // scrub would otherwise leave the kill with no attacker at all.
-        // @see attackerNameFromLastFired, issue #42
-        v.lastfiredBy = { channel: droid.channel ?? NO_CHANNEL, name: droid.shipname };
-        v.cantexit = FIRETICKS;
-      });
-
-      const droidHypTickAt = new Date();
-      this.events.emit(COMBAT_HIT, {
-        attackerId: shipKey(droid.userid, droid.shipno),
-        victimId: shipKey(target.userid, target.shipno),
-        weapon: 'phaser',
-        damageHull: damage,
-        damageShield: 0,
-        sector,
-        tickAt: droidHypTickAt,
-      } satisfies CombatHitEvent);
-
-      // @see GEFUNCS.C:randamage — called after every droid hyper-phaser hit (GEDROIDS.C → GECMDS.C:1082)
-      applyRandamageAndEmit(this.random, this.events, this.classCache, target, sector, droidHypTickAt);
-    }
+    this.weapons.firehp(droid, target, this.fireCtx());
   }
 
   /** Launch a torpedo at target. @see GEDROIDS.C:472-480 torp */
-  private launchTorpedo(droid: ShipState, target: ShipState, ddist: number): void {
-    // Bounded by MAXTORPS, never by the array's length — see findFreeTorpSlot.
-    const emptySlot = findFreeTorpSlot(target.ltorpsChannel);
-    if (emptySlot === -1) return;
-    this.shipState.mutate(target.userid, target.shipno, (v) => {
-      while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
-      while (v.ltorpsDistance.length <= emptySlot) v.ltorpsDistance.push(0);
-      v.ltorpsChannel[emptySlot] = droid.channel ?? NO_CHANNEL;
-      v.ltorpsDistance[emptySlot] = ddist;
-    });
+  /**
+   * Canon's `torp`, the player's own. @see GEDROIDS.C:482 `torp(ptr,usrn,zothusn);`
+   * The volley warns its target once: GEDROIDS.C:481 `if (i>0) lockwarn = FALSE;`
+   * @see AiWeapons.torp
+   */
+  private launchTorpedo(droid: ShipState, target: ShipState, ddist: number, announce = true): void {
+    this.weapons.torp(droid, target, ddist, announce);
   }
 
   /** Lay a mine at current position. @see GEDROIDS.C:512 laymine */
+  /**
+   * Canon's `laymine`, the player's own, with canon's droid fuse of 10.
+   * @see GEDROIDS.C:512 `laymine(ptr,usrn,10);`, AiWeapons.laymine
+   */
   private layMine(droid: ShipState): void {
-    const mineCount = Number(droid.items[I_MINE] ?? 0n);
-    if (mineCount <= 0) return;
-
-    // Spend the mine only once the slot is actually taken. C's `--ptr->items[I_MINE]`
-    // sits inside laymine's free-slot branch and a refusal costs nothing
-    // (GECMDS.C:1809-1814). Decrementing first was harmless while the galaxy
-    // table had no cap; wiring NUMMINES made the refusal reachable, and a droid
-    // in a full galaxy would have burned its whole magazine laying nothing.
-    void this.mineRepo.create({
-      channel: droid.shipno,
-      // Canon's droid fuse is 10, the same short hazard a Cybertron drops:
-      // `laymine(ptr,usrn,10)` at GEDROIDS.C:512. Ours was 100 — ten times
-      // the slot occupancy per mine, in a twelve-slot galaxy-wide table.
-      timer: AI_MINE_TIMER,
-      xcoord: droid.xcoord,
-      ycoord: droid.ycoord,
-      deployedBy: droid.userid,
-    }).then((mine) => {
-      droid.items = [...droid.items] as typeof droid.items;
-      droid.items[I_MINE] = BigInt(Number(droid.items[I_MINE] ?? 0n) - 1);
-      this.mineRegistry.add({ ...mine, deployedBy: droid.userid });
-    }).catch((err: unknown) => {
-      if (err instanceof MineRefusedError) return; // canon: laymine returned 0, nothing spent
-      this.logger.error('Droid mine lay failed:', err);
-    });
+    if (Number(droid.items[I_MINE] ?? 0n) <= 0) return;
+    this.weapons.laymine(droid);
   }
 
   /** Deploy jammer. @see GEDROIDS.C:515 jam — sets jammer=JAMTIME */

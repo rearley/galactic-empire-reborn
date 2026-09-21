@@ -119,6 +119,24 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.2',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'Cybertrons can hit you with their phasers now. They always turned to face you and fired, but a mistake in how the shot was aimed sent the beam off at the wrong angle unless the ship happened to be pointing due north, so in practice almost every Cybertron phaser shot missed and only their torpedoes did any harm. Expect them to be noticeably more dangerous up close.',
+      },
+      {
+        category: 'corrected-to-canon',
+        text: 'Survey drones, transports and scows now fire their phasers the way the original did: straight ahead down their own nose in a wide beam, hitting whatever is in front of them, rather than locking onto one ship. A drone that is not facing you will usually miss you; one that is can catch you and anything beside you. Their shots no longer reach anyone inside the trading hub, and a Cybertron they hit by accident will turn on them.',
+      },
+      {
+        category: 'corrected-to-canon',
+        text: 'Every AI hyper-phaser hit can now knock out one of your ship\u2019s systems, as the original\u2019s always could; the Cybertron version had lost that. Drone torpedoes now come with the same incoming-torpedo warning a Cybertron\u2019s do, and the mines drones lay now record who laid them.',
+      },
+    ],
+  },
+  {
     version: '0.31.1',
     date: '2026-09-21',
     entries: [

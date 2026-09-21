@@ -33,7 +33,7 @@ import { FIRETICKS } from '../../../src/game/constants';
 import { MineTableFullError } from '../../../src/game/combat/mine.repository';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import type { Mock } from 'vitest';
-import { AiWeapons } from '../../../src/game/cybertron/ai-weapons';
+import { AiWeapons } from '../../../src/game/ai/ai-weapons';
 
 const cyb = (over: Partial<ShipState> = {}): ShipState => {
   const items = Array(14).fill(0n) as bigint[];

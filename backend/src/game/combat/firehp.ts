@@ -38,7 +38,10 @@ export interface HyperVictim {
 export function selectHyperVictims(args: {
   firer: ShipState;
   allShips: readonly ShipState[];
-  /** Absolute firing bearing — `normal(heading + degrees)`. */
+  /**
+   * The firing degree RELATIVE to the firer's heading — canon's `ptr->degrees`.
+   * `withinArc` adds the heading itself. @see firep.ts, ai-weapons-aim.spec.ts
+   */
   degree: number;
   /** The firer's class scan range, canon's hard cap (GECMDS.C:1054). */
   scanRange: number;

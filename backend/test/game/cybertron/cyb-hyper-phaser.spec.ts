@@ -35,7 +35,7 @@ import { ShipState, shipKey } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import { canonMaxWarp } from '../../helpers/canon-max-warp';
-import { AiWeapons } from '../../../src/game/cybertron/ai-weapons';
+import { AiWeapons } from '../../../src/game/ai/ai-weapons';
 
 const CYB_CLASS = 21;
 /** `where === 1` is hyperspace. */

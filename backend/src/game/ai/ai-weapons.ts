@@ -18,15 +18,15 @@ import { selectPhaserVictims } from '../combat/firep';
 import { selectHyperVictims } from '../combat/firehp';
 import { findFreeTorpSlot } from '../combat/projectile-slots';
 import { AI_MINE_TIMER, FIRETICKS, GESTAT_AUTO, HPFIRAMT, HPMINFIR, PMINFIRE, SHIELDDM } from '../constants';
-import { I_MINE } from '../constants/items';
+import { I_MINE, I_TORP } from '../constants/items';
 import type { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { CYBMINE_NONE, NO_CHANNEL } from '../ship/ship-channel.registry';
 import type { ShipStateService } from '../ship/ship-state.service';
 import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
 import type { TickContext } from '../tick/tick.types';
-import { provoke } from './cyb-transitions';
-import type { CybTraceService } from './cyb-trace.service';
+import { provoke } from '../cybertron/cyb-transitions';
+import type { CybTraceService } from '../cybertron/cyb-trace.service';
 
 /** What `AiWeapons` needs. Optional members degrade exactly as they did in the tick. */
 export interface AiWeaponsDeps {
@@ -138,7 +138,10 @@ export class AiWeapons {
     const victims = selectHyperVictims({
       firer: ship,
       allShips: this.shipState.findAllShips(),
-      degree: absAngle,
+      // RELATIVE to the hull, as the pilot's `pha` passes it: the selection
+      // adds the heading itself. Passing `absAngle` added it twice, so a hull
+      // at any heading but 0 fired somewhere else. @see ai-weapons-aim.spec.ts
+      degree: ship.degrees,
       scanRange,
       maxTonsFor: (c) => this.classes.getMaxTons(c),
     });
@@ -166,10 +169,25 @@ export class AiWeapons {
         sector: { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) },
         tickAt: ctx.firedAt,
       } as CombatHitEvent);
+
+      // Every victim rolls for a knocked-out system, as after a phaser hit:
+      //   GECMDS.C:1082 `randamage(wptr,othusn); /*assess any random damage */`
+      // The Cybertron copy of firehp had lost this line and the Droid copy kept
+      // it; one shared firehp now carries canon's. @see issue #62
+      applyRandamageAndEmit(this.random, this.events, this.classes, victim,
+        { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) }, ctx.firedAt);
     }
   }
 
-  firep(ship: ShipState, target: ShipState, ctx: TickContext): void {
+  /**
+   * Canon's `firep`: discharge the bank into the arc around `heading + degrees`
+   * at focus `percent`, hitting every ship in it.
+   *
+   * Whether the shooter AIMS first is the caller's canon, not firep's: a
+   * Cybertron points at its target (GECYBS.C:281 `ptr->degrees = (int)(cbearing(&ptr->coord,&wptr->coord,ptr->heading)+.5);`)
+   * while a Droid fires down its nose (GEDROIDS.C:361 `ptr->degrees = 0;`).
+   */
+  firep(ship: ShipState, target: ShipState, ctx: TickContext, opts: { aimAtTarget: boolean } = { aimAtTarget: true }): void {
     if (ship.phasr < PMINFIRE) return;
 
     // A-002: defense-in-depth range gate. The engagement-scan loop already gates
@@ -196,15 +214,17 @@ export class AiWeapons {
     // connects when the target drifts into the nose. The bearing was already
     // being computed here for the fired-event payload; it was simply never
     // written back to the ship.
-    this.shipState.mutate(ship.userid, ship.shipno, (s2) => {
-      s2.degrees = Math.round(bearing);
-    });
+    if (opts.aimAtTarget) {
+      this.shipState.mutate(ship.userid, ship.shipno, (s2) => {
+        s2.degrees = Math.round(bearing);
+      });
+    }
     const sector = { x: Math.floor(ship.xcoord), y: Math.floor(ship.ycoord) };
     const tickAt = ctx.firedAt;
 
     const firedEvent: CombatPhaserFiredEvent = {
       shipId: attackerId,
-      bearing,
+      bearing: opts.aimAtTarget ? bearing : ship.degrees,
       percent: 100,
       hyper: false,
       sector,
@@ -239,7 +259,9 @@ export class AiWeapons {
     const { victims } = selectPhaserVictims({
       firer: ship,
       allShips: this.shipState.findAllShips(),
-      degree: (ship.heading + ship.degrees) % 360,
+      // RELATIVE, for the same reason as firehp above: `withinArc` adds the
+      // heading (canon's `normal(ptr->heading + ptr->degrees)`, GECMDS.C:1035).
+      degree: ship.degrees,
       focus: ship.percent,
       phasrCharge: ship.phasr,
       scanRange: scanRangeGate,
@@ -301,8 +323,15 @@ export class AiWeapons {
       applyRandamageAndEmit(this.random, this.events, this.classes, victim, sector, tickAt);
     }
 
+    // The bank is spent whatever the shot achieves — GECMDS.C:1006
+    // `ptr->phasr = 0;` sits outside the victim loop — but the shooter is only
+    // locked into combat by a hit that lands, inside canon's gate:
+    //   GECMDS.C:975 `if (damage >= 1)`
+    //   GECMDS.C:978 `ptr->cantexit = FIRETICKS;`
+    // `selectPhaserVictims` returns only victims past that gate. The Cybertron
+    // copy locked itself in on every discharge; the Droid copy had it right.
     ship.phasr = 0;
-    ship.cantexit = FIRETICKS;
+    if (victims.length > 0) ship.cantexit = FIRETICKS;
   }
 
   /**
@@ -318,6 +347,10 @@ export class AiWeapons {
     // Bounded by MAXTORPS, never by the array's length — see findFreeTorpSlot.
     const emptySlot = findFreeTorpSlot(target.ltorpsChannel);
     if (emptySlot === -1) return; // all slots full
+    // Spent only once a tube is actually free, as canon does it:
+    //   GECMDS.C:1195 `--ptr->items[I_TORPEDO];`
+    ship.items = [...ship.items] as typeof ship.items;
+    ship.items[I_TORP] = BigInt(Math.max(0, Number(ship.items[I_TORP]) - 1));
     this.shipState.mutate(target.userid, target.shipno, (v) => {
       while (v.ltorpsChannel.length <= emptySlot) v.ltorpsChannel.push(255);
       while (v.ltorpsDistance.length <= emptySlot) v.ltorpsDistance.push(0);

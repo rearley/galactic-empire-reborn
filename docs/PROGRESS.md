@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 181 entries.
+Append-only, **newest at the bottom**. 182 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — one set of weapons for both AI kinds, and the aim that always missed](#session-2026-09-21-late--one-set-of-weapons-for-both-ai-kinds-and-the-aim-that-always-missed)
 - [2026-09-21 — the galaxy simulation, and what it found first](#session-2026-09-21-evening--the-galaxy-simulation-and-what-it-found-first)
 - [2026-09-21 — sys trace: why a Cybertron did what it did](#session-2026-09-21-later--sys-trace-why-a-cybertron-did-what-it-did)
 - [2026-09-21 — a claim changes in one place now](#session-2026-09-21--a-claim-changes-in-one-place-now)
@@ -8519,3 +8520,55 @@ so `releaseWon` never fires in the sim.
 
 **Known issues:** the owner reports that one of today's pushes failed CI. That
 is next.
+
+## Session 2026-09-21 (late) — one set of weapons for both AI kinds, and the aim that always missed
+
+**Completed: #62, in the two stages the owner chose.** The owner approved the
+design and left for lunch, so this ran unattended. Nothing is pushed.
+
+**Stage 1: no behaviour change.** The Cybertron tick split into three:
+- `CybertronTickService`, the scheduler: 440 lines, down from 1,412
+- `CybertronBrain`, the decisions: `cybLives` and everything it calls
+- `AiWeapons`, canon's weapon functions: `firep`, `firehp`, `torp`, `laymine`
+  and `zip`
+
+The pieces are composed inside the scheduler's constructor, so no modules
+changed and the 27 hand-built harnesses still compile. The proof is a golden
+fingerprint: the sha256 of every event plus the final state of every ship, over
+a one-hour simulated fight on seeds 1 and 2. It was byte-identical after each
+step. The simulation's clock now starts at a fixed time, so a run is
+reproducible down to the byte.
+
+**Stage 2: Droids fire through `AiWeapons`, as GEDROIDS.C does.** Canon decided
+every difference; the list is in DECISIONS 2026-09-21. The biggest: canon's
+Droid does not aim its phaser. It fires straight down its own nose at focus 2.
+
+**Found on the way: AI phasers counted the heading twice.** The shared victim
+selection takes a degree relative to the hull, and the AI passed an absolute
+one. A Cybertron's phasers hit only when its heading was 0, and every AI test
+sat at heading 0. The golden run shows zero Cybertron phaser hits on pilots in
+an hour of fighting before the fix, and 5 per seed after. This is the most
+player-visible change here: Cybertrons will be noticeably more dangerous up
+close. It was not separable into its own commit, because the Droid fixes need
+it. Reverting it is two lines in `ai-weapons.ts`.
+
+**Also found:**
+- `firep` locked the shooter into combat on every discharge; canon only does
+  so on a hit.
+- The Cybertron `firehp` had lost `randamage`.
+- The Droid never spent torpedoes, and stamped its mines with `shipno`.
+- Droid phasers could hit pilots inside the neutral zone.
+
+**Filed, not done: #65.** Canon `jam()` jams every ship in range and reads its
+range off `warsptr`, which needs a ruling. Canon `torp()` adds 20 to the launch
+distance. Both change Cybertron behaviour too.
+
+**Tests:** 7 Droid canon-weapon tests, and 15 aim tests at five headings. Four
+Droid fixtures moved out of sector (0,0) or turned to face their target; their
+assertions are unchanged. A Cybertron hyper-phaser test's random sequence now
+keeps the new `randamage` roll off the shield it is testing. Three source-scan
+tests point at the files the code moved to. Backend 705 suites / 6,883 on Node
+24, lint clean. v0.31.2, with three player changelog entries.
+
+**Next:** the owner reviews before pushing, especially the aim fix. Remaining
+under #58: #63 overlays, #64 channel aliasing, #65 jam and torpedo distance.

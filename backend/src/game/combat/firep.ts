@@ -51,7 +51,12 @@ export interface PhaserVictim {
 export function selectPhaserVictims(args: {
   firer: ShipState;
   allShips: readonly ShipState[];
-  /** Absolute firing bearing — `normal(heading + degrees)` (GECMDS.C:941). */
+  /**
+   * The firing degree RELATIVE to the firer's heading — canon's `ptr->degrees`.
+   * `lineOfFire` adds the heading itself to make canon's absolute
+   * `normal(heading + degrees)`. This said "absolute" once, and the AI believed
+   * it and added the heading twice. @see test/game/ai/ai-weapons-aim.spec.ts
+   */
   degree: number;
   /** Focus width, `ptr->percent`. */
   focus: number;

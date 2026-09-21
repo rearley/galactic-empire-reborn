@@ -7143,3 +7143,60 @@ long as they did.
 wasted (the 1% branch's allowance). It passes on seeds 1, 2 and 3. With the
 predicate removed from the tick, it fails on all three: at t=720s nothing
 spawned while class 24 or class 21 was ready.
+
+## 2026-09-21 — Both AI kinds fire the player's weapons, as canon's do; the AI aimed with the heading counted twice
+
+**Context.** Issue #62. Canon has one set of weapon functions, and both AI kinds
+call them: `firep` (GECYBS.C:519, GEDROIDS.C:366), `firehp` (GECYBS.C:278,
+GEDROIDS.C:354), `torp` (GECYBS.C:538, GEDROIDS.C:482) and `laymine`
+(GECYBS.C:315, GEDROIDS.C:512). The port had grown three copies: the player's,
+the Cybertron's and the Droid's. Stage 1 split the Cybertron tick into a
+scheduler (`CybertronTickService`), the decisions (`CybertronBrain`) and the
+weapons (`AiWeapons`). The golden simulation fingerprint was byte-identical
+before and after. Stage 2 moved the Droids onto `AiWeapons`, which is where
+canon decided every difference.
+
+**Decisions:**
+
+- **Droid phasers are canon `firep`: down the nose, focus 2.** Canon sets
+  GEDROIDS.C:361 `ptr->degrees = 0;` and :362 `ptr->percent = 2;` before
+  firing. It does not aim. The Droid-only copy aimed at its target and hit only
+  that ship. Now the Droid sweeps its arc:
+  - it hits whatever is in the arc
+  - it provokes any AI it hits
+  - it spares victims inside the neutral zone (GECMDS.C:951), which the old copy
+    did not
+  - it only hits ships in the game (status 1 or 2)
+- **`firehp` rolls `randamage` on every hit, for both AI kinds** (GECMDS.C:1082).
+  The Droid copy had it; the Cybertron copy had lost it.
+- **`firep` battle-locks the shooter only when a hit lands**
+  (GECMDS.C:975-978). The Cybertron copy locked itself in on every discharge;
+  the Droid copy was right.
+- **`torp` spends the torpedo only when a tube is free** (GECMDS.C:1195). The
+  Droid never spent one; the Cybertron spent it before looking for a tube. A
+  Droid volley now also warns its target once, through the same path (GEDROIDS.C:481).
+- **Droid mines carry the Droid's channel**, not its `shipno` (canon
+  `mines[i].channel = (byte)usrn`), so a mine kill can name who laid it. Laying
+  one now takes the combat lock, as canon's `laymine` does.
+
+**The aim bug.** `selectPhaserVictims` and `selectHyperVictims` take the firing
+degree RELATIVE to the hull. `withinArc` adds the heading, which is canon's
+`normal(ptr->heading + (double)ptr->degrees)`. Their doc comments said
+"absolute", and the AI believed them: it passed `heading + degrees`, so the
+heading was counted twice. A Cybertron hit what it aimed at only when its heading
+was 0. Its pursuit band turns it toward its prey, so at almost any real heading
+its phasers missed. Every AI test harness sat at heading 0.
+
+The golden simulation shows the size of it. One hour of pilots in the heaviest
+hull fighting back, seeds 1 and 2: **zero** Cybertron phaser hits on pilots
+before the fix, and 5 on each seed after. Cybertron deaths fell from 23 to 15
+(seed 1) and from 21 to 20 (seed 2); pilot deaths rose from 1 to 2 and from 0 to
+1. The player's `pha` passed the relative degree all along and was never
+affected. Pinned at five headings in `test/game/ai/ai-weapons-aim.spec.ts`.
+
+**Held back, filed as #65:**
+- canon `jam()` jams every ship in range, with a range read off `warsptr`. That
+  needs a ruling.
+- canon `torp()` adds 20 to the launch distance, and neither AI does.
+
+Both move Cybertron behaviour too, and neither was in the approved scope.
