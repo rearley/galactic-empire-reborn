@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 186 entries.
+Append-only, **newest at the bottom**. 187 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — locks provoke, the Cyberquad closes, and a lead on #42](#session-2026-09-21-night--locks-provoke-the-cyberquad-closes-and-a-lead-on-42)
 - [2026-09-21 — the hyperspace deviation that never was](#session-2026-09-21-evening-5--the-hyperspace-deviation-that-never-was)
 - [2026-09-21 — the AI's deviations, named](#session-2026-09-21-evening-4--the-ais-deviations-named)
 - [2026-09-21 — one jam() for everyone](#session-2026-09-21-evening-3--one-jam-for-everyone)
@@ -8671,3 +8672,37 @@ on three seeds: a Cybertron hyperwarps to a pilot 60 sectors out, then drops to
 normal space still holding its claim. No code change, no version bump.
 
 **#58 is complete:** #59-#66 are all closed.
+
+## Session 2026-09-21 (night) — locks provoke, the Cyberquad closes, and a lead on #42
+
+The owner asked for #55, #56 and #42 while playtesting. Committed, NOT pushed,
+so nothing restarted the server mid-game.
+
+**#55 (v0.31.5).** A torpedo or missile lock now provokes an AI, won or lost,
+through the shared `applyLockOutcome`, as canon's `lockon` does
+(GECMDS.C:1374). The #59 transitions made this one call plus tests.
+
+**#56 (v0.31.6).** Sixth house rule, `closeBandAtFiringRange`. The close band
+starts at `min(3.0, scanRange/10 000)`, so the Cyberquad (`S22SRNG 1000`) no
+longer crawls three sectors at warp 1 toward a pilot who stopped just out of its
+reach. It is a deliberate deviation, recorded as such in DECISIONS, the
+changelog and the player guide's `cybertrons` entry. `CANON_RULES` restores 3.0.
+The house-rules guard caught the missing DECISIONS entry before commit.
+
+**#42, a lead, still open.** A concrete mechanism produces exactly the symptom:
+- Until v0.31.2, droid mines carried the droid's `shipno`, which is 1 for every
+  droid.
+- The mine sweep runs after projectiles and before kill resolution in the same
+  tick, so a mine landing just after a killing missile repointed `lastfired` at
+  channel 1.
+- Channel 1 is usually a boot-hydrated Cybertron. If it is the victim itself,
+  the result is `attacker=none`.
+
+v0.31.2 already fixed it. It cannot be confirmed for the 09-12 kill:
+`lastWeapon` did not exist yet, and every deploy recreates the container and
+wipes `docker logs`, so no recurrence survives. Written up on the issue, with a
+suggestion to persist the manifest.
+
+**Tests:** backend 711 suites / 6,940 at #56; lint clean.
+
+**Not pushed:** v0.31.5 and v0.31.6. The owner decides when, after the playtest.
