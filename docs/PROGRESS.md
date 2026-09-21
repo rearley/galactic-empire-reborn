@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 187 entries.
+Append-only, **newest at the bottom**. 188 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — the suite runs in a third of the time](#session-2026-09-21-late-night--the-suite-runs-in-a-third-of-the-time)
 - [2026-09-21 — locks provoke, the Cyberquad closes, and a lead on #42](#session-2026-09-21-night--locks-provoke-the-cyberquad-closes-and-a-lead-on-42)
 - [2026-09-21 — the hyperspace deviation that never was](#session-2026-09-21-evening-5--the-hyperspace-deviation-that-never-was)
 - [2026-09-21 — the AI's deviations, named](#session-2026-09-21-evening-4--the-ais-deviations-named)
@@ -8706,3 +8707,23 @@ suggestion to persist the manifest.
 **Tests:** backend 711 suites / 6,940 at #56; lint clean.
 
 **Not pushed:** v0.31.5 and v0.31.6. The owner decides when, after the playtest.
+
+## Session 2026-09-21 (late night) — the suite runs in a third of the time
+
+**Completed: #51.** The owner asked to "make sure this is worth the work", so it
+was measured before anything was designed.
+
+The measurement overturned the issue's own proposal:
+- The 85 isolated files took 105 s of the ~150; the other 626 took 45 s.
+- The database classifier certifies only the cheap files as database-free.
+
+So instead of splitting the suite, every file runs in parallel on 4 workers,
+each against its own clone of `ge_test`. A throwaway experiment gave 51 s before
+any real code was written. The real version runs 712 files / 6,946 tests in
+~52 s, and was green five runs in a row. The experiment's one flake was a test
+reading advisory locks server-wide; it was fixed at the query. Details are in
+DECISIONS 2026-09-21.
+
+**Worth it:** about 100 s saved on every full run. That was a dozen runs in
+today's session alone, and CI's backend job gets the same speed-up on its 4
+vCPUs. Test-only change, so no version bump.

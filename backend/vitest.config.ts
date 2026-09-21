@@ -10,10 +10,12 @@
  * failure surfaces at runtime as an unrelated null dereference rather than at
  * type-check. @see https://docs.nestjs.com/recipes/swc
  *
- * **`singleThread` replaces Jest's `maxWorkers: 1`**, for the same unchanged
- * reason: every suite shares the one `ge_test` database, and running them in
- * parallel lets one suite's truncate wipe another's fixtures. Sequential
- * execution is the simplest correct isolation here.
+ * **Files run in parallel, each worker on its own database.** This once ran
+ * one file at a time (Jest's `maxWorkers: 1`) because every suite shared the
+ * one `ge_test`, and one file's truncate could wipe another's fixtures. Since
+ * #51 the global setup clones `ge_test_1` … `ge_test_N`, one per worker, so
+ * nothing is shared and the suite runs about three times faster.
+ * @see test/helpers/test-workers.ts
  *
  * **Two projects, split on `isolate`.** The suite was 283s, and the breakdown
  * said `import 47% / tests 44%` — most of it was re-evaluating 1,006 modules
@@ -37,6 +39,7 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 import { splitSpecs } from './test/helpers/isolation-policy';
+import { TEST_WORKERS } from './test/helpers/test-workers';
 
 const { isolated, shared } = splitSpecs(__dirname);
 
@@ -59,20 +62,24 @@ const common = {
   // asserted against backend/config/game.config.json directly, so shrinking
   // the galaxy here cannot mask a bad deployed value.
   // @see test/integration/range-and-ai.spec.ts
-  setupFiles: ['test/helpers/test-galaxy-size.ts'],
+  setupFiles: ['test/helpers/test-galaxy-size.ts', 'test/helpers/per-worker-db.ts'],
   testTimeout: 30_000,
-  // `fileParallelism: false` is the direct replacement for Jest's
-  // `maxWorkers: 1`, and it is here for the same unchanged reason: every
-  // suite shares the one `ge_test` database, so running two files at once
-  // lets one suite's truncate wipe another's fixtures. It still holds with
-  // the projects split: the two run one after the other, not side by side.
-  fileParallelism: false,
+  // Files run in PARALLEL, one worker per core up to four, and each worker has
+  // a database of its own (`ge_test_1` … `ge_test_N`, cloned by the global
+  // setup). This used to be `fileParallelism: false`, Jest's `maxWorkers: 1`,
+  // because every suite shared the one `ge_test` and one file's truncate could
+  // wipe another's fixtures. Nothing is shared now, so nothing needs sorting
+  // into "touches the database" and "does not" — the split issue #51 first
+  // proposed, which measurement showed would have parallelised only the cheap
+  // files. ~150 s became ~50 s. @see test/helpers/test-workers.ts
+  fileParallelism: true,
+  maxWorkers: TEST_WORKERS,
   // Forks rather than threads, and NOT `singleFork`. Pinning all 627 files
   // into one long-lived process ran the heap into a native abort
   // (`memory allocation of 133606233069056 bytes failed`, core dumped) part
-  // way through the run. A recycled child process per file bounds the memory
-  // and keeps execution sequential, which is the property that actually
-  // matters here.
+  // way through the run. A recycled child process per file bounds the memory.
+  // (This once also said forks kept execution sequential; it is parallel now,
+  // one database per worker — see `fileParallelism` above.)
   //
   // `isolate: false` in the `shared` project moves toward that old failure by
   // reusing one graph per worker, so peak RSS was measured after the split

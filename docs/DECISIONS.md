@@ -7370,3 +7370,44 @@ the firing gate reads. For one hull, canon's two numbers disagree by 30×.
 **Not done, recorded in #56:** the AI's lack of any danger model (threat
 assessment, grudge targeting). Each would be its own house rule, with its own
 entry.
+
+## 2026-09-21 — The backend suite runs in parallel, one test database per worker
+
+**Context.** #51 asked to split the suite into a parallel `pure` project and a
+serial `db` project, on the grounds that ~650 files paid for a constraint about
+10 imposed. Measured first, on 4 cores:
+
+| | Files | Wall time |
+|---|---|---|
+| `shared` project | 626 | 45 s |
+| `isolated` project | 85 | 105 s |
+
+In the `isolated` project, test execution was 53 s of the 105; the rest was
+per-file start-up. The import-graph classifier (`needs-database.ts`) certifies
+only ~200 files as database-free, because nearly every service spec imports
+Prisma types. Those 200 were already the cheap ones. The proposed split would
+have parallelised the fast third and left the slow two-thirds serial.
+
+**Decision.** Parallelise everything, and give each worker a database of its
+own, so nothing needs classifying at all:
+- `TEST_WORKERS` = min(4, cores).
+- The global setup resets `ge_test` as before, then clones `ge_test_1` …
+  `ge_test_N` from it with `CREATE DATABASE … TEMPLATE`. A clone is a file copy,
+  under a second each.
+- A setup file points each worker's `TEST_DATABASE_URL` at its own clone, using
+  `VITEST_POOL_ID`. Every connection in the suite, `PrismaService` included,
+  reads that variable.
+- A pool id with no clone throws, rather than letting two workers share a
+  database.
+
+**Result.** Full suite ~150 s → ~52 s, five consecutive green runs. A single
+spec file takes ~5 s including the clones.
+
+**What parallelism exposed.** One test read `pg_locks` server-wide, so it could
+see another worker's advisory lock. Its query is now scoped to the current
+database. Advisory locks never conflict across databases, so production code was
+unaffected. One test asserted the database was named exactly `ge_test`; it now
+accepts `ge_test_N`, still never the development database.
+
+**Unchanged.** The `shared`/`isolated` project split stays. It is about module
+graphs (`vi.mock`, `process.env`, Nest modules), not the database.

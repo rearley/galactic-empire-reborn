@@ -21,7 +21,9 @@ describe('PrismaService under Prisma 7', () => {
     try {
       const [row] = await service.$queryRaw<Array<{ db: string }>>`
         SELECT current_database() AS db`;
-      expect(row.db).toBe('ge_test');
+      // `ge_test`, or this worker's own clone of it, `ge_test_N` (#51) — never
+      // the development database.
+      expect(row.db).toMatch(/^ge_test(_\d+)?$/);
     } finally {
       await service.onModuleDestroy();
     }

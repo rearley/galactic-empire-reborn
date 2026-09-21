@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { needsDatabase, selectedSpecs } from "./needs-database";
 import { loadDotenv } from "../../helpers/load-dotenv";
+import { TEST_WORKERS } from "../../helpers/test-workers";
 
 // Load .env before globalSetup so TEST_DATABASE_URL is available without manual
 // env injection. The loader is shared with the manual suite's config, which
@@ -128,4 +129,19 @@ export default async function globalSetup(
     `psql "${url}" -c 'CREATE UNIQUE INDEX IF NOT EXISTS "user_email_lower_key" ON "User" (LOWER("email")) WHERE "email" IS NOT NULL'`,
     psqlOpts
   );
+
+  // One database per worker, cloned from the one just built, so files can run
+  // in parallel with nothing shared. A template clone is a file copy — well
+  // under a second each — where a second `db push` per worker would cost
+  // several. WITH (FORCE) drops a clone a crashed earlier run left connected.
+  // @see ../../helpers/test-workers.ts, issue #51
+  const base = new URL(url).pathname.slice(1);
+  const admin = new URL(url);
+  admin.pathname = "/postgres";
+  for (let i = 1; i <= TEST_WORKERS; i++) {
+    execSync(
+      `psql "${admin.toString()}" -c 'DROP DATABASE IF EXISTS "${base}_${i}" WITH (FORCE)' -c 'CREATE DATABASE "${base}_${i}" TEMPLATE "${base}"'`,
+      psqlOpts
+    );
+  }
 }

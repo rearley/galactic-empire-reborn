@@ -36,6 +36,9 @@ async function lockHolders(): Promise<number> {
   const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT count(*)::bigint AS n FROM pg_locks
     WHERE locktype = 'advisory' AND objid = ${ADVISORY_LOCK_KEY}::bigint % 4294967296
+      -- This database only: advisory locks are listed server-wide, and with a
+      -- test database per worker another worker's midnight run is not ours. #51
+      AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
   `;
   return Number(rows[0]?.n ?? 0n);
 }
