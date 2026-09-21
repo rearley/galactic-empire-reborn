@@ -61,6 +61,8 @@ export interface PilotOptions {
   classNumber: number;
   at: { x: number; y: number };
   script?: PilotScript;
+  /** Shields up at spawn, as a pilot expecting a fight would have them. */
+  shields?: boolean;
 }
 
 const quietLogger = { log: () => undefined, warn: () => undefined, error: () => undefined, debug: () => undefined } as unknown as Logger;
@@ -227,6 +229,7 @@ export class GalaxySim {
       phasr: 100,
       energy: 50_000,
       cybmine: 255,
+      ...(o.shields ? { shieldstat: 1, shield: cls.maxShields } : {}),
     });
     this.map.set(shipKey(ship.userid, ship.shipno), ship);
     if (o.script) this.scripts.set(shipKey(ship.userid, ship.shipno), o.script);
@@ -263,8 +266,10 @@ export class GalaxySim {
    */
   async run(opts: { seconds: number; every?: (sim: GalaxySim) => boolean | void }): Promise<void> {
     for (let i = 0; i < opts.seconds; i++) {
-      await vi.advanceTimersByTimeAsync(1000);
+      // Count the second first, so everything emitted during it is stamped with
+      // the second it happened in, and `every` sees the same number.
       this.elapsed++;
+      await vi.advanceTimersByTimeAsync(1000);
       for (const [key, script] of this.scripts) {
         const pilot = this.map.get(key);
         if (pilot) await script(pilot, this);
@@ -294,5 +299,24 @@ export function commute(a: { x: number; y: number }, b: { x: number; y: number }
     }
     pilot.head2b = headingToward(dx, dy);
     pilot.speed2b = speed;
+  };
+}
+
+/**
+ * Shoot back at whatever has claimed you: once the phaser bank is full and the
+ * claimant is inside this hull's scan range, fire `pha <relative bearing> 1`
+ * through the real handler. `pha` takes a bearing RELATIVE to the ship's
+ * heading (`firep.ts`, `normal(heading + degrees)`).
+ */
+export function fightBack(): PilotScript {
+  return async (pilot, sim) => {
+    const hunter = sim.cybertrons().find((c) => c.cybmine === pilot.channel);
+    if (!hunter || pilot.phasr < 100) return;
+    const range = sim.classes.get(pilot.shpclass)?.scanRange ?? 0;
+    const dx = hunter.xcoord - pilot.xcoord;
+    const dy = hunter.ycoord - pilot.ycoord;
+    if (Math.hypot(dx, dy) * 10_000 > range) return;
+    const rel = ((headingToward(dx, dy) - pilot.heading + 540) % 360) - 180;
+    await sim.command(pilot, 'pha', [String(Math.round(rel)), '1']);
   };
 }
