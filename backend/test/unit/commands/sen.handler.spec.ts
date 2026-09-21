@@ -67,13 +67,14 @@ describe('SenHandlerService', () => {
   });
 
   describe('message > 500 chars rejected (deliberate: port-original cap, DECISIONS 2026-09-19)', () => {
-    it('returns usage error and no broadcasts for overlong message', () => {
+    it('says the message is too long, and by how much, rather than pointing at the usage (#57)', () => {
       const ship = makeShip();
       const longMsg = 'x'.repeat(501).split(' ');
       const result = handler.command.handler(ship, ['a', ...longMsg], ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
-      // the answer to the wrong NUMBER of arguments, not a wrong channel.
-      expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);
+      // Canon has no cap (GECMDS.C:1825), so there is no canon line for this;
+      // the usage text it used to get read like a syntax error.
+      expect(result.lines.map((l) => l.text)).toEqual(['Message too long: 501 characters, the limit is 500.']);
     });
 
     it('accepts exactly 500 chars', () => {

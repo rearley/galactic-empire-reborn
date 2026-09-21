@@ -72,7 +72,8 @@ describe('sen E2E round-trip', () => {
       const longMsg = 'x '.repeat(251).trim(); // 501 chars
       const result = router.dispatch(`sen a ${longMsg}`, ship, ctx) as CommandResult;
       expect(result.broadcasts).toBeUndefined();
-      expect(result.lines[0].text).toMatch(/Type HELP SEND for the correct usage\./i);
+      // Says it is too long, not that the syntax is wrong. @see #57
+      expect(result.lines[0].text).toBe('Message too long: 501 characters, the limit is 500.');
     });
   });
 

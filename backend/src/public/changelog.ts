@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.7',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A message over the 500-character limit now tells you so, and how long it was, instead of answering "Type HELP SEND for the correct usage", which made it look as if you had typed the command wrong.',
+      },
+    ],
+  },
+  {
     version: '0.31.6',
     date: '2026-09-21',
     entries: [

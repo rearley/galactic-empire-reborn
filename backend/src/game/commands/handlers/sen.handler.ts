@@ -105,7 +105,7 @@ export class SenHandlerService {
     }
     const messageText = expansion.text;
     if (messageText.length > MAX_MSG_LEN) {
-      return { lines: [{ text: formatMessage(MessageId.MSG_USAGE_SEN), category: 'system' }] };
+      return { lines: [{ text: formatMessage(MessageId.MSG_TOO_LONG, messageText.length, MAX_MSG_LEN), category: 'system' }] };
     }
 
     // PORT-ORIGINAL rate limit. Canon throttles `send` not at all — MajorBBS

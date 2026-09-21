@@ -367,6 +367,7 @@ export enum MessageId {
 
   // sen (feature 012) — GECMDS.C:1825 cmd_send
   MSG_USAGE_SEN = 'MSG_USAGE_SEN',
+  MSG_TOO_LONG = 'MSG_TOO_LONG',
   MSG_SENT = 'MSG_SENT',
   MSG_SENT_SECTOR = 'MSG_SENT_SECTOR',
   MSG_SENT_HYPER = 'MSG_SENT_HYPER',
@@ -1033,6 +1034,10 @@ export const MESSAGE_STRINGS: Record<MessageId, string> = {
 
   // sen (feature 012) — GECMDS.C:1825 cmd_send
   [MessageId.MSG_USAGE_SEN]: CANON_MESSAGES.SNDFMT,
+  // PORT-ORIGINAL: canon's cmd_send has no length cap (GECMDS.C:1825), so it has
+  // no line for this; the cap is ours (docs/DECISIONS.md 2026-09-19). It used to
+  // answer with SNDFMT, which reads like a syntax error. @see #57
+  [MessageId.MSG_TOO_LONG]: 'Message too long: %d characters, the limit is %d.',
   [MessageId.MSG_SENT]: CANON_MESSAGES.MSGSNT2,
   [MessageId.MSG_SENT_SECTOR]: CANON_MESSAGES.MSGSNT4,
   [MessageId.MSG_SENT_HYPER]: CANON_MESSAGES.MSGSNT6,
