@@ -4,6 +4,8 @@ import { ShipStateService } from '../ship/ship-state.service';
 import { FIRETICKS } from '../constants';
 import { shipLetter } from '../commands/helpers/find-ship';
 import { COMBAT_TARGET_WARNING, CombatTargetWarningEvent } from './combat-events';
+import { provoke } from '../cybertron/cyb-transitions';
+import { tracedTransition, type CybTraceService } from '../cybertron/cyb-trace.service';
 
 /**
  * The consequences canon attaches to a fire-control lock, for BOTH ships.
@@ -35,6 +37,8 @@ export interface LockOutcomeDeps {
   events: EventEmitter2;
   /** Scan letters as a given ship sees them — canon's `shpltr(viewer,subject)`. */
   lettersFor: (userid: string, shipno: number) => ReadonlyArray<{ shipKey: string; letter: string }>;
+  /** The AI's `sys trace`, when there is one. */
+  trace?: CybTraceService;
 }
 
 export function applyLockOutcome(
@@ -43,6 +47,13 @@ export function applyLockOutcome(
   kind: 'lock-acquired' | 'lock-attempt',
   deps: LockOutcomeDeps,
 ): void {
+  // A lock on an AI makes it yours, won or lost — canon claims the target
+  // before the roll, inside the block that found it in range and uncloaked:
+  //   GECMDS.C:1374 `wptr->cybmine = usrn;`
+  // The phaser always did this; the torpedo and missile never had. @see #55
+  deps.shipState.mutate(target.userid, target.shipno, (t) =>
+    tracedTransition(deps.trace, t, 'provoke', () => provoke(t, firer), `locked by ${firer.username ?? firer.shipname}`));
+
   // Battle-lock BOTH. Canon does this whether the lock succeeded or failed.
   deps.shipState.mutate(firer.userid, firer.shipno, (s) => { s.cantexit = FIRETICKS; });
   deps.shipState.mutate(target.userid, target.shipno, (t) => { t.cantexit = FIRETICKS; });

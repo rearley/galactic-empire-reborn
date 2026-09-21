@@ -7327,3 +7327,16 @@ naming its DECISIONS entry:
   code, so the entry may now be stale, and #66 audits it.
 - `sys trace` and a kill-bookkeeping note are marked `@not-a-house-rule`:
   neither is AI behaviour a player meets.
+
+## 2026-09-21 — A torpedo or missile lock provokes an AI, as a phaser does
+
+**Context.** #55. Canon claims an AI for whoever attacks it in three places:
+`firep` (GECMDS.C:981), `firehp` (:1072) and `lockon` (:1374), which both
+`torp` and `missl` call. The port did the first two only.
+
+**Decision.** `applyLockOutcome`, the port's shared tail of canon's `lockon`,
+now calls the `provoke` transition, and the claim is traced. It sits where
+canon's does: after the cloak, range and zone gates, and before the lock roll's
+outcome matters. So a failed lock provokes too, exactly as canon claims before
+the roll. The assignment is bare, as canon's is: it overrides an existing claim
+and ignores `noclaim`.

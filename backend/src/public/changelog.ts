@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.5',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'corrected-to-canon',
+        text: 'Locking a torpedo or missile onto a Cybertron or drone now makes it come after you, as a phaser hit always has and as in the original. It happens the moment you try for the lock, whether the lock holds or not, so you can pull an AI off a friend with a torpedo as well as a phaser.',
+      },
+    ],
+  },
+  {
     version: '0.31.4',
     date: '2026-09-21',
     entries: [

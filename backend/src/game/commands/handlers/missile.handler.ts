@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ScanHandlerService } from './scan.handler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Command, CommandContext, CommandResult } from '../command.types';
@@ -16,6 +16,7 @@ import { applyLockOutcome, warnTarget } from '../../combat/lock-outcome';
 import { FIRETICKS, MAXMISSL, MISENGFC, MISFACT, MISSILE_CHARGE_MAX, SE100DAM } from '../../constants';
 import { I_MISSL } from '../../constants/items';
 import { dropShieldsForFire } from '../../combat/shield-drop';
+import { CybTraceService } from '../../cybertron/cyb-trace.service';
 
 const MISSILE_CHARGE_MIN = 1;
 
@@ -66,6 +67,8 @@ export class MissileHandlerService {
     // Canon resolves a target by SCAN LETTER (GECMDS.C:1473-1487), so this
     // needs the table `sca` builds. @see ScanHandlerService.lettersFor
     private readonly scanHandler: ScanHandlerService,
+    /** Records the claim a lock takes, in the AI's `sys trace`. @see #55 */
+    @Optional() private readonly trace?: CybTraceService,
   ) {
     void this.events;
     void this.random;
@@ -92,6 +95,7 @@ export class MissileHandlerService {
       shipState: this.shipState,
       events: this.events,
       lettersFor: (u, n) => this.scanHandler.lettersFor(u, n),
+      trace: this.trace,
     });
   }
 
