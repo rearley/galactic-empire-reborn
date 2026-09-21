@@ -91,7 +91,12 @@ export class GalaxySim {
    * measuring wall time. Call before `create`, which opens the heartbeats.
    */
   static installClock(): void {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+    // A fixed epoch, so every `tickAt` and trace timestamp is the same on every
+    // run: a sim must be reproducible down to the byte.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+      now: Date.UTC(2026, 8, 21),
+    });
   }
 
   /** Build and boot a galaxy. `installClock()` must have run first. */
