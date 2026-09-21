@@ -112,6 +112,9 @@ const SUITE_ROOTS: readonly string[] = [
   'test/team',
   'test/invariants',
   'test/public',
+  // The AI galaxy simulation (#61): the real ticks on a fake clock, for hours of
+  // play. In the default run because it measured fast enough to be.
+  'test/sim',
 ];
 
 /**
