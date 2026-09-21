@@ -6,6 +6,7 @@ import { shipKey } from '../ship/ship-state.types';
 import { CYBMINE_NONE, NO_CHANNEL } from '../ship/ship-channel.registry';
 import { CYB_MAXCASH } from '../constants';
 import type { CybertronLoadout } from './cyb-decisions';
+import { hydrate } from './cyb-transitions';
 
 /** Fields needed to create a new Cybertron spawn slot. */
 export interface SpawnSlotInit {
@@ -122,51 +123,10 @@ export class CybertronRepository {
         }
 
         const state = prismaShipToState(ship as Parameters<typeof prismaShipToState>[0]);
-        state.status = 2; // GESTAT_AUTO
         state.dirty = false;
-
-        // A saved claim does not survive the restart, and must not.
-        //
-        // `cybmine` stores a CHANNEL. Channels are session-scoped, recycled,
-        // and held only in memory by ShipChannelRegistry — nothing writes them
-        // to the database. The number that meant "I am hunting Wasp" before the
-        // restart means whoever is handed 18 next, which is a different pilot;
-        // the Cybertron would arrive already locked on a stranger. Canon clears
-        // it on load, in this same block:
-        //
-        //   GECYBS.C:133 `		ptr->cybmine = (byte)255;`
-        //   GECYBS.C:136 `		ptr->holdcourse = 0;`
-        //
-        // 255 is "I have claimed nobody", so the AI loop runs exactly as it does
-        // for a fresh hull: it re-scans on its next activation and picks a real
-        // target. `holdcourse` goes with it — a stored countdown makes the ship
-        // skip target selection for up to nine activations after boot, which
-        // would delay precisely the re-acquisition this is arranging.
-        state.cybmine = CYBMINE_NONE;
-        state.holdcourse = 0;
-
-        // Cruise speed, UNCONDITIONALLY — the third line of the same canon block:
-        //
-        //   GECYBS.C:134 `		ptr->speed2b = (double)(ptr->topspeed)*500.0;`
-        //
-        // Our topspeed is in warp units where warp 1 = 1000, so multiply by 1000.
-        //
-        // This used to be guarded by `speed2b === 0`, which only ever kick-started
-        // a ship that had stopped. Everything else kept whatever speed the process
-        // died holding — and that is frequently a COMBAT speed, meaningless once
-        // the claim above has been cleared. The close band assigns `rndm(500.0)`
-        // at point-blank range, so an Obliterator that had been shadowing a player
-        // came back from the v0.27.7 deploy still crawling at 284, with no target
-        // and no way to get anywhere: observed at (-0.22, 0.79), barely moving.
-        //
-        // Canon overwrites it on every load precisely because the stored value
-        // describes an engagement that no longer exists. Restoring the cruise
-        // speed is what makes a hydrated Cybertron equivalent to a fresh one,
-        // which is the whole point of the block.
-        // No `topspeed > 0` guard: canon has none, and it needs none. The one
-        // hull that ships with `topspeed` 0 is the Cybertron Base Star, an
-        // immobile fortress, and `0 * 1000` is exactly the speed it should have.
-        state.speed2b = state.topspeed * 1000;
+        // An AI, claiming nobody, holding no course, at cruise — whatever it
+        // was doing when the process died. @see cyb-transitions.ts hydrate
+        hydrate(state);
         this.shipState.loadShip(state);
         count++;
       }

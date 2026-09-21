@@ -44,6 +44,7 @@ import {
 } from '../../constants';
 import { CombatTickService } from '../../combat/combat-tick.service';
 import { dropShieldsForFire } from '../../combat/shield-drop';
+import { provoke } from '../../cybertron/cyb-transitions';
 
 /**
  * Handles `pha` / `phasor` — ship-to-ship phaser fire.
@@ -256,9 +257,7 @@ export class PhaserHandlerService {
       // you could not pull one off a teammate, and one you shot ignored you.
       // @see GECMDS.C:980-981 `if (wptr->status == GESTAT_AUTO) wptr->cybmine = usrn;`
       if (candidate.status === GESTAT_AUTO) {
-        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => {
-          v.cybmine = ship.channel ?? NO_CHANNEL;
-        });
+        this.shipState.mutate(candidate.userid, candidate.shipno, (v) => provoke(v, ship.channel ?? NO_CHANNEL));
       }
 
       // C branches solely on `shieldstat != SHIELDUP` (GECMDS.C:986).
@@ -481,7 +480,7 @@ export class PhaserHandlerService {
         v.lastWeapon = 'phaser';
         v.lastfiredBy = { channel: ship.channel ?? NO_CHANNEL, name: ship.shipname };
         v.cantexit = FIRETICKS;
-        if (v.status === GESTAT_AUTO) v.cybmine = ship.channel ?? NO_CHANNEL;
+        provoke(v, ship.channel ?? NO_CHANNEL);
       });
 
       const hitEvent: CombatHitEvent = {

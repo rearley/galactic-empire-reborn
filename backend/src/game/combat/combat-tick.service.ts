@@ -23,6 +23,7 @@ import {
   PENGUSE,
   USEENERGY_RESERVE,
   PMINFIRE,
+  GESTAT_AUTO,
 } from '../constants';
 import { MineRegistry, MineState } from './mine.registry';
 import { MineRepository } from './mine.repository';
@@ -61,6 +62,7 @@ import {
   CombatEventForInvariants,
   pushBounded,
 } from '../invariants/runtime-events';
+import { releaseDeadTarget } from '../cybertron/cyb-transitions';
 
 /** Decoy intercept distance threshold for torpedoes. @see specs/006b-combat/research.md */
 const TORP_DECOY_THRESHOLD = 5000;
@@ -392,12 +394,14 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         this.shipState.removeFromGame(victim);
 
         // Clear cybmine on any Cybertron targeting the dead ship so they don't
-        // immediately re-engage the player when they respawn. @see GEFUNCS.C:killem
+        // immediately re-engage the player when they respawn. PORT-ORIGINAL:
+        // canon's killem releases only the killer's claim.
+        // @see cyb-transitions.ts releaseDeadTarget
         for (const s of this.shipState.findAllShips()) {
           // cybmine holds the claimed player's CHANNEL (C: a usernumber,
           // GECYBS.C:368) — matching on shipno released the wrong claims.
-          if (s.status === 2 && victim.channel !== undefined && s.cybmine === victim.channel) {
-            s.cybmine = 255;
+          if (s.status === GESTAT_AUTO && victim.channel !== undefined && s.cybmine === victim.channel) {
+            releaseDeadTarget(s);
           }
         }
 
