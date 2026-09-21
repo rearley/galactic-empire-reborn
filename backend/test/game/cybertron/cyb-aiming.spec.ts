@@ -31,6 +31,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS } from '../../../src/game/constants/items';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import { canonMaxWarp } from '../../helpers/canon-max-warp';
+import { AiWeapons } from '../../../src/game/cybertron/ai-weapons';
 
 const CYB_CLASS = 21;
 
@@ -104,8 +105,7 @@ function buildHarness() {
 
   const ctx = { kind: 'PHYSICS', firedAt: new Date('2026-09-06T12:00:00Z'), seq: 1 };
   const fire = (a: ShipState, t: ShipState) =>
-    (svc as unknown as { cybFirePhaser: (s: ShipState, t: ShipState, c: unknown) => void })
-      .cybFirePhaser(a, t, ctx);
+    (svc as unknown as { weapons: AiWeapons }).weapons.firep(a, t, ctx as never);
   const attack = (a: ShipState, t: ShipState, ddist: number) =>
     (svc as unknown as {
       cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;

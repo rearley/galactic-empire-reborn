@@ -30,10 +30,10 @@
 import { I_MINE } from '../../../src/game/constants/items';
 import { FIRETICKS } from '../../../src/game/constants';
 
-import { CybertronTickService } from '../../../src/game/cybertron/cybertron-tick.service';
 import { MineTableFullError } from '../../../src/game/combat/mine.repository';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import type { Mock } from 'vitest';
+import { AiWeapons } from '../../../src/game/cybertron/ai-weapons';
 
 const cyb = (over: Partial<ShipState> = {}): ShipState => {
   const items = Array(14).fill(0n) as bigint[];
@@ -45,24 +45,23 @@ const cyb = (over: Partial<ShipState> = {}): ShipState => {
   } as ShipState;
 };
 
-/** Bare service with only what layMine touches. */
+/** The AI weapons, with only what `laymine` touches. */
 function build(create: Mock) {
-  const svc = Object.create(CybertronTickService.prototype) as object;
   const added: unknown[] = [];
-  Object.assign(svc, {
+  const weapons = new AiWeapons({
     mineRepo: { create },
     mineRegistry: { add: (m: unknown) => added.push(m) },
     shipState: {
       mutate: (_u: string, _n: number, fn: (s: ShipState) => void) => { fn(current); return current; },
     },
     logger: { error: vi.fn() },
-  });
+  } as unknown as ConstructorParameters<typeof AiWeapons>[0]);
   let current: ShipState;
   return {
     added,
     lay: async (ship: ShipState) => {
       current = ship;
-      (svc as { layMine: (s: ShipState) => void }).layMine(ship);
+      weapons.laymine(ship);
       await new Promise((r) => setImmediate(r));
     },
   };

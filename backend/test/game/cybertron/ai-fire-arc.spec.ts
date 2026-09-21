@@ -33,6 +33,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { NUMITEMS, PHATOWRP } from '../../../src/game/constants';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import { canonMaxWarp } from '../../helpers/canon-max-warp';
+import { AiWeapons } from '../../../src/game/cybertron/ai-weapons';
 
 const CYB_CLASS = 21;
 
@@ -108,11 +109,9 @@ function buildHarness() {
   );
 
   const fire = (attacker: ShipState, target: ShipState) =>
-    (svc as unknown as {
-      cybFirePhaser: (s: ShipState, t: ShipState, c: unknown) => void;
-    }).cybFirePhaser(attacker, target, {
+    (svc as unknown as { weapons: AiWeapons }).weapons.firep(attacker, target, {
       kind: 'PHYSICS', firedAt: new Date('2026-09-04T12:00:00Z'), seq: 1,
-    });
+    } as never);
 
   return { shipState, fire };
 }
