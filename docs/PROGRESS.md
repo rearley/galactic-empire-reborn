@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 188 entries.
+Append-only, **newest at the bottom**. 189 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — #42 reproduced: mines went off after missiles](#session-2026-09-21-late-night-2--42-reproduced-mines-went-off-after-missiles)
 - [2026-09-21 — the suite runs in a third of the time](#session-2026-09-21-late-night--the-suite-runs-in-a-third-of-the-time)
 - [2026-09-21 — locks provoke, the Cyberquad closes, and a lead on #42](#session-2026-09-21-night--locks-provoke-the-cyberquad-closes-and-a-lead-on-42)
 - [2026-09-21 — the hyperspace deviation that never was](#session-2026-09-21-evening-5--the-hyperspace-deviation-that-never-was)
@@ -8727,3 +8728,23 @@ DECISIONS 2026-09-21.
 **Worth it:** about 100 s saved on every full run. That was a dozen runs in
 today's session alone, and CI's backend job gets the same speed-up on its 4
 vCPUs. Test-only change, so no version bump.
+
+## Session 2026-09-21 (late night, 2) — #42 reproduced: mines went off after missiles
+
+**Completed: #42 (v0.31.8).** The owner asked how to confirm whether #42 was
+still needed. Comparing the port's physics-tick order against canon's `warrtia`
+answered it:
+- canon sweeps mines BEFORE torpedoes and missiles
+- the port swept them after, so a mine under a ship a missile had just killed
+  took the kill
+
+A reproduction test failed exactly so, crediting the mine layer, and the fix is
+a one-line reorder.
+
+**Correction to my own record.** Earlier today I told the owner, and wrote on
+the issue, that a mine taking the credit after your missile "is canon". It is
+not. I asserted canon's behaviour without reading canon's order. The v0.31.2
+channel fix removed only the `attacker=none` form of the bug; the ordering half
+was still live.
+
+**Tests:** 1 reproduction in `kill-attribution.spec.ts`. Backend 712 suites / 6,948, all green; lint clean.

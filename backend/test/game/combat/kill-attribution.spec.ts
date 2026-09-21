@@ -87,7 +87,7 @@ async function makeHarness(ships: ShipState[], seed = 99) {
   await service.onModuleInit();
 
   return {
-    service, shipMap, events, shipState,
+    service, shipMap, events, shipState, mineRegistry,
     fire: () => {
       const ctx: TickContext = { kind: TickKind.PHYSICS, tickNumber: 1, firedAt: new Date() };
       for (const h of subscribers) h(ctx);
@@ -96,6 +96,45 @@ async function makeHarness(ships: ShipState[], seed = 99) {
 }
 
 describe('CombatTickService — kill attribution (T053, FR-026)', () => {
+  /**
+   * #42. Canon sweeps mines FIRST in the 6-second tick, then walks each ship's
+   * torpedoes and missiles, then checks it for death:
+   *
+   *   GEMAIN.C:2244 `checkmines();`
+   *   GEMAIN.C:2264 `checktm(wptr,zothusn);`
+   *   GEMAIN.C:2267 `checkdam(wptr,zothusn);`
+   *
+   * So a killing missile is the last thing to touch its victim's `lastfired`
+   * before the kill is credited. The port swept mines AFTER projectiles, so a
+   * mine under the victim landed later and took the credit — the one gap
+   * between a missile kill and its resolution through which #42's
+   * `attacker=none` fits.
+   */
+  it('a killing missile keeps the credit when the victim also sits on a mine that tick', async () => {
+    const pilot = makeShip({ userid: 'pilot', shipno: 5, xcoord: 5.5, ycoord: 5.5, kills: 0 });
+    const layer = makeShip({ userid: 'layer', shipno: 11, xcoord: 9.5, ycoord: 9.5, kills: 0 });
+    const victim = makeShip({
+      userid: 'Cybrg-211', shipno: 211, status: 2, xcoord: 5.5, ycoord: 5.5,
+      shield: 0, shieldstat: 0, damage: 95,
+      lmisslChannel: [5, 255, 255],
+      lmisslDistance: [10, 0, 0],
+      lmisslEnergy: [50000, 0, 0],
+    });
+    const h = await makeHarness([pilot, layer, victim]);
+    // Timer 1: the tick decrements it to 0, when a mine goes off.
+    h.mineRegistry.add({ id: 1, channel: 11, timer: 1, xcoord: 5.5, ycoord: 5.5, deployedBy: 'layer' });
+
+    const destroyed: CombatShipDestroyedEvent[] = [];
+    h.events.on(COMBAT_SHIP_DESTROYED, (e: CombatShipDestroyedEvent) => destroyed.push(e));
+    h.fire();
+
+    expect(victim.lastWeapon).toBeDefined();
+    expect(destroyed).toHaveLength(1);
+    expect(destroyed[0].attackerId).toBe(shipKey('pilot', 5));
+    expect(pilot.kills).toBe(1);
+  });
+
+
   it('credits last attacker (missile after torpedo) when both hits land same tick and damage >= 100', async () => {
     // Alice (channel 7) torpedoes Bob; Carol (channel 9) missiles Bob; both
     // arrive same tick. Torps process before missiles in the carrier's slot

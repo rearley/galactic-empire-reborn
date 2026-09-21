@@ -7411,3 +7411,32 @@ accepts `ge_test_N`, still never the development database.
 
 **Unchanged.** The `shared`/`isolated` project split stays. It is about module
 graphs (`vi.mock`, `process.env`, Nest modules), not the database.
+
+## 2026-09-21 — Mines are swept before torpedoes and missiles, as in canon's tick
+
+**Context.** #42: a player's hyper-missiles killed a Cyberquad, and the log
+said `attacker=none`. The v0.31.2 channel fix removed one way that happened.
+Reproducing it showed the underlying cause was still live.
+
+**Canon's order.** Canon's 6-second `warrtia` sweeps mines first, then walks
+each ship's torpedoes and missiles, then checks it for death:
+- GEMAIN.C:2244 `checkmines();`
+- GEMAIN.C:2264 `checktm(wptr,zothusn);`
+- GEMAIN.C:2267 `checkdam(wptr,zothusn);`
+
+So a killing missile is the last thing to write its victim's `lastfired`.
+
+**What the port did.** `CombatTickService.onPhysicsTick` ran projectiles, then
+the mine sweep, then kill resolution, on the stated grounds "so projectile
+damage settles first". A mine going off under a ship a missile had just killed
+overwrote `lastfired` and took the kill. Until v0.31.2 Droid mines carried
+`shipno` 1 instead of a channel, which usually resolved to nobody, giving
+`attacker=none`. After it, the kill went to the mine's layer instead of the
+killer.
+
+**Decision.** Sweep mines first. Reproduced by
+`kill-attribution.spec.ts` ("a killing missile keeps the credit…"), which
+credited `layer:11` before the fix and credits the pilot after. No other test
+depended on the old order. One kill-resolution pass at the end still credits
+the same attacker as canon's per-ship `checkdam`, because nothing damages a
+ship after its own projectiles in the tick.

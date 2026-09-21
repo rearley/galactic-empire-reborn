@@ -185,6 +185,18 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
         return ka < kb ? -1 : ka > kb ? 1 : 0;
       });
 
+    // Mines FIRST, as canon's tick does, then each ship's torpedoes and
+    // missiles, then death:
+    //   GEMAIN.C:2244 `checkmines();  /* check for mines */`
+    //   GEMAIN.C:2264 `checktm(wptr,zothusn);   /* check torps, missl, and decoys */`
+    //   GEMAIN.C:2267 `checkdam(wptr,zothusn);`
+    // This ran mines AFTER projectiles, "so projectile damage settles first",
+    // and that order let a mine going off under a ship a missile had just
+    // killed overwrite `lastfired` and take the kill — #42's uncredited missile
+    // kill. tickAll() decrements timers; sweepCandidates() returns mines on the
+    // timer % 5 === 0 cadence (matches GEFUNCS.C:minesweep).
+    this.runMineSweep(ships, ctx);
+
     for (const ship of ships) {
       try {
         this.processShipCombat(ship, ctx);
@@ -195,14 +207,11 @@ export class CombatTickService implements OnModuleInit, BeforeApplicationShutdow
       }
     }
 
-    // Mine sweep pass — runs AFTER per-ship combat so projectile damage
-    // settles first. tickAll() decrements timers; sweepCandidates() returns
-    // mines on the timer % 5 === 0 cadence (matches GEFUNCS.C:minesweep).
-    this.runMineSweep(ships, ctx);
-
-    // Kill-resolution pass — runs LAST so any damage applied by phaser,
-    // projectile, or mine passes this tick is settled before kills are
-    // attributed and dead ships removed from the in-memory map.
+    // Kill-resolution pass — runs LAST so any damage applied by the mine and
+    // projectile passes this tick is settled before kills are attributed and
+    // dead ships removed from the in-memory map. Canon checks each ship right
+    // after its own checktm; with mines already swept, one pass at the end
+    // credits the same attacker.
     this.runKillResolution(ctx);
   }
 

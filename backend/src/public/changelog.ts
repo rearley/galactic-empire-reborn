@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.8',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'corrected-to-canon',
+        text: 'A kill you make with a torpedo or missile is now yours even if the ship you killed was sitting on someone else\u2019s mine. The game used to set off mines after torpedoes and missiles in each round, so a mine going off under a ship you had just destroyed could take the kill, and sometimes nobody got it at all. Mines now go off first, as in the original.',
+      },
+    ],
+  },
+  {
     version: '0.31.7',
     date: '2026-09-21',
     entries: [
