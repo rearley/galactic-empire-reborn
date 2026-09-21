@@ -96,6 +96,8 @@ export interface ChangelogRelease {
  * oversight and fails.
  */
 export const SILENT_RELEASES: Record<string, string> = {
+  '0.30.2':
+    'A restructure of how the AI ships keep track of whom they are hunting, so the kind of mistake behind the hub-camping Obliterator cannot be made again. They behave exactly as before.',
   '0.27.1':
     'A corrected code comment. The sysop Reports page was fixed the same day, but in the web server’s configuration rather than in this release, so there is nothing here a player could see.',
   '0.24.4':

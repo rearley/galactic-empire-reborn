@@ -41,7 +41,7 @@ export interface CybClaimState {
   tick: number;
 }
 
-/** `ptr->speed2b = 2000.0` after a kill — warp 2. @see GECYBS.C:818 */
+/** Warp 2 after a kill. @see GECYBS.C:818 `ptr->speed2b = 2000.0;` */
 export const CYB_WON_SPEED = 2000;
 
 /**
@@ -49,8 +49,9 @@ export const CYB_WON_SPEED = 2000;
  * the `noclaim` limit — canon's "sickum". Writes the claim and nothing else,
  * because canon writes nothing else: the next activation's pursuit band does
  * the steering. A player ship is left alone.
- * @see GECMDS.C:980-981 `if (wptr->status == GESTAT_AUTO) wptr->cybmine = usrn;`
- * @see GECMDS.C:1071-1072 (hyper-phaser), GECMDS.C:1373-1374 (torpedo/missile)
+ * @see GECMDS.C:981 `wptr->cybmine = usrn;` (phaser)
+ * @see GECMDS.C:1072 `wptr->cybmine = usrn;` (hyper-phaser)
+ * @see GECMDS.C:1374 `wptr->cybmine = usrn;` (torpedo/missile)
  */
 export function provoke(ai: { status: number; cybmine: number }, attackerChannel: number): void {
   if (ai.status === GESTAT_AUTO) ai.cybmine = attackerChannel;
@@ -67,9 +68,9 @@ export function acquire(ai: CybClaimState, channel: number): void {
 
 /**
  * The claimed pilot has left the game: drop them and cruise.
- * @see GECYBS.C:684-688
- *   `ptr->cybmine = (byte)255;`
- *   `ptr->speed2b = rndm(d_topspeed); /* let them cruise *\/`
+ * @see GECYBS.C:684 `if (!ingegame(zothusn))`
+ * @see GECYBS.C:686 `ptr->cybmine = (byte)255;`
+ * @see GECYBS.C:687 `ptr->speed2b = rndm(d_topspeed);`
  */
 export function releaseTargetLeft(ai: CybClaimState, topSpeed: number, rng: Random): void {
   ai.cybmine = CYBMINE_NONE;
@@ -79,7 +80,8 @@ export function releaseTargetLeft(ai: CybClaimState, topSpeed: number, rng: Rand
 /**
  * The claimed pilot is cloaked: hold course a while at a cruise, and give up on
  * them one time in ten.
- * @see GECYBS.C:692-704
+ * @see GECYBS.C:696 `ptr->holdcourse=gernd()%5+5;`
+ * @see GECYBS.C:700 `ptr->cybmine = 255;`
  */
 export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: Random): void {
   ai.holdcourse = Math.floor(rng.next() * 5) + 5;
@@ -92,9 +94,10 @@ export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: R
  *
  * The acquisition scan already refuses to LOCK a pilot inside (0,0), but a lock
  * taken outside it was never released, so a Cybertron that had claimed you
- * followed you onto the hub and shadowed you there. It cannot fire — canon's one
- * neutral test is the hunter's own position, GECYBS.C:251 — so it sat on top of
- * you, drifting out a sector and hyperwarping back in. Found in production as a
+ * followed you onto the hub and shadowed you there. It cannot fire, because
+ * canon's one neutral test is the hunter's own position,
+ * GECYBS.C:251 `if (!neutral(&ptr->coord)`
+ * so it sat on top of you, drifting out a sector and hyperwarping back in. Found in production as a
  * Sarten Obliterator holding station at (0.69, 0.53) with a live claim.
  *
  * Releasing the claim is not enough on its own. The speed the ship is holding is
@@ -103,7 +106,7 @@ export function releaseTargetCloaked(ai: CybClaimState, topSpeed: number, rng: R
  * and far too slow to get anywhere: Cybrg-205 at (0.54, 0.29), claim cleared,
  * `speed2b` 284, after v0.27.5. So this also applies canon's idle re-roll:
  *
- *   GECYBS.C:473 `ptr->speed2b = rndm(d_topspeed); /* change the direction *\/`
+ *   GECYBS.C:473 `ptr->speed2b = rndm(d_topspeed);`
  *   GECYBS.C:474 `ptr->head2b = rndm(359.9);`
  *
  * One re-roll, held until the next `idleCadence` — not the per-activation
@@ -119,9 +122,8 @@ export function releaseZoneEntry(ai: CybClaimState, topSpeed: number, rng: Rando
 /**
  * A Cyberquad's "lucky day": it breaks off and runs at top speed. The caller
  * still evaluates fire on this pass, as canon falls through.
- * @see GECYBS.C:259-261
- *   `ptr->cybmine = (byte)255; /* take a break *\/`
- *   `ptr->speed2b = d_topspeed;`
+ * @see GECYBS.C:259 `ptr->cybmine = (byte)255;`
+ * @see GECYBS.C:261 `ptr->speed2b = d_topspeed;`
  */
 export function releaseBreakOff(ai: CybClaimState, topSpeed: number): void {
   ai.cybmine = CYBMINE_NONE;
@@ -151,7 +153,7 @@ export function releaseNoTarget(ai: CybClaimState): void {
  * The claim names nobody the port can find. Canon's version is a claim on a
  * number past the terminal range; the port reaches it when the claimed channel
  * no longer resolves to an active pilot. The claim only.
- * @see GECYBS.C:678-681 `if (zothusn >= nterms) ptr->cybmine = (byte)255;`
+ * @see GECYBS.C:678 `if (zothusn >= nterms)`
  */
 export function releaseStale(ai: CybClaimState): void {
   ai.cybmine = CYBMINE_NONE;
@@ -160,8 +162,9 @@ export function releaseStale(ai: CybClaimState): void {
 /**
  * PORT-ORIGINAL: another ship killed the pilot this AI had claimed.
  *
- * Canon's `killem` calls only the KILLER's `won_func` (GEFUNCS.C:1110-1113) and
- * leaves every other claim to lapse on its holder's next activation, through
+ * Canon's `killem` calls only the KILLER's `won_func`,
+ *   GEFUNCS.C:1113 `shipclass[wptr->shpclass].won_func(wptr,who,ptr);`
+ * and leaves every other claim to lapse on its holder's next activation, through
  * the target-left branch. The port releases them at the kill, so they cannot
  * re-engage the pilot the moment they respawn. The claim only.
  */
@@ -177,7 +180,7 @@ export function releaseDeadTarget(ai: CybClaimState): void {
  * on the next activation, which assigns a RANDOM speed — so a Cybertron that had
  * just killed someone might tear off at top speed instead of easing off.
  * Invisible from the cockpit: you are dead at the moment it happens.
- * @see GECYBS.C:810-820 cyb_won
+ * @see GECYBS.C:810 `cyb_won(ptr,usrn,wptr)`
  */
 export function releaseWon(ai: CybClaimState): void {
   ai.cybmine = CYBMINE_NONE;
@@ -188,7 +191,7 @@ export function releaseWon(ai: CybClaimState): void {
 /**
  * The idle wander: every 100-200 activations an unclaimed Cybertron picks a new
  * course. A claimed one keeps the course its pursuit band set.
- * @see GECYBS.C:455-476 db_update
+ * @see GECYBS.C:455 `db_update(ptr,usrn)`
  */
 export function idleCadence(ai: CybClaimState, topSpeed: number, rng: Random): void {
   if (ai.cybupdate > 1) {
@@ -227,9 +230,11 @@ export function idleCadence(ai: CybClaimState, topSpeed: number, rng: Random): v
  *   GECYBS.C:134 `ptr->speed2b = (double)(ptr->topspeed)*500.0;`
  *   GECYBS.C:136 `ptr->holdcourse = 0;`
  *
- * Not written, deliberately and as recorded in DECISIONS: canon's `phasr`
- * (GECYBS.C:132), and `cybupdate` / `tick` (:135, :137), which are randomised
- * while the repository takes no `Random` port.
+ * Not written, deliberately and as recorded in DECISIONS, canon's
+ *   GECYBS.C:132 `ptr->phasr = 100;`
+ *   GECYBS.C:135 `ptr->cybupdate = 100 + gernd()%20;`
+ *   GECYBS.C:137 `ptr->tick = CYBTICKTIME + gernd()%(CYBTICKTIME*5);`
+ * — the last two are randomised and the repository takes no `Random` port.
  * @see docs/DECISIONS.md 2026-09-20 — a persisted `cybmine` named a channel
  */
 export function hydrate(ai: CybClaimState & { status: number; topspeed: number }): void {

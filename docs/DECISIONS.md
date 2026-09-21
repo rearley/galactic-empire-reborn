@@ -7006,3 +7006,60 @@ for one sentence, and it could not be re-worded by the player. Expanding in the
 f-key layer: would have worked only for bound lines and would have pulled a
 ship lookup into the router. A general `%x` template language: unbounded surface
 on the one input players type freely.
+
+## 2026-09-21 — A Cybertron's claim changes only through a named transition
+
+**Context.** The 2026-09-20 entry on the hydrate cruise-speed guard wrote down a
+rule: canon writing fields together describes one state transition, and a
+subset leaves it half-transitioned. Four defects that day (v0.27.4-v0.27.8) were
+each a claim that changed without its companions. A rule in a document did not
+stop the fourth, and nothing would have stopped a fifth. Filed as #59 under the
+AI-layer review #58.
+
+**Decision.** `src/game/cybertron/cyb-transitions.ts` holds one function per
+claim transition. Each writes that transition's complete field set, in the
+`Random` draw order the old call site used, with the canon lines quoted on the
+function. `test/invariants/cyb-claim-writes.spec.ts` fails on any assignment to
+`cybmine` or `cybupdate` anywhere else in `src/`.
+
+| Function | Canon | Writes |
+|---|---|---|
+| `provoke` | GECMDS.C:980-981, 1071-1072, 1373-1374 | `cybmine`, AI ships only |
+| `acquire` | GECYBS.C:740 | `cybmine` |
+| `releaseTargetLeft` | GECYBS.C:684-688 | `cybmine`, `speed2b` |
+| `releaseTargetCloaked` | GECYBS.C:692-704 | `holdcourse`, `speed2b`, 1-in-10 `cybmine` |
+| `releaseZoneEntry` | PORT-ORIGINAL, re-roll from GECYBS.C:473-474 | `cybmine`, `speed2b`, `head2b` |
+| `releaseBreakOff` | GECYBS.C:259-261 | `cybmine`, `speed2b` |
+| `releaseNoTarget` | GECYBS.C:735-736 | `tick`, `cybmine` |
+| `releaseStale` | GECYBS.C:678-681 | `cybmine` |
+| `releaseDeadTarget` | PORT-ORIGINAL | `cybmine` |
+| `releaseWon` | GECYBS.C:810-820 `cyb_won` | `cybmine`, `speed2b`, `cybupdate` |
+| `idleCadence` | GECYBS.C:455-476 `db_update` | `cybupdate`; unclaimed: `speed2b`, `head2b` |
+| `hydrate` | GECYBS.C:131-137 | `status`, `cybmine`, `holdcourse`, `speed2b` |
+
+**Reason.** The defect class is structural: the transitions were spread across
+a dozen sites, and each site had to remember the whole field set. With the set
+in one place, each canon block is read once, in one file, beside its quotation.
+
+**Zero gameplay change, and how that was checked.** Every function body moved
+verbatim. The 343 game and invariant test files passed unmodified, except for
+import paths and one test helper that had called the deleted private
+`cybUpdateDb`.
+
+**Newly labelled port-original.** Researching the call sites turned up
+`releaseDeadTarget`, the kill-time sweep in `combat-tick.service.ts`. It
+releases EVERY Cybertron's claim on a pilot who dies. It cited `GEFUNCS.C:killem`,
+but canon's `killem` calls only the KILLER's `won_func` (GEFUNCS.C:1110-1113) and
+lets other claims lapse on their holders' next activation. Kept, and now
+labelled as ours.
+
+**Deliberately out of scope.** The jammed drift, `cybCheckDamage` and the
+`cyb_attack` evasion tail write only steering (`speed2b` / `head2b` /
+`holdcourse`) and never the claim, so they cannot cause this defect class. They
+stay in the tick. `hydrate` still omits canon's `phasr`, `cybupdate` and `tick`,
+for the reasons in the 2026-09-20 hydrate entry.
+
+**What it makes cheap.** #55 (a torpedo or missile lock should provoke an AI,
+GECMDS.C:1373-1374) is now one `provoke()` call. A distress call, or any future
+reason to drop a claim, becomes a new function in this file rather than a new
+assignment in the tick.

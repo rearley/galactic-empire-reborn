@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 178 entries.
+Append-only, **newest at the bottom**. 179 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-21 — a claim changes in one place now](#session-2026-09-21--a-claim-changes-in-one-place-now)
 - [2026-09-20 — the help the game itself gives](#session-2026-09-20-ninth-pass--the-help-the-game-itself-gives)
 - [2026-09-20 — %t, the locked ship's name in a message](#session-2026-09-20-eighth-pass--t-the-locked-ships-name-in-a-message)
 - [2026-09-20 — killing the Obliterator now means something](#session-2026-09-20-seventh-pass--killing-the-obliterator-now-means-something)
@@ -8365,3 +8366,56 @@ and the command's own help page.
 **Tests:** `test/unit/help-port-addenda.spec.ts`, 5 new — including one that
 asserts `hel tra` and `hel transfer` give the same answer, which was the
 failing one. backend 694 suites / 6,789. v0.30.1.
+
+## Session 2026-09-21 — a claim changes in one place now
+
+**Asked by the owner:** a thinking session on what I would change about the AI
+if I were doing it again, then "create what you would change as issues … and
+then start knocking out 1." He also said: "we did this major review of the code once
+and this was what I hoped we would have done. in some cases it keeps the
+intent but makes the code better."
+
+**Filed:** #58, the AI-layer review, with six sub-issues linked under it: #59
+state transitions, #60 per-AI decision trace, #61 long-run headless simulation,
+#62 scheduler / brain / actuator split with one actuator for both AI kinds, #63
+port-original rules as named overlays, and #64 an investigation into whether a
+channel-keyed claim can alias a new pilot after logout. That one may be canon,
+since canon keys claims by line number too.
+
+**Completed: #59.** `cyb-transitions.ts` now holds every change to a
+Cybertron's claim, one function per canon transition. Each writes that
+transition's complete field set in the old draw order. Sixteen direct writes
+of `cybmine` / `cybupdate` across four files became calls, and `cyb-won.ts` was absorbed.
+`test/invariants/cyb-claim-writes.spec.ts` fails on a write anywhere else, and
+was seen to fail on a planted one. Table and reasoning are in DECISIONS
+2026-09-21.
+
+**Zero gameplay change.** No test assertion changed. One helper in
+`cyb-tick-lifecycle.spec.ts` had reached into the deleted private `cybUpdateDb`,
+and now calls `idleCadence` with the service's own `Random`.
+
+**Found while mapping call sites:**
+- The kill-time sweep that releases every Cybertron's claim on a dead pilot
+  cited `killem`, but canon releases only the killer's claim
+  (GEFUNCS.C:1110-1113). It is kept, and now labelled port-original.
+- The plan had recorded a "double provoke" in `phaser.handler.ts`. That was
+  wrong: two separate `sed` ranges printed back to back looked like one block.
+  The first edit therefore deleted the regular phaser's only retaliation write.
+  It was caught by re-grepping the file before any test run, then reverted and
+  redone in place. Worth knowing when a refactor's premise comes from
+  concatenated excerpts.
+- `wasAcquired` in the acquisition branch is always true, because it is
+  computed inside `if (ship.cybmine === 255)`. Harmless, and left for #62.
+
+**Citations.** Every canon line cited in `cyb-transitions.ts` carries its quote.
+The canon-citations ratchet rejected fourteen range-style citations such as
+`GECYBS.C:684-688`, because a quote must follow the line number directly. The
+unquoted count is now one below where this session started.
+
+**Tests:** 18 new in `cyb-transitions.spec.ts` (each transition's complete field
+set and its draw order), and 3 in `test/invariants/cyb-claim-writes.spec.ts`.
+backend 696 suites / 6,805, run on Node 24. On the Node 22 that the shell
+defaults to, `node-runtime-version.spec.ts` fails as designed. v0.30.2.
+
+**Next:** #60, the decision trace. Each named transition is now the natural
+place to log.
