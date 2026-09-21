@@ -93,6 +93,37 @@ describe('pickSpawnClass (T013)', () => {
   });
 });
 
+/**
+ * The v0.29.0 respawn hold, as the slot sees it. Before this the pick drew from
+ * every class under its cap, held or not, and `spawnOne` then refused a held
+ * one — so the whole three-minute slot went unused while another class sat
+ * short and ready. Found by the galaxy simulation (#61): 30 of 80 slots wasted
+ * in four hours of fighting. @see docs/DECISIONS.md 2026-09-21
+ */
+describe('pickSpawnClass skips classes inside their respawn hold', () => {
+  /** First draw decides the 1% branch; the second picks among the eligible. */
+  const draws = (...xs: number[]) => { let i = 0; return { next: () => xs[i++] }; };
+  const short21and24 = new Map([[21, 0], [22, 5], [23, 1], [24, 0], [25, 2]]);
+
+  it('never picks a held class while another short class is ready', () => {
+    for (const pick of [0, 0.3, 0.6, 0.99]) {
+      expect(pickSpawnClass(short21and24, CANON_CAPS, draws(0.5, pick), (n) => n === 21)).toBe(24);
+    }
+  });
+
+  it('returns null when every short class is held, rather than a pick spawnOne will refuse', () => {
+    expect(pickSpawnClass(short21and24, CANON_CAPS, draws(0.5, 0.5), (n) => n === 21 || n === 24)).toBeNull();
+  });
+
+  it('leaves canon\'s 1% any-class branch alone: spawnOne still enforces the hold there', () => {
+    expect(pickSpawnClass(short21and24, CANON_CAPS, draws(0.001, 0), (n) => n === 21)).toBe(21);
+  });
+
+  it('with no hold predicate, behaves exactly as before', () => {
+    expect(pickSpawnClass(short21and24, CANON_CAPS, draws(0.5, 0))).toBe(21);
+  });
+});
+
 describe('randomInitLoadout (T013)', () => {
   it('loadout ranges are [0, N) per C source', () => {
     for (let seed = 0; seed < 100; seed++) {

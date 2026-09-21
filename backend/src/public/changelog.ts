@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.1',
+    date: '2026-09-21',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'After a heavy fight the galaxy now restocks its Cybertrons at the pace it was meant to. Killing one class used to slow the return of every other class too: the restock would keep choosing the class you had just killed, find it still in its hold, and do nothing that round. Only the hull you killed waits out its hold now; the rest come back on the normal schedule.',
+      },
+    ],
+  },
+  {
     version: '0.30.1',
     date: '2026-09-20',
     entries: [

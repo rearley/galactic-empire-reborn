@@ -7114,3 +7114,32 @@ line follows them, marked "(this port)", from `SYS_PORT_HELP_LINES`.
   kinds one actuator.
 
 Sysop-only, so there is nothing for `GUIDE_DEVIATIONS`.
+
+## 2026-09-21 — The respawn hold wasted spawn slots; the pick now skips held classes
+
+**Context.** The galaxy simulation (#61) found this in its first combat
+scenario. Three pilots fought back for four simulated hours. On seed 1, 30 of
+80 spawn slots spawned nothing while a class was short and past its hold. The
+galaxy ran at about half its nine hulls for hours.
+
+**Cause.** The v0.29.0 hold ("Cybertron rarity is re-expressed as respawn time",
+2026-09-20) is enforced in `spawnOne`. `pickSpawnClass` chose at random among
+every class under its cap, held or not. When it chose a held class, `spawnOne`
+refused, and the whole three-minute slot went unused. So one held class slowed
+the refill of every other class. Nobody chose that.
+
+**Decision.** `pickSpawnClass` takes an `isHeld` predicate and leaves held
+classes out of the normal pick. `CybertronTickService.isHeld` is the one test
+that both the pick and `spawnOne` apply. Canon's 1% any-class branch is
+unchanged; `spawnOne` still enforces the hold on it.
+
+**Reason.** v0.29.0's stated intent was that a killed class is slow to return
+and nothing respawns faster than before. It said nothing about slowing other
+classes, and before v0.29.0 every slot with a short class spawned something.
+This restores that for classes that are not held. Held classes wait exactly as
+long as they did.
+
+**Verified both ways.** The fight-back scenario asserts at most 3% of slots
+wasted (the 1% branch's allowance). It passes on seeds 1, 2 and 3. With the
+predicate removed from the tick, it fails on all three: at t=720s nothing
+spawned while class 24 or class 21 was ready.

@@ -1282,6 +1282,19 @@ export class CybertronTickService implements OnModuleInit {
   }
 
   /**
+   * Whether a class is inside its v0.29.0 respawn hold. Clears an expired hold
+   * as it goes. The one test both the slot's pick and `spawnOne` apply, so they
+   * cannot disagree about which classes may spawn. @see cyb-population.ts
+   */
+  private isHeld(classNumber: number): boolean {
+    const notBefore = this.respawnNotBefore.get(classNumber);
+    if (notBefore === undefined) return false;
+    if (Date.now() < notBefore) return true;
+    this.respawnNotBefore.delete(classNumber);
+    return false;
+  }
+
+  /**
    * Per-slot spawn entry point: pick a class (1-in-30 tick cadence) and spawn one ship.
    * One ship per slot — behavior unchanged from original game loop.
    * @see GEMAIN.C outer loop (R-2); GECYBS.C cyb_init spawn cadence
@@ -1295,7 +1308,7 @@ export class CybertronTickService implements OnModuleInit {
         classCounts.set(cls, (classCounts.get(cls) ?? 0) + 1);
       }
 
-      const chosenClass = pickSpawnClass(classCounts, this.classConfigs, this.random);
+      const chosenClass = pickSpawnClass(classCounts, this.classConfigs, this.random, (n) => this.isHeld(n));
       if (chosenClass === null) return;
 
       await this.spawnOne(chosenClass, ctx);
@@ -1323,11 +1336,7 @@ export class CybertronTickService implements OnModuleInit {
     // the single funnel every spawn passes through — including `pickSpawnClass`'s
     // 1% branch, which ignores population entirely and would otherwise hand back
     // an Obliterator minutes after one died.
-    const notBefore = this.respawnNotBefore.get(classNumber);
-    if (notBefore !== undefined) {
-      if (Date.now() < notBefore) return false;
-      this.respawnNotBefore.delete(classNumber);
-    }
+    if (this.isHeld(classNumber)) return false;
     const aiShips = this.shipState.findAllShips().filter((s) => s.status === 2);
     const currentCount = aiShips.filter((s) => s.shpclass === classNumber).length;
     if (currentCount >= config.tot_to_create) return false;

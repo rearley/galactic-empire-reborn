@@ -243,6 +243,15 @@ export function pickSpawnClass(
   classCounts: Map<number, number>,
   configs: Record<number, CybertronClassConfig>,
   rand: Random,
+  /**
+   * PORT-ORIGINAL: classes inside their v0.29.0 respawn hold. They are skipped
+   * by the normal pick, so a slot goes to a class that can actually spawn —
+   * without this, a held pick was refused by `spawnOne` and the whole slot went
+   * unused while another class sat short and ready. The 1% branch below is
+   * canon's and is left alone; `spawnOne` still enforces the hold on it.
+   * @see docs/DECISIONS.md 2026-09-21 — the respawn hold wasted spawn slots
+   */
+  isHeld: (classNumber: number) => boolean = () => false,
 ): number | null {
   const classNumbers = Object.keys(configs).map(Number);
   // 1% random-class branch (regardless of fill state)
@@ -250,7 +259,7 @@ export function pickSpawnClass(
     return classNumbers[Math.floor(rand.next() * classNumbers.length)];
   }
   // Normal: pick from classes below their population cap
-  const eligible = classNumbers.filter((n) => (classCounts.get(n) ?? 0) < configs[n].tot_to_create);
+  const eligible = classNumbers.filter((n) => (classCounts.get(n) ?? 0) < configs[n].tot_to_create && !isHeld(n));
   if (eligible.length === 0) return null;
   return eligible[Math.floor(rand.next() * eligible.length)];
 }
