@@ -98,7 +98,7 @@ function harness(rand: Random, ships: ShipState[]) {
 
 function attack(cyb: ShipState, target: ShipState, ddistRaw: number, ships: ShipState[]): void {
   const { svc } = harness(firingRandom(), ships);
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;
   }).cybAttack(cyb, target, 0, ddistRaw, { firedAt: new Date() });
 }

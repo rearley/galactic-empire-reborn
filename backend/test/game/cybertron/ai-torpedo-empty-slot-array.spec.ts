@@ -109,7 +109,7 @@ describe('AI torpedoes reach a target whose ltorps arrays are empty (GECMDS.C:11
       scriptedRandom(),
     );
 
-    (svc as unknown as {
+    ((svc as unknown as { brain: unknown }).brain as {
       cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;
     }).cybAttack(cyb, player, 0, 1000, { firedAt: new Date() });
 

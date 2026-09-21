@@ -183,13 +183,13 @@ function harness(ships: ShipState[], rand: Random): Harness {
 }
 
 function scan(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     runEngagementScan: (s: ShipState, top: number, c: TickContext) => void;
   }).runEngagementScan(ship, TOP_SPEED, CTX);
 }
 
 function lockon(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     cybCheckLockon: (s: ShipState, top: number, c: TickContext) => void;
   }).cybCheckLockon(ship, TOP_SPEED, CTX);
 }

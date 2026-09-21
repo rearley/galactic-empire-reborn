@@ -137,6 +137,22 @@ export class CybTraceService {
   }
 }
 
+/**
+ * Apply a claim transition, recording it in the ship's trace when there is one.
+ * The transition runs either way. One definition for every AI piece that
+ * changes a claim — the brain, the scheduler and the weapons.
+ */
+export function tracedTransition(
+  trace: CybTraceService | undefined,
+  ship: CybClaimState & { userid: string; shipno: number },
+  event: string,
+  apply: () => void,
+  detail?: string,
+): void {
+  if (trace) trace.transition(`${ship.userid}:${ship.shipno}`, ship, event, apply, detail);
+  else apply();
+}
+
 /** What one target scan saw. @see GECYBS.C:709 `if (ptr->cybmine == (byte)255)` */
 export interface CybScanTally {
   /** Active pilots looked at. */

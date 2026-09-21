@@ -107,7 +107,7 @@ function buildHarness() {
   const fire = (a: ShipState, t: ShipState) =>
     (svc as unknown as { weapons: AiWeapons }).weapons.firep(a, t, ctx as never);
   const attack = (a: ShipState, t: ShipState, ddist: number) =>
-    (svc as unknown as {
+    ((svc as unknown as { brain: unknown }).brain as {
       cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;
     }).cybAttack(a, t, 0, ddist, ctx);
 

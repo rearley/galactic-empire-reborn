@@ -75,8 +75,9 @@ describe('both AI fire paths are gated', () => {
    * The BEHAVIOUR is pinned in test/game/cybertron/ai-fire-arc.spec.ts.
    */
   it('Cybertrons go through the shared firep selection', () => {
+    // Their weapons moved out of the tick into AiWeapons for #62.
     const text = readFileSync(
-      resolve(__dirname, '../../..', 'src/game/cybertron/cybertron-tick.service.ts'), 'utf8');
+      resolve(__dirname, '../../..', 'src/game/cybertron/ai-weapons.ts'), 'utf8');
     expect(text).toMatch(/(?<![\w$])selectPhaserVictims\s*\(/);
   });
 

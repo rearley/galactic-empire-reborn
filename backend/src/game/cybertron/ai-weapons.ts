@@ -45,10 +45,14 @@ export interface AiWeaponsDeps {
  * The weapons an AI fires — canon's own player functions, which is what both AI
  * kinds call:
  *
- *   firep    GECYBS.C:519 `firep(ptr,usrn);`, GEDROIDS.C:366
- *   firehp   GECYBS.C:278 `firehp(ptr,usrn);`, GEDROIDS.C:354
- *   torp     GECYBS.C:538 `torp(ptr,usrn,zothusn);`, GEDROIDS.C:482
- *   laymine  GECYBS.C:315 `laymine(ptr,usrn,10);`, GEDROIDS.C:512
+ *   firep    GECYBS.C:519 `firep(ptr,usrn);`
+ *            GEDROIDS.C:366 `firep(ptr,usrn);`
+ *   firehp   GECYBS.C:278 `firehp(ptr,usrn);`
+ *            GEDROIDS.C:354 `firehp(ptr,usrn);`
+ *   torp     GECYBS.C:538 `torp(ptr,usrn,zothusn);`
+ *            GEDROIDS.C:482 `torp(ptr,usrn,zothusn);`
+ *   laymine  GECYBS.C:315 `laymine(ptr,usrn,10);`
+ *            GEDROIDS.C:512 `laymine(ptr,usrn,10);`
  *   zip      the zipper sweep, handed the round it fires (GECYBS.C, cyb_attack)
  *
  * The actuator half of the AI: the brain decides, this fires. It holds no state,

@@ -100,7 +100,8 @@ describe('userKills is hydrated everywhere teamcode is', () => {
   });
 
   it('the escalation gates read it rather than the hull count', () => {
-    const text = src('src/game/cybertron/cybertron-tick.service.ts');
+    // The gates moved with `cyb_lives` into the brain. @see issue #62
+    const text = src('src/game/cybertron/cybertron-brain.ts');
     expect(text).not.toMatch(/\btarget\.kills\b/);
     expect(text).toMatch(/escalationKills\(target\)/);
   });

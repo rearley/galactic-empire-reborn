@@ -437,19 +437,19 @@ function cybHarness(
 }
 
 function scan(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     runEngagementScan: (s: ShipState, top: number, c: TickContext) => void;
   }).runEngagementScan(ship, CYB_TOP_SPEED, CYB_CTX);
 }
 
 function lockon(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     cybCheckLockon: (s: ShipState, top: number, c: TickContext) => void;
   }).cybCheckLockon(ship, CYB_TOP_SPEED, CYB_CTX);
 }
 
 function lives(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     cybLives: (s: ShipState, c: TickContext) => void;
   }).cybLives(ship, CYB_CTX);
 }

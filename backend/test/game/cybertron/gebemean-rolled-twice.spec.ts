@@ -112,7 +112,7 @@ describe('gebemean is rolled once per WEAPON (GECYBS.C:514, :527)', () => {
     const player = makeShip({ userid: 'p1', shipno: 1, xcoord: 5.1, ycoord: 5 });
 
     const svc = harness(rand, [cyb, player]);
-    (svc as unknown as {
+    ((svc as unknown as { brain: unknown }).brain as {
       cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;
     }).cybAttack(cyb, player, 0, 1000, { firedAt: new Date() });
 
@@ -131,7 +131,7 @@ describe('gebemean is rolled once per WEAPON (GECYBS.C:514, :527)', () => {
     const player = makeShip({ userid: 'p1', shipno: 1, xcoord: 5.1, ycoord: 5 });
 
     const svc = harness(rand, [cyb, player]);
-    (svc as unknown as {
+    ((svc as unknown as { brain: unknown }).brain as {
       cybAttack: (s: ShipState, t: ShipState, tough: number, d: number, c: unknown) => void;
     }).cybAttack(cyb, player, 0, 1000, { firedAt: new Date() });
 

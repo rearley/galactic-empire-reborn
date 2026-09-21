@@ -242,7 +242,7 @@ function harness(ships: ShipState[], rand: Random): Harness {
 
 /** The whole per-activation body, exactly as the 1s AI tick calls it. */
 function lives(svc: CybertronTickService, ship: ShipState): void {
-  (svc as unknown as {
+  ((svc as unknown as { brain: unknown }).brain as {
     cybLives: (s: ShipState, c: TickContext) => void;
   }).cybLives(ship, CTX);
 }
