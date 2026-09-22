@@ -17,7 +17,6 @@ import {
   CYB_BREAKOFF,
   PMINFIRE,
   MAXTORPS,
-  TORFACT,
   CYB_BE_NICE,
   CYB_BE_EASY,
   CYBSLO,
@@ -32,7 +31,6 @@ import type { ShipState } from '../ship/ship-state.types';
 import { shipKey } from '../ship/ship-state.types';
 import {
   cdistance,
-  torpedoLockSucceeds,
 } from '../combat/combat-math';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import {
@@ -382,8 +380,11 @@ export class CybertronBrain {
     // hard zero, and the firer's own speed drives the term negative above
     // roughly warp 3.5. The port used to skip this entirely, which let an
     // Obliterator at warp 14 volley a Dreadnought to death.
+    // `lockon` runs only when a volley was rolled (`for (i=0;i<j;++i)`), and
+    // brings canon's tail with it: the target is warned and both are pinned,
+    // won or lost. @see AiWeapons.lockon
     // @see GECYBS.C:538 -> GECMDS.C:1188 torp -> lockon
-    const canLock = torpedoLockSucceeds(ship.speed, target.speed, ddist / 10_000, TORFACT);
+    const canLock = torpCount > 0 && this.weapons.lockon(ship, target, ddist);
     for (let i = 0; canLock && i < torpCount && i < MAXTORPS; i++) {
       // Refill one torp slot before launching (@see GECYBS.C:534)
       if (Number(ship.items[I_TORP]) < 1) {

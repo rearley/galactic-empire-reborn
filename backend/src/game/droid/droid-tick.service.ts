@@ -35,7 +35,6 @@ import {
   GESTAT_USER,
   PMINFIRE,
   JAMTIME,
-  TORFACT,
 } from '../constants';
 import { I_TORP, I_MINE, I_JAMMER } from '../constants/items';
 import { buildDroidConfig } from './droid.config';
@@ -54,7 +53,6 @@ import {
   COMBAT_SHIP_DESTROYED,
   CombatShipDestroyedEvent,
 } from '../combat/combat-events';
-import { torpedoLockSucceeds } from '../combat/combat-math';
 import { CombatTickService } from '../combat/combat-tick.service';
 import { AiWeapons } from '../ai/ai-weapons';
 
@@ -385,8 +383,10 @@ export class DroidTickService implements OnModuleInit {
       // GEDROIDS.C:482 calls `torp()`, and `torp()` opens with `lockon()` —
       // a Droid is bound by the same lock arithmetic as a player. A target at
       // warp is a hard zero; the firer's own speed kills the term above
-      // roughly warp 3.5. @see GECMDS.C:1378-1395
-      const canLock = torpedoLockSucceeds(droid.speed, fb.target.speed, fb.ddist / 10_000, TORFACT);
+      // roughly warp 3.5. `lockon` also warns the target and pins both ships,
+      // whichever way it goes: GECMDS.C:1419 `wptr->cantexit = FIRETICKS;`
+      // @see AiWeapons.lockon
+      const canLock = fb.torpCount > 0 && this.weapons.lockon(droid, fb.target, fb.ddist);
       for (let i = 0; canLock && i < fb.torpCount; i++) {
         // Replenish before fire @see GEDROIDS.C:480
         droid.items = [...droid.items] as typeof droid.items;

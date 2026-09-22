@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-22 — an AI torpedo lock now warns its target](#session-2026-09-22--an-ai-torpedo-lock-now-warns-its-target)
 - [2026-09-21 — #42 reproduced: mines went off after missiles](#session-2026-09-21-late-night-2--42-reproduced-mines-went-off-after-missiles)
 - [2026-09-21 — the suite runs in a third of the time](#session-2026-09-21-late-night--the-suite-runs-in-a-third-of-the-time)
 - [2026-09-21 — locks provoke, the Cyberquad closes, and a lead on #42](#session-2026-09-21-night--locks-provoke-the-cyberquad-closes-and-a-lead-on-42)
@@ -8748,3 +8749,59 @@ channel fix removed only the `attacker=none` form of the bug; the ordering half
 was still live.
 
 **Tests:** 1 reproduction in `kill-attribution.spec.ts`. Backend 712 suites / 6,948, all green; lint clean.
+
+## Session 2026-09-22 — an AI torpedo lock now warns its target
+
+**Completed (v0.31.9).** A player reported that a Cyberquad at warp 10 fired
+torpedoes at them and killed them. What prod showed:
+- The kill (9:07 PM, Star Cruiser `Hornet`, sector (0,10)) was `cause=phaser`.
+  Canon puts no speed gate on the firer's phaser.
+- Prod was on current HEAD, so the AI torpedo lock gate from 2026-09-09 was
+  live. On that path a Quad at warp 10 cannot lock.
+- Nothing on prod recorded AI torpedo launches, so the report could not be
+  checked either way.
+
+The investigation found one real canon gap. Canon's `lockon` (GECMDS.C:1339)
+always runs its tail, lock or no lock: LOCK2/LOCK4 to the target, and
+`cantexit = FIRETICKS` on both ships. The player's `tor` did this through
+`applyLockOutcome`. Both AI brains computed only the arithmetic, so a
+Cybertron or Droid that painted a pilot, or tried to, said nothing and pinned
+nobody.
+
+`AiWeapons.lockon` is now the one AI entry point. It does four things:
+- canon's two early refusals, fire control broken and target in the neutral
+  zone, with no tail
+- the lock arithmetic
+- the shared `applyLockOutcome`
+- a log line, `ai torpedo lock: ...`, with both speeds, the range, `fact` and
+  the verdict
+
+The log is diagnostic only. It runs once per volley, which is canon's
+`lockwarn` behaviour, so the next "torpedoes at warp" report can be checked
+against numbers.
+
+Canon's jammer test in `lockon` reads `warsptr`, the global current-user ship,
+not the firer. It has no defined meaning for an AI caller and is not
+reproduced.
+
+**Tests:**
+- `ai-torpedo-lock-outcome.spec.ts`: 7 cases, covering failed and successful
+  locks, no volley, the neutral zone, fire control, and the log line.
+- 2 new Droid cases in `droid-torpedo-lock-gate.spec.ts`.
+- The canon-rules galaxy sim caught the missing neutral-zone refusal.
+- Droid torpedo fixtures moved from the hub (sector 0,0) to (10,10), where
+  canon allows a lock at all.
+- `droid-tick-final.spec.ts` now expects the victim battle-locked, by the
+  torpedo's lock rather than the zero-damage graze.
+- Backend 713 files: all green except the Node-major check, which fails only
+  because the local runtime is Node 22 and CI pins 24. Lint clean.
+
+**Next:** watch `docker logs ge-backend | grep 'ai torpedo lock'` the next
+time a torpedo-at-warp report comes in.
+
+**Known issues:** canon prints TFIRE2, the "Incoming torpedo" warning, on
+EVERY tube: it is not gated by `lockwarn` (GECMDS.C:1198). The port announces
+only the first tube of a volley, per DECISIONS 2026-09-06, which read
+`lockwarn` as gating the launch message. Not changed here. Raise it before
+touching it.
+

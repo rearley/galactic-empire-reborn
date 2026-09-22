@@ -35,8 +35,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { ShipState } from '../../../src/game/ship/ship-state.types';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import {
-  DROID_CLASS_VAKORY, DROID_USERID_PREFIX, GESTAT_USER, PMINFIRE,
+  DROID_CLASS_VAKORY, DROID_USERID_PREFIX, FIRETICKS, GESTAT_USER, PMINFIRE,
 } from '../../../src/game/constants';
+import { COMBAT_TARGET_WARNING } from '../../../src/game/combat/combat-events';
 
 function makeShip(over: Partial<ShipState> = {}): ShipState {
   return baseMakeShip({
@@ -90,6 +91,10 @@ function buildHarness(droidSpeed: number, target: ShipState) {
     userid: `${DROID_USERID_PREFIX}1`, shipno: 1, shipname: 'Vakory',
     shpclass: DROID_CLASS_VAKORY, status: 2, isEphemeral: true,
     speed: droidSpeed, phasr: PMINFIRE, damage: 0,
+    // Sector (10,10), off the hub: canon's lockon refuses a target in the
+    // neutral zone first, GECMDS.C:1363 `if  (neutral(&(wptr->coord)))`.
+    // Every target below sits at the same offset, so the ranges are unchanged.
+    xcoord: 10, ycoord: 10,
     // Fight-back needs BOTH: `cantexit > 0 && lastfired > 0` (GEDROIDS.C:443).
     // cantexit is the battle lock set when something fires on you.
     cantexit: 5, lastfired: target.channel ?? 2, channel: 1,
@@ -129,7 +134,7 @@ function buildHarness(droidSpeed: number, target: ShipState) {
     { create: vi.fn().mockResolvedValue({ id: 1 }) } as unknown as MineRepository,
     events, rand,
   );
-  return { svc, droid, target };
+  return { svc, droid, target, events };
 }
 
 /** Torpedoes queued onto the victim by the Droid. */
@@ -145,7 +150,7 @@ function act(svc: DroidTickService, droid: ShipState, players: ShipState[]): voi
 
 describe('a Droid torpedo passes the lock check the player command uses', () => {
   it('fires when both ships are slow and close — the baseline that must keep working', () => {
-    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0 });
+    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10 });
     const { svc, droid } = buildHarness(0, target);
     act(svc, droid, [target]);
     expect(torpedoesOn(target)).toBeGreaterThan(0);
@@ -153,7 +158,7 @@ describe('a Droid torpedo passes the lock check the player command uses', () => 
 
   it('does NOT fire while the Droid itself is at warp', () => {
     // Speed term alone: 1.2 - 14030/5000 = -1.61. No distance rescues it.
-    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0 });
+    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10 });
     const { svc, droid } = buildHarness(14_030, target);
     act(svc, droid, [target]);
     expect(torpedoesOn(target)).toBe(0);
@@ -163,7 +168,7 @@ describe('a Droid torpedo passes the lock check the player command uses', () => 
     // `if (wptr->speed > 999) fact = 0` — a hard zero on the TARGET's speed,
     // whatever the firer is doing. This is why canon's help says keep moving.
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0, speed: 1_000,
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10, speed: 1_000,
     });
     const { svc, droid } = buildHarness(0, target);
     act(svc, droid, [target]);
@@ -173,9 +178,33 @@ describe('a Droid torpedo passes the lock check the player command uses', () => 
   it('does NOT fire from beyond the lock envelope even at a dead stop', () => {
     // A stationary firer reaches 2.67 sectors. At 3.5 the factor is
     // 1.2 * ((5 - 3.5)/4) = 0.45, under the 0.7 threshold.
-    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 3.5, ycoord: 0 });
+    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 13.5, ycoord: 10 });
     const { svc, droid } = buildHarness(0, target);
     act(svc, droid, [target]);
     expect(torpedoesOn(target)).toBe(0);
+  });
+
+  it('warns its target of the lock attempt even when the lock fails — LOCK4', () => {
+    // Canon's lockon tells the target either way — LOCK2 on a lock, LOCK4 on a
+    // miss, GECMDS.C:1415 `prfmsg(LOCK4,shpltr(ship,usrn));` — once per volley,
+    // GEDROIDS.C:481 `if (i>0) lockwarn = FALSE;`. The AI path used to compute
+    // the lock and say nothing.
+    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10, cantexit: 0 });
+    const { svc, droid, events } = buildHarness(14_030, target);
+    const kinds: string[] = [];
+    events.on(COMBAT_TARGET_WARNING, (e: { kind: string }) => kinds.push(e.kind));
+    act(svc, droid, [target]);
+    expect(kinds.filter((k) => k.startsWith('lock-'))).toEqual(['lock-attempt']);
+    expect(target.cantexit).toBe(FIRETICKS);
+  });
+
+  it('warns its target of a successful lock before the launch — LOCK2', () => {
+    const target = makeShip({ userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10 });
+    const { svc, droid, events } = buildHarness(0, target);
+    const kinds: string[] = [];
+    events.on(COMBAT_TARGET_WARNING, (e: { kind: string }) => kinds.push(e.kind));
+    act(svc, droid, [target]);
+    expect(kinds.filter((k) => k === 'lock-acquired' || k === 'torpedo-launched'))
+      .toEqual(['lock-acquired', 'torpedo-launched']);
   });
 });

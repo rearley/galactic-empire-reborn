@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.9',
+    date: '2026-09-22',
+    entries: [
+      {
+        category: 'corrected-to-canon',
+        text: 'Cybertrons and droids now warn you when they try to lock torpedoes on you, as a pilot always has: "Ship X has a fire control scanner locked on us!" when the lock takes, and "Ship X is attempting to lock fire control scanners on us" when it does not. Either way it counts as combat for both ships, as in the original, so it interrupts a repair. They also no longer try to lock on to a ship in the neutral zone.',
+      },
+    ],
+  },
+  {
     version: '0.31.8',
     date: '2026-09-21',
     entries: [

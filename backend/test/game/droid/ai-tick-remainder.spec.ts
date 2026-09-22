@@ -214,7 +214,10 @@ function droidHarness(rand: Random, droidOver: Partial<ShipState>, target: ShipS
     userid: `${DROID_USERID_PREFIX}1`, shipno: 1, channel: 1, shipname: 'Vakory',
     shpclass: DROID_CLASS_VAKORY, status: GESTAT_AUTO,
     topspeed: 4, phasr: 0, phasrtype: 1, damage: 0,
-    xcoord: 0, ycoord: 0,
+    // Sector (10,10), off the hub: canon's lockon refuses a target in the
+    // neutral zone before anything else, GECMDS.C:1363 `if  (neutral(&(wptr->coord)))`,
+    // so a torpedo case staged at the origin would never reach its subject.
+    xcoord: 10, ycoord: 10,
     cantexit: 5, lastfired: target.channel ?? 2,
     ...droidOver,
   });
@@ -261,7 +264,7 @@ describe('the Vakory scrambles its attack vector mid-fight (GEDROIDS.C:491-494)'
 
   it('a landed roll rewrites speed, heading and hold-course together', () => {
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0,
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10,
     });
     const { svc, droid } = droidHarness(fixedRandom(DRAW), {
       speed2b: 4_000, head2b: 270, holdcourse: 0,
@@ -281,7 +284,7 @@ describe('the Vakory scrambles its attack vector mid-fight (GEDROIDS.C:491-494)'
     // new one. If the service applied `alterVector` unconditionally the three
     // assertions below would all move.
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0,
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10,
     });
     const { svc, droid } = droidHarness(fixedRandom(DRAW), {
       speed2b: 4_000, head2b: 270, holdcourse: 7,
@@ -309,7 +312,9 @@ describe('a Droid torpedo needs a free tube on the victim (GECMDS.C:1178-1184)',
 
   it('takes the LOWEST free tube, not the end of the array', () => {
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0,
+      // 0.125 off the droid, exact in binary: 10.1 - 10 is not 0.1 in floats,
+      // and this case floors the range.
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 10.125, ycoord: 10,
       ltorpsChannel: [7, 255, 9], ltorpsDistance: [1_000, 0, 2_000],
     });
     const { svc, droid } = droidHarness(fixedRandom(VOLLEY_DRAW), {}, target);
@@ -321,7 +326,7 @@ describe('a Droid torpedo needs a free tube on the victim (GECMDS.C:1178-1184)',
     expect(target.ltorpsChannel).toEqual([7, droid.channel, 9]);
     // The range, floored by canon's unsigned cast, plus 20:
     // GECMDS.C:1201 `wptr->ltorps[i].distance += 20;` (#65)
-    expect(target.ltorpsDistance[1]).toBe(Math.floor(0.1 * SECTOR) + 20);
+    expect(target.ltorpsDistance[1]).toBe(Math.floor(0.125 * SECTOR) + 20);
     expect(target.ltorpsDistance[0]).toBe(1_000);
     expect(target.ltorpsDistance[2]).toBe(2_000);
   });
@@ -330,7 +335,7 @@ describe('a Droid torpedo needs a free tube on the victim (GECMDS.C:1178-1184)',
     // A fourth simultaneous lock is a torpedo the pilot can never shake: there
     // is no fourth slot to clear it from. Canon prints TORFULL and returns.
     const target = makeShip({
-      userid: 'p1', shipno: 2, channel: 2, xcoord: 0.1, ycoord: 0,
+      userid: 'p1', shipno: 2, channel: 2, xcoord: 10.1, ycoord: 10,
       ltorpsChannel: [7, 8, 9], ltorpsDistance: [1_000, 2_000, 3_000],
     });
     const { svc, droid } = droidHarness(fixedRandom(VOLLEY_DRAW), {}, target);

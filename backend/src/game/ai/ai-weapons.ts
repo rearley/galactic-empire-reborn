@@ -4,7 +4,9 @@ import type { Random } from '../combat/random.port';
 import type { MineRegistry } from '../combat/mine.registry';
 import { MineRepository, MineRefusedError } from '../combat/mine.repository';
 import type { CombatTickService } from '../combat/combat-tick.service';
-import { cdistance, inScanRange, shieldhit } from '../combat/combat-math';
+import { cdistance, inScanRange, lockFact, LOCK_MIN_FACT, shieldhit } from '../combat/combat-math';
+import { applyLockOutcome } from '../combat/lock-outcome';
+import { isInNeutralZone } from '../combat/neutral-zone';
 import {
   COMBAT_PHASER_FIRED,
   COMBAT_HIT,
@@ -18,7 +20,7 @@ import { applyJam } from '../combat/jam';
 import { selectPhaserVictims } from '../combat/firep';
 import { selectHyperVictims } from '../combat/firehp';
 import { findFreeTorpSlot } from '../combat/projectile-slots';
-import { AI_MINE_TIMER, FIRETICKS, GESTAT_AUTO, HPFIRAMT, HPMINFIR, PMINFIRE, SHIELDDM } from '../constants';
+import { AI_MINE_TIMER, FIRETICKS, GESTAT_AUTO, HPFIRAMT, HPMINFIR, PMINFIRE, SHIELDDM, TORFACT } from '../constants';
 import { I_MINE, I_TORP } from '../constants/items';
 import type { ShipClassCacheService } from '../physics/ship-class-cache.service';
 import { CYBMINE_NONE, NO_CHANNEL } from '../ship/ship-channel.registry';
@@ -333,6 +335,52 @@ export class AiWeapons {
     // copy locked itself in on every discharge; the Droid copy had it right.
     ship.phasr = 0;
     if (victims.length > 0) ship.cantexit = FIRETICKS;
+  }
+
+  /**
+   * `lockon` for an AI torpedo: the arithmetic AND the tail canon runs either
+   * way it goes — battle-lock both ships, and tell the target (LOCK2 on a lock,
+   * LOCK4 on a miss) when `lockwarn` is up. The AI used to compute the lock and
+   * drop the tail, so a Cybertron that painted a pilot, or tried to, was silent.
+   *
+   * Call it ONCE per volley. Canon calls `lockon` per tube, but nothing between
+   * tubes moves either ship, so every tube gets the first one's answer, and
+   * `lockwarn` silences the rest — GECYBS.C:537 `if (i>0) lockwarn = FALSE;`,
+   * and the Droid's copy, GEDROIDS.C:481 `if (i>0) lockwarn = FALSE;`. What is
+   * left of tubes 2+ is the same idempotent battle lock.
+   *
+   * Every call is logged. That is diagnostic, not canon: a pilot reported
+   * torpedoes from a Cyberquad at warp 10 and prod had no record of any AI
+   * torpedo's speeds or range to check it against.
+   *
+   * @see GECMDS.C:1339 `int FUNC lockon(ptr,type,ship,usrn)`
+   */
+  lockon(ship: ShipState, target: ShipState, ddist: number): boolean {
+    // Canon's early refusals come BEFORE the tail: no warning, no battle lock.
+    // Both speak only to the firer, and an AI has no terminal to read them.
+    //   GECMDS.C:1347 `if (ptr->firecntl > 0)`
+    //   GECMDS.C:1363 `if  (neutral(&(wptr->coord)))`
+    // The jammer test between them reads `warsptr`, the global current-user
+    // pointer, not the firer, so it has no defined meaning for an AI caller
+    // and is not reproduced here. GECMDS.C:1354 `if (warsptr->jammer > 0)`
+    if (ship.firecntl > 0) return false;
+    if (isInNeutralZone(target)) return false;
+
+    const distSectors = ddist / 10_000;
+    const fact = lockFact('torpedo', ship.speed, target.speed, distSectors, TORFACT);
+    const locked = fact > LOCK_MIN_FACT;
+    this.logger.log(
+      `ai torpedo lock: firer='${ship.shipname}' (${shipKey(ship.userid, ship.shipno)}) firerSpeed=${Math.round(ship.speed)}`
+      + ` target='${target.shipname}' (${shipKey(target.userid, target.shipno)}) targetSpeed=${Math.round(target.speed)}`
+      + ` dist=${distSectors.toFixed(3)} fact=${fact.toFixed(3)} result=${locked ? 'lock' : 'fail'}`,
+    );
+
+    // The letter is resolved by the gateway from `attackerId`, so the AI has
+    // no scan table to offer here. @see warnTarget
+    applyLockOutcome(ship, target, locked ? 'lock-acquired' : 'lock-attempt', {
+      shipState: this.shipState, events: this.events, lettersFor: () => [], trace: this.trace,
+    });
+    return locked;
   }
 
   /**

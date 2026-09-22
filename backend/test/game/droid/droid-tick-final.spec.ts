@@ -416,13 +416,17 @@ describe('a shot that computes to less than one point of damage', () => {
     expect(target.shield).toBe(100);
     expect(target.shieldstat).toBe(0);
     expect(target.lastfired).toBe(-1);
-    expect(target.cantexit).toBe(0);
     // ...but the bank is spent anyway, and the FIRER is not battle-locked:
     // canon gates `ptr->cantexit` (GECMDS.C:977) and not `ptr->phasr`.
     expect(droid.phasr).toBe(0);
     // The gate is confined to the phaser: the torpedo volley that follows it in
     // `actClass12` is outside the guard and still locks a tube (GEDROIDS.C:476-483).
     expect(target.ltorpsChannel[0]).toBe(droid.channel);
+    // And that torpedo's `lockon` battle-locks the victim, as it does after any
+    // lock, won or lost: GECMDS.C:1405 `wptr->cantexit = FIRETICKS;`. So the
+    // victim IS pinned on this pass — by the torpedo, not the graze. This used
+    // to assert 0, back when the AI's lockon skipped canon's tail.
+    expect(target.cantexit).toBe(FIRETICKS);
   });
 
   /**
