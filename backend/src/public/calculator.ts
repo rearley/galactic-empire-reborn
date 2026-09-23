@@ -35,14 +35,10 @@ const SECONDS_PER_DAY = 86_400;
 const MOUTHS_PER_UNIT = 100;
 
 /**
- * `manhours` divided by the two constants canon folds into the rate formula:
- *
- *   qty = (men * (rate/100) * ((manhours/10000)/6)) / 7
- *
- * so one rate point yields `men * manhours / 42_000_000` units before `fact`.
- * Used only for advisory arithmetic; real production comes from the tick.
+ * Upper bound on the food-rate search. Far past the budget of 100, so a
+ * colony that no legal spread can feed still gets a number rather than a hang.
  */
-const RATE_DIVISOR = 42_000_000;
+const MAX_FOOD_RATE_SEARCHED = 1_000;
 
 export interface PlanetModelItem {
   index: number;
@@ -278,15 +274,8 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
   });
 
   const foodProduced = items[I_FOOD].producedPerTick;
-
-  // One rate point of food, before `fact`, at this population.
-  const foodPerRatePoint = (men * MANHOURS[I_FOOD]) / RATE_DIVISOR;
-  const minimumRate =
-    foodPerRatePoint > 0 ? Math.ceil(eaten / (foodPerRatePoint * fact)) : 0;
-
-  // The debit happens before the starvation test, so the stock has to cover the
-  // colonists' own share twice: once eaten, once still on the shelf.
-  const starvationFloor = Math.floor(men / MOUTHS_PER_UNIT) * 2;
+  const minimumRate = minimumFoodRate(input);
+  const starvationFloor = starvationFloorOf(men, troops);
 
   const pressure = revoltPressure(input.taxrate, men);
   const taxPerTick = Number(after.tax);
@@ -318,7 +307,7 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
       netPerTick: foodProduced - eaten,
       starvationFloor,
       minimumRate,
-      safe: input.stock[I_FOOD] >= starvationFloor && foodProduced >= eaten,
+      safe: input.stock[I_FOOD] >= starvationFloor && input.rates[I_FOOD] >= minimumRate,
     },
     tax: {
       perTick: taxPerTick,
@@ -340,6 +329,61 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
     starvedMen: starved.men,
     starvedTroops: starved.troops,
   };
+}
+
+/**
+ * The smallest food stock that gets through a tick without starving anyone.
+ *
+ * Troops are tested against the stock before anything is eaten, then both
+ * populations eat, then colonists are tested against what is left. So the
+ * stock has to hold the garrison's share once and the colonists' share twice:
+ * once eaten, once still on the shelf.
+ *
+ * @see GEPLANET.C:206-209 troop test, GEPLANET.C:221-230 the debit
+ */
+function starvationFloorOf(men: number, troops: number): number {
+  return Math.floor(troops / MOUTHS_PER_UNIT) + Math.floor(men / MOUTHS_PER_UNIT) * 2;
+}
+
+/**
+ * The lowest food rate a colony can hold indefinitely.
+ *
+ * NOT break-even. The floor above is two ticks of eating, so it rises with the
+ * population, and a rate that merely replaces what was eaten holds the stock
+ * level while the floor climbs past it. That is the figure this page used to
+ * give, and a colony set to it starved an eighth of 3.8 million people.
+ *
+ * Found by running the real tick rather than by rearranging the rate formula:
+ * start the larder exactly on the floor, run one tick, and ask whether the
+ * stock is still on (or above) the floor the grown colony needs. The margin
+ * rises with the food rate, so the first rate that passes is the answer.
+ */
+function minimumFoodRate(input: CalculatorInput): number {
+  const men = input.stock[I_MEN];
+  if (men <= 0) return 0;
+
+  const margin = (rate: number): number => {
+    const stock = input.stock.slice();
+    stock[I_FOOD] = starvationFloorOf(men, input.stock[I_TROOPS]);
+    const rates = input.rates.slice();
+    rates[I_FOOD] = rate;
+    const { state } = applyEconomyTickWithLosses(toPlanetState({ ...input, stock, rates }));
+    const floorAfter = starvationFloorOf(
+      Number(state.items[I_MEN].qty),
+      Number(state.items[I_TROOPS].qty),
+    );
+    return Number(state.items[I_FOOD].qty) - floorAfter;
+  };
+
+  let lo = 0;
+  let hi = MAX_FOOD_RATE_SEARCHED;
+  if (margin(hi) < 0) return hi;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (margin(mid) >= 0) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
 }
 
 /** Total credit value of one tick's production, used for the tax comparison. */

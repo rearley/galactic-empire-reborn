@@ -96,11 +96,14 @@ export const SURVIVAL_TIPS: readonly Tip[] = Object.freeze([
       'just the soldiers.',
   },
   {
-    what: 'The food rate does not change as you grow',
+    what: 'Breaking even is not enough while you grow',
     detail:
-      'Both production and consumption scale with population, so the minimum rate is the same at ' +
-      'six hundred thousand people as at sixty million. Set it once. It only moves when the ' +
-      'production multiplier moves — which means when you change tax, or turn the gold bonus on.',
+      'A rate that only replaces what was eaten holds your stock level — but the stock you need ' +
+      'is two ticks of eating, and that rises with every colonist born. A growing colony at ' +
+      'break-even slides under its own floor and loses an eighth of itself. The lowest rate shown ' +
+      'here already covers that: it keeps the larder growing as fast as the colony. The same goes ' +
+      'for colonists you land: every hundred you drop off needs two more cases on the shelf that ' +
+      'same moment, so bring the food with them.',
   },
 ]);
 

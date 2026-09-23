@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.10',
+    date: '2026-09-23',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The colony calculator’s “lowest food rate” was only enough to replace what your people ate. That is not enough for a colony that is growing: the food you need in store rises with every colonist born, so a larder held level by that rate eventually falls short and an eighth of the colony starves. The rate it gives now keeps your food stock growing as fast as your colony, and it no longer calls a colony “fed” at break-even. It also counts your troops when it tells you how much food you need in store. If you set a food rate from the calculator before today, check it again.',
+      },
+    ],
+  },
+  {
     version: '0.31.9',
     date: '2026-09-22',
     entries: [

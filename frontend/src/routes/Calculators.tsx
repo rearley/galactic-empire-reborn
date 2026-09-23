@@ -699,7 +699,7 @@ export function Calculators(): React.JSX.Element {
                 <Stat
                   label="Lowest food rate that feeds them"
                   value={String(result.food.minimumRate)}
-                  hint="Break-even exactly. Add a point or two for margin."
+                  hint="Feeds them and keeps the larder growing as fast as the colony. Break-even is not enough."
                 />
               </div>
               <RateControl

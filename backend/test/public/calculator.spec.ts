@@ -157,6 +157,21 @@ describe('simulate — survival advice', () => {
     expect(simulate(input()).food.starvationFloor).toBe(Math.floor(424_242 / 100) * 2);
   });
 
+  it('counts the garrison in the floor, since troops eat before colonists are tested', () => {
+    const stock = input().stock.slice();
+    stock[I_TROOPS] = 40_000;
+    const r = simulate(input({ stock }));
+    expect(r.food.starvationFloor).toBe(Math.floor(40_000 / 100) + Math.floor(424_242 / 100) * 2);
+
+    // One case under that floor and the real tick kills colonists.
+    const under = stock.slice();
+    under[I_FOOD] = r.food.starvationFloor - 1;
+    expect(simulate(input({ stock: under })).starvedMen).toBeGreaterThan(0);
+    const at = stock.slice();
+    at[I_FOOD] = r.food.starvationFloor;
+    expect(simulate(input({ stock: at })).starvedMen).toBe(0);
+  });
+
   it('calls a colony unsafe while it is eating into its stores', () => {
     // Rate 21 clears the bill at fact 2.625 but not at 1.75 — which is exactly
     // the gap a colony sits in for one tick before its first gold lands.
@@ -164,14 +179,70 @@ describe('simulate — survival advice', () => {
     expect(simulate(input({ planetCash: 1000 })).food.safe).toBe(true);
   });
 
-  it('puts the minimum food rate on the true break-even, not a rounded guess', () => {
-    const bonus = input({ planetCash: 1000 });
-    expect(simulate(bonus).food.minimumRate).toBe(20);
+  /**
+   * Run the real tick `ticks` times and report the first starvation, if any.
+   *
+   * Break-even is not enough: the floor is two ticks of eating, so it climbs
+   * with the population, and a stock held level by an exactly-balanced rate is
+   * overtaken. A player set food to the calculator's old break-even figure and
+   * lost an eighth of a 3.8 million colony. Only a multi-tick run shows it.
+   */
+  function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
+    let state = {
+      xsect: 1, ysect: 1, plnum: 1, type: 0, xcoord: 0, ycoord: 0,
+      userid: 'calc', name: 'calc', enviorn: inp.enviorn, resource: inp.resource,
+      cash: BigInt(inp.planetCash), debt: 0n, tax: 0n, taxrate: inp.taxrate,
+      warnings: 0, password: '', lastattack: '', beacon: '', spyowner: '',
+      technology: 0, teamcode: 0n,
+      items: inp.stock.map((qty, i) => ({
+        qty: BigInt(qty), rate: inp.rates[i], sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+      })),
+    } as PlanetState;
+    for (let t = 1; t <= ticks; t++) {
+      const r = applyEconomyTickWithLosses(state);
+      if (r.starved.men > 0 || r.starved.troops > 0) return t;
+      state = r.state;
+    }
+    return null;
+  }
 
-    const at = bonus.rates.slice(); at[I_FOOD] = 20;
-    const below = bonus.rates.slice(); below[I_FOOD] = 19;
-    expect(simulate({ ...bonus, rates: at }).food.netPerTick).toBeGreaterThanOrEqual(0);
-    expect(simulate({ ...bonus, rates: below }).food.netPerTick).toBeLessThan(0);
+  /** The fixture with food at `rate` and the larder exactly at its floor. */
+  function atFloor(rate: number, over: Partial<CalculatorInput> = {}): CalculatorInput {
+    const base = input({ planetCash: 1000, ...over });
+    const rates = base.rates.slice(); rates[I_FOOD] = rate;
+    const stock = base.stock.slice();
+    stock[I_FOOD] = simulate(base).food.starvationFloor;
+    return { ...base, rates, stock };
+  }
+
+  it('recommends a food rate that keeps a growing colony fed indefinitely', () => {
+    const min = simulate(input({ planetCash: 1000 })).food.minimumRate;
+    // 200 ticks is fifty days; the population nearly triples at men rate 25.
+    expect(firstStarvation(atFloor(min), 200)).toBeNull();
+  });
+
+  it('recommends the LOWEST such rate — one point less starves', () => {
+    const min = simulate(input({ planetCash: 1000 })).food.minimumRate;
+    expect(firstStarvation(atFloor(min - 1), 200)).not.toBeNull();
+  });
+
+  it('asks for more than break-even while the colony grows', () => {
+    // 20 exactly feeds this colony's current mouths (the old answer) and still
+    // starves it within days, because the floor rises and the stock does not.
+    const growing = simulate(input({ planetCash: 1000 }));
+    expect(growing.food.minimumRate).toBe(21);
+    expect(firstStarvation(atFloor(20), 200)).not.toBeNull();
+
+    // With the colonist rate at zero there is no growth, and break-even holds.
+    const rates = input().rates.slice(); rates[I_MEN] = 0;
+    const still = simulate(input({ planetCash: 1000, rates }));
+    expect(still.food.minimumRate).toBe(20);
+    expect(firstStarvation(atFloor(20, { rates }), 200)).toBeNull();
+  });
+
+  it('does not call a break-even colony safe while it is growing', () => {
+    expect(simulate(atFloor(20)).food.safe).toBe(false);
+    expect(simulate(atFloor(21)).food.safe).toBe(true);
   });
 });
 

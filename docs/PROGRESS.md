@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 189 entries.
+Append-only, **newest at the bottom**. 190 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-23 — the calculator's safe food rate starved a colony](#session-2026-09-23-later--the-calculators-safe-food-rate-starved-a-colony)
 - [2026-09-23 — a graphical game on this engine, as a concept](#session-2026-09-23--a-graphical-game-on-this-engine-as-a-concept)
 - [2026-09-22 — an AI torpedo lock now warns its target](#session-2026-09-22--an-ai-torpedo-lock-now-warns-its-target)
 - [2026-09-21 — #42 reproduced: mines went off after missiles](#session-2026-09-21-late-night-2--42-reproduced-mines-went-off-after-missiles)
@@ -8832,3 +8833,39 @@ thinking it over.
 
 **Known issues:** none. No version bump, since nothing deploys.
 
+## Session 2026-09-23 (later) — the calculator's safe food rate starved a colony
+
+**Completed:** a player set food to the rate the calculator recommended and lost
+477,000 colonists, an eighth of about 3.8 million. The recommendation was the
+break-even rate, where food made each tick equals food eaten. But the
+starvation floor is two ticks of eating (the debit lands before the test), so
+it rises with the population. At break-even the stock holds level while the
+floor climbs past it. On that planet (env 3, res 2, colonist rate 39) the floor
+rose about 570 a tick against a stock gaining about 290.
+- `minimumRate` (`backend/src/public/calculator.ts`) now comes from the real
+  tick. It is the lowest food rate at which a larder that starts exactly on the
+  floor is still on the grown colony's floor one tick later. For that planet
+  it went from 20 to 21.
+- `food.safe` now requires that rate, rather than production >= consumption.
+- `starvationFloor` now includes the garrison's share (troops/100). Troops are
+  tested before the debit, so the old floor was too low for any garrisoned
+  colony.
+- The survival tip "The food rate does not change as you grow... Set it once"
+  was false as written and was the advice followed. It is rewritten, and now
+  also says to land food with colonists.
+
+**Tests:** `test/public/calculator.spec.ts` runs the real tick for 200 ticks:
+the recommended rate never starves, one point less does, and break-even starves
+a growing colony but holds a static one. The old test that pinned break-even
+is replaced. The garrison floor is checked one case either side against the
+tick.
+
+**Decisions made:** none. Canon has no calculator, so this is a port-original
+fix.
+
+**Next:** none.
+
+**Known issues:** the advice still assumes the cash bonus stays on. A colony
+with planet cash but no gold rate loses the bonus within a few ticks, and its
+food rate then falls short. The Production tab tip on gold covers this, but the
+Survival figures do not warn about it.
