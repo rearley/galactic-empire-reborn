@@ -13,6 +13,7 @@ session.**
 | `GAME_MECHANICS.md` | Implemented mechanics with C source references | Each mechanic lands |
 | `DEPLOYMENT.md` | How production is actually put together | Any deploy-shape change |
 | `audits/` | Point-in-time review findings, with a status banner | A review runs, or a finding closes |
+| `concepts/` | Design explorations that do not ship: mock-ups, with a README of what each settled | A concept is explored or superseded |
 
 ## Where open work is tracked
 

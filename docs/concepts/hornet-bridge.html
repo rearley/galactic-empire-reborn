@@ -1,0 +1,1843 @@
+<!--
+  Hornet Bridge: a graphical-client concept for a separate game built on this engine.
+  Mock-up only. Nothing here talks to the running game.
+
+  Embeds data from Galactic Empire (c) 1988-1992 Michael B. Murdock, GPL-2.0-or-later:
+  the neutral-zone planet names and coordinates (GE/REL/MBMGEMSG.MSG S00P1-6), item names
+  and weights, the Star Cruiser hold size, the orbit range and the torpedo lock formula.
+  This file is distributed under this repository's AGPL-3.0-or-later. See NOTICE.
+  Published copy: https://claude.ai/artifact/W82eprPYJGTyjgHMFjzJRd
+-->
+<title>Hornet Bridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --void: #070a0f;
+    --glass: rgba(11, 16, 23, 0.82);
+    --glass-hi: rgba(18, 25, 35, 0.94);
+    --edge: rgba(255, 176, 0, 0.2);
+    --amber: #ffb000;
+    --amber-dim: #9a6d16;
+    --ink: #dbe2ea;
+    --ink-dim: #7b8794;
+    --hostile: #ff3b5c;
+    --me: #bfefff;
+    --planet: #7fd37a;
+    --ok: #9be37a;
+    --kestrel: #e070ff;
+    --ironside: #ff8a3d;
+    --display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background: var(--void); color: var(--ink); font-family: var(--display);
+    overflow: hidden; user-select: none; -webkit-user-select: none;
+  }
+  input, textarea { user-select: text; -webkit-user-select: text; }
+  #game { position: fixed; inset: 0; overflow: hidden; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #stage.dragging { cursor: grabbing; }
+
+  .panel {
+    position: relative; background: var(--glass); border: 1px solid var(--edge);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    padding: 12px 14px;
+  }
+  .panel::before { content: ""; position: absolute; top: 0; left: 0; width: 18px; height: 2px; background: var(--amber); }
+  .panel h2, .lbl {
+    margin: 0; font: 600 11px/1 var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber);
+  }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .btn {
+    font: 600 12px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink); background: var(--glass-hi); border: 1px solid var(--edge); padding: 7px 10px 6px; cursor: pointer;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+  .btn.primary { background: var(--amber); color: var(--void); border-color: var(--amber); }
+  .btn.primary:hover:not(:disabled) { background: #ffc440; color: var(--void); }
+  .btn.danger { border-color: rgba(255, 59, 92, 0.6); color: #ff8098; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, .toggle:focus-within, [tabindex]:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* top bar */
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+    background: linear-gradient(to bottom, rgba(7, 10, 15, 0.94), rgba(7, 10, 15, 0)); pointer-events: none;
+  }
+  .topbar > * { pointer-events: auto; }
+  .ident { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .shipname { font: 700 22px/1 var(--display); letter-spacing: 0.08em; color: var(--me); }
+  .cls { font: 500 14px/1 var(--display); color: var(--ink-dim); letter-spacing: 0.06em; white-space: nowrap; }
+  .chip { font: 600 10px/1 var(--display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--void); background: var(--amber); padding: 4px 6px 3px; }
+  .where { display: flex; gap: 12px; align-items: baseline; }
+  #sector { font: 600 16px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; }
+  #coords { font-size: 12px; color: var(--ink-dim); }
+  #zoomLbl { font: 600 11px/1 var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); border: 1px solid var(--edge); padding: 4px 6px 3px; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .credits { font: 500 13px/1 var(--mono); color: var(--amber); padding-right: 4px; white-space: nowrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 7px; font: 600 12px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink); background: var(--glass); border: 1px solid var(--edge); padding: 7px 10px 6px; cursor: pointer; }
+  .toggle input { accent-color: var(--amber); margin: 0; width: 13px; height: 13px; }
+  .btn[aria-pressed="true"] { color: var(--void); background: var(--amber); border-color: var(--amber); }
+
+  /* columns */
+  .leftcol, .rightcol { position: absolute; top: 64px; display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+  .leftcol { left: 16px; width: 244px; }
+  .rightcol { right: 16px; width: 272px; }
+  .leftcol > *, .rightcol > * { pointer-events: auto; }
+  .status { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .status > * { min-width: 0; }
+  .meter-row { display: grid; grid-template-columns: 58px 1fr 40px; align-items: center; gap: 8px; }
+  .meter-row > span { font: 600 12px/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  .meter-row > b { font: 500 12px/1 var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { position: relative; height: 10px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; width: 100%; background: var(--me); transition: width 0.15s linear; }
+  .bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 7px, var(--void) 7px 9px); }
+  .bar.hull i { background: var(--ok); }
+  .bar.hull.low i { background: var(--hostile); }
+  .bar.phaser i, .bar.hold i { background: var(--amber); }
+  .bar.hold.full i { background: var(--hostile); }
+  #shBtn { justify-self: start; font-size: 11px; padding: 5px 8px 4px; background: transparent; color: var(--me); border-color: rgba(191, 239, 255, 0.4); }
+  #shBtn[aria-pressed="false"] { color: var(--hostile); border-color: rgba(255, 59, 92, 0.5); }
+  .nav { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; align-items: center; padding-top: 6px; border-top: 1px solid rgba(255, 176, 0, 0.12); }
+  #dial { width: 92px; height: 92px; display: block; }
+  .readout { display: grid; gap: 3px; }
+  .readout b { font: 600 32px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--me); }
+  .readout b.sm { font-size: 18px; color: var(--ink); }
+  .readout small { font: 500 11.5px/1.25 var(--mono); color: var(--ink-dim); overflow-wrap: anywhere; }
+  .throttle { display: grid; gap: 7px; }
+  .throttle label { display: flex; justify-content: space-between; }
+  .throttle label b { font: 500 12px/1 var(--mono); color: var(--ink); letter-spacing: 0; }
+  #throttle { width: 100%; accent-color: var(--amber); margin: 0; }
+  .views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .views button { font: 600 11px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 0 6px;
+    background: transparent; color: var(--ink-dim); border: 1px solid rgba(255, 176, 0, 0.18); cursor: pointer; }
+  .views button[aria-pressed="true"] { color: var(--void); background: var(--amber); border-color: var(--amber); }
+  #centerBtn { font-size: 11px; padding: 6px 8px 5px; justify-self: stretch; }
+
+  .radar { display: grid; justify-items: center; gap: 6px; padding: 10px; }
+  #radar { width: 168px; height: 168px; display: block; }
+  .radar .cap { font: 500 11px/1 var(--mono); color: var(--ink-dim); }
+  .target { display: grid; gap: 10px; min-height: 110px; }
+  .t-empty { color: var(--ink-dim); font: 500 14px/1.4 var(--display); margin: 0; }
+  .t-head { display: flex; gap: 10px; align-items: center; }
+  .letter { flex: none; width: 30px; height: 30px; display: grid; place-items: center; font: 600 16px/1 var(--mono); color: var(--void); background: var(--amber); }
+  .letter.hostile { background: var(--hostile); color: #fff; }
+  .t-head b { display: block; font: 700 17px/1.1 var(--display); letter-spacing: 0.04em; }
+  .t-head small { display: block; font: 500 12px/1.2 var(--display); color: var(--ink-dim); letter-spacing: 0.06em; }
+  .t-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0; }
+  .t-stats div { display: grid; gap: 3px; min-width: 0; }
+  .t-stats dt { font: 600 10px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+  .t-stats dd { margin: 0; font: 500 13.5px/1.1 var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .t-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lock { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(255, 176, 0, 0.12); }
+  .lock-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .lock-top span { font: 600 11px/1 var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); }
+  .lock-top b { font: 600 12px/1 var(--mono); }
+  .lock-top b.ok { color: var(--ok); } .lock-top b.no { color: var(--ink-dim); } .lock-top b.bad { color: var(--hostile); }
+  .meter { position: relative; height: 8px; background: rgba(255, 255, 255, 0.07); }
+  .meter i { position: absolute; inset: 0 auto 0 0; background: var(--amber); transition: width 0.12s linear; }
+  .meter i.ok { background: var(--ok); }
+  .meter em { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+  .why { margin: 0; font: 500 13px/1.35 var(--display); color: var(--ink); letter-spacing: 0.02em; }
+  .threat .lock-top span { color: var(--hostile); }
+
+  .bottom { position: absolute; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; pointer-events: none; }
+  .bottom > * { pointer-events: auto; }
+  .log { list-style: none; margin: 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;
+    background: linear-gradient(to top, rgba(7, 10, 15, 0.88), rgba(7, 10, 15, 0.25)); border-left: 2px solid var(--amber-dim);
+    max-width: 640px; min-height: 60px; font: 400 12.5px/1.35 var(--mono); }
+  .log li { overflow-wrap: anywhere; }
+  .log li time { color: var(--ink-dim); margin-right: 8px; }
+  .log li.warn { color: var(--amber); } .log li.danger { color: #ff7088; } .log li.you { color: var(--me); }
+  .log li.cmd { color: var(--amber-dim); }
+  .weapons-wrap { display: grid; gap: 6px; justify-items: end; max-width: 100%; }
+  .weapons { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; padding-bottom: 2px; }
+  .wpn { position: relative; flex: none; width: 92px; height: 74px; display: grid; grid-template-rows: auto 1fr auto; justify-items: start; align-items: end;
+    padding: 8px 9px; text-align: left; cursor: pointer; background: var(--glass-hi); color: var(--ink); border: 1px solid var(--edge);
+    clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px)); font-family: var(--display); }
+  .wpn kbd { font: 600 11px/1 var(--mono); color: var(--void); background: var(--amber); padding: 2px 5px; }
+  .wpn .wn { font: 700 14px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; }
+  .wpn .wc { font: 500 12px/1 var(--mono); color: var(--ink-dim); margin-top: 4px; }
+  .wpn:hover { border-color: var(--amber); }
+  .wpn[data-state="ready"] { border-color: rgba(155, 227, 122, 0.55); }
+  .wpn[data-state="ready"] .wn { color: var(--ok); }
+  .wpn[data-state="blocked"] { opacity: 0.55; } .wpn[data-state="empty"] { opacity: 0.35; }
+  .wpn .ring { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+    background: conic-gradient(var(--amber) calc(var(--p, 1) * 360deg), rgba(255, 255, 255, 0.1) 0);
+    -webkit-mask: radial-gradient(circle, transparent 6px, #000 7px); mask: radial-gradient(circle, transparent 6px, #000 7px); }
+  .wpn.flash { animation: flash 0.25s ease-out; }
+  @keyframes flash { from { background: rgba(255, 176, 0, 0.45); } to { background: var(--glass-hi); } }
+  #hint { margin: 0; font: 500 13px/1.3 var(--display); color: var(--ink-dim); letter-spacing: 0.03em; text-align: right; max-width: 480px; min-height: 17px; }
+
+  /* planet screen */
+  .dock { position: absolute; top: 64px; right: 16px; bottom: 112px; width: min(640px, calc(100% - 280px));
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 0; padding: 0; }
+  .dock-head { display: flex; gap: 14px; align-items: center; padding: 14px 16px 12px; border-bottom: 1px solid rgba(255, 176, 0, 0.14); }
+  #dockGlobe { width: 64px; height: 64px; flex: none; }
+  .dock-title { flex: 1; min-width: 0; display: grid; gap: 4px; }
+  .dock-title h3 { margin: 0; font: 700 26px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+  .dock-title p { margin: 0; font: 500 13px/1.3 var(--display); color: var(--ink-dim); letter-spacing: 0.04em; }
+  .owner { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 6px 3px; color: var(--void); }
+  .dock-close { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid rgba(255, 176, 0, 0.14); overflow-x: auto; }
+  .tabs button { font: 600 13px/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--ink-dim);
+    border: 0; border-bottom: 2px solid transparent; padding: 12px 12px 10px; cursor: pointer; white-space: nowrap; }
+  .tabs button[aria-selected="true"] { color: var(--amber); border-bottom-color: var(--amber); }
+  .dock-body { overflow: auto; padding: 14px 16px 16px; display: grid; gap: 14px; align-content: start; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .hold { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; min-width: 240px; flex: 1; }
+  .hold span { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+  .hold b { font: 500 12px/1 var(--mono); white-space: nowrap; }
+  .steps { display: flex; gap: 4px; align-items: center; }
+  .steps span { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); margin-right: 4px; }
+  .steps button { font: 500 12px/1 var(--mono); background: transparent; color: var(--ink); border: 1px solid rgba(255, 176, 0, 0.25); padding: 5px 8px; cursor: pointer; }
+  .steps button[aria-pressed="true"] { background: var(--amber); color: var(--void); border-color: var(--amber); }
+  table.grid { width: 100%; border-collapse: collapse; font: 500 13px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  table.grid th { font: 600 10.5px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); text-align: right; padding: 0 8px 8px; }
+  table.grid th:first-child, table.grid td:first-child { text-align: left; padding-left: 0; }
+  table.grid td { padding: 5px 8px; text-align: right; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+  table.grid td.name { font: 600 14px/1.1 var(--display); letter-spacing: 0.04em; color: var(--ink); }
+  table.grid td.zero { color: rgba(123, 135, 148, 0.55); }
+  table.grid td.mv, table.grid th.mv { text-align: center; white-space: nowrap; }
+  table.grid tr:hover td { background: rgba(255, 176, 0, 0.04); }
+  .mv button { font: 600 14px/1 var(--mono); width: 30px; height: 24px; background: var(--glass-hi); color: var(--amber); border: 1px solid rgba(255, 176, 0, 0.3); cursor: pointer; margin: 0 2px; }
+  .mv button:hover:not(:disabled) { background: var(--amber); color: var(--void); }
+  .mv button:disabled { opacity: 0.25; cursor: not-allowed; }
+  .table-wrap { overflow-x: auto; }
+  .note { margin: 0; font: 500 13.5px/1.4 var(--display); color: var(--ink); letter-spacing: 0.02em; padding: 10px 12px; background: rgba(255, 176, 0, 0.07); border-left: 2px solid var(--amber); }
+  .note.bad { background: rgba(255, 59, 92, 0.08); border-left-color: var(--hostile); }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 16px; margin: 0; }
+  .kv div { display: grid; gap: 4px; }
+  .kv dt { font: 600 10.5px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+  .kv dd { margin: 0; font: 500 17px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+  .kv dd small { font-size: 12px; color: var(--ink-dim); }
+  .field { display: grid; gap: 6px; }
+  .field label { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); display: flex; justify-content: space-between; }
+  .field label b { font: 500 12px/1 var(--mono); color: var(--ink); letter-spacing: 0; }
+  .field input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
+  .field input[type="text"], .field input[type="number"] {
+    font: 500 14px/1 var(--mono); color: var(--ink); background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 176, 0, 0.25); padding: 8px 9px; min-width: 0; }
+  .field small { font: 500 12px/1.3 var(--display); color: var(--ink-dim); letter-spacing: 0.02em; }
+  .inline { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  .inline input { flex: 1; }
+  .section-h { margin: 4px 0 0; font: 600 11px/1 var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); }
+  .progress { height: 10px; background: rgba(255, 255, 255, 0.07); position: relative; }
+  .progress i { position: absolute; inset: 0 auto 0 0; background: var(--ok); }
+
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding-inline: 16px; background: rgba(3, 5, 8, 0.72); }
+  .card { max-width: 480px; width: 100%; display: grid; gap: 12px; max-height: calc(100% - 32px); overflow: auto; }
+  .card.wide { max-width: 860px; }
+  .keys-list { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; margin: 0; font: 500 14px/1.3 var(--display); }
+  .keys-list dt { font: 500 12px/1.3 var(--mono); color: var(--amber); }
+  .keys-list dd { margin: 0; }
+  .card p { margin: 0; font: 500 13px/1.45 var(--display); color: var(--ink-dim); letter-spacing: 0.02em; }
+  table.colonies tbody tr { cursor: pointer; }
+  table.colonies td.when { font: 500 12.5px/1.2 var(--display); color: var(--ink-dim); letter-spacing: 0.02em; }
+  .tip { position: absolute; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 12px; align-items: start; max-width: min(540px, calc(100% - 32px));
+    background: var(--amber); color: var(--void); padding: 10px 12px 10px 14px;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+  .tip p { margin: 0; font: 600 15px/1.3 var(--display); letter-spacing: 0.02em; }
+  .tip button { background: transparent; border: 0; color: var(--void); font: 700 18px/1 var(--display); cursor: pointer; padding: 0 2px; }
+  .console { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 10px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; background: rgba(3, 5, 8, 0.96); border-bottom: 1px solid var(--amber); }
+  .console label { font: 600 18px/1 var(--mono); color: var(--amber); }
+  .console input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--amber); font: 500 16px/1 var(--mono); caret-color: var(--amber); padding: 4px 0; }
+  .console input:focus { outline: none; }
+  .console input::placeholder { color: var(--amber-dim); }
+  .dead-msg { font: 700 30px/1.1 var(--display); letter-spacing: 0.08em; color: var(--hostile); text-align: center; }
+  .dead-msg small { display: block; font: 500 14px/1.4 var(--display); color: var(--ink-dim); letter-spacing: 0.04em; margin-top: 6px; }
+
+  @media (max-width: 1180px) { .radar { display: none; } }
+  @media (max-width: 900px) { .dock { width: auto; left: 16px; } }
+  @media (max-width: 760px) {
+    #coords, .cls, .toggle span, #fsBtn, .credits { display: none; }
+    .leftcol { width: calc(50% - 22px); top: 58px; }
+    .rightcol { width: calc(50% - 22px); top: 58px; }
+    .nav, .throttle, .t-actions .btn + .btn, .why, .threat { display: none; }
+    .panel { padding: 10px; }
+    .meter-row { grid-template-columns: 46px 1fr 32px; gap: 6px; }
+    .t-stats { grid-template-columns: repeat(2, 1fr); }
+    .t-stats div:nth-child(3) { display: none; }
+    .bottom { grid-template-columns: 1fr; }
+    .log { max-height: 80px; overflow: hidden; font-size: 11px; }
+    .weapons-wrap { justify-items: stretch; }
+    #hint { text-align: left; }
+    .wpn { width: 78px; height: 64px; }
+    .dock { top: 58px; bottom: 190px; }
+    .tip { bottom: 200px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wpn.flash { animation: none; }
+    .bar i, .meter i { transition: none; }
+  }
+</style>
+
+<div id="game">
+  <canvas id="stage" aria-label="Tactical view: click a ship or planet to target it, click space to set a course, drag to pan, scroll to zoom"></canvas>
+
+  <header class="topbar">
+    <div class="ident">
+      <span class="shipname">HORNET</span>
+      <span class="cls">Star Cruiser</span>
+      <span class="chip">Mock-up</span>
+    </div>
+    <div class="where">
+      <span id="sector">Sector 12,-4</span>
+      <span id="coords" class="mono">(12.450, -3.550)</span>
+      <span id="zoomLbl">Tactical</span>
+    </div>
+    <div class="tools">
+      <span class="credits" id="credits">12,480 cr</span>
+      <button class="btn" id="coloniesBtn" type="button">Colonies</button>
+      <label class="toggle" for="smooth"><input type="checkbox" id="smooth" checked><span>Smooth motion</span></label>
+      <button class="btn" id="soundBtn" type="button" aria-pressed="false">Sound off</button>
+      <button class="btn" id="fsBtn" type="button">Full screen</button>
+      <button class="btn" id="keysBtn" type="button">Keys</button>
+    </div>
+  </header>
+
+  <div class="leftcol">
+    <section class="panel status" aria-label="Ship status">
+      <h2>Ship status</h2>
+      <div class="meter-row"><span>Hull</span><div class="bar hull" id="hullBar"><i id="bHull"></i></div><b id="nHull">100</b></div>
+      <div class="meter-row"><span>Shields</span><div class="bar shield"><i id="bShield"></i></div><b id="nShield">100</b></div>
+      <div class="meter-row"><span>Phasers</span><div class="bar phaser"><i id="bPhaser"></i></div><b id="nPhaser">100</b></div>
+      <div class="meter-row"><span>Hold</span><div class="bar hold" id="holdBar"><i id="bHold"></i></div><b id="nHold">0t</b></div>
+      <button class="btn" id="shBtn" type="button" aria-pressed="true">Shields up · H</button>
+      <div class="nav">
+        <canvas id="dial" aria-hidden="true"></canvas>
+        <div class="readout">
+          <span class="lbl">Warp</span>
+          <b id="warpNow">0.0</b>
+          <small id="warpTo">holding</small>
+          <span class="lbl" style="margin-top:6px">Heading</span>
+          <b id="hdg" class="sm">060°</b>
+        </div>
+      </div>
+      <div class="throttle">
+        <label for="throttle" class="lbl">Cruise warp <b id="thrV">6.0</b></label>
+        <input type="range" id="throttle" min="0" max="12" step="0.5" value="6">
+      </div>
+      <span class="lbl">View</span>
+      <div class="views" role="group" aria-label="Zoom level">
+        <button type="button" data-view="0" aria-pressed="true">Tactical</button>
+        <button type="button" data-view="1" aria-pressed="false">Sector</button>
+        <button type="button" data-view="2" aria-pressed="false">Scanner</button>
+        <button type="button" data-view="3" aria-pressed="false">Galaxy</button>
+      </div>
+      <button class="btn" id="centerBtn" type="button" hidden>Back to my ship · C</button>
+    </section>
+  </div>
+
+  <div class="rightcol">
+    <section class="panel radar" aria-label="Short-range scanner">
+      <canvas id="radar" aria-hidden="true"></canvas>
+      <span class="cap">Short range · 1 sector radius</span>
+    </section>
+    <section class="panel target" id="target"><div id="tgtLive" aria-live="polite"></div><div id="tgtAct" class="t-actions"></div></section>
+  </div>
+
+  <section class="panel dock" id="dock" hidden aria-label="Planet screen">
+    <div class="dock-head">
+      <canvas id="dockGlobe" aria-hidden="true"></canvas>
+      <div class="dock-title"><h3 id="dockName">Tessaly</h3><p id="dockSub"></p></div>
+      <div class="dock-close">
+        <button class="btn" type="button" data-act="hide">Hide · Esc</button>
+        <button class="btn danger" type="button" data-act="leave">Leave orbit · L</button>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" id="dockTabs"></div>
+    <div class="dock-body" id="dockBody"></div>
+  </section>
+
+  <div class="bottom">
+    <ol class="log" id="log" aria-live="polite"></ol>
+    <div class="weapons-wrap">
+      <p id="hint"></p>
+      <nav class="weapons" aria-label="Weapons">
+        <button class="wpn" id="w1" type="button"><kbd>1</kbd><span class="ring" id="w1r"></span><span class="wn">Phaser</span><span class="wc">100%</span></button>
+        <button class="wpn" id="w2" type="button"><kbd>2</kbd><span class="wn">Torpedo</span><span class="wc">×40</span></button>
+        <button class="wpn" id="w3" type="button"><kbd>3</kbd><span class="wn">Missile</span><span class="wc">×20</span></button>
+        <button class="wpn" id="w4" type="button"><kbd>4</kbd><span class="wn">Decoy</span><span class="wc">×12</span></button>
+        <button class="wpn" id="w5" type="button"><kbd>5</kbd><span class="wn">Mine</span><span class="wc">×10</span></button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="tip" id="tip"><p id="tipText"></p><button id="tipX" type="button" aria-label="Dismiss tip">×</button></div>
+
+  <div class="console" id="console" hidden>
+    <label for="cmd">›</label>
+    <input id="cmd" autocomplete="off" spellcheck="false" placeholder="pha · tor a · warp 6 · rot 90 · sca · orb · tra down 10 tor · help">
+  </div>
+
+  <div class="overlay" id="coloniesOv" hidden>
+    <div class="panel card wide">
+      <div class="row-between"><h2>Your colonies</h2><button class="btn" type="button" id="coloniesClose">Close · Esc</button></div>
+      <div class="table-wrap"><table class="grid colonies" id="coloniesTable"></table></div>
+      <p>Click a colony to fly the camera to it. Treasuries grow every few seconds from population and tax. That's the nightly production report, arriving as it happens instead of as mail.</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="keys" hidden>
+    <div class="panel card">
+      <h2>Controls</h2>
+      <dl class="keys-list">
+        <dt>Click space</dt><dd>Set a course. Your ship turns, cruises and stops there.</dd>
+        <dt>Click</dt><dd>Target a ship or planet. Double-click a planet to orbit it.</dd>
+        <dt>Drag</dt><dd>Pan the map. C brings the camera back to your ship.</dd>
+        <dt>Wheel · Z / X</dt><dd>Zoom: tactical, sector, scanner, galaxy</dd>
+        <dt>1 – 5</dt><dd>Phaser, torpedo, missile, decoy, mine</dd>
+        <dt>Tab</dt><dd>Next ship target, nearest first</dd>
+        <dt>O / L</dt><dd>Orbit the targeted planet / leave orbit</dd>
+        <dt>W / S · A / D</dt><dd>Cruise warp up or down · turn by hand</dd>
+        <dt>Space · H</dt><dd>All stop · shields</dd>
+        <dt>G</dt><dd>Colonies</dd>
+        <dt>`</dt><dd>Command console. The classic commands still work.</dd>
+      </dl>
+      <p>This is a mock-up. Nothing here talks to the real game. Distances and speeds are to the original's scale: a sector is 10,000 units, you orbit within 250, and warp 10 crosses a sector in about 20 seconds. The Star Cruiser's 3,000-ton hold, item weights, neutral-zone planet names and the torpedo lock formula are the original game's too. Planets, owners, prices, damage and AI are made up.</p>
+      <button class="btn primary" id="keysClose" type="button">Back to the bridge</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="dead" hidden>
+    <p class="dead-msg">HORNET DESTROYED<small>The mock-up puts you back together in a moment.</small></p>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  // ---------- constants (scale is the original game's) ----------
+  const TAU = Math.PI * 2, D2R = Math.PI / 180;
+  const K = 1 / 65 / 3;           // sectors/second per warp: speed/65000 per move, one move per 3 s
+  const TORFACT = 4, LOCK_MIN = 0.7;
+  const ORBIT_R = 0.025;          // 250 units
+  const PHASER_RANGE = 2.4, MISSILE_RANGE = 2.5, SCAN_RANGE = 20, SHORT_RANGE = 1;
+  const CAP = 3000;               // Star Cruiser maxTons
+  const UNIV = 100;
+  const NAMES = ['men', 'missiles', 'torpedos', 'ion cannons', 'flux pods', 'food cases', 'fighters', 'decoys', 'troops', 'zippers', 'jammers', 'mines', 'gold', 'spy'];
+  const KW = ['men', 'mis', 'tor', 'ion', 'flu', 'foo', 'fig', 'dec', 'tro', 'zip', 'jam', 'min', 'gol', 'spy'];
+  const TONS = [1, 5, 3, 250, 20, 2, 15, 3, 2, 5, 4, 5, 0.5, 1];
+  const PRICE = [25, 150, 100, 5000, 60, 15, 900, 80, 40, 300, 400, 120, 500, 2000]; // mock market
+  const I = { MEN: 0, MIS: 1, TOR: 2, ION: 3, FLU: 4, FOO: 5, FIG: 6, DEC: 7, TRO: 8, ZIP: 9, JAM: 10, MIN: 11, GOL: 12, SPY: 13 };
+  const COL = { me: '#bfefff', hostile: '#ff3b5c', amber: '#ffb000', droid: '#e8c77a', neutral: '#9fb3c8' };
+  const OWNERS = {
+    you: { name: 'Yours', color: '#bfefff' },
+    kestrel: { name: 'Kestrel · Red Veil', color: '#e070ff' },
+    ironside: { name: 'Ironside', color: '#ff8a3d' },
+    empire: { name: 'The Empire · neutral', color: '#7fd37a' },
+  };
+  const ENVS = {
+    Terran: ['#cdeebf', '#3f8a4a', '#0f2419'], Oceanic: ['#c4e6ff', '#2f6fb0', '#0b1a30'], Desert: ['#ffe2ac', '#c08a3e', '#35220f'],
+    Volcanic: ['#ffb99a', '#a8401f', '#260b05'], Arctic: ['#f4fbff', '#9ec2d8', '#22313b'], Jungle: ['#dcf7a8', '#5a9a2a', '#15260a'],
+    Station: ['#e8f0f6', '#7d8c99', '#1d252c'],
+  };
+  const ENV_KEYS = ['Terran', 'Oceanic', 'Desert', 'Volcanic', 'Arctic', 'Jungle'];
+  const FOOD_RATE = { Terran: 1.2, Oceanic: 1, Desert: 0.3, Volcanic: 0.2, Arctic: 0.25, Jungle: 1.4, Station: 0 };
+  const GOLD_RATE = { Terran: 0.3, Oceanic: 0.2, Desert: 0.9, Volcanic: 1.3, Arctic: 0.7, Jungle: 0.2, Station: 0 };
+  const VIEWS = [{ name: 'Tactical', across: 0.5 }, { name: 'Sector', across: 1.25 }, { name: 'Scanner', across: 44 }, { name: 'Galaxy', across: 215 }];
+  const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = (s) => document.querySelector(s);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const wrap = (a) => ((a % 360) + 360) % 360;
+  const angDiff = (a, b) => { const d = wrap(b - a); return d > 180 ? d - 360 : d; };
+  const bearing = (a, b) => wrap(Math.atan2(b.x - a.x, -(b.y - a.y)) / D2R);
+  const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  const warpOf = (v) => v / 1000;
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const hexA = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function hash(x, y, s) {
+    let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 1274126177);
+    h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  const secOf = (p) => `${Math.floor(p.x)},${Math.floor(p.y)}`;
+  const fmtEta = (s) => (!isFinite(s) ? '—' : s < 60 ? `${Math.ceil(s)}s` : s < 3600 ? `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`);
+
+  /** Canon's torpedo lock, GECMDS.C lockon: a target at warp is a hard zero. */
+  function lockFact(firerV, targetV, d) {
+    if (targetV > 999 || d >= 5) return 0;
+    return (1.2 - (firerV + targetV) / 5000) * ((5 - d) / TORFACT);
+  }
+  const phaserStrength = (d) => Math.pow(clamp(1 - d / PHASER_RANGE, 0, 1), 5);
+
+  // ---------- planets ----------
+  const st = (o) => { const a = Array(14).fill(0); for (const k in o) a[I[k]] = o[k]; return a; };
+  function mkPlanet(o) {
+    return Object.assign({ planet: true, alive: true, kind: 'planet', letter: 'P', size: 0.5, env: 'Terran', owner: null,
+      stores: Array(14).fill(0), cash: 0, debt: 0, tax: 12, beacon: '', hostile: false, lastAttack: 'never', revealed: false }, o);
+  }
+  const home = [
+    mkPlanet({ id: 'tessaly', name: 'Tessaly', x: 12.535, y: -3.63, owner: 'you', env: 'Oceanic', size: 0.8, cash: 42150, tax: 12,
+      stores: st({ MEN: 26800, MIS: 60, TOR: 240, ION: 6, FLU: 90, FOO: 1200, FIG: 20, TRO: 300, GOL: 35 }),
+      beacon: 'Tessaly welcomes traders. Hostiles will be ionised.', lastAttack: '3 days ago, Cyberquad 43332' }),
+    mkPlanet({ id: 'varn', name: 'Varn', x: 12.22, y: -3.31, env: 'Desert', size: 0.55 }),
+    mkPlanet({ id: 'oxin', name: 'Oxin', x: 12.8, y: -3.82, owner: 'kestrel', env: 'Volcanic', size: 0.65, cash: 88000,
+      stores: st({ MEN: 31000, TRO: 420, ION: 9, FIG: 12, GOL: 400 }), beacon: 'Red Veil territory. Turn back.' }),
+    mkPlanet({ id: 'maru', name: 'Maru', x: 12.86, y: -3.2, env: 'Jungle', size: 0.45 }),
+    mkPlanet({ id: 'dessa', name: 'Dessa', x: 12.16, y: -3.86, env: 'Arctic', size: 0.35 }),
+  ];
+  const COLONIES = {
+    '14,-9': mkPlanet({ id: 'brisk', name: 'Brisk', x: 14.4, y: -8.6, owner: 'you', env: 'Desert', size: 0.5, cash: 8300, tax: 18,
+      stores: st({ MEN: 9200, TRO: 80, ION: 2, FOO: 300, GOL: 120 }) }),
+    '7,2': mkPlanet({ id: 'halden', name: 'Halden', x: 7.7, y: 2.3, owner: 'you', env: 'Terran', size: 0.9, cash: 131900, tax: 10,
+      stores: st({ MEN: 44100, TRO: 900, ION: 12, FIG: 40, FOO: 5200, FLU: 400 }), lastAttack: 'yesterday, Ironside' }),
+    '21,-6': mkPlanet({ id: 'corvo', name: 'Corvo', x: 21.3, y: -5.5, owner: 'you', env: 'Arctic', size: 0.4, cash: 1200, tax: 25,
+      stores: st({ MEN: 3100, TRO: 40 }), lastAttack: '2 hours ago, Kestrel' }),
+  };
+  // The neutral zone's six planets, by the original's own names and coordinates (MBMGEMSG.MSG S00P1-6).
+  const NEUTRAL = [
+    ['Zygor', 5000, 5000, 'Terran'], ['Tahanian Station', 7000, 7000, 'Station'], ['Enforcer Planet', 2000, 2000, 'Volcanic'],
+    ['Kayriez Portal', 1100, 6700, 'Station'], ['Lydorian Portal', 6700, 1500, 'Station'], ['Tryklon Portal', 5500, 7800, 'Station'],
+  ].map(([name, x, y, env], i) => mkPlanet({ id: `nz${i}`, name, x: x / 10000, y: y / 10000, owner: 'empire', env, size: env === 'Station' ? 0.4 : 0.7, market: true }));
+  const BLOBS = [['kestrel', 18, -1, 5], ['kestrel', 28, -14, 7], ['ironside', -35, 40, 10], ['ironside', -10, -60, 6], ['ironside', 45, 55, 8], ['kestrel', -60, -20, 6]];
+  function territory(sx, sy) {
+    for (const [o, bx, by, r] of BLOBS) if (Math.hypot(sx - bx, sy - by) < r * (0.7 + 0.5 * hash(sx, sy, 99))) return o;
+    return null;
+  }
+  const TERR = [];
+  for (let x = -UNIV; x < UNIV; x++) for (let y = -UNIV; y < UNIV; y++) { const o = territory(x, y); if (o) TERR.push([x, y, o]); }
+  const SYL = ['ka', 'ren', 'os', 'vel', 'tor', 'mi', 'dra', 'xa', 'lu', 'qen', 'ar', 'ith', 'sol', 'ban', 'ez', 'or', 'ny', 'cal', 've', 'thu'];
+  const pname = (sx, sy, i) => {
+    const n = 2 + Math.floor(hash(sx, sy, 200 + i) * 2);
+    let s = ''; for (let k = 0; k < n; k++) s += SYL[Math.floor(hash(sx, sy, 300 + i * 7 + k) * SYL.length)];
+    return cap(s) + (hash(sx, sy, 400 + i) < 0.25 ? ' ' + ['II', 'III', 'IV', 'Prime'][Math.floor(hash(sx, sy, 401 + i) * 4)] : '');
+  };
+  const secCache = new Map();
+  function sectorPlanets(sx, sy) {
+    const k = `${sx},${sy}`;
+    let a = secCache.get(k);
+    if (a) return a;
+    a = [];
+    if (sx >= -UNIV && sx < UNIV && sy >= -UNIV && sy < UNIV) {
+      if (k === '12,-4') a = home;
+      else if (k === '0,0') a = NEUTRAL;
+      else {
+        const n = hash(sx, sy, 1) < 0.45 ? 0 : Math.min(9, 1 + Math.floor(hash(sx, sy, 2) ** 2 * 7));
+        const own = territory(sx, sy);
+        for (let i = 0; i < n; i++) {
+          const owner = own && hash(sx, sy, 50 + i) < 0.75 ? own : null;
+          a.push(mkPlanet({ id: `g${k}:${i}`, name: pname(sx, sy, i), x: sx + 0.08 + 0.84 * hash(sx, sy, 10 + i), y: sy + 0.08 + 0.84 * hash(sx, sy, 30 + i),
+            owner, env: ENV_KEYS[Math.floor(hash(sx, sy, 70 + i) * ENV_KEYS.length)], size: 0.3 + 0.6 * hash(sx, sy, 90 + i), gen: true }));
+        }
+        if (COLONIES[k]) a.push(COLONIES[k]);
+      }
+    }
+    secCache.set(k, a);
+    return a;
+  }
+  function fillPlanet(p) {
+    if (!p.gen || p.filled) return;
+    p.filled = true;
+    const h = (s) => hash(Math.round(p.x * 1000), Math.round(p.y * 1000), s);
+    if (p.owner) { p.stores[I.MEN] = 4000 + Math.floor(h(1) * 40000); p.stores[I.TRO] = Math.floor(h(2) * 600); p.stores[I.ION] = Math.floor(h(3) * 10); p.cash = Math.floor(h(4) * 90000); }
+  }
+  const allPlanets = () => { const s = new Set([...home, ...Object.values(COLONIES), ...NEUTRAL]); for (const a of secCache.values()) for (const p of a) s.add(p); return [...s]; };
+  const yourPlanets = () => allPlanets().filter((p) => p.owner === 'you');
+  const wormholes = [
+    { id: 'wh1', kind: 'wormhole', wormhole: true, alive: true, letter: 'W', name: 'Wormhole', x: 12.63, y: -3.27, exit: { x: -40.5, y: 63.5 } },
+    { id: 'wh2', kind: 'wormhole', wormhole: true, alive: true, letter: 'W', name: 'Wormhole', x: -40.55, y: 63.45, exit: { x: 12.6, y: -3.3 } },
+  ];
+
+  // ---------- ships ----------
+  function mk(o) {
+    const s = Object.assign({ x: 0, y: 0, h: 0, h2b: 0, v: 0, v2b: 0, hull: 100, shield: 100, shieldMax: 100, shieldUp: true,
+      alive: true, trail: [], trailT: 0, turn: 90, acc: 2500, hitFlash: 0, lockFlash: 0 }, o);
+    s.snap = { x: s.x, y: s.y, h: s.h };
+    return s;
+  }
+  const me = mk({ id: 'me', kind: 'me', name: 'Hornet', letter: '', x: 12.45, y: -3.55, h: 60, h2b: 60, turn: 120,
+    phaser: 100, items: st({ MEN: 150, MIS: 20, TOR: 40, FLU: 54, FOO: 50, DEC: 12, TRO: 60, JAM: 2, MIN: 10 }),
+    dest: null, orbitGoal: null, orbiting: null, orbitA: 0, repairing: false, combatT: 0 });
+  const quad = mk({ id: 'quad', kind: 'quad', letter: 'A', name: 'Cyberquad 43332', cls: 'Cybertron Battle Cruiser', hostile: true,
+    x: 12.95, y: -3.95, h: 220, v: 2000, v2b: 2000, state: 'patrol', home: { x: 12.82, y: -3.9 }, cool: 0, phT: 0, respawn: 0, wakeT: 25 });
+  const drone = mk({ id: 'drone', kind: 'drone', letter: 'B', name: 'Vakory Survey Drone', cls: 'Droid · class 33',
+    x: 12.41, y: -3.47, h: 120, v: 500, v2b: 500, shield: 40, shieldMax: 40, home: { x: 12.4, y: -3.48 }, wT: 2, phT: 3, respawn: 0 });
+  const trans = mk({ id: 'trans', kind: 'trans', letter: 'C', name: 'Murdonian Transport', cls: 'Droid · class 32',
+    x: 12.02, y: -3.42, h: 95, h2b: 95, v: 2500, v2b: 2500, shield: 300, shieldMax: 300, respawn: 0 });
+  const FAR = [
+    ['D', 'Kestrel', 'Battle Cruiser · Red Veil', 18.5, -2.2, false, 'kestrel'], ['E', 'Cyberquad 51207', 'Cybertron Battle Cruiser', 5.2, -9.4, true],
+    ['F', 'Lydorian Garbage Scow', 'Droid · class 31', 16.2, 3.1, false], ['G', 'Ironside', 'Dreadnought', 2.4, 6.8, false, 'ironside'],
+    ['H', 'Murdonian Transport', 'Droid · class 32', 23.1, -11.2, false],
+  ].map(([letter, name, cls, x, y, hostile, team], i) => mk({ id: `far${i}`, kind: hostile ? 'quad' : team ? 'player' : 'drone', far: true, letter, name, cls, hostile, team,
+    x, y, h: Math.random() * 360, v: 3000 + i * 900, v2b: 3000 + i * 900, wT: 0 }));
+  const near = [quad, drone, trans];
+  const contacts = [...near, ...FAR];
+  const ships = [me, ...contacts];
+
+  const S = {
+    t: 0, tickT: 0, smooth: true, sound: false, target: null, proj: [], parts: [], beams: [], mines: [], decoys: [], log: [], tipStep: -1,
+    dead: 0, zoom: 1, zoomTo: 1, cam: { x: me.x, y: me.y }, camGoal: { x: me.x, y: me.y }, free: false, shake: 0, hudT: 0, keys: new Set(),
+    credits: 12480, dock: null, dockTab: 'cargo', step: 10, incomeT: 5, ionT: 0, drag: null, lastClick: { t: 0, id: null },
+  };
+
+  // ---------- canvas ----------
+  const cv = $('#stage'), ctx = cv.getContext('2d');
+  const rcv = $('#radar'), rc = rcv.getContext('2d');
+  const dcv = $('#dial'), dc = dcv.getContext('2d');
+  const gcv = $('#dockGlobe'), gc = gcv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, MIN = 1;
+  function fit(c, g, w, h) { c.width = Math.round(w * DPR); c.height = Math.round(h * DPR); g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  const zoomFor = (across) => MIN / across;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight; MIN = Math.max(200, Math.min(W, H));
+    fit(cv, ctx, W, H); fit(rcv, rc, 168, 168); fit(dcv, dc, 92, 92); fit(gcv, gc, 64, 64);
+  }
+  window.addEventListener('resize', () => { const a = MIN / S.zoom, b = MIN / S.zoomTo; resize(); S.zoom = zoomFor(a); S.zoomTo = zoomFor(b); });
+  resize();
+  S.zoom = S.zoomTo = zoomFor(VIEWS[0].across);
+  const Z_MIN = () => zoomFor(240), Z_MAX = () => zoomFor(0.12);
+  const viewIndex = () => { const a = MIN / S.zoom; return a < 0.9 ? 0 : a < 4 ? 1 : a < 110 ? 2 : 3; };
+
+  const layers = [{ f: 0.3, n: 150, s: 0.8, a: 0.35 }, { f: 1, n: 90, s: 1.1, a: 0.55 }, { f: 2.4, n: 40, s: 1.7, a: 0.9 }]
+    .map((l) => ({ ...l, stars: Array.from({ length: l.n }, () => ({ x: Math.random() * 640, y: Math.random() * 640, tw: Math.random() * TAU })) }));
+
+  // ---------- log, tips, sound ----------
+  const logEl = $('#log');
+  const stamp = () => { const s = Math.floor(S.t); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  function say(text, kind = 'info') {
+    S.log.push({ text, kind, at: stamp() });
+    if (S.log.length > 6) S.log.shift();
+    logEl.innerHTML = S.log.map((l, i) => `<li class="${l.kind}" style="opacity:${(0.45 + (0.55 * (i + 7 - S.log.length)) / 6).toFixed(2)}"><time>${l.at}</time>${esc(l.text)}</li>`).join('');
+  }
+  const TIPS = [
+    'You\'re parked beside Tessaly, one of your colonies. Double-click it (or click it, then Orbit) to open the planet screen. Scroll to zoom out.',
+    'Anything you click shows up here. Planets get Set course and Orbit. Ships get a torpedo lock meter.',
+    'Cyberquad inbound at warp 10. Stay above warp 1 and its torpedoes can’t lock you. Its phasers still can.',
+    'This is the planet screen. ‹ brings cargo up to your ship, › puts it down. The hold limit is the Star Cruiser’s real 3,000 tons.',
+  ];
+  function tip(n) { if (n <= S.tipStep) return; S.tipStep = n; $('#tipText').textContent = TIPS[n]; $('#tip').hidden = false; }
+  $('#tipX').addEventListener('click', () => { $('#tip').hidden = true; });
+
+  let ac = null;
+  function tone(f0, f1, dur, type = 'sine', vol = 0.06, delay = 0) {
+    if (!S.sound || !ac) return;
+    const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, vol = 0.2, freq = 600) {
+    if (!S.sound || !ac) return;
+    const len = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; f.type = 'lowpass'; f.frequency.value = freq; g.gain.value = vol;
+    src.connect(f).connect(g).connect(ac.destination); src.start();
+  }
+  const sfx = {
+    phaser: () => tone(1500, 160, 0.28, 'sawtooth', 0.045),
+    torp: () => { noise(0.25, 0.18, 500); tone(320, 80, 0.3, 'triangle', 0.07); },
+    lock: () => { for (let i = 0; i < 3; i++) { tone(880, 880, 0.1, 'square', 0.035, i * 0.2); tone(660, 660, 0.1, 'square', 0.035, i * 0.2 + 0.1); } },
+    attempt: () => { tone(520, 520, 0.09, 'square', 0.03); tone(520, 520, 0.09, 'square', 0.03, 0.16); },
+    boom: () => noise(0.9, 0.35, 280), hit: () => noise(0.18, 0.2, 900),
+    click: () => tone(1200, 900, 0.05, 'square', 0.02), dock: () => { tone(300, 600, 0.35, 'sine', 0.05); tone(600, 900, 0.3, 'sine', 0.04, 0.2); },
+    warp: () => { tone(80, 1200, 0.9, 'sawtooth', 0.04); noise(0.8, 0.12, 1500); },
+  };
+  $('#soundBtn').addEventListener('click', (e) => {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (err) { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+    S.sound = !S.sound && !!ac;
+    e.currentTarget.setAttribute('aria-pressed', String(S.sound));
+    e.currentTarget.textContent = S.sound ? 'Sound on' : 'Sound off';
+  });
+
+  // ---------- combat ----------
+  function spark(x, y, color, n = 14, spd = 0.5) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, v = spd * (0.3 + Math.random());
+      S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.6, max: 1.1, color });
+    }
+  }
+  const PX = () => 1 / S.zoom; // one screen pixel, in sectors — effects are sized in pixels
+  function applyDamage(t, dmg, src, kind) {
+    if (!t.alive) return;
+    let hull = dmg;
+    if (t.shieldUp && t.shield > 0) { const ab = Math.min(t.shield, dmg * 0.8); t.shield -= ab; hull = dmg - ab; }
+    t.hull -= hull; t.hitFlash = 0.25;
+    spark(t.x, t.y, kind === 'phaser' || kind === 'ion' ? COL.amber : '#ffffff', 8, 60 * PX());
+    if (t === me) {
+      S.shake = 1; me.combatT = 6; sfx.hit();
+      if (me.repairing) { me.repairing = false; say('The maintenance team has downed tools. We\'re under fire.', 'warn'); }
+      if (kind === 'torp') say(hull < dmg * 0.5 ? 'We have taken a hit from a torpedo, shields deflected some of the blast!' : 'We have taken a hit from a torpedo, Sir! Damage control has been notified.', 'danger');
+      else if (kind === 'phaser') say(`Phaser fire from ship ${src.letter}! Shields at ${Math.max(0, Math.round(me.shield))}.`, 'danger');
+      else if (kind === 'ion') say(`Ion cannon fire from ${src.name}!`, 'danger');
+      else if (kind === 'missile') say('Missile impact, Sir!', 'danger');
+    } else if (src === me) { t.angry = true; }
+    if (t.hull <= 0) destroy(t);
+  }
+  function destroy(t) {
+    t.alive = false; t.hull = 0;
+    spark(t.x, t.y, t === me ? COL.me : t.hostile ? COL.hostile : COL.droid, 60, 140 * PX());
+    spark(t.x, t.y, '#ffffff', 20, 70 * PX());
+    S.beams.push({ ring: true, x: t.x, y: t.y, t: 0.9 });
+    sfx.boom();
+    if (S.target === t) S.target = null;
+    S.proj = S.proj.filter((p) => p.tgt !== t);
+    if (t === me) { S.dead = 3; closeDock(); me.orbiting = null; say('Hull breach! Hornet destroyed.', 'danger'); $('#dead').hidden = false; }
+    else { say(`${t.name} destroyed!`, 'you'); t.respawn = t.kind === 'quad' ? 30 : 12; }
+  }
+  function respawn(s) {
+    const a = Math.random() * TAU, r = s.kind === 'quad' ? 0.9 : 0.3;
+    Object.assign(s, { x: me.x + Math.cos(a) * r, y: me.y + Math.sin(a) * r, hull: 100, shield: s.shieldMax, alive: true, angry: false, trail: [] });
+    s.snap = { x: s.x, y: s.y, h: s.h };
+    if (s.kind === 'quad') { s.state = 'patrol'; s.home = { x: s.x, y: s.y }; s.v2b = 2000; s.wakeT = 10; }
+    if (s.kind === 'drone') s.home = { x: s.x, y: s.y };
+  }
+  function phaserHit(src, tgt, d) {
+    const base = src === me ? me.phaser * 0.6 : src.kind === 'quad' ? 22 : 10;
+    S.beams.push({ a: src, b: tgt, t: 0.22, color: src.hostile ? COL.hostile : COL.amber });
+    sfx.phaser();
+    if (src === me) me.combatT = 6;
+    applyDamage(tgt, base * phaserStrength(d), src, 'phaser');
+  }
+  function launch(src, tgt, type) {
+    if (!src.alive || !tgt.alive) return;
+    const spec = type === 'torp' ? { speed: 0.09, dmg: 28 + Math.random() * 14 } : { speed: 0.16, dmg: 45 + Math.random() * 12 };
+    S.proj.push({ x: src.x, y: src.y, src, tgt, type, ...spec, life: 30, trail: [], snap: { x: src.x, y: src.y } });
+    sfx.torp();
+    if (src === me) me.combatT = 6;
+    if (tgt === me) say(`WARNING! WARNING! Incoming ${type === 'torp' ? 'torpedo' : 'missile'} from ship ${src.letter}.`, 'danger');
+  }
+  function needTarget() {
+    const t = S.target;
+    if (!me.alive) return null;
+    if (!t) { say('Fire control: no target. Click a ship first.', 'info'); return null; }
+    if (!t.alive || t.planet || t.wormhole) { say('Fire control only locks on ships.', 'info'); return null; }
+    return t;
+  }
+  function flash(id) { const b = $(id); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
+  function firePhaser() {
+    const t = needTarget(); if (!t) return; flash('#w1');
+    const d = dist(me, t);
+    if (d > PHASER_RANGE) return say(`Ship ${t.letter} is ${d.toFixed(2)} sectors out. Phasers reach ${PHASER_RANGE}.`, 'info');
+    if (me.phaser < 20) return say('Phaser banks still charging, Sir.', 'info');
+    phaserHit(me, t, d); me.phaser = 0;
+  }
+  function fireTorp() {
+    const t = needTarget(); if (!t) return; flash('#w2');
+    if (me.items[I.TOR] <= 0) return say('Torpedo racks are empty.', 'info');
+    if (lockFact(me.v, t.v, dist(me, t)) <= LOCK_MIN) return say(`Fire control scanners cannot get a positive lock on ship ${t.letter}, Sir!`, 'warn');
+    me.items[I.TOR]--; launch(me, t, 'torp'); say('Torpedoes fired sir!', 'you');
+  }
+  function fireMissile() {
+    const t = needTarget(); if (!t) return; flash('#w3');
+    if (me.items[I.MIS] <= 0) return say('No missiles left.', 'info');
+    const d = dist(me, t);
+    if (d > MISSILE_RANGE) return say(`Ship ${t.letter} is out of missile range (${MISSILE_RANGE} sectors).`, 'info');
+    me.items[I.MIS]--; launch(me, t, 'missile'); say('Missile away!', 'you');
+  }
+  function dropDecoy() {
+    if (!me.alive) return; flash('#w4');
+    if (me.items[I.DEC] <= 0) return say('No decoys left.', 'info');
+    me.items[I.DEC]--;
+    const dcy = { x: me.x - Math.sin(me.h * D2R) * 0.004, y: me.y + Math.cos(me.h * D2R) * 0.004, alive: true, life: 20 };
+    S.decoys.push(dcy);
+    let pulled = 0;
+    for (const p of S.proj) if (p.tgt === me && Math.random() < 0.6) { p.tgt = dcy; pulled++; }
+    say(pulled ? `Decoy launched. ${pulled} incoming ${pulled > 1 ? 'are' : 'is'} following it.` : 'Decoy launched.', 'you');
+  }
+  function dropMine() {
+    if (!me.alive) return; flash('#w5');
+    if (me.items[I.MIN] <= 0) return say('No mines left.', 'info');
+    me.items[I.MIN]--; S.mines.push({ x: me.x, y: me.y, arm: 3 }); say('Mine laid. It arms in three seconds.', 'you');
+  }
+  const FIRE = [firePhaser, fireTorp, fireMissile, dropDecoy, dropMine];
+  FIRE.forEach((fn, i) => $(`#w${i + 1}`).addEventListener('click', fn));
+  function toggleShields() { me.shieldUp = !me.shieldUp; say(me.shieldUp ? 'Shields up.' : 'Shields down.', me.shieldUp ? 'you' : 'warn'); hud(); }
+  $('#shBtn').addEventListener('click', toggleShields);
+
+  // ---------- navigation ----------
+  const thr = $('#throttle');
+  const cruise = () => Number(thr.value) * 1000;
+  thr.addEventListener('input', () => { if (me.orbiting) leaveOrbit(); if (!me.dest) me.v2b = cruise(); });
+  function setCourse(x, y, goal = null) {
+    if (!me.alive) return;
+    if (me.orbiting) leaveOrbit(true);
+    me.dest = { x, y }; me.orbitGoal = goal;
+    if (cruise() === 0) { thr.value = '6'; }
+    const d = dist(me, me.dest);
+    say(goal ? `Course laid in for ${goal.name}, ${d.toFixed(2)} sectors. ETA ${fmtEta(d / (warpOf(cruise()) * K))} at warp ${warpOf(cruise()).toFixed(1)}.`
+      : `Course laid in: ${d.toFixed(2)} sectors, ETA ${fmtEta(d / (warpOf(cruise()) * K))}.`, 'cmd');
+  }
+  function orbitPlanet(p) {
+    if (!p || !p.planet || !me.alive) return;
+    if (me.orbiting === p) { openDock(p); return; }
+    if (dist(me, p) <= ORBIT_R) enterOrbit(p);
+    else setCourse(p.x, p.y, p);
+  }
+  function enterOrbit(p) {
+    Object.assign(me, { orbiting: p, orbitGoal: null, dest: null, v: 0, v2b: 0, orbitA: bearing(p, me) });
+    say(`> orbit ${p.name}`, 'cmd');
+    say(`Standard orbit around ${p.name}, Sir.`, 'you');
+    sfx.dock();
+    openDock(p);
+    tip(3);
+  }
+  function leaveOrbit(silent) {
+    if (!me.orbiting) return;
+    const p = me.orbiting;
+    me.orbiting = null; me.repairing = false;
+    closeDock();
+    if (!silent) say(`Leaving orbit of ${p.name}.`, 'info');
+  }
+
+  // ---------- simulation ----------
+  function steer(s, dt) {
+    const d = angDiff(s.h, s.h2b), m = s.turn * dt;
+    s.h = wrap(s.h + clamp(d, -m, m));
+    const a = s.acc * dt; s.v += clamp(s.v2b - s.v, -a, a);
+    const step = warpOf(s.v) * K * dt;
+    s.x += Math.sin(s.h * D2R) * step; s.y -= Math.cos(s.h * D2R) * step;
+    fx(s, dt);
+  }
+  function fx(s, dt) {
+    if (s.shieldUp && s.shield < s.shieldMax) s.shield = Math.min(s.shieldMax, s.shield + (s.shieldMax / 30) * dt);
+    s.hitFlash = Math.max(0, s.hitFlash - dt); s.lockFlash = Math.max(0, s.lockFlash - dt);
+    s.trailT -= dt;
+    if (s.trailT <= 0) { s.trailT = 0.12; if (s.v > 250) s.trail.push({ x: s.x, y: s.y, a: 1 }); if (s.trail.length > 30) s.trail.shift(); }
+    for (const p of s.trail) p.a -= dt * 0.45;
+    while (s.trail.length && s.trail[0].a <= 0) s.trail.shift();
+  }
+
+  function updateMe(dt) {
+    if (!me.alive) return;
+    me.phaser = Math.min(100, me.phaser + 12 * dt);
+    me.combatT = Math.max(0, me.combatT - dt);
+    if (me.orbiting) {
+      const p = me.orbiting;
+      me.orbitA = wrap(me.orbitA + dt * 14);
+      me.x = p.x + Math.sin(me.orbitA * D2R) * ORBIT_R * 0.55; me.y = p.y - Math.cos(me.orbitA * D2R) * ORBIT_R * 0.55;
+      me.h = wrap(me.orbitA + 90); me.h2b = me.h;
+      if (me.repairing) {
+        me.hull = Math.min(100, me.hull + 3 * dt);
+        if (me.hull >= 100) { me.repairing = false; say('Repairs complete. Hull at 100%.', 'you'); }
+      }
+      fx(me, dt);
+      return;
+    }
+    if (S.keys.has('a') || S.keys.has('d')) { me.dest = null; me.orbitGoal = null; me.h2b = wrap(me.h + (S.keys.has('a') ? -45 : 45)); }
+    if (me.dest) {
+      const d = dist(me, me.dest);
+      me.h2b = bearing(me, me.dest);
+      if (me.orbitGoal && d <= ORBIT_R * 0.8) { enterOrbit(me.orbitGoal); return; }
+      if (d < 0.0015) { me.dest = null; me.v2b = 0; }
+      else {
+        let v = Math.min(cruise() || 6000, Math.max(250, d * 60000));
+        if (Math.abs(angDiff(me.h, me.h2b)) > 50) v = Math.min(v, 600);
+        me.v2b = v;
+      }
+    }
+    steer(me, dt);
+    for (const w of wormholes) {
+      if (dist(me, w) < 0.006) {
+        me.x = w.exit.x; me.y = w.exit.y; me.snap = { x: me.x, y: me.y, h: me.h }; me.trail = []; me.dest = null; me.v2b = Math.min(me.v2b, 1000);
+        S.cam = { x: me.x, y: me.y }; S.free = false;
+        spark(me.x, me.y, '#c79bff', 50, 120 * PX()); sfx.warp();
+        say(`Through the wormhole. We've come out in sector ${secOf(me)}.`, 'warn');
+        break;
+      }
+    }
+  }
+
+  function updateQuad(q, dt) {
+    if (!q.alive) { q.respawn -= dt; if (q.respawn <= 0) respawn(q); return; }
+    const d = dist(q, me);
+    q.cool -= dt; q.phT -= dt; q.wakeT -= dt;
+    if (q.state === 'patrol') {
+      const dh = dist(q, q.home);
+      q.h2b = dh > 0.08 ? bearing(q, q.home) : wrap(bearing(q, q.home) + 95); q.v2b = 1500;
+      if (me.alive && d < 0.6 && q.wakeT <= 0) { q.state = 'pursue'; say('Scanners: Cyberquad 43332 (A) has turned toward us. Warp 10.', 'danger'); tip(2); }
+    } else if (q.state === 'pursue') {
+      q.h2b = bearing(q, me); q.v2b = 10000;
+      if (d < 0.1) { q.state = 'engage'; q.cool = 1.8; q.phT = 1; }
+      if (!me.alive || d > 3) q.state = 'patrol';
+    } else if (q.state === 'engage') {
+      q.h2b = wrap(bearing(q, me) + 75); q.v2b = 800;
+      if (d > 0.3) q.state = 'pursue';
+      if (q.cool <= 0 && me.alive) {
+        q.cool = 3.6;
+        if (lockFact(q.v, me.v, d) > LOCK_MIN) {
+          me.lockFlash = 1.6; sfx.lock();
+          say('WARNING! WARNING! Ship A has a fire control scanner locked on us!', 'danger');
+          const n = 1 + Math.floor(Math.random() * 2);
+          for (let i = 0; i < n; i++) setTimeout(() => launch(q, me, 'torp'), i * 300);
+        } else {
+          me.lockFlash = 0.9; sfx.attempt();
+          say('WARNING! WARNING! Ship A is attempting to lock fire control scanners on us.', 'warn');
+        }
+      }
+      if (q.phT <= 0 && d < 0.25 && me.alive) { q.phT = 4.4; phaserHit(q, me, d); }
+      if (q.hull < 30) { q.state = 'flee'; say('Cyberquad 43332 is breaking off.', 'info'); }
+    } else if (q.state === 'flee') {
+      q.h2b = wrap(bearing(q, me) + 180); q.v2b = 10000;
+      if (d > 1.2) { q.state = 'patrol'; q.home = { x: q.x, y: q.y }; q.hull = Math.min(100, q.hull + 40); q.wakeT = 20; }
+    }
+    steer(q, dt);
+  }
+  function updateDrone(s, dt) {
+    if (!s.alive) { s.respawn -= dt; if (s.respawn <= 0) respawn(s); return; }
+    const d = dist(s, me);
+    s.wT -= dt; s.phT -= dt;
+    if (s.angry && me.alive && d < 0.3) {
+      s.h2b = wrap(bearing(s, me) + 60); s.v2b = 600;
+      if (s.phT <= 0 && d < 0.25) { s.phT = 6; phaserHit(s, me, d); }
+    } else if (s.wT <= 0) {
+      s.wT = 4 + Math.random() * 5;
+      s.h2b = dist(s, s.home) > 0.06 ? bearing(s, s.home) : Math.random() * 360;
+      s.v2b = 300 + Math.random() * 700;
+    }
+    steer(s, dt);
+  }
+  function updateTransport(s, dt) {
+    if (!s.alive) { s.respawn -= dt; if (s.respawn <= 0) respawn(s); return; }
+    s.h2b = 95; s.v2b = 2500;
+    if (dist(s, me) > 1.5) { s.x = me.x - 0.7; s.y = me.y + (Math.random() * 0.4 - 0.2); s.trail = []; s.snap = { x: s.x, y: s.y, h: s.h }; }
+    steer(s, dt);
+  }
+  function updateFar(s, dt) {
+    s.wT -= dt;
+    if (s.wT <= 0) { s.wT = 20 + Math.random() * 30; s.h2b = Math.random() * 360; }
+    steer(s, dt);
+  }
+  function updateProjectiles(dt) {
+    for (const p of S.proj) {
+      p.life -= dt;
+      const t = p.tgt;
+      if (!t || !t.alive || p.life <= 0) { p.dead = true; spark(p.x, p.y, '#888888', 5, 20 * PX()); continue; }
+      const d = dist(p, t), step = p.speed * dt;
+      if (d <= step + 0.0015) {
+        p.dead = true;
+        if (S.decoys.includes(t)) { t.alive = false; spark(t.x, t.y, COL.me, 18, 60 * PX()); say('A decoy took the hit.', 'you'); }
+        else applyDamage(t, p.dmg, p.src, p.type === 'torp' ? 'torp' : 'missile');
+      } else {
+        p.x += ((t.x - p.x) / d) * step; p.y += ((t.y - p.y) / d) * step;
+        p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 16) p.trail.shift();
+      }
+    }
+    S.proj = S.proj.filter((p) => !p.dead);
+  }
+  function updateMinesDecoys(dt) {
+    for (const m of S.mines) {
+      m.arm -= dt;
+      if (m.arm > 0) continue;
+      for (const s of near) {
+        if (s.alive && dist(m, s) < 0.012) { m.dead = true; S.beams.push({ ring: true, x: m.x, y: m.y, t: 0.6 }); applyDamage(s, 45, me, 'mine'); say(`Our mine caught ship ${s.letter}!`, 'you'); break; }
+      }
+    }
+    S.mines = S.mines.filter((m) => !m.dead);
+    for (const dcy of S.decoys) { dcy.life -= dt; if (dcy.life <= 0) dcy.alive = false; }
+    S.decoys = S.decoys.filter((d) => d.alive);
+  }
+  function updatePlanets(dt) {
+    S.incomeT -= dt;
+    if (S.incomeT <= 0) {
+      S.incomeT = 6;
+      for (const p of yourPlanets()) p.cash += Math.round(p.stores[I.MEN] * (p.tax / 100) * 0.25);
+      if (S.dock) refreshDock();
+      if (!$('#coloniesOv').hidden) renderColonies();
+    }
+    // An enemy planet you have attacked shoots back while you sit in its orbit.
+    if (me.orbiting && me.orbiting.hostile && me.orbiting.owner !== 'you' && me.orbiting.stores[I.ION] > 0 && me.alive) {
+      S.ionT -= dt;
+      if (S.ionT <= 0) { S.ionT = 5; const p = me.orbiting; S.beams.push({ a: p, b: me, t: 0.3, color: '#ff8a3d' }); applyDamage(me, 5 + p.stores[I.ION], p, 'ion'); }
+    }
+    // Your own colony's ion cannons cover you when a Cybertron attacks inside its orbit.
+    const t = home[0];
+    if (t.owner === 'you' && quad.alive && quad.state === 'engage' && dist(quad, t) < 0.08) {
+      t.ionCool = (t.ionCool ?? 2) - dt;
+      if (t.ionCool <= 0) { t.ionCool = 4; S.beams.push({ a: t, b: quad, t: 0.3, color: COL.me }); applyDamage(quad, 6 + t.stores[I.ION], t, 'ion'); say('Tessaly\'s ion cannons are firing on ship A.', 'you'); }
+    }
+  }
+
+  function step(dt) {
+    S.t += dt;
+    updateMe(dt); updateQuad(quad, dt); updateDrone(drone, dt); updateTransport(trans, dt);
+    for (const f of FAR) updateFar(f, dt);
+    updateProjectiles(dt); updateMinesDecoys(dt); updatePlanets(dt);
+    for (const p of S.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; p.life -= dt; }
+    S.parts = S.parts.filter((p) => p.life > 0);
+    for (const b of S.beams) b.t -= dt;
+    S.beams = S.beams.filter((b) => b.t > 0);
+    S.shake = Math.max(0, S.shake - dt * 2.5);
+
+    // The server moves each ship once every three seconds; with smoothing off, that's all you see.
+    S.tickT += dt;
+    if (S.tickT >= 3) {
+      S.tickT -= 3;
+      for (const s of ships) s.snap = { x: s.x, y: s.y, h: s.h };
+      for (const p of S.proj) p.snap = { x: p.x, y: p.y };
+    }
+
+    // camera and zoom
+    const k = 1 - Math.exp(-dt * 9);
+    S.zoom = Math.exp(Math.log(S.zoom) + (Math.log(S.zoomTo) - Math.log(S.zoom)) * k);
+    if (!S.free) S.camGoal = { x: rp(me).x, y: rp(me).y };
+    if (!S.smooth && !S.free) S.cam = { ...S.camGoal };
+    else { S.cam.x += (S.camGoal.x - S.cam.x) * (S.free ? k : Math.min(1, k * 2.2)); S.cam.y += (S.camGoal.y - S.cam.y) * (S.free ? k : Math.min(1, k * 2.2)); }
+
+    if (S.dead > 0) {
+      S.dead -= dt;
+      if (S.dead <= 0) {
+        Object.assign(me, { alive: true, hull: 100, shield: 100, v: 0, v2b: 0, dest: null, orbitGoal: null, trail: [] });
+        me.snap = { x: me.x, y: me.y, h: me.h };
+        if (quad.alive) quad.state = 'flee';
+        $('#dead').hidden = true; say('Hornet restored. The Cyberquad is withdrawing.', 'info');
+      }
+    }
+    S.hudT -= dt;
+    if (S.hudT <= 0) { S.hudT = 0.1; hud(); }
+  }
+
+  // ---------- rendering ----------
+  const rp = (s) => (S.smooth || !s.snap ? s : s.snap);
+  const X = (x) => W / 2 + (x - S.cam.x) * S.zoom;
+  const Y = (y) => H / 2 + (y - S.cam.y) * S.zoom;
+  const onScreen = (x, y, m = 40) => x > -m && y > -m && x < W + m && y < H + m;
+  const R_SHIP = 10;
+  const colorOf = (s) => (s.kind === 'me' ? COL.me : s.hostile ? COL.hostile : s.team ? OWNERS[s.team].color : s.kind === 'drone' ? COL.droid : COL.neutral);
+  const ownerColor = (p) => (p.owner ? OWNERS[p.owner].color : '#8a96a3');
+
+  function drawBackground() {
+    ctx.fillStyle = '#070a0f'; ctx.fillRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(W * 0.75, H * 0.2, 0, W * 0.75, H * 0.2, Math.max(W, H) * 0.8);
+    g.addColorStop(0, 'rgba(92,52,140,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const g2 = ctx.createRadialGradient(W * 0.15, H * 0.85, 0, W * 0.15, H * 0.85, Math.max(W, H) * 0.6);
+    g2.addColorStop(0, 'rgba(255,128,0,0.05)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+    const T = 640;
+    for (const l of layers) {
+      const ox = ((-S.cam.x * l.f * 200) % T + T) % T, oy = ((-S.cam.y * l.f * 200) % T + T) % T;
+      for (let tx = 0; tx * T < W + T; tx++) for (let ty = 0; ty * T < H + T; ty++) {
+        for (const s of l.stars) {
+          const x = s.x + ox + (tx - 1) * T, y = s.y + oy + (ty - 1) * T;
+          if (x < -2 || y < -2 || x > W + 2 || y > H + 2) continue;
+          const tw = RM ? 1 : 0.7 + 0.3 * Math.sin(S.t * 1.7 + s.tw);
+          ctx.fillStyle = `rgba(215,228,245,${(l.a * tw).toFixed(3)})`;
+          ctx.fillRect(x, y, l.s, l.s);
+        }
+      }
+    }
+  }
+
+  function visibleSectors() {
+    const x0 = Math.floor(S.cam.x - W / 2 / S.zoom), x1 = Math.floor(S.cam.x + W / 2 / S.zoom);
+    const y0 = Math.floor(S.cam.y - H / 2 / S.zoom), y1 = Math.floor(S.cam.y + H / 2 / S.zoom);
+    return { x0: Math.max(-UNIV, x0), x1: Math.min(UNIV - 1, x1), y0: Math.max(-UNIV, y0), y1: Math.min(UNIV - 1, y1) };
+  }
+
+  function drawMap() {
+    const z = S.zoom, v = visibleSectors();
+    // territory, when a sector is small enough to read as a tile
+    if (z < 40) {
+      const a = z < 8 ? 0.4 : 0.22 * (1 - (z - 8) / 32) + 0.06;
+      for (const [x, y, o] of TERR) {
+        if (x < v.x0 - 1 || x > v.x1 + 1 || y < v.y0 - 1 || y > v.y1 + 1) continue;
+        ctx.fillStyle = hexA(OWNERS[o].color, a); ctx.fillRect(X(x), Y(y), z + 0.5, z + 0.5);
+      }
+      for (const p of yourPlanets()) { const sx = Math.floor(p.x), sy = Math.floor(p.y); ctx.fillStyle = hexA(COL.me, a + 0.15); ctx.fillRect(X(sx), Y(sy), z + 0.5, z + 0.5); }
+    }
+    // neutral zone
+    ctx.fillStyle = 'rgba(127,211,122,0.07)'; ctx.fillRect(X(0), Y(0), z, z);
+    ctx.strokeStyle = 'rgba(127,211,122,0.45)'; ctx.lineWidth = 1; ctx.strokeRect(X(0) + 0.5, Y(0) + 0.5, z, z);
+    // your current sector
+    ctx.fillStyle = 'rgba(255,176,0,0.03)'; ctx.fillRect(X(Math.floor(me.x)), Y(Math.floor(me.y)), z, z);
+    // grid
+    const step = z < 2.5 ? 25 : z < 12 ? 10 : 1;
+    ctx.strokeStyle = step === 1 ? 'rgba(255,176,0,0.09)' : 'rgba(255,176,0,0.12)'; ctx.beginPath();
+    for (let x = Math.ceil(v.x0 / step) * step; x <= v.x1 + 1; x += step) { const px = Math.round(X(x)) + 0.5; ctx.moveTo(px, Math.max(0, Y(-UNIV))); ctx.lineTo(px, Math.min(H, Y(UNIV))); }
+    for (let y = Math.ceil(v.y0 / step) * step; y <= v.y1 + 1; y += step) { const py = Math.round(Y(y)) + 0.5; ctx.moveTo(Math.max(0, X(-UNIV)), py); ctx.lineTo(Math.min(W, X(UNIV)), py); }
+    ctx.stroke();
+    // galaxy edge
+    ctx.strokeStyle = 'rgba(255,176,0,0.5)'; ctx.strokeRect(X(-UNIV), Y(-UNIV), 2 * UNIV * z, 2 * UNIV * z);
+    ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(255,176,0,0.35)';
+    if (z > 70) { for (let x = v.x0; x <= v.x1; x++) for (let y = v.y0; y <= v.y1; y++) ctx.fillText(`${x},${y}`, X(x) + 6, Y(y) + 14); }
+    else if (step > 1) { for (let x = Math.ceil(v.x0 / step) * step; x <= v.x1; x += step) for (let y = Math.ceil(v.y0 / step) * step; y <= v.y1; y += step) ctx.fillText(`${x},${y}`, X(x) + 4, Y(y) + 12); }
+    if (z < 60) {
+      ctx.fillStyle = 'rgba(127,211,122,0.8)'; ctx.font = '600 11px "Saira Condensed", sans-serif';
+      ctx.fillText('NEUTRAL ZONE', X(0) + Math.max(z, 4) + 4, Y(0) + 10);
+    }
+  }
+
+  function drawGlobe(g, x, y, r, env, glow) {
+    const c = ENVS[env] || ENVS.Terran;
+    if (env === 'Station') {
+      g.save(); g.translate(x, y); g.rotate(S.t * 0.2);
+      g.strokeStyle = c[0]; g.lineWidth = 1.6; g.strokeRect(-r * 0.75, -r * 0.75, r * 1.5, r * 1.5);
+      g.fillStyle = c[1]; g.fillRect(-r * 0.35, -r * 0.35, r * 0.7, r * 0.7); g.restore();
+      return;
+    }
+    const gr = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    gr.addColorStop(0, c[0]); gr.addColorStop(0.55, c[1]); gr.addColorStop(1, c[2]);
+    if (glow) { g.shadowBlur = 16; g.shadowColor = c[1]; }
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); g.shadowBlur = 0;
+  }
+
+  function drawPlanets() {
+    const z = S.zoom;
+    if (z < 14) return;
+    const v = visibleSectors();
+    if ((v.x1 - v.x0 + 1) * (v.y1 - v.y0 + 1) > 4200) return;
+    for (let sx = v.x0; sx <= v.x1; sx++) for (let sy = v.y0; sy <= v.y1; sy++) {
+      for (const p of sectorPlanets(sx, sy)) {
+        const px = X(p.x), py = Y(p.y);
+        if (!onScreen(px, py)) continue;
+        if (z < 110) { ctx.fillStyle = ownerColor(p); ctx.fillRect(px - 1.5, py - 1.5, 3, 3); continue; }
+        const r = 5 + p.size * 7;
+        const orb = ORBIT_R * z;
+        if (orb > r + 8) {
+          ctx.strokeStyle = me.orbitGoal === p || me.orbiting === p ? 'rgba(255,176,0,0.55)' : 'rgba(255,255,255,0.1)';
+          ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.arc(px, py, orb, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+        }
+        drawGlobe(ctx, px, py, r, p.env, true);
+        if (p.owner) { ctx.strokeStyle = hexA(ownerColor(p), 0.9); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, r + 4, 0, TAU); ctx.stroke(); ctx.lineWidth = 1; }
+        if (z > 180) {
+          ctx.font = '600 12px "Saira Condensed", sans-serif'; ctx.fillStyle = 'rgba(219,226,234,0.9)';
+          ctx.fillText(p.name.toUpperCase(), px + r + 9, py + 1);
+          ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillStyle = hexA(ownerColor(p), 0.9);
+          ctx.fillText(p.owner ? OWNERS[p.owner].name : 'unclaimed', px + r + 9, py + 13);
+        }
+      }
+    }
+    for (const w of wormholes) {
+      const px = X(w.x), py = Y(w.y);
+      if (!onScreen(px, py) || z < 60) continue;
+      ctx.save(); ctx.translate(px, py);
+      for (let i = 0; i < 3; i++) {
+        ctx.rotate(RM ? 0.6 : S.t * (0.8 + i * 0.3)); ctx.strokeStyle = `rgba(199,155,255,${0.7 - i * 0.18})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 7 + i * 4, 0, Math.PI * 1.2); ctx.stroke();
+      }
+      ctx.restore();
+      if (z > 180) { ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(199,155,255,0.85)'; ctx.fillText(`WORMHOLE → ${Math.floor(w.exit.x)},${Math.floor(w.exit.y)}`, px + 22, py + 4); }
+    }
+  }
+
+  function shipPath(kind, r) {
+    ctx.beginPath();
+    if (kind === 'me') { ctx.moveTo(0, -r); ctx.lineTo(r * 0.72, r * 0.8); ctx.lineTo(0, r * 0.35); ctx.lineTo(-r * 0.72, r * 0.8); }
+    else if (kind === 'quad') {
+      ctx.moveTo(0, -r * 1.1); ctx.lineTo(r * 0.32, -r * 0.3); ctx.lineTo(r * 1.05, 0); ctx.lineTo(r * 0.32, r * 0.3);
+      ctx.lineTo(0, r * 1.05); ctx.lineTo(-r * 0.32, r * 0.3); ctx.lineTo(-r * 1.05, 0); ctx.lineTo(-r * 0.32, -r * 0.3);
+    } else if (kind === 'drone') { ctx.moveTo(0, -r * 0.8); ctx.lineTo(r * 0.6, r * 0.6); ctx.lineTo(-r * 0.6, r * 0.6); }
+    else if (kind === 'player') { ctx.moveTo(0, -r); ctx.lineTo(r * 0.5, 0); ctx.lineTo(r * 0.8, r * 0.9); ctx.lineTo(0, r * 0.5); ctx.lineTo(-r * 0.8, r * 0.9); ctx.lineTo(-r * 0.5, 0); }
+    else { ctx.moveTo(-r * 0.4, -r * 1.2); ctx.lineTo(r * 0.4, -r * 1.2); ctx.lineTo(r * 0.5, r * 0.9); ctx.lineTo(r * 0.9, r * 1.2); ctx.lineTo(-r * 0.9, r * 1.2); ctx.lineTo(-r * 0.5, r * 0.9); }
+    ctx.closePath();
+  }
+  function shipVisible(s) {
+    if (s === me) return true;
+    if (!s.alive) return false;
+    const d = dist(me, s);
+    return d <= SCAN_RANGE && S.zoom >= 3;
+  }
+  function drawShip(s) {
+    if (!shipVisible(s)) return;
+    const p = rp(s), px = X(p.x), py = Y(p.y), z = S.zoom;
+    if (!onScreen(px, py)) return;
+    const col = s.hitFlash > 0 ? '#ffffff' : colorOf(s);
+    if (z < 110 && s !== me) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+      if (z > 8) { ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.fillText(s.letter, px + 5, py - 4); }
+      return;
+    }
+    if (s === me && z < 110) {
+      const pulse = RM ? 0 : (S.t * 1.2) % 1;
+      ctx.strokeStyle = hexA(COL.me, 0.8 - pulse * 0.8); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, 6 + pulse * 18, 0, TAU); ctx.stroke();
+    }
+    if (S.smooth && s.trail.length > 1 && z > 110) {
+      ctx.lineWidth = 2;
+      for (let i = 1; i < s.trail.length; i++) {
+        const a = s.trail[i - 1], b = s.trail[i];
+        ctx.strokeStyle = hexA(colorOf(s), Math.max(0, b.a) * 0.35);
+        ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); ctx.stroke();
+      }
+    }
+    const r = (s.kind === 'trans' ? 1.2 : 1) * (s === me ? R_SHIP + 1 : R_SHIP);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(p.h * D2R);
+    if (s.v > 300) {
+      const len = r * (0.6 + Math.min(1.4, warpOf(s.v) / 6)) * (RM ? 1 : 0.85 + Math.random() * 0.3);
+      const g = ctx.createLinearGradient(0, r * 0.6, 0, r * 0.6 + len);
+      g.addColorStop(0, hexA(colorOf(s), 0.8)); g.addColorStop(1, hexA(colorOf(s), 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-r * 0.25, r * 0.6); ctx.lineTo(r * 0.25, r * 0.6); ctx.lineTo(0, r * 0.6 + len); ctx.fill();
+    }
+    ctx.shadowBlur = 14; ctx.shadowColor = col;
+    shipPath(s.kind, r);
+    ctx.fillStyle = hexA(col, 0.2); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.restore();
+    if (s.shieldUp && s.shield > 1 && z > 110) {
+      ctx.strokeStyle = hexA(colorOf(s), 0.12 + 0.25 * (s.shield / s.shieldMax) * (s.hitFlash > 0 ? 3 : 1));
+      ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, r * 1.55, 0, TAU); ctx.stroke();
+    }
+    if (s !== me && z > 110) {
+      ctx.font = '600 11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = hexA(colorOf(s), 0.95); ctx.fillRect(px + r + 6, py - r - 2, 14, 14);
+      ctx.fillStyle = s.hostile ? '#ffffff' : '#070a0f'; ctx.fillText(s.letter, px + r + 9, py - r + 9);
+      ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillStyle = hexA(colorOf(s), 0.85);
+      ctx.fillText(s.name, px + r + 25, py - r + 9);
+      ctx.fillStyle = 'rgba(219,226,234,0.55)'; ctx.fillText(`w${warpOf(s.v).toFixed(1)}`, px + r + 25, py - r + 22);
+    }
+  }
+
+  function targetPos(t) { return t.planet || t.wormhole ? t : rp(t); }
+  function drawOverlays() {
+    const z = S.zoom, mp = rp(me), mx = X(mp.x), my = Y(mp.y);
+    if (z >= 3 && z < 110) {
+      ctx.strokeStyle = 'rgba(255,176,0,0.25)'; ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.arc(mx, my, SCAN_RANGE * z, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      if (SCAN_RANGE * z < Math.max(W, H)) { ctx.fillStyle = 'rgba(255,176,0,0.55)'; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillText('SCANNER RANGE · 20 SECTORS', mx + 6, my - SCAN_RANGE * z - 6); }
+    }
+    if (me.dest && me.alive) {
+      const dx = X(me.dest.x), dy = Y(me.dest.y);
+      ctx.strokeStyle = 'rgba(255,176,0,0.5)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(dx, dy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.save(); ctx.translate(dx, dy); ctx.rotate(Math.PI / 4); ctx.strokeStyle = COL.amber; ctx.strokeRect(-5, -5, 10, 10); ctx.restore();
+      const eta = dist(me, me.dest) / Math.max(1e-6, warpOf(Math.max(me.v, 1)) * K);
+      ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(255,176,0,0.85)';
+      ctx.fillText(`${dist(me, me.dest).toFixed(2)} sec · ETA ${fmtEta(eta)}`, dx + 10, dy - 8);
+    }
+    const t = S.target;
+    if (t && t.alive !== false && me.alive && (t.planet || t.wormhole || shipVisible(t))) {
+      const tp = targetPos(t), tx = X(tp.x), ty = Y(tp.y), d = dist(me, t);
+      if (!t.planet && !t.wormhole && z > 110) {
+        const eff = PHASER_RANGE * (1 - Math.pow(0.25, 0.2));
+        ctx.strokeStyle = 'rgba(255,176,0,0.16)'; ctx.setLineDash([2, 6]);
+        ctx.beginPath(); ctx.arc(mx, my, eff * z, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      }
+      if (!me.dest || d < 3) {
+        ctx.strokeStyle = 'rgba(255,176,0,0.35)'; ctx.setLineDash([1, 5]);
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+      }
+      const rr = (t.planet ? 5 + t.size * 7 : R_SHIP) + 9 + (RM ? 0 : Math.sin(S.t * 4) * 2), c = 7;
+      ctx.strokeStyle = COL.amber; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        ctx.moveTo(tx + sx * rr, ty + sy * (rr - c)); ctx.lineTo(tx + sx * rr, ty + sy * rr); ctx.lineTo(tx + sx * (rr - c), ty + sy * rr);
+      }
+      ctx.stroke(); ctx.lineWidth = 1;
+    }
+    if (me.lockFlash > 0 && me.alive) {
+      const r = R_SHIP + 16, a = Math.min(1, me.lockFlash);
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(RM ? 0 : S.t * 2.5);
+      ctx.strokeStyle = hexA(COL.hostile, a); ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(r - 6, 0); ctx.lineTo(r + 6, 0); ctx.stroke(); }
+      ctx.restore(); ctx.lineWidth = 1;
+    }
+  }
+
+  function drawFx() {
+    for (const m of S.mines) {
+      const armed = m.arm <= 0, px = X(m.x), py = Y(m.y), s = 4 + (armed && !RM ? Math.sin(S.t * 6) : 0);
+      ctx.save(); ctx.translate(px, py); ctx.rotate(Math.PI / 4);
+      ctx.strokeStyle = armed ? COL.amber : 'rgba(255,176,0,0.35)'; ctx.lineWidth = 1.5; ctx.strokeRect(-s, -s, s * 2, s * 2); ctx.restore();
+    }
+    for (const dcy of S.decoys) if (RM || Math.sin(S.t * 20) > -0.3) { ctx.fillStyle = hexA(COL.me, 0.6); ctx.beginPath(); ctx.arc(X(dcy.x), Y(dcy.y), 3, 0, TAU); ctx.fill(); }
+    for (const p of S.proj) {
+      const pos = S.smooth ? p : p.snap, col = p.src === me ? COL.amber : COL.hostile;
+      if (S.smooth && p.trail.length > 1) {
+        ctx.strokeStyle = hexA(col, 0.35); ctx.lineWidth = 2; ctx.beginPath();
+        ctx.moveTo(X(p.trail[0].x), Y(p.trail[0].y)); for (const q of p.trail) ctx.lineTo(X(q.x), Y(q.y)); ctx.stroke();
+      }
+      ctx.shadowBlur = 12; ctx.shadowColor = col; ctx.fillStyle = p.type === 'torp' ? '#ffffff' : col;
+      ctx.beginPath(); ctx.arc(X(pos.x), Y(pos.y), p.type === 'torp' ? 3.2 : 2.4, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
+    }
+    for (const b of S.beams) {
+      if (b.ring) {
+        const k = 1 - b.t / 0.9;
+        ctx.strokeStyle = `rgba(255,220,160,${(b.t / 0.9).toFixed(3)})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), 6 + k * 60, 0, TAU); ctx.stroke(); ctx.lineWidth = 1;
+        continue;
+      }
+      const a = targetPos(b.a), c = targetPos(b.b), al = clamp(b.t / 0.22, 0, 1);
+      ctx.shadowBlur = 16; ctx.shadowColor = b.color; ctx.strokeStyle = hexA(b.color, al); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(c.x), Y(c.y)); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,255,${al.toFixed(3)})`; ctx.lineWidth = 1; ctx.stroke(); ctx.shadowBlur = 0;
+    }
+    for (const p of S.parts) { ctx.fillStyle = hexA(p.color, clamp(p.life / p.max, 0, 1)); ctx.fillRect(X(p.x) - 1, Y(p.y) - 1, 2.2, 2.2); }
+  }
+
+  function drawRadar() {
+    const c = 84, R = 78, range = SHORT_RANGE;
+    rc.clearRect(0, 0, 168, 168);
+    const g = rc.createRadialGradient(c, c, 0, c, c, R);
+    g.addColorStop(0, 'rgba(255,176,0,0.08)'); g.addColorStop(1, 'rgba(255,176,0,0.02)');
+    rc.fillStyle = g; rc.beginPath(); rc.arc(c, c, R, 0, TAU); rc.fill();
+    rc.strokeStyle = 'rgba(255,176,0,0.2)'; rc.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) { rc.beginPath(); rc.arc(c, c, (R * i) / 4, 0, TAU); rc.stroke(); }
+    rc.beginPath(); rc.moveTo(c - R, c); rc.lineTo(c + R, c); rc.moveTo(c, c - R); rc.lineTo(c, c + R); rc.stroke();
+    const sweep = (S.t * TAU) / 2.4;
+    if (rc.createConicGradient) {
+      const cg = rc.createConicGradient(sweep - 1.1, c, c);
+      cg.addColorStop(0, 'rgba(255,176,0,0)'); cg.addColorStop(1.1 / TAU, 'rgba(255,176,0,0.28)'); cg.addColorStop(1.1 / TAU + 0.001, 'rgba(255,176,0,0)');
+      rc.fillStyle = cg; rc.beginPath(); rc.arc(c, c, R, 0, TAU); rc.fill();
+    }
+    rc.strokeStyle = 'rgba(255,176,0,0.7)'; rc.beginPath(); rc.moveTo(c, c); rc.lineTo(c + Math.cos(sweep) * R, c + Math.sin(sweep) * R); rc.stroke();
+    const sx = Math.floor(me.x), sy = Math.floor(me.y), blips = [...contacts.filter((s) => s.alive)];
+    for (let x = sx - 1; x <= sx + 1; x++) for (let y = sy - 1; y <= sy + 1; y++) blips.push(...sectorPlanets(x, y));
+    for (const s of blips) {
+      const dx = s.x - me.x, dy = s.y - me.y;
+      if (Math.hypot(dx, dy) > range) continue;
+      const ang = Math.atan2(dy, dx), since = ((sweep - ang) % TAU + TAU) % TAU, fade = RM ? 1 : 1 - since / TAU;
+      const col = s.planet ? ownerColor(s) : colorOf(s), bx = c + (dx / range) * R, by = c + (dy / range) * R;
+      rc.fillStyle = hexA(col, (s.planet ? 0.4 : 0.25) + 0.6 * fade);
+      if (s.planet) rc.fillRect(bx - 2, by - 2, 4, 4); else { rc.beginPath(); rc.arc(bx, by, s === S.target ? 4 : 3, 0, TAU); rc.fill(); }
+      if (s === S.target) { rc.strokeStyle = COL.amber; rc.beginPath(); rc.arc(bx, by, 7, 0, TAU); rc.stroke(); }
+    }
+    rc.fillStyle = COL.me; rc.beginPath(); rc.arc(c, c, 2.5, 0, TAU); rc.fill();
+  }
+
+  function drawDial() {
+    const c = 46, R = 40;
+    dc.clearRect(0, 0, 92, 92);
+    dc.strokeStyle = 'rgba(255,176,0,0.35)'; dc.lineWidth = 1; dc.beginPath(); dc.arc(c, c, R, 0, TAU); dc.stroke();
+    for (let a = 0; a < 360; a += 30) {
+      const r0 = a % 90 === 0 ? R - 8 : R - 4, rad = (a - 90) * D2R;
+      dc.beginPath(); dc.moveTo(c + Math.cos(rad) * r0, c + Math.sin(rad) * r0); dc.lineTo(c + Math.cos(rad) * R, c + Math.sin(rad) * R); dc.stroke();
+    }
+    dc.fillStyle = COL.amber; dc.font = '600 10px "Saira Condensed", sans-serif'; dc.textAlign = 'center'; dc.fillText('0', c, c - R + 18);
+    const needle = (deg, col, w, dash) => {
+      const rad = (deg - 90) * D2R; dc.strokeStyle = col; dc.lineWidth = w; dc.setLineDash(dash);
+      dc.beginPath(); dc.moveTo(c, c); dc.lineTo(c + Math.cos(rad) * (R - 10), c + Math.sin(rad) * (R - 10)); dc.stroke(); dc.setLineDash([]);
+    };
+    if (Math.abs(angDiff(me.h, me.h2b)) > 1) needle(me.h2b, 'rgba(255,176,0,0.6)', 1, [3, 3]);
+    needle(me.h, COL.me, 2, []);
+    dc.fillStyle = COL.me; dc.beginPath(); dc.arc(c, c, 3, 0, TAU); dc.fill();
+  }
+
+  function drawDockGlobe() {
+    if (!S.dock) return;
+    gc.clearRect(0, 0, 64, 64);
+    drawGlobe(gc, 32, 32, 24, S.dock.env, true);
+    if (S.dock.owner) { gc.strokeStyle = ownerColor(S.dock); gc.lineWidth = 2; gc.beginPath(); gc.arc(32, 32, 29, 0, TAU); gc.stroke(); }
+    const a = (S.t * 0.8) % TAU; gc.fillStyle = COL.me; gc.beginPath(); gc.arc(32 + Math.cos(a) * 29, 32 + Math.sin(a) * 29 * 0.4, 2.5, 0, TAU); gc.fill();
+  }
+
+  function render() {
+    if (S.shake > 0 && !RM) { S.cam.x += (Math.random() - 0.5) * S.shake * 4 / S.zoom; S.cam.y += (Math.random() - 0.5) * S.shake * 4 / S.zoom; }
+    drawBackground(); drawMap(); drawPlanets(); drawOverlays();
+    for (const s of contacts) drawShip(s);
+    drawShip(me);
+    drawFx(); drawRadar(); drawDial(); drawDockGlobe();
+  }
+
+  // ---------- HUD ----------
+  const tgtEl = $('#target');
+  const tons = () => me.items.reduce((a, n, i) => a + n * TONS[i], 0);
+  function lockWhy(firerV, targetV, d) {
+    if (d >= 5) return 'Out of fire-control range.';
+    if (targetV > 999) return `Target is at warp ${warpOf(targetV).toFixed(1)}. No torpedo can lock a ship moving at warp 1 or faster.`;
+    if (lockFact(firerV, targetV, d) > LOCK_MIN) return 'Both ships slow and close. Press 2.';
+    const combined = 5000 * (1.2 - (LOCK_MIN * TORFACT) / (5 - d));
+    if (combined <= 0) return `Too far. Even dead in space you need to be within ${(5 - (LOCK_MIN * TORFACT) / 1.2).toFixed(2)} sectors.`;
+    const mine = combined - targetV;
+    if (mine <= 0) return 'Too far for how fast the target is moving. Close in.';
+    return `You're too fast. Drop below warp ${(mine / 1000).toFixed(1)} to lock at this range.`;
+  }
+  let lastTargetHtml = '', lastActKey = '';
+  function hud() {
+    $('#sector').textContent = `Sector ${secOf(me)}`;
+    $('#coords').textContent = `(${me.x.toFixed(3)}, ${me.y.toFixed(3)})`;
+    const vi = viewIndex();
+    $('#zoomLbl').textContent = VIEWS[vi].name;
+    document.querySelectorAll('.views button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.view) === vi)));
+    $('#centerBtn').hidden = !S.free;
+    $('#credits').textContent = `${fmt(S.credits)} cr`;
+    const hull = Math.max(0, me.hull);
+    $('#bHull').style.width = `${hull}%`; $('#nHull').textContent = Math.round(hull);
+    $('#hullBar').classList.toggle('low', hull < 35);
+    $('#bShield').style.width = `${me.shieldUp ? me.shield : 0}%`; $('#nShield').textContent = me.shieldUp ? Math.round(me.shield) : 'off';
+    $('#bPhaser').style.width = `${me.phaser}%`; $('#nPhaser').textContent = Math.round(me.phaser);
+    const t0 = tons();
+    $('#bHold').style.width = `${Math.min(100, (t0 / CAP) * 100)}%`; $('#nHold').textContent = `${Math.round((t0 / CAP) * 100)}%`;
+    $('#holdBar').classList.toggle('full', t0 >= CAP * 0.97);
+    const sb = $('#shBtn'); sb.setAttribute('aria-pressed', String(me.shieldUp)); sb.textContent = me.shieldUp ? 'Shields up · H' : 'Shields down · H';
+    $('#warpNow').textContent = warpOf(me.v).toFixed(1);
+    $('#warpTo').textContent = me.orbiting ? `in orbit · ${me.orbiting.name}` : me.dest ? `→ ${warpOf(me.v2b).toFixed(1)} · ETA ${fmtEta(dist(me, me.dest) / (warpOf(Math.max(me.v, 1)) * K))}`
+      : Math.abs(me.v - me.v2b) > 50 ? `→ ${warpOf(me.v2b).toFixed(1)}` : 'holding';
+    $('#hdg').textContent = `${String(Math.round(me.h) % 360).padStart(3, '0')}°`;
+    $('#thrV').textContent = Number(thr.value).toFixed(1);
+
+    const t = S.target && (S.target.planet || S.target.wormhole || S.target.alive) ? S.target : null;
+    if (!t) S.target = null;
+    const isShip = t && !t.planet && !t.wormhole;
+    const d = t ? dist(me, t) : 0, f = isShip ? lockFact(me.v, t.v, d) : 0;
+    const set = (id, stt, txt) => { const b = $(id); b.dataset.state = stt; b.querySelector('.wc').textContent = txt; };
+    $('#w1r').style.setProperty('--p', (me.phaser / 100).toFixed(3));
+    set('#w1', !isShip || d > PHASER_RANGE || me.phaser < 20 ? 'blocked' : 'ready', `${Math.round(me.phaser)}%`);
+    set('#w2', me.items[I.TOR] <= 0 ? 'empty' : isShip && f > LOCK_MIN ? 'ready' : 'blocked', `×${me.items[I.TOR]}`);
+    set('#w3', me.items[I.MIS] <= 0 ? 'empty' : isShip && d <= MISSILE_RANGE ? 'ready' : 'blocked', `×${me.items[I.MIS]}`);
+    set('#w4', me.items[I.DEC] <= 0 ? 'empty' : 'ready', `×${me.items[I.DEC]}`);
+    set('#w5', me.items[I.MIN] <= 0 ? 'empty' : 'ready', `×${me.items[I.MIN]}`);
+    $('#hint').textContent = !t ? 'Click a ship or planet to target it.' : !isShip ? 'Fire control only locks on ships.'
+      : d > PHASER_RANGE ? `Out of phaser range: ${d.toFixed(2)} sectors.` : f <= LOCK_MIN ? `Phaser ${Math.round(phaserStrength(d) * 100)}% at this range. Torpedo: ${lockWhy(me.v, t.v, d)}`
+      : `Phaser ${Math.round(phaserStrength(d) * 100)}% at this range. Torpedo lock holds.`;
+
+    let html;
+    if (!t) html = '<h2>Target</h2><p class="t-empty">No target. Click a ship or planet, or press Tab for the nearest ship.</p>';
+    else if (t.planet) html = planetCard(t, d);
+    else if (t.wormhole) {
+      html = `<h2>Target</h2><div class="t-head"><span class="letter" style="background:#c79bff">W</span><div><b>Wormhole</b><small>Exits in sector ${Math.floor(t.exit.x)},${Math.floor(t.exit.y)}</small></div></div>
+        <dl class="t-stats"><div><dt>Range</dt><dd>${d.toFixed(3)}</dd></div><div><dt>Bearing</dt><dd>${String(Math.round(bearing(me, t))).padStart(3, '0')}°</dd></div><div><dt>ETA</dt><dd>${fmtEta(d / (warpOf(cruise()) * K))}</dd></div></dl>`;
+    } else html = shipCard(t, d, f);
+    if (html !== lastTargetHtml) { $('#tgtLive').innerHTML = html; lastTargetHtml = html; }
+    // Buttons are rebuilt only when what they do changes, so a click is never lost to a refresh.
+    const actKey = t ? `${t.id}|${me.orbiting === t}` : 'none';
+    if (actKey !== lastActKey) {
+      lastActKey = actKey;
+      $('#tgtAct').innerHTML = !t || (!t.planet && !t.wormhole) ? ''
+        : t.wormhole ? '<button class="btn primary" type="button" data-act="course">Fly into it</button>'
+        : me.orbiting === t ? '<button class="btn primary" type="button" data-act="dock">Planet screen</button><button class="btn danger" type="button" data-act="leave">Leave orbit</button>'
+        : '<button class="btn primary" type="button" data-act="orbit">Orbit · O</button><button class="btn" type="button" data-act="course">Set course</button>';
+      $('#tgtAct').hidden = !$('#tgtAct').innerHTML;
+    }
+  }
+  function planetCard(p, d) {
+    const orbiting = me.orbiting === p, eta = d / (warpOf(cruise()) * K);
+    return `<h2>Target</h2>
+      <div class="t-head"><span class="letter" style="background:${ownerColor(p)}">P</span><div><b>${esc(p.name)}</b><small style="color:${ownerColor(p)}">${p.owner ? OWNERS[p.owner].name : 'Unclaimed'} · ${p.env}</small></div></div>
+      <dl class="t-stats"><div><dt>Range</dt><dd>${orbiting ? 'orbit' : d.toFixed(3)}</dd></div><div><dt>Sector</dt><dd>${secOf(p)}</dd></div><div><dt>ETA</dt><dd>${orbiting ? '—' : fmtEta(eta)}</dd></div></dl>`;
+  }
+  function shipCard(t, d, f) {
+    const pct = clamp(f / 1.5, 0, 1) * 100, holds = f > LOCK_MIN, shieldPct = Math.round((t.shield / t.shieldMax) * 100);
+    let threat = '';
+    if (t.hostile) {
+      const tf = lockFact(t.v, me.v, d), can = tf > LOCK_MIN;
+      const msg = me.v > 999 ? `You're at warp ${warpOf(me.v).toFixed(1)}. Their torpedoes can't lock you. Keep moving.`
+        : can ? 'They can lock you right now. Get above warp 1.' : `They can't lock yet. At warp ${warpOf(t.v).toFixed(1)} they're too fast themselves, or too far.`;
+      threat = `<div class="lock threat"><div class="lock-top"><span>Their torpedo lock on you</span><b class="${can ? 'bad' : 'no'}">${can ? 'CAN LOCK' : 'NO LOCK'}</b></div>
+        <div class="meter"><i style="width:${(clamp(tf / 1.5, 0, 1) * 100).toFixed(1)}%;background:var(--hostile)"></i><em style="left:${((LOCK_MIN / 1.5) * 100).toFixed(1)}%"></em></div>
+        <p class="why">${msg}</p></div>`;
+    }
+    return `<h2>Target</h2>
+      <div class="t-head"><span class="letter ${t.hostile ? 'hostile' : ''}">${t.letter}</span><div><b>${esc(t.name)}</b><small>${esc(t.cls)}</small></div></div>
+      <dl class="t-stats"><div><dt>Range</dt><dd>${d.toFixed(3)}</dd></div><div><dt>Bearing</dt><dd>${String(Math.round(bearing(me, t))).padStart(3, '0')}°</dd></div><div><dt>Speed</dt><dd>w${warpOf(t.v).toFixed(1)}</dd></div></dl>
+      <div class="meter-row"><span>Hull</span><div class="bar hull${t.hull < 35 ? ' low' : ''}"><i style="width:${Math.max(0, t.hull)}%"></i></div><b>${Math.max(0, Math.round(t.hull))}</b></div>
+      <div class="meter-row"><span>Shields</span><div class="bar shield"><i style="width:${shieldPct}%"></i></div><b>${shieldPct}</b></div>
+      <div class="lock"><div class="lock-top"><span>Your torpedo lock</span><b class="${holds ? 'ok' : 'no'}">${holds ? 'HOLDS' : 'NO LOCK'}</b></div>
+        <div class="meter"><i class="${holds ? 'ok' : ''}" style="width:${pct.toFixed(1)}%"></i><em style="left:${((LOCK_MIN / 1.5) * 100).toFixed(1)}%"></em></div>
+        <p class="why">${lockWhy(me.v, t.v, d)}</p></div>${threat}`;
+  }
+  tgtEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]'); if (!b || !S.target) return;
+    const t = S.target, a = b.dataset.act;
+    if (a === 'orbit') orbitPlanet(t);
+    else if (a === 'course') setCourse(t.x, t.y, null);
+    else if (a === 'dock') openDock(t);
+    else if (a === 'leave') leaveOrbit();
+    hud();
+  });
+
+  // ---------- planet screen ----------
+  const dockEl = $('#dock'), bodyEl = $('#dockBody');
+  function tabsFor(p) {
+    if (p.market) return [['market', 'Trading post'], ['info', 'About']];
+    if (p.owner === 'you') return [['cargo', 'Cargo'], ['colony', 'Colony'], ['repairs', 'Repairs']];
+    if (!p.owner) return [['cargo', 'Cargo'], ['info', 'Survey']];
+    return [['assault', 'Assault'], ['info', 'Intel']];
+  }
+  function openDock(p) {
+    fillPlanet(p);
+    S.dock = p;
+    const tabs = tabsFor(p);
+    if (!tabs.some(([k]) => k === S.dockTab)) S.dockTab = tabs[0][0];
+    dockEl.hidden = false;
+    $('.rightcol').hidden = true;
+    renderDock();
+  }
+  function closeDock() { S.dock = null; dockEl.hidden = true; $('.rightcol').hidden = false; }
+  function dockSub(p) {
+    const own = p.owner ? `<span class="owner" style="background:${ownerColor(p)}">${OWNERS[p.owner].name}</span>` : '<span class="owner" style="background:#8a96a3">Unclaimed</span>';
+    return `${own} &nbsp;${p.env} · sector ${secOf(p)} · population ${fmt(p.stores[I.MEN])}`;
+  }
+  function renderDock() {
+    const p = S.dock; if (!p) return;
+    const focus = document.activeElement && dockEl.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+    $('#dockName').textContent = p.name;
+    $('#dockSub').innerHTML = dockSub(p);
+    $('#dockTabs').innerHTML = tabsFor(p).map(([k, label]) => `<button type="button" role="tab" data-act="tab" data-tab="${k}" data-key="tab-${k}" aria-selected="${S.dockTab === k}">${label}</button>`).join('');
+    bodyEl.innerHTML = ({ cargo: cargoTab, colony: colonyTab, repairs: repairsTab, assault: assaultTab, market: marketTab, info: infoTab })[S.dockTab](p);
+    if (focus) { const el = dockEl.querySelector(`[data-key="${focus}"]`); if (el) el.focus(); }
+  }
+  function refreshDock() {
+    const p = S.dock; if (!p) return;
+    $('#dockSub').innerHTML = dockSub(p);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('kvCash', `${fmt(p.cash)} cr`);
+    set('repHull', `${Math.round(me.hull)}%`);
+    const pr = document.getElementById('repBar'); if (pr) pr.style.width = `${me.hull}%`;
+    if (S.dockTab === 'repairs' && !me.repairing && document.getElementById('repState')) set('repState', me.hull >= 100 ? 'Hull at 100%. Nothing to repair.' : 'Ready.');
+  }
+  function holdHtml() {
+    const t = tons(), pct = Math.min(100, (t / CAP) * 100);
+    return `<div class="hold"><span>Hold</span><div class="bar hold${t >= CAP * 0.97 ? ' full' : ''}"><i style="width:${pct}%"></i></div><b>${fmt(t)} / ${fmt(CAP)} t</b></div>`;
+  }
+  function stepsHtml() {
+    return `<div class="steps" role="group" aria-label="Amount per click"><span>Per click</span>${[1, 10, 100, 'all'].map((v) =>
+      `<button type="button" data-act="step" data-v="${v}" data-key="step-${v}" aria-pressed="${(v === 'all' ? Infinity : v) === S.step}">${v === 'all' ? 'All' : v}</button>`).join('')}</div>`;
+  }
+  function cargoTab(p) {
+    const can = p.owner === 'you' || !p.owner;
+    const rows = NAMES.map((n, i) => {
+      if (!p.owner && i !== I.MEN && me.items[i] === 0 && p.stores[i] === 0) return '';
+      const up = can && p.stores[i] > 0, down = can && me.items[i] > 0;
+      return `<tr><td class="name">${cap(n)}</td><td class="${me.items[i] ? '' : 'zero'}">${fmt(me.items[i])}</td>
+        <td class="mv"><button type="button" data-act="up" data-i="${i}" data-key="up-${i}" ${up ? '' : 'disabled'} aria-label="Bring ${n} up to the ship">‹</button><button type="button" data-act="down" data-i="${i}" data-key="down-${i}" ${down ? '' : 'disabled'} aria-label="Put ${n} down on ${esc(p.name)}">›</button></td>
+        <td class="${p.stores[i] ? '' : 'zero'}">${fmt(p.stores[i])}</td><td class="zero">${TONS[i]}</td></tr>`;
+    }).join('');
+    const note = !p.owner ? `<p class="note">Nobody owns ${esc(p.name)}. Put men down to found a colony here. A few hundred will do to start.</p>` : '';
+    return `<div class="row-between">${holdHtml()}${stepsHtml()}</div>${note}
+      <div class="table-wrap"><table class="grid"><thead><tr><th>Item</th><th>Hornet</th><th class="mv">‹ up · down ›</th><th>${esc(p.name)}</th><th>t/unit</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Every click is a classic command underneath: ‹ is <span class="mono">tra up</span>, › is <span class="mono">tra down</span>. Type them in the console (\`) and they do the same thing.</p>`;
+  }
+  function colonyTab(p) {
+    const food = Math.round((p.stores[I.MEN] / 1000) * FOOD_RATE[p.env] * 10), gold = Math.round((p.stores[I.MEN] / 1000) * GOLD_RATE[p.env] * 2);
+    const income = Math.round(p.stores[I.MEN] * (p.tax / 100) * 0.25 * 10);
+    return `<dl class="kv">
+        <div><dt>Population</dt><dd>${fmt(p.stores[I.MEN])}</dd></div>
+        <div><dt>Treasury</dt><dd id="kvCash">${fmt(p.cash)} cr</dd></div>
+        <div><dt>Debt</dt><dd>${fmt(p.debt)} cr</dd></div>
+        <div><dt>Food / day</dt><dd>+${fmt(food)}</dd></div>
+        <div><dt>Gold / day</dt><dd>+${fmt(gold)}</dd></div>
+        <div><dt>Last attacked</dt><dd><small>${esc(p.lastAttack)}</small></dd></div>
+      </dl>
+      <div class="field"><label for="tax">Tax rate <b id="taxV">${p.tax}%</b></label>
+        <input type="range" id="tax" min="0" max="50" step="1" value="${p.tax}" data-key="tax">
+        <small id="taxNote">About ${fmt(income)} cr a minute into the treasury at this rate. Higher taxes slow population growth.</small></div>
+      <p class="section-h">Defences</p>
+      <dl class="kv">
+        <div><dt>Ion cannons</dt><dd>${fmt(p.stores[I.ION])}</dd></div>
+        <div><dt>Fighters</dt><dd>${fmt(p.stores[I.FIG])}</dd></div>
+        <div><dt>Troops</dt><dd>${fmt(p.stores[I.TRO])}</dd></div>
+      </dl>
+      <div class="field"><label for="beacon">Beacon message <b id="beaconN">${p.beacon.length}/75</b></label>
+        <input type="text" id="beacon" maxlength="75" value="${esc(p.beacon)}" data-key="beacon">
+        <small>Broadcast to every ship that enters sector ${secOf(p)}.</small></div>
+      <div class="field"><label for="wd">Withdraw from treasury</label>
+        <div class="inline"><input type="number" id="wd" min="0" step="100" value="${Math.min(10000, p.cash)}" data-key="wd"><button class="btn primary" type="button" data-act="withdraw" data-key="withdraw">Withdraw</button></div></div>`;
+  }
+  function repairsTab(p) {
+    const ok = p.stores[I.MEN] >= 25000, dmg = 100 - me.hull, cost = Math.ceil(dmg * 40);
+    if (!ok) return `<p class="note bad">${esc(p.name)} has ${fmt(p.stores[I.MEN])} people. A repair yard needs a colony of at least 25,000. That's the original game's rule.</p>`;
+    return `<dl class="kv"><div><dt>Hull</dt><dd id="repHull">${Math.round(me.hull)}%</dd></div><div><dt>Cost</dt><dd>${fmt(cost)} cr</dd></div><div><dt>Time</dt><dd>${fmtEta(dmg / 3)}</dd></div></dl>
+      <div class="progress"><i id="repBar" style="width:${me.hull}%"></i></div>
+      <p class="note" id="repState">${me.repairing ? 'Repairs under way: 3 points a second.' : dmg < 1 ? 'Hull at 100%. Nothing to repair.' : 'Ready.'}</p>
+      <div class="inline"><button class="btn primary" type="button" data-act="repair" data-key="repair" ${dmg < 1 || me.repairing ? 'disabled' : ''}>Repair for ${fmt(cost)} cr</button></div>
+      <p class="note">Combat stops the yard. If anything fires on you while you're here, the maintenance team downs tools. That's canon too.</p>`;
+  }
+  function assaultTab(p) {
+    const rev = p.revealed;
+    return `<p class="note bad">${esc(p.name)} belongs to ${OWNERS[p.owner].name}. You can't trade here. You can take it.</p>
+      <dl class="kv">
+        <div><dt>Population</dt><dd>${fmt(p.stores[I.MEN])}</dd></div>
+        <div><dt>Troops</dt><dd>${rev ? fmt(p.stores[I.TRO]) : '<small>unknown</small>'}</dd></div>
+        <div><dt>Ion cannons</dt><dd>${rev ? fmt(p.stores[I.ION]) : '<small>unknown</small>'}</dd></div>
+      </dl>
+      <div class="inline"><button class="btn" type="button" data-act="spy" data-key="spy" ${me.items[I.SPY] > 0 ? '' : 'disabled'}>Send a spy (${me.items[I.SPY]} aboard)</button></div>
+      ${me.items[I.SPY] > 0 ? '' : '<small style="color:var(--ink-dim);font:500 12px/1.3 var(--display)">No spies aboard. The trading posts in the neutral zone sell them.</small>'}
+      <div class="field"><label for="troopN">Troops to land <b id="troopV">${Math.min(me.items[I.TRO], 60)}</b></label>
+        <input type="range" id="troopN" min="0" max="${me.items[I.TRO]}" step="1" value="${Math.min(me.items[I.TRO], 60)}" data-key="troopN">
+        <small>You carry ${fmt(me.items[I.TRO])} troops. Attacking makes the planet's ion cannons fire on you for as long as you stay in orbit.</small></div>
+      <div class="inline"><button class="btn danger" type="button" data-act="attack" data-key="attack" ${me.items[I.TRO] > 0 ? '' : 'disabled'}>Land troops</button></div>`;
+  }
+  function marketTab(p) {
+    const rows = NAMES.map((n, i) => `<tr><td class="name">${cap(n)}</td><td class="${me.items[i] ? '' : 'zero'}">${fmt(me.items[i])}</td><td>${fmt(PRICE[i])}</td><td>${fmt(PRICE[i] * 0.7)}</td>
+      <td class="mv"><button type="button" data-act="buy" data-i="${i}" data-key="buy-${i}" aria-label="Buy ${n}">+</button><button type="button" data-act="sell" data-i="${i}" data-key="sell-${i}" ${me.items[i] ? '' : 'disabled'} aria-label="Sell ${n}">−</button></td></tr>`).join('');
+    return `<div class="row-between">${holdHtml()}${stepsHtml()}</div>
+      <div class="table-wrap"><table class="grid"><thead><tr><th>Item</th><th>Aboard</th><th>Buy</th><th>Sell</th><th class="mv">+ buy · sell −</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Prices in this mock-up are made up. The planet is real: ${esc(p.name)} is one of the neutral zone's six, at the original's coordinates.</p>`;
+  }
+  function infoTab(p) {
+    const lines = p.market ? `The Empire runs ${esc(p.name)}. Nobody can attack it, and weapons fired inside the neutral zone turn on whoever fired them.`
+      : !p.owner ? `${esc(p.name)} is unclaimed. ${p.env} world, size ${Math.round(p.size * 10)}. Food ${FOOD_RATE[p.env] >= 1 ? 'grows well' : 'is scarce'}; gold ${GOLD_RATE[p.env] >= 0.7 ? 'is rich here' : 'is thin'}.`
+      : `${esc(p.name)} is held by ${OWNERS[p.owner].name}. Beacon: “${esc(p.beacon || 'no message')}”`;
+    return `<p class="note">${lines}</p><dl class="kv"><div><dt>Environment</dt><dd>${p.env}</dd></div><div><dt>Sector</dt><dd>${secOf(p)}</dd></div><div><dt>Position</dt><dd><small>${p.x.toFixed(3)}, ${p.y.toFixed(3)}</small></dd></div></dl>`;
+  }
+  function transfer(i, dir, nOverride) {
+    const p = S.dock; if (!p) return;
+    if (p.owner && p.owner !== 'you') return say(`${p.name} isn't ours. No transfers.`, 'warn');
+    let n = nOverride ?? S.step;
+    if (dir === 'down') {
+      n = Math.min(n, me.items[i]); if (n <= 0) return;
+      me.items[i] -= n; p.stores[i] += n;
+      say(`> tra down ${n} ${KW[i]}`, 'cmd');
+      if (!p.owner && i === I.MEN) { p.owner = 'you'; p.cash = 0; p.lastAttack = 'never'; say(`${p.name} is ours. Colony founded with ${fmt(n)} settlers.`, 'you'); S.dockTab = 'cargo'; }
+    } else {
+      const free = Math.floor((CAP - tons()) / TONS[i] + 1e-9);
+      n = Math.min(n, p.stores[i], free);
+      if (n <= 0) return say(free <= 0 ? 'The hold is full, Sir.' : 'Nothing to bring up.', 'warn');
+      me.items[i] += n; p.stores[i] -= n;
+      say(`> tra up ${n} ${KW[i]}`, 'cmd');
+    }
+    sfx.click(); renderDock(); hud();
+  }
+  function market(i, dir) {
+    let n = S.step;
+    if (dir === 'buy') {
+      const free = Math.floor((CAP - tons()) / TONS[i] + 1e-9), afford = Math.floor(S.credits / PRICE[i]);
+      n = Math.min(n, free, afford);
+      if (n <= 0) return say(free <= 0 ? 'The hold is full, Sir.' : 'Not enough credits.', 'warn');
+      me.items[i] += n; S.credits -= n * PRICE[i]; say(`> buy ${n} ${KW[i]}`, 'cmd');
+    } else {
+      n = Math.min(n, me.items[i]); if (n <= 0) return;
+      me.items[i] -= n; S.credits += Math.round(n * PRICE[i] * 0.7); say(`> sell ${n} ${KW[i]}`, 'cmd');
+    }
+    sfx.click(); renderDock(); hud();
+  }
+  function attackPlanet() {
+    const p = S.dock, n = Number(($('#troopN') || {}).value || 0);
+    if (!p || n <= 0) return;
+    me.items[I.TRO] -= n; p.hostile = true; S.ionT = 2; me.combatT = 6;
+    say(`> attack ${p.name} ${n}`, 'cmd'); say(`Landing ${n} troops on ${p.name}…`, 'warn');
+    renderDock();
+    setTimeout(() => {
+      if (S.dock !== p && me.orbiting !== p) { say(`We lost contact with our troops on ${p.name}.`, 'danger'); return; }
+      const def = p.stores[I.TRO] + Math.floor(p.stores[I.MEN] / 400), atk = n * (0.8 + Math.random() * 0.6);
+      if (atk > def) {
+        p.owner = 'you'; p.hostile = false; p.stores[I.TRO] = Math.floor(atk - def); p.lastAttack = 'just now, by you';
+        say(`${p.name} has fallen. It's ours.`, 'you'); S.dockTab = 'cargo';
+      } else { p.stores[I.TRO] = Math.max(0, Math.floor(def - atk - Math.floor(p.stores[I.MEN] / 400))); p.revealed = true; say(`The assault on ${p.name} failed. ${p.stores[I.TRO]} defenders left.`, 'danger'); }
+      if (S.dock === p) openDock(p); hud();
+    }, 2200);
+  }
+  dockEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+    const a = b.dataset.act, i = Number(b.dataset.i), p = S.dock;
+    if (a === 'tab') { S.dockTab = b.dataset.tab; renderDock(); }
+    else if (a === 'up' || a === 'down') transfer(i, a);
+    else if (a === 'buy' || a === 'sell') market(i, a);
+    else if (a === 'step') { S.step = b.dataset.v === 'all' ? Infinity : Number(b.dataset.v); renderDock(); }
+    else if (a === 'leave') leaveOrbit();
+    else if (a === 'hide') closeDock();
+    else if (a === 'withdraw') {
+      const amt = clamp(Math.floor(Number($('#wd').value) || 0), 0, p.cash);
+      if (amt <= 0) return;
+      p.cash -= amt; S.credits += amt; say(`> withdraw ${amt}`, 'cmd'); say(`${fmt(amt)} credits transferred from ${p.name}.`, 'you'); renderDock(); hud();
+    } else if (a === 'repair') {
+      const cost = Math.ceil((100 - me.hull) * 40);
+      if (S.credits < cost) return say('Not enough credits for the repair.', 'warn');
+      if (me.combatT > 0) return say('The yard won\'t start while we\'re in combat.', 'warn');
+      S.credits -= cost; me.repairing = true; say(`> maint`, 'cmd'); say('Repair crews are aboard.', 'you'); renderDock(); hud();
+    } else if (a === 'spy') {
+      if (me.items[I.SPY] <= 0) return;
+      me.items[I.SPY]--; p.revealed = true; say(`Our spy reports from ${p.name}.`, 'you'); renderDock();
+    } else if (a === 'attack') attackPlanet();
+  });
+  dockEl.addEventListener('input', (e) => {
+    const p = S.dock; if (!p) return;
+    if (e.target.id === 'tax') {
+      p.tax = Number(e.target.value); $('#taxV').textContent = `${p.tax}%`;
+      $('#taxNote').textContent = `About ${fmt(p.stores[I.MEN] * (p.tax / 100) * 0.25 * 10)} cr a minute into the treasury at this rate. Higher taxes slow population growth.`;
+    } else if (e.target.id === 'beacon') { p.beacon = e.target.value; $('#beaconN').textContent = `${p.beacon.length}/75`; }
+    else if (e.target.id === 'troopN') $('#troopV').textContent = e.target.value;
+  });
+
+  // ---------- colonies ----------
+  const colOv = $('#coloniesOv');
+  function renderColonies() {
+    const rows = yourPlanets().map((p) => `<tr data-id="${p.id}" tabindex="0"><td class="name">${esc(p.name)}</td><td>${secOf(p)}</td><td>${fmt(p.stores[I.MEN])}</td>
+      <td>${fmt(p.cash)}</td><td>${p.tax}%</td><td>${fmt(p.stores[I.TRO])}</td><td>${fmt(p.stores[I.ION])}</td><td>${fmt(dist(me, p))}</td><td class="when">${esc(p.lastAttack)}</td></tr>`).join('');
+    $('#coloniesTable').innerHTML = `<thead><tr><th>Colony</th><th>Sector</th><th>People</th><th>Treasury</th><th>Tax</th><th>Troops</th><th>Ion</th><th>Sectors away</th><th>Last attacked</th></tr></thead><tbody>${rows}</tbody>`;
+  }
+  function openColonies() { renderColonies(); colOv.hidden = false; }
+  function jumpTo(p) {
+    colOv.hidden = true; S.free = true; S.camGoal = { x: p.x, y: p.y }; S.zoomTo = zoomFor(VIEWS[1].across); S.target = p; hud();
+  }
+  $('#coloniesBtn').addEventListener('click', openColonies);
+  $('#coloniesClose').addEventListener('click', () => { colOv.hidden = true; });
+  $('#coloniesTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) jumpTo(allPlanets().find((p) => p.id === tr.dataset.id)); });
+  $('#coloniesTable').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const tr = e.target.closest('tr[data-id]'); if (tr) jumpTo(allPlanets().find((p) => p.id === tr.dataset.id)); } });
+
+  // ---------- input ----------
+  function select(t) { S.target = t; if (t) { tip(1); sfx.click(); } hud(); }
+  function pickAt(mx, my) {
+    let best = null, bd = Infinity;
+    const consider = (s, lim) => { const p = targetPos(s), d = Math.hypot(X(p.x) - mx, Y(p.y) - my); if (d < lim && d < bd) { best = s; bd = d; } };
+    for (const s of contacts) if (shipVisible(s)) consider(s, 16);
+    if (S.zoom >= 14) {
+      const wx = S.cam.x + (mx - W / 2) / S.zoom, wy = S.cam.y + (my - H / 2) / S.zoom;
+      for (let x = Math.floor(wx) - 1; x <= Math.floor(wx) + 1; x++) for (let y = Math.floor(wy) - 1; y <= Math.floor(wy) + 1; y++)
+        for (const p of sectorPlanets(x, y)) consider(p, S.zoom < 110 ? 7 : 12 + p.size * 7);
+    }
+    if (S.zoom >= 60) for (const w of wormholes) consider(w, 16);
+    return best;
+  }
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.addEventListener('pointerdown', (e) => {
+    cv.setPointerCapture(e.pointerId);
+    S.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button, cam: { ...S.cam } };
+  });
+  cv.addEventListener('pointermove', (e) => {
+    const r = cv.getBoundingClientRect();
+    if (S.drag) {
+      const dx = e.clientX - S.drag.x, dy = e.clientY - S.drag.y;
+      if (!S.drag.moved && Math.hypot(dx, dy) > 5) { S.drag.moved = true; cv.classList.add('dragging'); }
+      if (S.drag.moved) { S.free = true; S.cam = { x: S.drag.cam.x - dx / S.zoom, y: S.drag.cam.y - dy / S.zoom }; S.camGoal = { ...S.cam }; }
+      return;
+    }
+    cv.style.cursor = pickAt(e.clientX - r.left, e.clientY - r.top) ? 'pointer' : 'crosshair';
+  });
+  cv.addEventListener('pointerup', (e) => {
+    const d = S.drag; S.drag = null; cv.classList.remove('dragging');
+    if (!d || d.moved) return;
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const hit = d.button === 0 ? pickAt(mx, my) : null;
+    if (hit) {
+      const now = performance.now();
+      if (hit.planet && S.lastClick.id === hit.id && now - S.lastClick.t < 400) orbitPlanet(hit);
+      S.lastClick = { t: now, id: hit.id };
+      select(hit); return;
+    }
+    if (!me.alive) return;
+    setCourse(S.cam.x + (mx - W / 2) / S.zoom, S.cam.y + (my - H / 2) / S.zoom);
+  });
+  cv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    S.zoomTo = clamp(S.zoomTo * Math.exp(-e.deltaY * 0.0016), Z_MIN(), Z_MAX());
+  }, { passive: false });
+  function setView(i) { S.zoomTo = zoomFor(VIEWS[clamp(i, 0, 3)].across); }
+  document.querySelectorAll('.views button').forEach((b) => b.addEventListener('click', () => setView(Number(b.dataset.view))));
+  function recenter() { S.free = false; hud(); }
+  $('#centerBtn').addEventListener('click', recenter);
+
+  rcv.addEventListener('pointerdown', (e) => {
+    const r = rcv.getBoundingClientRect(), mx = e.clientX - r.left - 84, my = e.clientY - r.top - 84;
+    let best = null, bd = 12;
+    const cands = [...contacts.filter((c) => c.alive)];
+    for (let x = Math.floor(me.x) - 1; x <= Math.floor(me.x) + 1; x++) for (let y = Math.floor(me.y) - 1; y <= Math.floor(me.y) + 1; y++) cands.push(...sectorPlanets(x, y));
+    for (const s of cands) {
+      const px = ((s.x - me.x) / SHORT_RANGE) * 78, py = ((s.y - me.y) / SHORT_RANGE) * 78, d = Math.hypot(px - mx, py - my);
+      if (d < bd) { best = s; bd = d; }
+    }
+    if (best) select(best);
+  });
+
+  function cycleTarget() {
+    const list = contacts.filter((c) => c.alive && dist(me, c) < 2).sort((a, b) => dist(me, a) - dist(me, b));
+    if (!list.length) return say('No ships within two sectors.', 'info');
+    const i = list.indexOf(S.target);
+    select(list[(i + 1) % list.length]);
+  }
+
+  const con = $('#console'), cmd = $('#cmd');
+  function toggleConsole(open) {
+    con.hidden = open === undefined ? !con.hidden : !open;
+    if (!con.hidden) { cmd.value = ''; setTimeout(() => cmd.focus(), 0); } else cmd.blur();
+  }
+  const byLetter = (l) => contacts.find((c) => c.alive && c.letter.toLowerCase() === (l || '').toLowerCase()) || null;
+  function runCommand(line) {
+    const parts = line.trim().toLowerCase().split(/\s+/), [verb, arg] = parts;
+    if (!verb) return;
+    say(`> ${line.trim()}`, 'cmd');
+    if (verb === 'help') say('Commands: pha, tor <letter>, mis <letter>, warp <n>, rot <deg>, sca, shi, stop, orb, tra up|down <n> <item>.', 'info');
+    else if (verb === 'pha') firePhaser();
+    else if (verb === 'tor' || verb === 'mis') {
+      const t = arg ? byLetter(arg) : S.target;
+      if (arg && !t) return say(`Scanners cannot locate ship ${arg.toUpperCase()}.`, 'warn');
+      if (t) select(t);
+      if (verb === 'tor') fireTorp(); else fireMissile();
+    } else if (verb === 'warp') {
+      const n = clamp(Number(arg), 0, 12);
+      if (Number.isNaN(n)) return say('Usage: warp <0-12>', 'info');
+      if (me.orbiting) leaveOrbit(true);
+      thr.value = String(n); me.dest = null; me.orbitGoal = null; me.v2b = n * 1000; say(`Warp ${n.toFixed(1)}, aye.`, 'info');
+    } else if (verb === 'rot') {
+      const n = Number(arg);
+      if (Number.isNaN(n)) return say('Usage: rot <degrees>', 'info');
+      if (me.orbiting) leaveOrbit(true);
+      me.dest = null; me.orbitGoal = null; me.h2b = wrap(n); say(`Coming to heading ${String(Math.round(wrap(n))).padStart(3, '0')}.`, 'info');
+    } else if (verb === 'sca') {
+      for (const s of contacts.filter((c) => c.alive && dist(me, c) <= SCAN_RANGE).sort((a, b) => dist(me, a) - dist(me, b)))
+        say(`${s.letter}  ${s.name.padEnd(22)} ${dist(me, s).toFixed(3)}  ${String(Math.round(bearing(me, s))).padStart(3, '0')}°  w${warpOf(s.v).toFixed(1)}`, 'info');
+    } else if (verb === 'shi' || verb === 'shield') toggleShields();
+    else if (verb === 'stop') { me.dest = null; me.orbitGoal = null; me.v2b = 0; say('All stop.', 'info'); }
+    else if (verb === 'orb' || verb === 'orbit') {
+      if (S.target && S.target.planet) orbitPlanet(S.target);
+      else say('Target a planet first, then orb.', 'info');
+    } else if (verb === 'tra') {
+      if (!me.orbiting) return say('We have to be in orbit to transfer cargo.', 'warn');
+      const [, dir, nStr, kw] = parts, i = KW.indexOf((kw || '').slice(0, 3)), n = nStr === 'all' ? Infinity : Number(nStr);
+      if ((dir !== 'up' && dir !== 'down') || i < 0 || !(n > 0)) return say('Usage: tra up|down <amount> <item>', 'info');
+      if (!S.dock) openDock(me.orbiting);
+      transfer(i, dir, n);
+    } else say(`Unknown command "${verb}". Type help.`, 'warn');
+  }
+  cmd.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { runCommand(cmd.value); cmd.value = ''; e.preventDefault(); }
+    else if (e.key === 'Escape' || e.key === '`') { toggleConsole(false); e.preventDefault(); }
+    e.stopPropagation();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    const tg = e.target;
+    if (tg && tg.tagName === 'INPUT' && tg.type !== 'range' && tg.type !== 'checkbox') { if (e.key === 'Escape') tg.blur(); return; }
+    const k = e.key.toLowerCase();
+    if (k === '`') { toggleConsole(); e.preventDefault(); return; }
+    if (k === 'escape') {
+      if (!$('#keys').hidden) $('#keys').hidden = true;
+      else if (!colOv.hidden) colOv.hidden = true;
+      else if (S.dock) closeDock();
+      else select(null);
+      return;
+    }
+    if (k >= '1' && k <= '5') { FIRE[Number(k) - 1](); e.preventDefault(); }
+    else if (k === 'tab') { cycleTarget(); e.preventDefault(); }
+    else if (k === 'h') toggleShields();
+    else if (k === ' ') { if (tg && tg.tagName === 'BUTTON') return; me.dest = null; me.orbitGoal = null; me.v2b = 0; e.preventDefault(); }
+    else if (k === 'w' || k === 's') {
+      thr.value = String(clamp(Number(thr.value) + (k === 'w' ? 0.5 : -0.5), 0, 12));
+      if (me.orbiting && k === 'w') leaveOrbit();
+      if (!me.dest) me.v2b = cruise();
+    } else if (k === 'a' || k === 'd') { if (me.orbiting) leaveOrbit(); S.keys.add(k); }
+    else if (k === 'z') setView(viewIndex() + 1);
+    else if (k === 'x') setView(viewIndex() - 1);
+    else if (k === 'c') recenter();
+    else if (k === 'o') { if (S.target && S.target.planet) orbitPlanet(S.target); }
+    else if (k === 'l') leaveOrbit();
+    else if (k === 'g') { if (colOv.hidden) openColonies(); else colOv.hidden = true; }
+    else if (k === '?') $('#keys').hidden = false;
+  });
+  window.addEventListener('keyup', (e) => S.keys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur', () => S.keys.clear());
+
+  $('#smooth').addEventListener('change', (e) => {
+    S.smooth = e.target.checked;
+    say(S.smooth ? 'Smooth motion on: the client animates between server updates.' : 'Smooth motion off: each ship jumps once every three seconds, which is all the server sends.', 'info');
+  });
+  $('#fsBtn').addEventListener('click', () => {
+    const el = document.documentElement;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (el.requestFullscreen) el.requestFullscreen().catch(() => say('Full screen isn’t available here.', 'info'));
+  });
+  $('#keysBtn').addEventListener('click', () => { $('#keys').hidden = false; });
+  $('#keysClose').addEventListener('click', () => { $('#keys').hidden = true; });
+
+  // ---------- go ----------
+  say('Bridge online. Sector 12,-4: five planets, one wormhole, three ships.', 'info');
+  say('Press ` for the command console. pha, tor a, warp 6 and tra still work.', 'info');
+  tip(0);
+  S.target = home[0];
+  hud();
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    step(dt); render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>

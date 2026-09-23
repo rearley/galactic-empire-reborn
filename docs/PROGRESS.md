@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-23 — a graphical game on this engine, as a concept](#session-2026-09-23--a-graphical-game-on-this-engine-as-a-concept)
 - [2026-09-22 — an AI torpedo lock now warns its target](#session-2026-09-22--an-ai-torpedo-lock-now-warns-its-target)
 - [2026-09-21 — #42 reproduced: mines went off after missiles](#session-2026-09-21-late-night-2--42-reproduced-mines-went-off-after-missiles)
 - [2026-09-21 — the suite runs in a third of the time](#session-2026-09-21-late-night--the-suite-runs-in-a-third-of-the-time)
@@ -8804,4 +8805,30 @@ EVERY tube: it is not gated by `lockwarn` (GECMDS.C:1198). The port announces
 only the first tube of a volley, per DECISIONS 2026-09-06, which read
 `lockwarn` as gating the launch message. Not changed here. Raise it before
 touching it.
+
+## Session 2026-09-23 — a graphical game on this engine, as a concept
+
+**Completed:** a design exploration, not a feature. The owner wants a separate
+game for new players, with its own galaxy and players, built on this engine with
+a graphical client instead of text commands. It was worked out against a
+playable mock-up, `docs/concepts/hornet-bridge.html`, which the owner rated
+"great" and asked to keep. `docs/concepts/README.md` records what it settled:
+- the canon scale forces a four-stop continuous zoom
+- orbiting opens a planet screen whose controls map to the classic commands
+- the torpedo lock meter shows canon's formula
+- the client must smooth between ticks
+- the tech direction: PixiJS for the play area, React for the panels
+
+**Tests:** none. The mock-up is a standalone page, and nothing in it runs
+against the game.
+
+**Decisions made:** it is a SEPARATE game, not the `modern-ui` branch's second
+client onto the same galaxy. That separation is what frees it from the
+"ambient vs requested" rule and allows a live radar.
+
+**Next (open):** decide where it lives. The options are a new repo forked from
+master, or two games on one domain with separate databases. The owner is
+thinking it over.
+
+**Known issues:** none. No version bump, since nothing deploys.
 
