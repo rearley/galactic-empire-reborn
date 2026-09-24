@@ -1,6 +1,6 @@
 import {
   BASEPRICE, ITEM_KEYWORDS, ITEM_NAMES, ITEM_TONS, MANHOURS, MAXPL, NUMITEMS,
-  I_FOOD, I_MEN, I_TROOPS,
+  I_FOOD, I_GOLD, I_MEN, I_TROOPS,
 } from '../game/constants/items';
 import { PLANTOCK_SECONDS } from '../game/constants';
 import { applyEconomyTickWithLosses, revoltPressure } from '../game/planet/planet-economy';
@@ -39,6 +39,13 @@ const MOUTHS_PER_UNIT = 100;
  * colony that no legal spread can feed still gets a number rather than a hang.
  */
 const MAX_FOOD_RATE_SEARCHED = 1_000;
+
+/**
+ * How far ahead to look for the cash bonus running out: ten days of ticks.
+ * Unrefilled cash decays by at least 5% a slot, fourteen slots a tick, so any
+ * cash a planet can hold is gone long before this.
+ */
+const BONUS_HORIZON_TICKS = 40;
 
 export interface PlanetModelItem {
   index: number;
@@ -109,7 +116,19 @@ export interface CalculatorResult {
     producedPerTick: number;
     netPerTick: number;
     starvationFloor: number;
+    /**
+     * The lowest food rate the colony can hold indefinitely. When the cash
+     * bonus is running out, this is the rate that still feeds it without the
+     * bonus.
+     */
     minimumRate: number;
+    /** The same figure while the bonus is still on. Equal to `minimumRate` when it is not running out. */
+    minimumRateWithBonus: number;
+    /**
+     * Ticks the food slot still gets the 1.5x cash bonus: null while something
+     * keeps it on for the foreseeable future, 0 when there is none.
+     */
+    bonusTicksLeft: number | null;
     safe: boolean;
   };
   tax: {
@@ -274,7 +293,10 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
   });
 
   const foodProduced = items[I_FOOD].producedPerTick;
-  const minimumRate = minimumFoodRate(input);
+  const bonusTicksLeft = cashBonusTicksLeft(input);
+  const minimumRateWithBonus = minimumFoodRate(input);
+  const minimumRate =
+    bonusTicksLeft === null ? minimumRateWithBonus : minimumFoodRate(withoutCash(input));
   const starvationFloor = starvationFloorOf(men, troops);
 
   const pressure = revoltPressure(input.taxrate, men);
@@ -307,6 +329,8 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
       netPerTick: foodProduced - eaten,
       starvationFloor,
       minimumRate,
+      minimumRateWithBonus,
+      bonusTicksLeft,
       safe: input.stock[I_FOOD] >= starvationFloor && input.rates[I_FOOD] >= minimumRate,
     },
     tax: {
@@ -384,6 +408,57 @@ function minimumFoodRate(input: CalculatorInput): number {
     else lo = mid + 1;
   }
   return lo;
+}
+
+/** The colony with no planet cash and no gold waiting to become cash. */
+function withoutCash(input: CalculatorInput): CalculatorInput {
+  const stock = input.stock.slice();
+  stock[I_GOLD] = 0;
+  return { ...input, stock, planetCash: 0 };
+}
+
+/**
+ * Does the food slot get the 1.5x bonus on this tick?
+ *
+ * Answered by the tick, not by re-deriving the decay: run it twice, once as
+ * the colony stands and once with its cash and gold taken away, with food at a
+ * rate high enough to register, and see whether the first grew more food.
+ * The bonus test sits inside the slot loop after that slot's own decay, so a
+ * planet can hold enough cash for the early slots and none left for food.
+ *
+ * @see GEPLANET.C:288 `if (plptr->cash > 0)`
+ */
+function foodBonusOn(state: PlanetState): boolean {
+  const probe = (s: PlanetState): bigint => {
+    const items = s.items.map((it, i) => (i === I_FOOD ? { ...it, rate: 100 } : it));
+    return applyEconomyTickWithLosses({ ...s, items }).state.items[I_FOOD].qty;
+  };
+  const broke = {
+    ...state,
+    cash: 0n,
+    items: state.items.map((it, i) => (i === I_GOLD ? { ...it, qty: 0n } : it)),
+  };
+  return probe(state) > probe(broke);
+}
+
+/**
+ * How many more ticks the food slot keeps the cash bonus.
+ *
+ * Planet cash decays every slot of every tick and nothing but gold refills it,
+ * so a colony holding cash with no gold rate — or too little gold to survive
+ * the decay as far as the food slot — loses the bonus within a day. Every food
+ * figure computed at 1.5x is then wrong by a third. This runs the colony
+ * forward on its own rates and finds the tick where that happens.
+ *
+ * @returns null if the bonus holds for {@link BONUS_HORIZON_TICKS}; 0 if there is none now.
+ */
+function cashBonusTicksLeft(input: CalculatorInput): number | null {
+  let state = toPlanetState(input);
+  for (let t = 0; t < BONUS_HORIZON_TICKS; t++) {
+    if (!foodBonusOn(state)) return t;
+    state = applyEconomyTickWithLosses(state).state;
+  }
+  return null;
 }
 
 /** Total credit value of one tick's production, used for the tax comparison. */

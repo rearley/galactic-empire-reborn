@@ -182,6 +182,35 @@ describe('Calculators', () => {
     expect(await screen.findByText(/-1,855/)).toBeInTheDocument();
   });
 
+  it('warns when the cash bonus is running out, and what food rate that leaves', async () => {
+    mockServer(result({
+      food: {
+        eatenPerTick: 6185, producedPerTick: 6494, netPerTick: 309, starvationFloor: 12370,
+        minimumRate: 31, minimumRateWithBonus: 21, bonusTicksLeft: 3, safe: false,
+      },
+    }));
+    await renderWithData();
+    await userEvent.click(screen.getByRole('tab', { name: 'Survival' }));
+    const warning = await screen.findByTestId('bonus-lapse');
+    expect(warning).toHaveTextContent(/runs out in 3 ticks/i);
+    expect(warning).toHaveTextContent(/18 hours/i);
+    expect(warning).toHaveTextContent(/31/);
+    expect(warning).toHaveTextContent(/21/);
+  });
+
+  it('says nothing about the bonus while it is being kept on', async () => {
+    mockServer(result({
+      food: {
+        eatenPerTick: 6185, producedPerTick: 6494, netPerTick: 309, starvationFloor: 12370,
+        minimumRate: 21, minimumRateWithBonus: 21, bonusTicksLeft: null, safe: true,
+      },
+    }));
+    await renderWithData();
+    await userEvent.click(screen.getByRole('tab', { name: 'Survival' }));
+    await screen.findByText(/starvation begins below/i);
+    expect(screen.queryByTestId('bonus-lapse')).not.toBeInTheDocument();
+  });
+
   it('says plainly when a tax rate costs more production than it collects', async () => {
     mockServer(result({
       taxrate: 30,

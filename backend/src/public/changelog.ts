@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.11',
+    date: '2026-09-24',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The colony calculator now warns you when your planet’s 1.5x production bonus is about to run out. Planet cash shrinks every tick, and only gold refills it, so a colony with cash but too little gold coming in loses the bonus within a day, and every food figure worked out with it is then too low by a third. The Survival tab now says how many ticks the bonus has left, gives the food rate that still feeds the colony once it is gone, and gives the rate that would do if you keep it on. Fractions of a gold bar are lost each tick, so a small colony can need more than a point or two of gold to keep it on.',
+      },
+    ],
+  },
+  {
     version: '0.31.10',
     date: '2026-09-23',
     entries: [

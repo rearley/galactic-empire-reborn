@@ -144,6 +144,33 @@ describe('simulate — the shared budget of 100', () => {
   });
 });
 
+/**
+ * Run the real tick `ticks` times and report the first starvation, if any.
+ *
+ * Break-even is not enough: the floor is two ticks of eating, so it climbs
+ * with the population, and a stock held level by an exactly-balanced rate is
+ * overtaken. A player set food to the calculator's old break-even figure and
+ * lost an eighth of a 3.8 million colony. Only a multi-tick run shows it.
+ */
+function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
+  let state = {
+    xsect: 1, ysect: 1, plnum: 1, type: 0, xcoord: 0, ycoord: 0,
+    userid: 'calc', name: 'calc', enviorn: inp.enviorn, resource: inp.resource,
+    cash: BigInt(inp.planetCash), debt: 0n, tax: 0n, taxrate: inp.taxrate,
+    warnings: 0, password: '', lastattack: '', beacon: '', spyowner: '',
+    technology: 0, teamcode: 0n,
+    items: inp.stock.map((qty, i) => ({
+      qty: BigInt(qty), rate: inp.rates[i], sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
+    })),
+  } as PlanetState;
+  for (let t = 1; t <= ticks; t++) {
+    const r = applyEconomyTickWithLosses(state);
+    if (r.starved.men > 0 || r.starved.troops > 0) return t;
+    state = r.state;
+  }
+  return null;
+}
+
 describe('simulate — survival advice', () => {
   it('counts colonists AND troops as eaters, which is this port stated deviation', () => {
     const stock = input().stock.slice();
@@ -178,33 +205,6 @@ describe('simulate — survival advice', () => {
     expect(simulate(input({ planetCash: 0 })).food.safe).toBe(false);
     expect(simulate(input({ planetCash: 1000 })).food.safe).toBe(true);
   });
-
-  /**
-   * Run the real tick `ticks` times and report the first starvation, if any.
-   *
-   * Break-even is not enough: the floor is two ticks of eating, so it climbs
-   * with the population, and a stock held level by an exactly-balanced rate is
-   * overtaken. A player set food to the calculator's old break-even figure and
-   * lost an eighth of a 3.8 million colony. Only a multi-tick run shows it.
-   */
-  function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
-    let state = {
-      xsect: 1, ysect: 1, plnum: 1, type: 0, xcoord: 0, ycoord: 0,
-      userid: 'calc', name: 'calc', enviorn: inp.enviorn, resource: inp.resource,
-      cash: BigInt(inp.planetCash), debt: 0n, tax: 0n, taxrate: inp.taxrate,
-      warnings: 0, password: '', lastattack: '', beacon: '', spyowner: '',
-      technology: 0, teamcode: 0n,
-      items: inp.stock.map((qty, i) => ({
-        qty: BigInt(qty), rate: inp.rates[i], sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
-      })),
-    } as PlanetState;
-    for (let t = 1; t <= ticks; t++) {
-      const r = applyEconomyTickWithLosses(state);
-      if (r.starved.men > 0 || r.starved.troops > 0) return t;
-      state = r.state;
-    }
-    return null;
-  }
 
   /** The fixture with food at `rate` and the larder exactly at its floor. */
   function atFloor(rate: number, over: Partial<CalculatorInput> = {}): CalculatorInput {
@@ -243,6 +243,63 @@ describe('simulate — survival advice', () => {
   it('does not call a break-even colony safe while it is growing', () => {
     expect(simulate(atFloor(20)).food.safe).toBe(false);
     expect(simulate(atFloor(21)).food.safe).toBe(true);
+  });
+});
+
+describe('simulate — the cash bonus running out', () => {
+  /**
+   * The fixture with its two gold points moved to flux: the planet holds cash
+   * today, so it runs at 1.5x, but nothing refills that cash and it decays
+   * every tick. Whatever the food figures say at 1.5x stops being true within
+   * a day.
+   */
+  function noGold(over: Partial<CalculatorInput> = {}): CalculatorInput {
+    const base = input({ planetCash: 1000, ...over });
+    const rates = base.rates.slice();
+    rates[I_FLUX] += rates[I_GOLD];
+    rates[I_GOLD] = 0;
+    return { ...base, rates };
+  }
+
+  it('says nothing while a gold rate keeps the bonus on', () => {
+    expect(simulate(input({ planetCash: 1000 })).food.bonusTicksLeft).toBeNull();
+  });
+
+  it('counts the ticks the bonus has left when nothing refills planet cash', () => {
+    // env 3 / res 2 decays cash by 0.85 per slot, fourteen slots a tick:
+    // 1000 -> ~102 -> ~10 -> 0. The food slot (5) still sees cash on the third
+    // tick and none on the fourth.
+    expect(simulate(noGold()).food.bonusTicksLeft).toBe(3);
+  });
+
+  it('reports zero when the planet has no bonus to lose', () => {
+    expect(simulate(noGold({ planetCash: 0 })).food.bonusTicksLeft).toBe(0);
+  });
+
+  it('quotes the rate that survives the bonus running out, and the one that needed it', () => {
+    const r = simulate(noGold());
+    expect(r.food.minimumRate).toBe(simulate(noGold({ planetCash: 0 })).food.minimumRate);
+    expect(r.food.minimumRateWithBonus).toBe(21);
+    expect(r.food.minimumRate).toBeGreaterThan(r.food.minimumRateWithBonus);
+  });
+
+  it('keeps the colony fed at the quoted rate, where the bonus-rate starves it', () => {
+    const r = simulate(noGold());
+    const fed = (rate: number): CalculatorInput => {
+      const base = noGold();
+      const rates = base.rates.slice(); rates[I_FOOD] = rate;
+      const stock = base.stock.slice(); stock[I_FOOD] = r.food.starvationFloor;
+      return { ...base, rates, stock };
+    };
+    expect(firstStarvation(fed(r.food.minimumRate), 200)).toBeNull();
+    expect(firstStarvation(fed(r.food.minimumRateWithBonus), 200)).not.toBeNull();
+  });
+
+  it('does not call a colony safe on a food rate that only the fading bonus supports', () => {
+    const base = noGold();
+    const stock = base.stock.slice(); stock[I_FOOD] = 100_000;
+    const rates = base.rates.slice(); rates[I_FOOD] = 21;
+    expect(simulate({ ...base, stock, rates }).food.safe).toBe(false);
   });
 });
 

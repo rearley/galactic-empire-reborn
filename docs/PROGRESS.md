@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 190 entries.
+Append-only, **newest at the bottom**. 191 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-24 — the calculator warns when the cash bonus runs out](#session-2026-09-24--the-calculator-warns-when-the-cash-bonus-runs-out)
 - [2026-09-23 — the calculator's safe food rate starved a colony](#session-2026-09-23-later--the-calculators-safe-food-rate-starved-a-colony)
 - [2026-09-23 — a graphical game on this engine, as a concept](#session-2026-09-23--a-graphical-game-on-this-engine-as-a-concept)
 - [2026-09-22 — an AI torpedo lock now warns its target](#session-2026-09-22--an-ai-torpedo-lock-now-warns-its-target)
@@ -8865,7 +8866,38 @@ fix.
 
 **Next:** none.
 
-**Known issues:** the advice still assumes the cash bonus stays on. A colony
-with planet cash but no gold rate loses the bonus within a few ticks, and its
-food rate then falls short. The Production tab tip on gold covers this, but the
-Survival figures do not warn about it.
+**Known issues:** the advice assumed the cash bonus stays on. Fixed the next
+day; see 2026-09-24.
+
+## Session 2026-09-24 — the calculator warns when the cash bonus runs out
+
+**Completed:** the follow-up the previous entry recorded as a known issue. The
+Survival figures assumed the 1.5x cash bonus stays on. Planet cash decays every
+slot of every tick and only gold refills it, so a colony with cash but too
+little gold loses the bonus within a day.
+- `cashBonusTicksLeft` (`backend/src/public/calculator.ts`) runs the colony
+  forward on its own rates. At each tick it runs the real tick twice, once as
+  the colony stands and once with its cash and gold removed, with food probed
+  at rate 100, and asks whether the food slot grew more with the cash.
+- When the bonus runs out, `food.minimumRate` becomes the rate without the
+  bonus, and `food.safe` judges against it. `minimumRateWithBonus` and
+  `bonusTicksLeft` are new fields. The Survival tab shows a warning with both
+  rates and the hours left.
+- Found along the way: fractions of a gold bar are discarded each tick, so at
+  gold rate 2 a colony under roughly 270,000 people makes no gold at all and
+  never keeps the bonus. The worked example on the page is one of these, and
+  now shows the warning. The Production tip that said "a tiny gold rate keeps
+  that bonus switched on permanently" is corrected.
+
+**Tests:** backend `calculator.spec.ts`. With no gold, env 3 and res 2, the
+bonus lasts exactly 3 ticks (1000 -> ~102 -> ~10 -> 0). The quoted rate
+survives 200 real ticks, and the with-bonus rate starves the colony. With the
+bonus kept on, nothing is reported. Frontend `calculators.spec.tsx`: the
+warning shows its ticks, its hours and both rates, and is absent while the
+bonus holds.
+
+**Decisions made:** none.
+
+**Next:** none.
+
+**Known issues:** none.

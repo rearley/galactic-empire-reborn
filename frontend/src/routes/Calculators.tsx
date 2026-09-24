@@ -57,6 +57,10 @@ interface CalcResult {
   food: {
     eatenPerTick: number; producedPerTick: number; netPerTick: number;
     starvationFloor: number; minimumRate: number; safe: boolean;
+    /** Absent from servers older than v0.31.11. */
+    minimumRateWithBonus?: number;
+    /** Ticks the 1.5x cash bonus has left; null while it is kept on. Absent from older servers. */
+    bonusTicksLeft?: number | null;
   };
   tax: {
     perTick: number; goodsLostPerTick: number; troopsToHoldOrder: number;
@@ -709,6 +713,17 @@ export function Calculators(): React.JSX.Element {
                 suggestion={result.food.minimumRate}
                 onAdopt={() => setRate(I_FOOD, result.food.minimumRate)}
               />
+              {(result.food.bonusTicksLeft ?? 0) > 0 && (
+                <p data-testid="bonus-lapse" className="mt-4 text-sm leading-relaxed text-yellow-400">
+                  Your 1.5x production bonus runs out in {result.food.bonusTicksLeft} ticks
+                  {model && ` (${n(((result.food.bonusTicksLeft ?? 0) * model.tickSeconds) / 3600)} hours)`}:
+                  planet cash decays every tick, and not enough gold is coming in to refill it.
+                  Without the bonus the colony needs a food rate of{' '}
+                  <span className="text-yellow-200">{result.food.minimumRate}</span>, which is the
+                  figure above. Keep the bonus on with a gold rate and{' '}
+                  <span className="text-yellow-200">{result.food.minimumRateWithBonus}</span> would do.
+                </p>
+              )}
               <p className={`mt-4 text-sm ${result.food.safe ? 'text-green-400' : 'text-red-400'}`}>
                 {result.food.safe
                   ? `Fed. Starvation begins below ${n(result.food.starvationFloor)} cases in store.`

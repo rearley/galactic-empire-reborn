@@ -46,7 +46,9 @@ export const PRODUCTION_TIPS: readonly Tip[] = Object.freeze([
     detail:
       'Production is multiplied by (environment + resource + 2) x 0.25, then by the tax factor, ' +
       'and then by 1.5 if the planet is holding any cash at all. Gold is swept into planet cash ' +
-      'every tick, so a tiny gold rate keeps that bonus switched on permanently. It also lowers ' +
+      'every tick, so a gold rate that makes at least one bar per tick keeps that bonus switched ' +
+      'on permanently. Fractions of a bar are lost, so a small colony may need more than a point ' +
+      'or two; the Survival tab warns you if the bonus is running out. It also lowers ' +
       'the food rate you need, because that requirement is 52.5 divided by the same multiplier.',
   },
   {
