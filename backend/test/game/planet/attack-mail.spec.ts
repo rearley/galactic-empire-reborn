@@ -346,3 +346,54 @@ describe('PlanetAttackService — attacking a revolted planet', () => {
     expect(mailCreates).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A letter that fails to send never undoes the fight
+// ---------------------------------------------------------------------------
+
+/**
+ * The mail is written after the combat has been applied and before ownership
+ * moves. An insert that throws for any reason (a deleted owner, a dropped
+ * connection) used to abort the whole command there: casualties taken,
+ * planet stripped, nothing captured. The letter is a notification, and losing
+ * one must cost the attacker nothing.
+ */
+describe('PlanetAttackService — a failed letter', () => {
+  function withBrokenMail() {
+    const made = makeService(7);
+    (made.mockPrisma.mailStat.create as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('connection terminated'),
+    );
+    return made;
+  }
+
+  it('still hands over a planet won with fighters', async () => {
+    const { service } = withBrokenMail();
+    const planet = makePlanet(0, 1000, 'owner');
+
+    const outcome = await service.attackFighter(10_000, makeShip(), planet);
+
+    expect(outcome.won).toBe(1);
+    expect(planet.userid).toBe('attacker');
+  });
+
+  it('still hands over a planet won with troops', async () => {
+    const { service } = withBrokenMail();
+    const planet = makePlanet(10, 0, 'owner');
+
+    const outcome = await service.attackTroop(10_000, makeShip(), planet);
+
+    expect(outcome.won).toBe(1);
+    expect(planet.userid).toBe('attacker');
+  });
+
+  it('still hands over a planet whose spy report fails to send', async () => {
+    const { service } = withBrokenMail();
+    const planet = { ...makePlanet(0, 1000, 'owner'), spyowner: 'spy1' };
+
+    const outcome = await service.attackFighter(10_000, makeShip(), planet);
+
+    expect(outcome.won).toBe(1);
+    expect(planet.userid).toBe('attacker');
+  });
+});

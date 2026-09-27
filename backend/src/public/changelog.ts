@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.14',
+    date: '2026-09-27',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'A planet attack can no longer be undone by the letter it sends. After a raid the game writes to the planet’s owner, or to a spy watching it, and if that letter failed to save for any reason the whole attack stopped halfway: your losses stood, the planet was stripped, and it stayed theirs. The letter is now sent on a best-effort basis, and the fight’s result always stands.',
+      },
+    ],
+  },
+  {
     version: '0.31.13',
     date: '2026-09-27',
     entries: [

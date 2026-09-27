@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 193 entries.
+Append-only, **newest at the bottom**. 194 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-27 — a failed letter no longer undoes an attack](#session-2026-09-27-evening--a-failed-letter-no-longer-undoes-an-attack)
 - [2026-09-27 — a revolted colony could not be taken back](#session-2026-09-27-later--a-revolted-colony-could-not-be-taken-back)
 - [2026-09-27 — a fed colony revolted and the calculator never said](#session-2026-09-27--a-fed-colony-revolted-and-the-calculator-never-said)
 - [2026-09-24 — the calculator warns when the cash bonus runs out](#session-2026-09-24--the-calculator-warns-when-the-cash-bonus-runs-out)
@@ -8967,6 +8968,27 @@ error before the fix.
 **Decisions made:** none. Nobody governs a free planet, so there is no one to
 write to.
 
-**Known issues:** the mail insert still runs before the ownership transfer, so
-a mail failure for any other reason would abort a won attack the same way. The
-economy service already treats its mail as fire-and-forget. Not changed here.
+**Known issues:** the mail insert still ran before the ownership transfer, so
+a mail failure for any other reason would have aborted a won attack the same
+way. Closed the same day; see the next entry.
+
+## Session 2026-09-27 (evening) — a failed letter no longer undoes an attack
+
+**Completed:** the known issue from the entry above. Every attack letter, both
+the owner's distress mail and the spy reports in `callForHelp`, goes through
+`insertDistressMail` (`backend/src/game/planet/planet-attack.service.ts`), and
+it now catches and logs instead of throwing. All its callers run after combat
+has been applied and before ownership moves, so any failed insert had aborted
+the command halfway. `PlanetEconomyService` already treated its mail this way.
+The `isMailable` guard stays: it keeps a letter to `**Free**` from being
+attempted at all, rather than logged as an error on every free-planet raid.
+
+**Tests:** `attack-mail.spec.ts` with a mail mock that rejects every insert: a
+fighter raid, a troop landing, and a fighter raid on a planet with a spy on it
+each still win and move ownership. All three failed before the change.
+
+**Decisions made:** none.
+
+**Next:** none.
+
+**Known issues:** none.

@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRepository } from '../player/user.repository';
@@ -36,6 +36,8 @@ export interface AttackOwnerAlertPayload {
  */
 @Injectable()
 export class PlanetAttackService {
+  private readonly logger = new Logger(PlanetAttackService.name);
+
   constructor(
     @Inject(SHIP_STATE_PORT) private readonly ships: ShipStatePort,
     private readonly prisma: PrismaService,
@@ -440,7 +442,32 @@ export class PlanetAttackService {
     return this.ships.findByUserid(ownerUserid).some((s) => s.status === 1);
   }
 
+  /**
+   * Write one attack letter: the owner's distress mail or a spy's report.
+   *
+   * Never throws. Every caller runs after the combat has been applied and
+   * before ownership moves, so a failed insert used to abort the command
+   * there: casualties taken, planet stripped, nothing captured, and the
+   * player shown "Internal error processing command." A letter is a
+   * notification; losing one is logged and costs the attacker nothing. The
+   * economy tick treats its mail the same way.
+   */
   private async insertDistressMail(
+    recipientUserid: string,
+    mailType: MessageId,
+    planet: PlanetState,
+    num: number,
+    ship: ShipState,
+  ): Promise<void> {
+    try {
+      await this.writeDistressMail(recipientUserid, mailType, planet, num, ship);
+    } catch (err) {
+      const stack = err instanceof Error ? err.stack : String(err);
+      this.logger.error(`Attack mail failed for ${recipientUserid} re ${planet.name}: ${stack}`);
+    }
+  }
+
+  private async writeDistressMail(
     recipientUserid: string,
     mailType: MessageId,
     planet: PlanetState,
