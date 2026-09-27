@@ -65,6 +65,8 @@ interface CalcResult {
   tax: {
     perTick: number; goodsLostPerTick: number; troopsToHoldOrder: number;
     willRevolt: boolean; sustainingTroopRate: number; worthwhile: boolean;
+    /** Ticks until the first revolt roll, 1 = this tick; null when it holds. Absent from servers older than v0.31.12. */
+    revoltTicksAway?: number | null;
   };
   growth: {
     perTickPercent: number; doublingDays: number | null;
@@ -254,6 +256,41 @@ function Stat({ label, value, hint, tone }: {
       <div className={`mt-1 text-lg ${colour}`}>{value}</div>
       {hint && <div className="mt-1 text-xs leading-snug text-gray-500">{hint}</div>}
     </div>
+  );
+}
+
+/**
+ * The revolt warning, shown on the Survival tab as well as the Tax tab.
+ *
+ * Revolt is tax against garrison and has nothing to do with food, so a colony
+ * set up from the Survival tab alone can be perfectly fed and still lost. A
+ * player did exactly that on a colony claimed with the previous owner's tax
+ * rate still on it.
+ */
+function RevoltRisk({ result, tickSeconds }: {
+  result: CalcResult; tickSeconds: number | null;
+}): React.JSX.Element | null {
+  const away = result.tax.revoltTicksAway ?? (result.tax.willRevolt ? 1 : null);
+  if (away === null || result.taxrate <= 0) return null;
+  const tax = `${result.taxrate}% tax`;
+  return (
+    <p data-testid="revolt-risk" className="mt-4 text-sm leading-relaxed text-red-400">
+      {away <= 1 ? (
+        <>
+          At {tax} this colony needs {n(result.tax.troopsToHoldOrder)} troops to keep order, and
+          has fewer. Every tick it rolls one in ten to revolt, and a revolt loses you the colony.
+        </>
+      ) : (
+        <>
+          At {tax} the garrison falls below the revolt line in {away} ticks
+          {tickSeconds !== null && ` (${n((away * tickSeconds) / 3600)} hours)`} as the colony
+          grows, and from then on it rolls one in ten every tick. A troop rate of{' '}
+          {n1(result.tax.sustainingTroopRate)} keeps pace.
+        </>
+      )}{' '}
+      Set the tax to 0 in adm, or land troops. A colony you claim keeps its previous
+      owner&apos;s tax rate.
+    </p>
   );
 }
 
@@ -729,6 +766,7 @@ export function Calculators(): React.JSX.Element {
                   ? `Fed. Starvation begins below ${n(result.food.starvationFloor)} cases in store.`
                   : `Not sustainable. Starvation begins below ${n(result.food.starvationFloor)} cases in store, and an eighth of the population dies the tick it happens.`}
               </p>
+              <RevoltRisk result={result} tickSeconds={model?.tickSeconds ?? null} />
               {(result.starvedMen > 0 || result.starvedTroops > 0) && (
                 <p className="mt-2 text-sm text-red-400">
                   On these numbers this tick kills {n(result.starvedMen)} colonists and{' '}
@@ -764,7 +802,7 @@ export function Calculators(): React.JSX.Element {
                 <Stat
                   label="Troops needed to stop a revolt"
                   value={n(result.tax.troopsToHoldOrder)}
-                  hint="Meet it and the revolt roll never happens. Fall short and it is one tick in ten."
+                  hint="What the colony will ask for after this tick's growth. Meet it and the revolt roll never happens; fall short and it is one tick in ten."
                   tone={result.tax.willRevolt ? 'bad' : undefined}
                 />
                 <Stat
@@ -788,12 +826,7 @@ export function Calculators(): React.JSX.Element {
                 the colony and <span className="text-gray-200">wit</span> moves it to your credits.
                 Planet cash never can be.
               </p>
-              {result.tax.willRevolt && (
-                <p className="mt-2 text-sm text-red-400">
-                  Your garrison is below the threshold — one tick in ten, this colony revolts and
-                  you lose it.
-                </p>
-              )}
+              <RevoltRisk result={result} tickSeconds={model?.tickSeconds ?? null} />
               <Tips items={TAX_TIPS} />
             </>
           )}

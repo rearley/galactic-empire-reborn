@@ -47,6 +47,13 @@ const MAX_FOOD_RATE_SEARCHED = 1_000;
  */
 const BONUS_HORIZON_TICKS = 40;
 
+/**
+ * How far ahead to look for a garrison falling behind its colony: thirty days
+ * of ticks. The line moves only as fast as the population grows, so a slow
+ * drift takes weeks to cross it, and a player sets the rates and walks away.
+ */
+const REVOLT_HORIZON_TICKS = 120;
+
 export interface PlanetModelItem {
   index: number;
   name: string;
@@ -134,8 +141,15 @@ export interface CalculatorResult {
   tax: {
     perTick: number;
     goodsLostPerTick: number;
+    /** The garrison the revolt check will ask for on this tick, after growth. */
     troopsToHoldOrder: number;
+    /** This tick's check fails, so the one-in-ten roll happens. */
     willRevolt: boolean;
+    /**
+     * Ticks until the first revolt roll on these rates: 1 is this tick. Null
+     * when untaxed, or when the garrison holds for {@link REVOLT_HORIZON_TICKS}.
+     */
+    revoltTicksAway: number | null;
     sustainingTroopRate: number;
     worthwhile: boolean;
   };
@@ -299,7 +313,10 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
     bonusTicksLeft === null ? minimumRateWithBonus : minimumFoodRate(withoutCash(input));
   const starvationFloor = starvationFloorOf(men, troops);
 
-  const pressure = revoltPressure(input.taxrate, men);
+  // GEPLANET.C:343-362 checks AFTER the slot loop, so the population it taxes
+  // is the one this tick grew, and the garrison is whatever survived eating.
+  const pressure = revoltPressure(input.taxrate, Number(after.items[I_MEN].qty));
+  const troopsAfter = Number(after.items[I_TROOPS].qty);
   const taxPerTick = Number(after.tax);
 
   // What the tax rate costs: every good is produced at `1 - taxrate/120`, so
@@ -337,7 +354,8 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
       perTick: taxPerTick,
       goodsLostPerTick: goodsLost,
       troopsToHoldOrder: Math.ceil(pressure),
-      willRevolt: pressure > troops,
+      willRevolt: pressure > troopsAfter,
+      revoltTicksAway: revoltTicksAway(input),
       sustainingTroopRate: menRate * input.taxrate * 0.051042,
       worthwhile: taxPerTick > goodsLost,
     },
@@ -457,6 +475,28 @@ function cashBonusTicksLeft(input: CalculatorInput): number | null {
   for (let t = 0; t < BONUS_HORIZON_TICKS; t++) {
     if (!foodBonusOn(state)) return t;
     state = applyEconomyTickWithLosses(state).state;
+  }
+  return null;
+}
+
+/**
+ * How many ticks until the revolt check first fails, running the colony
+ * forward on its own rates.
+ *
+ * The line is taxrate / 120 x 0.35 x population, so a garrison that clears it
+ * today falls behind a growing colony unless the troop rate keeps pace. A
+ * single-tick verdict calls that colony safe right up to the tick it is not.
+ *
+ * @see GEPLANET.C:343-362 the revolt check
+ * @returns 1 for this tick; null when untaxed or safe for {@link REVOLT_HORIZON_TICKS}.
+ */
+function revoltTicksAway(input: CalculatorInput): number | null {
+  if (input.taxrate <= 0) return null;
+  let state = toPlanetState(input);
+  for (let t = 1; t <= REVOLT_HORIZON_TICKS; t++) {
+    state = applyEconomyTickWithLosses(state).state;
+    const pressure = revoltPressure(input.taxrate, Number(state.items[I_MEN].qty));
+    if (pressure > Number(state.items[I_TROOPS].qty)) return t;
   }
   return null;
 }

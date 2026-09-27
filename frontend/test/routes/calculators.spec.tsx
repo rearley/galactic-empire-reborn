@@ -218,8 +218,58 @@ describe('Calculators', () => {
     }));
     await renderWithData();
     await userEvent.click(screen.getByRole('tab', { name: 'Tax' }));
-    expect(await screen.findByText(/40,000/)).toBeInTheDocument();
+    expect(await screen.findByText('40,000')).toBeInTheDocument();
     expect(await screen.findByTestId('tax-verdict')).toHaveTextContent(/costs more than it collects/i);
+  });
+
+  // Revolt is tax against garrison, not food. A player fed a colony well past
+  // the floor from this tab, never looked at the Tax tab, and lost it to a tax
+  // rate the previous owner had left on it.
+  it('warns on the survival tab when a fed colony is rolling to revolt', async () => {
+    mockServer(result({
+      taxrate: 15,
+      tax: {
+        perTick: 4_300, goodsLostPerTick: 9_000, troopsToHoldOrder: 15_100, willRevolt: true,
+        revoltTicksAway: 1, sustainingTroopRate: 45.9, worthwhile: false,
+      },
+    }));
+    await renderWithData();
+    await userEvent.click(screen.getByRole('tab', { name: 'Survival' }));
+    const warning = await screen.findByTestId('revolt-risk');
+    expect(warning).toHaveTextContent(/15% tax/i);
+    expect(warning).toHaveTextContent(/15,100 troops/i);
+    expect(warning).toHaveTextContent(/one in ten/i);
+  });
+
+  it('warns on both tabs when the garrison will fall behind a growing colony', async () => {
+    mockServer(result({
+      taxrate: 30,
+      tax: {
+        perTick: 15_462, goodsLostPerTick: 20_100, troopsToHoldOrder: 37_223, willRevolt: false,
+        revoltTicksAway: 7, sustainingTroopRate: 38.3, worthwhile: false,
+      },
+    }));
+    await renderWithData();
+    await userEvent.click(screen.getByRole('tab', { name: 'Survival' }));
+    expect(await screen.findByTestId('revolt-risk')).toHaveTextContent(/7 ticks/i);
+    await userEvent.click(screen.getByRole('tab', { name: 'Tax' }));
+    const drift = await screen.findByTestId('revolt-risk');
+    expect(drift).toHaveTextContent(/7 ticks/i);
+    expect(drift).toHaveTextContent(/38\.3/);
+  });
+
+  it('says nothing about revolt when the garrison holds', async () => {
+    mockServer(result({
+      taxrate: 30,
+      tax: {
+        perTick: 15_462, goodsLostPerTick: 20_100, troopsToHoldOrder: 37_223, willRevolt: false,
+        revoltTicksAway: null, sustainingTroopRate: 38.3, worthwhile: false,
+      },
+    }));
+    await renderWithData();
+    await userEvent.click(screen.getByRole('tab', { name: 'Survival' }));
+    await screen.findByText(/starvation begins below/i);
+    expect(screen.queryByTestId('revolt-risk')).not.toBeInTheDocument();
   });
 
   it('captions the rate the server ran, not the one still being typed', async () => {

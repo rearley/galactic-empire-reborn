@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.12',
+    date: '2026-09-27',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'The colony calculator now warns you when a colony is heading for a revolt, on the Survival tab as well as the Tax tab. A revolt comes from tax rate against garrison and has nothing to do with food, so a colony fed perfectly from the Survival tab could still be lost without a word from the page. It also checks your garrison against the population after the tick has grown it, as the game does, instead of before, and it runs the colony forward to tell you how many ticks a garrison that is enough today has before a growing colony overtakes it. One thing worth knowing: a colony you claim keeps the tax rate its previous owner set. Run adm and check it.',
+      },
+    ],
+  },
+  {
     version: '0.31.11',
     date: '2026-09-24',
     entries: [

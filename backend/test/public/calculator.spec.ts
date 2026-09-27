@@ -6,7 +6,7 @@ import {
 import { applyEconomyTickWithLosses, revoltPressure } from '../../src/game/planet/planet-economy';
 import {
   BASEPRICE, ITEM_NAMES, ITEM_TONS, MANHOURS, MAXPL, NUMITEMS,
-  I_MEN, I_FOOD, I_FLUX, I_GOLD, I_TROOPS,
+  I_MEN, I_FOOD, I_FLUX, I_GOLD, I_TROOPS, I_FIGHTER,
 } from '../../src/game/constants/items';
 import { PLANTOCK_SECONDS } from '../../src/game/constants';
 import { PlanetState } from '../../src/game/planet/planet-state.types';
@@ -144,16 +144,9 @@ describe('simulate — the shared budget of 100', () => {
   });
 });
 
-/**
- * Run the real tick `ticks` times and report the first starvation, if any.
- *
- * Break-even is not enough: the floor is two ticks of eating, so it climbs
- * with the population, and a stock held level by an exactly-balanced rate is
- * overtaken. A player set food to the calculator's old break-even figure and
- * lost an eighth of a 3.8 million colony. Only a multi-tick run shows it.
- */
-function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
-  let state = {
+/** The same synthetic colony as a PlanetState, for walking the real tick forward. */
+function toPlanet(inp: CalculatorInput): PlanetState {
+  return {
     xsect: 1, ysect: 1, plnum: 1, type: 0, xcoord: 0, ycoord: 0,
     userid: 'calc', name: 'calc', enviorn: inp.enviorn, resource: inp.resource,
     cash: BigInt(inp.planetCash), debt: 0n, tax: 0n, taxrate: inp.taxrate,
@@ -163,6 +156,18 @@ function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
       qty: BigInt(qty), rate: inp.rates[i], sell: false, reserve: 0, markup2a: 0, sold2a: 0n,
     })),
   } as PlanetState;
+}
+
+/**
+ * Run the real tick `ticks` times and report the first starvation, if any.
+ *
+ * Break-even is not enough: the floor is two ticks of eating, so it climbs
+ * with the population, and a stock held level by an exactly-balanced rate is
+ * overtaken. A player set food to the calculator's old break-even figure and
+ * lost an eighth of a 3.8 million colony. Only a multi-tick run shows it.
+ */
+function firstStarvation(inp: CalculatorInput, ticks: number): number | null {
+  let state = toPlanet(inp);
   for (let t = 1; t <= ticks; t++) {
     const r = applyEconomyTickWithLosses(state);
     if (r.starved.men > 0 || r.starved.troops > 0) return t;
@@ -306,7 +311,8 @@ describe('simulate — the cash bonus running out', () => {
 describe('simulate — tax advice', () => {
   it('uses the games own revolt threshold, not a copy of it', () => {
     const r = simulate(input({ taxrate: 30 }));
-    expect(r.tax.troopsToHoldOrder).toBe(Math.ceil(revoltPressure(30, 424_242)));
+    const grownMen = r.items[I_MEN].stockAfter;
+    expect(r.tax.troopsToHoldOrder).toBe(Math.ceil(revoltPressure(30, grownMen)));
     expect(r.tax.willRevolt).toBe(true);
   });
 
@@ -332,6 +338,74 @@ describe('simulate — tax advice', () => {
     const r = simulate(input({ taxrate: 0 }));
     expect(r.tax.troopsToHoldOrder).toBe(0);
     expect(r.tax.willRevolt).toBe(false);
+    expect(r.tax.revoltTicksAway).toBeNull();
+  });
+
+  // GEPLANET.C:343-362 runs the revolt check AFTER the slot loop, so it tests
+  // the grown population against the grown garrison. A garrison sized to the
+  // population before the tick is short by one tick of growth.
+  it('tests the garrison against the population the tick has grown, as canon does', () => {
+    const pre = revoltPressure(30, 424_242);
+    const stock = input().stock.slice();
+    stock[I_TROOPS] = Math.ceil(pre);
+    const r = simulate(input({ stock, taxrate: 30 }));
+
+    const { state } = applyEconomyTickWithLosses(toPlanet(input({ stock, taxrate: 30 })));
+    const grownMen = Number(state.items[I_MEN].qty);
+    expect(grownMen).toBeGreaterThan(424_242);
+
+    expect(r.tax.troopsToHoldOrder).toBe(Math.ceil(revoltPressure(30, grownMen)));
+    expect(r.tax.willRevolt).toBe(true);
+    expect(r.tax.revoltTicksAway).toBe(1);
+  });
+
+  it('sees a garrison that is enough today fall behind a growing colony', () => {
+    const stock = input().stock.slice();
+    stock[I_TROOPS] = 38_000;   // above today's line of 37,122, troop rate 0
+    const r = simulate(input({ stock, taxrate: 30 }));
+    expect(r.tax.willRevolt).toBe(false);
+
+    // Walk the real tick until the canon test fails; the page must agree.
+    let state = toPlanet(input({ stock, taxrate: 30 }));
+    let expected = 0;
+    for (let t = 1; t <= 100; t++) {
+      state = applyEconomyTickWithLosses(state).state;
+      if (revoltPressure(30, Number(state.items[I_MEN].qty)) > Number(state.items[I_TROOPS].qty)) {
+        expected = t;
+        break;
+      }
+    }
+    expect(expected).toBeGreaterThan(1);
+    expect(r.tax.revoltTicksAway).toBe(expected);
+  });
+
+  it('is content when the garrison grows with the colony', () => {
+    const stock = input().stock.slice();
+    stock[I_TROOPS] = 38_000;
+    const rates = input().rates.slice();
+    rates[I_FLUX] = 12;
+    rates[I_TROOPS] = 40;   // past men rate 25 x taxrate 30 x 0.051 = 38.3
+    const r = simulate(input({ stock, rates, taxrate: 30 }));
+    expect(r.tax.willRevolt).toBe(false);
+    expect(r.tax.revoltTicksAway).toBeNull();
+  });
+
+  // A player claimed a colony whose previous owner had left a tax rate on it,
+  // fed it well past the floor, set no troops, and lost it to a revolt. The
+  // food verdict was right and irrelevant: revolt is tax against garrison.
+  it('flags a fed, taxed colony with no garrison as rolling to revolt', () => {
+    const stock = new Array(NUMITEMS).fill(0);
+    stock[I_MEN] = 300_000;
+    stock[I_FOOD] = 20_000;
+    stock[I_FIGHTER] = 1_000;
+    const rates = new Array(NUMITEMS).fill(0);
+    rates[I_MEN] = 60;
+    rates[I_FOOD] = 25;
+    rates[I_GOLD] = 15;
+    const r = simulate({ stock, rates, enviorn: 3, resource: 2, taxrate: 15, planetCash: 1000 });
+    expect(r.food.safe).toBe(true);
+    expect(r.tax.willRevolt).toBe(true);
+    expect(r.tax.revoltTicksAway).toBe(1);
   });
 });
 

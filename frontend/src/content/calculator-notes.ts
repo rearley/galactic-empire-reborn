@@ -77,6 +77,13 @@ export const PRODUCTION_TIPS: readonly Tip[] = Object.freeze([
 /** Survival tab. */
 export const SURVIVAL_TIPS: readonly Tip[] = Object.freeze([
   {
+    what: 'Food does not stop a revolt',
+    detail:
+      'A revolt is decided by tax rate against garrison, never by the larder. A colony fed ' +
+      'perfectly from this tab is still lost to a revolt if it is taxed and short of troops, ' +
+      'and a colony you claimed may carry a tax rate its previous owner set. Check the Tax tab.',
+  },
+  {
     what: 'Colonists eat here — a deliberate change',
     detail:
       'The original debits food for troops only, then starves colonists against that same stock, ' +
@@ -111,6 +118,16 @@ export const SURVIVAL_TIPS: readonly Tip[] = Object.freeze([
 
 /** Tax tab. */
 export const TAX_TIPS: readonly Tip[] = Object.freeze([
+  // GECMDS.C:3437 abandon clears only userid; GEMAIN.C:2910-2917 claim resets
+  // every rate and sets men and food to 50, but never touches taxrate.
+  {
+    what: 'A colony you claim keeps the old owner’s tax rate',
+    detail:
+      'Abandoning a colony clears its owner and nothing else, and claiming one resets the ' +
+      'production rates but not the tax. A planet someone taxed and abandoned comes to you still ' +
+      'taxed, with whatever garrison they left, which may be none. Run adm and check the tax rate ' +
+      'before you do anything else.',
+  },
   {
     what: 'Tax is the one colony income that reaches your own credits',
     detail:
@@ -129,7 +146,8 @@ export const TAX_TIPS: readonly Tip[] = Object.freeze([
   {
     what: 'A garrison at the threshold means no revolt at all',
     detail:
-      'Unrest is taxrate / 120 x 0.35 x population. If your troops meet it, the revolt roll is ' +
+      'Unrest is taxrate / 120 x 0.35 x population, measured after the tick has grown the ' +
+      'colony. If your troops meet it, the revolt roll is ' +
       'skipped entirely — it is not a reduced chance, it is none. Below it, it is one in ten ' +
       'every tick, and a revolt hands the colony back to nobody.',
   },

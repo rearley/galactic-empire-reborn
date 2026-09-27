@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 191 entries.
+Append-only, **newest at the bottom**. 192 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-27 — a fed colony revolted and the calculator never said](#session-2026-09-27--a-fed-colony-revolted-and-the-calculator-never-said)
 - [2026-09-24 — the calculator warns when the cash bonus runs out](#session-2026-09-24--the-calculator-warns-when-the-cash-bonus-runs-out)
 - [2026-09-23 — the calculator's safe food rate starved a colony](#session-2026-09-23-later--the-calculators-safe-food-rate-starved-a-colony)
 - [2026-09-23 — a graphical game on this engine, as a concept](#session-2026-09-23--a-graphical-game-on-this-engine-as-a-concept)
@@ -8897,6 +8898,41 @@ warning shows its ticks, its hours and both rates, and is absent while the
 bonus holds.
 
 **Decisions made:** none.
+
+**Next:** none.
+
+**Known issues:** none.
+
+## Session 2026-09-27 — a fed colony revolted and the calculator never said
+
+**Completed:** a player set a claimed colony's food rate from the Survival tab,
+fed it well past the floor, and lost it to a revolt. The production row showed
+tax 15%, 0 troops, ~344,000 colonists. The previous owner had set the tax and
+abandoned the colony. Canon's abandon (`GECMDS.C:3437`) clears only the owner,
+and claiming (`GEMAIN.C:2910-2917`) resets the rates but not `taxrate`. That is
+canon and stays. The calculator had three gaps:
+- `willRevolt` tested the population before the tick. `GEPLANET.C:343-362` runs
+  the check after the slot loop, so a garrison sized to the "troops needed"
+  figure was already one tick of growth short. `troopsToHoldOrder` and
+  `willRevolt` now use the post-tick men and troops.
+- It only judged one tick. `revoltTicksAway` (`backend/src/public/calculator.ts`)
+  runs the colony forward up to 120 ticks, 30 days, and returns the first tick
+  whose revolt check fails. It is null when the colony is untaxed or holds.
+- The Survival tab never mentioned revolt. A shared `RevoltRisk` warning now
+  shows on both Survival and Tax. New tips: food does not stop a revolt, and a
+  claimed colony keeps the old owner's tax rate.
+
+Also found: the "keep pace" troop rate is about 38 for men rate 25 at 30% tax,
+not a few points. The formula on the page was already right.
+
+**Tests:** backend `calculator.spec.ts`: the garrison is tested against the
+grown population. A garrison sufficient today is overtaken on the exact tick
+the real tick walk finds. A troop rate past the keep-pace figure holds. A fed,
+taxed colony with no troops rolls on tick 1. Frontend `calculators.spec.tsx`:
+the warning shows on Survival and Tax with the ticks and keep-pace rate, and is
+absent when the garrison holds.
+
+**Decisions made:** none. Inherited tax is canon.
 
 **Next:** none.
 
