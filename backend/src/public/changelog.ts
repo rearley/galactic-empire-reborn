@@ -119,6 +119,16 @@ export const SILENT_RELEASES: Record<string, string> = {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.31.13',
+    date: '2026-09-27',
+    entries: [
+      {
+        category: 'port-bug',
+        text: 'Attacking a colony that had revolted failed with “Internal error processing command.” The fight itself ran, so you lost the fighters or troops it cost you, but the planet never changed hands, and every retry failed the same way. The game was trying to send the usual “your colony is under attack” letter to the planet’s owner, and a revolted colony has no owner to write to. It no longer tries, and taking a free planet works.',
+      },
+    ],
+  },
+  {
     version: '0.31.12',
     date: '2026-09-27',
     entries: [

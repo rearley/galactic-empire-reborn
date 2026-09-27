@@ -15,6 +15,7 @@ import { ShipState } from '../../../src/game/ship/ship-state.types';
 import { PlanetState } from '../../../src/game/planet/planet-state.types';
 import { I_TROOPS, I_FIGHTER, NUMITEMS } from '../../../src/game/constants/items';
 import { MAIL_CLASS_DISTRESS } from '../../../src/game/constants';
+import { FREE_PLANET_OWNER } from '../../../src/game/planet/planet-economy';
 import { makeShip as baseMakeShip } from '../../helpers/make-ship';
 import {
   PLATTRT1_DEFAULT, PLATTRT2_DEFAULT, FIRETICKS_DEFAULT,
@@ -293,5 +294,54 @@ describe('owner distress mail is suppressed for an owner in-game (GEFUNCS.C:2231
 
     expect(mailCreates.filter((m) => (m as { data: { userid: string } }).data.userid === 'spook').length)
       .toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A revolted planet has no one to write to
+// ---------------------------------------------------------------------------
+
+/**
+ * A revolted colony's owner is the literal "**Free**" (GEPLANET.C:377), which
+ * has no User row. The distress mail to it violated MailStat_userid_fkey,
+ * threw out of the resolver after the fighters had already fought and before
+ * ownership moved, and the player saw "Internal error processing command.":
+ * fighters lost, planet stripped, still free, and every retry the same.
+ */
+describe('PlanetAttackService — attacking a revolted planet', () => {
+  function withForeignKey() {
+    const made = makeService(7);
+    (made.mockPrisma.mailStat.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (args: { data: { userid: string } }) => {
+        if (args.data.userid === FREE_PLANET_OWNER) {
+          return Promise.reject(new Error('Foreign key constraint violated: MailStat_userid_fkey'));
+        }
+        made.mailCreates.push(args);
+        return Promise.resolve({});
+      },
+    );
+    return made;
+  }
+
+  it('takes a free planet with fighters and writes to nobody', async () => {
+    const { service, mailCreates } = withForeignKey();
+    const planet = makePlanet(0, 1000, FREE_PLANET_OWNER);
+
+    const outcome = await service.attackFighter(10_000, makeShip(), planet);
+
+    expect(outcome.won).toBe(1);
+    expect(planet.userid).toBe('attacker');
+    expect(mailCreates).toHaveLength(0);
+  });
+
+  it('takes a free planet with troops and writes to nobody', async () => {
+    const { service, mailCreates } = withForeignKey();
+    const planet = makePlanet(10, 0, FREE_PLANET_OWNER);
+
+    const outcome = await service.attackTroop(10_000, makeShip(), planet);
+
+    expect(outcome.won).toBe(1);
+    expect(planet.userid).toBe('attacker');
+    expect(mailCreates).toHaveLength(0);
   });
 });

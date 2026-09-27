@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 192 entries.
+Append-only, **newest at the bottom**. 193 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-27 — a revolted colony could not be taken back](#session-2026-09-27-later--a-revolted-colony-could-not-be-taken-back)
 - [2026-09-27 — a fed colony revolted and the calculator never said](#session-2026-09-27--a-fed-colony-revolted-and-the-calculator-never-said)
 - [2026-09-24 — the calculator warns when the cash bonus runs out](#session-2026-09-24--the-calculator-warns-when-the-cash-bonus-runs-out)
 - [2026-09-23 — the calculator's safe food rate starved a colony](#session-2026-09-23-later--the-calculators-safe-food-rate-starved-a-colony)
@@ -8937,3 +8938,35 @@ absent when the garrison holds.
 **Next:** none.
 
 **Known issues:** none.
+
+## Session 2026-09-27 (later) — a revolted colony could not be taken back
+
+**Completed:** the player whose colony revolted (entry above) went to retake it
+with `att 10000 fig` and got "Internal error processing command." The prod log
+showed `PrismaClientKnownRequestError P2003` on `MailStat_userid_fkey`, thrown
+from `PlanetAttackService.insertDistressMail` inside `attackFighter`.
+
+A revolted colony's owner is the literal `**Free**` (GEPLANET.C:377), which has
+no User row. Both attack resolvers addressed the owner's distress mail to it.
+The insert threw after combat had been applied to the ship and the in-memory
+planet, and before the ownership transfer and `flushPlanet`. So the attacker
+lost fighters, the planet stayed free, the hostile mark stayed on and let the
+ion cannons fire, and every retry failed the same way. C's `mailit` writes to
+"**Free**" harmlessly; our foreign key does not allow it.
+
+`isMailable` (`backend/src/game/planet/planet-attack.service.ts`) now skips the
+owner's mail when the owner is `**Free**`, in both the troop and fighter
+branches. The spy arm of `callForHelp` still runs, because it writes to
+`spyowner`, a real player.
+
+**Tests:** `attack-mail.spec.ts`, with a mail mock that rejects `**Free**` the
+way the foreign key does: both a fighter raid and a troop landing take a free
+planet, move ownership and write no mail. They failed with the production
+error before the fix.
+
+**Decisions made:** none. Nobody governs a free planet, so there is no one to
+write to.
+
+**Known issues:** the mail insert still runs before the ownership transfer, so
+a mail failure for any other reason would abort a won attack the same way. The
+economy service already treats its mail as fire-and-forget. Not changed here.

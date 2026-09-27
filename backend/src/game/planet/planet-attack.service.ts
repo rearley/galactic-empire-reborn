@@ -8,6 +8,7 @@ import { PLATTRT1, PLATTRT2, PLATTRF1, PLATTRF2, PLATTRF3, FIRETICKS } from '../
 import { AttackKind, ITEM_DESTRUCTION_RANGE } from '../commands/_attack-constants';
 import { AttackOutcome } from './planet-attack.types';
 import { PlanetState } from './planet-state.types';
+import { FREE_PLANET_OWNER } from './planet-economy';
 import { ShipState } from '../ship/ship-state.types';
 import { I_TROOPS, I_FIGHTER, ITEM_NAMES } from '../constants/items';
 import { MAIL_CLASS_DISTRESS } from '../constants';
@@ -174,7 +175,7 @@ export class PlanetAttackService {
 
     // Step 9: mail — mailit(1), so it is skipped for an owner who is in-game
     // and has already had the live alert. @see GECMDS.C:3760–3771, GEFUNCS.C:2231
-    if (ratio > 1 && ownerAtAttackTime && !this.ownerIsInGame(ownerAtAttackTime)) {
+    if (ratio > 1 && this.isMailable(ownerAtAttackTime) && !this.ownerIsInGame(ownerAtAttackTime)) {
       const mailType = won === 1 ? MessageId.MESG03 : MessageId.MESG02;
       await this.insertDistressMail(ownerAtAttackTime, mailType, planet, num, ship);
     }
@@ -306,7 +307,7 @@ export class PlanetAttackService {
 
     // Step 10: mail — mailit(1) again, same suppression.
     // @see GECMDS.C:3924–3936, GEFUNCS.C:2231
-    if ((ratio > 2 || won === 1) && ownerAtAttackTime && !this.ownerIsInGame(ownerAtAttackTime)) {
+    if ((ratio > 2 || won === 1) && this.isMailable(ownerAtAttackTime) && !this.ownerIsInGame(ownerAtAttackTime)) {
       const mailType = won === 1 ? MessageId.MESG05 : MessageId.MESG04;
       await this.insertDistressMail(ownerAtAttackTime, mailType, planet, num, ship);
     }
@@ -363,6 +364,20 @@ export class PlanetAttackService {
    *
    * Returns the lines addressed to the ATTACKER, for the caller's narration.
    */
+  /**
+   * Whether the owner field names someone a letter can reach.
+   *
+   * A revolted colony's owner is the literal "**Free**" (GEPLANET.C:377). C's
+   * mailit writes to it harmlessly; here MailStat.userid is a foreign key to
+   * User, so the insert threw out of the resolver after the combat had been
+   * applied and before ownership moved. Nobody governs a free planet, so
+   * there is nobody to tell. A spy on it still reports: that letter goes to
+   * `spyowner`, a real player.
+   */
+  private isMailable(owner: string | null): owner is string {
+    return !!owner && owner !== FREE_PLANET_OWNER;
+  }
+
   private async callForHelp(
     planet: PlanetState,
     ship: ShipState,
