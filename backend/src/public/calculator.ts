@@ -313,7 +313,8 @@ export function simulate(raw: Partial<CalculatorInput>): CalculatorResult {
     bonusTicksLeft === null ? minimumRateWithBonus : minimumFoodRate(withoutCash(input));
   const starvationFloor = starvationFloorOf(men, troops);
 
-  // GEPLANET.C:343-362 checks AFTER the slot loop, so the population it taxes
+  // GEPLANET.C:343 `if (!sameas(plptr->userid,"**Free**"))` opens the revolt
+  // check, and it runs AFTER the slot loop, so the population it taxes
   // is the one this tick grew, and the garrison is whatever survived eating.
   const pressure = revoltPressure(input.taxrate, Number(after.items[I_MEN].qty));
   const troopsAfter = Number(after.items[I_TROOPS].qty);
@@ -487,7 +488,7 @@ function cashBonusTicksLeft(input: CalculatorInput): number | null {
  * today falls behind a growing colony unless the troop rate keeps pace. A
  * single-tick verdict calls that colony safe right up to the tick it is not.
  *
- * @see GEPLANET.C:343-362 the revolt check
+ * @see GEPLANET.C:343 `if (!sameas(plptr->userid,"**Free**"))` the revolt check
  * @returns 1 for this tick; null when untaxed or safe for {@link REVOLT_HORIZON_TICKS}.
  */
 function revoltTicksAway(input: CalculatorInput): number | null {

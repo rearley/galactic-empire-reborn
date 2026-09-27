@@ -367,7 +367,8 @@ export class PlanetAttackService {
   /**
    * Whether the owner field names someone a letter can reach.
    *
-   * A revolted colony's owner is the literal "**Free**" (GEPLANET.C:377). C's
+   * A revolted colony's owner is the literal "**Free**":
+   * GEPLANET.C:377 `strcpy(plptr->userid,"**Free**");`. C's
    * mailit writes to it harmlessly; here MailStat.userid is a foreign key to
    * User, so the insert threw out of the resolver after the combat had been
    * applied and before ownership moved. Nobody governs a free planet, so

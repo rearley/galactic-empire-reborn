@@ -118,7 +118,8 @@ export const SURVIVAL_TIPS: readonly Tip[] = Object.freeze([
 
 /** Tax tab. */
 export const TAX_TIPS: readonly Tip[] = Object.freeze([
-  // GECMDS.C:3437 abandon clears only userid; GEMAIN.C:2910-2917 claim resets
+  // Abandon clears only the owner, GECMDS.C:3437 `plptr->userid[0] = 0;`. Claim,
+  // GEMAIN.C:2910 `strncpy(plptr->userid,warsptr->userid,UIDSIZ);`, resets
   // every rate and sets men and food to 50, but never touches taxrate.
   {
     what: 'A colony you claim keeps the old owner’s tax rate',

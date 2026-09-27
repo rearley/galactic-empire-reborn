@@ -302,7 +302,8 @@ describe('owner distress mail is suppressed for an owner in-game (GEFUNCS.C:2231
 // ---------------------------------------------------------------------------
 
 /**
- * A revolted colony's owner is the literal "**Free**" (GEPLANET.C:377), which
+ * A revolted colony's owner is the literal "**Free**":
+ * GEPLANET.C:377 `strcpy(plptr->userid,"**Free**");`, which
  * has no User row. The distress mail to it violated MailStat_userid_fkey,
  * threw out of the resolver after the fighters had already fought and before
  * ownership moved, and the player saw "Internal error processing command.":

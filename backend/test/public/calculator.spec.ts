@@ -341,7 +341,8 @@ describe('simulate — tax advice', () => {
     expect(r.tax.revoltTicksAway).toBeNull();
   });
 
-  // GEPLANET.C:343-362 runs the revolt check AFTER the slot loop, so it tests
+  // GEPLANET.C:343 `if (!sameas(plptr->userid,"**Free**"))` opens the revolt
+  // check, and it runs AFTER the slot loop, so it tests
   // the grown population against the grown garrison. A garrison sized to the
   // population before the tick is short by one tick of growth.
   it('tests the garrison against the population the tick has grown, as canon does', () => {
