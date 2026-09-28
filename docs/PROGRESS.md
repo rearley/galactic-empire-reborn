@@ -1,6 +1,6 @@
 # Progress log
 
-Append-only, **newest at the bottom**. 194 entries.
+Append-only, **newest at the bottom**. 195 entries.
 
 <!-- INDEX -->
 ## Most recent first
@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-28 — the backend's logs outlive a deploy](#session-2026-09-28--the-backends-logs-outlive-a-deploy)
 - [2026-09-27 — a failed letter no longer undoes an attack](#session-2026-09-27-evening--a-failed-letter-no-longer-undoes-an-attack)
 - [2026-09-27 — a revolted colony could not be taken back](#session-2026-09-27-later--a-revolted-colony-could-not-be-taken-back)
 - [2026-09-27 — a fed colony revolted and the calculator never said](#session-2026-09-27--a-fed-colony-revolted-and-the-calculator-never-said)
@@ -8992,3 +8993,34 @@ each still win and move ownership. All three failed before the change.
 **Next:** none.
 
 **Known issues:** none.
+
+## Session 2026-09-28 — the backend's logs outlive a deploy
+
+**Completed:** a player reported being killed in a new Dreadnought by a Sarten
+Obliterator while at warp 30. The DB had the facts: `SHIP LOST` mail, killer
+`SOBx940002`, sector (-1,1), 27 Sep 16:29 UTC. The diagnostic lines added in
+v0.31.9 for exactly this kind of report were gone. The container log is
+json-file, it dies with the container, and the v0.31.14 deploy at 21:32 UTC
+had recreated it. The kill itself cannot now be reconstructed.
+
+The production stack's `backend` service now logs to the host journal
+(`logging: driver: journald, tag: ge-backend`). The journal is persistent and
+reached back six months at the time. The previous 15 hours of json-file log
+were saved to `/var/log/ge-backend-20260927T2132-to-20260928.log` before the
+switch. The stack file was backed up to `compose.yaml.bak-20260928`. Verified:
+LogConfig reads journald, `journalctl CONTAINER_NAME=ge-backend` shows the
+boot, `docker logs` still reads it, health check healthy. `docs/DEPLOYMENT.md`
+has a new "Reading the backend's logs" section.
+
+The recreate restarted the game without the 45-second warning while a player
+was on, and they saw the "Refit in progress" shutdown line. Tell whoever is
+playing before a manual recreate.
+
+**Decisions made:** journald over a bind-mounted log file. It needs no
+rotation config of its own, `docker logs` keeps working, and watchtower
+carries the driver across deploys.
+
+**Next:** none.
+
+**Known issues:** the frontend container still uses json-file. It only holds
+nginx access lines, which no investigation has needed.

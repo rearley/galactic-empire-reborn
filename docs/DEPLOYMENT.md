@@ -423,6 +423,38 @@ is running on canon defaults. The second case is not an error and will not fail
 a health check — it is how a container once ran a 601x601 galaxy while everyone
 believed it was 201x201.
 
+## Reading the backend's logs
+
+The backend logs to the **host journal**, not Docker's default json-file. The
+`backend` service in the stack's `compose.yaml` carries:
+
+```yaml
+    logging:
+      driver: journald
+      options:
+        tag: ge-backend
+```
+
+A json-file log lives inside the container and is deleted with it, and
+watchtower recreates the container on every deploy. So every deploy erased the
+log, including the `ship destroyed:` records and the `ai torpedo lock:` lines
+that exist to settle "how did I die" reports. On 2026-09-28 a player's
+Dreadnought kill could not be explained because a deploy five hours later had
+wiped it. The host journal is persistent (`/var/log/journal`) and covered six
+months when this was set up. The game writes about 2 KB an hour.
+
+```bash
+journalctl CONTAINER_NAME=ge-backend --since '2026-09-28 08:00' --no-pager
+journalctl CONTAINER_NAME=ge-backend --no-pager | grep 'ship destroyed'
+docker logs ge-backend      # still works, but only since the container started
+```
+
+Watchtower copies the container's `HostConfig` when it recreates it, so the
+logging driver survives deploys. Editing the stack file does not take effect
+until the backend is recreated: `docker compose -p ge -f compose.yaml up -d
+backend`. That is a restart without the 45-second warning, so tell anyone
+playing first.
+
 ## What was redacted, and why it did not cost anything
 
 This file was written as an operations runbook for one server and then published
