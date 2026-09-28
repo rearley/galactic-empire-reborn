@@ -10,6 +10,7 @@ Recent entries, reversed — the log itself reads oldest-first, which makes
 every entry; it is the recent ones, and it carries no count on purpose, because
 a hardcoded number here went stale the first time someone appended without it.
 
+- [2026-09-28 — the graphical game moves to its own repo](#session-2026-09-28-later--the-graphical-game-moves-to-its-own-repo)
 - [2026-09-28 — the backend's logs outlive a deploy](#session-2026-09-28--the-backends-logs-outlive-a-deploy)
 - [2026-09-27 — a failed letter no longer undoes an attack](#session-2026-09-27-evening--a-failed-letter-no-longer-undoes-an-attack)
 - [2026-09-27 — a revolted colony could not be taken back](#session-2026-09-27-later--a-revolted-colony-could-not-be-taken-back)
@@ -9024,3 +9025,25 @@ carries the driver across deploys.
 
 **Known issues:** the frontend container still uses json-file. It only holds
 nginx access lines, which no investigation has needed.
+
+## Session 2026-09-28 (later) — the graphical game moves to its own repo
+
+**Completed:** closes the open item from 2026-09-23, "decide where it lives". The
+graphical game is now its own project, `rearley/ge-reborn-modern` (private). It
+was copied from this repo at `f0b2e6f` with full history and is checked out at
+`~/dev/ge-reborn-modern`. The `hornet-bridge.html` mock-up was removed from
+`docs/concepts/`, and the README there now records the move and why. The
+`modern-ui` branch was deleted unmerged. It was local only, and its last commit
+was `87b921f`.
+
+**Tests:** none. Docs only.
+
+**Decisions made:** a separate repo rather than two games on one domain. The new
+game is meant to diverge, and this repo's canon-first rules would block it. The
+new repo's `upstream` remote points here and is fetch-only.
+
+**Next:** none here. The work continues in the new repo.
+
+**Known issues:** the new repo inherited `ci.yml`, whose build pushes to the same
+ghcr image names that production's watchtower follows. GitHub Actions is disabled
+on that repo until those images are renamed. Nothing from it has ever built.
